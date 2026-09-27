@@ -18,21 +18,21 @@ if DATABASE_URL:
         MYSQL_PORT = url.port or 3306
         MYSQL_USER = url.username or "root"
         MYSQL_PASSWORD = url.password or ""
-        MYSQL_DB = url.path.lstrip("/") or "project_payentdb"
+        MYSQL_DB = url.path.lstrip("/") or "payent_marketplace_db"
     except Exception as e:
         print(f"Warning: Failed to parse DATABASE_URL: {e}")
         MYSQL_HOST = os.getenv("MYSQLHOST", os.getenv("MYSQL_HOST", "localhost"))
         MYSQL_PORT = int(os.getenv("MYSQLPORT", os.getenv("MYSQL_PORT", "3306")))
         MYSQL_USER = os.getenv("MYSQLUSER", os.getenv("MYSQL_USER", "root"))
         MYSQL_PASSWORD = os.getenv("MYSQLPASSWORD", os.getenv("MYSQL_PASSWORD", "Bmohan"))
-        MYSQL_DB = os.getenv("MYSQLDATABASE", os.getenv("MYSQL_DB", "project_payentdb"))
+        MYSQL_DB = os.getenv("MYSQLDATABASE", os.getenv("MYSQL_DB", "payent_marketplace_db"))
 else:
     # Railway environment variable aliases (MYSQLHOST / MYSQL_HOST, etc.)
     MYSQL_HOST = os.getenv("MYSQLHOST", os.getenv("MYSQL_HOST", "localhost"))
     MYSQL_PORT = int(os.getenv("MYSQLPORT", os.getenv("MYSQL_PORT", "3306")))
     MYSQL_USER = os.getenv("MYSQLUSER", os.getenv("MYSQL_USER", "root"))
     MYSQL_PASSWORD = os.getenv("MYSQLPASSWORD", os.getenv("MYSQL_PASSWORD", "Bmohan"))
-    MYSQL_DB = os.getenv("MYSQLDATABASE", os.getenv("MYSQL_DB", "project_payentdb"))
+    MYSQL_DB = os.getenv("MYSQLDATABASE", os.getenv("MYSQL_DB", "payent_marketplace_db"))
 
 MYSQL_SSL = os.getenv("MYSQL_SSL", "true").lower() in ("true", "1", "yes")
 

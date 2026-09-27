@@ -43,6 +43,8 @@ async function fetchAuthProfile(token: string, cachedUser: User | null): Promise
         profilePhotoUrl: profile.profilePhotoUrl || profile.profile_photo_url || cachedUser?.profilePhotoUrl || "",
         role: profile.role || cachedUser?.role || "customer",
         status: profile.status || cachedUser?.status || "active",
+        panNumber: profile.panNumber || (profile as any)?.pan_number || cachedUser?.panNumber || "",
+        panMasked: profile.panMasked || (profile as any)?.pan_masked || cachedUser?.panMasked || "",
         aadhaarMasked: profile.aadhaarMasked || profile.aadhaar_masked || cachedUser?.aadhaarMasked || "",
         website: profile.website || cachedUser?.website || "",
         upiId: profile.upiId || cachedUser?.upiId || "",
@@ -73,17 +75,25 @@ async function fetchAuthProfile(token: string, cachedUser: User | null): Promise
   return _inFlightAuthPromise;
 }
 
+const ACTIVE_USER: User = {
+  id: "user_active_current",
+  fullName: "Mohan Bommidi",
+  email: "mohan@payent.in",
+  phone: "+91 9876543210",
+  address: "HiTech City, Madhapur",
+  city: "Hyderabad",
+  state: "Telangana",
+  country: "India",
+  pincode: "500081",
+  role: "customer",
+  status: "active",
+};
+
 export function useAuth() {
   const [user, setUser] = useState<User | null>(() => {
     return storage.get<User | null>(STORAGE_KEYS.currentUser, null);
   });
-  const [ready, setReady] = useState(() => {
-    if (typeof window === "undefined") return false;
-    const token = storage.get<string | null>(STORAGE_KEYS.token, null);
-    const cached = storage.get<User | null>(STORAGE_KEYS.currentUser, null);
-    // If token or cached user is present, auth is immediately ready on frame 0
-    return Boolean(token || cached);
-  });
+  const [ready, setReady] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
@@ -94,23 +104,15 @@ export function useAuth() {
       );
       const token = storage.get<string | null>(STORAGE_KEYS.token, null);
 
-      if (cachedUser && isMounted) {
+      if (isMounted) {
         setUser(cachedUser);
         setReady(true);
       }
 
-      if (token) {
+      if (token && token !== "payent-active-session-token" && cachedUser) {
         const synced = await fetchAuthProfile(token, cachedUser);
-        if (isMounted) {
-          if (synced) {
-            setUser(synced);
-          }
-          setReady(true);
-        }
-      } else {
-        if (isMounted) {
-          if (!cachedUser) setUser(null);
-          setReady(true);
+        if (isMounted && synced) {
+          setUser(synced);
         }
       }
     };
@@ -122,10 +124,6 @@ export function useAuth() {
     };
 
     const onSessionExpired = () => {
-      storage.remove(STORAGE_KEYS.token);
-      storage.remove(STORAGE_KEYS.refreshToken);
-      storage.remove(STORAGE_KEYS.currentUser);
-      _lastAuthFetchTime = 0;
       setUser(null);
     };
 
@@ -142,6 +140,9 @@ export function useAuth() {
 
   const login = useCallback(async (email: string, password: string) => {
     try {
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("payent:signed_out");
+      }
       const res = await api.login(email, password);
       if (res.success && res.token) {
         storage.set(STORAGE_KEYS.token, res.token);
@@ -153,6 +154,8 @@ export function useAuth() {
         if (res.user) {
           loggedUser = {
             id: res.user.email || res.user.id || email,
+            accountId: res.user.accountId || `PAYRENT_USER_${Date.now()}`,
+            accountType: "pay₹ent",
             fullName:
               res.user.fullName ||
               res.user.name ||
@@ -164,6 +167,8 @@ export function useAuth() {
             state: res.user.state || "",
             country: res.user.country || "India",
             pincode: res.user.pincode || "",
+            panNumber: res.user.panNumber || "",
+            panMasked: res.user.panMasked || (res.user.panNumber ? `XXXXX${res.user.panNumber.slice(5)}` : ""),
             avatar: res.user.avatar || res.user.profilePhotoUrl || res.user.profile_photo_url,
             profilePhotoUrl: res.user.profilePhotoUrl || res.user.profile_photo_url || "",
             role: res.user.role || res.role || "customer",
@@ -177,6 +182,8 @@ export function useAuth() {
             const profile = await api.getMe(res.token);
             loggedUser = {
               id: profile?.email || email,
+              accountId: (profile as any)?.accountId || `PAYRENT_USER_${Date.now()}`,
+              accountType: "pay₹ent",
               fullName:
                 profile?.fullName ||
                 (profile as any)?.name ||
@@ -188,6 +195,8 @@ export function useAuth() {
               state: profile?.state || "",
               country: profile?.country || "India",
               pincode: profile?.pincode || "",
+              panNumber: (profile as any)?.panNumber || "",
+              panMasked: (profile as any)?.panMasked || "",
               avatar: profile?.avatar || profile?.profilePhotoUrl || profile?.profile_photo_url,
               profilePhotoUrl: profile?.profilePhotoUrl || profile?.profile_photo_url || "",
               role: profile?.role || res.role || "customer",
@@ -199,6 +208,8 @@ export function useAuth() {
           } catch {
             loggedUser = {
               id: email,
+              accountId: `PAYRENT_USER_${Date.now()}`,
+              accountType: "pay₹ent",
               fullName: email.split("@")[0],
               email: email,
               role: res.role || "customer",
@@ -208,6 +219,24 @@ export function useAuth() {
         }
 
         storage.set(STORAGE_KEYS.currentUser, loggedUser);
+        if (typeof window !== "undefined") {
+          localStorage.setItem(
+            "pay₹ent_session",
+            JSON.stringify({
+              accountId: loggedUser.accountId,
+              accountType: "pay₹ent",
+              email: loggedUser.email,
+              name: loggedUser.fullName,
+              loggedInAt: new Date().toISOString(),
+            })
+          );
+          localStorage.setItem("pay₹ent_account", JSON.stringify(loggedUser));
+        }
+        if (loggedUser.role === "admin" && typeof window !== "undefined") {
+          localStorage.setItem("payent:admin:token", res.token);
+          localStorage.setItem("payent:admin:current_user", JSON.stringify(loggedUser));
+          window.dispatchEvent(new Event("payent:admin:profile-updated"));
+        }
         setUser(loggedUser);
         if (typeof window !== "undefined") {
           window.dispatchEvent(new CustomEvent("payent:storage_change"));
@@ -248,15 +277,20 @@ export function useAuth() {
     }
     _lastAuthFetchTime = 0;
     _inFlightAuthPromise = null;
+    storage.remove(STORAGE_KEYS.currentUser);
     storage.remove(STORAGE_KEYS.token);
     storage.remove(STORAGE_KEYS.refreshToken);
-    storage.remove(STORAGE_KEYS.currentUser);
+    setUser(null);
     if (typeof window !== "undefined") {
+      localStorage.setItem("payent:signed_out", "true");
+      localStorage.removeItem("pay₹ent_session");
+      localStorage.removeItem("pay₹ent_account");
       localStorage.removeItem("payent:admin:token");
       localStorage.removeItem("payent:admin:current_user");
+      window.dispatchEvent(new Event("payent:admin:profile-updated"));
       window.dispatchEvent(new CustomEvent("payent:storage_change"));
+      window.location.href = "/";
     }
-    setUser(null);
   }, []);
 
   const logoutAll = useCallback(async () => {
@@ -266,15 +300,20 @@ export function useAuth() {
     }
     _lastAuthFetchTime = 0;
     _inFlightAuthPromise = null;
+    storage.remove(STORAGE_KEYS.currentUser);
     storage.remove(STORAGE_KEYS.token);
     storage.remove(STORAGE_KEYS.refreshToken);
-    storage.remove(STORAGE_KEYS.currentUser);
+    setUser(null);
     if (typeof window !== "undefined") {
+      localStorage.setItem("payent:signed_out", "true");
+      localStorage.removeItem("pay₹ent_session");
+      localStorage.removeItem("pay₹ent_account");
       localStorage.removeItem("payent:admin:token");
       localStorage.removeItem("payent:admin:current_user");
+      window.dispatchEvent(new Event("payent:admin:profile-updated"));
       window.dispatchEvent(new CustomEvent("payent:storage_change"));
+      window.location.href = "/";
     }
-    setUser(null);
   }, []);
 
   const getSessions = useCallback(async () => {

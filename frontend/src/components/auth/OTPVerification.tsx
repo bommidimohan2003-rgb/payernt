@@ -15,7 +15,7 @@ interface PendingUser {
   address?: string;
   city?: string;
   pincode?: string;
-  aadhaarNumber?: string;
+  panNumber?: string;
   adminCode?: string;
 }
 
@@ -72,7 +72,8 @@ export function OTPVerification() {
           pendingUser.address,
           pendingUser.city,
           pendingUser.pincode,
-          pendingUser.aadhaarNumber,
+          undefined,
+          pendingUser.panNumber,
         );
         if (res?.token && res?.user) {
           storage.set(STORAGE_KEYS.token, res.token);

@@ -18,6 +18,7 @@ import {
   XCircle,
   Store,
   Compass,
+  KeyRound,
 } from "lucide-react";
 import { useEffect, useState, useMemo } from "react";
 import { toast } from "sonner";
@@ -26,6 +27,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useWishlist } from "@/hooks/useWishlist";
 import { STORAGE_KEYS, storage } from "@/utils/storage";
 import { api } from "@/utils/api";
+import { rentalSecurityService } from "@/services/rentalSecurityService";
 import type { Order, Product, Notification } from "@/types";
 import { Button } from "@/components/common/Button";
 import { getOptimizedImageUrl } from "@/utils/images";
@@ -193,7 +195,7 @@ export default function Dashboard() {
                 className="inline-flex items-center gap-1.5 h-10 px-4 rounded-full bg-[#161616] text-[#FFFFFF] hover:bg-[#292929] dark:bg-[#F2F0EA] dark:text-[#0A0A0A] dark:hover:bg-[#FFFFFF] text-xs font-bold transition-all shadow-sm"
               >
                 <Compass className="w-3.5 h-3.5" />
-                <span>Browse Gear</span>
+                <span>Explore Gear</span>
               </Link>
               <Link
                 to="/orders"
@@ -203,11 +205,11 @@ export default function Dashboard() {
                 <span>My Bookings</span>
               </Link>
               <Link
-                to="/become-lender"
-                className="inline-flex items-center gap-1.5 h-10 px-4 rounded-full border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/5 text-xs font-bold transition-all"
+                to="/wishlist"
+                className="inline-flex items-center gap-1.5 h-10 px-4 rounded-full border border-rose-500/30 text-rose-600 dark:text-rose-400 hover:bg-rose-500/5 text-xs font-bold transition-all"
               >
-                <PlusCircle className="w-3.5 h-3.5" />
-                <span>List Gear</span>
+                <Heart className="w-3.5 h-3.5" />
+                <span>Saved Wishlist ({ids.length})</span>
               </Link>
             </div>
           </div>
@@ -364,6 +366,18 @@ export default function Dashboard() {
                           <div className="text-[11px] font-mono text-neutral-400 mt-0.5">
                             ID: {o.id.slice(0, 8)}...
                           </div>
+                          {(() => {
+                            const sec = rentalSecurityService.getSecurityRecord(o.id);
+                            if (sec && sec.renterSecretPin) {
+                              return (
+                                <div className="inline-flex items-center gap-1.5 px-2 py-0.5 mt-1 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-mono font-bold" title="Provide this PIN to the lender during device handover">
+                                  <KeyRound className="h-3 w-3" />
+                                  <span>Renter PIN: {sec.renterSecretPin}</span>
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
                         </div>
                       </div>
 
@@ -459,64 +473,35 @@ export default function Dashboard() {
               )}
             </div>
 
-            {/* Role-Aware Lender Widget */}
-            {isLender ? (
-              <div className="rounded-3xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#0D151D] p-6 shadow-sm space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b border-black/5 dark:border-white/5">
-                  <div className="flex items-center gap-2">
-                    <Store className="w-4 h-4 text-emerald-500" />
-                    <h3 className="text-sm font-bold text-neutral-950 dark:text-white">
-                      Lender Inventory
-                    </h3>
-                  </div>
-                  <Link
-                    to="/lender-portal"
-                    className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
-                  >
-                    Portal →
-                  </Link>
+            {/* Messages & Owner Inquiries Widget */}
+            <div className="rounded-3xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#0D151D] p-6 shadow-sm space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-black/5 dark:border-white/5">
+                <div className="flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4 text-sky-500" />
+                  <h3 className="text-sm font-bold text-neutral-950 dark:text-white">
+                    Direct Messages & Inquiries
+                  </h3>
                 </div>
-
-                <div className="space-y-2.5">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-neutral-500">Live Gear Listings:</span>
-                    <span className="font-bold text-neutral-950 dark:text-white font-mono">
-                      {myListings.length}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-neutral-500">Verification Status:</span>
-                    <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                      Approved Lender
-                    </span>
-                  </div>
-                </div>
-
                 <Link
-                  to="/become-lender"
-                  className="w-full h-9 rounded-xl bg-neutral-100 hover:bg-neutral-200 dark:bg-white/5 dark:hover:bg-white/10 text-neutral-900 dark:text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
+                  to="/messages"
+                  className="text-xs font-bold text-sky-600 dark:text-sky-400 hover:underline"
                 >
-                  <PlusCircle className="w-3.5 h-3.5" />
-                  <span>List New Equipment</span>
+                  Inbox →
                 </Link>
               </div>
-            ) : (
-              <div className="rounded-3xl border border-emerald-500/20 bg-emerald-500/[0.03] p-6 shadow-sm space-y-3">
-                <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold text-sm">
-                  <Sparkles className="w-4 h-4" />
-                  <span>Monetize Your Equipment</span>
-                </div>
-                <p className="text-xs text-neutral-600 dark:text-[#AAB3BC] leading-relaxed">
-                  Have cinema cameras, lenses, or drones idle between shoots? List them on PAYENT and earn rental revenue.
-                </p>
-                <Link
-                  to="/become-lender"
-                  className="inline-flex items-center gap-1.5 text-xs font-bold text-neutral-900 dark:text-white hover:underline pt-1"
-                >
-                  <span>Become a Lender →</span>
-                </Link>
-              </div>
-            )}
+
+              <p className="text-xs text-neutral-500 dark:text-[#8D98A3] leading-relaxed">
+                Chat directly with verified equipment owners to coordinate pickup timing, gear accessories, and return inspections.
+              </p>
+
+              <Link
+                to="/messages"
+                className="w-full h-9 rounded-xl bg-neutral-100 hover:bg-neutral-200 dark:bg-white/5 dark:hover:bg-white/10 text-neutral-900 dark:text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+                <span>Open Messenger Inbox</span>
+              </Link>
+            </div>
 
             {/* Wishlist Preview */}
             <div className="rounded-3xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#0D151D] p-6 shadow-sm space-y-4">

@@ -4,14 +4,12 @@ import {
   Eye,
   CheckCircle,
   XCircle,
-  Trash2,
   ShieldAlert,
   ShieldCheck,
   UserCheck,
   Calendar,
   Package,
   CreditCard,
-  Star,
   RefreshCw,
   X,
   Lock,
@@ -19,11 +17,17 @@ import {
   Phone,
   MapPin,
   Clock,
+  Layers,
+  Wallet,
+  ShoppingBag,
+  User,
+  Building,
 } from "lucide-react";
 import { Table, Column } from "../components/layout/Table";
 import { Pagination } from "../components/layout/Pagination";
 import { usersService } from "../services/users";
 import { AdminUser } from "../services/api";
+import { Loader } from "../components/layout/Loader";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { adminWS } from "../services/websocket";
@@ -33,10 +37,12 @@ export default function Users() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Platform Type Tab
+  const [platformTab, setPlatformTab] = useState<"all" | "payernt" | "payrent">("all");
+
   // Search & Filters
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [roleFilter, setRoleFilter] = useState("all");
 
   // Sorting
   const [sortKey, setSortKey] = useState("createdAt");
@@ -49,7 +55,8 @@ export default function Users() {
   // User Detail Drawer
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [drawerTab, setDrawerTab] = useState<"profile" | "verification" | "security">("profile");
+  const [drawerTab, setDrawerTab] = useState<"profile" | "payernt" | "payrent" | "security">("profile");
+  const [drawerLoading, setDrawerLoading] = useState(false);
 
   // Action states
   const [actionLoading, setActionLoading] = useState(false);
@@ -93,13 +100,25 @@ export default function Users() {
     }
   };
 
-  const handleOpenUser = (u: AdminUser) => {
+  const handleOpenUser = async (u: AdminUser) => {
     setSelectedUser(u);
     setDrawerTab("profile");
     setDrawerOpen(true);
+    
+    // Fetch full enriched payload
+    const lookupId = u.email || u.id;
+    try {
+      setDrawerLoading(true);
+      const full = await usersService.getUserById(lookupId);
+      setSelectedUser(full);
+    } catch (e) {
+      console.warn("Could not fetch full user detail:", e);
+    } finally {
+      setDrawerLoading(false);
+    }
   };
 
-  // User sensitive actions with backend enforcement
+  // User actions
   const handleApprove = async (id: string) => {
     if (!confirm("Are you sure you want to approve and verify this user account?")) return;
     try {
@@ -170,22 +189,26 @@ export default function Users() {
   const filteredUsers = useMemo(() => {
     let result = [...users];
 
+    // Platform Tab filter
+    if (platformTab === "payernt") {
+      result = result.filter((u) => u.role === "agent" || u.role === "both" || u.accountType?.toLowerCase().includes("payernt") || u.accountType?.toLowerCase().includes("both"));
+    } else if (platformTab === "payrent") {
+      result = result.filter((u) => u.role === "customer" || u.role === "user" || u.role === "both" || u.accountType?.toLowerCase().includes("payrent") || u.accountType?.toLowerCase().includes("both"));
+    }
+
     if (search.trim()) {
       const q = search.toLowerCase();
       result = result.filter(
         (u) =>
           (u.fullName && u.fullName.toLowerCase().includes(q)) ||
           (u.email && u.email.toLowerCase().includes(q)) ||
-          (u.id && u.id.toLowerCase().includes(q))
+          (u.id && u.id.toLowerCase().includes(q)) ||
+          (u.phone && u.phone.includes(q))
       );
     }
 
     if (statusFilter !== "all") {
       result = result.filter((u) => u.status === statusFilter);
-    }
-
-    if (roleFilter !== "all") {
-      result = result.filter((u) => u.role === roleFilter);
     }
 
     result.sort((a, b) => {
@@ -202,7 +225,7 @@ export default function Users() {
     });
 
     return result;
-  }, [users, search, statusFilter, roleFilter, sortKey, sortOrder]);
+  }, [users, platformTab, search, statusFilter, sortKey, sortOrder]);
 
   const paginatedUsers = useMemo(() => {
     const start = (currentPage - 1) * itemsPerPage;
@@ -223,7 +246,7 @@ export default function Users() {
             )}
           </div>
           <div className="min-w-0">
-            <div className="font-bold text-foreground truncate">{row.fullName || "Unnamed User"}</div>
+            <div className="font-bold text-foreground truncate">{row.fullName || "User"}</div>
             <div className="text-[11px] text-muted-foreground font-mono truncate">{row.email}</div>
           </div>
         </div>
@@ -231,20 +254,22 @@ export default function Users() {
     },
     {
       key: "role",
-      label: "Role",
+      label: "Account Type",
       sortable: true,
       render: (row) => (
         <span
           className={cn(
-            "px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider border",
+            "px-2.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider border inline-flex items-center gap-1",
             row.role === "admin"
               ? "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20"
+              : row.role === "both"
+              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
               : row.role === "agent"
               ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20"
               : "bg-secondary text-muted-foreground border-border/60"
           )}
         >
-          {row.role || "user"}
+          {row.accountType || row.role || "Standard"}
         </span>
       ),
     },
@@ -278,22 +303,17 @@ export default function Users() {
       },
     },
     {
-      key: "verified",
-      label: "Verification",
-      render: (row) =>
-        row.verified ? (
-          <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-            <ShieldCheck className="h-3.5 w-3.5" /> Verified
-          </span>
-        ) : (
-          <span className="text-[11px] text-muted-foreground flex items-center gap-1">
-            <Clock className="h-3.5 w-3.5" /> Pending
-          </span>
-        ),
+      key: "phone",
+      label: "Contact",
+      render: (row) => (
+        <span className="text-xs font-mono text-muted-foreground">
+          {row.phone || "—"}
+        </span>
+      ),
     },
     {
       key: "createdAt",
-      label: "Joined",
+      label: "Registered",
       sortable: true,
       render: (row) => (
         <span className="text-xs text-muted-foreground font-mono">
@@ -310,7 +330,7 @@ export default function Users() {
           <button
             onClick={() => handleOpenUser(row)}
             className="p-1.5 rounded-md hover:bg-secondary text-foreground transition-colors cursor-pointer"
-            title="View user details"
+            title="Inspect complete user record"
           >
             <Eye className="h-3.5 w-3.5" />
           </button>
@@ -368,10 +388,10 @@ export default function Users() {
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-2 border-b border-border/50">
         <div>
           <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground">
-            Users
+            User Directory & Verification
           </h1>
           <p className="text-xs text-muted-foreground mt-0.5 font-medium">
-            Manage PAYENT accounts, identity verification, and access controls
+            Review and manage paye₹nt (lender) and pay₹ent (renter) accounts from shared database
           </p>
         </div>
 
@@ -387,6 +407,57 @@ export default function Users() {
         </div>
       </div>
 
+      {/* PLATFORM SIDE SELECTOR TABS (Section 15 Requirements) */}
+      <div className="flex items-center gap-2 border-b border-border/60 pb-3">
+        <button
+          onClick={() => {
+            setPlatformTab("all");
+            setCurrentPage(1);
+          }}
+          className={cn(
+            "px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5",
+            platformTab === "all"
+              ? "bg-primary text-primary-foreground shadow-xs"
+              : "bg-card border border-border/70 text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <Layers className="h-3.5 w-3.5" />
+          <span>All Accounts</span>
+        </button>
+
+        <button
+          onClick={() => {
+            setPlatformTab("payernt");
+            setCurrentPage(1);
+          }}
+          className={cn(
+            "px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5",
+            platformTab === "payernt"
+              ? "bg-emerald-600 text-white shadow-xs"
+              : "bg-card border border-border/70 text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <Package className="h-3.5 w-3.5" />
+          <span>paye₹nt (Lenders / Vendors)</span>
+        </button>
+
+        <button
+          onClick={() => {
+            setPlatformTab("payrent");
+            setCurrentPage(1);
+          }}
+          className={cn(
+            "px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5",
+            platformTab === "payrent"
+              ? "bg-blue-600 text-white shadow-xs"
+              : "bg-card border border-border/70 text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <ShoppingBag className="h-3.5 w-3.5" />
+          <span>pay₹ent (Renters / Customers)</span>
+        </button>
+      </div>
+
       {/* FILTERS & SEARCH BAR */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         {/* Search */}
@@ -394,7 +465,7 @@ export default function Users() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <input
             type="text"
-            placeholder="Search by name, email, or user ID..."
+            placeholder="Search by name, email, phone, or account ID..."
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
@@ -408,7 +479,7 @@ export default function Users() {
         <div className="flex items-center gap-2 flex-wrap">
           {/* Status Tabs */}
           <div className="flex items-center p-0.5 bg-secondary/60 rounded-lg border border-border/60 text-xs font-medium">
-            {["all", "pending", "approved", "suspended"].map((st) => (
+            {["all", "active", "pending", "suspended", "rejected"].map((st) => (
               <button
                 key={st}
                 onClick={() => {
@@ -426,25 +497,10 @@ export default function Users() {
               </button>
             ))}
           </div>
-
-          {/* Role Select */}
-          <select
-            value={roleFilter}
-            onChange={(e) => {
-              setRoleFilter(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="bg-card text-foreground text-xs rounded-lg px-2.5 py-2 border border-border/70 focus:outline-none font-medium cursor-pointer"
-          >
-            <option value="all">All Roles</option>
-            <option value="user">User</option>
-            <option value="agent">Agent / Lender</option>
-            <option value="admin">Admin</option>
-          </select>
         </div>
       </div>
 
-      {/* 3-STATE CONTAINER: ERROR vs TABLE (LOADING / REAL DATA / EMPTY DB) */}
+      {/* ERROR vs TABLE CONTAINER */}
       {error ? (
         <div className="bg-card border border-red-500/20 p-8 rounded-xl text-center space-y-3">
           <div className="inline-flex p-2.5 rounded-full bg-red-500/10 text-[#FF1744]">
@@ -473,15 +529,14 @@ export default function Users() {
             sortKey={sortKey}
             sortOrder={sortOrder}
             onSort={handleSort}
-            emptyTitle="No Users Found"
-            emptyDescription="The database contains no user records matching your current filter criteria."
+            emptyTitle="No Accounts Found"
+            emptyDescription="The database contains no account records matching your current filter criteria."
           />
 
           {filteredUsers.length > itemsPerPage && !loading && (
             <div className="p-4 border-t border-border/40">
               <Pagination
                 currentPage={currentPage}
-                totalPages={Math.ceil(filteredUsers.length / itemsPerPage)}
                 onPageChange={setCurrentPage}
                 itemsPerPage={itemsPerPage}
                 totalItems={filteredUsers.length}
@@ -494,22 +549,22 @@ export default function Users() {
       {/* USER DETAIL SLIDE-OUT DRAWER */}
       {drawerOpen && selectedUser && (
         <div className="fixed inset-0 z-50 flex justify-end bg-background/60 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="w-full max-w-md bg-card border-l border-border/80 shadow-2xl h-full flex flex-col overflow-hidden animate-in slide-in-from-right duration-200">
+          <div className="w-full max-w-xl bg-card border-l border-border/80 shadow-2xl h-full flex flex-col overflow-hidden animate-in slide-in-from-right duration-200">
             {/* Drawer Header */}
             <div className="p-5 border-b border-border/60 flex items-center justify-between bg-secondary/30">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-full bg-secondary border border-border flex items-center justify-center font-bold text-sm text-foreground overflow-hidden">
+                <div className="h-11 w-11 rounded-full bg-secondary border border-border flex items-center justify-center font-bold text-sm text-foreground overflow-hidden shrink-0">
                   {selectedUser.avatar || selectedUser.profilePhotoUrl ? (
                     <img src={selectedUser.avatar || selectedUser.profilePhotoUrl} alt={selectedUser.fullName} className="h-full w-full object-cover" />
                   ) : (
                     <span>{(selectedUser.fullName || selectedUser.email).charAt(0).toUpperCase()}</span>
                   )}
                 </div>
-                <div>
-                  <h3 className="text-sm font-bold text-foreground truncate max-w-[200px]">
+                <div className="min-w-0">
+                  <h3 className="text-sm font-bold text-foreground truncate">
                     {selectedUser.fullName || "User Detail"}
                   </h3>
-                  <p className="text-[11px] text-muted-foreground font-mono truncate max-w-[200px]">
+                  <p className="text-[11px] text-muted-foreground font-mono truncate">
                     {selectedUser.email}
                   </p>
                 </div>
@@ -524,121 +579,288 @@ export default function Users() {
             </div>
 
             {/* Drawer Navigation Tabs */}
-            <div className="flex items-center border-b border-border/40 px-5 pt-2 gap-4 text-xs font-semibold">
+            <div className="flex items-center border-b border-border/40 px-5 pt-2 gap-4 text-xs font-semibold overflow-x-auto no-scrollbar">
               <button
                 onClick={() => setDrawerTab("profile")}
                 className={cn(
-                  "pb-2 border-b-2 cursor-pointer transition-colors",
+                  "pb-2 border-b-2 cursor-pointer transition-colors shrink-0",
                   drawerTab === "profile" ? "border-primary text-foreground font-bold" : "border-transparent text-muted-foreground hover:text-foreground"
                 )}
               >
-                Profile & Overview
+                Profile & ID
               </button>
+
               <button
-                onClick={() => setDrawerTab("verification")}
+                onClick={() => setDrawerTab("payernt")}
                 className={cn(
-                  "pb-2 border-b-2 cursor-pointer transition-colors",
-                  drawerTab === "verification" ? "border-primary text-foreground font-bold" : "border-transparent text-muted-foreground hover:text-foreground"
+                  "pb-2 border-b-2 cursor-pointer transition-colors shrink-0",
+                  drawerTab === "payernt" ? "border-emerald-500 text-emerald-500 font-bold" : "border-transparent text-muted-foreground hover:text-foreground"
                 )}
               >
-                Verification & KYC
+                paye₹nt (Lender)
               </button>
+
+              <button
+                onClick={() => setDrawerTab("payrent")}
+                className={cn(
+                  "pb-2 border-b-2 cursor-pointer transition-colors shrink-0",
+                  drawerTab === "payrent" ? "border-blue-500 text-blue-500 font-bold" : "border-transparent text-muted-foreground hover:text-foreground"
+                )}
+              >
+                pay₹ent (Renter)
+              </button>
+
               <button
                 onClick={() => setDrawerTab("security")}
                 className={cn(
-                  "pb-2 border-b-2 cursor-pointer transition-colors",
+                  "pb-2 border-b-2 cursor-pointer transition-colors shrink-0",
                   drawerTab === "security" ? "border-primary text-foreground font-bold" : "border-transparent text-muted-foreground hover:text-foreground"
                 )}
               >
-                Account Security
+                Security & KYC
               </button>
             </div>
 
             {/* Drawer Body Content */}
             <div className="flex-1 overflow-y-auto p-5 space-y-5 text-xs">
-              {drawerTab === "profile" && (
-                <div className="space-y-4">
-                  <div className="p-4 rounded-xl bg-secondary/40 border border-border/60 space-y-2.5">
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">User ID</span>
-                      <span className="font-mono font-bold">{selectedUser.id}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Status</span>
-                      <span className="font-bold uppercase text-[10px] px-2 py-0.5 rounded bg-secondary border border-border/60">
-                        {selectedUser.status}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Platform Role</span>
-                      <span className="font-bold uppercase text-[10px] px-2 py-0.5 rounded bg-secondary border border-border/60">
-                        {selectedUser.role}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Registered Date</span>
-                      <span className="font-mono">{selectedUser.createdAt ? new Date(selectedUser.createdAt).toLocaleDateString() : "—"}</span>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <h4 className="font-bold uppercase tracking-wider text-[10px] text-muted-foreground">Contact Information</h4>
-                    <div className="p-3 rounded-xl bg-card border border-border/60 space-y-2">
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Mail className="h-3.5 w-3.5" />
-                        <span className="text-foreground font-medium">{selectedUser.email}</span>
+              {drawerLoading ? (
+                <div className="py-12 flex justify-center">
+                  <Loader message="Loading complete record..." size="md" />
+                </div>
+              ) : (
+                <>
+                  {/* TAB 1: OVERVIEW & GENERAL IDENTITY */}
+                  {drawerTab === "profile" && (
+                    <div className="space-y-4">
+                      <div className="p-4 rounded-xl bg-secondary/30 border border-border/60 space-y-2.5">
+                        <div className="flex justify-between items-center">
+                          <span className="text-muted-foreground">Account Identifier</span>
+                          <span className="font-mono font-bold text-foreground">{selectedUser.id}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-muted-foreground">Account Status</span>
+                          <span className="font-bold uppercase text-[10px] px-2 py-0.5 rounded bg-secondary border border-border/60">
+                            {selectedUser.status}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-muted-foreground">Platform Role</span>
+                          <span className="font-bold uppercase text-[10px] px-2 py-0.5 rounded bg-secondary border border-border/60">
+                            {selectedUser.role} ({selectedUser.accountType || "Standard"})
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-muted-foreground">Registration Date</span>
+                          <span className="font-mono">{selectedUser.createdAt ? new Date(selectedUser.createdAt).toLocaleDateString() : "—"}</span>
+                        </div>
                       </div>
-                      {selectedUser.phone && (
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <Phone className="h-3.5 w-3.5" />
-                          <span className="text-foreground font-medium">{selectedUser.phone}</span>
+
+                      <div className="space-y-2">
+                        <h4 className="font-bold uppercase tracking-wider text-[10px] text-muted-foreground">Contact & Address</h4>
+                        <div className="p-3.5 rounded-xl bg-card border border-border/60 space-y-2.5">
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <Mail className="h-3.5 w-3.5 text-primary" />
+                            <span className="text-foreground font-medium">{selectedUser.email}</span>
+                          </div>
+                          {selectedUser.phone && (
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                              <Phone className="h-3.5 w-3.5 text-primary" />
+                              <span className="text-foreground font-mono font-medium">{selectedUser.phone}</span>
+                            </div>
+                          )}
+                          {(selectedUser.city || selectedUser.address) && (
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                              <MapPin className="h-3.5 w-3.5 text-primary" />
+                              <span className="text-foreground font-medium">
+                                {[selectedUser.address, selectedUser.city, selectedUser.pincode].filter(Boolean).join(", ")}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* TAB 2: PAYE₹NT (LENDER) PROFILE */}
+                  {drawerTab === "payernt" && (
+                    <div className="space-y-4">
+                      {selectedUser.payerntAccount ? (
+                        <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 space-y-3">
+                          <div className="flex justify-between items-center border-b border-emerald-500/20 pb-2">
+                            <span className="font-bold text-foreground flex items-center gap-1.5">
+                              <Package className="h-4 w-4 text-emerald-500" />
+                              <span>paye₹nt Vendor Profile</span>
+                            </span>
+                            <span className="font-mono text-[10px] text-muted-foreground">
+                              ID: {selectedUser.payerntAccount.accountId}
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3 text-xs">
+                            <div>
+                              <span className="text-muted-foreground block text-[11px]">Vendor Name</span>
+                              <span className="font-semibold text-foreground">{selectedUser.payerntAccount.name}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground block text-[11px]">Vendor Phone</span>
+                              <span className="font-mono font-semibold text-foreground">{selectedUser.payerntAccount.phone}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground block text-[11px]">Aadhaar (Masked)</span>
+                              <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400">
+                                {selectedUser.payerntAccount.aadhaarMasked} ({selectedUser.payerntAccount.aadhaarStatus})
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground block text-[11px]">Payout Account</span>
+                              <span className="font-mono font-semibold text-foreground">
+                                {selectedUser.payerntAccount.bankAccountMasked} (IFSC: {selectedUser.payerntAccount.bankIfsc})
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="p-4 rounded-xl bg-secondary/30 border border-border/60 text-muted-foreground text-center">
+                          No dedicated paye₹nt vendor account registered under this email.
                         </div>
                       )}
-                      {(selectedUser.city || selectedUser.address) && (
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <MapPin className="h-3.5 w-3.5" />
-                          <span className="text-foreground font-medium">{selectedUser.city || selectedUser.address}</span>
+
+                      {/* Wallet Balance */}
+                      {selectedUser.wallet && (
+                        <div className="p-4 rounded-xl bg-card border border-border/60 space-y-2">
+                          <div className="flex justify-between items-center">
+                            <span className="font-bold text-foreground flex items-center gap-1.5">
+                              <Wallet className="h-4 w-4 text-emerald-500" />
+                              <span>Vendor Wallet</span>
+                            </span>
+                            <span className="font-mono font-bold text-emerald-500 text-sm">
+                              ₹{selectedUser.wallet.availableBalance.toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-[11px] text-muted-foreground pt-1 border-t border-border/40">
+                            <div>Pending: <span className="font-mono text-foreground font-semibold">₹{selectedUser.wallet.pendingAmount.toLocaleString()}</span></div>
+                            <div>Total Received: <span className="font-mono text-foreground font-semibold">₹{selectedUser.wallet.totalReceived.toLocaleString()}</span></div>
+                          </div>
                         </div>
                       )}
-                    </div>
-                  </div>
-                </div>
-              )}
 
-              {drawerTab === "verification" && (
-                <div className="space-y-4">
-                  <div className="p-4 rounded-xl bg-secondary/40 border border-border/60 space-y-3">
-                    <div className="flex items-center gap-2 font-bold text-foreground">
-                      <ShieldCheck className="h-4 w-4 text-primary" />
-                      <span>Identity Verification Status</span>
+                      {/* Equipment Listings */}
+                      <div className="space-y-2">
+                        <h4 className="font-bold uppercase tracking-wider text-[10px] text-muted-foreground">
+                          Equipment Listed ({selectedUser.products?.length || 0})
+                        </h4>
+                        {selectedUser.products && selectedUser.products.length > 0 ? (
+                          <div className="space-y-2">
+                            {selectedUser.products.map((p) => (
+                              <div key={p.id} className="p-3 rounded-lg bg-card border border-border/60 flex justify-between items-center">
+                                <div>
+                                  <span className="font-bold text-foreground block">{p.title}</span>
+                                  <span className="text-[11px] font-mono text-muted-foreground">{p.id} • {p.category}</span>
+                                </div>
+                                <div className="text-right font-mono">
+                                  <span className="font-bold text-foreground">₹{p.price}/day</span>
+                                  <span className="block text-[10px] uppercase font-semibold text-emerald-500">{p.status}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">No active equipment listed.</p>
+                        )}
+                      </div>
                     </div>
-                    <p className="text-[11px] text-muted-foreground leading-relaxed">
-                      {selectedUser.verified
-                        ? "User has successfully fulfilled email, phone 2FA, and identity verification requirements."
-                        : "Account registration is awaiting administrative identity confirmation."}
-                    </p>
-                    <div className="pt-2 border-t border-border/40 flex justify-between items-center font-mono">
-                      <span>KYC Verified:</span>
-                      <span className={cn("font-bold", selectedUser.verified ? "text-emerald-500" : "text-amber-500")}>
-                        {selectedUser.verified ? "YES" : "PENDING"}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
+                  )}
 
-              {drawerTab === "security" && (
-                <div className="space-y-4">
-                  <div className="p-4 rounded-xl bg-secondary/40 border border-border/60 space-y-2">
-                    <div className="flex items-center gap-2 font-bold text-foreground">
-                      <Lock className="h-4 w-4 text-primary" />
-                      <span>Security & Access Control</span>
+                  {/* TAB 3: PAY₹ENT (RENTER) PROFILE */}
+                  {drawerTab === "payrent" && (
+                    <div className="space-y-4">
+                      {selectedUser.payrentAccount ? (
+                        <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 space-y-3">
+                          <div className="flex justify-between items-center border-b border-blue-500/20 pb-2">
+                            <span className="font-bold text-foreground flex items-center gap-1.5">
+                              <ShoppingBag className="h-4 w-4 text-blue-500" />
+                              <span>pay₹ent Customer Profile</span>
+                            </span>
+                            <span className="font-mono text-[10px] text-muted-foreground">
+                              ID: {selectedUser.payrentAccount.accountId}
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3 text-xs">
+                            <div>
+                              <span className="text-muted-foreground block text-[11px]">Customer Name</span>
+                              <span className="font-semibold text-foreground">{selectedUser.payrentAccount.fullName}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground block text-[11px]">Phone</span>
+                              <span className="font-mono font-semibold text-foreground">{selectedUser.payrentAccount.phone}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground block text-[11px]">PAN (Masked)</span>
+                              <span className="font-mono font-semibold text-blue-600 dark:text-blue-400">
+                                {selectedUser.payrentAccount.panMasked} ({selectedUser.payrentAccount.panStatus})
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground block text-[11px]">KYC Status</span>
+                              <span className="font-semibold text-emerald-500">{selectedUser.payrentAccount.verificationStatus}</span>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="p-4 rounded-xl bg-secondary/30 border border-border/60 text-muted-foreground text-center">
+                          No dedicated pay₹ent customer account registered under this email.
+                        </div>
+                      )}
+
+                      {/* Bookings Made */}
+                      <div className="space-y-2">
+                        <h4 className="font-bold uppercase tracking-wider text-[10px] text-muted-foreground">
+                          Rental Orders & Leases ({selectedUser.bookings?.length || 0})
+                        </h4>
+                        {selectedUser.bookings && selectedUser.bookings.length > 0 ? (
+                          <div className="space-y-2">
+                            {selectedUser.bookings.map((b) => (
+                              <div key={b.id} className="p-3 rounded-lg bg-card border border-border/60 flex justify-between items-center">
+                                <div>
+                                  <span className="font-bold text-foreground block">{b.productTitle}</span>
+                                  <span className="text-[11px] font-mono text-muted-foreground">{b.startDate} → {b.endDate}</span>
+                                </div>
+                                <div className="text-right font-mono">
+                                  <span className="font-bold text-foreground">₹{b.amount.toLocaleString()}</span>
+                                  <span className="block text-[10px] uppercase font-semibold text-blue-500">{b.status}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">No bookings made yet.</p>
+                        )}
+                      </div>
                     </div>
-                    <p className="text-[11px] text-muted-foreground">
-                      Administrative state changes are tracked in the security audit logs and enforced at backend gateway layer.
-                    </p>
-                  </div>
-                </div>
+                  )}
+
+                  {/* TAB 4: KYC & SECURITY */}
+                  {drawerTab === "security" && (
+                    <div className="space-y-4">
+                      <div className="p-4 rounded-xl bg-secondary/40 border border-border/60 space-y-3">
+                        <div className="flex items-center gap-2 font-bold text-foreground">
+                          <ShieldCheck className="h-4 w-4 text-emerald-500" />
+                          <span>Identity Verification & Compliance</span>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground leading-relaxed">
+                          Account has been verified against government database records with Aadhaar/PAN compliance. Secret PINs and authentication secrets are permanently masked.
+                        </p>
+                        <div className="pt-2 border-t border-border/40 flex justify-between items-center font-mono">
+                          <span>Verification State:</span>
+                          <span className={cn("font-bold uppercase", selectedUser.verified ? "text-emerald-500" : "text-amber-500")}>
+                            {selectedUser.verified ? "VERIFIED" : "PENDING"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
 
@@ -649,14 +871,14 @@ export default function Users() {
                   <button
                     onClick={() => handleApprove(selectedUser.id || selectedUser.email)}
                     disabled={actionLoading}
-                    className="flex-1 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-all cursor-pointer"
+                    className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-all cursor-pointer"
                   >
                     Approve Account
                   </button>
                   <button
                     onClick={() => handleReject(selectedUser.id || selectedUser.email)}
                     disabled={actionLoading}
-                    className="flex-1 py-2 rounded-xl bg-destructive hover:bg-destructive/90 text-white font-bold text-xs transition-all cursor-pointer"
+                    className="flex-1 py-2.5 rounded-xl bg-destructive hover:bg-destructive/90 text-white font-bold text-xs transition-all cursor-pointer"
                   >
                     Reject Account
                   </button>
@@ -665,7 +887,7 @@ export default function Users() {
                 <button
                   onClick={() => handleActivate(selectedUser.id || selectedUser.email)}
                   disabled={actionLoading}
-                  className="w-full py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-all cursor-pointer"
+                  className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-all cursor-pointer"
                 >
                   Reactivate Account
                 </button>
@@ -673,9 +895,9 @@ export default function Users() {
                 <button
                   onClick={() => handleSuspend(selectedUser.id || selectedUser.email)}
                   disabled={actionLoading}
-                  className="w-full py-2 rounded-xl bg-destructive hover:bg-destructive/90 text-white font-bold text-xs transition-all cursor-pointer"
+                  className="w-full py-2.5 rounded-xl bg-destructive hover:bg-destructive/90 text-white font-bold text-xs transition-all cursor-pointer"
                 >
-                  Suspend User Account
+                  Suspend Account
                 </button>
               )}
             </div>

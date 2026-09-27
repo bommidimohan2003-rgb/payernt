@@ -39,10 +39,10 @@ export function CreatorCommunity() {
               {/* CTAs */}
               <div className="flex flex-wrap items-center gap-3 pt-2">
                 <Link
-                  to="/become-lender"
+                  to="/browse"
                   className="bg-[#F2F0EA] hover:bg-white text-[#161616] px-6 py-3 rounded-xl text-sm font-bold flex items-center gap-2 shadow-xl hover:scale-102 active:scale-98 transition-all cursor-pointer"
                 >
-                  <span>Become a Lender</span>
+                  <span>Explore Gear</span>
                   <ArrowRight className="h-4 w-4" />
                 </Link>
 

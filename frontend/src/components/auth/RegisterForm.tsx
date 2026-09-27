@@ -12,6 +12,8 @@ import {
   MapPin,
   Building2,
   Compass,
+  Sparkles,
+  Loader2,
 } from "lucide-react";
 import { useMemo, useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
@@ -20,8 +22,10 @@ import { Button } from "@/components/common/Button";
 import { Input } from "@/components/common/Input";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/utils/api";
+import { payrentApi } from "@/services/payrentApi";
 import { STORAGE_KEYS, storage } from "@/utils/storage";
 import { toast } from "sonner";
+import type { User as UserType } from "@/types";
 
 const schema = z
   .object({
@@ -36,21 +40,22 @@ const schema = z
       .min(1, "Email is required")
       .email("Enter a valid email address")
       .max(255),
+    panNumber: z
+      .string()
+      .trim()
+      .toUpperCase()
+      .min(1, "PAN Number is required")
+      .regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, "Enter a valid PAN number."),
     phone: z
       .string()
       .trim()
       .min(7, "Enter a valid phone number (at least 7 digits)")
       .max(20),
-    aadhaarNumber: z
-      .string()
-      .trim()
-      .min(1, "Aadhaar number is required")
-      .regex(/^\d{12}$/, "Aadhaar number must be exactly 12 numeric digits"),
     address: z
       .string()
       .trim()
       .min(5, "Enter complete street address (at least 5 characters)"),
-    city: z.string().trim().min(2, "Enter city name"),
+    city: z.string().trim().optional(),
     pincode: z.string().trim().min(6, "Enter valid 6-digit PIN code").max(10),
     password: z
       .string()
@@ -88,13 +93,36 @@ export function RegisterForm() {
   const navigate = useNavigate();
   const [showPw, setShowPw] = useState(false);
   const [error, setErrorState] = useState<string | null>(null);
+  const [isChecking, setIsChecking] = useState(false);
 
   useEffect(() => {
     if (user) {
-      if (user.role === "admin") {
+      const searchParams =
+        typeof window !== "undefined"
+          ? new URLSearchParams(window.location.search)
+          : null;
+      const redirectUrl =
+        searchParams?.get("redirect") ||
+        searchParams?.get("returnUrl") ||
+        (typeof window !== "undefined"
+          ? localStorage.getItem("pay₹ent_pending_product_redirect")
+          : null);
+      const pendingProductId =
+        typeof window !== "undefined"
+          ? localStorage.getItem("pendingProductId")
+          : null;
+
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("pay₹ent_pending_product_redirect");
+        localStorage.removeItem("pendingProductId");
+      }
+
+      if (redirectUrl && redirectUrl.startsWith("/")) {
+        navigate({ to: redirectUrl as any });
+      } else if (pendingProductId) {
+        navigate({ to: `/product/${pendingProductId}` as any });
+      } else if (user.role === "admin") {
         navigate({ to: "/admin/dashboard" });
-      } else if (user.status === "pending") {
-        navigate({ to: "/account-pending" });
       } else {
         navigate({ to: "/categories" });
       }
@@ -105,6 +133,8 @@ export function RegisterForm() {
     register,
     handleSubmit,
     watch,
+    setValue,
+    getValues,
     setError,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
@@ -112,13 +142,61 @@ export function RegisterForm() {
     mode: "onBlur",
   });
 
+  const handleCheckUser = async () => {
+    const { fullName, phone, email } = getValues();
+    const cleanName = (fullName || "").trim();
+    const cleanPhone = (phone || "").trim();
+    const cleanEmail = (email || "").trim().toLowerCase();
+
+    if (!cleanName || cleanName.length < 2) {
+      toast.error("Please enter your full name before checking.");
+      return;
+    }
+    if (!cleanPhone || cleanPhone.replace(/\D/g, "").length < 10) {
+      toast.error("Please enter a valid 10-digit mobile number before checking.");
+      return;
+    }
+    if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      toast.error("Please enter a valid email address before checking.");
+      return;
+    }
+
+    setIsChecking(true);
+    try {
+      const res = await payrentApi.checkRegistration({
+        name: cleanName,
+        mobile: cleanPhone,
+        email: cleanEmail,
+        targetAccountType: "pay₹ent",
+      });
+
+      if (res.targetAccountExists) {
+        toast.error("Your pay₹ent account already exists. Please login instead.");
+        return;
+      }
+
+      if (res.found && res.prefill) {
+        toast.success("Existing account found. Your details have been filled.");
+        if (res.prefill.address) setValue("address", res.prefill.address, { shouldValidate: true });
+        if (res.prefill.pincode) setValue("pincode", res.prefill.pincode, { shouldValidate: true });
+        if (res.prefill.city) setValue("city", res.prefill.city, { shouldValidate: true });
+      } else {
+        toast.info("No existing account found. Please continue registration.");
+      }
+    } catch {
+      toast.error("Unable to check your details. Please try again.");
+    } finally {
+      setIsChecking(false);
+    }
+  };
+
   const pw = watch("password") ?? "";
   const watchIsAdmin = watch("isAdmin") ?? false;
   const level = useMemo(() => strength(pw), [pw]);
   const labels = ["Weak", "Fair", "Good", "Strong", "Excellent"];
 
   const showAdminOption = useMemo(() => {
-    if (typeof window === "undefined") return false;
+    if (typeof window !== "undefined") return false;
     const params = new URLSearchParams(window.location.search);
     for (const [key, value] of params.entries()) {
       if (
@@ -136,6 +214,7 @@ export function RegisterForm() {
     try {
       const adminCode =
         showAdminOption && data.isAdmin ? data.adminCode : undefined;
+      const panUpper = data.panNumber.toUpperCase().trim();
       const res = await api.registerVerify(
         data.email,
         data.phone,
@@ -144,28 +223,112 @@ export function RegisterForm() {
         data.fullName,
         adminCode,
         data.address,
-        data.city,
+        data.city || "India",
         data.pincode,
-        data.aadhaarNumber,
+        undefined,
+        panUpper,
       );
-      if (res?.success) {
-        if (res.token && res.user) {
-          storage.set(STORAGE_KEYS.token, res.token);
-          storage.set(STORAGE_KEYS.currentUser, res.user);
-          if (res.refreshToken) {
-            storage.set(STORAGE_KEYS.refreshToken, res.refreshToken);
-          }
-          if (typeof window !== "undefined") {
-            window.dispatchEvent(new CustomEvent("payent:storage_change"));
-          }
-        }
-        toast.success(res.message || "Account created successfully!");
-        if (res.user?.role === "admin") {
-          navigate({ to: "/admin/dashboard" });
+
+      if (!res?.success) {
+        const errorMsg = res?.error || res?.message || "Failed to create account.";
+        const lower = errorMsg.toLowerCase();
+        if (lower.includes("email") || lower.includes("exists")) {
+          setError("email", { type: "server", message: errorMsg });
+        } else if (lower.includes("phone") || lower.includes("mobile")) {
+          setError("phone", { type: "server", message: errorMsg });
+        } else if (lower.includes("pan")) {
+          setError("panNumber", { type: "server", message: errorMsg });
+        } else if (
+          lower.includes("password") ||
+          lower.includes("breach") ||
+          lower.includes("character") ||
+          lower.includes("common") ||
+          lower.includes("safer")
+        ) {
+          setError("password", { type: "server", message: errorMsg });
+        } else if (lower.includes("admin")) {
+          setError("adminCode", { type: "server", message: errorMsg });
         } else {
-          navigate({ to: "/account-pending" });
+          setErrorState(errorMsg);
         }
+        toast.error(errorMsg);
         return;
+      }
+
+      const userObj = res.user || res.account || {};
+      const accountId = userObj.accountId || `PAYRENT_USER_${data.email}`;
+      const panMasked = userObj.panMasked || `XXXXX${panUpper.slice(5)}`;
+      const createdUser: UserType = {
+        id: userObj.id || userObj.email || data.email,
+        accountId,
+        accountType: "pay₹ent",
+        fullName: userObj.fullName || userObj.name || data.fullName,
+        email: userObj.email || data.email,
+        phone: userObj.phone || data.phone,
+        address: userObj.address || data.address,
+        city: userObj.city || data.city || "India",
+        pincode: userObj.pincode || data.pincode,
+        panNumber: panUpper,
+        panMasked,
+        role: userObj.role || "customer",
+        status: userObj.status || "active",
+        country: "India",
+      };
+
+      const authToken = res.token;
+      if (authToken) {
+        storage.set(STORAGE_KEYS.token, authToken);
+      }
+      storage.set(STORAGE_KEYS.currentUser, createdUser);
+      if (res.refreshToken) {
+        storage.set(STORAGE_KEYS.refreshToken, res.refreshToken);
+      }
+
+      if (typeof window !== "undefined") {
+        localStorage.setItem(
+          "pay₹ent_session",
+          JSON.stringify({
+            accountId,
+            accountType: "pay₹ent",
+            email: createdUser.email,
+            name: createdUser.fullName,
+            loggedInAt: new Date().toISOString(),
+          })
+        );
+        localStorage.setItem("pay₹ent_account", JSON.stringify(createdUser));
+        window.dispatchEvent(new CustomEvent("payent:storage_change"));
+      }
+
+      toast.success("Account created successfully!");
+
+      const searchParams =
+        typeof window !== "undefined"
+          ? new URLSearchParams(window.location.search)
+          : null;
+      const redirectUrl =
+        searchParams?.get("redirect") ||
+        searchParams?.get("returnUrl") ||
+        (typeof window !== "undefined"
+          ? localStorage.getItem("pay₹ent_pending_product_redirect")
+          : null);
+      const pendingProductId =
+        typeof window !== "undefined"
+          ? localStorage.getItem("pendingProductId")
+          : null;
+
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("pay₹ent_pending_product_redirect");
+        localStorage.removeItem("pendingProductId");
+      }
+
+      if (redirectUrl && redirectUrl.startsWith("/")) {
+        navigate({ to: redirectUrl as any });
+      } else if (pendingProductId) {
+        navigate({ to: `/product/${pendingProductId}` as any });
+      } else if (createdUser.role === "admin") {
+        navigate({ to: "/admin/dashboard" });
+      } else {
+        navigate({ to: "/categories" });
       }
     } catch (err) {
       const msg =
@@ -175,8 +338,8 @@ export function RegisterForm() {
         setError("email", { type: "server", message: msg });
       } else if (lower.includes("phone")) {
         setError("phone", { type: "server", message: msg });
-      } else if (lower.includes("aadhaar")) {
-        setError("aadhaarNumber", { type: "server", message: msg });
+      } else if (lower.includes("pan")) {
+        setError("panNumber", { type: "server", message: "Enter a valid PAN number." });
       } else if (
         lower.includes("password") ||
         lower.includes("breach") ||
@@ -196,126 +359,122 @@ export function RegisterForm() {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 text-left">
-      {/* Section 1: Account & Contact Info */}
-      <div className="space-y-2">
-        <div className="flex items-center gap-1.5 text-[11px] font-black text-primary uppercase tracking-wider">
-          <User className="h-3.5 w-3.5" />
-          <span>Account & Identity Info</span>
-        </div>
+      {/* 1. Name */}
+      <Input
+        label="Name"
+        placeholder="Your full name"
+        icon={<User className="h-4 w-4" />}
+        error={errors.fullName?.message}
+        {...register("fullName")}
+      />
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Input
-            label="Full Name"
-            placeholder="Your full name"
-            icon={<User className="h-4 w-4" />}
-            error={errors.fullName?.message}
-            {...register("fullName")}
-          />
-          <Input
-            label="Email Address"
-            type="email"
-            placeholder="you@example.com"
-            icon={<Mail className="h-4 w-4" />}
-            error={errors.email?.message}
-            {...register("email")}
-          />
-        </div>
+      {/* 2. Mobile Number */}
+      <Input
+        label="Mobile Number"
+        placeholder="+91 98765 43210"
+        icon={<Phone className="h-4 w-4" />}
+        error={errors.phone?.message}
+        {...register("phone")}
+      />
+
+      {/* 3. Email Address */}
+      <Input
+        label="Email Address"
+        type="email"
+        placeholder="you@example.com"
+        icon={<Mail className="h-4 w-4" />}
+        error={errors.email?.message}
+        {...register("email")}
+      />
+
+      {/* CHECK Button */}
+      <div className="pt-1 pb-1">
+        <button
+          type="button"
+          onClick={handleCheckUser}
+          disabled={isChecking}
+          className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-primary/30 bg-primary/10 hover:bg-primary/20 text-primary font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shadow-xs disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          {isChecking ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              <span>Checking Shared Database...</span>
+            </>
+          ) : (
+            <>
+              <Sparkles className="h-3.5 w-3.5" />
+              <span>CHECK</span>
+            </>
+          )}
+        </button>
+      </div>
+
+      {/* 4. PAN Number (Indian format validation: ABCDE1234F) */}
+      <Input
+        label="PAN Number"
+        placeholder="ABCDE1234F"
+        icon={<ShieldCheck className="h-4 w-4" />}
+        error={errors.panNumber?.message}
+        maxLength={10}
+        style={{ textTransform: "uppercase" }}
+        {...register("panNumber", {
+          onChange: (e) => {
+            e.target.value = e.target.value.toUpperCase().replace(/\s+/g, "");
+          },
+        })}
+      />
+
+      {/* 5. User Address */}
+      <Input
+        label="User Address"
+        placeholder="Street address, house number, area"
+        icon={<MapPin className="h-4 w-4" />}
+        error={errors.address?.message}
+        {...register("address")}
+      />
+
+      {/* 6. Pincode */}
+      <Input
+        label="Pincode"
+        placeholder="500081"
+        icon={<Compass className="h-4 w-4" />}
+        error={errors.pincode?.message}
+        maxLength={6}
+        {...register("pincode")}
+      />
+
+      {/* 7. Password & 8. Confirm Password */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <Input
+          label="Password"
+          type={showPw ? "text" : "password"}
+          placeholder="At least 8 characters"
+          icon={<Lock className="h-4 w-4" />}
+          rightAdornment={
+            <button
+              type="button"
+              onClick={() => setShowPw((v) => !v)}
+              className="p-1 text-muted-foreground hover:text-foreground cursor-pointer"
+            >
+              {showPw ? (
+                <EyeOff className="h-4 w-4" />
+              ) : (
+                <Eye className="h-4 w-4" />
+              )}
+            </button>
+          }
+          error={errors.password?.message}
+          {...register("password")}
+        />
 
         <Input
-          label="Aadhaar Number (12 Digits Required)"
-          placeholder="123456789012"
-          icon={<ShieldCheck className="h-4 w-4" />}
-          error={errors.aadhaarNumber?.message}
-          maxLength={12}
-          {...register("aadhaarNumber")}
+          label="Confirm Password"
+          type={showPw ? "text" : "password"}
+          placeholder="Repeat password"
+          icon={<Lock className="h-4 w-4" />}
+          error={errors.confirm?.message}
+          {...register("confirm")}
         />
-      </div>
-
-      {/* Section 2: Address & Phone */}
-      <div className="space-y-2">
-        <div className="flex items-center gap-1.5 text-[11px] font-black text-primary uppercase tracking-wider">
-          <MapPin className="h-3.5 w-3.5" />
-          <span>Address & Phone</span>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-          <div className="sm:col-span-5">
-            <Input
-              label="Phone Number"
-              placeholder="+91 98765 43210"
-              icon={<Phone className="h-4 w-4" />}
-              error={errors.phone?.message}
-              {...register("phone")}
-            />
-          </div>
-          <div className="sm:col-span-7">
-            <Input
-              label="Street Address / House No"
-              placeholder="123 Indiranagar, 100ft Road"
-              icon={<MapPin className="h-4 w-4" />}
-              error={errors.address?.message}
-              {...register("address")}
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Input
-            label="City"
-            placeholder="Bengaluru"
-            icon={<Building2 className="h-4 w-4" />}
-            error={errors.city?.message}
-            {...register("city")}
-          />
-          <Input
-            label="PIN Code"
-            placeholder="560038"
-            icon={<Compass className="h-4 w-4" />}
-            error={errors.pincode?.message}
-            {...register("pincode")}
-          />
-        </div>
-      </div>
-
-      {/* Section 3: Password & Security */}
-      <div className="space-y-2">
-        <div className="flex items-center gap-1.5 text-[11px] font-black text-primary uppercase tracking-wider">
-          <Lock className="h-3.5 w-3.5" />
-          <span>Security Password</span>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Input
-            label="Password"
-            type={showPw ? "text" : "password"}
-            placeholder="At least 8 characters"
-            icon={<Lock className="h-4 w-4" />}
-            rightAdornment={
-              <button
-                type="button"
-                onClick={() => setShowPw((v) => !v)}
-                className="p-1 text-muted-foreground hover:text-foreground cursor-pointer"
-              >
-                {showPw ? (
-                  <EyeOff className="h-4 w-4" />
-                ) : (
-                  <Eye className="h-4 w-4" />
-                )}
-              </button>
-            }
-            error={errors.password?.message}
-            {...register("password")}
-          />
-
-          <Input
-            label="Confirm Password"
-            type={showPw ? "text" : "password"}
-            placeholder="Repeat password"
-            icon={<Lock className="h-4 w-4" />}
-            error={errors.confirm?.message}
-            {...register("confirm")}
-          />
-        </div>
       </div>
 
       {/* Password Strength Indicator */}
@@ -370,7 +529,7 @@ export function RegisterForm() {
         </div>
       )}
 
-      {/* Terms & Action Row */}
+      {/* Terms & Create Account Button */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-border/40">
         <label className="flex items-center gap-2 text-xs cursor-pointer">
           <input
@@ -397,7 +556,7 @@ export function RegisterForm() {
           disabled={isSubmitting}
         >
           <span>
-            {isSubmitting ? "Creating..." : "Create Account & Verify"}
+            {isSubmitting ? "Creating..." : "Create Account"}
           </span>
           {!isSubmitting && <ArrowRight className="h-3.5 w-3.5" />}
         </Button>
@@ -412,3 +571,4 @@ export function RegisterForm() {
     </form>
   );
 }
+

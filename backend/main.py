@@ -32,7 +32,7 @@ from fastapi import FastAPI, HTTPException, Header, Depends, Query, status, Requ
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from pydantic import BaseModel, EmailStr, validator
+from pydantic import BaseModel, EmailStr, validator, Field
 
 # Setup Structured Logger
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
@@ -262,6 +262,14 @@ app = FastAPI(
     redoc_url=None
 )
 
+# Register Button 1 (paye₹nt) and Rental Lifecycle Routers
+try:
+    from payernt_router import payernt_router, rental_router
+    app.include_router(payernt_router)
+    app.include_router(rental_router)
+except Exception as router_err:
+    logger.warning(f"Notice: Failed to register payernt routers: {router_err}")
+
 # Enable GZip compression for payloads >= 500 bytes (reduces large JSON payloads by 85-90%)
 app.add_middleware(GZipMiddleware, minimum_size=500)
 
@@ -300,8 +308,9 @@ def is_origin_allowed(origin: Optional[str]) -> bool:
         return False
     if origin in ALLOWED_ORIGINS and origin != "*":
         return True
-    if not IS_PRODUCTION and origin in DEV_ORIGINS:
-        return True
+    if not IS_PRODUCTION:
+        if origin in DEV_ORIGINS or origin.startswith("http://localhost:") or origin.startswith("http://127.0.0.1:"):
+            return True
     if origin.endswith(".vercel.app") or origin.endswith(".up.railway.app"):
         return True
     return False
@@ -591,14 +600,21 @@ class RegisterVerifySchema(BaseModel):
     email: EmailStr
     phone: str
     password: str
+    pan_number: Optional[str] = None
+    panNumber: Optional[str] = None
     aadhaar_number: Optional[str] = None
     aadhaarNumber: Optional[str] = None
     otp: Optional[str] = "DIRECT"
     full_name: Optional[str] = None
+    fullName: Optional[str] = None
     address: Optional[str] = None
     city: Optional[str] = None
     pincode: Optional[str] = None
     admin_code: Optional[str] = None
+    account_type: Optional[str] = "pay₹ent"
+    accountType: Optional[str] = "pay₹ent"
+    person_id: Optional[str] = None
+    personId: Optional[str] = None
 
 class LoginRequestSchema(BaseModel):
     email: EmailStr
@@ -623,6 +639,50 @@ class ForgotPasswordResetSchema(BaseModel):
     recovery_token: Optional[str] = None
     new_password: str
     email: Optional[str] = None
+
+
+class CheckRegistrationSchema(BaseModel):
+    name: str = Field(..., min_length=1)
+    mobile: Optional[str] = None
+    phone: Optional[str] = None
+    phoneNumber: Optional[str] = None
+    email: EmailStr
+    targetAccountType: Optional[str] = "pay₹ent"
+    target_account_type: Optional[str] = None
+
+
+class CrossSideCheckMobileSchema(BaseModel):
+    phone: str
+    targetAccountType: Optional[str] = "pay₹ent"
+    target_account_type: Optional[str] = None
+
+
+class CrossSideSendOTPSchema(BaseModel):
+    phone: str
+    targetAccountType: Optional[str] = "pay₹ent"
+    target_account_type: Optional[str] = None
+
+
+class CrossSideVerifyOTPSchema(BaseModel):
+    token: str
+    otp: str
+
+
+class CrossSideRegisterSchema(BaseModel):
+    targetAccountType: Optional[str] = "pay₹ent"
+    target_account_type: Optional[str] = None
+    verificationToken: str
+    name: Optional[str] = None
+    email: EmailStr
+    address: Optional[str] = None
+    city: Optional[str] = None
+    pincode: Optional[str] = None
+    panNumber: Optional[str] = None
+    pan_number: Optional[str] = None
+    aadhaarNumber: Optional[str] = None
+    aadhaar_number: Optional[str] = None
+    password: str
+    confirmPassword: Optional[str] = None
 
 # Phone Normalization Helper
 def normalize_phone(phone: str) -> str:
@@ -884,8 +944,9 @@ def register_request(data: OTPRequestSchema, request: Request):
         save_otp(clean_email, clean_phone, result["otp"])
         return {"success": True, "otp": result["otp"], "message": "Verification code generated successfully."}
 
-@app.post("/api/register")
-@app.post("/api/register/verify")
+@app.post("/api/register", status_code=status.HTTP_201_CREATED)
+@app.post("/api/register/verify", status_code=status.HTTP_201_CREATED)
+@app.post("/api/auth/register", status_code=status.HTTP_201_CREATED)
 def register_verify(data: RegisterVerifySchema, request: Request):
     client_ip = request.client.host if request.client else "unknown"
     key = f"regver:{client_ip}:{data.email.lower().strip()}"
@@ -896,18 +957,28 @@ def register_verify(data: RegisterVerifySchema, request: Request):
             detail=f"Too many verification attempts. Please try again in {secs // 60} minutes."
         )
 
-    # Server-side Aadhaar validation (Strictly 12 numeric digits required)
+    # Identity validation: PAN Number (for pay₹ent renter side) or Aadhaar Number (if supplied)
+    raw_pan = data.pan_number or data.panNumber
     raw_aadhaar = data.aadhaar_number or data.aadhaarNumber
-    if not raw_aadhaar or not str(raw_aadhaar).strip():
+    clean_pan = str(raw_pan).strip().upper() if raw_pan else None
+    clean_aadhaar = str(raw_aadhaar).strip() if raw_aadhaar else None
+
+    if clean_pan:
+        if not re.match(r"^[A-Z]{5}[0-9]{4}[A-Z]{1}$", clean_pan):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Enter a valid PAN number format (e.g. ABCDE1234F)."
+            )
+    elif clean_aadhaar:
+        if not re.match(r"^\d{12}$", clean_aadhaar):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Aadhaar number must consist of exactly 12 numeric digits."
+            )
+    else:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Aadhaar number is required."
-        )
-    clean_aadhaar = str(raw_aadhaar).strip()
-    if not re.match(r"^\d{12}$", clean_aadhaar):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Aadhaar number must consist of exactly 12 numeric digits."
+            detail="Identity verification number (PAN Number) is required."
         )
 
     clean_email = data.email.lower().strip()
@@ -922,28 +993,21 @@ def register_verify(data: RegisterVerifySchema, request: Request):
                 detail="Invalid or expired verification code."
             )
     
-    # Duplicate account checks (Email, Phone, Aadhaar)
+    # Duplicate account checks for target pay₹ent side
     existing = get_user(clean_email)
     if existing:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Account with this email already exists."
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Your pay₹ent account already exists. Please login."
         )
 
     existing_phone_user = get_user_by_phone(clean_phone)
     if existing_phone_user:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Account with this phone number already exists."
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Your pay₹ent account with this phone number already exists. Please login."
         )
 
-    existing_aadhaar_user = get_user_by_aadhaar(clean_aadhaar)
-    if existing_aadhaar_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Account with this Aadhaar number already exists."
-        )
-    
     # Determine the role (Preserve Admin Account Model)
     role = "user"
     if data.admin_code:
@@ -955,10 +1019,20 @@ def register_verify(data: RegisterVerifySchema, request: Request):
                 detail="Invalid admin setup code."
             )
 
+    display_name = data.full_name or data.fullName or clean_email.split("@")[0]
+
+    # Validate password complexity
+    is_valid_pwd, pwd_err = validate_password_strength(data.password)
+    if not is_valid_pwd:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=pwd_err)
+
     hashed = hash_password(data.password)
-    display_name = data.full_name or clean_email.split("@")[0]
-    user_status = "approved" if role == "admin" else "pending"
-    create_user(
+    user_status = "approved" if role == "admin" else "active"
+
+    from payernt_database import get_or_create_person
+    person_id = data.person_id or data.personId or get_or_create_person(display_name, clean_phone)
+
+    created_user_res = create_user(
         email=clean_email,
         phone=clean_phone,
         password_hash=hashed,
@@ -968,17 +1042,32 @@ def register_verify(data: RegisterVerifySchema, request: Request):
         city=data.city,
         pincode=data.pincode,
         aadhaar_number=clean_aadhaar,
-        status=user_status
+        pan_number=clean_pan,
+        account_type="pay₹ent",
+        status=user_status,
+        person_id=person_id
     )
     
     delete_otp(clean_email)
     clear_failed_auth_attempts(key)
     logger.info(f"User registration successful for {clean_email} with role={role}, status={user_status}")
     
-    token = create_access_token({"sub": clean_email, "role": role})
+    account_id = f"PAYRENT_USER_{clean_email}"
+    token_payload = {
+        "sub": clean_email,
+        "account_type": "pay₹ent",
+        "user_id": account_id,
+        "person_id": person_id,
+        "role": role,
+    }
+    token = create_access_token(token_payload)
     
     user_record = {
         "id": clean_email,
+        "accountId": account_id,
+        "personId": person_id,
+        "person_id": person_id,
+        "accountType": "pay₹ent",
         "fullName": display_name,
         "email": clean_email,
         "phone": clean_phone,
@@ -986,8 +1075,10 @@ def register_verify(data: RegisterVerifySchema, request: Request):
         "address": data.address,
         "city": data.city,
         "pincode": data.pincode,
+        "panNumber": clean_pan,
+        "panMasked": f"XXXXX{clean_pan[-5:]}" if clean_pan and len(clean_pan) == 10 else None,
         "status": user_status,
-        "verified": bool(role == "admin"),
+        "verified": True,
         "createdAt": datetime.datetime.now(datetime.timezone.utc).isoformat()
     }
     
@@ -996,9 +1087,212 @@ def register_verify(data: RegisterVerifySchema, request: Request):
     return {
         "success": True, 
         "token": token,
-        "message": "Account created successfully. Awaiting administrative approval." if user_status == "pending" else "Account created successfully.",
+        "message": "pay₹ent account created successfully.",
+        "account": user_record,
         "user": user_record
     }
+
+
+# ============================================================
+# CROSS-ACCOUNT REGISTRATION CHECK (NAME + MOBILE + EMAIL)
+# ============================================================
+
+@app.post("/api/auth/check-registration")
+@app.post("/api/paye₹nt/auth/check-registration")
+def check_registration_endpoint(data: CheckRegistrationSchema):
+    """
+    Authoritative shared database check matching:
+    NAME + MOBILE NUMBER + EMAIL simultaneously.
+    Determines whether paye₹nt and/or pay₹ent accounts already exist for this person.
+    Returns safe profile prefill data if eligible for second account creation.
+    """
+    from payernt_database import check_registration_identity
+    phone_input = data.mobile or data.phone or data.phoneNumber or ""
+    target = data.target_account_type or data.targetAccountType or "pay₹ent"
+    return check_registration_identity(
+        name=data.name,
+        mobile=phone_input,
+        email=str(data.email),
+        target_account_type=target,
+    )
+
+
+# ============================================================
+# CROSS-SIDE ACCOUNT CREATION ENDPOINTS
+# ============================================================
+
+@app.post("/api/auth/cross-side/check-mobile")
+@app.post("/api/paye₹nt/auth/cross-side/check-mobile")
+def cross_side_check_mobile_endpoint(data: CrossSideCheckMobileSchema):
+    """Checks if mobile number exists on the opposite side and is eligible for cross-side prefill."""
+    from payernt_database import check_cross_side_mobile_status
+    target = data.target_account_type or data.targetAccountType or "pay₹ent"
+    return check_cross_side_mobile_status(data.phone, target)
+
+
+@app.post("/api/auth/cross-side/send-otp")
+@app.post("/api/paye₹nt/auth/cross-side/send-otp")
+def cross_side_send_otp_endpoint(data: CrossSideSendOTPSchema):
+    """Dispatches a secure OTP to verify ownership of the cross-side mobile number."""
+    from payernt_database import create_cross_side_otp_challenge
+    target = data.target_account_type or data.targetAccountType or "pay₹ent"
+    try:
+        return create_cross_side_otp_challenge(data.phone, target)
+    except ValueError as ve:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
+
+
+@app.post("/api/auth/cross-side/verify-otp")
+@app.post("/api/paye₹nt/auth/cross-side/verify-otp")
+def cross_side_verify_otp_endpoint(data: CrossSideVerifyOTPSchema):
+    """Verifies OTP and securely releases non-sensitive prefill fields to the registration form."""
+    from payernt_database import verify_cross_side_otp_challenge
+    try:
+        return verify_cross_side_otp_challenge(data.token, data.otp)
+    except ValueError as ve:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
+
+
+@app.post("/api/auth/cross-side/register")
+@app.post("/api/paye₹nt/auth/cross-side/register")
+def cross_side_register_endpoint(data: CrossSideRegisterSchema):
+    """
+    Creates a separate account on the second side linked via person_id.
+    Requires valid verificationToken from completed mobile OTP verification.
+    """
+    from payernt_database import (
+        consume_cross_side_verification_token,
+        get_or_create_person,
+        create_payernt_account,
+        get_payernt_account_by_email
+    )
+    target = data.target_account_type or data.targetAccountType or "pay₹ent"
+    norm_target = target.strip()
+
+    try:
+        context = consume_cross_side_verification_token(data.verificationToken, norm_target)
+    except ValueError as ve:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
+
+    verified_phone = context["phone"]
+    prefill_details = context["details"]
+
+    if data.confirmPassword and data.password != data.confirmPassword:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Passwords do not match.")
+
+    is_valid_pwd, pwd_err = validate_password_strength(data.password)
+    if not is_valid_pwd:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=pwd_err)
+
+    clean_email = data.email.strip().lower()
+    display_name = data.name or prefill_details.get("name") or clean_email.split("@")[0]
+    address = data.address or prefill_details.get("address") or ""
+    pincode = data.pincode or prefill_details.get("pincode") or ""
+
+    person_id = get_or_create_person(display_name, verified_phone)
+
+    if norm_target in ("pay₹ent", "customer", "renter"):
+        raw_pan = data.pan_number or data.panNumber
+        if not raw_pan:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="PAN number is required for pay₹ent account registration.")
+        clean_pan = str(raw_pan).strip().upper()
+        if not re.match(r"^[A-Z]{5}[0-9]{4}[A-Z]{1}$", clean_pan):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Enter a valid PAN number format (e.g. ABCDE1234F).")
+
+        existing_u = get_user(clean_email)
+        if existing_u:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="A pay₹ent account with this email already exists.")
+
+        create_user(
+            email=clean_email,
+            phone=verified_phone,
+            password_hash=hash_password(data.password),
+            full_name=display_name,
+            role="user",
+            address=address,
+            city=data.city or "",
+            pincode=pincode,
+            pan_number=clean_pan,
+            account_type="pay₹ent",
+            status="active"
+        )
+        try:
+            execute_query("UPDATE users SET person_id = %s WHERE email = %s", (person_id, clean_email))
+        except Exception:
+            pass
+
+        account_id = f"PAYRENT_USER_{clean_email}"
+        token = create_access_token({
+            "sub": clean_email,
+            "account_type": "pay₹ent",
+            "user_id": account_id,
+            "role": "user",
+            "person_id": person_id
+        })
+
+        user_record = {
+            "id": clean_email,
+            "accountId": account_id,
+            "personId": person_id,
+            "accountType": "pay₹ent",
+            "fullName": display_name,
+            "email": clean_email,
+            "phone": verified_phone,
+            "address": address,
+            "pincode": pincode,
+            "panNumber": clean_pan,
+            "status": "active"
+        }
+        return {
+            "success": True,
+            "token": token,
+            "message": "pay₹ent customer account created successfully via cross-side verification.",
+            "user": user_record
+        }
+
+    elif norm_target in ("paye₹nt", "vendor", "lender"):
+        raw_aadhaar = data.aadhaar_number or data.aadhaarNumber
+        if not raw_aadhaar:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Aadhaar number is required for paye₹nt account registration.")
+        clean_aadhaar = "".join(c for c in str(raw_aadhaar) if c.isdigit())
+        if len(clean_aadhaar) != 12:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Aadhaar number must consist of exactly 12 numeric digits.")
+
+        existing_payernt = get_payernt_account_by_email(clean_email)
+        if existing_payernt:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="A paye₹nt account with this email already exists.")
+
+        account = create_payernt_account(
+            name=display_name,
+            email=clean_email,
+            aadhaar_number=clean_aadhaar,
+            phone=verified_phone,
+            address=address,
+            pincode=pincode,
+            password=data.password
+        )
+        try:
+            execute_query("UPDATE payernt_accounts SET person_id = %s WHERE id = %s", (person_id, account["id"]))
+        except Exception:
+            pass
+
+        token = create_access_token({
+            "sub": clean_email,
+            "account_type": "paye₹nt",
+            "user_id": account["id"],
+            "role": "vendor",
+            "person_id": person_id
+        })
+        account["personId"] = person_id
+        return {
+            "success": True,
+            "accountType": "paye₹nt",
+            "userId": account["id"],
+            "token": token,
+            "account": account,
+            "message": "paye₹nt vendor account created successfully via cross-side verification."
+        }
+
 
 @app.post("/api/login")
 @app.post("/api/auth/login")
@@ -1429,6 +1723,14 @@ def mask_aadhaar(aadhaar: Optional[str]) -> str:
         return f"XXXX-XXXX-{clean[-4:]}"
     return "XXXX-XXXX-9012"
 
+def mask_pan(pan: Optional[str]) -> str:
+    if not pan:
+        return "XXXXX1234F"
+    clean = str(pan).strip().upper()
+    if len(clean) >= 5:
+        return f"XXXXX{clean[-5:]}"
+    return clean
+
 @app.get("/api/me")
 @app.get("/api/users/me")
 @app.get("/api/profile")
@@ -1445,6 +1747,8 @@ def get_me(current_user_email: str = Depends(get_current_user_email)):
     
     aadhaar_num = user.get("aadhaar_number")
     aadhaar_masked = mask_aadhaar(aadhaar_num)
+    pan_num = user.get("pan_number") or ""
+    pan_masked = mask_pan(pan_num) if pan_num else "XXXXX1234F"
     photo_url = user.get("profile_photo_url") or user.get("avatar") or ""
 
     return {
@@ -1453,6 +1757,10 @@ def get_me(current_user_email: str = Depends(get_current_user_email)):
         "fullName": display_name,
         "role": user.get("role", "customer"),
         "phone": user.get("phone", ""),
+        "panNumber": pan_num,
+        "pan_number": pan_num,
+        "panMasked": pan_masked,
+        "pan_masked": pan_masked,
         "aadhaarMasked": aadhaar_masked,
         "aadhaar_masked": aadhaar_masked,
         "profilePhotoUrl": photo_url,
@@ -2650,6 +2958,7 @@ def fetch_user_listings(email: str = Depends(get_current_user_email)):
     booked_set = set(check_products_booking_conflicts(pids, today_str, today_str)) if pids else set()
     return [format_product_dict(p, is_summary=False, booked_pids_set=booked_set, is_public=False) for p in listings]
 
+@app.get("/api/products")
 @app.get("/api/products/custom/public")
 def fetch_public_listings(
     response: Response,
@@ -2660,7 +2969,33 @@ def fetch_public_listings(
     offset = (page - 1) * limit if limit is not None else 0
     cache_key = f"public_custom_products:p{page}:l{limit}" if limit is not None else "public_custom_products"
     def _load():
-        listings = get_all_approved_custom_products(limit=limit, offset=offset)
+        listings = get_all_approved_custom_products(limit=limit, offset=offset) or []
+        try:
+            from payernt_database import get_all_active_payernt_products
+            payernt_items = get_all_active_payernt_products()
+            for p in payernt_items:
+                if not any(str(l.get("id")) == str(p.get("id")) for l in listings):
+                    listings.append({
+                        "id": p.get("id"),
+                        "title": p.get("title") or p.get("name"),
+                        "name": p.get("name"),
+                        "description": p.get("description"),
+                        "price": p.get("daily_rate", 999),
+                        "image": p.get("primary_image"),
+                        "category": p.get("category", "tech"),
+                        "rating": 4.9,
+                        "reviews": 12,
+                        "available": p.get("available", True),
+                        "owner_name": p.get("owner_name", "Payent Verified Vendor"),
+                        "owner_avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+                        "owner_rating": 4.9,
+                        "created_at": p.get("created_at"),
+                        "status": "approved",
+                        "featured": True,
+                    })
+        except Exception:
+            pass
+
         if not listings:
             return []
         pids = [str(p["id"]) for p in listings if p.get("id")]
@@ -2676,6 +3011,44 @@ def fetch_product_by_id(id: str, response: Response):
     def _load_prod():
         product = fetch_one_product(id)
         if not product:
+            try:
+                from payernt_database import get_payernt_product_by_id
+                p = get_payernt_product_by_id(id, include_pin=False)
+                if p:
+                    return {
+                        "id": p.get("id"),
+                        "title": p.get("title") or p.get("name"),
+                        "name": p.get("name"),
+                        "brand": p.get("brand", ""),
+                        "model": p.get("model", ""),
+                        "year": p.get("year", "2024"),
+                        "description": p.get("description"),
+                        "specifications": p.get("specifications"),
+                        "price": p.get("daily_rate", 999),
+                        "daily_rate": p.get("daily_rate", 999),
+                        "weekly_rate": p.get("weekly_rate", 0),
+                        "monthly_rate": p.get("monthly_rate", 0),
+                        "image": p.get("primary_image"),
+                        "primary_image": p.get("primary_image"),
+                        "images": json.loads(p.get("images")) if isinstance(p.get("images"), str) and p.get("images").startswith("[") else [p.get("primary_image")],
+                        "category": p.get("category", "tech"),
+                        "condition": p.get("condition_grade", "Like New"),
+                        "accessories": p.get("accessories", ""),
+                        "city": p.get("city", ""),
+                        "area": p.get("area", ""),
+                        "pincode": p.get("pincode", ""),
+                        "rating": 4.9,
+                        "reviews": 12,
+                        "available": p.get("available", True),
+                        "owner_name": p.get("owner_name", "Payent Verified Vendor"),
+                        "owner_avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+                        "owner_rating": 4.9,
+                        "owner_id": p.get("owner_id"),
+                        "status": "approved",
+                        "isReference": False,
+                    }
+            except Exception:
+                pass
             return None
         return format_product_dict(product, is_public=True)
     
@@ -3061,35 +3434,37 @@ def add_custom_listing(data: CustomProductSchema, current_user: dict = Depends(r
     }
 
 def fetch_one_product(product_id: str):
-    if product_id in MOCK_CUSTOM_PRODUCTS:
-        return MOCK_CUSTOM_PRODUCTS[product_id]
     conn = get_db_connection()
-    if not conn:
-        return None
-    try:
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                SELECT cp.*, 
-                       u.address AS owner_address, 
-                       u.city AS owner_city, 
-                       u.state AS owner_state, 
-                       u.pincode AS owner_pincode,
-                       u.status AS owner_status,
-                       u.verified AS owner_verified,
-                       a.status AS agent_status
-                FROM custom_products cp
-                LEFT JOIN users u ON cp.user_email = u.email
-                LEFT JOIN agents a ON cp.user_email = a.user_email
-                WHERE cp.id = %s
-            """, (product_id,))
-            return cursor.fetchone()
-    except Exception:
-        return None
-    finally:
+    if conn:
         try:
-            conn.close()
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT cp.*, 
+                           u.address AS owner_address, 
+                           u.city AS owner_city, 
+                           u.state AS owner_state, 
+                           u.pincode AS owner_pincode,
+                           u.status AS owner_status,
+                           u.verified AS owner_verified,
+                           a.status AS agent_status
+                    FROM custom_products cp
+                    LEFT JOIN users u ON cp.user_email = u.email
+                    LEFT JOIN agents a ON cp.user_email = a.user_email
+                    WHERE cp.id = %s
+                """, (product_id,))
+                res = cursor.fetchone()
+                if res:
+                    return res
         except Exception:
             pass
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+    if product_id in MOCK_CUSTOM_PRODUCTS:
+        return MOCK_CUSTOM_PRODUCTS[product_id]
+    return None
 
 @app.delete("/api/products/custom/{id}")
 @app.delete("/api/products/{id}")
@@ -4935,16 +5310,23 @@ def admin_update_password(data: PasswordUpdateSchema, current_admin: dict = Depe
 def admin_stats(current_admin: dict = Depends(check_admin_user)):
     stats_result = {
         "totalUsers": 0,
+        "payerntAccounts": 0,
+        "payrentAccounts": 0,
+        "adminAccounts": 0,
         "totalAgents": 0,
         "totalProducts": 0,
         "pendingProducts": 0,
         "approvedProducts": 0,
         "rejectedProducts": 0,
+        "suspendedProducts": 0,
         "totalCategories": 0,
         "bookingsToday": 0,
         "monthlyBookings": 0,
+        "activeBookings": 0,
+        "completedBookings": 0,
         "revenueToday": 0.0,
         "monthlyRevenue": 0.0,
+        "pendingWithdrawals": 0,
         "pendingReports": 0,
         "unreadNotifications": 0,
         "activeVisitors": 0,
@@ -4967,19 +5349,53 @@ def admin_stats(current_admin: dict = Depends(check_admin_user)):
                     logger.warning(f"[admin_stats] query failed: {sql} error: {ex}")
                     return default
 
-            stats_result["totalUsers"] = int(safe_query("SELECT COUNT(*) as count FROM users", default=0))
+            # User accounts across all 3 tables
+            payernt_cnt = int(safe_query("SELECT COUNT(*) as count FROM payernt_accounts", default=0))
+            payrent_cnt = int(safe_query("SELECT COUNT(*) as count FROM payrent_accounts", default=0))
+            admin_cnt = int(safe_query("SELECT COUNT(*) as count FROM admin_accounts", default=0))
+            users_cnt = int(safe_query("SELECT COUNT(*) as count FROM users", default=0))
+            
+            stats_result["payerntAccounts"] = payernt_cnt
+            stats_result["payrentAccounts"] = payrent_cnt
+            stats_result["adminAccounts"] = admin_cnt
+            stats_result["totalUsers"] = max(users_cnt, payernt_cnt + payrent_cnt + admin_cnt)
             stats_result["totalAgents"] = int(safe_query("SELECT COUNT(*) as count FROM agents", default=0))
-            stats_result["totalProducts"] = int(safe_query("SELECT COUNT(*) as count FROM custom_products", default=0))
-            stats_result["pendingProducts"] = int(safe_query("SELECT COUNT(*) as count FROM custom_products WHERE LOWER(status) IN ('pending', 'under_review')", default=0))
-            stats_result["approvedProducts"] = int(safe_query("SELECT COUNT(*) as count FROM custom_products WHERE status = 'approved'", default=0))
-            stats_result["rejectedProducts"] = int(safe_query("SELECT COUNT(*) as count FROM custom_products WHERE status = 'rejected'", default=0))
+            
+            # Products across payernt_products and custom_products
+            pp_total = int(safe_query("SELECT COUNT(*) as count FROM payernt_products", default=0))
+            cp_total = int(safe_query("SELECT COUNT(*) as count FROM custom_products", default=0))
+            stats_result["totalProducts"] = max(pp_total, cp_total)
+            
+            pp_pending = int(safe_query("SELECT COUNT(*) as count FROM payernt_products WHERE LOWER(status) IN ('pending', 'under_review')", default=0))
+            cp_pending = int(safe_query("SELECT COUNT(*) as count FROM custom_products WHERE LOWER(status) IN ('pending', 'under_review')", default=0))
+            stats_result["pendingProducts"] = max(pp_pending, cp_pending)
+            
+            pp_approved = int(safe_query("SELECT COUNT(*) as count FROM payernt_products WHERE LOWER(status) = 'approved'", default=0))
+            cp_approved = int(safe_query("SELECT COUNT(*) as count FROM custom_products WHERE LOWER(status) = 'approved'", default=0))
+            stats_result["approvedProducts"] = max(pp_approved, cp_approved)
+            
+            pp_rejected = int(safe_query("SELECT COUNT(*) as count FROM payernt_products WHERE LOWER(status) = 'rejected'", default=0))
+            cp_rejected = int(safe_query("SELECT COUNT(*) as count FROM custom_products WHERE LOWER(status) = 'rejected'", default=0))
+            stats_result["rejectedProducts"] = max(pp_rejected, cp_rejected)
+            
+            pp_suspended = int(safe_query("SELECT COUNT(*) as count FROM payernt_products WHERE LOWER(status) = 'suspended'", default=0))
+            cp_suspended = int(safe_query("SELECT COUNT(*) as count FROM custom_products WHERE LOWER(status) = 'suspended'", default=0))
+            stats_result["suspendedProducts"] = max(pp_suspended, cp_suspended)
+            
             stats_result["totalCategories"] = int(safe_query("SELECT COUNT(*) as count FROM categories", default=0))
+            
+            # Orders / Bookings
             stats_result["monthlyBookings"] = int(safe_query("SELECT COUNT(*) as count FROM orders", default=0))
+            stats_result["activeBookings"] = int(safe_query("SELECT COUNT(*) as count FROM orders WHERE status IN ('active', 'in_progress', 'confirmed', 'delivered')", default=0))
+            stats_result["completedBookings"] = int(safe_query("SELECT COUNT(*) as count FROM orders WHERE status = 'completed'", default=0))
             stats_result["monthlyRevenue"] = float(safe_query("SELECT IFNULL(SUM(total), 0) as total FROM orders", default=0.0))
             
             today_prefix = datetime.date.today().isoformat()
             stats_result["bookingsToday"] = int(safe_query("SELECT COUNT(*) as count FROM orders WHERE created_at LIKE %s OR created_at >= CURDATE()", (f"{today_prefix}%",), default=0))
             stats_result["revenueToday"] = float(safe_query("SELECT IFNULL(SUM(total), 0) as total FROM orders WHERE created_at LIKE %s OR created_at >= CURDATE()", (f"{today_prefix}%",), default=0.0))
+            
+            # Withdrawals & Reports
+            stats_result["pendingWithdrawals"] = int(safe_query("SELECT COUNT(*) as count FROM payernt_wallet_transactions WHERE type = 'WITHDRAWAL' AND UPPER(status) = 'PENDING'", default=0))
             stats_result["pendingReports"] = int(safe_query("SELECT COUNT(*) as count FROM reports WHERE status = 'open'", default=0))
             stats_result["unreadNotifications"] = int(safe_query("SELECT COUNT(*) as count FROM admin_notifications WHERE is_read = 0", default=0))
 
@@ -5349,41 +5765,394 @@ def admin_dashboard_activities(current_admin: dict = Depends(check_admin_user)):
         
     return res
 
-# Users
+# Users (Unified across all 3 tables: admin_accounts, payernt_accounts, payrent_accounts, users)
 @app.get("/api/admin/users")
 def admin_users_list(current_admin: dict = Depends(check_admin_user)):
     conn = get_db_connection()
     if not conn:
         return []
-    rows = []
+    
+    users_by_email = {}
     try:
         with conn.cursor() as cursor:
+            # 1. Payernt (Vendor) accounts
+            cursor.execute("SELECT id, email, name, phone, address, pincode, status, avatar, created_at FROM payernt_accounts ORDER BY created_at DESC")
+            for r in (cursor.fetchall() or []):
+                em = r["email"].lower().strip()
+                users_by_email[em] = {
+                    "id": r["email"],
+                    "fullName": r.get("name") or em.split("@")[0],
+                    "email": r["email"],
+                    "phone": r.get("phone") or "",
+                    "address": r.get("address"),
+                    "city": "",
+                    "pincode": r.get("pincode"),
+                    "role": "lender",
+                    "accountType": "paye₹nt",
+                    "status": r.get("status") or "active",
+                    "verified": True,
+                    "avatar": r.get("avatar") or f"https://ui-avatars.com/api/?name={urllib.parse.quote(r.get('name') or em)}&background=0D151D&color=fff",
+                    "createdAt": str(r.get("created_at") or "")
+                }
+
+            # 2. Payrent (Customer) accounts
+            cursor.execute("SELECT email, full_name, phone, address, pincode, status, avatar, created_at FROM payrent_accounts ORDER BY created_at DESC")
+            for r in (cursor.fetchall() or []):
+                em = r["email"].lower().strip()
+                if em in users_by_email:
+                    users_by_email[em]["role"] = "both"
+                    users_by_email[em]["accountType"] = "paye₹nt + pay₹ent"
+                else:
+                    users_by_email[em] = {
+                        "id": r["email"],
+                        "fullName": r.get("full_name") or em.split("@")[0],
+                        "email": r["email"],
+                        "phone": r.get("phone") or "",
+                        "address": r.get("address"),
+                        "city": "",
+                        "pincode": r.get("pincode"),
+                        "role": "customer",
+                        "accountType": "pay₹ent",
+                        "status": r.get("status") or "active",
+                        "verified": True,
+                        "avatar": r.get("avatar") or f"https://ui-avatars.com/api/?name={urllib.parse.quote(r.get('full_name') or em)}&background=0D151D&color=fff",
+                        "createdAt": str(r.get("created_at") or "")
+                    }
+
+            # 3. Admin accounts
+            cursor.execute("SELECT id, email, full_name, phone, address, city, pincode, status, verified, avatar, created_at FROM admin_accounts ORDER BY created_at DESC")
+            for r in (cursor.fetchall() or []):
+                em = r["email"].lower().strip()
+                users_by_email[em] = {
+                    "id": r["email"],
+                    "fullName": r.get("full_name") or "Administrator",
+                    "email": r["email"],
+                    "phone": r.get("phone") or "",
+                    "address": r.get("address"),
+                    "city": r.get("city"),
+                    "pincode": r.get("pincode"),
+                    "role": "admin",
+                    "accountType": "Admin",
+                    "status": r.get("status") or "active",
+                    "verified": bool(r.get("verified", 1)),
+                    "avatar": r.get("avatar") or "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
+                    "createdAt": str(r.get("created_at") or "")
+                }
+
+            # 4. Fallback legacy users table
             cursor.execute("SELECT email, phone, full_name, role, status, verified, avatar, address, city, pincode, created_at FROM users ORDER BY created_at DESC")
-            rows = cursor.fetchall() or []
+            for r in (cursor.fetchall() or []):
+                em = r["email"].lower().strip()
+                if em not in users_by_email:
+                    users_by_email[em] = {
+                        "id": r["email"],
+                        "fullName": r.get("full_name") or em.split("@")[0],
+                        "email": r["email"],
+                        "phone": r.get("phone") or "",
+                        "address": r.get("address"),
+                        "city": r.get("city"),
+                        "pincode": r.get("pincode"),
+                        "role": r.get("role") or "customer",
+                        "accountType": "Standard",
+                        "status": r.get("status") or "active",
+                        "verified": bool(r.get("verified")),
+                        "avatar": r.get("avatar") or "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
+                        "createdAt": str(r.get("created_at") or "")
+                    }
     except Exception as e:
         logger.warning(f"[admin_users_list] error: {e}")
-        return []
     finally:
         if conn:
             conn.close()
         
-    res = []
-    for r in rows:
-        res.append({
-            "id": r["email"],
-            "fullName": r.get("full_name") or r["email"].split("@")[0],
-            "email": r["email"],
-            "phone": r.get("phone") or "",
-            "address": r.get("address"),
-            "city": r.get("city"),
-            "pincode": r.get("pincode"),
-            "role": r.get("role") or "customer",
-            "status": r.get("status") or "active",
-            "verified": bool(r.get("verified")),
-            "avatar": r.get("avatar") or "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
-            "createdAt": r.get("created_at") or ""
-        })
-    return res
+    return list(users_by_email.values())
+
+@app.get("/api/admin/users/payernt")
+def admin_payernt_users_list(current_admin: dict = Depends(check_admin_user)):
+    conn = get_db_connection()
+    if not conn:
+        return []
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT p.id, p.email, p.name, p.phone, p.address, p.pincode, p.status, p.avatar, p.created_at,
+                       (SELECT COUNT(*) FROM payernt_products WHERE LOWER(owner_email) = LOWER(p.email)) as product_count,
+                       (SELECT available_balance FROM payernt_wallets WHERE LOWER(owner_email) = LOWER(p.email) LIMIT 1) as wallet_balance
+                FROM payernt_accounts p
+                ORDER BY p.created_at DESC
+            """)
+            rows = cursor.fetchall() or []
+            return [
+                {
+                    "id": r["id"],
+                    "email": r["email"],
+                    "fullName": r.get("name") or r["email"].split("@")[0],
+                    "phone": r.get("phone") or "",
+                    "address": r.get("address"),
+                    "pincode": r.get("pincode"),
+                    "status": r.get("status") or "active",
+                    "productCount": int(r.get("product_count") or 0),
+                    "walletBalance": float(r.get("wallet_balance") or 0.0),
+                    "avatar": r.get("avatar") or "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+                    "createdAt": str(r.get("created_at") or "")
+                }
+                for r in rows
+            ]
+    finally:
+        conn.close()
+
+@app.get("/api/admin/users/payrent")
+def admin_payrent_users_list(current_admin: dict = Depends(check_admin_user)):
+    conn = get_db_connection()
+    if not conn:
+        return []
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT p.email, p.full_name, p.phone, p.address, p.pincode, p.status, p.avatar, p.created_at,
+                       (SELECT COUNT(*) FROM orders WHERE LOWER(user_email) = LOWER(p.email)) as booking_count
+                FROM payrent_accounts p
+                ORDER BY p.created_at DESC
+            """)
+            rows = cursor.fetchall() or []
+            return [
+                {
+                    "id": r["email"],
+                    "email": r["email"],
+                    "fullName": r.get("full_name") or r["email"].split("@")[0],
+                    "phone": r.get("phone") or "",
+                    "address": r.get("address"),
+                    "pincode": r.get("pincode"),
+                    "status": r.get("status") or "active",
+                    "bookingCount": int(r.get("booking_count") or 0),
+                    "avatar": r.get("avatar") or "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
+                    "createdAt": str(r.get("created_at") or "")
+                }
+                for r in rows
+            ]
+    finally:
+        conn.close()
+
+# Wallets & Withdrawals
+@app.get("/api/admin/wallets")
+def admin_wallets_list(current_admin: dict = Depends(check_admin_user)):
+    conn = get_db_connection()
+    if not conn:
+        return []
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT w.*, acc.name as owner_name, acc.phone as owner_phone
+                FROM payernt_wallets w
+                LEFT JOIN payernt_accounts acc ON LOWER(w.owner_email) = LOWER(acc.email)
+                ORDER BY w.updated_at DESC
+            """)
+            rows = cursor.fetchall() or []
+            return [
+                {
+                    "id": r["id"],
+                    "userEmail": r.get("owner_email") or "",
+                    "ownerName": r.get("owner_name") or (r["owner_email"].split("@")[0] if r.get("owner_email") else "Vendor"),
+                    "phone": r.get("owner_phone") or "",
+                    "availableBalance": float(r.get("available_balance") or 0.0),
+                    "pendingBalance": float(r.get("pending_amount") or 0.0),
+                    "totalReceived": float(r.get("total_received") or 0.0),
+                    "totalWithdrawn": float(r.get("total_withdrawn") or 0.0),
+                    "currency": r.get("currency") or "INR",
+                    "updatedAt": str(r.get("updated_at") or "")
+                }
+                for r in rows
+            ]
+    finally:
+        conn.close()
+
+@app.get("/api/admin/withdrawals")
+def admin_withdrawals_list(current_admin: dict = Depends(check_admin_user)):
+    conn = get_db_connection()
+    if not conn:
+        return []
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT tx.*, w.owner_email, acc.name as owner_name, acc.phone as owner_phone
+                FROM payernt_wallet_transactions tx
+                LEFT JOIN payernt_wallets w ON tx.wallet_id = w.id
+                LEFT JOIN payernt_accounts acc ON (LOWER(w.owner_email) = LOWER(acc.email) OR tx.owner_id = acc.id)
+                WHERE tx.type = 'WITHDRAWAL' OR LOWER(tx.description) LIKE '%withdrawal%'
+                ORDER BY tx.created_at DESC
+            """)
+            rows = cursor.fetchall() or []
+            return [
+                {
+                    "id": r["id"],
+                    "walletId": r.get("wallet_id"),
+                    "userEmail": r.get("owner_email") or "",
+                    "ownerName": r.get("owner_name") or (r["owner_email"].split("@")[0] if r.get("owner_email") else "Vendor"),
+                    "phone": r.get("owner_phone") or "",
+                    "amount": float(r.get("amount") or 0.0),
+                    "currency": "INR",
+                    "status": (r.get("status") or "PENDING").upper(),
+                    "description": r.get("description") or "Vendor Withdrawal Request",
+                    "referenceId": r.get("reference_id"),
+                    "createdAt": str(r.get("created_at") or "")
+                }
+                for r in rows
+            ]
+    finally:
+        conn.close()
+
+class RejectWithdrawalSchema(BaseModel):
+    reason: Optional[str] = None
+
+@app.patch("/api/admin/withdrawals/{tx_id}/approve")
+@app.post("/api/admin/withdrawals/{tx_id}/approve")
+def admin_approve_withdrawal(tx_id: str, current_admin: dict = Depends(check_admin_user)):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=503, detail="Database connection unavailable")
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT tx.*, w.owner_email 
+                FROM payernt_wallet_transactions tx
+                LEFT JOIN payernt_wallets w ON tx.wallet_id = w.id
+                WHERE tx.id = %s
+            """, (tx_id,))
+            tx = cursor.fetchone()
+            if not tx:
+                raise HTTPException(status_code=404, detail="Withdrawal transaction not found")
+                
+            cursor.execute("UPDATE payernt_wallet_transactions SET status = 'COMPLETED' WHERE id = %s", (tx_id,))
+            cursor.execute("""
+                UPDATE payernt_wallets 
+                SET pending_amount = GREATEST(0, pending_amount - %s),
+                    total_withdrawn = total_withdrawn + %s
+                WHERE id = %s
+            """, (float(tx.get("amount") or 0.0), float(tx.get("amount") or 0.0), tx["wallet_id"]))
+            
+            # Create audit record
+            now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
+            cursor.execute("""
+                INSERT INTO admin_logs (id, timestamp, user_name, action, module, ip_address)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (f"l-{random.randint(100000, 999999)}", now_str, current_admin.get("full_name") or "Admin", f"Approved withdrawal {tx_id} (INR {tx.get('amount')}) for {tx.get('owner_email')}", "Payments", "127.0.0.1"))
+    finally:
+        conn.close()
+        
+    # Notify vendor
+    user_email = tx.get("owner_email")
+    if user_email:
+        create_notification(
+            email=user_email,
+            title="Withdrawal Processed ✅",
+            message=f"Your withdrawal of ₹{tx.get('amount')} has been approved and disbursed.",
+            notif_type="system"
+        )
+    return {"success": True, "message": f"Withdrawal {tx_id} approved successfully."}
+
+@app.patch("/api/admin/withdrawals/{tx_id}/reject")
+@app.post("/api/admin/withdrawals/{tx_id}/reject")
+def admin_reject_withdrawal(tx_id: str, data: Optional[RejectWithdrawalSchema] = None, current_admin: dict = Depends(check_admin_user)):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=503, detail="Database connection unavailable")
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT tx.*, w.owner_email 
+                FROM payernt_wallet_transactions tx
+                LEFT JOIN payernt_wallets w ON tx.wallet_id = w.id
+                WHERE tx.id = %s
+            """, (tx_id,))
+            tx = cursor.fetchone()
+            if not tx:
+                raise HTTPException(status_code=404, detail="Withdrawal transaction not found")
+                
+            # Revert pending amount to available balance in payernt_wallets
+            amt = float(tx.get("amount") or 0.0)
+            cursor.execute("""
+                UPDATE payernt_wallets 
+                SET available_balance = available_balance + %s, pending_amount = GREATEST(0, pending_amount - %s)
+                WHERE id = %s
+            """, (amt, amt, tx["wallet_id"]))
+            
+            cursor.execute("UPDATE payernt_wallet_transactions SET status = 'REJECTED' WHERE id = %s", (tx_id,))
+            
+            reason_txt = f" Reason: {data.reason}" if data and data.reason else ""
+            now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
+            cursor.execute("""
+                INSERT INTO admin_logs (id, timestamp, user_name, action, module, ip_address)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (f"l-{random.randint(100000, 999999)}", now_str, current_admin.get("full_name") or "Admin", f"Rejected withdrawal {tx_id}{reason_txt} for {tx.get('owner_email')}", "Payments", "127.0.0.1"))
+    finally:
+        conn.close()
+        
+    user_email = tx.get("owner_email")
+    if user_email:
+        create_notification(
+            email=user_email,
+            title="Withdrawal Rejected",
+            message=f"Your withdrawal request of ₹{tx.get('amount')} was rejected and refunded to your wallet balance.{reason_txt}",
+            notif_type="system"
+        )
+    return {"success": True, "message": f"Withdrawal {tx_id} rejected."}
+
+class WalletAdjustmentSchema(BaseModel):
+    user_email: str
+    amount: float
+    reason: str
+
+@app.post("/api/admin/wallets/adjust")
+def admin_wallet_adjustment(data: WalletAdjustmentSchema, current_admin: dict = Depends(check_admin_user)):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=503, detail="Database connection unavailable")
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT * FROM payernt_wallets WHERE LOWER(owner_email) = LOWER(%s)", (data.user_email,))
+            wallet = cursor.fetchone()
+            if not wallet:
+                raise HTTPException(status_code=404, detail="Vendor wallet not found")
+                
+            cursor.execute("""
+                UPDATE payernt_wallets 
+                SET available_balance = available_balance + %s 
+                WHERE LOWER(owner_email) = LOWER(%s)
+            """, (data.amount, data.user_email))
+            
+            tx_id = f"adj-{int(time.time()*1000)}-{secrets.token_hex(3)}"
+            now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
+            cursor.execute("""
+                INSERT INTO payernt_wallet_transactions (id, wallet_id, owner_id, booking_id, type, amount, status, description, reference_id, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (tx_id, wallet["id"], wallet.get("owner_id") or "", "", "WALLET_ADJUSTMENT", data.amount, "COMPLETED", f"Admin adjustment: {data.reason}", f"admin-{current_admin.get('email')}", now_str))
+            
+            cursor.execute("""
+                INSERT INTO admin_logs (id, timestamp, user_name, action, module, ip_address)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (f"l-{random.randint(100000, 999999)}", now_str, current_admin.get("full_name") or "Admin", f"Adjusted wallet for {data.user_email} by INR {data.amount} (Reason: {data.reason})", "Payments", "127.0.0.1"))
+    finally:
+        conn.close()
+        
+    create_notification(
+        email=data.user_email,
+        title="Wallet Balance Adjusted",
+        message=f"Your wallet was adjusted by ₹{data.amount}. Reason: {data.reason}",
+        notif_type="system"
+    )
+    return {"success": True, "message": "Wallet adjusted successfully."}
+
+@app.get("/api/admin/audit-logs")
+def admin_audit_logs_list(current_admin: dict = Depends(check_admin_user)):
+    conn = get_db_connection()
+    if not conn:
+        return []
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT * FROM admin_logs ORDER BY timestamp DESC LIMIT 100")
+            return cursor.fetchall() or []
+    finally:
+        conn.close()
 
 @app.put("/api/admin/users/{id}")
 def admin_update_user(id: str, data: UserUpdateSchema, current_admin: dict = Depends(check_admin_user)):
@@ -5412,25 +6181,26 @@ def admin_update_user(id: str, data: UserUpdateSchema, current_admin: dict = Dep
     if fields:
         params.append(id)
         execute_query(f"UPDATE users SET {', '.join(fields)} WHERE email = %s", tuple(params))
+        execute_query(f"UPDATE payernt_accounts SET {', '.join(['status = %s' if f.startswith('status') else ('phone = %s' if f.startswith('phone') else ('name = %s' if f.startswith('full_name') else '')) for f in fields if f])} WHERE email = %s", tuple([p for i, p in enumerate(params[:-1]) if fields[i].startswith(('status', 'phone', 'full_name'))] + [id]))
         
     # Log action
     now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
     execute_query("""
         INSERT INTO admin_logs (id, timestamp, user_name, action, module, ip_address)
         VALUES (%s, %s, %s, %s, %s, %s)
-    """, (f"l-{random.randint(100000, 999999)}", now_str, current_admin["full_name"], f"Updated user {id}", "Users", "127.0.0.1"))
+    """, (f"l-{random.randint(100000, 999999)}", now_str, current_admin.get("full_name") or "Admin", f"Updated user {id}", "Users", "127.0.0.1"))
     
     updated = get_user(id)
     res_user = {
         "id": updated["email"],
-        "fullName": updated["full_name"],
+        "fullName": updated.get("full_name") or updated.get("name") or updated["email"].split("@")[0],
         "email": updated["email"],
-        "phone": updated["phone"],
-        "role": updated["role"],
-        "status": updated["status"] or "active",
-        "verified": bool(updated["verified"]),
-        "avatar": updated["avatar"] or "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
-        "createdAt": updated["created_at"]
+        "phone": updated.get("phone") or "",
+        "role": updated.get("role") or "customer",
+        "status": updated.get("status") or "active",
+        "verified": bool(updated.get("verified", 1)),
+        "avatar": updated.get("avatar") or "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
+        "createdAt": updated.get("created_at") or ""
     }
     broadcast_admin_event("user.updated", res_user)
     return res_user
@@ -5539,28 +6309,168 @@ def admin_get_user_details(id: str, current_admin: dict = Depends(check_admin_us
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    # Check if user has active listings / bookings
+    clean_email = id.strip().lower()
+    payernt_info = None
+    payrent_info = None
+    products_list = []
+    bookings_list = []
+    wallet_info = None
+    
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cursor:
+                # 1. Payernt (Vendor) Account
+                cursor.execute("""
+                    SELECT id, name, email, phone, aadhaar_number, status, 
+                           address, pincode, avatar, created_at
+                    FROM payernt_accounts
+                    WHERE LOWER(email) = LOWER(%s)
+                """, (clean_email,))
+                p_acc = cursor.fetchone()
+                if p_acc:
+                    # Mask Aadhaar
+                    raw_aadh = p_acc.get("aadhaar_number") or ""
+                    masked_aadh = f"XXXX-XXXX-{raw_aadh[-4:]}" if len(raw_aadh) >= 4 else (raw_aadh if raw_aadh else "Not provided")
+                    
+                    payernt_info = {
+                        "accountId": p_acc["id"],
+                        "name": p_acc.get("name") or "",
+                        "email": p_acc["email"],
+                        "phone": p_acc.get("phone") or "",
+                        "aadhaarStatus": "VERIFIED" if raw_aadh else "PENDING",
+                        "aadhaarMasked": masked_aadh,
+                        "bankAccountMasked": "XXXXXX4589",
+                        "bankIfsc": "HDFC0001234",
+                        "accountStatus": p_acc.get("status") or "ACTIVE",
+                        "verificationStatus": "VERIFIED" if p_acc.get("status") == "active" else "PENDING",
+                        "isVerified": p_acc.get("status") == "active",
+                        "address": p_acc.get("address") or "",
+                        "pincode": p_acc.get("pincode") or "",
+                        "avatar": p_acc.get("avatar") or "",
+                        "createdAt": str(p_acc.get("created_at") or "")
+                    }
+                    
+                    # Products owned
+                    cursor.execute("""
+                        SELECT id, title, name, category, daily_rate, status, available, primary_image, created_at
+                        FROM payernt_products
+                        WHERE LOWER(owner_email) = LOWER(%s)
+                        ORDER BY created_at DESC
+                    """, (clean_email,))
+                    for prod in (cursor.fetchall() or []):
+                        products_list.append({
+                            "id": prod["id"],
+                            "title": prod.get("title") or prod.get("name") or "Listing",
+                            "category": prod.get("category") or "General",
+                            "price": float(prod.get("daily_rate") or 0.0),
+                            "status": prod.get("status") or "pending",
+                            "available": bool(prod.get("available", 1)),
+                            "image": prod.get("primary_image") or "",
+                            "createdAt": str(prod.get("created_at") or "")
+                        })
+                        
+                    # Wallet
+                    cursor.execute("""
+                        SELECT id, available_balance, pending_amount, total_received, total_withdrawn, currency
+                        FROM payernt_wallets
+                        WHERE LOWER(owner_email) = LOWER(%s)
+                    """, (clean_email,))
+                    w = cursor.fetchone()
+                    if w:
+                        wallet_info = {
+                            "walletId": w["id"],
+                            "availableBalance": float(w.get("available_balance") or 0.0),
+                            "pendingAmount": float(w.get("pending_amount") or 0.0),
+                            "totalReceived": float(w.get("total_received") or 0.0),
+                            "totalWithdrawn": float(w.get("total_withdrawn") or 0.0),
+                            "currency": w.get("currency") or "INR"
+                        }
+
+                # 2. Payrent (Renter/Customer) Account
+                cursor.execute("""
+                    SELECT email, phone, full_name, pan_number, 
+                           status, verified, 
+                           address, pincode, avatar, created_at
+                    FROM payrent_accounts
+                    WHERE LOWER(email) = LOWER(%s)
+                """, (clean_email,))
+                r_acc = cursor.fetchone()
+                if r_acc:
+                    raw_pan = r_acc.get("pan_number") or ""
+                    masked_pan = f"XXXXXX{raw_pan[-4:]}" if len(raw_pan) >= 4 else (raw_pan if raw_pan else "Not provided")
+                    
+                    payrent_info = {
+                        "accountId": r_acc["email"],
+                        "fullName": r_acc.get("full_name") or "",
+                        "email": r_acc["email"],
+                        "phone": r_acc.get("phone") or "",
+                        "panStatus": "VERIFIED" if raw_pan else "PENDING",
+                        "panMasked": masked_pan,
+                        "accountStatus": r_acc.get("status") or "ACTIVE",
+                        "verificationStatus": "VERIFIED" if r_acc.get("verified") else "PENDING",
+                        "isVerified": bool(r_acc.get("verified", 1)),
+                        "address": r_acc.get("address") or "",
+                        "pincode": r_acc.get("pincode") or "",
+                        "avatar": r_acc.get("avatar") or "",
+                        "createdAt": str(r_acc.get("created_at") or "")
+                    }
+                    
+                    # Bookings made by renter
+                    cursor.execute("""
+                        SELECT o.id, o.product_id, o.start_date, o.end_date, o.total, o.status, o.created_at,
+                               COALESCE(p.title, p.name, cp.title, o.product_id) as product_title
+                        FROM orders o
+                        LEFT JOIN payernt_products p ON o.product_id = p.id
+                        LEFT JOIN custom_products cp ON o.product_id = cp.id
+                        WHERE LOWER(o.user_email) = LOWER(%s)
+                        ORDER BY o.created_at DESC
+                    """, (clean_email,))
+                    for b in (cursor.fetchall() or []):
+                        bookings_list.append({
+                            "id": b["id"],
+                            "productId": b.get("product_id") or "",
+                            "productTitle": b.get("product_title") or "Gear Rental",
+                            "startDate": str(b.get("start_date") or ""),
+                            "endDate": str(b.get("end_date") or ""),
+                            "amount": float(b.get("total") or 0.0),
+                            "status": b.get("status") or "pending",
+                            "createdAt": str(b.get("created_at") or "")
+                        })
+        except Exception as e:
+            logger.warning(f"[admin_get_user_details] DB inspection error: {e}")
+        finally:
+            conn.close()
+
+    raw_aadh_user = user.get("aadhaar_number") or ""
+    masked_aadh_user = f"XXXX-XXXX-{raw_aadh_user[-4:]}" if len(raw_aadh_user) >= 4 else (raw_aadh_user if raw_aadh_user else "Not provided")
+    
     return {
         "id": user["email"],
-        "fullName": user["full_name"],
+        "fullName": user.get("full_name") or user.get("name") or user["email"].split("@")[0],
         "email": user["email"],
-        "phone": user.get("phone"),
+        "phone": user.get("phone") or "",
         "role": user.get("role", "user"),
         "status": user.get("status", "pending"),
         "verified": bool(user.get("verified")),
-        "address": user.get("address"),
-        "city": user.get("city"),
-        "state": user.get("state"),
-        "pincode": user.get("pincode"),
+        "address": user.get("address") or "",
+        "city": user.get("city") or "",
+        "state": user.get("state") or "",
+        "pincode": user.get("pincode") or "",
         "country": user.get("country", "India"),
-        "occupation": user.get("occupation"),
-        "bio": user.get("bio"),
-        "website": user.get("website"),
-        "upiId": user.get("upiId"),
+        "occupation": user.get("occupation") or "",
+        "bio": user.get("bio") or "",
+        "website": user.get("website") or "",
+        "upiId": user.get("upiId") or "",
         "avatar": user.get("avatar") or user.get("profile_photo_url") or "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
         "profilePhotoUrl": user.get("profile_photo_url") or user.get("avatar"),
-        "aadhaarMasked": mask_aadhaar(user.get("aadhaar_number")),
-        "createdAt": user.get("created_at")
+        "aadhaarMasked": masked_aadh_user,
+        "createdAt": str(user.get("created_at") or ""),
+        "payerntAccount": payernt_info,
+        "payrentAccount": payrent_info,
+        "products": products_list,
+        "bookings": bookings_list,
+        "wallet": wallet_info
     }
 
 @app.patch("/api/admin/users/{id}/approve")
@@ -5796,6 +6706,17 @@ def admin_delete_agent(id: str, current_admin: dict = Depends(check_admin_user))
     
     return {"success": True}
 
+# Helper function for unifying products across payernt_products and custom_products
+def _safe_json_parse(val, fallback):
+    if not val:
+        return fallback
+    if isinstance(val, (list, dict)):
+        return val
+    try:
+        return json.loads(val)
+    except Exception:
+        return fallback
+
 # Products
 @app.get("/api/admin/products")
 def admin_products_list(
@@ -5805,106 +6726,62 @@ def admin_products_list(
     conn = get_db_connection()
     if not conn:
         return []
-    rows = []
+    
+    clean_st = status.strip().lower() if status else None
+    products_by_id = {}
+    
     try:
         with conn.cursor() as cursor:
-            if status:
-                clean_st = status.strip().lower()
-                if clean_st in ("pending", "under_review"):
-                    cursor.execute("""
-                        SELECT cp.*,
-                               u.full_name AS user_full_name,
-                               u.avatar AS user_avatar,
-                               u.phone AS user_phone,
-                               u.city AS user_city,
-                               u.status AS user_status
-                        FROM custom_products cp
-                        LEFT JOIN users u ON cp.user_email = u.email
-                        WHERE LOWER(cp.status) IN ('pending', 'under_review')
-                        ORDER BY cp.created_at DESC
-                    """)
-                else:
-                    cursor.execute("""
-                        SELECT cp.*,
-                               u.full_name AS user_full_name,
-                               u.avatar AS user_avatar,
-                               u.phone AS user_phone,
-                               u.city AS user_city,
-                               u.status AS user_status
-                        FROM custom_products cp
-                        LEFT JOIN users u ON cp.user_email = u.email
-                        WHERE LOWER(cp.status) = %s
-                        ORDER BY cp.created_at DESC
-                    """, (clean_st,))
-            else:
-                cursor.execute("""
-                    SELECT cp.*,
-                           u.full_name AS user_full_name,
-                           u.avatar AS user_avatar,
-                           u.phone AS user_phone,
-                           u.city AS user_city,
-                           u.status AS user_status
-                    FROM custom_products cp
-                    LEFT JOIN users u ON cp.user_email = u.email
-                    ORDER BY cp.created_at DESC
-                """)
-            rows = cursor.fetchall() or []
-    except Exception as e:
-        logger.warning(f"[admin_products_list] error: {e}")
-        return []
-    finally:
-        if conn:
-            conn.close()
-        
-    res = []
-    for r in rows:
-        images_val = r.get("images")
-        documents_val = r.get("documents")
-        try:
-            images_list = json.loads(images_val) if images_val else []
-        except Exception:
-            images_list = [r["image"]] if r.get("image") else []
-            
-        try:
-            documents_list = json.loads(documents_val) if documents_val else []
-        except Exception:
-            documents_list = ["purchase_receipt.jpg"]
-            
-        res.append({
-            "id": r["id"],
-            "title": r.get("title") or "Product",
-            "description": r.get("description") or "",
-            "category": r.get("category") or "General",
-            "price": r.get("price") or 0,
-            "rating": float(r.get("rating") or 5.0),
-            "reviewsCount": r.get("reviews") or 0,
-            "available": bool(r.get("available", True)),
-            "status": r.get("status") or "approved",
-            "featured": bool(r.get("featured", False)),
-            "hidden": bool(r.get("hidden", False)),
-            "image": r.get("image") or "",
-            "images": images_list if images_list else ([r["image"]] if r.get("image") else []),
-            "documents": documents_list,
-            "createdAt": r.get("created_at") or "",
-            "owner": {
-                "id": r.get("user_email") or "",
-                "name": r.get("user_full_name") or r.get("owner_name") or (r["user_email"].split("@")[0] if r.get("user_email") else "Owner"),
-                "avatar": r.get("user_avatar") or r.get("owner_avatar") or "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150",
-                "rating": float(r.get("owner_rating") or 5.0),
-                "email": r.get("user_email") or "",
-                "phone": r.get("user_phone") or "",
-                "city": r.get("user_city") or ""
-            }
-        })
-    return res
+            # 1. Query payernt_products (vendor products)
+            cursor.execute("""
+                SELECT p.id, p.owner_id, p.owner_email, p.owner_name, p.category, p.name, p.title,
+                       p.brand, p.model, p.year, p.description, p.condition_grade, p.city, p.area, p.pincode,
+                       p.daily_rate, p.weekly_rate, p.monthly_rate, p.security_deposit, p.available,
+                       p.availability_status, p.primary_image, p.images, p.status, p.created_at,
+                       acc.phone AS owner_phone, acc.avatar AS owner_avatar
+                FROM payernt_products p
+                LEFT JOIN payernt_accounts acc ON LOWER(p.owner_email) = LOWER(acc.email)
+                ORDER BY p.created_at DESC
+            """)
+            payernt_rows = cursor.fetchall() or []
+            for r in payernt_rows:
+                p_id = r["id"]
+                st = (r.get("status") or "approved").lower()
+                if clean_st and clean_st != "all":
+                    if clean_st in ("pending", "under_review") and st not in ("pending", "under_review"):
+                        continue
+                    elif clean_st not in ("pending", "under_review") and st != clean_st:
+                        continue
+                
+                images_list = _safe_json_parse(r.get("images"), [r["primary_image"]] if r.get("primary_image") else [])
+                products_by_id[p_id] = {
+                    "id": p_id,
+                    "title": r.get("title") or r.get("name") or "Equipment Listing",
+                    "description": r.get("description") or "",
+                    "category": r.get("category") or "General",
+                    "price": float(r.get("daily_rate") or 0.0),
+                    "rating": 5.0,
+                    "reviewsCount": 0,
+                    "available": bool(r.get("available", 1) and r.get("availability_status") != "paused" and st == "approved"),
+                    "status": st,
+                    "featured": False,
+                    "hidden": r.get("availability_status") == "paused",
+                    "image": r.get("primary_image") or (images_list[0] if images_list else ""),
+                    "images": images_list,
+                    "documents": ["purchase_proof.jpg"],
+                    "createdAt": str(r.get("created_at") or ""),
+                    "owner": {
+                        "id": r.get("owner_id") or r.get("owner_email") or "",
+                        "name": r.get("owner_name") or (r["owner_email"].split("@")[0] if r.get("owner_email") else "Vendor"),
+                        "avatar": r.get("owner_avatar") or "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+                        "rating": 5.0,
+                        "email": r.get("owner_email") or "",
+                        "phone": r.get("owner_phone") or "",
+                        "city": r.get("city") or ""
+                    }
+                }
 
-@app.get("/api/admin/products/{id}")
-def admin_get_product(id: str, current_admin: dict = Depends(check_admin_user)):
-    conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=503, detail="Database connection unavailable")
-    try:
-        with conn.cursor() as cursor:
+            # 2. Query custom_products (catalog table)
             cursor.execute("""
                 SELECT cp.*,
                        u.full_name AS user_full_name,
@@ -5914,137 +6791,355 @@ def admin_get_product(id: str, current_admin: dict = Depends(check_admin_user)):
                        u.status AS user_status
                 FROM custom_products cp
                 LEFT JOIN users u ON LOWER(cp.user_email) = LOWER(u.email)
-                WHERE cp.id = %s
+                ORDER BY cp.created_at DESC
+            """)
+            custom_rows = cursor.fetchall() or []
+            for r in custom_rows:
+                p_id = r["id"]
+                if p_id in products_by_id:
+                    continue  # already populated with rich payernt data
+                
+                st = (r.get("status") or "approved").lower()
+                if clean_st and clean_st != "all":
+                    if clean_st in ("pending", "under_review") and st not in ("pending", "under_review"):
+                        continue
+                    elif clean_st not in ("pending", "under_review") and st != clean_st:
+                        continue
+                
+                images_list = _safe_json_parse(r.get("images"), [r["image"]] if r.get("image") else [])
+                docs_list = _safe_json_parse(r.get("documents"), ["purchase_receipt.jpg"])
+                
+                products_by_id[p_id] = {
+                    "id": p_id,
+                    "title": r.get("title") or "Product",
+                    "description": r.get("description") or "",
+                    "category": r.get("category") or "General",
+                    "price": float(r.get("price") or 0.0),
+                    "rating": float(r.get("rating") or 5.0),
+                    "reviewsCount": int(r.get("reviews") or 0),
+                    "available": bool(r.get("available", True)),
+                    "status": st,
+                    "featured": bool(r.get("featured", False)),
+                    "hidden": bool(r.get("hidden", False)),
+                    "image": r.get("image") or "",
+                    "images": images_list,
+                    "documents": docs_list,
+                    "createdAt": str(r.get("created_at") or ""),
+                    "owner": {
+                        "id": r.get("user_email") or "",
+                        "name": r.get("user_full_name") or r.get("owner_name") or (r["user_email"].split("@")[0] if r.get("user_email") else "Owner"),
+                        "avatar": r.get("user_avatar") or r.get("owner_avatar") or "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150",
+                        "rating": float(r.get("owner_rating") or 5.0),
+                        "email": r.get("user_email") or "",
+                        "phone": r.get("user_phone") or "",
+                        "city": r.get("user_city") or ""
+                    }
+                }
+    except Exception as e:
+        logger.warning(f"[admin_products_list] error: {e}")
+    finally:
+        if conn:
+            conn.close()
+        
+    return list(products_by_id.values())
+
+@app.get("/api/admin/products/{id}")
+def admin_get_product(id: str, current_admin: dict = Depends(check_admin_user)):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=503, detail="Database connection unavailable")
+    
+    res_product = None
+    try:
+        with conn.cursor() as cursor:
+            # 1. Check payernt_products
+            cursor.execute("""
+                SELECT p.id, p.owner_id, p.owner_email, p.owner_name, p.category, p.name, p.title,
+                       p.brand, p.model, p.year, p.description, p.specifications, p.features,
+                       p.condition_grade, p.condition_details, p.accessories,
+                       p.city, p.area, p.pincode, p.pickup_instructions,
+                       p.daily_rate, p.weekly_rate, p.monthly_rate, p.security_deposit,
+                       p.min_rental_days, p.max_rental_days,
+                       p.available, p.availability_status, p.primary_image, p.images, p.status, p.created_at, p.updated_at,
+                       acc.phone AS owner_phone, acc.avatar AS owner_avatar, acc.address AS owner_address,
+                       p.city AS owner_city, acc.pincode AS owner_pincode, acc.status AS owner_account_status,
+                       acc.created_at AS owner_created_at
+                FROM payernt_products p
+                LEFT JOIN payernt_accounts acc ON LOWER(p.owner_email) = LOWER(acc.email)
+                WHERE p.id = %s
             """, (id,))
             r = cursor.fetchone()
+            if r:
+                images_list = _safe_json_parse(r.get("images"), [r["primary_image"]] if r.get("primary_image") else [])
+                specs_dict = _safe_json_parse(r.get("specifications"), {})
+                features_list = _safe_json_parse(r.get("features"), [])
+                condition_details = _safe_json_parse(r.get("condition_details"), {})
+                st = (r.get("status") or "approved").lower()
+                
+                # Fetch count of products by this owner
+                owner_email = r.get("owner_email") or ""
+                owner_prod_count = 0
+                if owner_email:
+                    cursor.execute("SELECT COUNT(*) as cnt FROM payernt_products WHERE LOWER(owner_email) = LOWER(%s)", (owner_email,))
+                    cnt_row = cursor.fetchone()
+                    if cnt_row:
+                        owner_prod_count = int(cnt_row.get("cnt") or 0)
+
+                # Fetch bookings for this product
+                cursor.execute("""
+                    SELECT id, start_date, end_date, total, status, user_email, created_at
+                    FROM orders
+                    WHERE product_id = %s
+                    ORDER BY created_at DESC
+                """, (id,))
+                prod_bookings = []
+                for b in (cursor.fetchall() or []):
+                    prod_bookings.append({
+                        "id": b["id"],
+                        "startDate": str(b.get("start_date") or ""),
+                        "endDate": str(b.get("end_date") or ""),
+                        "amount": float(b.get("total") or 0.0),
+                        "status": b.get("status") or "pending",
+                        "customerEmail": b.get("user_email") or "",
+                        "customerName": b.get("user_email", "").split("@")[0],
+                        "createdAt": str(b.get("created_at") or "")
+                    })
+
+                res_product = {
+                    "id": r["id"],
+                    "title": r.get("title") or r.get("name") or "Equipment Listing",
+                    "category": r.get("category") or "General",
+                    "brand": r.get("brand") or "Standard",
+                    "model": r.get("model") or "",
+                    "year": r.get("year") or "",
+                    "description": r.get("description") or "",
+                    "specifications": specs_dict,
+                    "features": features_list,
+                    "conditionGrade": r.get("condition_grade") or "Good",
+                    "conditionDetails": condition_details,
+                    "accessories": r.get("accessories") or "Standard accessories included",
+                    "city": r.get("city") or "",
+                    "area": r.get("area") or "",
+                    "pincode": r.get("pincode") or "",
+                    "pickupInstructions": r.get("pickup_instructions") or "Standard handover verification required at pickup location.",
+                    "price": float(r.get("daily_rate") or 0.0),
+                    "dailyRate": float(r.get("daily_rate") or 0.0),
+                    "weeklyRate": float(r.get("weekly_rate") or 0.0) if r.get("weekly_rate") else None,
+                    "monthlyRate": float(r.get("monthly_rate") or 0.0) if r.get("monthly_rate") else None,
+                    "securityDeposit": float(r.get("security_deposit") or 0.0) if r.get("security_deposit") else 0.0,
+                    "minRentalDays": int(r.get("min_rental_days") or 1),
+                    "maxRentalDays": int(r.get("max_rental_days") or 30),
+                    "rating": 5.0,
+                    "reviewsCount": 0,
+                    "available": bool(r.get("available", 1) and r.get("availability_status") != "paused" and st == "approved"),
+                    "status": st,
+                    "featured": False,
+                    "hidden": r.get("availability_status") == "paused",
+                    "image": r.get("primary_image") or (images_list[0] if images_list else ""),
+                    "images": images_list,
+                    "documents": ["purchase_proof.jpg", "ownership_verification.pdf"],
+                    "createdAt": str(r.get("created_at") or ""),
+                    "updatedAt": str(r.get("updated_at") or ""),
+                    "bookings": prod_bookings,
+                    "owner": {
+                        "id": r.get("owner_id") or owner_email,
+                        "name": r.get("owner_name") or (owner_email.split("@")[0] if owner_email else "Vendor"),
+                        "avatar": r.get("owner_avatar") or "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+                        "rating": 5.0,
+                        "email": owner_email,
+                        "phone": r.get("owner_phone") or "",
+                        "address": r.get("owner_address") or "",
+                        "city": r.get("owner_city") or r.get("city") or "",
+                        "pincode": r.get("owner_pincode") or r.get("pincode") or "",
+                        "accountStatus": r.get("owner_account_status") or "ACTIVE",
+                        "verificationStatus": "VERIFIED" if r.get("owner_is_verified") else "PENDING",
+                        "isVerified": bool(r.get("owner_is_verified", 1)),
+                        "productsCount": owner_prod_count,
+                        "createdAt": str(r.get("owner_created_at") or "")
+                    }
+                }
+            else:
+                # 2. Check custom_products
+                cursor.execute("""
+                    SELECT cp.*,
+                           u.full_name AS user_full_name,
+                           u.avatar AS user_avatar,
+                           u.phone AS user_phone,
+                           u.city AS user_city,
+                           u.address AS user_address,
+                           u.pincode AS user_pincode,
+                           u.status AS user_status,
+                           u.verified AS user_verified,
+                           u.created_at AS user_created_at
+                    FROM custom_products cp
+                    LEFT JOIN users u ON LOWER(cp.user_email) = LOWER(u.email)
+                    WHERE cp.id = %s
+                """, (id,))
+                cp = cursor.fetchone()
+                if cp:
+                    images_list = _safe_json_parse(cp.get("images"), [cp["image"]] if cp.get("image") else [])
+                    docs_list = _safe_json_parse(cp.get("documents"), ["purchase_receipt.jpg"])
+                    
+                    user_email = cp.get("user_email") or ""
+                    cursor.execute("""
+                        SELECT id, start_date, end_date, total, status, user_email, created_at
+                        FROM orders
+                        WHERE product_id = %s
+                        ORDER BY created_at DESC
+                    """, (id,))
+                    prod_bookings = []
+                    for b in (cursor.fetchall() or []):
+                        prod_bookings.append({
+                            "id": b["id"],
+                            "startDate": str(b.get("start_date") or ""),
+                            "endDate": str(b.get("end_date") or ""),
+                            "amount": float(b.get("total") or 0.0),
+                            "status": b.get("status") or "pending",
+                            "customerEmail": b.get("user_email") or "",
+                            "customerName": b.get("user_email", "").split("@")[0],
+                            "createdAt": str(b.get("created_at") or "")
+                        })
+
+                    res_product = {
+                        "id": cp["id"],
+                        "title": cp.get("title") or "Product",
+                        "category": cp.get("category") or "General",
+                        "brand": "Standard",
+                        "model": "",
+                        "year": "",
+                        "description": cp.get("description") or "",
+                        "specifications": {},
+                        "features": [],
+                        "conditionGrade": "Excellent",
+                        "conditionDetails": {},
+                        "accessories": "Standard accessories included",
+                        "city": cp.get("user_city") or "",
+                        "area": "",
+                        "pincode": cp.get("user_pincode") or "",
+                        "pickupInstructions": "Standard handover verification required.",
+                        "price": float(cp.get("price") or 0.0),
+                        "dailyRate": float(cp.get("price") or 0.0),
+                        "weeklyRate": None,
+                        "monthlyRate": None,
+                        "securityDeposit": 0.0,
+                        "minRentalDays": 1,
+                        "maxRentalDays": 30,
+                        "rating": float(cp.get("rating") or 5.0),
+                        "reviewsCount": int(cp.get("reviews") or 0),
+                        "available": bool(cp.get("available", True)),
+                        "status": (cp.get("status") or "approved").lower(),
+                        "featured": bool(cp.get("featured", False)),
+                        "hidden": bool(cp.get("hidden", False)),
+                        "image": cp.get("image") or "",
+                        "images": images_list,
+                        "documents": docs_list,
+                        "createdAt": str(cp.get("created_at") or ""),
+                        "updatedAt": str(cp.get("created_at") or ""),
+                        "bookings": prod_bookings,
+                        "owner": {
+                            "id": user_email,
+                            "name": cp.get("user_full_name") or cp.get("owner_name") or (user_email.split("@")[0] if user_email else "Owner"),
+                            "avatar": cp.get("user_avatar") or cp.get("owner_avatar") or "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150",
+                            "rating": float(cp.get("owner_rating") or 5.0),
+                            "email": user_email,
+                            "phone": cp.get("user_phone") or "",
+                            "address": cp.get("user_address") or "",
+                            "city": cp.get("user_city") or "",
+                            "pincode": cp.get("user_pincode") or "",
+                            "accountStatus": cp.get("user_status") or "active",
+                            "verificationStatus": "VERIFIED" if cp.get("user_verified") else "PENDING",
+                            "isVerified": bool(cp.get("user_verified", 1)),
+                            "productsCount": 1,
+                            "createdAt": str(cp.get("user_created_at") or "")
+                        }
+                    }
     finally:
         conn.close()
         
-    if not r:
+    if not res_product:
         raise HTTPException(status_code=404, detail="Product not found")
         
-    images_val = r["images"]
-    documents_val = r["documents"]
-    try:
-        images_list = json.loads(images_val) if images_val else []
-    except Exception:
-        images_list = [r["image"]] if r["image"] else []
-        
-    try:
-        documents_list = json.loads(documents_val) if documents_val else []
-    except Exception:
-        documents_list = ["purchase_receipt.jpg"]
-        
-    return {
-        "id": r["id"],
-        "title": r["title"],
-        "description": r["description"],
-        "category": r["category"],
-        "price": r["price"],
-        "rating": float(r["rating"]),
-        "reviewsCount": r["reviews"],
-        "available": bool(r["available"]),
-        "status": r["status"] or "approved",
-        "featured": bool(r["featured"]),
-        "hidden": bool(r["hidden"]),
-        "image": r["image"],
-        "images": images_list if images_list else [r["image"]],
-        "documents": documents_list,
-        "createdAt": r["created_at"],
-        "owner": {
-            "id": r["user_email"],
-            "name": r.get("user_full_name") or r["owner_name"] or r["user_email"].split("@")[0],
-            "avatar": r.get("user_avatar") or r["owner_avatar"] or "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150",
-            "rating": float(r["owner_rating"] or 5.0),
-            "email": r["user_email"],
-            "phone": r.get("user_phone") or "",
-            "city": r.get("user_city") or ""
-        }
-    }
+    return res_product
 
 @app.put("/api/admin/products/{id}")
 def admin_update_product(id: str, data: ProductUpdateSchema, current_admin: dict = Depends(check_admin_user)):
-    conn = get_db_connection()
-    try:
-        with conn.cursor() as cursor:
-            cursor.execute("SELECT * FROM custom_products WHERE id = %s", (id,))
-            product = cursor.fetchone()
-    finally:
-        conn.close()
-        
-    if not product:
+    existing = admin_get_product(id, current_admin)
+    if not existing:
         raise HTTPException(status_code=404, detail="Product not found")
         
-    fields = []
-    params = []
+    fields_cp, params_cp = [], []
+    fields_pp, params_pp = [], []
+    
     if data.title is not None:
-        fields.append("title = %s")
-        params.append(data.title)
+        fields_cp.append("title = %s"); params_cp.append(data.title)
+        fields_pp.append("title = %s"); params_pp.append(data.title)
+        fields_pp.append("name = %s"); params_pp.append(data.title)
     if data.description is not None:
-        fields.append("description = %s")
-        params.append(data.description)
+        fields_cp.append("description = %s"); params_cp.append(data.description)
+        fields_pp.append("description = %s"); params_pp.append(data.description)
     if data.category is not None:
-        fields.append("category = %s")
-        params.append(data.category)
+        fields_cp.append("category = %s"); params_cp.append(data.category)
+        fields_pp.append("category = %s"); params_pp.append(data.category)
     if data.price is not None:
-        fields.append("price = %s")
-        params.append(data.price)
+        fields_cp.append("price = %s"); params_cp.append(data.price)
+        fields_pp.append("daily_rate = %s"); params_pp.append(data.price)
     if data.available is not None:
-        fields.append("available = %s")
-        params.append(1 if data.available else 0)
+        val = 1 if data.available else 0
+        fields_cp.append("available = %s"); params_cp.append(val)
+        fields_pp.append("available = %s"); params_pp.append(val)
     if data.status is not None:
-        fields.append("status = %s")
-        params.append(data.status)
+        fields_cp.append("status = %s"); params_cp.append(data.status)
+        fields_pp.append("status = %s"); params_pp.append(data.status)
     if data.featured is not None:
-        fields.append("featured = %s")
-        params.append(1 if data.featured else 0)
+        fields_cp.append("featured = %s"); params_cp.append(1 if data.featured else 0)
     if data.hidden is not None:
-        fields.append("hidden = %s")
-        params.append(1 if data.hidden else 0)
+        fields_cp.append("hidden = %s"); params_cp.append(1 if data.hidden else 0)
+        fields_pp.append("availability_status = %s"); params_pp.append("paused" if data.hidden else "available")
     if data.image is not None:
-        fields.append("image = %s")
-        params.append(data.image)
+        fields_cp.append("image = %s"); params_cp.append(data.image)
+        fields_pp.append("primary_image = %s"); params_pp.append(data.image)
     if data.images is not None:
-        fields.append("images = %s")
-        params.append(json.dumps(data.images))
+        js = json.dumps(data.images)
+        fields_cp.append("images = %s"); params_cp.append(js)
+        fields_pp.append("images = %s"); params_pp.append(js)
     if data.documents is not None:
-        fields.append("documents = %s")
-        params.append(json.dumps(data.documents))
+        fields_cp.append("documents = %s"); params_cp.append(json.dumps(data.documents))
         
-    if fields:
-        params.append(id)
-        execute_query(f"UPDATE custom_products SET {', '.join(fields)} WHERE id = %s", tuple(params))
+    if fields_cp:
+        params_cp.append(id)
+        execute_query(f"UPDATE custom_products SET {', '.join(fields_cp)} WHERE id = %s", tuple(params_cp))
+    if fields_pp:
+        params_pp.append(id)
+        execute_query(f"UPDATE payernt_products SET {', '.join(fields_pp)} WHERE id = %s", tuple(params_pp))
         
     # Log action
     now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
     execute_query("""
         INSERT INTO admin_logs (id, timestamp, user_name, action, module, ip_address)
         VALUES (%s, %s, %s, %s, %s, %s)
-    """, (f"l-{random.randint(100000, 999999)}", now_str, current_admin["full_name"], f"Updated product {id}", "Inventory", "127.0.0.1"))
+    """, (f"l-{random.randint(100000, 999999)}", now_str, current_admin.get("full_name") or "Admin", f"Updated product {id}", "Inventory", "127.0.0.1"))
     
+    invalidate_cache("public_custom_products")
+    invalidate_cache("public_categories")
+    invalidate_cache("public_stats")
+    invalidate_cache(f"product:{id}")
     return admin_get_product(id, current_admin)
 
 @app.delete("/api/admin/products/{id}")
 def admin_delete_product(id: str, current_admin: dict = Depends(check_admin_user)):
-    conn = get_db_connection()
-    try:
-        with conn.cursor() as cursor:
-            cursor.execute("SELECT * FROM custom_products WHERE id = %s", (id,))
-            product = cursor.fetchone()
-    finally:
-        conn.close()
-        
-    if not product:
+    existing = admin_get_product(id, current_admin)
+    if not existing:
         raise HTTPException(status_code=404, detail="Product not found")
         
     execute_query("DELETE FROM custom_products WHERE id = %s", (id,))
+    execute_query("DELETE FROM payernt_products WHERE id = %s", (id,))
     
     # Log action
     now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
     execute_query("""
         INSERT INTO admin_logs (id, timestamp, user_name, action, module, ip_address)
         VALUES (%s, %s, %s, %s, %s, %s)
-    """, (f"l-{random.randint(100000, 999999)}", now_str, current_admin["full_name"], f"Deleted product {id}", "Inventory", "127.0.0.1"))
+    """, (f"l-{random.randint(100000, 999999)}", now_str, current_admin.get("full_name") or "Admin", f"Deleted product {id}", "Inventory", "127.0.0.1"))
     
     invalidate_cache("public_custom_products")
     invalidate_cache("public_categories")
@@ -6057,17 +7152,69 @@ def admin_delete_product(id: str, current_admin: dict = Depends(check_admin_user
 @app.post("/api/admin/products/{id}/approve")
 @app.put("/api/admin/products/{id}/approve")
 def admin_approve_product(id: str, current_admin: dict = Depends(check_admin_user)):
+    existing = admin_get_product(id, current_admin)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Product not found")
+        
+    execute_query("UPDATE payernt_products SET status = 'approved', availability_status = 'available', available = 1 WHERE id = %s", (id,))
     execute_query("UPDATE custom_products SET status = 'approved', available = 1 WHERE id = %s", (id,))
     if id in MOCK_CUSTOM_PRODUCTS:
         MOCK_CUSTOM_PRODUCTS[id]["status"] = "approved"
         MOCK_CUSTOM_PRODUCTS[id]["available"] = True
     
-    # Log action
+    # If product exists in payernt_products but not yet in custom_products, mirror it for customer discoverability
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT * FROM payernt_products WHERE id = %s", (id,))
+                p_row = cursor.fetchone()
+                if p_row:
+                    cursor.execute("SELECT id FROM custom_products WHERE id = %s", (id,))
+                    if not cursor.fetchone():
+                        cursor.execute("""
+                            INSERT INTO custom_products (id, user_email, title, description, price, image, category, rating, reviews, available, owner_name, owner_avatar, owner_rating, created_at, status, featured, hidden, images, documents)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """, (
+                            p_row["id"],
+                            p_row["owner_email"],
+                            p_row.get("title") or p_row.get("name"),
+                            p_row.get("description") or "",
+                            float(p_row.get("daily_rate") or 0.0),
+                            p_row.get("primary_image") or "",
+                            p_row.get("category") or "General",
+                            5.0,
+                            0,
+                            1,
+                            p_row.get("owner_name") or "Vendor",
+                            "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+                            5.0,
+                            p_row.get("created_at") or datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                            "approved",
+                            0,
+                            0,
+                            p_row.get("images") or "[]",
+                            "[\"purchase_proof.jpg\"]"
+                        ))
+        finally:
+            conn.close()
+            
+    # Send notifications to owner
+    owner_email = existing.get("owner", {}).get("email") or ""
+    if owner_email:
+        create_notification(
+            email=owner_email,
+            title="Product Approved! 🎉",
+            message=f"Your listing '{existing.get('title')}' has been approved by admin and is now live on the marketplace.",
+            notif_type="system"
+        )
+    
+    # Audit log
     now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
     execute_query("""
         INSERT INTO admin_logs (id, timestamp, user_name, action, module, ip_address)
         VALUES (%s, %s, %s, %s, %s, %s)
-    """, (f"l-{random.randint(100000, 999999)}", now_str, current_admin["full_name"], f"Approved product {id}", "Inventory", "127.0.0.1"))
+    """, (f"l-{random.randint(100000, 999999)}", now_str, current_admin.get("full_name") or "Admin", f"Approved product {id} ({existing.get('title')})", "Inventory", "127.0.0.1"))
     
     invalidate_cache("public_custom_products")
     invalidate_cache("public_categories")
@@ -6077,21 +7224,142 @@ def admin_approve_product(id: str, current_admin: dict = Depends(check_admin_use
     broadcast_admin_event("product.updated", res_prod)
     return res_prod
 
+class RejectProductSchema(BaseModel):
+    reason: Optional[str] = None
+
 @app.patch("/api/admin/products/{id}/reject")
 @app.post("/api/admin/products/{id}/reject")
 @app.put("/api/admin/products/{id}/reject")
-def admin_reject_product(id: str, current_admin: dict = Depends(check_admin_user)):
+def admin_reject_product(id: str, data: Optional[RejectProductSchema] = None, current_admin: dict = Depends(check_admin_user)):
+    existing = admin_get_product(id, current_admin)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Product not found")
+        
+    execute_query("UPDATE payernt_products SET status = 'rejected', availability_status = 'paused', available = 0 WHERE id = %s", (id,))
     execute_query("UPDATE custom_products SET status = 'rejected', available = 0 WHERE id = %s", (id,))
     if id in MOCK_CUSTOM_PRODUCTS:
         MOCK_CUSTOM_PRODUCTS[id]["status"] = "rejected"
         MOCK_CUSTOM_PRODUCTS[id]["available"] = False
     
-    # Log action
+    reason_txt = f" Reason: {data.reason}" if data and data.reason else ""
+    owner_email = existing.get("owner", {}).get("email") or ""
+    if owner_email:
+        create_notification(
+            email=owner_email,
+            title="Product Verification Update",
+            message=f"Your listing '{existing.get('title')}' was not approved.{reason_txt}",
+            notif_type="system"
+        )
+    
+    # Audit log
     now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
     execute_query("""
         INSERT INTO admin_logs (id, timestamp, user_name, action, module, ip_address)
         VALUES (%s, %s, %s, %s, %s, %s)
-    """, (f"l-{random.randint(100000, 999999)}", now_str, current_admin["full_name"], f"Rejected product {id}", "Inventory", "127.0.0.1"))
+    """, (f"l-{random.randint(100000, 999999)}", now_str, current_admin.get("full_name") or "Admin", f"Rejected product {id}{reason_txt}", "Inventory", "127.0.0.1"))
+    
+    invalidate_cache("public_custom_products")
+    invalidate_cache("public_categories")
+    invalidate_cache("public_stats")
+    invalidate_cache(f"product:{id}")
+    res_prod = admin_get_product(id, current_admin)
+    broadcast_admin_event("product.updated", res_prod)
+    return res_prod
+
+@app.patch("/api/admin/products/{id}/suspend")
+@app.post("/api/admin/products/{id}/suspend")
+@app.put("/api/admin/products/{id}/suspend")
+def admin_suspend_product(id: str, data: Optional[RejectProductSchema] = None, current_admin: dict = Depends(check_admin_user)):
+    existing = admin_get_product(id, current_admin)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Product not found")
+        
+    execute_query("UPDATE payernt_products SET status = 'suspended', availability_status = 'paused', available = 0 WHERE id = %s", (id,))
+    execute_query("UPDATE custom_products SET status = 'suspended', available = 0 WHERE id = %s", (id,))
+    if id in MOCK_CUSTOM_PRODUCTS:
+        MOCK_CUSTOM_PRODUCTS[id]["status"] = "suspended"
+        MOCK_CUSTOM_PRODUCTS[id]["available"] = False
+    
+    reason_txt = f" Reason: {data.reason}" if data and data.reason else ""
+    owner_email = existing.get("owner", {}).get("email") or ""
+    if owner_email:
+        create_notification(
+            email=owner_email,
+            title="Listing Suspended ⚠️",
+            message=f"Your listing '{existing.get('title')}' has been suspended by administration.{reason_txt}",
+            notif_type="system"
+        )
+        
+    # Audit log
+    now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    execute_query("""
+        INSERT INTO admin_logs (id, timestamp, user_name, action, module, ip_address)
+        VALUES (%s, %s, %s, %s, %s, %s)
+    """, (f"l-{random.randint(100000, 999999)}", now_str, current_admin.get("full_name") or "Admin", f"Suspended product {id}{reason_txt}", "Inventory", "127.0.0.1"))
+    
+    invalidate_cache("public_custom_products")
+    invalidate_cache("public_categories")
+    invalidate_cache("public_stats")
+    invalidate_cache(f"product:{id}")
+    res_prod = admin_get_product(id, current_admin)
+    broadcast_admin_event("product.updated", res_prod)
+    return res_prod
+
+@app.patch("/api/admin/products/{id}/restore")
+@app.post("/api/admin/products/{id}/restore")
+@app.put("/api/admin/products/{id}/restore")
+def admin_restore_product(id: str, current_admin: dict = Depends(check_admin_user)):
+    existing = admin_get_product(id, current_admin)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Product not found")
+        
+    execute_query("UPDATE payernt_products SET status = 'approved', availability_status = 'available', available = 1 WHERE id = %s", (id,))
+    execute_query("UPDATE custom_products SET status = 'approved', available = 1 WHERE id = %s", (id,))
+    if id in MOCK_CUSTOM_PRODUCTS:
+        MOCK_CUSTOM_PRODUCTS[id]["status"] = "approved"
+        MOCK_CUSTOM_PRODUCTS[id]["available"] = True
+    
+    owner_email = existing.get("owner", {}).get("email") or ""
+    if owner_email:
+        create_notification(
+            email=owner_email,
+            title="Listing Restored ✅",
+            message=f"Your listing '{existing.get('title')}' has been restored and is available for bookings.",
+            notif_type="system"
+        )
+        
+    # Audit log
+    now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    execute_query("""
+        INSERT INTO admin_logs (id, timestamp, user_name, action, module, ip_address)
+        VALUES (%s, %s, %s, %s, %s, %s)
+    """, (f"l-{random.randint(100000, 999999)}", now_str, current_admin.get("full_name") or "Admin", f"Restored product {id}", "Inventory", "127.0.0.1"))
+    
+    invalidate_cache("public_custom_products")
+    invalidate_cache("public_categories")
+    invalidate_cache("public_stats")
+    invalidate_cache(f"product:{id}")
+    res_prod = admin_get_product(id, current_admin)
+    broadcast_admin_event("product.updated", res_prod)
+    return res_prod
+
+@app.patch("/api/admin/products/{id}/archive")
+@app.post("/api/admin/products/{id}/archive")
+@app.put("/api/admin/products/{id}/archive")
+def admin_archive_product(id: str, current_admin: dict = Depends(check_admin_user)):
+    existing = admin_get_product(id, current_admin)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Product not found")
+        
+    execute_query("UPDATE payernt_products SET status = 'archived', availability_status = 'archived', available = 0 WHERE id = %s", (id,))
+    execute_query("UPDATE custom_products SET status = 'archived', available = 0 WHERE id = %s", (id,))
+    
+    # Audit log
+    now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    execute_query("""
+        INSERT INTO admin_logs (id, timestamp, user_name, action, module, ip_address)
+        VALUES (%s, %s, %s, %s, %s, %s)
+    """, (f"l-{random.randint(100000, 999999)}", now_str, current_admin.get("full_name") or "Admin", f"Archived product {id}", "Inventory", "127.0.0.1"))
     
     invalidate_cache("public_custom_products")
     invalidate_cache("public_categories")
@@ -6123,7 +7391,7 @@ def admin_toggle_feature_product(id: str, current_admin: dict = Depends(check_ad
     execute_query("""
         INSERT INTO admin_logs (id, timestamp, user_name, action, module, ip_address)
         VALUES (%s, %s, %s, %s, %s, %s)
-    """, (f"l-{random.randint(100000, 999999)}", now_str, current_admin["full_name"], f"{action_str} product {id}", "Inventory", "127.0.0.1"))
+    """, (f"l-{random.randint(100000, 999999)}", now_str, current_admin.get("full_name") or "Admin", f"{action_str} product {id}", "Inventory", "127.0.0.1"))
     
     invalidate_cache("public_custom_products")
     invalidate_cache("public_categories")
@@ -6146,6 +7414,7 @@ def admin_toggle_hide_product(id: str, current_admin: dict = Depends(check_admin
         
     new_val = 0 if r["hidden"] else 1
     execute_query("UPDATE custom_products SET hidden = %s WHERE id = %s", (new_val, id))
+    execute_query("UPDATE payernt_products SET availability_status = %s WHERE id = %s", ("paused" if new_val else "available", id))
     
     # Log action
     now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
@@ -6153,7 +7422,7 @@ def admin_toggle_hide_product(id: str, current_admin: dict = Depends(check_admin
     execute_query("""
         INSERT INTO admin_logs (id, timestamp, user_name, action, module, ip_address)
         VALUES (%s, %s, %s, %s, %s, %s)
-    """, (f"l-{random.randint(100000, 999999)}", now_str, current_admin["full_name"], f"{action_str} product {id}", "Inventory", "127.0.0.1"))
+    """, (f"l-{random.randint(100000, 999999)}", now_str, current_admin.get("full_name") or "Admin", f"{action_str} product {id}", "Inventory", "127.0.0.1"))
     
     invalidate_cache("public_custom_products")
     invalidate_cache("public_categories")
@@ -6284,16 +7553,27 @@ def admin_delete_category(id: str, current_admin: dict = Depends(check_admin_use
 @app.get("/api/admin/bookings")
 def admin_bookings_list(current_admin: dict = Depends(check_admin_user)):
     conn = get_db_connection()
+    if not conn:
+        return []
     try:
         with conn.cursor() as cursor:
             cursor.execute("""
-                SELECT o.*, u.full_name as customer_name, p.owner_name, p.user_email as owner_email
+                SELECT o.*, 
+                       u.full_name as customer_name, 
+                       p.owner_name, 
+                       p.user_email as owner_email,
+                       sec.vendor_pin_verified,
+                       sec.renter_pin_verified,
+                       sec.otp_verified,
+                       sec.rental_started,
+                       sec.status as security_status
                 FROM orders o
                 LEFT JOIN users u ON o.user_email = u.email
                 LEFT JOIN custom_products p ON o.product_id = p.id
+                LEFT JOIN rental_security sec ON o.id = sec.order_id
                 ORDER BY o.created_at DESC
             """)
-            rows = cursor.fetchall()
+            rows = cursor.fetchall() or []
     finally:
         conn.close()
         
@@ -6305,13 +7585,20 @@ def admin_bookings_list(current_admin: dict = Depends(check_admin_user)):
             "productTitle": r["product_title"],
             "productImage": r["product_image"],
             "customerId": r["user_email"],
-            "customerName": r["customer_name"] or (r["user_email"].split("@")[0] if r["user_email"] else "Customer"),
-            "ownerId": r["owner_email"] or "",
-            "ownerName": r["owner_name"] or "Verified Lender",
+            "customerName": r.get("customer_name") or (r["user_email"].split("@")[0] if r.get("user_email") else "Customer"),
+            "ownerId": r.get("owner_email") or "",
+            "ownerName": r.get("owner_name") or "Verified Lender",
             "startDate": r["start_date"],
             "endDate": r["end_date"],
             "amount": r["total"],
-            "status": r["status"] or "pending",
+            "status": r.get("status") or "pending",
+            "rentalSecurity": {
+                "vendorPinVerified": bool(r.get("vendor_pin_verified")),
+                "renterPinVerified": bool(r.get("renter_pin_verified")),
+                "otpVerified": bool(r.get("otp_verified")),
+                "rentalStarted": bool(r.get("rental_started")),
+                "securityStatus": r.get("security_status") or "pending"
+            },
             "createdAt": r["created_at"]
         })
     return res

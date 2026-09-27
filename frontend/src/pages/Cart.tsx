@@ -217,7 +217,7 @@ export default function Cart() {
                     </div>
                     <div className="flex items-center gap-2">
                       <CheckCircle2 className="h-4 w-4 text-neutral-700 dark:text-neutral-300 shrink-0" />
-                      <span>Instant KYC and government Aadhaar verification</span>
+                      <span>Instant KYC and government ID / PAN verification</span>
                     </div>
                   </div>
                 </div>

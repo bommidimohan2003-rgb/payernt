@@ -1,4 +1,4 @@
-import { useNavigate, useParams } from "@tanstack/react-router";
+import { useNavigate, useParams, Link } from "@tanstack/react-router";
 import {
   Check,
   Truck,
@@ -11,8 +11,21 @@ import {
   Info,
   Tag,
   ShoppingBag,
+  Calendar,
+  Clock,
+  Heart,
+  AlertCircle,
+  Sparkles,
+  CheckCircle2,
+  CalendarCheck,
+  CalendarX,
+  RotateCcw,
+  User,
+  Package,
+  KeyRound,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { MainLayout } from "@/layouts/MainLayout";
 import { Button } from "@/components/common/Button";
 import { Rating } from "@/components/common/Rating";
@@ -30,7 +43,8 @@ import { tracker } from "@/utils/eventTracker";
 import { api } from "@/utils/api";
 import { storage, STORAGE_KEYS } from "@/utils/storage";
 import { formatOwnerAddress } from "@/utils/formatters";
-import type { Product } from "@/types";
+import type { Product, Order } from "@/types";
+import { ProductMessageModal } from "@/components/browse/ProductMessageModal";
 
 const KNOWN_BRANDS = [
   "Sony",
@@ -63,19 +77,72 @@ function getProductBrand(product: Product): string | null {
   return null;
 }
 
+// Helper to format ISO YYYY-MM-DD
+function toDateInputValue(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+// Calculate inclusive days between two YYYY-MM-DD dates
+function calculateInclusiveDays(startStr: string, endStr: string): number {
+  if (!startStr || !endStr) return 0;
+  const start = new Date(startStr);
+  const end = new Date(endStr);
+  const diffTime = end.getTime() - start.getTime();
+  if (diffTime < 0) return 0;
+  return Math.round(diffTime / (1000 * 60 * 60 * 24)) + 1;
+}
+
+import { rentalSecurityService } from "@/services/rentalSecurityService";
+import type { RentalSecurity } from "@/types";
+
 export default function ProductDetails() {
-  const { id } = useParams({ from: "/product/$id" });
+  const params = useParams({ strict: false }) as { id?: string };
+  const routeParamId = params?.id || (typeof window !== "undefined" ? window.location.pathname.split("/").filter(Boolean).pop() || "" : "");
+  const id = String(routeParamId || "");
   const navigate = useNavigate();
   const { has, toggle } = useWishlist();
   const { user } = useAuth();
   const { addToCart, cartItems } = useCart();
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [justAddedToCart, setJustAddedToCart] = useState(false);
+  const [showMessageModal, setShowMessageModal] = useState(false);
+  const [securityRecord, setSecurityRecord] = useState<RentalSecurity | null>(null);
 
   // Instant cache lookup for zero-latency initial render
-  const initialCachedProduct = api.getCachedProduct(id);
+  const initialCachedProduct = id ? api.getCachedProduct(id) : null;
   const [product, setProduct] = useState<Product | null>(initialCachedProduct);
   const [productLoading, setProductLoading] = useState<boolean>(!initialCachedProduct);
+
+  // Date Selection & Availability States
+  const todayStr = useMemo(() => toDateInputValue(new Date()), []);
+  const tomorrowStr = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return toDateInputValue(d);
+  }, []);
+
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
+  const [availabilityChecked, setAvailabilityChecked] = useState<boolean>(false);
+  const [isAvailableForDates, setIsAvailableForDates] = useState<boolean | null>(null);
+  const [availabilityMessage, setAvailabilityMessage] = useState<string>("");
+  const [bookingConfirmedOrder, setBookingConfirmedOrder] = useState<Order | null>(null);
+  const [isCreatingBooking, setIsCreatingBooking] = useState<boolean>(false);
+
+  // Auth Protection: If unauthenticated, redirect to login while preserving target product
+  useEffect(() => {
+    if (!user) {
+      const redirectTarget = `/product/${id}`;
+      try {
+        localStorage.setItem("pay₹ent_pending_product_redirect", redirectTarget);
+        localStorage.setItem("pendingProductId", String(id));
+      } catch (e) {}
+      navigate({ to: "/login", search: { redirect: redirectTarget } as any });
+    }
+  }, [user, id, navigate]);
 
   // Stale-While-Revalidate: load latest product details in background
   useEffect(() => {
@@ -147,53 +214,222 @@ export default function ProductDetails() {
       isMounted = false;
     };
   }, [id]);
+
   const [similarProducts, setSimilarProducts] = useState<Product[]>([]);
   const [frequentlyTogether, setFrequentlyTogether] = useState<Product[]>([]);
+
+  // Existing Bookings lookup for Date Overlap Detection
+  const existingProductBookings = useMemo(() => {
+    if (!product) return [];
+    const allOrders = storage.get<Order[]>(STORAGE_KEYS.orders, []);
+    return allOrders.filter(
+      (o) =>
+        (o.productId === product.id || (o as any).product_id === product.id) &&
+        o.status !== "cancelled"
+    );
+  }, [product, bookingConfirmedOrder]);
+
+  const currentUserId = user?.id || user?.email || "";
+  const ownerId =
+    (product as any)?.ownerId ||
+    (product as any)?.owner_id ||
+    (product as any)?.user_id ||
+    product?.owner?.email ||
+    "";
+  const ownerEmail = product?.owner?.email?.toLowerCase().trim() || "";
+  const userEmail = user?.email?.toLowerCase().trim() || "";
+  const ownerName = (
+    product?.owner?.name ||
+    (product as Product & { owner_name?: string })?.owner_name ||
+    ""
+  ).toLowerCase().trim();
+  const userFullName = (user?.fullName || "").toLowerCase().trim();
 
   const isOwner = Boolean(
     user &&
     product &&
-    (user.fullName === product.owner.name || user.email === product.owner.name),
+    !product.isReference &&
+    ((ownerId && currentUserId && ownerId === currentUserId) ||
+      (ownerEmail && userEmail && ownerEmail === userEmail) ||
+      (ownerName && userFullName && ownerName === userFullName))
   );
 
-  const [messagingLoading, setMessagingLoading] = useState(false);
+  const isInCart = Boolean(
+    product && cartItems.some((item) => item.product_id === product.id),
+  );
 
-  const handleMessageLender = async () => {
+  // Rental Calculation
+  const rentalDays = useMemo(() => {
+    if (!startDate || !endDate) return 0;
+    return calculateInclusiveDays(startDate, endDate);
+  }, [startDate, endDate]);
+
+  const estimatedTotal = useMemo(() => {
+    if (!product || rentalDays <= 0) return 0;
+    return rentalDays * (Number(product.price) || 0);
+  }, [product, rentalDays]);
+
+  // Handle Date Changes (resets check state)
+  const handleStartDateChange = (val: string) => {
+    setStartDate(val);
+    setAvailabilityChecked(false);
+    setIsAvailableForDates(null);
+    setAvailabilityMessage("");
+    // If end date is earlier than new start date, reset or bump end date
+    if (endDate && val && new Date(endDate) < new Date(val)) {
+      setEndDate(val);
+    }
+  };
+
+  const handleEndDateChange = (val: string) => {
+    setEndDate(val);
+    setAvailabilityChecked(false);
+    setIsAvailableForDates(null);
+    setAvailabilityMessage("");
+  };
+
+  // CHECK AVAILABILITY LOGIC
+  const handleCheckAvailability = () => {
+    if (!startDate || !endDate) {
+      toast.error("Please select both a Start Date and End Date.");
+      return;
+    }
+
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const today = new Date(todayStr);
+
+    if (start < today) {
+      setIsAvailableForDates(false);
+      setAvailabilityMessage("Start date cannot be in the past.");
+      setAvailabilityChecked(true);
+      toast.error("Start date cannot be in the past.");
+      return;
+    }
+
+    if (end < start) {
+      setIsAvailableForDates(false);
+      setAvailabilityMessage("End date must be on or after the start date.");
+      setAvailabilityChecked(true);
+      toast.error("End date cannot be earlier than start date.");
+      return;
+    }
+
+    if (product && !product.available) {
+      setIsAvailableForDates(false);
+      setAvailabilityMessage("This gear is currently marked as unavailable by the owner.");
+      setAvailabilityChecked(true);
+      return;
+    }
+
+    // Check overlap with existing confirmed bookings
+    // Overlap formula: newStart <= existingEnd && newEnd >= existingStart
+    const hasOverlap = existingProductBookings.some((booking) => {
+      const bStart = booking.startDate || (booking as any).start_date;
+      const bEnd = booking.endDate || (booking as any).end_date;
+      if (!bStart || !bEnd) return false;
+
+      const existingStart = new Date(bStart);
+      const existingEnd = new Date(bEnd);
+
+      return start <= existingEnd && end >= existingStart;
+    });
+
+    if (hasOverlap) {
+      setIsAvailableForDates(false);
+      setAvailabilityMessage(
+        "Product is not available for the selected dates (overlaps with an existing booking). Please pick alternative dates."
+      );
+      setAvailabilityChecked(true);
+      toast.error("Gear is booked for one or more selected dates.");
+    } else {
+      setIsAvailableForDates(true);
+      setAvailabilityMessage("✓ Product available for selected dates!");
+      setAvailabilityChecked(true);
+      toast.success("Gear is available! Review booking summary below.");
+    }
+  };
+
+  // CONFIRM BOOKING LOGIC
+  const handleConfirmBooking = () => {
     if (!product) return;
-    const token = storage.get<string | null>(STORAGE_KEYS.token, null);
-    if (!token || !user) {
-      toast.error("Please sign in to message the lender.");
+
+    if (!user) {
+      toast.info("Please log in to confirm your rental booking.");
       navigate({ to: "/login", search: { redirect: `/product/${id}` } as any });
       return;
     }
 
     if (isOwner) {
-      toast.info("You are the owner of this gear listing.");
+      toast.error("You cannot rent your own product.");
       return;
     }
 
-    setMessagingLoading(true);
-    try {
-      const res = await api.createOrGetConversation(token, {
-        productId: product.id,
-      });
-      if (res.success && res.conversation) {
-        navigate({
-          to: "/messages",
-          search: { conversationId: res.conversation.id } as any,
-        });
-      }
-    } catch (err: unknown) {
-      const e = err as { message?: string };
-      toast.error(e.message || "Failed to start conversation with lender.");
-    } finally {
-      setMessagingLoading(false);
+    if (!isAvailableForDates || rentalDays <= 0) {
+      toast.error("Please check and confirm date availability before booking.");
+      return;
     }
-  };
 
-  const isInCart = Boolean(
-    product && cartItems.some((item) => item.product_id === product.id),
-  );
+    setIsCreatingBooking(true);
+
+    const renterId = user.accountId || user.id || user.email;
+    const bookingId = `ord_${Date.now()}`;
+    const newOrder: Order = {
+      id: bookingId,
+      productId: product.id,
+      product_id: product.id,
+      productTitle: product.title,
+      product_title: product.title,
+      productImage: product.image,
+      product_image: product.image,
+      startDate: startDate,
+      start_date: startDate,
+      endDate: endDate,
+      end_date: endDate,
+      total: estimatedTotal,
+      status: "pending", // Booking requested
+      createdAt: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+      user_email: user.email,
+      userEmail: user.email,
+      ...({
+        renterId,
+        ownerId: ownerId || product.owner?.email || "PAYERNT_USER_001",
+        rentalDuration: rentalDays,
+        rentalRate: Number(product.price) || 0,
+        estimatedAmount: estimatedTotal,
+      } as any),
+    };
+
+    // Store in global order list & user-specific localStorage key
+    const allOrders = storage.get<Order[]>(STORAGE_KEYS.orders, []);
+    const updatedOrders = [newOrder, ...allOrders];
+    storage.set(STORAGE_KEYS.orders, updatedOrders);
+
+    const userBookingsKey = `bookings_${user.id || user.email}`;
+    const userBookings = storage.get<Order[]>(userBookingsKey, []);
+    storage.set(userBookingsKey, [newOrder, ...userBookings]);
+
+    // Create / retrieve single Rental Security record for this booking
+    const vendorPin = (product as unknown as { vendorSecretPin?: string }).vendorSecretPin || "5831";
+    const secRecord = rentalSecurityService.getOrCreateSecurityRecord({
+      bookingId,
+      productId: product.id,
+      vendorId: ownerId || product.owner?.email || "PAYERNT_USER_001",
+      renterId,
+      vendorSecretPin: vendorPin,
+    });
+    setSecurityRecord(secRecord);
+
+    // Dispatch global event so dashboard and order pages update seamlessly
+    window.dispatchEvent(new CustomEvent("payent_orders_updated"));
+
+    setTimeout(() => {
+      setIsCreatingBooking(false);
+      setBookingConfirmedOrder(newOrder);
+      toast.success("Rental booking request created successfully!");
+    }, 400);
+  };
 
   const handleAddToCart = async () => {
     if (!product) return;
@@ -213,21 +449,6 @@ export default function ProductDetails() {
       setJustAddedToCart(true);
       setTimeout(() => setJustAddedToCart(false), 3000);
     }
-  };
-
-  const handleRentNow = () => {
-    if (!product) return;
-    if (!user) {
-      toast.error("Please log in to book this item.");
-      navigate({ to: "/login", search: { redirect: `/product/${id}` } as any });
-      return;
-    }
-    navigate({
-      to: "/checkout",
-      search: {
-        id: product.id,
-      } as never,
-    });
   };
 
   useEffect(() => {
@@ -276,7 +497,7 @@ export default function ProductDetails() {
           <h1 className="text-2xl font-bold">Product not found</h1>
           <Button
             className="mt-6"
-            onClick={() => navigate({ to: "/categories" })}
+            onClick={() => navigate({ to: "/browse" })}
           >
             Browse marketplace
           </Button>
@@ -307,8 +528,8 @@ export default function ProductDetails() {
     },
     aggregateRating: {
       "@type": "AggregateRating",
-      ratingValue: product.rating,
-      reviewCount: product.reviews,
+      ratingValue: product.rating != null ? Number(product.rating) : 5,
+      reviewCount: product.reviews || 0,
     },
   };
 
@@ -324,8 +545,8 @@ export default function ProductDetails() {
       {
         "@type": "ListItem",
         position: 2,
-        name: "Categories",
-        item: "https://payent.com/categories",
+        name: "Explore",
+        item: "https://payent.com/browse",
       },
       {
         "@type": "ListItem",
@@ -337,20 +558,21 @@ export default function ProductDetails() {
   };
 
   const gallery =
-    product.images && product.images.length > 0
-      ? product.images
-      : product.rotationFrames && product.rotationFrames.length > 0
-        ? product.rotationFrames
-        : [product.image];
+    Array.isArray(product.images) && product.images.length > 0
+      ? product.images.filter(Boolean)
+      : Array.isArray(product.rotationFrames) && product.rotationFrames.length > 0
+        ? product.rotationFrames.filter(Boolean)
+        : [product.image || "/placeholder.png"];
 
   const brand = getProductBrand(product);
+  const isWishlisted = has(product.id);
 
   return (
     <MainLayout>
       <JsonLd schema={productSchema} />
       <JsonLd schema={breadcrumbSchema} />
       <section className="mx-auto max-w-7xl px-4 md:px-6 py-5 space-y-6">
-        {/* Navigation Breadcrumb / Back to Browse */}
+        {/* Navigation Breadcrumb / Back to Explore */}
         <div className="flex items-center justify-between pb-1">
           <button
             type="button"
@@ -359,17 +581,39 @@ export default function ProductDetails() {
             className="inline-flex items-center gap-2 text-xs sm:text-sm font-bold text-muted-foreground hover:text-foreground transition-colors cursor-pointer group"
           >
             <ArrowLeft className="h-4 w-4 group-hover:-translate-x-1 transition-transform" />
-            <span>← Back to Browse</span>
+            <span>← Back to Explore</span>
           </button>
 
-          <span className="text-xs text-muted-foreground font-mono hidden sm:inline-block">
-            Gear ID: {product.id}
-          </span>
+          <div className="flex items-center gap-3">
+            {/* Wishlist Header Action */}
+            <button
+              type="button"
+              onClick={() => {
+                toggle(product.id);
+                toast.success(
+                  isWishlisted ? "Removed from wishlist" : "Saved to wishlist!"
+                );
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border bg-card hover:bg-secondary text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95"
+            >
+              <Heart
+                className={cn(
+                  "h-3.5 w-3.5",
+                  isWishlisted ? "fill-red-500 text-red-500" : "text-muted-foreground"
+                )}
+              />
+              <span>{isWishlisted ? "Saved" : "Save"}</span>
+            </button>
+
+            <span className="text-xs text-muted-foreground font-mono hidden sm:inline-block">
+              ID: #{product.id}
+            </span>
+          </div>
         </div>
 
         <div className="grid lg:grid-cols-12 gap-6 items-start">
           {/* Left Column: Image Viewer */}
-          <div className="lg:col-span-7 space-y-3 sticky top-20">
+          <div className="lg:col-span-7 space-y-4 sticky top-20">
             {product.angleImages && product.angleImages.length >= 2 ? (
               <ProductAngleViewer
                 angles={product.angleImages}
@@ -391,44 +635,59 @@ export default function ProductDetails() {
                 isWishlisted={has(product.id)}
               />
             )}
-          </div>
 
-          {/* Right Column: Reference App Mockup Details & Booking Panel */}
-          <div className="lg:col-span-5 space-y-4">
-            {/* Functional Reference Notice Banner */}
-            {product.isReference && (
-              <div className="flex items-center gap-2.5 p-3 rounded-xl bg-card border-2 border-primary/30 text-xs text-foreground shadow-sm">
-                <Info className="h-4 w-4 text-primary shrink-0" />
-                <span>
-                  <span className="font-extrabold px-1.5 py-0.5 rounded bg-black text-white dark:bg-white dark:text-black text-[10px] tracking-wider uppercase mr-1">
-                    REFERENCE MODEL
-                  </span>{" "}
-                  This item serves as a reference model for demonstrating
-                  platform features.
+            {/* Specifications & Verified Gear Details */}
+            <div className="rounded-3xl bg-card border border-border/80 p-5 space-y-3.5 shadow-xs text-left">
+              <div className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Tag className="h-4 w-4 text-foreground" />
+                  <span>Gear Specifications & Verification</span>
+                </div>
+                <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded-full">
+                  <ShieldCheck className="h-3 w-3" /> Insured & Calibrated
                 </span>
               </div>
-            )}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+                <div className="p-3 rounded-2xl bg-secondary/40 border border-border/60">
+                  <span className="text-[10px] uppercase font-bold text-muted-foreground block">Category</span>
+                  <span className="font-extrabold text-foreground truncate block capitalize mt-0.5">{product.category}</span>
+                </div>
+                <div className="p-3 rounded-2xl bg-secondary/40 border border-border/60">
+                  <span className="text-[10px] uppercase font-bold text-muted-foreground block">Brand / Model</span>
+                  <span className="font-extrabold text-foreground truncate block mt-0.5">{brand || "Pro Spec"}</span>
+                </div>
+                <div className="p-3 rounded-2xl bg-secondary/40 border border-border/60">
+                  <span className="text-[10px] uppercase font-bold text-muted-foreground block">Condition</span>
+                  <span className="font-extrabold text-foreground truncate block mt-0.5">{(product as unknown as { condition?: string }).condition || "Pristine / Mint"}</span>
+                </div>
+                <div className="p-3 rounded-2xl bg-secondary/40 border border-border/60">
+                  <span className="text-[10px] uppercase font-bold text-muted-foreground block">Pickup Hub</span>
+                  <span className="font-extrabold text-foreground truncate block mt-0.5">{formatOwnerAddress(product) || product.location || "Direct Handover"}</span>
+                </div>
+              </div>
+            </div>
+          </div>
 
-            <div className="rounded-2xl bg-card border border-border/80 p-4 md:p-5 space-y-4 shadow-lg text-left">
-              {/* Category & Availability Header with Brand */}
+          {/* Right Column: Details, Availability & Rental Booking Section */}
+          <div className="lg:col-span-5 space-y-4">
+            <div className="rounded-3xl bg-card border border-border/80 p-5 md:p-6 space-y-5 shadow-lg text-left">
+              {/* Category & Status Header */}
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs uppercase font-bold tracking-wider text-foreground px-3 py-1 rounded-md bg-secondary border border-border">
+                  <span className="text-xs uppercase font-extrabold tracking-wider text-foreground px-3 py-1 rounded-xl bg-secondary border border-border">
                     {product.category}
                   </span>
                   {brand && (
-                    <span className="text-xs font-bold text-foreground px-2.5 py-1 rounded-md bg-secondary/80 border border-border">
+                    <span className="text-xs font-bold text-foreground px-2.5 py-1 rounded-xl bg-secondary/80 border border-border">
                       {brand}
                     </span>
                   )}
                 </div>
+
                 {product.available ? (
-                  <span className="inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 font-extrabold px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
-                    <Check className="h-3.5 w-3.5" /> Available Now
-                  </span>
-                ) : product.status === "pending" ? (
-                  <span className="text-xs text-amber-600 dark:text-amber-400 font-extrabold px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20">
-                    Pending Approval
+                  <span className="inline-flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-extrabold px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                    Available for Rent
                   </span>
                 ) : (
                   <span className="text-xs text-destructive font-extrabold px-3 py-1 rounded-full bg-destructive/10 border border-destructive/20">
@@ -438,255 +697,264 @@ export default function ProductDetails() {
               </div>
 
               {/* Title & Rating */}
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <h1 className="text-2xl md:text-3xl font-black tracking-tight leading-tight text-foreground font-display">
                   {product.title}
                 </h1>
                 <div className="flex items-center gap-2 text-xs font-bold">
                   <div className="flex items-center gap-1 text-foreground bg-secondary px-2.5 py-0.5 rounded-full border border-border">
-                    <Star className="h-3.5 w-3.5 fill-foreground text-foreground" />
-                    <span>{product.rating.toFixed(1)}</span>
+                    <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                    <span>{(product.rating != null ? Number(product.rating) : 5.0).toFixed(1)}</span>
                   </div>
-                  {product.reviews > 0 && (
+                  {(product.reviews || 0) > 0 && (
                     <span className="text-muted-foreground">
-                      ({product.reviews} verified reviews)
+                      ({product.reviews} verified renter reviews)
                     </span>
                   )}
                 </div>
               </div>
 
               {/* Description */}
-              <p className="text-sm text-muted-foreground leading-relaxed font-normal">
-                {product.description}
+              <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+                {product.description || `Professional ${product.title} in excellent working condition. Insured and calibrated for creative shoots.`}
               </p>
 
-              {/* Owner Info Tile */}
-              {!product.isReference ? (
-                <div className="flex items-center gap-3.5 p-4 rounded-2xl bg-secondary/50 border border-border/80">
+              {/* Owner Info Tile with Direct Message Action */}
+              {!product.isReference && (
+                <div className="flex items-center gap-3.5 p-4 rounded-2xl bg-secondary/40 border border-border/80">
                   <img
-                    src={product.owner.avatar}
-                    alt={product.owner.name}
-                    className="h-12 w-12 rounded-full object-cover border-2 border-border"
+                    src={product.owner?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(product.owner?.name || "Owner")}&background=10b981&color=ffffff`}
+                    alt={product.owner?.name || "Owner"}
+                    className="h-11 w-11 rounded-full object-cover border-2 border-border"
                   />
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-extrabold text-foreground truncate">
-                      {product.owner.name}
+                    <div className="text-xs font-extrabold text-foreground truncate">
+                      {product.owner?.name || "Verified Gear Host"}
                     </div>
-                    <div className="text-xs text-muted-foreground mt-0.5 font-medium flex items-center gap-1 flex-wrap">
-                      <MapPin className="h-3 w-3 text-primary inline shrink-0" />
-                      <span>{formatOwnerAddress(product)}</span>
+                    <div className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1 flex-wrap">
+                      <ShieldCheck className="h-3 w-3 text-emerald-500 shrink-0" />
+                      <span>Verified Host</span>
                       <span>·</span>
-                      <span>Verified Lender</span>
-                      <span>·</span>
-                      <Star className="h-3 w-3 fill-foreground text-foreground inline" />
-                      <span>{product.owner.rating}</span>
+                      <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                      <span>{product.owner?.rating || "5.0"}</span>
                     </div>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    loading={messagingLoading}
-                    leftIcon={
-                      <MessageSquare className="h-3.5 w-3.5 text-foreground" />
-                    }
-                    onClick={handleMessageLender}
-                    className="font-bold text-xs border-border hover:border-primary"
-                  >
-                    Message Lender
-                  </Button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-3.5 p-4 rounded-2xl bg-secondary/40 border border-border/70">
-                  <div className="h-10 w-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-foreground font-black shrink-0">
-                    <Tag className="h-5 w-5" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xs font-extrabold text-foreground uppercase tracking-wider">
-                      Payent Reference Model
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-0.5 font-medium">
-                      Standard specification item for lender guidance and
-                      reference booking.
-                    </div>
-                  </div>
+
+                  {!isOwner && (
+                    <button
+                      type="button"
+                      onClick={() => setShowMessageModal(true)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border bg-card hover:bg-secondary text-foreground text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95 shrink-0"
+                    >
+                      <MessageSquare className="h-3.5 w-3.5 text-sky-500" />
+                      <span>Message</span>
+                    </button>
+                  )}
                 </div>
               )}
 
-              {/* Specifications & Verified Gear Details */}
-              <div className="rounded-2xl bg-secondary/35 border border-border/80 p-4 space-y-3">
-                <div className="text-[11px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <Tag className="h-3.5 w-3.5 text-foreground" />
-                    <span>Gear Specifications & Details</span>
-                  </div>
-                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">Verified Listing</span>
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="p-2.5 rounded-xl bg-card border border-border/60">
-                    <span className="text-[10px] uppercase font-bold text-muted-foreground block">Category</span>
-                    <span className="font-extrabold text-foreground truncate block capitalize">{product.category}</span>
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-card border border-border/60">
-                    <span className="text-[10px] uppercase font-bold text-muted-foreground block">Brand / Maker</span>
-                    <span className="font-extrabold text-foreground truncate block">{brand || "Professional Gear"}</span>
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-card border border-border/60">
-                    <span className="text-[10px] uppercase font-bold text-muted-foreground block">Condition</span>
-                    <span className="font-extrabold text-foreground truncate block">{(product as unknown as { condition?: string }).condition || "Pristine / Calibrated"}</span>
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-card border border-border/60">
-                    <span className="text-[10px] uppercase font-bold text-muted-foreground block">Location</span>
-                    <span className="font-extrabold text-foreground truncate block">{formatOwnerAddress(product) || product.location || "Direct Handover"}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Pricing & Primary Action Button */}
-              <div className="pt-4 border-t border-border space-y-4">
+              {/* ========================================================= */}
+              {/* RENTAL AVAILABILITY & BOOKING SECTION                     */}
+              {/* ========================================================= */}
+              <div className="pt-2 border-t border-border/80 space-y-4">
                 <div className="flex items-baseline justify-between">
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                    Total Rental Rate
+                  <span className="text-xs font-extrabold text-muted-foreground uppercase tracking-wider">
+                    Rental Daily Rate
                   </span>
                   <div>
-                    <span className="text-3xl font-black text-foreground tracking-tight">
-                      ₹{product.price}
+                    <span className="text-3xl font-black text-foreground font-display font-mono">
+                      ₹{(Number(product.price) || 0).toLocaleString("en-IN")}
                     </span>
-                    <span className="text-xs text-slate-400 font-medium">
-                      {" "}
-                      / day
-                    </span>
+                    <span className="text-xs text-muted-foreground font-semibold"> / day</span>
                   </div>
                 </div>
 
-                {product.isReference ? (
-                  <div className="space-y-2">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        navigate({
-                          to: "/become-lender",
-                          search: {
-                            title: product.title,
-                            category: product.category,
-                            price: product.price.toString(),
-                          } as never,
-                        })
-                      }
-                      className="w-full bg-[#161616] dark:bg-[#F2F0EA] hover:bg-[#292929] dark:hover:bg-[#FFFDF7] active:bg-[#0B0B0B] dark:active:bg-[#DDD9D0] text-white dark:text-[#0A0A0A] font-bold text-sm py-4 rounded-2xl shadow-lg transition-all duration-200 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
-                    >
-                      <span>List Your Gear</span>
-                      <ArrowRight className="h-4 w-4" />
-                    </button>
-                    <p className="text-[11px] text-muted-foreground text-center font-medium">
-                      Reference item. Listed gear from community lenders
-                      includes instant Rent Now booking.
+                {isOwner ? (
+                  <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-center space-y-1">
+                    <p className="text-xs font-bold text-amber-600 dark:text-amber-400">
+                      You are the owner of this listing.
                     </p>
-                  </div>
-                ) : isOwner ? (
-                  <div className="space-y-2">
-                    <button
-                      type="button"
-                      disabled
-                      className="w-full bg-secondary text-muted-foreground font-bold text-sm py-4 rounded-2xl border border-border/80 cursor-not-allowed flex items-center justify-center gap-2 opacity-70"
-                    >
-                      <span>Your Listed Item</span>
-                    </button>
-                    <p className="text-[11px] text-muted-foreground text-center font-medium">
-                      You are the owner of this listing and cannot book your own
-                      item.
+                    <p className="text-[11px] text-muted-foreground">
+                      You cannot rent or create bookings on your own equipment.
                     </p>
                   </div>
                 ) : (
-                  <div className="space-y-3">
-                    {/* PRIMARY ACTION: ADD TO CART */}
-                    {product.available ? (
-                      <button
-                        type="button"
-                        disabled={isAddingToCart}
-                        onClick={handleAddToCart}
-                        id="product-details-add-to-cart-btn"
-                        className={cn(
-                          "w-full h-13 rounded-2xl font-black text-sm tracking-tight flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer",
-                          justAddedToCart
-                            ? "bg-emerald-600 text-white"
-                            : "bg-[#161616] dark:bg-[#F2F0EA] hover:bg-[#292929] dark:hover:bg-[#FFFDF7] text-white dark:text-[#0A0A0A] active:scale-98",
+                  <div className="p-4 sm:p-5 rounded-2xl bg-secondary/30 border border-border space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-xs font-extrabold text-foreground uppercase tracking-wider">
+                        <Calendar className="h-4 w-4 text-primary" />
+                        <span>Select Rental Dates</span>
+                      </div>
+                      <span className="text-[11px] text-muted-foreground font-medium">
+                        Min. 1 Day Rental
+                      </span>
+                    </div>
+
+                    {/* Date Inputs Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-bold text-muted-foreground block">
+                          Start Date
+                        </label>
+                        <input
+                          type="date"
+                          min={todayStr}
+                          value={startDate}
+                          onChange={(e) => handleStartDateChange(e.target.value)}
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-card text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-bold text-muted-foreground block">
+                          End Date (Return)
+                        </label>
+                        <input
+                          type="date"
+                          min={startDate || todayStr}
+                          value={endDate}
+                          onChange={(e) => handleEndDateChange(e.target.value)}
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-card text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Existing Booked Dates Warning if any */}
+                    {existingProductBookings.length > 0 && (
+                      <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-700 dark:text-amber-300 space-y-1">
+                        <span className="font-bold block">Currently Booked Periods:</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {existingProductBookings.map((b) => (
+                            <span
+                              key={b.id}
+                              className="px-2 py-0.5 rounded-md bg-card/80 border border-amber-500/20 font-mono text-[10px]"
+                            >
+                              {b.startDate} → {b.endDate}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Step 1: Check Availability Action */}
+                    {!availabilityChecked || isAvailableForDates === false ? (
+                      <div className="space-y-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={handleCheckAvailability}
+                          className="w-full py-3 px-4 rounded-xl bg-foreground text-background font-extrabold text-xs shadow-md hover:opacity-95 active:scale-98 transition-all cursor-pointer flex items-center justify-center gap-2"
+                        >
+                          <CalendarCheck className="h-4 w-4" />
+                          <span>Check Date Availability</span>
+                        </button>
+
+                        {availabilityChecked && isAvailableForDates === false && (
+                          <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs font-bold flex items-center gap-2">
+                            <CalendarX className="h-4 w-4 shrink-0" />
+                            <span>{availabilityMessage}</span>
+                          </div>
                         )}
-                      >
-                        {isAddingToCart ? (
-                          <span>Adding to Cart...</span>
-                        ) : justAddedToCart ? (
-                          <>
-                            <Check className="h-4 w-4 text-white" />
-                            <span>Added to Cart!</span>
-                          </>
-                        ) : (
-                          <>
-                            <ShoppingBag className="h-4 w-4" />
-                            <span>ADD TO CART</span>
-                          </>
-                        )}
-                      </button>
+                      </div>
                     ) : (
-                      <button
-                        type="button"
-                        disabled
-                        id="product-details-add-to-cart-btn"
-                        className="w-full h-13 rounded-2xl font-bold text-sm tracking-tight flex items-center justify-center gap-2 bg-neutral-200 text-neutral-400 dark:bg-neutral-800 dark:text-neutral-500 cursor-not-allowed border border-neutral-300/40 dark:border-white/5 opacity-80"
+                      /* Step 2: Available Summary Matrix & Confirm Booking */
+                      <motion.div
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="space-y-3.5 pt-1"
                       >
-                        <span>NOT AVAILABLE</span>
-                      </button>
+                        <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold flex items-center justify-between">
+                          <span className="flex items-center gap-1.5">
+                            <CheckCircle2 className="h-4 w-4 shrink-0" />
+                            <span>{availabilityMessage}</span>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAvailabilityChecked(false);
+                              setIsAvailableForDates(null);
+                            }}
+                            className="text-[11px] underline hover:opacity-80 cursor-pointer"
+                          >
+                            Change Dates
+                          </button>
+                        </div>
+
+                        {/* Booking Summary Box */}
+                        <div className="p-3.5 rounded-xl border border-border bg-card space-y-2 text-xs">
+                          <div className="flex justify-between text-muted-foreground">
+                            <span>Rental Duration:</span>
+                            <span className="font-extrabold text-foreground">{rentalDays} Days</span>
+                          </div>
+                          <div className="flex justify-between text-muted-foreground">
+                            <span>Daily Rate:</span>
+                            <span className="font-semibold text-foreground">₹{product.price} / day</span>
+                          </div>
+                          <div className="pt-2 border-t border-border flex justify-between items-baseline">
+                            <span className="font-bold text-foreground">Estimated Total:</span>
+                            <span className="text-xl font-black text-emerald-600 dark:text-emerald-400 font-display font-mono">
+                              ₹{estimatedTotal.toLocaleString("en-IN")}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Confirm Booking Button */}
+                        <button
+                          type="button"
+                          disabled={isCreatingBooking}
+                          onClick={handleConfirmBooking}
+                          id="confirm-booking-btn"
+                          className="w-full py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow-lg active:scale-98 transition-all cursor-pointer flex items-center justify-center gap-2"
+                        >
+                          {isCreatingBooking ? (
+                            <span>Creating Booking Request...</span>
+                          ) : (
+                            <>
+                              <CheckCircle2 className="h-4 w-4" />
+                              <span>Confirm Booking Request (₹{estimatedTotal.toLocaleString("en-IN")})</span>
+                            </>
+                          )}
+                        </button>
+                      </motion.div>
                     )}
 
-                    {/* Secondary Action: Instant Booking / Checkout */}
-                    {product.available && (
+                    {/* Secondary Action: Add to Cart */}
+                    <div className="pt-1 border-t border-border/60 flex items-center justify-between">
+                      <span className="text-[11px] text-muted-foreground">Prefer to rent later?</span>
                       <button
                         type="button"
-                        onClick={handleRentNow}
-                        id="product-details-rent-now-btn"
-                        className="w-full py-2.5 rounded-xl border border-border/80 hover:bg-secondary/70 text-xs font-bold text-foreground transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                        onClick={handleAddToCart}
+                        disabled={isAddingToCart}
+                        className="text-xs font-bold text-primary hover:underline inline-flex items-center gap-1 cursor-pointer"
                       >
-                        <span>Instant Booking / Checkout</span>
-                        <ArrowRight className="h-3.5 w-3.5" />
+                        <ShoppingBag className="h-3 w-3" />
+                        <span>{justAddedToCart ? "Added to Cart!" : "Add to Rental Cart"}</span>
                       </button>
-                    )}
-
-                    {/* Quick navigation link to Cart page */}
-                    {(isInCart || justAddedToCart) && (
-                      <button
-                        type="button"
-                        onClick={() => navigate({ to: "/cart" })}
-                        id="product-details-view-cart-link"
-                        className="w-full flex items-center justify-center gap-1.5 py-1 text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
-                      >
-                        <span>✓ Gear in your rental cart — View Cart Page & Proceed to Checkout</span>
-                        <ArrowRight className="h-3 w-3" />
-                      </button>
-                    )}
+                    </div>
                   </div>
                 )}
               </div>
 
-              {/* Insurance & Delivery Badges */}
+              {/* Insurance & Protection Guarantee */}
               <div className="grid grid-cols-2 gap-3 pt-2">
                 <div className="flex items-start gap-2.5 p-3 rounded-2xl bg-secondary/40 border border-border/60">
-                  <ShieldCheck className="h-4 w-4 text-[#FF5A5F] shrink-0 mt-0.5" />
+                  <ShieldCheck className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
                   <div>
                     <div className="text-xs font-extrabold text-foreground">
-                      100% Insured
+                      ₹50,000 Insured
                     </div>
-                    <div className="text-[10px] text-slate-400 mt-0.5 font-medium">
-                      Up to ₹5 Lakhs coverage
+                    <div className="text-[10px] text-muted-foreground mt-0.5">
+                      Full damage protection
                     </div>
                   </div>
                 </div>
                 <div className="flex items-start gap-2.5 p-3 rounded-2xl bg-secondary/40 border border-border/60">
-                  <Truck className="h-4 w-4 text-[#FF5A5F] shrink-0 mt-0.5" />
+                  <Truck className="h-4 w-4 text-primary shrink-0 mt-0.5" />
                   <div>
                     <div className="text-xs font-extrabold text-foreground">
-                      Doorstep Delivery
+                      Verified Handover
                     </div>
-                    <div className="text-[10px] text-slate-400 mt-0.5 font-medium">
-                      Same-day pickup option
+                    <div className="text-[10px] text-muted-foreground mt-0.5">
+                      Direct pickup & return
                     </div>
                   </div>
                 </div>
@@ -694,6 +962,139 @@ export default function ProductDetails() {
             </div>
           </div>
         </div>
+
+        {/* ========================================================= */}
+        {/* BOOKING CREATED SUCCESS MODAL                             */}
+        {/* ========================================================= */}
+        <AnimatePresence>
+          {bookingConfirmedOrder && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 select-none">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setBookingConfirmedOrder(null)}
+                className="fixed inset-0 bg-black/80 backdrop-blur-md"
+              />
+
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 12 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 12 }}
+                transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                className="relative w-full max-w-md rounded-3xl border border-border bg-card p-6 sm:p-8 space-y-6 shadow-2xl text-center z-10"
+              >
+                <div className="h-16 w-16 rounded-3xl bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 flex items-center justify-center mx-auto shadow-sm">
+                  <CheckCircle2 className="h-9 w-9" />
+                </div>
+
+                <div className="space-y-1.5">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
+                    Booking Request Confirmed
+                  </span>
+                  <h3 className="text-2xl font-black text-foreground font-display">
+                    Rental Requested!
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    Your request has been sent to the owner for handover confirmation.
+                  </p>
+                </div>
+
+                {/* Booking Receipt Summary Card */}
+                <div className="p-4 rounded-2xl bg-secondary/40 border border-border text-left space-y-2.5 text-xs">
+                  <div className="flex items-center gap-3 pb-2 border-b border-border/60">
+                    <img
+                      src={bookingConfirmedOrder.productImage}
+                      alt={bookingConfirmedOrder.productTitle}
+                      className="h-12 w-12 rounded-xl object-cover border border-border bg-card shrink-0"
+                    />
+                    <div className="min-w-0">
+                      <h4 className="font-bold text-foreground truncate">
+                        {bookingConfirmedOrder.productTitle}
+                      </h4>
+                      <p className="text-[11px] text-muted-foreground font-mono mt-0.5">
+                        Booking ID: #{bookingConfirmedOrder.id}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Rental Schedule:</span>
+                    <span className="font-bold text-foreground">
+                      {bookingConfirmedOrder.startDate} → {bookingConfirmedOrder.endDate}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Duration:</span>
+                    <span className="font-bold text-foreground">{rentalDays} Days</span>
+                  </div>
+
+                  <div className="flex justify-between items-baseline pt-1 border-t border-border/60">
+                    <span className="font-bold text-foreground">Estimated Amount:</span>
+                    <span className="text-base font-black text-emerald-600 dark:text-emerald-400 font-mono">
+                      ₹{bookingConfirmedOrder.total.toLocaleString("en-IN")}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Renter Handover Secret PIN Banner */}
+                {securityRecord && (
+                  <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-center space-y-1.5 shadow-xs">
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 text-[10px] font-bold uppercase tracking-wider">
+                      <KeyRound className="h-3 w-3" />
+                      <span>Your Renter Secret PIN</span>
+                    </div>
+                    <div className="font-mono text-3xl sm:text-4xl font-black text-foreground tracking-widest selection:bg-none">
+                      {securityRecord.renterSecretPin}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground leading-snug max-w-xs mx-auto">
+                      Provide this 4-digit PIN to the gear owner during physical handover to verify and activate your rental.
+                    </p>
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="space-y-2.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBookingConfirmedOrder(null);
+                      navigate({ to: "/dashboard" });
+                    }}
+                    className="w-full py-3.5 px-4 rounded-2xl bg-foreground text-background font-bold text-xs shadow-md hover:opacity-95 active:scale-98 transition-all cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <span>View in User Dashboard</span>
+                    <ArrowRight className="h-4 w-4" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBookingConfirmedOrder(null);
+                      setShowMessageModal(true);
+                    }}
+                    className="w-full py-3 px-4 rounded-2xl border border-border hover:bg-secondary text-foreground font-semibold text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <MessageSquare className="h-3.5 w-3.5 text-sky-500" />
+                    <span>Message Owner About Pickup</span>
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* ========================================================= */}
+        {/* PRODUCT-SPECIFIC MESSAGING MODAL                          */}
+        {/* ========================================================= */}
+        {showMessageModal && (
+          <ProductMessageModal
+            isOpen={showMessageModal}
+            onClose={() => setShowMessageModal(false)}
+            product={product}
+          />
+        )}
 
         {/* Frequently Booked Together Section */}
         {frequentlyTogether.length > 0 && (
@@ -718,53 +1119,6 @@ export default function ProductDetails() {
             badge="Category Match"
             className="pt-6"
           />
-        )}
-
-        {/* Reviews Section - Hidden for reference catalog products */}
-        {!product.isReference && product.reviews > 0 && (
-          <div className="pt-10 border-t border-border/80">
-            <h2 className="text-2xl font-black tracking-tight mb-6 font-display">
-              Verified Customer Reviews
-            </h2>
-            <div className="grid gap-5 md:grid-cols-3">
-              {/* Reviews from backend will be rendered here once GET /api/reviews endpoint is implemented */}
-              {(
-                [] as Array<{
-                  id: string;
-                  author: string;
-                  avatar?: string;
-                  rating: number;
-                  comment: string;
-                  date: string;
-                }>
-              ).map((r) => (
-                <div
-                  key={r.id}
-                  className="rounded-3xl bg-card border border-border p-6 space-y-3 shadow-md"
-                >
-                  <div className="flex items-center gap-3">
-                    <img
-                      src={r.avatar ?? ""}
-                      alt={r.author}
-                      className="h-10 w-10 rounded-full object-cover border border-[#FF5A5F]"
-                    />
-                    <div className="text-left">
-                      <div className="text-sm font-extrabold text-foreground">
-                        {r.author}
-                      </div>
-                      <div className="text-[10px] text-muted-foreground font-medium">
-                        {r.date}
-                      </div>
-                    </div>
-                  </div>
-                  <Rating value={r.rating} />
-                  <p className="text-xs text-muted-foreground leading-relaxed font-medium">
-                    {r.comment}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
         )}
       </section>
     </MainLayout>

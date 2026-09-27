@@ -180,22 +180,31 @@ import {
 
 function RootContent() {
   const [showChatbot, setShowChatbot] = useState(false);
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+
   useEffect(() => {
     const timer = setTimeout(() => setShowChatbot(true), 1000);
     return () => clearTimeout(timer);
   }, []);
 
+  const isGateway = pathname === "/" || pathname === "/select";
+  const isPayernt =
+    pathname === "/payernt" ||
+    pathname === "/become-lender" ||
+    pathname === "/lender-portal";
+  const hideMainNavigation = isGateway || isPayernt || pathname.startsWith("/admin");
+
   return (
     <>
       <AppPreloader />
-      <Navigation4 />
+      {!hideMainNavigation && <Navigation4 />}
       {/* Origin-Based Expanding Reveal Page Transition */}
       <OriginRevealPageTransition>
         <Outlet />
       </OriginRevealPageTransition>
 
-      <CartDrawer />
-      {showChatbot && <HelpChatbot />}
+      {!isGateway && !isPayernt && <CartDrawer />}
+      {showChatbot && !isGateway && !isPayernt && <HelpChatbot />}
       <Toaster position="bottom-right" richColors />
     </>
   );

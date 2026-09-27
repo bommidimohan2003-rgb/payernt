@@ -1,6 +1,13 @@
 import os
 import sys
 
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
 # Ensure backend directory is in sys.path for serverless environment compatibility
 backend_dir = os.path.dirname(os.path.abspath(__file__))
 if backend_dir not in sys.path:
@@ -40,6 +47,7 @@ def ensure_database_exists():
             password=MYSQL_PASSWORD,
             cursorclass=pymysql.cursors.DictCursor,
             connect_timeout=5,
+            charset="utf8mb4",
             **ssl_kwargs
         )
         try:
@@ -90,6 +98,7 @@ def get_db_pool():
             database=MYSQL_DB,
             cursorclass=pymysql.cursors.DictCursor,
             connect_timeout=5,
+            charset="utf8mb4",
             autocommit=True,
             **ssl_kwargs
         )
@@ -124,6 +133,7 @@ def get_db_connection():
             database=MYSQL_DB,
             cursorclass=pymysql.cursors.DictCursor,
             connect_timeout=3,
+            charset="utf8mb4",
             **ssl_kwargs
         )
         _last_db_failure_timestamp = 0.0
@@ -250,6 +260,8 @@ def init_db(force: bool = False):
     except Exception:
         pass
 
+    add_column_safely("users", "account_type VARCHAR(50) DEFAULT 'pay₹ent'")
+    add_column_safely("users", "pan_number VARCHAR(20) NULL")
     add_column_safely("users", "status VARCHAR(50) DEFAULT 'active'")
     add_column_safely("users", "verified BOOLEAN DEFAULT TRUE")
     add_column_safely("users", "avatar LONGTEXT NULL")
@@ -266,9 +278,66 @@ def init_db(force: bool = False):
     add_column_safely("users", "last_login_at VARCHAR(100)")
     add_column_safely("users", "aadhaar_number VARCHAR(20) NULL")
     add_column_safely("users", "profile_photo_url LONGTEXT NULL")
+    add_column_safely("users", "person_id VARCHAR(255) NULL")
+    add_index_safely("users", "idx_users_pan_number", "pan_number")
+    add_index_safely("users", "idx_users_account_type", "account_type")
     add_index_safely("users", "idx_users_aadhaar_number", "aadhaar_number")
     add_index_safely("users", "idx_users_phone", "phone")
     add_index_safely("users", "idx_users_city", "city")
+    add_index_safely("users", "idx_users_person_id", "person_id")
+
+    # 1. Dedicated Admin Accounts Table
+    execute_query("""
+        CREATE TABLE IF NOT EXISTS admin_accounts (
+            id VARCHAR(255) PRIMARY KEY,
+            email VARCHAR(255) UNIQUE NOT NULL,
+            full_name VARCHAR(255) NOT NULL,
+            phone VARCHAR(50) NULL,
+            password_hash VARCHAR(255) NOT NULL,
+            role VARCHAR(50) DEFAULT 'admin',
+            avatar LONGTEXT NULL,
+            address VARCHAR(500) NULL,
+            city VARCHAR(100) NULL,
+            pincode VARCHAR(20) NULL,
+            status VARCHAR(50) DEFAULT 'active',
+            verified BOOLEAN DEFAULT TRUE,
+            created_at VARCHAR(100) NOT NULL,
+            last_login_at VARCHAR(100) NULL,
+            INDEX idx_admin_email (email),
+            INDEX idx_admin_role (role)
+        )
+    """)
+
+    # 2. Dedicated Payrent (Customer / Renter) Accounts Table
+    execute_query("""
+        CREATE TABLE IF NOT EXISTS payrent_accounts (
+            email VARCHAR(255) PRIMARY KEY,
+            phone VARCHAR(50) NOT NULL,
+            password_hash VARCHAR(255) NULL,
+            full_name VARCHAR(255) NOT NULL,
+            role VARCHAR(50) DEFAULT 'customer',
+            account_type VARCHAR(50) DEFAULT 'pay₹ent',
+            pan_number VARCHAR(20) NULL,
+            status VARCHAR(50) DEFAULT 'active',
+            verified BOOLEAN DEFAULT TRUE,
+            avatar LONGTEXT NULL,
+            profile_photo_url LONGTEXT NULL,
+            address VARCHAR(500) NULL,
+            city VARCHAR(100) NULL,
+            state VARCHAR(100) NULL,
+            pincode VARCHAR(20) NULL,
+            occupation VARCHAR(255) NULL,
+            bio TEXT NULL,
+            country VARCHAR(100) DEFAULT 'India',
+            person_id VARCHAR(255) NULL,
+            created_at VARCHAR(100) NOT NULL,
+            last_login_at VARCHAR(100) NULL,
+            updated_at VARCHAR(100) NULL,
+            INDEX idx_payrent_phone (phone),
+            INDEX idx_payrent_pan (pan_number),
+            INDEX idx_payrent_person_id (person_id)
+        )
+    """)
 
     # Create token_blocklist table for server-side JWT revocation
     execute_query("""
@@ -828,6 +897,12 @@ def init_db(force: bool = False):
     except Exception as sync_err:
         print(f"Notice: Auto sync existing product owners to agents notice: {sync_err}")
 
+    try:
+        from payernt_database import init_payernt_tables
+        init_payernt_tables()
+    except Exception as payernt_err:
+        print(f"Notice: Payernt tables initialization notice: {payernt_err}")
+
     _db_initialized = True
     print("MySQL database structures initialized.")
 
@@ -884,6 +959,26 @@ def get_user(email: str):
         t, cached = _user_cache[clean_email]
         if now - t < 30.0:
             return cached
+
+    # 1. Search admin_accounts
+    try:
+        admin = fetch_one("SELECT * FROM admin_accounts WHERE email = %s", (clean_email,))
+        if admin:
+            _user_cache[clean_email] = (now, admin)
+            return admin
+    except Exception as e:
+        logger.warning("DB read error in get_user (admin_accounts): %s", e)
+
+    # 2. Search payrent_accounts
+    try:
+        payrent = fetch_one("SELECT * FROM payrent_accounts WHERE email = %s", (clean_email,))
+        if payrent:
+            _user_cache[clean_email] = (now, payrent)
+            return payrent
+    except Exception as e:
+        logger.warning("DB read error in get_user (payrent_accounts): %s", e)
+
+    # 3. Fallback to users table
     try:
         user = fetch_one("SELECT * FROM users WHERE email = %s", (clean_email,))
         if user:
@@ -891,6 +986,7 @@ def get_user(email: str):
             return user
     except Exception as e:
         logger.warning("DB read error in get_user for %s — falling back to MOCK_USERS: %s", clean_email, e)
+
     res = MOCK_USERS.get(clean_email)
     if res:
         _user_cache[clean_email] = (now, res)
@@ -899,14 +995,17 @@ def get_user(email: str):
 def has_admin_user() -> bool:
     """Check if at least one administrator account exists in the database."""
     try:
-        row = fetch_one("SELECT COUNT(*) as count FROM users WHERE LOWER(role) = 'admin'")
+        row = fetch_one("SELECT COUNT(*) as count FROM admin_accounts WHERE LOWER(role) IN ('admin', 'superadmin')")
         if row and row.get("count", 0) > 0:
+            return True
+        row_users = fetch_one("SELECT COUNT(*) as count FROM users WHERE LOWER(role) IN ('admin', 'superadmin')")
+        if row_users and row_users.get("count", 0) > 0:
             return True
     except Exception as e:
         logger.warning(f"Error checking admin user existence in DB: {e}")
 
     for u in MOCK_USERS.values():
-        if u.get("role", "").lower() == "admin":
+        if u.get("role", "").lower() in ("admin", "superadmin"):
             return True
     return False
 
@@ -946,9 +1045,12 @@ def get_user_by_phone(phone: str):
         return None
     clean = str(phone).strip()
     try:
-        user = fetch_one("SELECT * FROM users WHERE phone = %s", (clean,))
+        user = fetch_one("SELECT * FROM payrent_accounts WHERE phone = %s", (clean,))
         if user:
             return user
+        user_u = fetch_one("SELECT * FROM users WHERE phone = %s", (clean,))
+        if user_u:
+            return user_u
     except Exception as e:
         logger.warning("DB read error in get_user_by_phone: %s", e)
     for u in MOCK_USERS.values():
@@ -966,14 +1068,27 @@ def create_user(
     city: str = None,
     pincode: str = None,
     aadhaar_number: str = None,
-    status: str = None
+    pan_number: str = None,
+    account_type: str = "pay₹ent",
+    status: str = None,
+    person_id: str = None
 ):
     created_at = dt.now(timezone.utc).isoformat()
     clean_email = email.strip().lower()
     clean_aadhaar = "".join(c for c in str(aadhaar_number) if c.isdigit()) if aadhaar_number else None
-    user_status = status if status else ("approved" if role == "admin" else "pending")
+    clean_pan = str(pan_number).strip().upper() if pan_number else None
+    user_status = status if status else ("approved" if role == "admin" else "active")
+
+    if not person_id:
+        try:
+            from payernt_database import get_or_create_person
+            person_id = get_or_create_person(full_name or clean_email.split("@")[0], phone)
+        except Exception:
+            person_id = None
+
     user_data = {
         "email": clean_email,
+        "person_id": person_id,
         "phone": phone,
         "password_hash": password_hash,
         "full_name": full_name,
@@ -982,20 +1097,54 @@ def create_user(
         "city": city,
         "pincode": pincode,
         "aadhaar_number": clean_aadhaar,
+        "pan_number": clean_pan,
+        "account_type": account_type or "pay₹ent",
         "status": user_status,
-        "verified": bool(role == "admin"),
+        "verified": True,
         "created_at": created_at
     }
     MOCK_USERS[clean_email] = user_data
     invalidate_user_cache(clean_email)
+
+    if role in ("admin", "superadmin"):
+        try:
+            execute_query("""
+                INSERT INTO admin_accounts (id, email, full_name, phone, password_hash, role, address, city, pincode, status, verified, created_at, last_login_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE full_name=VALUES(full_name), password_hash=VALUES(password_hash), status=VALUES(status)
+            """, (f"ADMIN_{clean_email}", clean_email, full_name, phone, password_hash, role, address, city, pincode, user_status, 1, created_at, created_at))
+        except Exception as e:
+            print(f"Notice: Database write error in admin_accounts: {e}")
+    else:
+        try:
+            execute_query("""
+                INSERT INTO payrent_accounts (id, person_id, email, phone, password_hash, full_name, role, account_type, pan_number, status, verified, address, city, pincode, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE full_name=VALUES(full_name), password_hash=VALUES(password_hash), status=VALUES(status), person_id=VALUES(person_id)
+            """, (f"PAYRENT_USER_{clean_email}", person_id, clean_email, phone, password_hash, full_name, role, account_type or "pay₹ent", clean_pan, user_status, 1, address, city, pincode, created_at))
+        except Exception as e:
+            print(f"Notice: Database write error in payrent_accounts: {e}")
+
     try:
         execute_query(
-            "INSERT INTO users (email, phone, password_hash, full_name, role, address, city, pincode, aadhaar_number, status, verified, created_at) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
-            (clean_email, phone, password_hash, full_name, role, address, city, pincode, clean_aadhaar, user_status, 1 if role == "admin" else 0, created_at)
+            "INSERT INTO users (email, person_id, phone, password_hash, full_name, role, address, city, pincode, aadhaar_number, pan_number, account_type, status, verified, created_at) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) ON DUPLICATE KEY UPDATE full_name=VALUES(full_name), password_hash=VALUES(password_hash), status=VALUES(status), person_id=VALUES(person_id)",
+            (clean_email, person_id, phone, password_hash, full_name, role, address, city, pincode, clean_aadhaar, clean_pan, account_type or "pay₹ent", user_status, 1, created_at)
         )
     except Exception as e:
         print(f"Notice: Database write error in create_user: {e}")
+
+    if person_id:
+        try:
+            execute_query("UPDATE payernt_accounts SET person_id = %s WHERE email = %s OR phone = %s", (person_id, clean_email, phone))
+        except Exception:
+            pass
+
     return {
+        "id": clean_email,
+        "accountId": f"PAYRENT_USER_{clean_email}",
+        "personId": person_id,
+        "person_id": person_id,
+        "accountType": account_type or "pay₹ent",
         "email": clean_email,
         "phone": phone,
         "fullName": full_name,
@@ -1004,8 +1153,10 @@ def create_user(
         "city": city,
         "pincode": pincode,
         "aadhaar_number": clean_aadhaar,
+        "panNumber": clean_pan,
+        "panMasked": f"XXXXX{clean_pan[-5:]}" if clean_pan and len(clean_pan) == 10 else None,
         "status": user_status,
-        "verified": bool(role == "admin"),
+        "verified": True,
         "createdAt": created_at
     }
 
@@ -3372,6 +3523,11 @@ def evaluate_product_availability(product: dict, booked_pids_set: Optional[Set[s
 
     if not owner_status and owner_email:
         u = get_user(owner_email)
+        if not u:
+            try:
+                u = fetch_one("SELECT status FROM payernt_accounts WHERE email = %s", (owner_email,))
+            except Exception:
+                pass
         if u:
             owner_status = str(u.get("status") or "active").lower().strip()
         else:

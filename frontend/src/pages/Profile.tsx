@@ -30,6 +30,8 @@ import {
   X,
   AlertTriangle,
   ChevronDown,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
@@ -51,6 +53,7 @@ export default function Profile() {
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [isPhotoMenuOpen, setIsPhotoMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"details" | "location" | "payout" | "security">("details");
+  const [showPan, setShowPan] = useState(false);
 
   const [stats, setStats] = useState<UserProfileStats | null>(() => {
     return storage.get<UserProfileStats | null>("user_profile_stats", null);
@@ -562,7 +565,7 @@ export default function Profile() {
                 <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-2">
                   <div className="px-3 py-1 rounded-xl bg-secondary/80 border border-border text-xs font-medium text-foreground flex items-center gap-1.5">
                     <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
-                    <span>Aadhaar: <strong className="font-mono text-foreground font-bold">{user?.aadhaarMasked || user?.aadhaar_masked || "Not linked"}</strong></span>
+                    <span>PAN: <strong className="font-mono text-foreground font-bold">{user?.panMasked || (user?.panNumber ? `XXXXX${user.panNumber.slice(-5)}` : "Not linked")}</strong></span>
                   </div>
                   <div className="px-3 py-1 rounded-xl bg-secondary/80 border border-border text-xs font-medium text-foreground flex items-center gap-1.5">
                     <Mail className="h-3.5 w-3.5 text-primary" />
@@ -897,12 +900,33 @@ export default function Profile() {
                 </div>
 
                 <div className="grid sm:grid-cols-3 gap-5">
-                  <Input
-                    label="Aadhaar Number (Masked)"
-                    icon={<ShieldCheck className="h-4 w-4 text-emerald-500" />}
-                    value={user?.aadhaarMasked || user?.aadhaar_masked || "XXXX-XXXX-9012"}
-                    disabled
-                  />
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-foreground flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <ShieldCheck className="h-4 w-4 text-emerald-500" />
+                        PAN Number
+                      </span>
+                      {user?.panNumber && user.panNumber.length > 5 && (
+                        <button
+                          type="button"
+                          onClick={() => setShowPan(!showPan)}
+                          className="text-[11px] text-primary hover:underline flex items-center gap-1 cursor-pointer font-medium"
+                        >
+                          {showPan ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                          {showPan ? "Mask" : "Show Full"}
+                        </button>
+                      )}
+                    </label>
+                    <Input
+                      value={
+                        showPan
+                          ? user?.panNumber || user?.panMasked || "XXXXX1234F"
+                          : user?.panMasked || (user?.panNumber ? `XXXXX${user.panNumber.slice(-5)}` : "XXXXX1234F")
+                      }
+                      disabled
+                      className="font-mono uppercase font-bold tracking-wider"
+                    />
+                  </div>
                   <Input
                     label="Email Address"
                     icon={<Mail className="h-4 w-4" />}
@@ -1091,10 +1115,10 @@ export default function Profile() {
                     <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
                     <div>
                       <p className="text-xs font-bold text-foreground">
-                        Govt ID Verification
+                        Govt PAN Card Verification
                       </p>
-                      <p className="text-[10px] text-muted-foreground font-medium">
-                        Aadhaar verified (`XXXX-XXXX-9012`)
+                      <p className="text-[10px] text-muted-foreground font-medium font-mono">
+                        PAN: {user?.panMasked || (user?.panNumber ? `XXXXX${user.panNumber.slice(-5)}` : "XXXXX1234F")} (Verified)
                       </p>
                     </div>
                   </div>
@@ -1203,7 +1227,7 @@ export default function Profile() {
                 onClick={() => {
                   logout();
                   toast.success("Logged out successfully.");
-                  navigate({ to: "/login" });
+                  navigate({ to: "/" });
                 }}
                 className="w-full font-bold text-xs flex items-center justify-center gap-2 py-2.5 shadow-md hover:shadow-lg transition-all cursor-pointer"
               >

@@ -1,11 +1,12 @@
 import { useEffect, useState, useCallback } from "react";
 import { toast } from "sonner";
-import { Package, Truck, MessageSquare } from "lucide-react";
+import { Package, Truck, MessageSquare, KeyRound } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/common/Button";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
 import { STORAGE_KEYS, storage } from "@/utils/storage";
 import { api } from "@/utils/api";
+import { rentalSecurityService } from "@/services/rentalSecurityService";
 import type { Order } from "@/types";
 import { LoadingState, ErrorState, EmptyState } from "@/components/states";
 import { useNavigate } from "@tanstack/react-router";
@@ -126,6 +127,18 @@ export default function Orders() {
                   <div>
                     <div className="font-semibold text-foreground leading-snug">{o.productTitle || o.product_title || "Gear Rental"}</div>
                     <div className="text-xs text-muted-foreground mt-0.5">Booking #{o.id}</div>
+                    {(() => {
+                      const sec = rentalSecurityService.getSecurityRecord(o.id);
+                      if (sec && sec.renterSecretPin) {
+                        return (
+                          <div className="inline-flex items-center gap-1.5 px-2 py-0.5 mt-1 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-mono font-bold" title="Provide this PIN to the lender during device handover">
+                            <KeyRound className="h-3 w-3" />
+                            <span>Renter PIN: {sec.renterSecretPin}</span>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
                   <div className="text-xs text-muted-foreground">
                     {o.startDate || o.start_date || "Today"} – {o.endDate || o.end_date || "Tomorrow"}

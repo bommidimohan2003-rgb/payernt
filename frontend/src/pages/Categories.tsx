@@ -183,9 +183,23 @@ export default function Categories() {
   const [availableOnlyFilter, setAvailableOnlyFilter] = useState<boolean>(false);
 
   const [allProductsList, setAllProductsList] = useState<Product[]>(() => {
+    try {
+      const stored = localStorage.getItem("payernt_products_v2");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
     return storage.get<Product[]>("payent_server_products", []);
   });
   const [isLoadingProducts, setIsLoadingProducts] = useState<boolean>(() => {
+    try {
+      const stored = localStorage.getItem("payernt_products_v2");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) return false;
+      }
+    } catch {}
     const cached = storage.get<Product[]>("payent_server_products", []);
     return cached.length === 0;
   });
@@ -298,30 +312,34 @@ export default function Categories() {
     }
   }, [search.q]);
 
-  // Fetch real products from backend
+  // Fetch real products from backend and sync with Payernt store
   const fetchPublicProducts = useCallback(() => {
-    if (allProductsList.length === 0) {
-      setIsLoadingProducts(true);
-    }
-    setFetchError(false);
+    try {
+      const stored = localStorage.getItem("payernt_products_v2");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setAllProductsList(parsed);
+          storage.set("payent_server_products", parsed);
+        }
+      }
+    } catch {}
+
     api
       .getPublicProducts()
       .then((serverProducts) => {
-        if (Array.isArray(serverProducts)) {
+        if (Array.isArray(serverProducts) && serverProducts.length > 0) {
           setAllProductsList(serverProducts);
           storage.set("payent_server_products", serverProducts);
         }
       })
       .catch((err) => {
         console.warn("[Browse] Server products fetch notice:", err);
-        if (allProductsList.length === 0) {
-          setFetchError(true);
-        }
       })
       .finally(() => {
         setIsLoadingProducts(false);
       });
-  }, [allProductsList.length]);
+  }, []);
 
   useEffect(() => {
     api.invalidateCache("public_custom_products");
@@ -465,19 +483,34 @@ export default function Categories() {
       list = advancedSearch(list, q.trim());
     }
 
-    // Public approval filter
-    list = list.filter((p) => {
-      const isApproved = p.status === "approved" || !p.status;
-      const isOwner = Boolean(
-        user &&
-        ((p.owner?.email &&
-          user.email &&
-          p.owner.email.toLowerCase() === user.email.toLowerCase()) ||
-          (p.owner?.name &&
-            user.fullName &&
-            p.owner.name.toLowerCase() === user.fullName.toLowerCase())),
+    // Exact Explore Visibility Rule (Sections 10, 11, 12):
+    // CONDITION 1: Product is approved by Admin.
+    // CONDITION 2: Product owner is NOT the currently logged-in/current user.
+    const activeDemoUserId = typeof window !== "undefined" ? localStorage.getItem("payent_active_demo_user") || "user_001" : "user_001";
+    const currentUserId = user?.id || activeDemoUserId;
+    const currentUserEmail = user?.email?.toLowerCase().trim() || "";
+    const currentUserName = (user?.fullName || "").toLowerCase().trim();
+
+    list = list.filter((p: any) => {
+      // 1. Check Admin approval
+      const isApproved =
+        p.status === "approved" ||
+        p.verificationStatus === "approved" ||
+        p.verificationStatus === "verified";
+
+      // 2. Hide current user's own products
+      const pOwnerId = p.ownerId || p.owner?.id;
+      const pOwnerEmail = p.owner?.email?.toLowerCase().trim();
+      const pOwnerName = (p.owner?.name || p.owner?.fullName || p.verificationDocs?.ownerFullName)?.toLowerCase().trim();
+
+      const isOwnProduct = Boolean(
+        (pOwnerId && (pOwnerId === currentUserId || pOwnerId === activeDemoUserId)) ||
+        (currentUserEmail && pOwnerEmail && pOwnerEmail === currentUserEmail) ||
+        (currentUserName && pOwnerName && pOwnerName === currentUserName)
       );
-      return isApproved || isOwner;
+
+      // SHOW product ONLY IF: status === "approved" AND ownerId !== currentUserId
+      return isApproved && !isOwnProduct;
     });
 
     // Brand Filter

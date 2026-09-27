@@ -14,6 +14,10 @@ export const usersService = {
     return response.data;
   },
 
+  async getUserById(id: string): Promise<AdminUser> {
+    return this.getUserDetails(id);
+  },
+
   async updateUser(id: string, data: Partial<AdminUser>): Promise<AdminUser> {
     const response = await adminApi.put(`/users/${encodeURIComponent(id)}`, data);
     return response.data;

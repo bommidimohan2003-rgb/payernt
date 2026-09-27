@@ -39,10 +39,25 @@ export function LoginForm() {
           ? new URLSearchParams(window.location.search)
           : null;
       const redirectUrl =
-        searchParams?.get("redirect") || searchParams?.get("returnUrl");
+        searchParams?.get("redirect") ||
+        searchParams?.get("returnUrl") ||
+        (typeof window !== "undefined"
+          ? localStorage.getItem("pay₹ent_pending_product_redirect")
+          : null);
+      const pendingProductId =
+        typeof window !== "undefined"
+          ? localStorage.getItem("pendingProductId")
+          : null;
+
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("pay₹ent_pending_product_redirect");
+        localStorage.removeItem("pendingProductId");
+      }
 
       if (redirectUrl && redirectUrl.startsWith("/")) {
-        navigate({ to: redirectUrl as "/dashboard" });
+        navigate({ to: redirectUrl as any });
+      } else if (pendingProductId) {
+        navigate({ to: `/product/${pendingProductId}` as any });
       } else if (user.role === "admin") {
         navigate({ to: "/admin/dashboard" });
       } else {
@@ -92,10 +107,25 @@ export function LoginForm() {
         ? new URLSearchParams(window.location.search)
         : null;
     const redirectUrl =
-      searchParams?.get("redirect") || searchParams?.get("returnUrl");
+      searchParams?.get("redirect") ||
+      searchParams?.get("returnUrl") ||
+      (typeof window !== "undefined"
+        ? localStorage.getItem("pay₹ent_pending_product_redirect")
+        : null);
+    const pendingProductId =
+      typeof window !== "undefined"
+        ? localStorage.getItem("pendingProductId")
+        : null;
+
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("pay₹ent_pending_product_redirect");
+      localStorage.removeItem("pendingProductId");
+    }
 
     if (redirectUrl && redirectUrl.startsWith("/")) {
-      navigate({ to: redirectUrl as "/dashboard" });
+      navigate({ to: redirectUrl as any });
+    } else if (pendingProductId) {
+      navigate({ to: `/product/${pendingProductId}` as any });
     } else if (currentUser?.role === "admin") {
       const userToken = storage.get<string | null>(STORAGE_KEYS.token, null);
       if (userToken) {

@@ -11,12 +11,16 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as WishlistRouteImport } from './routes/wishlist'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as SelectRouteImport } from './routes/select'
 import { Route as ReviewsRouteImport } from './routes/reviews'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as PaymentRouteImport } from './routes/payment'
+import { Route as PayerntRouteImport } from './routes/payernt'
+import { Route as PayentRouteImport } from './routes/payent'
+import { Route as PayantRouteImport } from './routes/payant'
 import { Route as OtpRouteImport } from './routes/otp'
 import { Route as OrdersRouteImport } from './routes/orders'
 import { Route as NotificationsRouteImport } from './routes/notifications'
@@ -67,6 +71,11 @@ const SettingsRoute = SettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SelectRoute = SelectRouteImport.update({
+  id: '/select',
+  path: '/select',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ReviewsRoute = ReviewsRouteImport.update({
   id: '/reviews',
   path: '/reviews',
@@ -95,6 +104,21 @@ const PrivacyRoute = PrivacyRouteImport.update({
 const PaymentRoute = PaymentRouteImport.update({
   id: '/payment',
   path: '/payment',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PayerntRoute = PayerntRouteImport.update({
+  id: '/payernt',
+  path: '/payernt',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PayentRoute = PayentRouteImport.update({
+  id: '/payent',
+  path: '/payent',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PayantRoute = PayantRouteImport.update({
+  id: '/payant',
+  path: '/payant',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OtpRoute = OtpRouteImport.update({
@@ -312,12 +336,16 @@ export interface FileRoutesByFullPath {
   '/notifications': typeof NotificationsRoute
   '/orders': typeof OrdersRoute
   '/otp': typeof OtpRoute
+  '/payant': typeof PayantRoute
+  '/payent': typeof PayentRoute
+  '/payernt': typeof PayerntRoute
   '/payment': typeof PaymentRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
   '/reviews': typeof ReviewsRoute
+  '/select': typeof SelectRoute
   '/settings': typeof SettingsRoute
   '/wishlist': typeof WishlistRoute
   '/admin/activity-logs': typeof AdminActivityLogsRoute
@@ -360,12 +388,16 @@ export interface FileRoutesByTo {
   '/notifications': typeof NotificationsRoute
   '/orders': typeof OrdersRoute
   '/otp': typeof OtpRoute
+  '/payant': typeof PayantRoute
+  '/payent': typeof PayentRoute
+  '/payernt': typeof PayerntRoute
   '/payment': typeof PaymentRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
   '/reviews': typeof ReviewsRoute
+  '/select': typeof SelectRoute
   '/settings': typeof SettingsRoute
   '/wishlist': typeof WishlistRoute
   '/admin/activity-logs': typeof AdminActivityLogsRoute
@@ -410,12 +442,16 @@ export interface FileRoutesById {
   '/notifications': typeof NotificationsRoute
   '/orders': typeof OrdersRoute
   '/otp': typeof OtpRoute
+  '/payant': typeof PayantRoute
+  '/payent': typeof PayentRoute
+  '/payernt': typeof PayerntRoute
   '/payment': typeof PaymentRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
   '/reviews': typeof ReviewsRoute
+  '/select': typeof SelectRoute
   '/settings': typeof SettingsRoute
   '/wishlist': typeof WishlistRoute
   '/admin/activity-logs': typeof AdminActivityLogsRoute
@@ -461,12 +497,16 @@ export interface FileRouteTypes {
     | '/notifications'
     | '/orders'
     | '/otp'
+    | '/payant'
+    | '/payent'
+    | '/payernt'
     | '/payment'
     | '/privacy'
     | '/profile'
     | '/register'
     | '/reset-password'
     | '/reviews'
+    | '/select'
     | '/settings'
     | '/wishlist'
     | '/admin/activity-logs'
@@ -509,12 +549,16 @@ export interface FileRouteTypes {
     | '/notifications'
     | '/orders'
     | '/otp'
+    | '/payant'
+    | '/payent'
+    | '/payernt'
     | '/payment'
     | '/privacy'
     | '/profile'
     | '/register'
     | '/reset-password'
     | '/reviews'
+    | '/select'
     | '/settings'
     | '/wishlist'
     | '/admin/activity-logs'
@@ -558,12 +602,16 @@ export interface FileRouteTypes {
     | '/notifications'
     | '/orders'
     | '/otp'
+    | '/payant'
+    | '/payent'
+    | '/payernt'
     | '/payment'
     | '/privacy'
     | '/profile'
     | '/register'
     | '/reset-password'
     | '/reviews'
+    | '/select'
     | '/settings'
     | '/wishlist'
     | '/admin/activity-logs'
@@ -608,12 +656,16 @@ export interface RootRouteChildren {
   NotificationsRoute: typeof NotificationsRoute
   OrdersRoute: typeof OrdersRoute
   OtpRoute: typeof OtpRoute
+  PayantRoute: typeof PayantRoute
+  PayentRoute: typeof PayentRoute
+  PayerntRoute: typeof PayerntRoute
   PaymentRoute: typeof PaymentRoute
   PrivacyRoute: typeof PrivacyRoute
   ProfileRoute: typeof ProfileRoute
   RegisterRoute: typeof RegisterRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   ReviewsRoute: typeof ReviewsRoute
+  SelectRoute: typeof SelectRoute
   SettingsRoute: typeof SettingsRoute
   WishlistRoute: typeof WishlistRoute
   DeliveryIdRoute: typeof DeliveryIdRoute
@@ -634,6 +686,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/select': {
+      id: '/select'
+      path: '/select'
+      fullPath: '/select'
+      preLoaderRoute: typeof SelectRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reviews': {
@@ -676,6 +735,27 @@ declare module '@tanstack/react-router' {
       path: '/payment'
       fullPath: '/payment'
       preLoaderRoute: typeof PaymentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/payernt': {
+      id: '/payernt'
+      path: '/payernt'
+      fullPath: '/payernt'
+      preLoaderRoute: typeof PayerntRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/payent': {
+      id: '/payent'
+      path: '/payent'
+      fullPath: '/payent'
+      preLoaderRoute: typeof PayentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/payant': {
+      id: '/payant'
+      path: '/payant'
+      fullPath: '/payant'
+      preLoaderRoute: typeof PayantRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/otp': {
@@ -1029,12 +1109,16 @@ const rootRouteChildren: RootRouteChildren = {
   NotificationsRoute: NotificationsRoute,
   OrdersRoute: OrdersRoute,
   OtpRoute: OtpRoute,
+  PayantRoute: PayantRoute,
+  PayentRoute: PayentRoute,
+  PayerntRoute: PayerntRoute,
   PaymentRoute: PaymentRoute,
   PrivacyRoute: PrivacyRoute,
   ProfileRoute: ProfileRoute,
   RegisterRoute: RegisterRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   ReviewsRoute: ReviewsRoute,
+  SelectRoute: SelectRoute,
   SettingsRoute: SettingsRoute,
   WishlistRoute: WishlistRoute,
   DeliveryIdRoute: DeliveryIdRoute,

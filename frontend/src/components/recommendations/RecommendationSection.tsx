@@ -12,8 +12,10 @@ import {
 import type { Product } from "@/types";
 import { tracker } from "@/utils/eventTracker";
 import { useWishlist } from "@/hooks/useWishlist";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/common/Button";
 import { Rating } from "@/components/common/Rating";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 interface RecommendationSectionProps {
@@ -37,6 +39,7 @@ export function RecommendationSection({
 }: RecommendationSectionProps) {
   const navigate = useNavigate();
   const { has, toggle } = useWishlist();
+  const { user } = useAuth();
 
 
   useEffect(() => {
@@ -60,6 +63,36 @@ export function RecommendationSection({
       default:
         return <Compass className="h-4 w-4 text-primary" />;
     }
+  };
+
+  const handleProductClick = (productId: string) => {
+    tracker.recommendationClick(productId, type);
+    if (!user) {
+      const redirectTarget = `/product/${productId}`;
+      try {
+        localStorage.setItem("pay₹ent_pending_product_redirect", redirectTarget);
+        localStorage.setItem("pendingProductId", String(productId));
+      } catch (e) {}
+      navigate({ to: "/login", search: { redirect: redirectTarget } as any });
+      return;
+    }
+    navigate({ to: "/product/$id", params: { id: productId } });
+  };
+
+  const handleWishlistToggle = (e: React.MouseEvent, productId: string) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (!user) {
+      const redirectTarget = `/product/${productId}`;
+      try {
+        localStorage.setItem("pay₹ent_pending_product_redirect", redirectTarget);
+        localStorage.setItem("pendingProductId", String(productId));
+      } catch (e) {}
+      toast.info("Please log in to save gear to your wishlist.");
+      navigate({ to: "/login", search: { redirect: redirectTarget } as any });
+      return;
+    }
+    toggle(productId);
   };
 
   if (layout === "compact") {
@@ -88,12 +121,10 @@ export function RecommendationSection({
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
           {products.slice(0, 4).map((product) => (
-            <Link
+            <div
               key={product.id}
-              to="/product/$id"
-              params={{ id: product.id }}
-              onClick={() => tracker.recommendationClick(product.id, type)}
-              className="group flex items-center gap-3 p-3 rounded-2xl bg-card border border-border/80 hover:border-primary/50 transition-all duration-200 shadow-sm hover:shadow-md"
+              onClick={() => handleProductClick(product.id)}
+              className="group flex items-center gap-3 p-3 rounded-2xl bg-card border border-border/80 hover:border-primary/50 transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer"
             >
               <img
                 src={product.image}
@@ -111,7 +142,7 @@ export function RecommendationSection({
                   </span>
                 </p>
               </div>
-            </Link>
+            </div>
           ))}
         </div>
       </div>
@@ -152,12 +183,7 @@ export function RecommendationSection({
           return (
             <div
               key={product.id}
-              onClick={() =>
-                navigate({
-                  to: "/product/$id",
-                  params: { id: product.id },
-                })
-              }
+              onClick={() => handleProductClick(product.id)}
               className="group rounded-3xl p-3.5 bg-card border border-border hover:border-primary/40 transition-all duration-300 shadow-md hover:shadow-xl hover:-translate-y-1 cursor-pointer flex flex-col justify-between"
             >
               <div className="relative aspect-4/3 rounded-2xl overflow-hidden bg-secondary/30 mb-3">
@@ -169,10 +195,7 @@ export function RecommendationSection({
 
                 <button
                   type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggle(product.id);
-                  }}
+                  onClick={(e) => handleWishlistToggle(e, product.id)}
                   aria-label="Wishlist item"
                   className={cn(
                     "absolute top-3 right-3 p-2 rounded-full backdrop-blur-md transition-all duration-200 cursor-pointer shadow-md",
@@ -203,18 +226,11 @@ export function RecommendationSection({
                     )}
                   </div>
 
-                  <Link
-                    to="/product/$id"
-                    params={{ id: product.id }}
-                    onClick={() =>
-                      tracker.recommendationClick(product.id, type)
-                    }
-                    className="block group-hover:text-primary transition-colors"
-                  >
+                  <div className="block group-hover:text-primary transition-colors">
                     <h3 className="font-extrabold text-sm md:text-base text-foreground line-clamp-1">
                       {product.title}
                     </h3>
-                  </Link>
+                  </div>
 
                   <p className="text-xs text-muted-foreground line-clamp-2 mt-1 font-normal">
                     {product.description}
@@ -235,21 +251,17 @@ export function RecommendationSection({
                     </span>
                   </div>
 
-                  <Link
-                    to="/product/$id"
-                    params={{ id: product.id }}
-                    onClick={() =>
-                      tracker.recommendationClick(product.id, type)
-                    }
+                  <Button
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleProductClick(product.id);
+                    }}
+                    className="rounded-xl font-bold bg-primary text-primary-foreground hover:opacity-90 gap-1 text-xs"
                   >
-                    <Button
-                      size="sm"
-                      className="rounded-xl font-bold bg-primary text-primary-foreground hover:opacity-90 gap-1 text-xs"
-                    >
-                      <span>View</span>
-                      <ArrowRight className="h-3.5 w-3.5" />
-                    </Button>
-                  </Link>
+                    <span>Rent</span>
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </Button>
                 </div>
               </div>
             </div>

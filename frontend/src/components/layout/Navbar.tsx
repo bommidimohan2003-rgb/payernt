@@ -44,16 +44,18 @@ export function Navbar() {
     >
       <div className="mx-auto flex h-16 sm:h-[68px] w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Left: Brand Identity Logo */}
-        <Link
-          to="/"
-          ref={(el) => registerOriginRef("home-logo", el as HTMLElement | null)}
-          onClick={(e) => triggerOriginTransition("home", e.currentTarget)}
-          className="flex items-center gap-3 shrink-0 focus:outline-none group select-none py-1 transition-transform active:scale-96"
-          id="nav-logo"
-          aria-label="Payent Home"
-        >
-          <LogoIcon showTagline={false} />
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            to="/payant"
+            ref={(el) => registerOriginRef("home-logo", el as HTMLElement | null)}
+            onClick={(e) => triggerOriginTransition("home", e.currentTarget)}
+            className="flex items-center gap-3 shrink-0 focus:outline-none group select-none py-1 transition-transform active:scale-96"
+            id="nav-logo"
+            aria-label="Payent Home"
+          >
+            <LogoIcon showTagline={false} />
+          </Link>
+        </div>
 
         {/* Right: Theme Toggle & Auth / Profile Controls */}
         <div className="flex items-center gap-2 sm:gap-3">

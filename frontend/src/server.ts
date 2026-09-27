@@ -14,12 +14,21 @@ type ServerEntry = {
 let serverEntryPromise: Promise<ServerEntry> | undefined;
 
 async function getServerEntry(): Promise<ServerEntry> {
-  if (!serverEntryPromise) {
-    serverEntryPromise = import("@tanstack/react-start/server-entry").then(
-      (m) => (m.default ?? m) as ServerEntry,
-    );
+  if (process.env.NODE_ENV === "production") {
+    if (!serverEntryPromise) {
+      serverEntryPromise = import("@tanstack/react-start/server-entry").then(
+        (m) => (m.default ?? m) as ServerEntry,
+      );
+    }
+    return serverEntryPromise;
   }
-  return serverEntryPromise;
+  try {
+    const m = await import("@tanstack/react-start/server-entry");
+    return (m.default ?? m) as ServerEntry;
+  } catch (err) {
+    console.error("Failed to load server-entry:", err);
+    throw err;
+  }
 }
 
 // h3 swallows in-handler throws into a normal 500 Response with body

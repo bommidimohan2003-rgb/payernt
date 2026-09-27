@@ -50,11 +50,11 @@ export function CallToAction() {
             </Link>
 
             <Link
-              to="/become-lender"
+              to="/browse"
               className="w-full sm:w-auto justify-center px-6 sm:px-8 py-3.5 sm:py-4 rounded-2xl font-extrabold text-sm border border-border dark:border-white/20 bg-secondary/80 dark:bg-white/5 hover:bg-secondary dark:hover:bg-white/10 text-foreground dark:text-white transition-all flex items-center gap-2 cursor-pointer backdrop-blur-xl"
             >
               <Sparkles className="h-4 w-4 text-amber-500 dark:text-amber-400" />
-              <span>Become Certified Lender</span>
+              <span>Explore All Gear</span>
             </Link>
           </div>
 

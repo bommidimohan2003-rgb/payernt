@@ -6,9 +6,7 @@ import {
   MessageSquare,
   Package,
   Settings,
-  Store,
   User,
-  Shield,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -30,24 +28,7 @@ export function Sidebar() {
   const { user } = useAuth();
   const { unreadCount } = useUnreadMessages();
 
-  const isLender = user?.role === "lender" || user?.role === "admin";
-
-  const sidebarItems = [
-    baseItems[0], // Overview
-    ...(isLender
-      ? [{ to: "/lender-portal", icon: Store, label: "Lender Studio" } as const]
-      : [{ to: "/become-lender", icon: Store, label: "Become a Lender" } as const]),
-    ...baseItems.slice(1),
-    ...(user?.role === "admin"
-      ? [
-          {
-            to: "/admin/dashboard",
-            icon: Shield,
-            label: "Admin Portal",
-          } as const,
-        ]
-      : []),
-  ];
+  const sidebarItems = baseItems;
 
   return (
     <aside className="hidden lg:block w-64 shrink-0 sticky top-20 h-fit">

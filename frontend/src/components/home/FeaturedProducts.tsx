@@ -12,6 +12,7 @@ import {
 import { api } from "@/utils/api";
 import { storage, STORAGE_KEYS } from "@/utils/storage";
 import { useWishlist } from "@/hooks/useWishlist";
+import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import type { Product } from "@/types";
 import { getOptimizedImageUrl, getResponsiveImageSrcSet } from "@/utils/images";
@@ -31,6 +32,7 @@ interface DisplayProduct {
 export function FeaturedProducts() {
   const navigate = useNavigate();
   const { has, toggle } = useWishlist();
+  const { user } = useAuth();
   const [products, setProducts] = useState<DisplayProduct[]>(() => {
     const cached = storage.get<Product[]>("payent_server_products", []);
     const seen = new Set<string>();
@@ -121,12 +123,31 @@ export function FeaturedProducts() {
   const handleWishlist = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     e.preventDefault();
+    if (!user) {
+      const redirectTarget = `/product/${id}`;
+      try {
+        localStorage.setItem("pay₹ent_pending_product_redirect", redirectTarget);
+        localStorage.setItem("pendingProductId", String(id));
+      } catch (e) {}
+      toast.info("Please log in to save gear to your wishlist.");
+      navigate({ to: "/login", search: { redirect: redirectTarget } as any });
+      return;
+    }
     toggle(id);
     const isLiked = has(id);
     toast.success(isLiked ? "Removed from wishlist" : "Saved to wishlist!");
   };
 
   const handleDetails = (id: string) => {
+    if (!user) {
+      const redirectTarget = `/product/${id}`;
+      try {
+        localStorage.setItem("pay₹ent_pending_product_redirect", redirectTarget);
+        localStorage.setItem("pendingProductId", String(id));
+      } catch (e) {}
+      navigate({ to: "/login", search: { redirect: redirectTarget } as any });
+      return;
+    }
     navigate({ to: "/product/$id", params: { id } });
   };
 
@@ -219,10 +240,10 @@ export function FeaturedProducts() {
               Be the first creator or lender to list your equipment and start earning daily rental income.
             </p>
             <Link
-              to="/become-lender"
+              to="/browse"
               className="mt-5 inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#161616] hover:bg-[#262626] text-[#F2F0EA] dark:bg-[#F2F0EA] dark:text-[#161616] dark:hover:bg-white text-xs sm:text-sm font-bold shadow-md transition-all cursor-pointer"
             >
-              <span>List Your Gear Now</span>
+              <span>Explore All Gear</span>
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>

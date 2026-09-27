@@ -354,10 +354,10 @@ export default function Contact() {
               </span>
               <div className="flex flex-col gap-2 pt-1 text-xs">
                 <Link
-                  to="/become-lender"
+                  to="/browse"
                   className="font-semibold text-neutral-900 dark:text-white hover:text-primary transition-colors flex items-center justify-between"
                 >
-                  <span>List equipment as a lender</span>
+                  <span>Explore available gear catalog</span>
                   <span>→</span>
                 </Link>
                 <Link

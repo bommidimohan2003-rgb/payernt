@@ -532,14 +532,14 @@ export default function Reports() {
                 columns={disputeColumns}
                 data={paginatedDisputes}
                 loading={loadingDisputes}
-                emptyMessage="No open dispute reports or violation claims found."
+                emptyTitle="No Dispute Reports"
+                emptyDescription="No open dispute reports or violation claims found."
               />
 
               {filteredDisputes.length > itemsPerPage && (
                 <div className="p-4 border-t border-border/40">
                   <Pagination
                     currentPage={currentPage}
-                    totalPages={Math.ceil(filteredDisputes.length / itemsPerPage)}
                     onPageChange={setCurrentPage}
                     itemsPerPage={itemsPerPage}
                     totalItems={filteredDisputes.length}

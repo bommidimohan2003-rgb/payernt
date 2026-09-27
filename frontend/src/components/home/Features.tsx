@@ -34,7 +34,7 @@ const features = [
   {
     icon: CheckCircle,
     title: "Verified Users & Gear",
-    desc: "Aadhaar & DigiLocker KYC verification for all members ensures a secure, trusted peer-to-peer community.",
+    desc: "PAN & DigiLocker KYC verification for all members ensures a secure, trusted peer-to-peer community.",
     glow: "rgba(255, 90, 95, 0.35)",
     bg: "rgba(255, 90, 95, 0.1)",
   },

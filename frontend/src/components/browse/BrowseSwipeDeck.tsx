@@ -12,6 +12,7 @@ import {
 import { useNavigate } from "@tanstack/react-router";
 import type { Product } from "@/types";
 import { useWishlist } from "@/hooks/useWishlist";
+import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { getOptimizedImageUrl, getResponsiveImageSrcSet } from "@/utils/images";
@@ -79,6 +80,7 @@ export function BrowseSwipeDeck({
   const [, setCycleIndex] = useState<number>(0);
 
   const { has, toggle } = useWishlist();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   // Reset queue when products array changes (due to filter or search)
@@ -344,6 +346,20 @@ export function BrowseSwipeDeck({
     }
     if (!activeProduct) return;
     api.cacheProduct(activeProduct);
+
+    if (!user) {
+      const redirectTarget = `/product/${activeProduct.id}`;
+      try {
+        localStorage.setItem("pay₹ent_pending_product_redirect", redirectTarget);
+        localStorage.setItem("pendingProductId", String(activeProduct.id));
+      } catch (e) {}
+      navigate({
+        to: "/login",
+        search: { redirect: redirectTarget } as any,
+      });
+      return;
+    }
+
     navigate({
       to: "/product/$id",
       params: { id: activeProduct.id },
@@ -354,6 +370,21 @@ export function BrowseSwipeDeck({
     e.stopPropagation();
     e.preventDefault();
     if (!activeProduct) return;
+
+    if (!user) {
+      const redirectTarget = `/product/${activeProduct.id}`;
+      try {
+        localStorage.setItem("pay₹ent_pending_product_redirect", redirectTarget);
+        localStorage.setItem("pendingProductId", String(activeProduct.id));
+      } catch (e) {}
+      toast.info("Please log in to save gear to your wishlist.");
+      navigate({
+        to: "/login",
+        search: { redirect: redirectTarget } as any,
+      });
+      return;
+    }
+
     toggle(activeProduct.id);
     toast.success(
       has(activeProduct.id) ? "Removed from wishlist" : "Saved to wishlist!",

@@ -41,8 +41,14 @@ function AdminLayout() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isDenied, setIsDenied] = useState(false);
+  const isLoginPage = typeof window !== "undefined" && window.location.pathname === "/admin/login";
 
   useEffect(() => {
+    if (isLoginPage) {
+      setLoading(false);
+      return;
+    }
+
     import("@/admin/services/auth").then(({ authService }) => {
       const loggedIn = authService.isAuthenticated();
       const currentUser = authService.getCurrentUser();
@@ -50,7 +56,7 @@ function AdminLayout() {
       if (!loggedIn) {
         setIsAuthenticated(false);
         setLoading(false);
-        navigate({ to: "/login" });
+        navigate({ to: "/admin/login" });
         return;
       }
 
@@ -65,7 +71,11 @@ function AdminLayout() {
 
       setLoading(false);
     });
-  }, [navigate]);
+  }, [navigate, isLoginPage]);
+
+  if (isLoginPage) {
+    return <Outlet />;
+  }
 
   if (loading) {
     return (

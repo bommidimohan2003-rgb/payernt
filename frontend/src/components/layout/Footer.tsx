@@ -3,9 +3,8 @@ import { Instagram, Linkedin, Twitter, Youtube } from "lucide-react";
 import { LogoIcon } from "@/components/common/LogoIcon";
 
 const navLinks = [
-  { label: "Home", to: "/" },
-  { label: "Browse", to: "/browse" },
-  { label: "Become a Lender", to: "/become-lender" },
+  { label: "Home", to: "/payent" },
+  { label: "Explore", to: "/browse" },
   { label: "About", to: "/about" },
   { label: "Contact", to: "/contact" },
 ];

@@ -9,15 +9,84 @@ export interface AdminUser {
   fullName: string;
   email: string;
   phone: string;
-  role: "admin" | "agent" | "user";
+  role: "admin" | "agent" | "user" | "customer" | "both";
   status: "active" | "suspended" | "pending" | "rejected" | "approved";
   verified: boolean;
   avatar: string;
   profilePhotoUrl?: string;
   address?: string;
   city?: string;
+  state?: string;
   pincode?: string;
+  country?: string;
+  occupation?: string;
+  bio?: string;
+  website?: string;
+  upiId?: string;
+  aadhaarMasked?: string;
+  accountType?: string;
   createdAt: string;
+  payerntAccount?: {
+    accountId: string;
+    name: string;
+    email: string;
+    phone: string;
+    aadhaarStatus: string;
+    aadhaarMasked: string;
+    bankAccountMasked: string;
+    bankIfsc: string;
+    accountStatus: string;
+    verificationStatus: string;
+    isVerified: boolean;
+    address: string;
+    city: string;
+    pincode: string;
+    avatar: string;
+    createdAt: string;
+  } | null;
+  payrentAccount?: {
+    accountId: string;
+    fullName: string;
+    email: string;
+    phone: string;
+    panStatus: string;
+    panMasked: string;
+    accountStatus: string;
+    verificationStatus: string;
+    isVerified: boolean;
+    address: string;
+    pincode: string;
+    avatar: string;
+    createdAt: string;
+  } | null;
+  products?: Array<{
+    id: string;
+    title: string;
+    category: string;
+    price: number;
+    status: string;
+    available: boolean;
+    image: string;
+    createdAt: string;
+  }>;
+  bookings?: Array<{
+    id: string;
+    productId: string;
+    productTitle: string;
+    startDate: string;
+    endDate: string;
+    amount: number;
+    status: string;
+    createdAt: string;
+  }>;
+  wallet?: {
+    walletId: string;
+    availableBalance: number;
+    pendingAmount: number;
+    totalReceived: number;
+    totalWithdrawn: number;
+    currency: string;
+  } | null;
 }
 
 export interface AdminAgent {
@@ -38,23 +107,61 @@ export interface AdminProduct {
   title: string;
   description: string;
   category: string;
+  brand?: string;
+  model?: string;
+  year?: string | number;
+  specifications?: Record<string, any>;
+  features?: string[];
+  conditionGrade?: string;
+  conditionDetails?: Record<string, any>;
+  accessories?: string;
+  city?: string;
+  area?: string;
+  pincode?: string;
+  pickupInstructions?: string;
   price: number;
+  dailyRate?: number;
+  weeklyRate?: number | null;
+  monthlyRate?: number | null;
+  securityDeposit?: number;
+  minRentalDays?: number;
+  maxRentalDays?: number;
   rating: number;
   reviewsCount: number;
   available: boolean;
-  status: "pending" | "approved" | "rejected";
+  status: "pending" | "approved" | "rejected" | "under_review" | "needs_correction";
   featured: boolean;
   hidden: boolean;
   image: string;
   images: string[];
   documents: string[];
   createdAt: string;
+  updatedAt?: string;
+  bookings?: Array<{
+    id: string;
+    startDate: string;
+    endDate: string;
+    amount: number;
+    status: string;
+    customerEmail: string;
+    customerName: string;
+    createdAt: string;
+  }>;
   owner: {
     id: string;
     name: string;
     avatar: string;
     rating: number;
     email: string;
+    phone?: string;
+    address?: string;
+    city?: string;
+    pincode?: string;
+    accountStatus?: string;
+    verificationStatus?: string;
+    isVerified?: boolean;
+    productsCount?: number;
+    createdAt?: string;
   };
 }
 

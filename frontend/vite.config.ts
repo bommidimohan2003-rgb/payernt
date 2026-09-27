@@ -53,7 +53,9 @@ export default defineConfig({
     tanstackStart({
       server: { entry: "src/server.ts" },
     }),
-    nitro(),
+    nitro({
+      entry: "src/server.ts",
+    }),
     tailwindcss(),
     react(),
   ],

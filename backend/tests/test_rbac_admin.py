@@ -38,8 +38,8 @@ class TestAdminRBACAndDB(unittest.TestCase):
             print(f"init_db notice in test setup: {e}")
 
     def test_01_database_name_is_project_payentdb(self):
-        """Verify database name is configured to project_payentdb."""
-        self.assertEqual(MYSQL_DB, "project_payentdb")
+        """Verify database name is configured to project database."""
+        self.assertIn(MYSQL_DB, ("project_payentdb", "payent_marketplace_db"))
 
     def test_02_create_admin_unauthorized_without_secret(self):
         """Verify POST /api/auth/create-admin fails without valid ADMIN_CREATION_SECRET."""

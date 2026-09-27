@@ -33,7 +33,7 @@ export function ProfileDropdown() {
     try {
       await authService.logout();
       setIsOpen(false);
-      navigate({ to: "/login" });
+      navigate({ to: "/" });
     } catch (err) {
       console.error("Logout failed:", err);
     }

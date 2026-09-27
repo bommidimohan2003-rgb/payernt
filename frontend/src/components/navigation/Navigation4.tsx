@@ -12,7 +12,6 @@ import { useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   Home,
   Compass,
-  PlusCircle,
   ShoppingBag,
   LayoutDashboard,
 } from "lucide-react";
@@ -95,7 +94,7 @@ function Nav4DockItem({
         onFocus={() => setIsHovered(true)}
         onBlur={() => setIsHovered(false)}
         onClick={handleClick}
-        className={`relative flex items-center justify-center rounded-xl transition-all duration-200 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary shrink-0 ${
+        className={`relative flex items-center justify-center rounded-2xl transition-all duration-200 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary shrink-0 ${
           item.isActive
             ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-950 shadow-md"
             : "hover:bg-black/5 dark:hover:bg-white/10 text-neutral-700 hover:text-neutral-950 dark:text-neutral-300 dark:hover:text-white"
@@ -131,7 +130,7 @@ function Nav4DockItem({
             animate={{ opacity: 1, y: -10, scale: 1 }}
             exit={{ opacity: 0, y: 4, scale: 0.95 }}
             transition={{ duration: 0.15, ease: "easeOut" }}
-            className="absolute bottom-full mb-2.5 left-1/2 -translate-x-1/2 pointer-events-none z-50 whitespace-nowrap px-3 sm:px-3.5 py-1.5 rounded-lg bg-neutral-950/90 dark:bg-white/95 text-white dark:text-neutral-950 text-xs sm:text-sm font-bold shadow-xl border border-white/15 dark:border-black/10 backdrop-blur-md flex items-center gap-1.5"
+            className="absolute bottom-full mb-2.5 left-1/2 -translate-x-1/2 pointer-events-none z-50 whitespace-nowrap px-3 sm:px-3.5 py-1.5 rounded-xl bg-neutral-950/90 dark:bg-white/95 text-white dark:text-neutral-950 text-xs sm:text-sm font-bold shadow-xl border border-white/15 dark:border-black/10 backdrop-blur-md flex items-center gap-1.5"
             role="tooltip"
           >
             <span>{item.label}</span>
@@ -156,8 +155,12 @@ export interface Navigation4Props {
 }
 
 /**
- * Universal Navigation Dock
- * Sleek horizontal bottom navigation with macOS-style dock scaling, spring physics, and tooltips across both big screens and mobile.
+ * Universal Navigation Dock for pay₹ent
+ * Exactly 4 items:
+ * 1. Home
+ * 2. Explore
+ * 3. Cart
+ * 4. User Dashboard
  */
 export function Navigation4({
   className = "",
@@ -186,19 +189,12 @@ export function Navigation4({
   const mouseX = useMotionValue(Infinity);
   const isHovered = useMotionValue(0);
 
-  const isRouteActive = (to: string, exact = false) => {
-    if (exact) return pathname === to;
-    if (to === "/browse" || to === "/categories") {
+  const isRouteActive = (to: string) => {
+    if (to === "/browse") {
       return (
         pathname.startsWith("/browse") ||
         pathname.startsWith("/categories") ||
         pathname.startsWith("/product")
-      );
-    }
-    if (to === "/become-lender") {
-      return (
-        pathname.startsWith("/become-lender") ||
-        pathname.startsWith("/lender-portal")
       );
     }
     if (to === "/cart") {
@@ -208,11 +204,14 @@ export function Navigation4({
       return (
         pathname.startsWith("/dashboard") ||
         pathname.startsWith("/orders") ||
-        pathname.startsWith("/notifications") ||
-        pathname.startsWith("/settings")
+        pathname.startsWith("/wishlist") ||
+        pathname.startsWith("/profile") ||
+        pathname.startsWith("/settings") ||
+        pathname.startsWith("/messages") ||
+        pathname.startsWith("/notifications")
       );
     }
-    return pathname.startsWith(to);
+    return pathname === to;
   };
 
   const mainItems: Navigation4Item[] = [
@@ -220,26 +219,19 @@ export function Navigation4({
       id: "home",
       label: "Home",
       icon: <Home className="h-4 w-4 sm:h-[18px] sm:w-[18px] md:h-[19px] md:w-[19px] stroke-[1.6]" />,
-      isActive: isRouteActive("/", true),
-      onClick: () => navigate({ to: "/" }),
+      isActive: pathname === "/payant" || pathname === "/payent",
+      onClick: () => navigate({ to: "/payant" }),
     },
     {
       id: "browse",
-      label: "Browse Gear",
+      label: "Explore",
       icon: <Compass className="h-4 w-4 sm:h-[18px] sm:w-[18px] md:h-[19px] md:w-[19px] stroke-[1.6]" />,
       isActive: isRouteActive("/browse"),
       onClick: () => navigate({ to: "/browse" }),
     },
     {
-      id: "lend",
-      label: "List Equipment",
-      icon: <PlusCircle className="h-4 w-4 sm:h-[18px] sm:w-[18px] md:h-[19px] md:w-[19px] stroke-[1.6]" />,
-      isActive: isRouteActive("/become-lender"),
-      onClick: () => navigate({ to: "/become-lender" }),
-    },
-    {
       id: "cart",
-      label: "Rental Cart",
+      label: "Cart",
       icon: <ShoppingBag className="h-4 w-4 sm:h-[18px] sm:w-[18px] md:h-[19px] md:w-[19px] stroke-[1.6]" />,
       badge: cartCount > 0 ? cartCount : undefined,
       isActive: isRouteActive("/cart"),
@@ -247,20 +239,20 @@ export function Navigation4({
     },
     {
       id: "dashboard",
-      label: "Dashboard",
+      label: "User Dashboard",
       icon: <LayoutDashboard className="h-4 w-4 sm:h-[18px] sm:w-[18px] md:h-[19px] md:w-[19px] stroke-[1.6]" />,
       isActive: isRouteActive("/dashboard"),
       onClick: () => navigate({ to: "/dashboard" }),
     },
   ];
 
-  if (pathname.startsWith("/admin")) {
+  if (pathname.startsWith("/admin") || pathname === "/payernt") {
     return null;
   }
 
   return (
     <aside
-      aria-label="Application Bottom Navigation Dock"
+      aria-label="pay₹ent Navigation Dock"
       className={`fixed bottom-[calc(0.75rem+env(safe-area-inset-bottom,0px))] md:bottom-6 inset-x-0 mx-auto z-50 flex justify-center items-center pointer-events-none select-none px-3 w-full max-w-full ${className}`}
     >
       <motion.div
@@ -283,9 +275,9 @@ export function Navigation4({
           isHovered.set(0);
           mouseX.set(Infinity);
         }}
-        className="pointer-events-auto py-2 sm:py-2.5 px-6 sm:px-8 md:px-10 rounded-2xl bg-white/92 dark:bg-[#0D151D]/95 backdrop-blur-2xl border-2 border-neutral-300 dark:border-neutral-700 shadow-xl shadow-black/20 dark:shadow-black/80 flex items-center justify-center gap-3 sm:gap-4 md:gap-5 w-auto min-w-[320px] sm:min-w-[420px] md:min-w-[480px] max-w-[calc(100vw-1.5rem)] overflow-visible"
+        className="pointer-events-auto py-2 sm:py-2.5 px-6 sm:px-8 md:px-10 rounded-2xl bg-white/92 dark:bg-[#0D151D]/95 backdrop-blur-2xl border-2 border-neutral-300 dark:border-neutral-700 shadow-xl shadow-black/20 dark:shadow-black/80 flex items-center justify-center gap-3 sm:gap-4 md:gap-5 w-auto min-w-[320px] sm:min-w-[400px] md:min-w-[460px] max-w-[calc(100vw-1.5rem)] overflow-visible"
       >
-        {/* Core Navigation Items */}
+        {/* The 4 Main Items: Home, Explore, Cart, User Dashboard */}
         <div className="flex items-center justify-around w-full gap-2.5 sm:gap-4 md:gap-6 shrink-0">
           {mainItems.map((item) => (
             <Nav4DockItem

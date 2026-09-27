@@ -5,6 +5,7 @@ import {
   useRef,
   useCallback,
   useEffect,
+  useId,
   type ReactNode,
 } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -37,19 +38,18 @@ interface OriginRevealContextType {
 }
 
 const getDefaultOrigin = (id = "home"): OriginData => {
-  const w = typeof window !== "undefined" ? window.innerWidth : 1000;
-  const h = typeof window !== "undefined" ? window.innerHeight : 800;
+  // Deterministic values for SSR and initial client hydration
   return {
     id,
-    x: w / 2 - 28,
-    y: h - 60,
+    x: 472,
+    y: 740,
     width: 56,
     height: 56,
-    cx: w / 2,
-    cy: h - 32,
-    vw: w,
-    vh: h,
-    timestamp: Date.now(),
+    cx: 500,
+    cy: 768,
+    vw: 1000,
+    vh: 800,
+    timestamp: 0,
     isReverse: false,
   };
 };
@@ -81,6 +81,18 @@ export function OriginRevealProvider({ children }: { children: ReactNode }) {
 
     mediaQuery.addEventListener("change", handleChange);
     return () => mediaQuery.removeEventListener("change", handleChange);
+  }, []);
+
+  // Update client dimensions post-hydration
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setOrigin((prev) => ({
+      ...prev,
+      vw: window.innerWidth,
+      vh: window.innerHeight,
+      cx: window.innerWidth / 2,
+      cy: window.innerHeight - 32,
+    }));
   }, []);
 
   // Monitor browser back / forward navigation
@@ -278,12 +290,34 @@ function createOrganicMorphPath(
 export function OriginRevealPageTransition({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { origin, isReducedMotion } = useOriginReveal();
+  const rawId = useId();
+  const safeId = rawId.replace(/[^a-zA-Z0-9_-]/g, "");
 
-  const vw = typeof window !== "undefined" ? window.innerWidth : (origin.vw || 1000);
-  const vh = typeof window !== "undefined" ? window.innerHeight : (origin.vh || 800);
+  const clipId = `origin-reveal-clip-${safeId}`;
+  const auraGradientId = `origin-aura-grad-${safeId}`;
+  const blurId = `aura-blur-${safeId}`;
 
-  const cx = origin.cx ?? vw / 2;
-  const cy = origin.cy ?? vh - 40;
+  const [isMounted, setIsMounted] = useState(false);
+  const [viewport, setViewport] = useState({ width: 1000, height: 800 });
+
+  useEffect(() => {
+    setIsMounted(true);
+    const updateSize = () => {
+      setViewport({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      });
+    };
+    updateSize();
+    window.addEventListener("resize", updateSize);
+    return () => window.removeEventListener("resize", updateSize);
+  }, []);
+
+  const vw = isMounted ? viewport.width : 1000;
+  const vh = isMounted ? viewport.height : 800;
+
+  const cx = isMounted && origin.cx != null ? origin.cx : vw / 2;
+  const cy = isMounted && origin.cy != null ? origin.cy : vh - 40;
 
   // Calculate maximum distance from origin to the 4 viewport corners
   const maxRadius = Math.max(
@@ -292,9 +326,6 @@ export function OriginRevealPageTransition({ children }: { children: ReactNode }
     Math.hypot(cx, vh - cy),
     Math.hypot(vw - cx, vh - cy)
   ) * 1.35;
-
-  const clipId = `origin-reveal-clip-${origin.timestamp}`;
-  const auraGradientId = `origin-aura-grad-${origin.timestamp}`;
 
   // Organic smooth expansion keyframe paths
   const r0 = 4;
@@ -333,7 +364,7 @@ export function OriginRevealPageTransition({ children }: { children: ReactNode }
   return (
     <AnimatePresence mode="wait" initial={false}>
       <motion.div
-        key={`${pathname}-${origin.timestamp}`}
+        key={`${pathname}-${isMounted ? origin.timestamp : 0}`}
         className="relative w-full flex-1 flex flex-col min-h-screen"
       >
         {/* Dynamic SVG Clip Path Definition */}
@@ -389,7 +420,7 @@ export function OriginRevealPageTransition({ children }: { children: ReactNode }
               <stop offset="92%" stopColor="rgba(255, 255, 255, 0.35)" />
               <stop offset="100%" stopColor="rgba(255, 23, 68, 0.5)" />
             </radialGradient>
-            <filter id={`aura-blur-${origin.timestamp}`}>
+            <filter id={blurId}>
               <feGaussianBlur stdDeviation="8" />
             </filter>
           </defs>
@@ -399,7 +430,7 @@ export function OriginRevealPageTransition({ children }: { children: ReactNode }
             strokeWidth="3.5"
             strokeLinecap="round"
             strokeLinejoin="round"
-            filter={`url(#aura-blur-${origin.timestamp})`}
+            filter={`url(#${blurId})`}
             initial={{ d: pathStart }}
             animate={{
               d: origin.isReverse

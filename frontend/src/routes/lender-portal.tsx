@@ -1,19 +1,17 @@
-import { createFileRoute } from "@tanstack/react-router";
-import LenderPortal from "@/pages/LenderPortal";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { getSeoMetadata } from "@/utils/seo";
-import { ProtectedRoute } from "@/components/common/ProtectedRoute";
 
 export const Route = createFileRoute("/lender-portal")({
+  beforeLoad: () => {
+    throw redirect({ to: "/dashboard" });
+  },
   head: () =>
     getSeoMetadata({
-      title: "Lender Portal | Payent",
-      description:
-        "Manage your listed tech gear and view incoming renter bookings.",
+      title: "User Dashboard | Payent",
+      description: "Manage your equipment rentals and bookings.",
       path: "/lender-portal",
     }),
-  component: () => (
-    <ProtectedRoute>
-      <LenderPortal />
-    </ProtectedRoute>
-  ),
+  component: () => null,
 });
+
+export default Route;

@@ -45,3 +45,6 @@ __pycache__/
 scratch/
 backend/backups/*.json
 backend/backups/*.sql
+.venv/
+**/.tanstack/
+frontend/.tanstack/

@@ -185,12 +185,6 @@ export default function About() {
                   <span>Explore Gear</span>
                   <ArrowRight className="h-3.5 w-3.5" />
                 </Link>
-                <Link
-                  to="/become-lender"
-                  className="inline-flex items-center gap-2 h-11 px-6 rounded-full border border-[#D6D6D6] dark:border-white/25 text-[#171717] dark:text-[#F3F3F3] hover:bg-[#F3F3F3] dark:hover:bg-white/[0.08] text-xs font-bold transition-all cursor-pointer"
-                >
-                  <span>Become a Lender</span>
-                </Link>
               </div>
 
               {/* Micro-trust indicators */}
@@ -611,10 +605,10 @@ export default function About() {
 
           <div className="shrink-0">
             <Link
-              to="/become-lender"
+              to="/browse"
               className="inline-flex items-center gap-2.5 h-12 px-8 rounded-full bg-white text-black hover:bg-[#EAEAEA] text-sm font-bold transition-all shadow-lg cursor-pointer"
             >
-              <span>Become a Lender</span>
+              <span>Explore Gear</span>
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
@@ -638,12 +632,6 @@ export default function About() {
           >
             <span>Explore Gear</span>
             <ArrowRight className="h-4 w-4" />
-          </Link>
-          <Link
-            to="/become-lender"
-            className="inline-flex items-center gap-2 h-12 px-8 rounded-full border border-[#D6D6D6] dark:border-white/25 text-[#171717] dark:text-[#F3F3F3] hover:bg-[#F3F3F3] dark:hover:bg-white/[0.08] text-sm font-bold transition-all cursor-pointer"
-          >
-            <span>Become a Lender</span>
           </Link>
         </div>
       </section>

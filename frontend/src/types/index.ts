@@ -18,6 +18,11 @@ export interface User {
   aadhaarNumber?: string;
   aadhaarMasked?: string;
   aadhaar_masked?: string;
+  panNumber?: string;
+  panMasked?: string;
+  pan_masked?: string;
+  accountId?: string;
+  accountType?: "pay₹ent" | "paye₹nt";
   role?: "user" | "admin" | "customer" | "lender";
   status?: "pending" | "approved" | "rejected" | "suspended" | "active";
   createdAt?: string;
@@ -61,6 +66,26 @@ export interface Product {
     location?: string;
     status?: string;
   };
+  ownerId?: string;
+  ownerAccountType?: "paye₹nt";
+  vendorSecretPin?: string;
+}
+
+export interface RentalSecurity {
+  id: string; // e.g. "RENTAL_SECURITY_001"
+  bookingId: string;
+  productId: string;
+  vendorId: string;
+  renterId: string;
+  vendorSecretPin: string;
+  renterSecretPin: string;
+  vendorPinVerified: boolean;
+  renterPinVerified: boolean;
+  otpVerified: boolean;
+  rentalStarted: boolean;
+  status: "security_pending" | "verified" | "active" | "completed";
+  createdAt: string;
+  rentalStartedAt: string | null;
 }
 
 export interface Category {

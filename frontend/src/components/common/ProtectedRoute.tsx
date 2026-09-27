@@ -13,26 +13,23 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (ready) {
-      if (!user && !token) {
+      if (!user) {
         const currentPath =
           typeof window !== "undefined" ? window.location.pathname : "";
         if (currentPath && currentPath !== "/login" && currentPath !== "/") {
-          window.location.href = `/login?redirect=${encodeURIComponent(currentPath + (window.location.search || ""))}`;
+          navigate({
+            to: "/login",
+            search: { redirect: currentPath + (window.location.search || "") } as any,
+          });
         } else {
           navigate({ to: "/login" });
         }
-      } else if (user && (user.status === "pending" || user.status === "rejected" || user.status === "suspended") && user.role !== "admin") {
-        const currentPath =
-          typeof window !== "undefined" ? window.location.pathname : "";
-        if (currentPath !== "/account-pending" && !currentPath.startsWith("/profile")) {
-          navigate({ to: "/account-pending" });
-        }
       }
     }
-  }, [ready, user, token, navigate]);
+  }, [ready, user, navigate]);
 
-  // If token or cached user exists, render children immediately
-  if (isAuthPresent) {
+  // If user session exists, render children immediately
+  if (user) {
     return <>{children}</>;
   }
 
