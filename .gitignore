@@ -33,13 +33,19 @@ dist-ssr
 
 # Local Environment Variables
 .env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env*.local
+backend/.env
+!.env.example
 
 # Python Cache
 __pycache__/
 *.pyc
-*.docx
-~$*
-.env*
+*.pyo
+.pytest_cache/
 .vercel
 .playwright-mcp/
 scratch/
