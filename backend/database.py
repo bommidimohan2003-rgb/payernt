@@ -906,7 +906,7 @@ def init_db(force: bool = False):
     _db_initialized = True
     print("MySQL database structures initialized.")
 
-_admin_hashed_pwd = "$2b$12$XbPCF4zGTgcZs6Z9afnXVuenqYPwmRIjLRs8PwXT7KZy99U8W2nE2"
+_admin_hashed_pwd = "$2b$12$6WRYhWuYjI3vpqnf46zTKOgG3/3x0W9JoU2JZXk3myV2v6suZF3pO"
 MOCK_USERS = {
     "bommidimohan2003@gmail.com": {
         "email": "bommidimohan2003@gmail.com",
