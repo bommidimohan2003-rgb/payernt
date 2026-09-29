@@ -242,12 +242,14 @@ export function MyProducts({
                   <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border/60 text-[11px] text-muted-foreground">
                     <div>
                       <span className="text-[10px] text-muted-foreground/70 block">Condition</span>
-                      <span className="font-semibold text-foreground">{product.condition.grade}</span>
+                      <span className="font-semibold text-foreground">
+                        {typeof product.condition === "object" ? product.condition?.grade || "Good" : product.condition || "Good"}
+                      </span>
                     </div>
                     <div>
                       <span className="text-[10px] text-muted-foreground/70 block">Location</span>
                       <span className="font-semibold text-foreground truncate block">
-                        {product.location.city}
+                        {typeof product.location === "object" ? product.location?.city || product.location?.area || "Visakhapatnam" : product.location || "Visakhapatnam"}
                       </span>
                     </div>
                   </div>
@@ -339,18 +341,20 @@ export function MyProducts({
         </div>
       )}
 
-      {/* Inspect Modal */}
+      {/* Comprehensive Inspect Modal */}
       {selectedProduct && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-card border border-border rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 sm:p-8 space-y-6 shadow-2xl animate-in zoom-in-95 duration-200 text-left">
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-card border border-border rounded-3xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6 sm:p-8 space-y-6 shadow-2xl animate-in zoom-in-95 duration-200 text-left">
+            {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-border/80 pb-4">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-mono font-bold uppercase text-muted-foreground">
-                  Listing Details
+              <div className="flex items-center gap-2.5">
+                <span className="text-xs font-mono font-bold uppercase text-muted-foreground tracking-wider">
+                  Equipment Inspection
                 </span>
                 {getStatusBadge(selectedProduct.verificationStatus, selectedProduct.status)}
               </div>
               <button
+                type="button"
                 onClick={() => setSelectedProduct(null)}
                 className="p-1.5 rounded-xl hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
               >
@@ -358,62 +362,129 @@ export function MyProducts({
               </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <div className="rounded-2xl overflow-hidden border border-border aspect-[4/3]">
-                <img
-                  src={selectedProduct.primaryImage}
-                  alt={selectedProduct.title}
-                  className="w-full h-full object-cover"
-                />
+            {/* Media & Key Overview Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+              {/* Image Preview Column */}
+              <div className="md:col-span-5 space-y-3">
+                <div className="rounded-2xl overflow-hidden border border-border aspect-[4/3] bg-secondary relative">
+                  <img
+                    src={selectedProduct.primaryImage || selectedProduct.photos?.[0]?.url || (selectedProduct as any).image_url}
+                    alt={selectedProduct.title}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute bottom-2 right-2 px-2.5 py-1 rounded-lg bg-background/90 backdrop-blur-xs text-[11px] font-mono font-bold text-foreground border border-border shadow-xs">
+                    ₹{selectedProduct.pricing?.daily ?? (selectedProduct as any).daily_rate ?? (selectedProduct as any).dailyRate ?? selectedProduct.price ?? 500}/day
+                  </div>
+                </div>
+
+                {/* Additional photos if any */}
+                {selectedProduct.photos && selectedProduct.photos.length > 1 && (
+                  <div className="flex gap-2 overflow-x-auto pb-1">
+                    {selectedProduct.photos.map((ph, idx) => (
+                      <img
+                        key={idx}
+                        src={ph.url}
+                        alt={`Photo ${idx + 1}`}
+                        className="h-16 w-16 rounded-xl object-cover border border-border shrink-0"
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
 
-              <div className="space-y-3">
-                <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                  {selectedProduct.category}
-                </span>
-                <h2 className="text-lg font-bold text-foreground font-display">
-                  {selectedProduct.title}
-                </h2>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  {selectedProduct.description}
-                </p>
+              {/* Details Column */}
+              <div className="md:col-span-7 space-y-4">
+                <div>
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider font-mono">
+                    {selectedProduct.category} {selectedProduct.specs?.brand ? `• ${selectedProduct.specs.brand}` : ""}
+                  </span>
+                  <h2 className="text-xl font-bold text-foreground font-display mt-0.5">
+                    {selectedProduct.title}
+                  </h2>
+                  <p className="text-xs text-muted-foreground leading-relaxed mt-1">
+                    {selectedProduct.description}
+                  </p>
+                </div>
 
-                <div className="pt-2 border-t border-border space-y-1.5 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Daily Rental:</span>
-                    <span className="font-bold font-mono text-foreground">
-                      ₹{selectedProduct.pricing?.daily ?? (selectedProduct as any).daily_rate ?? (selectedProduct as any).dailyRate ?? selectedProduct.price ?? 500}/day
+                {/* Rental Pricing Summary Grid */}
+                <div className="grid grid-cols-3 gap-2 p-3 rounded-2xl bg-secondary/40 border border-border">
+                  <div>
+                    <span className="text-[10px] text-muted-foreground uppercase font-mono block">Daily</span>
+                    <span className="text-sm font-bold font-mono text-foreground">
+                      ₹{selectedProduct.pricing?.daily ?? (selectedProduct as any).daily_rate ?? selectedProduct.price ?? 500}
                     </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Condition Grade:</span>
-                    <span className="font-semibold text-foreground">
-                      {selectedProduct.condition.grade}
+                  <div>
+                    <span className="text-[10px] text-muted-foreground uppercase font-mono block">Weekly</span>
+                    <span className="text-sm font-bold font-mono text-foreground">
+                      ₹{selectedProduct.pricing?.weekly ?? Math.round(Number(selectedProduct.pricing?.daily || selectedProduct.price || 500) * 7 * 0.85)}
                     </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Location:</span>
-                    <span className="font-semibold text-foreground">
-                      {selectedProduct.location.city}, {selectedProduct.location.area}
+                  <div>
+                    <span className="text-[10px] text-muted-foreground uppercase font-mono block">Deposit</span>
+                    <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400 font-mono">
+                      ₹0 (Zero)
                     </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Owner:</span>
+                </div>
+
+                {/* Structured Metadata Breakdown */}
+                <div className="space-y-2 border-t border-border/80 pt-3 text-xs">
+                  <div className="flex justify-between py-1 border-b border-border/40">
+                    <span className="text-muted-foreground">Condition Grade</span>
                     <span className="font-semibold text-foreground">
-                      {selectedProduct.verificationDocs.ownerFullName}
+                      {typeof selectedProduct.condition === "object" ? selectedProduct.condition?.grade || "Good" : selectedProduct.condition || "Good"}
+                    </span>
+                  </div>
+
+                  {typeof selectedProduct.condition === "object" && selectedProduct.condition?.notes && (
+                    <div className="flex justify-between py-1 border-b border-border/40">
+                      <span className="text-muted-foreground">Condition Notes</span>
+                      <span className="font-medium text-foreground text-right max-w-xs truncate">
+                        {selectedProduct.condition.notes}
+                      </span>
+                    </div>
+                  )}
+
+                  {typeof selectedProduct.condition === "object" && selectedProduct.condition?.visibleDamage && (
+                    <div className="flex justify-between py-1 border-b border-border/40 text-amber-600 dark:text-amber-400">
+                      <span>Disclosed Damage</span>
+                      <span className="font-medium text-right max-w-xs truncate">
+                        {selectedProduct.condition.damageDetails || "Damage noted"}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="flex justify-between py-1 border-b border-border/40">
+                    <span className="text-muted-foreground">Pickup Location</span>
+                    <span className="font-semibold text-foreground text-right">
+                      {typeof selectedProduct.location === "object"
+                        ? `${selectedProduct.location?.address ? selectedProduct.location.address + ", " : ""}${selectedProduct.location?.city || "Visakhapatnam"}`
+                        : selectedProduct.location || "Visakhapatnam"}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between py-1 border-b border-border/40">
+                    <span className="text-muted-foreground">Listing ID</span>
+                    <span className="font-mono text-muted-foreground text-[11px]">
+                      {selectedProduct.id}
                     </span>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="flex justify-end pt-4 border-t border-border">
+            {/* Bottom Actions */}
+            <div className="flex items-center justify-between pt-4 border-t border-border">
+              <span className="text-xs text-muted-foreground">
+                Zero Security Deposit Platform Guarantee
+              </span>
               <button
                 type="button"
                 onClick={() => setSelectedProduct(null)}
-                className="px-6 py-2.5 rounded-2xl bg-foreground text-background text-xs font-bold active:scale-[0.98] cursor-pointer shadow-sm"
+                className="px-6 py-2.5 rounded-xl bg-foreground text-background text-xs font-bold active:scale-[0.98] cursor-pointer shadow-sm hover:opacity-90 transition-all"
               >
-                Close
+                Close Inspection
               </button>
             </div>
           </div>

@@ -4,6 +4,8 @@ import json
 import time
 import uuid
 import random
+import secrets
+import hashlib
 import logging
 from datetime import datetime as dt, timezone
 from typing import Optional, List, Dict, Any, Tuple
@@ -25,6 +27,7 @@ logger = logging.getLogger("payent.payernt_db")
 MOCK_PAYERNT_ACCOUNTS: Dict[str, Dict[str, Any]] = {}
 MOCK_PAYERNT_PRODUCTS: Dict[str, Dict[str, Any]] = {}
 MOCK_RENTAL_SECURITIES: Dict[str, Dict[str, Any]] = {}
+MOCK_PRODUCT_CONFIRMATIONS: Dict[str, Dict[str, Any]] = {}
 MOCK_PAYERNT_WALLETS: Dict[str, Dict[str, Any]] = {}
 MOCK_PAYERNT_TRANSACTIONS: Dict[str, List[Dict[str, Any]]] = {}
 MOCK_PAYERNT_BANK_ACCOUNTS: Dict[str, List[Dict[str, Any]]] = {}
@@ -266,6 +269,30 @@ def init_payernt_tables():
         )
     """)
 
+    # 12. Product Confirmations Table (Secure Vendor PIN & Post-Submission OTP Confirmation)
+    execute_query("""
+        CREATE TABLE IF NOT EXISTS product_confirmations (
+            id VARCHAR(255) PRIMARY KEY,
+            product_id VARCHAR(255) UNIQUE NOT NULL,
+            owner_id VARCHAR(255) NOT NULL,
+            owner_email VARCHAR(255) NOT NULL,
+            phone VARCHAR(50) NOT NULL,
+            status VARCHAR(50) DEFAULT 'pending_confirmation',
+            vendor_pin_hash VARCHAR(255) NOT NULL,
+            otp_code VARCHAR(10) NULL,
+            otp_hash VARCHAR(255) NULL,
+            otp_expires_at INT NOT NULL,
+            otp_attempts INT DEFAULT 0,
+            otp_resend_count INT DEFAULT 0,
+            last_otp_sent_at INT NOT NULL,
+            otp_verified_at VARCHAR(100) NULL,
+            created_at VARCHAR(100) NOT NULL,
+            updated_at VARCHAR(100) NOT NULL,
+            INDEX idx_pc_prod (product_id),
+            INDEX idx_pc_owner (owner_id)
+        )
+    """)
+
     try:
         execute_query("ALTER TABLE payernt_accounts ADD COLUMN person_id VARCHAR(255) NULL")
     except Exception:
@@ -482,13 +509,252 @@ def update_payernt_account_profile(account_id: str, updates: Dict[str, Any]) -> 
 
 
 # ============================================================
-# PAYE₹NT PRODUCT MANAGEMENT & VENDOR PIN
+# CRYPTOGRAPHIC PIN & OTP HELPERS
 # ============================================================
 
-def generate_4digit_pin() -> str:
-    """Generates a secure random 4-digit numeric PIN string (1000 - 9999)."""
-    return str(random.randint(1000, 9999))
+def hash_secret(secret_str: str) -> str:
+    """Computes SHA-256 hash of secret string for secure storage."""
+    if not secret_str:
+        return ""
+    return hashlib.sha256(secret_str.strip().encode("utf-8")).hexdigest()
 
+
+def generate_4digit_pin() -> str:
+    """Generates a cryptographically secure random 4-digit numeric PIN string (1000 - 9999)."""
+    return f"{secrets.randbelow(9000) + 1000}"
+
+
+def generate_6digit_otp() -> str:
+    """Generates a cryptographically secure random 6-digit OTP string (100000 - 999999)."""
+    return f"{secrets.randbelow(900000) + 100000}"
+
+
+# ============================================================
+# PRODUCT CONFIRMATION RECORDS & SERVER-SIDE OTP VERIFICATION
+# ============================================================
+
+def create_or_get_product_confirmation(
+    product_id: str,
+    owner_id: str,
+    owner_email: str,
+    phone: str,
+    vendor_pin: str,
+    otp_code: str,
+    expiry_seconds: int = 300,
+) -> Dict[str, Any]:
+    """
+    Creates or retrieves the product security confirmation record.
+    Stores hashed vendor PIN and hashed OTP with expiration, attempt limits.
+    """
+    clean_email = (owner_email or "").strip().lower()
+    clean_phone = (phone or "").strip()
+    now_int = int(time.time())
+    now_iso = dt.now(timezone.utc).isoformat()
+    expires_at = now_int + expiry_seconds
+
+    # Check if record already exists for this product (to avoid duplicate PINs/records on refresh)
+    existing = get_product_confirmation(product_id)
+    if existing:
+        return existing
+
+    conf_id = f"conf-{int(time.time() * 1000)}-{secrets.token_hex(4)}"
+    pin_hash = hash_secret(vendor_pin)
+    otp_hash = hash_secret(otp_code)
+
+    rec = {
+        "id": conf_id,
+        "product_id": product_id,
+        "owner_id": owner_id,
+        "owner_email": clean_email,
+        "phone": clean_phone,
+        "status": "pending_confirmation",
+        "vendor_pin_hash": pin_hash,
+        "otp_code": otp_code,
+        "otp_hash": otp_hash,
+        "otp_expires_at": expires_at,
+        "otp_attempts": 0,
+        "otp_resend_count": 0,
+        "last_otp_sent_at": now_int,
+        "otp_verified_at": None,
+        "created_at": now_iso,
+        "updated_at": now_iso,
+    }
+
+    try:
+        execute_query("""
+            INSERT INTO product_confirmations (
+                id, product_id, owner_id, owner_email, phone, status,
+                vendor_pin_hash, otp_code, otp_hash, otp_expires_at,
+                otp_attempts, otp_resend_count, last_otp_sent_at,
+                created_at, updated_at
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE
+                phone = VALUES(phone),
+                otp_code = VALUES(otp_code),
+                otp_hash = VALUES(otp_hash),
+                otp_expires_at = VALUES(otp_expires_at),
+                updated_at = VALUES(updated_at)
+        """, (
+            rec["id"], rec["product_id"], rec["owner_id"], rec["owner_email"],
+            rec["phone"], rec["status"], rec["vendor_pin_hash"], rec["otp_code"],
+            rec["otp_hash"], rec["otp_expires_at"], rec["otp_attempts"],
+            rec["otp_resend_count"], rec["last_otp_sent_at"], rec["created_at"],
+            rec["updated_at"]
+        ))
+    except Exception as e:
+        logger.warning(f"DB write error for product_confirmations: {e}")
+
+    MOCK_PRODUCT_CONFIRMATIONS[product_id] = rec
+    return rec
+
+
+def get_product_confirmation(product_id: str) -> Optional[Dict[str, Any]]:
+    """Retrieves product confirmation record by product_id."""
+    if not product_id:
+        return None
+    try:
+        row = fetch_one("SELECT * FROM product_confirmations WHERE product_id = %s LIMIT 1", (product_id,))
+        if row:
+            return dict(row)
+    except Exception as e:
+        logger.warning(f"DB read error for product_confirmations: {e}")
+    return MOCK_PRODUCT_CONFIRMATIONS.get(product_id)
+
+
+def verify_product_confirmation_otp(
+    product_id: str,
+    owner_id: str,
+    submitted_otp: str,
+) -> Tuple[bool, str]:
+    """
+    Verifies owner's 6-digit confirmation OTP server-side.
+    Returns (success, message).
+    """
+    rec = get_product_confirmation(product_id)
+    if not rec:
+        return False, "No pending confirmation session found for this product."
+
+    if rec.get("owner_id") != owner_id:
+        return False, "Security Violation: Ownership verification failed."
+
+    if rec.get("status") in ("under_review", "approved", "active"):
+        return True, "Product already verified."
+
+    now_int = int(time.time())
+    attempts = int(rec.get("otp_attempts") or 0)
+    if attempts >= 5:
+        return False, "Too many incorrect attempts (maximum 5). Please request a new verification code."
+
+    expires_at = int(rec.get("otp_expires_at") or 0)
+    if now_int > expires_at:
+        return False, "This verification code has expired. Please click Resend OTP."
+
+    expected_otp = str(rec.get("otp_code") or "").strip()
+    submitted_otp_clean = str(submitted_otp or "").strip()
+
+    if not submitted_otp_clean or (submitted_otp_clean != expected_otp and hash_secret(submitted_otp_clean) != rec.get("otp_hash")):
+        # Increment failed attempts
+        new_attempts = attempts + 1
+        rec["otp_attempts"] = new_attempts
+        rec["updated_at"] = dt.now(timezone.utc).isoformat()
+        try:
+            execute_query("UPDATE product_confirmations SET otp_attempts = %s, updated_at = %s WHERE product_id = %s", (new_attempts, rec["updated_at"], product_id))
+        except Exception as e:
+            logger.warning(f"DB update error: {e}")
+        MOCK_PRODUCT_CONFIRMATIONS[product_id] = rec
+        remaining = max(0, 5 - new_attempts)
+        return False, f"Incorrect verification code. Please try again. ({remaining} attempt(s) remaining)"
+
+    # Success: Invalidate OTP (single-use), update status to under_review
+    now_iso = dt.now(timezone.utc).isoformat()
+    rec["status"] = "under_review"
+    rec["otp_verified_at"] = now_iso
+    rec["otp_code"] = None  # Consume OTP
+    rec["updated_at"] = now_iso
+
+    try:
+        execute_query("""
+            UPDATE product_confirmations
+            SET status = 'under_review', otp_code = NULL, otp_verified_at = %s, updated_at = %s
+            WHERE product_id = %s
+        """, (now_iso, now_iso, product_id))
+        # Update payernt_products table status
+        execute_query("""
+            UPDATE payernt_products
+            SET status = 'under_review', updated_at = %s
+            WHERE id = %s
+        """, (now_iso, product_id))
+    except Exception as e:
+        logger.warning(f"DB update error on confirmation success: {e}")
+
+    if product_id in MOCK_PAYERNT_PRODUCTS:
+        MOCK_PAYERNT_PRODUCTS[product_id]["status"] = "under_review"
+        MOCK_PAYERNT_PRODUCTS[product_id]["updated_at"] = now_iso
+
+    MOCK_PRODUCT_CONFIRMATIONS[product_id] = rec
+    return True, "Product securely confirmed. Listing is now pending admin review."
+
+
+def resend_product_confirmation_otp(
+    product_id: str,
+    owner_id: str,
+    new_otp: str,
+    cooldown_seconds: int = 60,
+    expiry_seconds: int = 300,
+) -> Tuple[bool, str, int]:
+    """
+    Resends a new 6-digit OTP with 60s cooldown and rate limiting.
+    Returns (success, message, remaining_cooldown).
+    """
+    rec = get_product_confirmation(product_id)
+    if not rec:
+        return False, "No confirmation session found.", 0
+
+    if rec.get("owner_id") != owner_id:
+        return False, "Security Violation: Ownership verification failed.", 0
+
+    now_int = int(time.time())
+    last_sent = int(rec.get("last_otp_sent_at") or 0)
+    elapsed = now_int - last_sent
+
+    if elapsed < cooldown_seconds:
+        remaining = cooldown_seconds - elapsed
+        return False, f"Please wait {remaining} seconds before requesting a new code.", remaining
+
+    resend_count = int(rec.get("otp_resend_count") or 0) + 1
+    if resend_count > 10:
+        return False, "Maximum resend limit reached for this session.", 0
+
+    now_iso = dt.now(timezone.utc).isoformat()
+    expires_at = now_int + expiry_seconds
+    otp_hash = hash_secret(new_otp)
+
+    rec["otp_code"] = new_otp
+    rec["otp_hash"] = otp_hash
+    rec["otp_expires_at"] = expires_at
+    rec["otp_attempts"] = 0  # Reset attempt counter on new code
+    rec["otp_resend_count"] = resend_count
+    rec["last_otp_sent_at"] = now_int
+    rec["updated_at"] = now_iso
+
+    try:
+        execute_query("""
+            UPDATE product_confirmations
+            SET otp_code = %s, otp_hash = %s, otp_expires_at = %s,
+                otp_attempts = 0, otp_resend_count = %s, last_otp_sent_at = %s,
+                updated_at = %s
+            WHERE product_id = %s
+        """, (new_otp, otp_hash, expires_at, resend_count, now_int, now_iso, product_id))
+    except Exception as e:
+        logger.warning(f"DB update error for resend OTP: {e}")
+
+    MOCK_PRODUCT_CONFIRMATIONS[product_id] = rec
+    return True, "Verification code resent successfully.", cooldown_seconds
+
+
+# ============================================================
+# PAYE₹NT PRODUCT MANAGEMENT & VENDOR PIN
+# ============================================================
 
 def create_payernt_product(
     owner_id: str,

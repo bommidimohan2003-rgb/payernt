@@ -21,7 +21,9 @@ from database import (
     hash_reset_token,
     create_db_session,
     get_user_active_sessions,
-    execute_query
+    execute_query,
+    clear_failed_auth_attempts,
+    RATE_LIMIT_STORE
 )
 from auth import hash_password, verify_password
 from email_service import (
@@ -39,9 +41,19 @@ class TestPasswordResetSecure(unittest.TestCase):
             init_db()
         except Exception:
             pass
+        RATE_LIMIT_STORE.clear()
+        try:
+            execute_query("DELETE FROM auth_rate_limits WHERE key_id LIKE %s", ("forgotpw%",))
+        except Exception:
+            pass
         cls.client = TestClient(app)
 
     def setUp(self):
+        RATE_LIMIT_STORE.clear()
+        try:
+            execute_query("DELETE FROM auth_rate_limits WHERE key_id LIKE %s", ("forgotpw%",))
+        except Exception:
+            pass
         self.unique_id = uuid.uuid4().hex[:8]
         self.test_email = f"reset_test_{self.unique_id}@example.com"
         self.initial_password = "InitialPass123!"

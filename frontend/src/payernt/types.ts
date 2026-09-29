@@ -155,6 +155,10 @@ export interface PayerntProduct {
   pickupDetails?: string;
   pricing: RentalPricing;
   price?: number;
+  daily_rate?: number;
+  dailyRate?: number;
+  weekly_rate?: number;
+  monthly_rate?: number;
   availability: ProductAvailabilitySchedule;
   verificationDocs: VerificationDocuments;
   verification?: Record<string, unknown>;

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePayerntStore } from "./store";
 import { PayerntNavbar } from "./components/PayerntNavbar";
@@ -13,7 +13,34 @@ import { PayerntAuth } from "./components/PayerntAuth";
 export function PayerntApp() {
   const [activeTab, setActiveTab] = useState<
     "home" | "products" | "requests" | "wallet" | "profile" | "list"
-  >("home");
+  >(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get("tab");
+      if (
+        tabParam === "home" ||
+        tabParam === "products" ||
+        tabParam === "requests" ||
+        tabParam === "wallet" ||
+        tabParam === "profile" ||
+        tabParam === "list"
+      ) {
+        return tabParam;
+      }
+    }
+    return "home";
+  });
+
+  // Sync tab changes with URL query
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get("tab");
+      if (tabParam && tabParam !== activeTab && ["home", "products", "requests", "wallet", "profile", "list"].includes(tabParam)) {
+        setActiveTab(tabParam as any);
+      }
+    }
+  }, []);
 
   const {
     activeAccount,

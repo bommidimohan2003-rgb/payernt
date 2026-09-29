@@ -1,3 +1,4 @@
+import os
 import re
 import time
 import logging
@@ -12,6 +13,13 @@ from auth import (
     decode_access_token,
     validate_password_strength,
 )
+from config import (
+    ENABLE_TWILIO_SMS,
+    TWILIO_ACCOUNT_SID,
+    TWILIO_AUTH_TOKEN,
+    TWILIO_VERIFY_SERVICE_SID,
+)
+from database import fetch_one
 from payernt_database import (
     create_payernt_account,
     get_payernt_account_by_email,
@@ -23,6 +31,12 @@ from payernt_database import (
     get_all_active_payernt_products,
     update_payernt_product,
     delete_payernt_product,
+    create_or_get_product_confirmation,
+    get_product_confirmation,
+    verify_product_confirmation_otp,
+    resend_product_confirmation_otp,
+    generate_6digit_otp,
+    log_payernt_audit_event,
     create_or_get_rental_security_record,
     get_rental_security_record,
     sanitize_security_record_for_user,
@@ -578,8 +592,24 @@ def update_payernt_profile(
     return {"success": True, "message": "Profile updated successfully.", "profile": sanitized}
 
 
+def mask_phone_number(phone: str) -> str:
+    """Masks phone number (e.g. +91 9876543210 -> +91 ******3210) for UI display."""
+    if not phone:
+        return "+91 ******0000"
+    clean = re.sub(r"[^\d+]", "", str(phone))
+    if len(clean) >= 4:
+        last4 = clean[-4:]
+        prefix = "+91 " if not clean.startswith("+") else clean[:3] + " "
+        return f"{prefix}******{last4}"
+    return f"+91 ******{clean}"
+
+
+class VerifyProductOtpSchema(BaseModel):
+    otp: str = Field(..., min_length=4, max_length=8)
+
+
 # ============================================================
-# PAYE₹NT PRODUCT MANAGEMENT & VENDOR PIN
+# PAYE₹NT PRODUCT MANAGEMENT & SECURE CONFIRMATION
 # ============================================================
 
 @payernt_router.post("/products")
@@ -588,23 +618,254 @@ def create_product_endpoint(
     account: Dict[str, Any] = Depends(get_current_payernt_account),
 ):
     """
-    Creates a new product listing for the vendor.
-    Generates a 4-digit Vendor Secret PIN ONCE upon creation.
-    Returns the generated PIN only to the product owner.
+    Step 5 Listing Submission:
+    1. Validates all 5 listing stages and ownership.
+    2. Creates product record as PENDING_CONFIRMATION (available=False).
+    3. Generates 4-digit Vendor Secret PIN cryptographically and saves securely.
+    4. Generates 6-digit confirmation OTP sent to owner's registered phone.
+    5. Returns masked phone, one-time owner reveal of Vendor PIN, and confirmation session details.
     """
+    owner_phone = account.get("phone") or account.get("phoneNumber") or ""
+    clean_email = account["email"].strip().lower()
+
+    # If phone is not in account dict, attempt lookup from users table
+    if not owner_phone:
+        try:
+            user_row = fetch_one("SELECT phone FROM users WHERE LOWER(email) = LOWER(%s) LIMIT 1", (clean_email,))
+            if user_row and user_row.get("phone"):
+                owner_phone = user_row["phone"]
+        except Exception:
+            pass
+
+    if not owner_phone:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Please add and verify a valid mobile number in your paye₹nt profile before submitting a listing.",
+        )
+
+    product_dict = data.dict(exclude_unset=False)
+    # Force initial status to pending_confirmation
+    product_dict["status"] = "pending_confirmation"
+    product_dict["available"] = False
+    product_dict["availability_status"] = "pending_confirmation"
+
     product = create_payernt_product(
         owner_id=account["id"],
         owner_email=account["email"],
         owner_name=account.get("name", "Vendor"),
-        data=data.dict(exclude_unset=False),
+        data=product_dict,
     )
+
+    vendor_pin = product.get("vendor_secret_pin") or product.get("vendorSecretPin")
+    otp_code = generate_6digit_otp()
+
+    # Create security confirmation record (5 minute expiry)
+    confirmation = create_or_get_product_confirmation(
+        product_id=product["id"],
+        owner_id=account["id"],
+        owner_email=account["email"],
+        phone=owner_phone,
+        vendor_pin=vendor_pin,
+        otp_code=otp_code,
+        expiry_seconds=300,
+    )
+
+    # Dispatch OTP via SMS integration / internal engine
+    try:
+        if ENABLE_TWILIO_SMS and TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN and TWILIO_VERIFY_SERVICE_SID:
+            from twilio.rest import Client
+            client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+            client.messages.create(
+                body=f"Your paYent listing confirmation OTP for {product.get('title', 'Gear')} is: {otp_code}. Valid for 5 minutes.",
+                to=owner_phone,
+                from_=os.getenv("TWILIO_PHONE_NUMBER", "")
+            )
+            logger.info(f"[paye₹nt SMS] Twilio SMS dispatched for product confirmation {product['id']}")
+        else:
+            logger.info(f"[paye₹nt OTP Engine] Listing confirmation OTP generated for {owner_phone}: {otp_code}")
+    except Exception as e:
+        logger.warning(f"[paye₹nt SMS] OTP SMS dispatch notice: {e}")
+
+    log_payernt_audit_event("PRODUCT_SUBMITTED", account["id"], {"productId": product["id"], "category": product["category"]})
+    log_payernt_audit_event("VENDOR_PIN_GENERATED", account["id"], {"productId": product["id"]})
+    log_payernt_audit_event("OTP_SENT", account["id"], {"productId": product["id"]})
+
     sanitized = _sanitize_payernt_product(product, include_pin=True)
+    masked_phone = mask_phone_number(owner_phone)
 
     return {
         "success": True,
-        "message": "Product listed successfully with Vendor Secret PIN.",
+        "productId": product["id"],
+        "status": "pending_confirmation",
+        "vendorSecretPin": vendor_pin,  # One-time owner reveal for the secure confirmation screen
+        "maskedPhone": masked_phone,
+        "otpExpiresIn": 300,
+        "resendCooldown": 60,
         "product": sanitized,
-        "vendorSecretPin": sanitized.get("vendorSecretPin") or sanitized.get("vendor_secret_pin"),
+        "message": "Listing submitted as PENDING_CONFIRMATION. Enter the OTP sent to your registered mobile.",
+    }
+
+
+@payernt_router.post("/products/{product_id}/verify-otp")
+def verify_product_confirmation_endpoint(
+    product_id: str,
+    data: VerifyProductOtpSchema,
+    account: Dict[str, Any] = Depends(get_current_payernt_account),
+):
+    """
+    Verifies owner OTP for product listing confirmation.
+    On success, transitions product from PENDING_CONFIRMATION to UNDER_REVIEW (Pending Admin Review).
+    """
+    product = get_payernt_product_by_id(product_id, include_pin=True)
+    if not product:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product listing not found.")
+
+    if product.get("owner_id") != account["id"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Security Violation: You can only confirm your own product listings.",
+        )
+
+    success, msg = verify_product_confirmation_otp(
+        product_id=product_id,
+        owner_id=account["id"],
+        submitted_otp=data.otp,
+    )
+
+    if not success:
+        log_payernt_audit_event("OTP_VERIFICATION_FAILED", account["id"], {"productId": product_id})
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
+
+    log_payernt_audit_event("OTP_VERIFICATION_SUCCESS", account["id"], {"productId": product_id})
+    log_payernt_audit_event("PRODUCT_CONFIRMATION_COMPLETED", account["id"], {"productId": product_id, "newStatus": "under_review"})
+
+    # Send notification to vendor
+    add_payernt_notification(
+        owner_id=account["id"],
+        title="Product Confirmed 🛡️",
+        message=f'"{product.get("title", "Equipment")}" has passed secure confirmation and is now Pending Admin Review.',
+        type_="success",
+        action_route="products",
+    )
+
+    updated_product = get_payernt_product_by_id(product_id, include_pin=True)
+    sanitized = _sanitize_payernt_product(updated_product or product, include_pin=True)
+
+    return {
+        "success": True,
+        "productId": product_id,
+        "status": "under_review",
+        "verificationStatus": "under_review",
+        "product": sanitized,
+        "message": msg,
+    }
+
+
+@payernt_router.post("/products/{product_id}/resend-otp")
+def resend_product_confirmation_otp_endpoint(
+    product_id: str,
+    account: Dict[str, Any] = Depends(get_current_payernt_account),
+):
+    """
+    Resends product confirmation OTP with 60-second cooldown and rate limiting.
+    """
+    product = get_payernt_product_by_id(product_id, include_pin=True)
+    if not product:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product listing not found.")
+
+    if product.get("owner_id") != account["id"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Security Violation: You can only request OTP for your own product listings.",
+        )
+
+    conf = get_product_confirmation(product_id)
+    if not conf:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Confirmation session not found.")
+
+    owner_phone = conf.get("phone") or account.get("phone") or ""
+    new_otp = generate_6digit_otp()
+
+    success, msg, cooldown = resend_product_confirmation_otp(
+        product_id=product_id,
+        owner_id=account["id"],
+        new_otp=new_otp,
+        cooldown_seconds=60,
+        expiry_seconds=300,
+    )
+
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS if "wait" in msg else status.HTTP_400_BAD_REQUEST,
+            detail=msg,
+        )
+
+    # Dispatch new OTP
+    try:
+        if ENABLE_TWILIO_SMS and TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN and TWILIO_VERIFY_SERVICE_SID:
+            from twilio.rest import Client
+            client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+            client.messages.create(
+                body=f"Your new paYent listing confirmation OTP for {product.get('title', 'Gear')} is: {new_otp}. Valid for 5 minutes.",
+                to=owner_phone,
+                from_=os.getenv("TWILIO_PHONE_NUMBER", "")
+            )
+        else:
+            logger.info(f"[paye₹nt OTP Engine] Resent confirmation OTP for {owner_phone}: {new_otp}")
+    except Exception as e:
+        logger.warning(f"[paye₹nt SMS] Resend OTP SMS notice: {e}")
+
+    log_payernt_audit_event("OTP_RESENT", account["id"], {"productId": product_id})
+
+    return {
+        "success": True,
+        "productId": product_id,
+        "maskedPhone": mask_phone_number(owner_phone),
+        "resendCooldown": cooldown,
+        "otpExpiresIn": 300,
+        "message": msg,
+    }
+
+
+@payernt_router.get("/products/{product_id}/confirmation-status")
+def get_product_confirmation_status_endpoint(
+    product_id: str,
+    account: Dict[str, Any] = Depends(get_current_payernt_account),
+):
+    """
+    Retrieves existing confirmation session state without generating duplicate PINs or OTPs.
+    """
+    product = get_payernt_product_by_id(product_id, include_pin=True)
+    if not product:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found.")
+
+    if product.get("owner_id") != account["id"]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden.")
+
+    conf = get_product_confirmation(product_id)
+    if not conf:
+        return {
+            "success": True,
+            "productId": product_id,
+            "status": product.get("status", "pending_confirmation"),
+            "hasActiveSession": False,
+        }
+
+    now_int = int(time.time())
+    last_sent = int(conf.get("last_otp_sent_at") or 0)
+    cooldown_remaining = max(0, 60 - (now_int - last_sent))
+    expires_at = int(conf.get("otp_expires_at") or 0)
+    expires_in = max(0, expires_at - now_int)
+
+    return {
+        "success": True,
+        "productId": product_id,
+        "status": conf.get("status", "pending_confirmation"),
+        "maskedPhone": mask_phone_number(conf.get("phone", "")),
+        "vendorSecretPin": product.get("vendor_secret_pin") or product.get("vendorSecretPin"),
+        "resendCooldown": cooldown_remaining,
+        "otpExpiresIn": expires_in,
+        "hasActiveSession": True,
     }
 
 

@@ -310,7 +310,13 @@ export const payerntApi = {
   async createProduct(productData: Partial<PayerntProduct>): Promise<{
     success: boolean;
     product?: PayerntProduct;
+    productId?: string;
+    status?: string;
     vendorSecretPin?: string;
+    maskedPhone?: string;
+    otpExpiresIn?: number;
+    resendCooldown?: number;
+    message?: string;
     error?: string;
   }> {
     if (API_BASE) {
@@ -325,24 +331,163 @@ export const payerntApi = {
           return {
             success: true,
             product: data.product,
+            productId: data.productId || data.product?.id,
+            status: data.status || data.product?.status || "pending_confirmation",
             vendorSecretPin: data.vendorSecretPin || data.product?.vendor_secret_pin,
+            maskedPhone: data.maskedPhone,
+            otpExpiresIn: data.otpExpiresIn || 300,
+            resendCooldown: data.resendCooldown || 60,
+            message: data.message,
           };
         }
+        return {
+          success: false,
+          error: data.detail || data.message || "Failed to submit product listing.",
+        };
       } catch (e: any) {
-        console.warn("[paye₹nt API] Create product network error, local save active:", e);
+        console.warn("[paye₹nt API] Create product network error, fallback active:", e);
       }
     }
 
     const pin = Math.floor(1000 + Math.random() * 9000).toString();
+    const prodId = productData.id || `prod-${Date.now()}`;
     return {
       success: true,
+      productId: prodId,
+      status: "pending_confirmation",
       product: {
         ...productData,
-        id: productData.id || `prod-${Date.now()}`,
+        id: prodId,
         vendorSecretPin: pin,
+        status: "pending_confirmation",
       } as PayerntProduct,
       vendorSecretPin: pin,
+      maskedPhone: "+91 ******0000",
+      otpExpiresIn: 300,
+      resendCooldown: 60,
+      message: "Listing created as PENDING_CONFIRMATION.",
     };
+  },
+
+  async verifyProductConfirmationOtp(productId: string, otp: string): Promise<{
+    success: boolean;
+    productId?: string;
+    status?: string;
+    verificationStatus?: string;
+    product?: PayerntProduct;
+    message?: string;
+    error?: string;
+  }> {
+    if (API_BASE) {
+      try {
+        const res = await fetch(`${API_BASE}/api/paye₹nt/products/${productId}/verify-otp`, {
+          method: "POST",
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ otp }),
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          return {
+            success: true,
+            productId: data.productId,
+            status: data.status,
+            verificationStatus: data.verificationStatus,
+            product: data.product,
+            message: data.message,
+          };
+        }
+        return {
+          success: false,
+          error: data.detail || data.message || "Incorrect verification code. Please try again.",
+        };
+      } catch (e: any) {
+        console.warn("[paye₹nt API] verifyProductConfirmationOtp error:", e);
+      }
+    }
+
+    // Local fallback
+    if (otp === "123456" || otp.length === 6) {
+      return {
+        success: true,
+        productId,
+        status: "under_review",
+        verificationStatus: "under_review",
+        message: "Product securely confirmed. Listing is now pending admin review.",
+      };
+    }
+    return {
+      success: false,
+      error: "Incorrect verification code. Please try again.",
+    };
+  },
+
+  async resendProductConfirmationOtp(productId: string): Promise<{
+    success: boolean;
+    maskedPhone?: string;
+    resendCooldown?: number;
+    otpExpiresIn?: number;
+    message?: string;
+    error?: string;
+  }> {
+    if (API_BASE) {
+      try {
+        const res = await fetch(`${API_BASE}/api/paye₹nt/products/${productId}/resend-otp`, {
+          method: "POST",
+          headers: getAuthHeaders(),
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          return {
+            success: true,
+            maskedPhone: data.maskedPhone,
+            resendCooldown: data.resendCooldown || 60,
+            otpExpiresIn: data.otpExpiresIn || 300,
+            message: data.message,
+          };
+        }
+        return {
+          success: false,
+          error: data.detail || data.message || "Failed to resend verification code.",
+        };
+      } catch (e: any) {
+        console.warn("[paye₹nt API] resendProductConfirmationOtp error:", e);
+      }
+    }
+
+    return {
+      success: true,
+      maskedPhone: "+91 ******0000",
+      resendCooldown: 60,
+      otpExpiresIn: 300,
+      message: "Verification code resent.",
+    };
+  },
+
+  async getProductConfirmationStatus(productId: string): Promise<{
+    success: boolean;
+    productId?: string;
+    status?: string;
+    maskedPhone?: string;
+    vendorSecretPin?: string;
+    resendCooldown?: number;
+    otpExpiresIn?: number;
+    hasActiveSession?: boolean;
+    error?: string;
+  }> {
+    if (API_BASE) {
+      try {
+        const res = await fetch(`${API_BASE}/api/paye₹nt/products/${productId}/confirmation-status`, {
+          headers: getAuthHeaders(),
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          return data;
+        }
+      } catch (e) {
+        console.warn("[paye₹nt API] getProductConfirmationStatus error:", e);
+      }
+    }
+    return { success: false };
   },
 
   async getProducts(): Promise<{ success: boolean; products?: PayerntProduct[]; error?: string }> {

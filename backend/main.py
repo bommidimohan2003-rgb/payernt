@@ -6748,9 +6748,9 @@ def admin_products_list(
                 p_id = r["id"]
                 st = (r.get("status") or "approved").lower()
                 if clean_st and clean_st != "all":
-                    if clean_st in ("pending", "under_review") and st not in ("pending", "under_review"):
+                    if clean_st in ("pending", "under_review", "pending_admin_review") and st not in ("pending", "under_review", "pending_admin_review"):
                         continue
-                    elif clean_st not in ("pending", "under_review") and st != clean_st:
+                    elif clean_st not in ("pending", "under_review", "pending_admin_review") and st != clean_st:
                         continue
                 
                 images_list = _safe_json_parse(r.get("images"), [r["primary_image"]] if r.get("primary_image") else [])
@@ -6801,9 +6801,9 @@ def admin_products_list(
                 
                 st = (r.get("status") or "approved").lower()
                 if clean_st and clean_st != "all":
-                    if clean_st in ("pending", "under_review") and st not in ("pending", "under_review"):
+                    if clean_st in ("pending", "under_review", "pending_admin_review") and st not in ("pending", "under_review", "pending_admin_review"):
                         continue
-                    elif clean_st not in ("pending", "under_review") and st != clean_st:
+                    elif clean_st not in ("pending", "under_review", "pending_admin_review") and st != clean_st:
                         continue
                 
                 images_list = _safe_json_parse(r.get("images"), [r["image"]] if r.get("image") else [])
