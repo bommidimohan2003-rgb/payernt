@@ -15,6 +15,7 @@ import {
   ChevronRight,
   X,
   RotateCcw,
+  ArrowLeft,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -31,6 +32,7 @@ interface UserWalletViewProps {
   onAddBankAccount: (account: Omit<BankAccount, "id" | "userId">) => void;
   onSimulateCredit?: (amount: number, productName: string) => void;
   onResetWalletDemo?: () => void;
+  onBack?: () => void;
 }
 
 export function UserWalletView({
@@ -39,6 +41,7 @@ export function UserWalletView({
   onAddBankAccount,
   onSimulateCredit,
   onResetWalletDemo,
+  onBack,
 }: UserWalletViewProps) {
   // Filter tabs: "all" | "credits" | "withdrawals" | "pending"
   const [filterTab, setFilterTab] = useState<"all" | "credits" | "withdrawals" | "pending">("all");
@@ -165,6 +168,19 @@ export function UserWalletView({
 
   return (
     <div className="space-y-8 text-left pb-16">
+      {/* Back Button */}
+      {onBack && (
+        <div>
+          <button
+            onClick={onBack}
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border border-border/80 bg-card hover:bg-secondary text-xs font-semibold text-foreground transition-all cursor-pointer shadow-2xs group"
+          >
+            <ArrowLeft className="h-3.5 w-3.5 group-hover:-translate-x-0.5 transition-transform" />
+            <span>Back to Dashboard</span>
+          </button>
+        </div>
+      )}
+
       {/* Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/80 pb-5">
         <div>

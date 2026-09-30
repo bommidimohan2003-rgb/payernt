@@ -29,10 +29,13 @@ import {
   Layers,
   Wrench,
   Info,
+  MessageSquare,
+  Send,
 } from "lucide-react";
 import { productsService } from "../services/products";
 import { usersService } from "../services/users";
 import { AdminProduct, AdminBooking, AdminUser } from "../services/api";
+import { payerntApi } from "@/payernt/payerntApiService";
 import { Loader } from "../components/layout/Loader";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -58,6 +61,13 @@ export default function ProductDetails() {
   const [ownerModalOpen, setOwnerModalOpen] = useState(false);
   const [ownerDetails, setOwnerDetails] = useState<AdminUser | null>(null);
   const [ownerLoading, setOwnerLoading] = useState(false);
+
+  // Admin Product Message Modal State
+  const [messageModalOpen, setMessageModalOpen] = useState(false);
+  const [messageType, setMessageType] = useState<string>("PRODUCT_REVIEW");
+  const [messageTitle, setMessageTitle] = useState("");
+  const [messageContent, setMessageContent] = useState("");
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
 
   const navigate = useNavigate();
 
@@ -90,6 +100,21 @@ export default function ProductDetails() {
       setIsSubmittingAction(true);
       const updated = await productsService.approveProduct(product.id);
       setProduct(updated);
+      
+      // Dispatch admin product approval message to owner
+      const recipientId = product.owner?.id || product.owner?.email || "user_001";
+      await payerntApi.sendAdminMessage({
+        recipientAccountId: recipientId,
+        productId: product.id,
+        productName: product.title,
+        productCategory: product.category,
+        title: `Listing Approved: ${product.title}`,
+        content: `Great news! Your listing "${product.title}" has been reviewed, approved by Admin, and is now live on the marketplace.`,
+        messageType: "PRODUCT_APPROVED",
+        senderAdminId: "admin_super",
+        senderName: "paye₹nt Moderation Team",
+      }).catch((err) => console.warn("Admin message dispatch note:", err));
+
       toast.success("Listing approved and published to marketplace.");
     } catch (e: any) {
       toast.error(e?.response?.data?.detail || "Failed to approve listing.");
@@ -114,6 +139,21 @@ export default function ProductDetails() {
       const updated = await productsService.rejectProduct(product.id, rejectionReason.trim());
       setProduct(updated);
       setRejectModalOpen(false);
+
+      // Dispatch admin product rejection message to owner
+      const recipientId = product.owner?.id || product.owner?.email || "user_001";
+      await payerntApi.sendAdminMessage({
+        recipientAccountId: recipientId,
+        productId: product.id,
+        productName: product.title,
+        productCategory: product.category,
+        title: `Listing Rejected: ${product.title}`,
+        content: `Your listing "${product.title}" was not approved. Feedback: ${rejectionReason.trim()}`,
+        messageType: "PRODUCT_REJECTED",
+        senderAdminId: "admin_super",
+        senderName: "paye₹nt Moderation Team",
+      }).catch((err) => console.warn("Admin message dispatch note:", err));
+
       toast.warning("Listing has been rejected with feedback sent to owner.");
     } catch (e: any) {
       toast.error(e?.response?.data?.detail || "Failed to reject listing.");
@@ -130,11 +170,70 @@ export default function ProductDetails() {
       setIsSubmittingAction(true);
       const updated = await productsService.requestCorrection(product.id, notes);
       setProduct(updated);
+
+      // Dispatch admin revision required message to owner
+      const recipientId = product.owner?.id || product.owner?.email || "user_001";
+      await payerntApi.sendAdminMessage({
+        recipientAccountId: recipientId,
+        productId: product.id,
+        productName: product.title,
+        productCategory: product.category,
+        title: `Revision Required: ${product.title}`,
+        content: `Admin review requested modifications for "${product.title}": ${notes}`,
+        messageType: "PRODUCT_REVISION_REQUIRED",
+        senderAdminId: "admin_super",
+        senderName: "paye₹nt Moderation Team",
+      }).catch((err) => console.warn("Admin message dispatch note:", err));
+
       toast.info("Correction request dispatched to product owner.");
     } catch (e: any) {
       toast.error("Failed to request correction.");
     } finally {
       setIsSubmittingAction(false);
+    }
+  };
+
+  const handleOpenMessageModal = (defaultType?: string, defaultTitle?: string) => {
+    if (!product) return;
+    setMessageType(defaultType || "PRODUCT_REVIEW");
+    setMessageTitle(defaultTitle || `Review Note: ${product.title}`);
+    setMessageContent("");
+    setMessageModalOpen(true);
+  };
+
+  const handleSendMessageToOwner = async () => {
+    if (!product) return;
+    const recipientId = product.owner?.id || product.owner?.email || "user_001";
+    if (!messageTitle.trim() || !messageContent.trim()) {
+      toast.error("Please provide both a message title and content.");
+      return;
+    }
+    try {
+      setIsSendingMessage(true);
+      const res = await payerntApi.sendAdminMessage({
+        recipientAccountId: recipientId,
+        productId: product.id,
+        productName: product.title,
+        productCategory: product.category,
+        title: messageTitle.trim(),
+        content: messageContent.trim(),
+        messageType: messageType,
+        senderAdminId: "admin_super",
+        senderName: "paye₹nt Admin Team",
+      });
+
+      if (res.success) {
+        toast.success(`Admin message dispatched to ${product.owner?.name || "owner"}.`);
+        setMessageModalOpen(false);
+        setMessageTitle("");
+        setMessageContent("");
+      } else {
+        toast.error(res.error || "Failed to dispatch message.");
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to send message.");
+    } finally {
+      setIsSendingMessage(false);
     }
   };
 
@@ -259,6 +358,14 @@ export default function ProductDetails() {
               <span>Reject Listing</span>
             </button>
           )}
+
+          <button
+            onClick={() => handleOpenMessageModal()}
+            className="bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 text-xs font-semibold px-3.5 py-2 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
+          >
+            <MessageSquare className="h-3.5 w-3.5" />
+            <span>Message Owner</span>
+          </button>
 
           <button
             onClick={handleToggleFeature}
@@ -694,14 +801,21 @@ export default function ProductDetails() {
               </div>
             </div>
 
-            {/* Prominent VIEW COMPLETE OWNER PROFILE button */}
-            <div className="pt-2">
+            {/* Prominent VIEW COMPLETE OWNER PROFILE button & Send Message */}
+            <div className="pt-2 space-y-2">
               <button
                 onClick={handleOpenOwnerModal}
                 className="w-full py-2.5 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
               >
                 <User className="h-4 w-4" />
                 <span>VIEW COMPLETE OWNER PROFILE</span>
+              </button>
+              <button
+                onClick={() => handleOpenMessageModal()}
+                className="w-full py-2 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground border border-border/70 text-xs font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <MessageSquare className="h-3.5 w-3.5 text-primary" />
+                <span>MESSAGE OWNER</span>
               </button>
             </div>
           </div>
@@ -921,6 +1035,119 @@ export default function ProductDetails() {
                 className="px-4 py-2 rounded-lg bg-secondary text-foreground text-xs font-semibold hover:bg-secondary/80 cursor-pointer"
               >
                 Close Profile
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5. ADMIN PRODUCT MESSAGE MODAL */}
+      {messageModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-card border border-border/70 rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+            {/* Modal Header */}
+            <div className="p-4 sm:p-5 border-b border-border/60 flex items-center justify-between bg-secondary/20">
+              <div className="flex items-center gap-2.5">
+                <div className="h-9 w-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold">
+                  <MessageSquare className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-foreground font-display">Dispatch Admin Message</h3>
+                  <p className="text-[11px] text-muted-foreground font-mono">Linked to Listing ID: {product.id}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setMessageModalOpen(false)}
+                className="h-8 w-8 rounded-lg hover:bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-4 sm:p-5 space-y-4 text-xs">
+              {/* Recipient & Product Context Cards */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 rounded-xl bg-secondary/40 border border-border/60 space-y-1">
+                  <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider block">Recipient</span>
+                  <p className="font-semibold text-foreground truncate">{product.owner?.name || "Product Owner"}</p>
+                  <p className="text-[10px] font-mono text-muted-foreground truncate">{product.owner?.email || product.owner?.id}</p>
+                </div>
+                <div className="p-3 rounded-xl bg-secondary/40 border border-border/60 space-y-1">
+                  <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider block">Product Listing</span>
+                  <p className="font-semibold text-foreground truncate">{product.title}</p>
+                  <span className="inline-block text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+                    {product.category}
+                  </span>
+                </div>
+              </div>
+
+              {/* Message Type Selector */}
+              <div>
+                <label className="block text-xs font-semibold text-foreground mb-1.5">Message Type</label>
+                <select
+                  value={messageType}
+                  onChange={(e) => setMessageType(e.target.value)}
+                  className="w-full h-10 px-3 rounded-xl bg-background border border-border/80 text-foreground text-xs focus:outline-hidden focus:ring-2 focus:ring-primary/40 transition-all font-medium"
+                >
+                  <option value="PRODUCT_REVIEW">PRODUCT_REVIEW — General Review</option>
+                  <option value="PRODUCT_REVISION_REQUIRED">PRODUCT_REVISION_REQUIRED — Revisions Needed</option>
+                  <option value="PRODUCT_APPROVED">PRODUCT_APPROVED — Listing Live</option>
+                  <option value="PRODUCT_REJECTED">PRODUCT_REJECTED — Rejected</option>
+                  <option value="PRICE_UPDATE">PRICE_UPDATE — Rate Adjustment</option>
+                  <option value="AVAILABILITY_UPDATE">AVAILABILITY_UPDATE — Calendar/Inventory</option>
+                  <option value="ACCOUNT_REVIEW">ACCOUNT_REVIEW — KYC/Account Note</option>
+                  <option value="ADMIN_NOTICE">ADMIN_NOTICE — Official Moderation Notice</option>
+                  <option value="SYSTEM_NOTICE">SYSTEM_NOTICE — System Notice</option>
+                </select>
+              </div>
+
+              {/* Title Field */}
+              <div>
+                <label className="block text-xs font-semibold text-foreground mb-1.5">Message Subject / Title</label>
+                <input
+                  type="text"
+                  value={messageTitle}
+                  onChange={(e) => setMessageTitle(e.target.value)}
+                  placeholder="e.g. Specification update needed for Vivobook"
+                  className="w-full h-10 px-3.5 rounded-xl bg-background border border-border/80 text-foreground text-xs placeholder:text-muted-foreground focus:outline-hidden focus:ring-2 focus:ring-primary/40 transition-all font-medium"
+                />
+              </div>
+
+              {/* Message Body Field */}
+              <div>
+                <label className="block text-xs font-semibold text-foreground mb-1.5">Message Content</label>
+                <textarea
+                  rows={4}
+                  value={messageContent}
+                  onChange={(e) => setMessageContent(e.target.value)}
+                  placeholder="Type official admin instructions or feedback for the owner here..."
+                  className="w-full p-3 rounded-xl bg-background border border-border/80 text-foreground text-xs placeholder:text-muted-foreground focus:outline-hidden focus:ring-2 focus:ring-primary/40 transition-all resize-none font-sans"
+                />
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-border/60 bg-secondary/20 flex items-center justify-end gap-2.5">
+              <button
+                onClick={() => setMessageModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-secondary hover:bg-secondary/80 text-foreground text-xs font-semibold transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSendMessageToOwner}
+                disabled={isSendingMessage || !messageTitle.trim() || !messageContent.trim()}
+                className="px-5 py-2 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+              >
+                {isSendingMessage ? (
+                  <span>Sending...</span>
+                ) : (
+                  <>
+                    <Send className="h-3.5 w-3.5" />
+                    <span>Send Message</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

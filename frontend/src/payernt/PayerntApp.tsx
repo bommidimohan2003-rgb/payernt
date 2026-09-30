@@ -9,10 +9,11 @@ import { RentalRequests } from "./components/RentalRequests";
 import { UserWalletView } from "./components/UserWallet";
 import { LenderProfileView } from "./components/LenderProfile";
 import { PayerntAuth } from "./components/PayerntAuth";
+import { PayerntMessages } from "./components/PayerntMessages";
 
 export function PayerntApp() {
   const [activeTab, setActiveTab] = useState<
-    "home" | "products" | "requests" | "wallet" | "profile" | "list"
+    "home" | "products" | "requests" | "wallet" | "profile" | "list" | "messages"
   >(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
@@ -23,7 +24,8 @@ export function PayerntApp() {
         tabParam === "requests" ||
         tabParam === "wallet" ||
         tabParam === "profile" ||
-        tabParam === "list"
+        tabParam === "list" ||
+        tabParam === "messages"
       ) {
         return tabParam;
       }
@@ -36,7 +38,7 @@ export function PayerntApp() {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const tabParam = params.get("tab");
-      if (tabParam && tabParam !== activeTab && ["home", "products", "requests", "wallet", "profile", "list"].includes(tabParam)) {
+      if (tabParam && tabParam !== activeTab && ["home", "products", "requests", "wallet", "profile", "list", "messages"].includes(tabParam)) {
         setActiveTab(tabParam as any);
       }
     }
@@ -55,6 +57,8 @@ export function PayerntApp() {
     earningsTransactions,
     wallet,
     notifications,
+    messages,
+    unreadMessagesCount,
     profile,
     stats,
     addProduct,
@@ -72,6 +76,7 @@ export function PayerntApp() {
     resetWalletData,
     markNotificationRead,
     markAllNotificationsRead,
+    markMessageRead,
     updateProfile,
     resetToDefaults,
   } = usePayerntStore();
@@ -83,39 +88,30 @@ export function PayerntApp() {
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col font-sans selection:bg-primary selection:text-primary-foreground">
-      {/* Top Navbar */}
-      <PayerntNavbar
-        activeTab={activeTab}
-        onTabChange={(tab) => setActiveTab(tab)}
-        pendingRequestsCount={stats.pendingRequestsCount}
-        notifications={notifications}
-        onMarkNotificationRead={markNotificationRead}
-        onMarkAllNotificationsRead={markAllNotificationsRead}
-        onResetDemo={resetToDefaults}
-        activeUser={activeUser}
-        activeAccount={activeAccount}
-        onLogout={logout}
-      />
-
-      {/* Main Container */}
-      <main className="flex-1 mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8">
+      {/* Main Container without top navbar */}
+      <main className={`flex-1 w-full ${activeTab === "home" ? "max-w-none p-0" : "mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 sm:py-8"}`}>
         <AnimatePresence mode="wait">
           {activeTab === "home" && (
-            <motion.div
-              key="home"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            >
+            <div key="home" className="w-full">
               <PayerntHome
                 stats={stats}
                 products={userProducts}
                 rentalRequests={rentalRequests}
                 earningsTransactions={earningsTransactions}
+                wallet={wallet}
+                profile={profile}
+                notifications={notifications}
+                messages={messages}
+                unreadMessagesCount={unreadMessagesCount}
+                activeAccount={activeAccount}
+                activeUser={activeUser}
                 onNavigate={(tab) => setActiveTab(tab)}
+                onLogout={logout}
+                onMarkNotificationRead={markNotificationRead}
+                onMarkAllNotificationsRead={markAllNotificationsRead}
+                onMarkMessageRead={markMessageRead}
               />
-            </motion.div>
+            </div>
           )}
 
           {activeTab === "list" && (
@@ -135,7 +131,7 @@ export function PayerntApp() {
                   clearDraft();
                   setActiveTab("products");
                 }}
-                onCancel={() => setActiveTab("products")}
+                onCancel={() => setActiveTab("home")}
               />
             </motion.div>
           )}
@@ -155,6 +151,7 @@ export function PayerntApp() {
                 onUpdateProduct={updateProduct}
                 onAddNewGear={() => setActiveTab("list")}
                 onNavigateToRequests={() => setActiveTab("requests")}
+                onBack={() => setActiveTab("home")}
               />
             </motion.div>
           )}
@@ -172,6 +169,7 @@ export function PayerntApp() {
                 onRequestAction={handleRequestAction}
                 onAdvanceLifecycle={advanceRentalLifecycle}
                 onNavigateToWallet={() => setActiveTab("wallet")}
+                onBack={() => setActiveTab("home")}
               />
             </motion.div>
           )}
@@ -190,6 +188,29 @@ export function PayerntApp() {
                 onAddBankAccount={addBankAccount}
                 onSimulateCredit={creditRentalPayment}
                 onResetWalletDemo={resetWalletData}
+                onBack={() => setActiveTab("home")}
+              />
+            </motion.div>
+          )}
+
+          {activeTab === "messages" && (
+            <motion.div
+              key="messages"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <PayerntMessages
+                messages={messages}
+                products={userProducts}
+                unreadCount={unreadMessagesCount}
+                onBack={() => setActiveTab("home")}
+                onMarkAsRead={(id) => markMessageRead(id)}
+                onNavigateToProduct={() => {
+                  setActiveTab("products");
+                }}
+                onNavigateTab={(tab) => setActiveTab(tab)}
               />
             </motion.div>
           )}
@@ -209,6 +230,7 @@ export function PayerntApp() {
                 onResetDemo={resetToDefaults}
                 onNavigateToProducts={() => setActiveTab("products")}
                 onLogout={logout}
+                onBack={() => setActiveTab("home")}
               />
             </motion.div>
           )}

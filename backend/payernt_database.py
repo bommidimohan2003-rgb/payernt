@@ -211,11 +211,17 @@ def init_payernt_tables():
             id VARCHAR(255) PRIMARY KEY,
             conversation_id VARCHAR(255) NOT NULL,
             product_id VARCHAR(255) NOT NULL,
+            product_name VARCHAR(255) NULL,
+            product_category VARCHAR(100) NULL,
             sender_id VARCHAR(255) NOT NULL,
             sender_name VARCHAR(255) NOT NULL,
             receiver_id VARCHAR(255) NOT NULL,
+            title VARCHAR(255) NULL,
             content TEXT NOT NULL,
+            message_type VARCHAR(50) DEFAULT 'ADMIN_NOTICE',
             is_read BOOLEAN DEFAULT FALSE,
+            read_at VARCHAR(100) NULL,
+            status VARCHAR(50) DEFAULT 'UNREAD',
             created_at VARCHAR(100) NOT NULL,
             INDEX idx_pm_conv (conversation_id),
             INDEX idx_pm_product (product_id),
@@ -223,6 +229,20 @@ def init_payernt_tables():
             INDEX idx_pm_receiver (receiver_id)
         )
     """)
+
+    # Safe column migrations for existing tables
+    for col_def in [
+        "title VARCHAR(255) NULL",
+        "message_type VARCHAR(50) DEFAULT 'ADMIN_NOTICE'",
+        "product_name VARCHAR(255) NULL",
+        "product_category VARCHAR(100) NULL",
+        "read_at VARCHAR(100) NULL",
+        "status VARCHAR(50) DEFAULT 'UNREAD'",
+    ]:
+        try:
+            execute_query(f"ALTER TABLE payernt_messages ADD COLUMN {col_def}")
+        except Exception:
+            pass
 
     # 9. Audit Logs Table
     execute_query("""
@@ -1623,47 +1643,205 @@ def mark_all_payernt_notifications_read(owner_id: str) -> bool:
 
 
 def get_payernt_messages(user_id: str, product_id: Optional[str] = None) -> List[Dict[str, Any]]:
-    """Fetches messages for conversations involving the user."""
+    """Fetches Admin/Product messages for the authenticated owner."""
+    raw_list = []
     try:
         if product_id:
-            rows = fetch_all("SELECT * FROM payernt_messages WHERE (sender_id = %s OR receiver_id = %s) AND product_id = %s ORDER BY created_at ASC", (user_id, user_id, product_id))
+            raw_list = fetch_all(
+                "SELECT * FROM payernt_messages WHERE receiver_id = %s AND product_id = %s ORDER BY created_at DESC",
+                (user_id, product_id),
+            ) or []
         else:
-            rows = fetch_all("SELECT * FROM payernt_messages WHERE sender_id = %s OR receiver_id = %s ORDER BY created_at ASC", (user_id, user_id))
-        if rows:
-            return rows
+            raw_list = fetch_all(
+                "SELECT * FROM payernt_messages WHERE receiver_id = %s ORDER BY created_at DESC",
+                (user_id,),
+            ) or []
     except Exception as e:
         logger.warning(f"DB fetch error for messages: {e}")
 
-    return [m for m in MOCK_PAYERNT_MESSAGES if (m.get("sender_id") == user_id or m.get("receiver_id") == user_id) and (not product_id or m.get("product_id") == product_id)]
+    if not raw_list:
+        raw_list = [
+            m for m in MOCK_PAYERNT_MESSAGES
+            if (m.get("receiver_id") == user_id or m.get("recipientAccountId") == user_id)
+            and (not product_id or m.get("product_id") == product_id or m.get("productId") == product_id)
+        ]
+
+    # Normalize structure for frontend
+    results = []
+    for r in raw_list:
+        p_id = r.get("product_id") or r.get("productId")
+        p_name = r.get("product_name") or r.get("productName")
+        p_cat = r.get("product_category") or r.get("productCategory")
+
+        # If product_name or category is missing, look up from payernt_products
+        if p_id and (not p_name or not p_cat):
+            try:
+                prod = fetch_one("SELECT title, category FROM payernt_products WHERE id = %s", (p_id,))
+                if prod:
+                    p_name = p_name or prod.get("title")
+                    p_cat = p_cat or prod.get("category")
+            except Exception:
+                pass
+            if not p_name and p_id in MOCK_PAYERNT_PRODUCTS:
+                p_name = MOCK_PAYERNT_PRODUCTS[p_id].get("title", "Equipment")
+                p_cat = MOCK_PAYERNT_PRODUCTS[p_id].get("category", "General")
+
+        is_read = bool(r.get("is_read") or r.get("read"))
+        msg_id = r.get("id") or r.get("messageId") or f"msg-{int(time.time() * 1000)}"
+        msg_type = r.get("message_type") or r.get("messageType") or "ADMIN_NOTICE"
+
+        results.append({
+            "id": msg_id,
+            "messageId": msg_id,
+            "recipientAccountId": r.get("receiver_id") or r.get("recipientAccountId") or user_id,
+            "senderAdminId": r.get("sender_id") or r.get("senderAdminId") or "admin_system",
+            "senderName": r.get("sender_name") or r.get("senderName") or "Payent Admin",
+            "productId": p_id,
+            "productName": p_name or "Gear Listing",
+            "productCategory": p_cat or "General",
+            "listingId": p_id,
+            "title": r.get("title") or "Admin Notice",
+            "content": r.get("content") or r.get("message") or "",
+            "message": r.get("content") or r.get("message") or "",
+            "messageType": msg_type,
+            "type": msg_type,
+            "createdAt": r.get("created_at") or r.get("createdAt") or dt.now(timezone.utc).isoformat(),
+            "readAt": r.get("read_at") or r.get("readAt"),
+            "read": is_read,
+            "status": r.get("status") or ("READ" if is_read else "UNREAD"),
+        })
+
+    return results
+
+
+def mark_payernt_message_read(message_id: str, user_id: str) -> bool:
+    """Marks an Admin message as read for the recipient user."""
+    now_iso = dt.now(timezone.utc).isoformat()
+    try:
+        execute_query(
+            "UPDATE payernt_messages SET is_read = TRUE, read_at = %s, status = 'READ' WHERE id = %s AND receiver_id = %s",
+            (now_iso, message_id, user_id),
+        )
+    except Exception as e:
+        logger.warning(f"DB update error for message read state: {e}")
+
+    for m in MOCK_PAYERNT_MESSAGES:
+        if (m.get("id") == message_id or m.get("messageId") == message_id) and (
+            m.get("receiver_id") == user_id or m.get("recipientAccountId") == user_id
+        ):
+            m["is_read"] = True
+            m["read"] = True
+            m["read_at"] = now_iso
+            m["readAt"] = now_iso
+            m["status"] = "READ"
+    return True
+
+
+def get_payernt_unread_messages_count(user_id: str) -> int:
+    """Counts unread Admin messages for the authenticated user."""
+    try:
+        row = fetch_one(
+            "SELECT COUNT(*) as cnt FROM payernt_messages WHERE receiver_id = %s AND (is_read = FALSE OR is_read = 0)",
+            (user_id,),
+        )
+        if row and "cnt" in row:
+            return int(row["cnt"])
+    except Exception as e:
+        logger.warning(f"DB count error for unread messages: {e}")
+
+    return len([
+        m for m in MOCK_PAYERNT_MESSAGES
+        if (m.get("receiver_id") == user_id or m.get("recipientAccountId") == user_id)
+        and not (m.get("is_read") or m.get("read"))
+    ])
 
 
 def send_payernt_message(sender_id: str, sender_name: str, receiver_id: str, product_id: str, content: str) -> Dict[str, Any]:
     """Sends a message regarding a product."""
-    msg_id = f"msg-{int(time.time() * 1000)}"
-    conv_id = f"conv-{min(sender_id, receiver_id)}-{max(sender_id, receiver_id)}-{product_id}"
+    return send_admin_product_message(
+        recipient_account_id=receiver_id,
+        sender_admin_id=sender_id,
+        product_id=product_id,
+        title="Product Update",
+        content=content,
+        message_type="ADMIN_NOTICE",
+        sender_name=sender_name,
+    )
+
+
+def send_admin_product_message(
+    recipient_account_id: str,
+    sender_admin_id: str,
+    product_id: Optional[str],
+    title: str,
+    content: str,
+    message_type: str = "ADMIN_NOTICE",
+    sender_name: str = "Payent Admin",
+    product_name: Optional[str] = None,
+    product_category: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Admin sends a product or account message to an owner."""
+    msg_id = f"msg-adm-{int(time.time() * 1000)}"
+    conv_id = f"conv-adm-{recipient_account_id}-{product_id or 'general'}"
     now_iso = dt.now(timezone.utc).isoformat()
+
+    # Look up product info if not supplied
+    if product_id and (not product_name or not product_category):
+        try:
+            prod = fetch_one("SELECT title, category FROM payernt_products WHERE id = %s", (product_id,))
+            if prod:
+                product_name = product_name or prod.get("title")
+                product_category = product_category or prod.get("category")
+        except Exception:
+            pass
 
     msg = {
         "id": msg_id,
+        "messageId": msg_id,
         "conversation_id": conv_id,
-        "product_id": product_id,
-        "sender_id": sender_id,
+        "product_id": product_id or "",
+        "productId": product_id or "",
+        "product_name": product_name or "Equipment",
+        "productName": product_name or "Equipment",
+        "product_category": product_category or "General",
+        "productCategory": product_category or "General",
+        "sender_id": sender_admin_id,
+        "senderAdminId": sender_admin_id,
         "sender_name": sender_name,
-        "receiver_id": receiver_id,
+        "senderName": sender_name,
+        "receiver_id": recipient_account_id,
+        "recipientAccountId": recipient_account_id,
+        "title": title.strip(),
         "content": content.strip(),
+        "message": content.strip(),
+        "message_type": message_type,
+        "messageType": message_type,
+        "is_read": False,
         "read": False,
+        "read_at": None,
+        "readAt": None,
+        "status": "UNREAD",
         "created_at": now_iso,
+        "createdAt": now_iso,
     }
 
     try:
         execute_query("""
-            INSERT INTO payernt_messages (id, conversation_id, product_id, sender_id, sender_name, receiver_id, content, is_read, created_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """, (msg_id, conv_id, product_id, sender_id, sender_name, receiver_id, content.strip(), False, now_iso))
+            INSERT INTO payernt_messages (
+                id, conversation_id, product_id, product_name, product_category,
+                sender_id, sender_name, receiver_id, title, content, message_type,
+                is_read, status, created_at
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (
+            msg_id, conv_id, product_id or "", product_name or "", product_category or "",
+            sender_admin_id, sender_name, recipient_account_id, title.strip(), content.strip(),
+            message_type, False, "UNREAD", now_iso
+        ))
     except Exception as e:
-        logger.warning(f"DB insert error for message: {e}")
+        logger.warning(f"DB insert error for admin message: {e}")
 
-    MOCK_PAYERNT_MESSAGES.append(msg)
+    MOCK_PAYERNT_MESSAGES.insert(0, msg)
     return msg
 
 

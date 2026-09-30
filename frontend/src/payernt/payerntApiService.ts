@@ -748,9 +748,9 @@ export const payerntApi = {
   },
 
   // ============================================================
-  // MESSAGES
+  // MESSAGES (ADMIN / PRODUCT BASED)
   // ============================================================
-  async getMessages(productId?: string): Promise<{ success: boolean; messages?: any[]; error?: string }> {
+  async getMessages(productId?: string): Promise<{ success: boolean; messages?: any[]; unreadCount?: number; error?: string }> {
     if (API_BASE) {
       try {
         const url = productId
@@ -761,10 +761,45 @@ export const payerntApi = {
         });
         const data = await res.json();
         if (res.ok && data.success) {
-          return { success: true, messages: data.messages };
+          return { success: true, messages: data.messages, unreadCount: data.unreadCount ?? 0 };
         }
       } catch (e) {
         console.warn("[paye₹nt API] Get messages error:", e);
+      }
+    }
+    return { success: false, messages: [], unreadCount: 0 };
+  },
+
+  async getUnreadMessagesCount(): Promise<{ success: boolean; unreadCount: number }> {
+    if (API_BASE) {
+      try {
+        const res = await fetch(`${API_BASE}/api/paye₹nt/messages/unread-count`, {
+          headers: getAuthHeaders(),
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          return { success: true, unreadCount: data.unreadCount ?? 0 };
+        }
+      } catch (e) {
+        console.warn("[paye₹nt API] Get unread count error:", e);
+      }
+    }
+    return { success: false, unreadCount: 0 };
+  },
+
+  async markMessageRead(messageId: string): Promise<{ success: boolean; unreadCount?: number; error?: string }> {
+    if (API_BASE) {
+      try {
+        const res = await fetch(`${API_BASE}/api/paye₹nt/messages/${encodeURIComponent(messageId)}/read`, {
+          method: "PATCH",
+          headers: getAuthHeaders(),
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          return { success: true, unreadCount: data.unreadCount };
+        }
+      } catch (e) {
+        console.warn("[paye₹nt API] Mark message read error:", e);
       }
     }
     return { success: false };
@@ -787,6 +822,36 @@ export const payerntApi = {
           return { success: true, message: data.message };
         }
         return { success: false, error: data.detail || "Failed to send message." };
+      } catch (e: any) {
+        return { success: false, error: e?.message || "Network error." };
+      }
+    }
+    return { success: true };
+  },
+
+  async sendAdminMessage(params: {
+    recipientAccountId: string;
+    productId?: string;
+    title: string;
+    content: string;
+    messageType?: string;
+    senderAdminId?: string;
+    senderName?: string;
+    productName?: string;
+    productCategory?: string;
+  }): Promise<{ success: boolean; message?: any; error?: string }> {
+    if (API_BASE) {
+      try {
+        const res = await fetch(`${API_BASE}/api/paye₹nt/messages/admin-send`, {
+          method: "POST",
+          headers: getAuthHeaders(),
+          body: JSON.stringify(params),
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          return { success: true, message: data.message };
+        }
+        return { success: false, error: data.detail || "Failed to send admin message." };
       } catch (e: any) {
         return { success: false, error: e?.message || "Network error." };
       }

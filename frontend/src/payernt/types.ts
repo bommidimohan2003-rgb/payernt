@@ -74,6 +74,7 @@ export interface ProductCondition {
   repairDetails?: string;
   accessoriesCondition?: string;
   additionalNotes?: string;
+  notes?: string;
   accessoriesIncluded: string[];
 }
 
@@ -81,6 +82,8 @@ export interface ProductLocation {
   city: string;
   area: string;
   pincode: string;
+  state?: string;
+  address?: string;
   postalCode?: string;
   pickupAvailable: boolean;
   doorstepDeliveryAvailable: boolean;
@@ -240,6 +243,39 @@ export interface EarningTransaction {
   payoutMethod: string;
 }
 
+export type AdminMessageType =
+  | "PRODUCT_REVIEW"
+  | "PRICE_UPDATE"
+  | "PRODUCT_APPROVED"
+  | "PRODUCT_REJECTED"
+  | "PRODUCT_REVISION_REQUIRED"
+  | "AVAILABILITY_UPDATE"
+  | "ACCOUNT_REVIEW"
+  | "ADMIN_NOTICE"
+  | "SYSTEM_NOTICE";
+
+export interface PayerntMessage {
+  id: string;
+  messageId?: string;
+  conversationId?: string;
+  recipientAccountId: string;
+  senderAdminId?: string;
+  senderName?: string;
+  productId?: string;
+  productName?: string;
+  productCategory?: string;
+  listingId?: string;
+  title: string;
+  content: string;
+  message?: string;
+  messageType: AdminMessageType | string;
+  type?: AdminMessageType | string;
+  createdAt: string;
+  readAt?: string | null;
+  read: boolean;
+  status: "UNREAD" | "READ" | "ARCHIVED" | string;
+}
+
 export interface LenderNotification {
   id: string;
   title: string;
@@ -274,6 +310,7 @@ export interface LenderProfile {
   avatar: string;
   city: string;
   area: string;
+  state?: string;
   address?: string;
   pincode?: string;
   aadhaarMasked?: string;

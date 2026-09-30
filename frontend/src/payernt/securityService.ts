@@ -50,6 +50,19 @@ export class LenderSecurityService {
   }
 
   /**
+   * Sets and confirms a custom host PIN.
+   */
+  public setAndConfirmPin(pin: string, confirmPin: string): { valid: boolean; error?: string } {
+    if (!pin || !confirmPin || pin !== confirmPin) {
+      return { valid: false, error: "PINs do not match. Try again." };
+    }
+    this.session.submissionPin = pin;
+    this.session.isPinVerified = true;
+    this.session.submissionStage = "mobile";
+    return { valid: true };
+  }
+
+  /**
    * Verifies the user-entered PIN against the application-generated PIN.
    */
   public verifySubmissionPin(enteredPin: string): { valid: boolean; error?: string } {

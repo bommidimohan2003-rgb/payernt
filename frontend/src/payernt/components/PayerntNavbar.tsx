@@ -142,11 +142,9 @@ export function PayerntNavbar({
             className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-border/80 bg-card hover:bg-secondary text-xs font-semibold text-foreground transition-all cursor-pointer shadow-2xs"
             title="View Profile"
           >
-            <img
-              src={displayAvatar}
-              alt={displayName}
-              className="h-5 w-5 rounded-full object-cover border border-border"
-            />
+            <div className="flex h-5 w-5 items-center justify-center rounded-md bg-gradient-to-br from-emerald-500 to-teal-700 text-white font-black text-[9px]">
+              {displayName.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase() || "LD"}
+            </div>
             <span className="hidden sm:inline font-bold text-xs max-w-[120px] truncate">{displayName}</span>
           </button>
 

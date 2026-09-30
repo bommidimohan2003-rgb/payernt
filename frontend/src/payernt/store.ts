@@ -13,6 +13,7 @@ import type {
   WalletTransaction,
   BankAccount,
   PayerntAccount,
+  PayerntMessage,
 } from "./types";
 import { payerntApi } from "./payerntApiService";
 
@@ -24,6 +25,7 @@ export const STORAGE_KEY_ACCOUNTS = "paye₹nt_accounts";
 export const STORAGE_KEY_WALLET = "paye₹nt_wallet";
 export const STORAGE_KEY_THEME = "paye₹nt_theme";
 export const STORAGE_KEY_ACTIVE_USER = "paye₹nt_active_demo_user";
+export const STORAGE_KEY_MESSAGES = "paye₹nt_messages";
 const STORAGE_KEY_DRAFT = "paye₹nt_product_draft";
 const STORAGE_KEY_REQUESTS = "paye₹nt_rental_requests";
 const STORAGE_KEY_EARNINGS = "paye₹nt_earnings";
@@ -215,6 +217,30 @@ export function usePayerntStore() {
     return INITIAL_NOTIFICATIONS;
   });
 
+  const [messages, setMessages] = useState<PayerntMessage[]>(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY_MESSAGES);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
+    return [];
+  });
+
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState<number>(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY_MESSAGES);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          return parsed.filter((m) => !m.read && !m.is_read).length;
+        }
+      }
+    } catch {}
+    return 0;
+  });
+
   const [profile, setProfile] = useState<LenderProfile>(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY_PROFILE);
@@ -301,6 +327,12 @@ export function usePayerntStore() {
 
   useEffect(() => {
     try {
+      localStorage.setItem(STORAGE_KEY_MESSAGES, JSON.stringify(messages));
+    } catch {}
+  }, [messages]);
+
+  useEffect(() => {
+    try {
       localStorage.setItem(STORAGE_KEY_PROFILE, JSON.stringify(profile));
     } catch {}
   }, [profile]);
@@ -344,12 +376,13 @@ export function usePayerntStore() {
       .getWallet()
       .then((res) => {
         if (res.success && res.wallet) {
+          const w = res.wallet as any;
           setWallet((prev) => ({
             ...prev,
-            availableBalance: Number(res.wallet?.available_balance ?? prev.availableBalance),
-            pendingAmount: Number(res.wallet?.pending_amount ?? prev.pendingAmount),
-            totalReceived: Number(res.wallet?.total_received ?? prev.totalReceived),
-            totalWithdrawn: Number(res.wallet?.total_withdrawn ?? prev.totalWithdrawn),
+            availableBalance: Number(w.available_balance ?? w.availableBalance ?? prev.availableBalance),
+            pendingBalance: Number(w.pending_amount ?? w.pendingBalance ?? prev.pendingBalance),
+            totalReceived: Number(w.total_received ?? w.totalReceived ?? prev.totalReceived),
+            totalWithdrawn: Number(w.total_withdrawn ?? w.totalWithdrawn ?? prev.totalWithdrawn),
             bankAccounts: Array.isArray(res.bankAccounts)
               ? (res.bankAccounts as any).filter((b: any) => !b.id?.startsWith("bank-00"))
               : prev.bankAccounts,
@@ -366,6 +399,17 @@ export function usePayerntStore() {
       .then((res) => {
         if (res.success && Array.isArray(res.notifications)) {
           setNotifications(res.notifications.filter((n) => n.id !== "notif-1"));
+        }
+      })
+      .catch(() => {});
+
+    payerntApi
+      .getMessages()
+      .then((res) => {
+        if (res.success && Array.isArray(res.messages)) {
+          setMessages(res.messages);
+          const count = res.unreadCount ?? res.messages.filter((m: any) => !m.read && !m.is_read).length;
+          setUnreadMessagesCount(count);
         }
       })
       .catch(() => {});
@@ -612,14 +656,14 @@ export function usePayerntStore() {
       adminRequestCorrection(id, notes);
     } else {
       setProducts((prev) => {
-        const nextList = prev.map((p) => {
+        const nextList: PayerntProduct[] = prev.map((p) => {
           if (p.id !== id) return p;
           return {
             ...p,
             verificationStatus: status,
             status: status,
             verificationNotes: notes,
-            availabilityStatus: (status === "approved" || status === "verified") ? "available" : "paused",
+            availabilityStatus: "paused" as ProductAvailability,
             updatedAt: new Date().toISOString(),
           };
         });
@@ -789,7 +833,7 @@ export function usePayerntStore() {
     }));
 
     // Call real paye₹nt backend
-    payerntApi.addBankAccount(bankData).catch((err) => {
+    payerntApi.addBankAccount(bankData as any).catch((err) => {
       console.warn("[paye₹nt Backend] Add bank account notice:", err);
     });
   };
@@ -831,6 +875,66 @@ export function usePayerntStore() {
   const markAllNotificationsRead = () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
   };
+
+  const fetchMessages = useCallback(
+    async (productId?: string) => {
+      if (!activeAccount?.accountId) return;
+      const res = await payerntApi.getMessages(productId);
+      if (res.success && Array.isArray(res.messages)) {
+        setMessages(res.messages);
+        const count = res.unreadCount ?? res.messages.filter((m: any) => !m.read && !m.is_read).length;
+        setUnreadMessagesCount(count);
+        try {
+          localStorage.setItem(STORAGE_KEY_MESSAGES, JSON.stringify(res.messages));
+        } catch {}
+      }
+    },
+    [activeAccount?.accountId]
+  );
+
+  const markMessageRead = useCallback(
+    async (messageId: string) => {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === messageId || m.messageId === messageId
+            ? { ...m, read: true, status: "READ", readAt: new Date().toISOString() }
+            : m
+        )
+      );
+      setUnreadMessagesCount((prev) => Math.max(0, prev - 1));
+
+      await payerntApi.markMessageRead(messageId);
+      if (activeAccount?.accountId) {
+        const res = await payerntApi.getUnreadMessagesCount();
+        if (res.success) {
+          setUnreadMessagesCount(res.unreadCount);
+        }
+      }
+    },
+    [activeAccount?.accountId]
+  );
+
+  const sendAdminMessage = useCallback(
+    async (params: {
+      recipientAccountId: string;
+      productId?: string;
+      title: string;
+      content: string;
+      messageType?: string;
+      senderAdminId?: string;
+      senderName?: string;
+      productName?: string;
+      productCategory?: string;
+    }) => {
+      const res = await payerntApi.sendAdminMessage(params);
+      if (res.success && res.message) {
+        setMessages((prev) => [res.message, ...prev]);
+        return res.message;
+      }
+      return null;
+    },
+    []
+  );
 
   const updateProfile = (updates: Partial<LenderProfile>) => {
     setProfile((prev) => ({ ...prev, ...updates }));
@@ -904,6 +1008,8 @@ export function usePayerntStore() {
     earningsTransactions,
     wallet,
     notifications,
+    messages,
+    unreadMessagesCount,
     profile,
     stats: {
       totalProductsCount,
@@ -932,6 +1038,9 @@ export function usePayerntStore() {
     resetWalletData,
     markNotificationRead,
     markAllNotificationsRead,
+    fetchMessages,
+    markMessageRead,
+    sendAdminMessage,
     updateProfile,
     resetToDefaults,
   };

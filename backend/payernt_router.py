@@ -56,6 +56,9 @@ from payernt_database import (
     mark_all_payernt_notifications_read,
     get_payernt_messages,
     send_payernt_message,
+    mark_payernt_message_read,
+    get_payernt_unread_messages_count,
+    send_admin_product_message,
     get_payernt_audit_logs,
 )
 
@@ -371,6 +374,18 @@ class SendMessageSchema(BaseModel):
     productId: str
     receiverId: str
     content: str = Field(..., min_length=1)
+
+
+class AdminSendMessageSchema(BaseModel):
+    recipientAccountId: str
+    productId: Optional[str] = None
+    title: str = Field(..., min_length=1)
+    content: str = Field(..., min_length=1)
+    messageType: Optional[str] = "ADMIN_NOTICE"
+    senderAdminId: Optional[str] = "admin_super"
+    senderName: Optional[str] = "Payent Admin"
+    productName: Optional[str] = None
+    productCategory: Optional[str] = None
 
 
 # ============================================================
@@ -1103,9 +1118,30 @@ def get_vendor_messages_endpoint(
     product_id: Optional[str] = None,
     account: Dict[str, Any] = Depends(get_current_payernt_account),
 ):
-    """Fetches product messages involving the vendor."""
+    """Fetches Admin and Product messages strictly for the authenticated account."""
     messages = get_payernt_messages(account["id"], product_id)
-    return {"success": True, "messages": messages}
+    unread_count = get_payernt_unread_messages_count(account["id"])
+    return {"success": True, "messages": messages, "unreadCount": unread_count}
+
+
+@payernt_router.get("/messages/unread-count")
+def get_vendor_unread_messages_count_endpoint(
+    account: Dict[str, Any] = Depends(get_current_payernt_account),
+):
+    """Fetches real unread Admin messages count for authenticated account."""
+    unread_count = get_payernt_unread_messages_count(account["id"])
+    return {"success": True, "unreadCount": unread_count}
+
+
+@payernt_router.patch("/messages/{message_id}/read")
+def mark_vendor_message_read_endpoint(
+    message_id: str,
+    account: Dict[str, Any] = Depends(get_current_payernt_account),
+):
+    """Marks a message as read for the authenticated account."""
+    mark_payernt_message_read(message_id, account["id"])
+    unread_count = get_payernt_unread_messages_count(account["id"])
+    return {"success": True, "messageId": message_id, "status": "READ", "unreadCount": unread_count}
 
 
 @payernt_router.post("/messages")
@@ -1120,6 +1156,26 @@ def send_vendor_message_endpoint(
         receiver_id=data.receiverId,
         product_id=data.productId,
         content=data.content,
+    )
+    return {"success": True, "message": msg}
+
+
+@payernt_router.post("/messages/admin-send")
+def send_admin_message_endpoint(
+    data: AdminSendMessageSchema,
+    account: Dict[str, Any] = Depends(get_current_payernt_account),
+):
+    """Sends an Admin-to-Owner product or review notice message."""
+    msg = send_admin_product_message(
+        recipient_account_id=data.recipientAccountId,
+        sender_admin_id=data.senderAdminId or account.get("id", "admin_system"),
+        product_id=data.productId,
+        title=data.title,
+        content=data.content,
+        message_type=data.messageType or "ADMIN_NOTICE",
+        sender_name=data.senderName or "Payent Admin",
+        product_name=data.productName,
+        product_category=data.productCategory,
     )
     return {"success": True, "message": msg}
 

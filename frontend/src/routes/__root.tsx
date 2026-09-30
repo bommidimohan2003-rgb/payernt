@@ -199,9 +199,13 @@ function RootContent() {
       <AppPreloader />
       {!hideMainNavigation && <Navigation4 />}
       {/* Origin-Based Expanding Reveal Page Transition */}
-      <OriginRevealPageTransition>
+      {isPayernt ? (
         <Outlet />
-      </OriginRevealPageTransition>
+      ) : (
+        <OriginRevealPageTransition>
+          <Outlet />
+        </OriginRevealPageTransition>
+      )}
 
       {!isGateway && !isPayernt && <CartDrawer />}
       {showChatbot && !isGateway && !isPayernt && <HelpChatbot />}
