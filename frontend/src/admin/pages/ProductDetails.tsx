@@ -102,7 +102,7 @@ export default function ProductDetails() {
       setProduct(updated);
       
       // Dispatch admin product approval message to owner
-      const recipientId = product.owner?.id || product.owner?.email || "user_001";
+      const recipientId = product.owner?.id || product.owner?.email || "bommidimohan2330@gmail.com";
       await payerntApi.sendAdminMessage({
         recipientAccountId: recipientId,
         productId: product.id,
@@ -141,7 +141,7 @@ export default function ProductDetails() {
       setRejectModalOpen(false);
 
       // Dispatch admin product rejection message to owner
-      const recipientId = product.owner?.id || product.owner?.email || "user_001";
+      const recipientId = product.owner?.id || product.owner?.email || "bommidimohan2330@gmail.com";
       await payerntApi.sendAdminMessage({
         recipientAccountId: recipientId,
         productId: product.id,
@@ -172,7 +172,7 @@ export default function ProductDetails() {
       setProduct(updated);
 
       // Dispatch admin revision required message to owner
-      const recipientId = product.owner?.id || product.owner?.email || "user_001";
+      const recipientId = product.owner?.id || product.owner?.email || "bommidimohan2330@gmail.com";
       await payerntApi.sendAdminMessage({
         recipientAccountId: recipientId,
         productId: product.id,
@@ -203,7 +203,7 @@ export default function ProductDetails() {
 
   const handleSendMessageToOwner = async () => {
     if (!product) return;
-    const recipientId = product.owner?.id || product.owner?.email || "user_001";
+    const recipientId = product.owner?.id || product.owner?.email || "bommidimohan2330@gmail.com";
     if (!messageTitle.trim() || !messageContent.trim()) {
       toast.error("Please provide both a message title and content.");
       return;
