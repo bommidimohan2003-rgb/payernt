@@ -135,6 +135,24 @@ export interface AdminProduct {
   image: string;
   images: string[];
   documents: string[];
+  videoUrl?: string;
+  approvedPriceRange?: {
+    minPrice: number;
+    maxPrice: number;
+    unit: "day" | "hour" | "week" | "month";
+    approvedAt?: string;
+    approvedBy?: string;
+  };
+  priceHistory?: Array<{
+    id: string;
+    minPrice: number;
+    maxPrice: number;
+    unit: string;
+    previousMinPrice?: number;
+    previousMaxPrice?: number;
+    updatedBy: string;
+    updatedAt: string;
+  }>;
   createdAt: string;
   updatedAt?: string;
   bookings?: Array<{
@@ -292,8 +310,8 @@ const getAdminApiBase = () => {
   }
   if (!base && typeof window !== "undefined") {
     const host = window.location.hostname;
-    const isLocal = host === "localhost" || host === "127.0.0.1";
-    if (isLocal) base = "http://127.0.0.1:8001";
+    if (host === "10.0.2.2") base = "http://10.0.2.2:8001";
+    else if (host === "localhost" || host === "127.0.0.1") base = "http://127.0.0.1:8001";
     else if (host.endsWith(".vercel.app")) base = "";
     else base = window.location.origin;
   }

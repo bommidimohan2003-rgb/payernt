@@ -7,7 +7,7 @@ export const Route = createFileRoute("/admin/")({
     if (loggedIn) {
       throw redirect({ to: "/admin/dashboard" });
     } else {
-      throw redirect({ to: "/login" });
+      throw redirect({ to: "/admin/login" });
     }
   },
   component: () => null,

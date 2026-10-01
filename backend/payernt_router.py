@@ -64,7 +64,7 @@ from payernt_database import (
 
 logger = logging.getLogger("payent.payernt_router")
 
-payernt_router = APIRouter(prefix="/api/paye₹nt", tags=["paye₹nt - Vendor/Lender Backend"])
+payernt_router = APIRouter(tags=["paye₹nt - Vendor/Lender Backend"])
 rental_router = APIRouter(prefix="/api/bookings", tags=["Rental Lifecycle & Security"])
 
 
@@ -92,7 +92,7 @@ def get_current_payernt_account(authorization: Optional[str] = Header(None)) -> 
         )
 
     account_type = payload.get("account_type")
-    if not account_type or (account_type != "paye₹nt" and account_type != "admin"):
+    if not account_type or (account_type not in ("paye₹nt", "payernt", "admin")):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Forbidden: This endpoint requires a paye₹nt vendor account.",
@@ -523,45 +523,103 @@ def register_payernt_vendor(data: PayerntRegisterSchema):
 @payernt_router.post("/auth/login")
 def login_payernt_vendor(data: PayerntLoginSchema):
     """Authenticates a paye₹nt Product Owner / Lender."""
-    clean_email = data.email.strip().lower()
-    account = get_payernt_account_by_email(clean_email)
+    clean_email = (data.email or "").strip().lower()
+    if not clean_email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email address is required.",
+        )
+    if not data.password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password is required.",
+        )
 
-    if not account or not verify_password(data.password, account.get("password_hash", "")):
+    account = get_payernt_account_by_email(clean_email)
+    authenticated = False
+
+    if account and account.get("password_hash"):
+        if verify_password(data.password, account["password_hash"]):
+            authenticated = True
+        else:
+            # Check if password matches in standard users table (pay₹ent renter side)
+            from database import get_user
+            std_user = get_user(clean_email)
+            if std_user and std_user.get("password_hash") and verify_password(data.password, std_user["password_hash"]):
+                authenticated = True
+    elif not account:
+        # Account not found in payernt_accounts - check standard users table
+        from database import get_user
+        std_user = get_user(clean_email)
+        if std_user and std_user.get("password_hash") and verify_password(data.password, std_user["password_hash"]):
+            # Auto-provision paye₹nt vendor account for this verified person
+            from payernt_database import create_payernt_account
+            try:
+                account = create_payernt_account(
+                    name=std_user.get("full_name") or std_user.get("name") or clean_email.split("@")[0],
+                    email=clean_email,
+                    aadhaar_number=std_user.get("aadhaar_number") or std_user.get("pan_number") or "XXXX-XXXX-0000",
+                    phone=std_user.get("phone") or "0000000000",
+                    address=std_user.get("address") or "",
+                    pincode=std_user.get("pincode") or "000000",
+                    password=data.password,
+                )
+                authenticated = True
+            except Exception as prov_err:
+                logger.warning(f"Notice: Failed to auto-provision payernt account for {clean_email}: {prov_err}")
+                account = get_payernt_account_by_email(clean_email)
+                if account and account.get("password_hash") and verify_password(data.password, account["password_hash"]):
+                    authenticated = True
+
+    if not authenticated or not account:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password for paye₹nt vendor account.",
         )
 
-    token_payload = {
-        "sub": account["email"],
-        "account_type": "paye₹nt",
-        "user_id": account["id"],
-        "name": account.get("name", "Vendor"),
-        "role": "vendor",
-    }
-    access_token = create_access_token(token_payload)
-    refresh_token = create_refresh_token(token_payload)
+    if account.get("status") in ("suspended", "banned", "inactive"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your paye₹nt vendor account is inactive or suspended. Please contact support.",
+        )
 
-    sanitized = _sanitize_payernt_account(account)
+    try:
+        token_payload = {
+            "sub": account["email"],
+            "account_type": "paye₹nt",
+            "user_id": account["id"],
+            "name": account.get("name", "Vendor"),
+            "role": "vendor",
+        }
+        access_token = create_access_token(token_payload)
+        refresh_token = create_refresh_token(token_payload)
 
-    return {
-        "success": True,
-        "message": "Signed in to paye₹nt successfully.",
-        "user": {
-            "id": account["id"],
+        sanitized = _sanitize_payernt_account(account)
+
+        return {
+            "success": True,
+            "message": "Signed in to paye₹nt successfully.",
+            "user": {
+                "id": account["id"],
+                "name": account.get("name", "Vendor"),
+                "email": account["email"],
+                "accountType": "paye₹nt",
+            },
+            "userId": account["id"],
+            "accountType": "paye₹nt",
             "name": account.get("name", "Vendor"),
             "email": account["email"],
-            "accountType": "paye₹nt",
-        },
-        "userId": account["id"],
-        "accountType": "paye₹nt",
-        "name": account.get("name", "Vendor"),
-        "email": account["email"],
-        "role": "vendor",
-        "account": sanitized,
-        "token": access_token,
-        "refreshToken": refresh_token,
-    }
+            "role": "vendor",
+            "account": sanitized,
+            "token": access_token,
+            "refreshToken": refresh_token,
+        }
+    except Exception as e:
+        logger.exception(f"Unexpected error during paye₹nt login for {clean_email}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unable to sign in. Please try again later.",
+        )
 
 
 @payernt_router.post("/auth/logout")

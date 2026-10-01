@@ -208,7 +208,12 @@ export function Sidebar() {
                 </div>
               )}
               {group.items.map((it) => {
-                const active = pathname === it.to || (it.to !== "/admin/dashboard" && pathname.startsWith(it.to));
+                const active =
+                  pathname === it.to ||
+                  (it.to !== "/admin/dashboard" && pathname.startsWith(it.to)) ||
+                  (it.to === "/admin/payments" && pathname.startsWith("/admin/wallet")) ||
+                  (it.to === "/admin/support" && (pathname.startsWith("/admin/help") || pathname.startsWith("/admin/messages"))) ||
+                  (it.to === "/admin/activity-logs" && pathname.startsWith("/admin/activity"));
                 const badgeVal = "badgeKey" in it ? getBadgeValue(it.badgeKey) : 0;
 
                 return (

@@ -29,6 +29,9 @@ function getWebSocketUrl(token: string): string {
 
   if (typeof window !== "undefined") {
     const host = window.location.hostname;
+    if (host === "10.0.2.2") {
+      return `ws://10.0.2.2:8001/api/admin/ws?token=${encodeURIComponent(token)}`;
+    }
     if (host === "localhost" || host === "127.0.0.1") {
       return `ws://127.0.0.1:8001/api/admin/ws?token=${encodeURIComponent(token)}`;
     }

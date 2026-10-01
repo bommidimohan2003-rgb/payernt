@@ -12,17 +12,27 @@ const getApiBase = () => {
   if (typeof window !== "undefined") {
     const win = window as unknown as { PAYENT_API_URL?: string };
     if (win.PAYENT_API_URL) return win.PAYENT_API_URL;
-  }
-  if (import.meta.env.VITE_PAYERNT_API_URL) {
-    return import.meta.env.VITE_PAYERNT_API_URL;
-  }
-  if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL;
-  }
-  if (typeof window !== "undefined") {
     const host = window.location.hostname;
+    if (host === "10.0.2.2") return "http://10.0.2.2:8001";
     const isLocal = host === "localhost" || host === "127.0.0.1";
     if (isLocal) return "http://127.0.0.1:8001";
+    if (host.endsWith(".vercel.app")) return "";
+  }
+  if (import.meta.env.VITE_PAYERNT_API_URL) {
+    const apiUrl = import.meta.env.VITE_PAYERNT_API_URL;
+    if (typeof window !== "undefined" && window.location.hostname === "10.0.2.2") {
+      return apiUrl.replace(/localhost|127\.0\.0\.1/, "10.0.2.2");
+    }
+    return apiUrl;
+  }
+  if (import.meta.env.VITE_API_URL) {
+    const apiUrl = import.meta.env.VITE_API_URL;
+    if (typeof window !== "undefined" && window.location.hostname === "10.0.2.2") {
+      return apiUrl.replace(/localhost|127\.0\.0\.1/, "10.0.2.2");
+    }
+    return apiUrl;
+  }
+  if (typeof window !== "undefined") {
     return window.location.origin;
   }
   return "";
@@ -35,8 +45,16 @@ function getAuthHeaders(): Record<string, string> {
     "Content-Type": "application/json",
   };
   try {
-    const token = localStorage.getItem("paye₹nt_token") || localStorage.getItem("payent_token");
+    let token =
+      localStorage.getItem("paye₹nt_token") ||
+      localStorage.getItem("payernt_token") ||
+      localStorage.getItem("payent_token") ||
+      localStorage.getItem("payent:token");
     if (token) {
+      token = token.trim();
+      if (token.startsWith('"') && token.endsWith('"')) {
+        token = token.slice(1, -1).trim();
+      }
       headers["Authorization"] = `Bearer ${token}`;
     }
   } catch {}
@@ -44,6 +62,9 @@ function getAuthHeaders(): Record<string, string> {
 }
 
 export const payerntApi = {
+  // ============================================================
+  // AUTHENTICATION & CROSS-ACCOUNT VERIFICATION
+  // ============================================================
   async checkRegistration(params: {
     name: string;
     mobile: string;
@@ -68,28 +89,26 @@ export const payerntApi = {
     };
     message?: string;
   }> {
-    if (API_BASE) {
-      try {
-        const res = await fetch(`${API_BASE}/api/paye₹nt/auth/check-registration`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: params.name,
-            mobile: params.mobile,
-            email: params.email,
-            targetAccountType: params.targetAccountType || "paye₹nt",
-          }),
-        });
-        return await res.json();
-      } catch (e: any) {
-        console.warn("[paye₹nt API] Check registration network error:", e);
-      }
+    try {
+      const res = await fetch(`${API_BASE}/api/payernt/auth/check-registration`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: params.name,
+          mobile: params.mobile,
+          email: params.email,
+          targetAccountType: params.targetAccountType || "paye₹nt",
+        }),
+      });
+      const data = await res.json();
+      return data;
+    } catch (e: any) {
+      return {
+        success: false,
+        found: false,
+        message: e?.message || "Unable to check registration details with server.",
+      };
     }
-    return {
-      success: false,
-      found: false,
-      message: "Unable to check your details. Please try again.",
-    };
   },
 
   async register(params: {
@@ -103,7 +122,7 @@ export const payerntApi = {
     confirmPassword?: string;
   }): Promise<{ success: boolean; account?: PayerntAccount; token?: string; error?: string }> {
     try {
-      const res = await fetch(`${API_BASE}/api/paye₹nt/auth/register`, {
+      const res = await fetch(`${API_BASE}/api/payernt/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(params),
@@ -115,104 +134,12 @@ export const payerntApi = {
         }
         return { success: true, account: data.account, token: data.token };
       }
-      return { success: false, error: data.detail || data.message || "Registration failed. Please check your details." };
+      return {
+        success: false,
+        error: data.detail || data.message || "Registration failed. Please check your details.",
+      };
     } catch (e: any) {
-      return { success: false, error: e?.message || "Unable to connect to the server. Please try again." };
-    }
-  },
-
-  async checkCrossSideMobile(phone: string, targetAccountType: string = "paye₹nt"): Promise<{
-    success: boolean;
-    exists_same_side?: boolean;
-    cross_side_eligible?: boolean;
-    existing_account_type?: string;
-    target_account_type?: string;
-    message?: string;
-  }> {
-    try {
-      const res = await fetch(`${API_BASE}/api/auth/cross-side/check-mobile`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, targetAccountType }),
-      });
-      return await res.json();
-    } catch {
-      return { success: false, message: "Failed to check mobile status." };
-    }
-  },
-
-  async sendCrossSideOtp(phone: string, targetAccountType: string = "paye₹nt"): Promise<{
-    success: boolean;
-    token?: string;
-    otp?: string;
-    message?: string;
-  }> {
-    try {
-      const res = await fetch(`${API_BASE}/api/auth/cross-side/send-otp`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, targetAccountType }),
-      });
-      return await res.json();
-    } catch {
-      return { success: false, message: "Failed to send verification code." };
-    }
-  },
-
-  async verifyCrossSideOtp(token: string, otp: string): Promise<{
-    success: boolean;
-    verified?: boolean;
-    verificationToken?: string;
-    prefill?: {
-      name?: string;
-      email?: string;
-      phone?: string;
-      address?: string;
-      pincode?: string;
-    };
-    requiredDocument?: string;
-    message?: string;
-  }> {
-    try {
-      const res = await fetch(`${API_BASE}/api/auth/cross-side/verify-otp`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, otp }),
-      });
-      return await res.json();
-    } catch {
-      return { success: false, message: "Verification failed." };
-    }
-  },
-
-  async registerCrossSide(params: {
-    verificationToken: string;
-    targetAccountType: string;
-    email: string;
-    name?: string;
-    address?: string;
-    city?: string;
-    pincode?: string;
-    aadhaarNumber?: string;
-    password: string;
-    confirmPassword?: string;
-  }): Promise<{ success: boolean; account?: PayerntAccount; token?: string; error?: string }> {
-    try {
-      const res = await fetch(`${API_BASE}/api/auth/cross-side/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(params),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        return { success: false, error: data.detail || data.message || "Registration failed." };
-      }
-      if (data.token) {
-        localStorage.setItem("paye₹nt_token", data.token);
-      }
-      return { success: true, account: data.account, token: data.token };
-    } catch (err: any) {
-      return { success: false, error: err?.message || "Registration failed." };
+      return { success: false, error: e?.message || "Unable to connect to the server." };
     }
   },
 
@@ -220,88 +147,75 @@ export const payerntApi = {
     email: string;
     password: string;
   }): Promise<{ success: boolean; account?: PayerntAccount; token?: string; error?: string }> {
-    if (API_BASE) {
-      try {
-        const res = await fetch(`${API_BASE}/api/paye₹nt/auth/login`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(params),
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          if (data.token) {
-            localStorage.setItem("paye₹nt_token", data.token);
-          }
-          return { success: true, account: data.account, token: data.token };
-        }
-        return { success: false, error: data.detail || data.message || "Invalid credentials." };
-      } catch (e: any) {
-        console.warn("[paye₹nt API] Login network error, using local fallback:", e);
-      }
-    }
-
-    // Local fallback
     try {
-      const stored = localStorage.getItem(STORAGE_KEY_ACCOUNT);
-      if (stored) {
-        const acc = JSON.parse(stored);
-        if (acc.email?.toLowerCase() === params.email.toLowerCase()) {
-          return { success: true, account: acc, token: `mock_payernt_jwt_${Date.now()}` };
+      const res = await fetch(`${API_BASE}/api/payernt/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: (params.email || "").trim().toLowerCase(),
+          password: params.password,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        if (data.token) {
+          localStorage.setItem("paye₹nt_token", data.token);
         }
+        return { success: true, account: data.account, token: data.token };
       }
-    } catch {}
-
-    return { success: false, error: "Invalid email or password for paye₹nt vendor account." };
+      return {
+        success: false,
+        error: data.detail || data.message || "Invalid credentials for paye₹nt account.",
+      };
+    } catch (e: any) {
+      return {
+        success: false,
+        error: e?.message || "Unable to reach server. Please check your network connection.",
+      };
+    }
   },
 
   async logout(): Promise<{ success: boolean }> {
     try {
       localStorage.removeItem("paye₹nt_token");
-      if (API_BASE) {
-        await fetch(`${API_BASE}/api/paye₹nt/auth/logout`, {
-          method: "POST",
-          headers: getAuthHeaders(),
-        });
-      }
+      await fetch(`${API_BASE}/api/payernt/auth/logout`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+      }).catch(() => {});
     } catch {}
     return { success: true };
   },
 
   async getProfile(): Promise<{ success: boolean; profile?: any; error?: string }> {
-    if (API_BASE) {
-      try {
-        const res = await fetch(`${API_BASE}/api/paye₹nt/profile`, {
-          headers: getAuthHeaders(),
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          return { success: true, profile: data.profile };
-        }
-      } catch (e) {
-        console.warn("[paye₹nt API] Get profile error:", e);
+    try {
+      const res = await fetch(`${API_BASE}/api/payernt/profile`, {
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return { success: true, profile: data.profile };
       }
+      return { success: false, error: data.detail || "Failed to load profile." };
+    } catch (e: any) {
+      return { success: false, error: e?.message || "Failed to fetch profile." };
     }
-    return { success: false };
   },
 
   async updateProfile(updates: any): Promise<{ success: boolean; profile?: any; error?: string }> {
-    if (API_BASE) {
-      try {
-        const res = await fetch(`${API_BASE}/api/paye₹nt/profile`, {
-          method: "PATCH",
-          headers: getAuthHeaders(),
-          body: JSON.stringify(updates),
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          return { success: true, profile: data.profile };
-        }
-        return { success: false, error: data.detail || "Failed to update profile." };
-      } catch (e: any) {
-        return { success: false, error: e?.message || "Network error." };
+    try {
+      const res = await fetch(`${API_BASE}/api/payernt/profile`, {
+        method: "PATCH",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(updates),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return { success: true, profile: data.profile };
       }
+      return { success: false, error: data.detail || "Failed to update profile." };
+    } catch (e: any) {
+      return { success: false, error: e?.message || "Network error while updating profile." };
     }
-    return { success: true, profile: updates };
   },
 
   // ============================================================
@@ -319,265 +233,116 @@ export const payerntApi = {
     message?: string;
     error?: string;
   }> {
-    if (API_BASE) {
-      try {
-        const res = await fetch(`${API_BASE}/api/paye₹nt/products`, {
-          method: "POST",
-          headers: getAuthHeaders(),
-          body: JSON.stringify(productData),
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          return {
-            success: true,
-            product: data.product,
-            productId: data.productId || data.product?.id,
-            status: data.status || data.product?.status || "pending_confirmation",
-            vendorSecretPin: data.vendorSecretPin || data.product?.vendor_secret_pin,
-            maskedPhone: data.maskedPhone,
-            otpExpiresIn: data.otpExpiresIn || 300,
-            resendCooldown: data.resendCooldown || 60,
-            message: data.message,
-          };
-        }
+    try {
+      const res = await fetch(`${API_BASE}/api/payernt/products`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(productData),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
         return {
-          success: false,
-          error: data.detail || data.message || "Failed to submit product listing.",
+          success: true,
+          product: data.product,
+          productId: data.productId || data.product?.id,
+          status: data.status || data.product?.status || "under_review",
+          vendorSecretPin: data.vendorSecretPin || data.product?.vendor_secret_pin,
+          maskedPhone: data.maskedPhone,
+          otpExpiresIn: data.otpExpiresIn || 300,
+          resendCooldown: data.resendCooldown || 60,
+          message: data.message,
         };
-      } catch (e: any) {
-        console.warn("[paye₹nt API] Create product network error, fallback active:", e);
       }
-    }
-
-    const pin = Math.floor(1000 + Math.random() * 9000).toString();
-    const prodId = productData.id || `prod-${Date.now()}`;
-    return {
-      success: true,
-      productId: prodId,
-      status: "pending_confirmation",
-      product: {
-        ...productData,
-        id: prodId,
-        vendorSecretPin: pin,
-        status: "pending_confirmation",
-      } as PayerntProduct,
-      vendorSecretPin: pin,
-      maskedPhone: "+91 ******0000",
-      otpExpiresIn: 300,
-      resendCooldown: 60,
-      message: "Listing created as PENDING_CONFIRMATION.",
-    };
-  },
-
-  async verifyProductConfirmationOtp(productId: string, otp: string): Promise<{
-    success: boolean;
-    productId?: string;
-    status?: string;
-    verificationStatus?: string;
-    product?: PayerntProduct;
-    message?: string;
-    error?: string;
-  }> {
-    if (API_BASE) {
-      try {
-        const res = await fetch(`${API_BASE}/api/paye₹nt/products/${productId}/verify-otp`, {
-          method: "POST",
-          headers: getAuthHeaders(),
-          body: JSON.stringify({ otp }),
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          return {
-            success: true,
-            productId: data.productId,
-            status: data.status,
-            verificationStatus: data.verificationStatus,
-            product: data.product,
-            message: data.message,
-          };
-        }
-        return {
-          success: false,
-          error: data.detail || data.message || "Incorrect verification code. Please try again.",
-        };
-      } catch (e: any) {
-        console.warn("[paye₹nt API] verifyProductConfirmationOtp error:", e);
-      }
-    }
-
-    // Local fallback
-    if (otp === "123456" || otp.length === 6) {
       return {
-        success: true,
-        productId,
-        status: "under_review",
-        verificationStatus: "under_review",
-        message: "Product securely confirmed. Listing is now pending admin review.",
+        success: false,
+        error: data.detail || data.message || "Failed to submit product listing to database.",
+      };
+    } catch (e: any) {
+      return {
+        success: false,
+        error: e?.message || "Network error while submitting product.",
       };
     }
-    return {
-      success: false,
-      error: "Incorrect verification code. Please try again.",
-    };
-  },
-
-  async resendProductConfirmationOtp(productId: string): Promise<{
-    success: boolean;
-    maskedPhone?: string;
-    resendCooldown?: number;
-    otpExpiresIn?: number;
-    message?: string;
-    error?: string;
-  }> {
-    if (API_BASE) {
-      try {
-        const res = await fetch(`${API_BASE}/api/paye₹nt/products/${productId}/resend-otp`, {
-          method: "POST",
-          headers: getAuthHeaders(),
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          return {
-            success: true,
-            maskedPhone: data.maskedPhone,
-            resendCooldown: data.resendCooldown || 60,
-            otpExpiresIn: data.otpExpiresIn || 300,
-            message: data.message,
-          };
-        }
-        return {
-          success: false,
-          error: data.detail || data.message || "Failed to resend verification code.",
-        };
-      } catch (e: any) {
-        console.warn("[paye₹nt API] resendProductConfirmationOtp error:", e);
-      }
-    }
-
-    return {
-      success: true,
-      maskedPhone: "+91 ******0000",
-      resendCooldown: 60,
-      otpExpiresIn: 300,
-      message: "Verification code resent.",
-    };
-  },
-
-  async getProductConfirmationStatus(productId: string): Promise<{
-    success: boolean;
-    productId?: string;
-    status?: string;
-    maskedPhone?: string;
-    vendorSecretPin?: string;
-    resendCooldown?: number;
-    otpExpiresIn?: number;
-    hasActiveSession?: boolean;
-    error?: string;
-  }> {
-    if (API_BASE) {
-      try {
-        const res = await fetch(`${API_BASE}/api/paye₹nt/products/${productId}/confirmation-status`, {
-          headers: getAuthHeaders(),
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          return data;
-        }
-      } catch (e) {
-        console.warn("[paye₹nt API] getProductConfirmationStatus error:", e);
-      }
-    }
-    return { success: false };
   },
 
   async getProducts(): Promise<{ success: boolean; products?: PayerntProduct[]; error?: string }> {
-    if (API_BASE) {
-      try {
-        const res = await fetch(`${API_BASE}/api/paye₹nt/products`, {
-          headers: getAuthHeaders(),
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          return { success: true, products: data.products };
-        }
-      } catch (e) {
-        console.warn("[paye₹nt API] Get products error:", e);
+    try {
+      const res = await fetch(`${API_BASE}/api/payernt/products`, {
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return { success: true, products: data.products };
       }
+      return { success: false, error: data.detail || "Failed to fetch products." };
+    } catch (e: any) {
+      return { success: false, error: e?.message || "Network error." };
     }
-    return { success: false };
   },
 
   async getProductById(id: string): Promise<{ success: boolean; product?: PayerntProduct; error?: string }> {
-    if (API_BASE) {
-      try {
-        const res = await fetch(`${API_BASE}/api/paye₹nt/products/${id}`, {
-          headers: getAuthHeaders(),
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          return { success: true, product: data.product };
-        }
-      } catch (e) {
-        console.warn("[paye₹nt API] Get product error:", e);
+    try {
+      const res = await fetch(`${API_BASE}/api/payernt/products/${id}`, {
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return { success: true, product: data.product };
       }
+      return { success: false, error: data.detail || "Product not found." };
+    } catch (e: any) {
+      return { success: false, error: e?.message || "Network error." };
     }
-    return { success: false };
   },
 
   async updateProduct(id: string, updates: Partial<PayerntProduct>): Promise<{ success: boolean; product?: PayerntProduct; error?: string }> {
-    if (API_BASE) {
-      try {
-        const res = await fetch(`${API_BASE}/api/paye₹nt/products/${id}`, {
-          method: "PATCH",
-          headers: getAuthHeaders(),
-          body: JSON.stringify(updates),
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          return { success: true, product: data.product };
-        }
-      } catch (e) {
-        console.warn("[paye₹nt API] Update product error:", e);
+    try {
+      const res = await fetch(`${API_BASE}/api/payernt/products/${id}`, {
+        method: "PATCH",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(updates),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return { success: true, product: data.product };
       }
+      return { success: false, error: data.detail || "Failed to update product." };
+    } catch (e: any) {
+      return { success: false, error: e?.message || "Network error." };
     }
-    return { success: true };
   },
 
   async deleteProduct(id: string): Promise<{ success: boolean; error?: string }> {
-    if (API_BASE) {
-      try {
-        const res = await fetch(`${API_BASE}/api/paye₹nt/products/${id}`, {
-          method: "DELETE",
-          headers: getAuthHeaders(),
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          return { success: true };
-        }
-      } catch (e) {
-        console.warn("[paye₹nt API] Delete product error:", e);
+    try {
+      const res = await fetch(`${API_BASE}/api/payernt/products/${id}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return { success: true };
       }
+      return { success: false, error: data.detail || "Failed to delete product." };
+    } catch (e: any) {
+      return { success: false, error: e?.message || "Network error." };
     }
-    return { success: true };
   },
 
   async updateProductStatus(id: string, status: string, availabilityStatus?: string): Promise<{ success: boolean; product?: PayerntProduct; error?: string }> {
-    if (API_BASE) {
-      try {
-        const res = await fetch(`${API_BASE}/api/paye₹nt/products/${id}/status`, {
-          method: "PATCH",
-          headers: getAuthHeaders(),
-          body: JSON.stringify({ status, availability_status: availabilityStatus }),
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          return { success: true, product: data.product };
-        }
-      } catch (e) {
-        console.warn("[paye₹nt API] Update product status error:", e);
+    try {
+      const res = await fetch(`${API_BASE}/api/payernt/products/${id}/status`, {
+        method: "PATCH",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ status, availability_status: availabilityStatus }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return { success: true, product: data.product };
       }
+      return { success: false, error: data.detail || "Failed to update product status." };
+    } catch (e: any) {
+      return { success: false, error: e?.message || "Network error." };
     }
-    return { success: true };
   },
 
   // ============================================================
@@ -588,43 +353,40 @@ export const payerntApi = {
     wallet?: UserWallet;
     transactions?: WalletTransaction[];
     bankAccounts?: BankAccount[];
+    error?: string;
   }> {
-    if (API_BASE) {
-      try {
-        const res = await fetch(`${API_BASE}/api/paye₹nt/wallet`, {
-          headers: getAuthHeaders(),
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          return {
-            success: true,
-            wallet: data.wallet,
-            transactions: data.transactions,
-            bankAccounts: data.bankAccounts,
-          };
-        }
-      } catch (e) {
-        console.warn("[paye₹nt API] Get wallet error:", e);
+    try {
+      const res = await fetch(`${API_BASE}/api/payernt/wallet`, {
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return {
+          success: true,
+          wallet: data.wallet,
+          transactions: data.transactions,
+          bankAccounts: data.bankAccounts,
+        };
       }
+      return { success: false, error: data.detail || "Failed to load wallet." };
+    } catch (e: any) {
+      return { success: false, error: e?.message || "Network error." };
     }
-    return { success: false };
   },
 
   async getTransactions(): Promise<{ success: boolean; transactions?: WalletTransaction[]; error?: string }> {
-    if (API_BASE) {
-      try {
-        const res = await fetch(`${API_BASE}/api/paye₹nt/wallet/transactions`, {
-          headers: getAuthHeaders(),
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          return { success: true, transactions: data.transactions };
-        }
-      } catch (e) {
-        console.warn("[paye₹nt API] Get transactions error:", e);
+    try {
+      const res = await fetch(`${API_BASE}/api/payernt/wallet/transactions`, {
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return { success: true, transactions: data.transactions };
       }
+      return { success: false, error: data.detail || "Failed to load transactions." };
+    } catch (e: any) {
+      return { success: false, error: e?.message || "Network error." };
     }
-    return { success: false };
   },
 
   async withdraw(
@@ -637,26 +399,23 @@ export const payerntApi = {
   }> {
     const payload =
       typeof amountOrParams === "number"
-        ? { amount: amountOrParams, bankAccountId: optionalBankAccountId || "bank-001" }
+        ? { amount: amountOrParams, bankAccountId: optionalBankAccountId || "" }
         : amountOrParams;
 
-    if (API_BASE) {
-      try {
-        const res = await fetch(`${API_BASE}/api/paye₹nt/wallet/withdraw`, {
-          method: "POST",
-          headers: getAuthHeaders(),
-          body: JSON.stringify(payload),
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          return { success: true, message: data.message };
-        }
-        return { success: false, error: data.detail || "Withdrawal failed." };
-      } catch (e: any) {
-        return { success: false, error: e?.message || "Network error during withdrawal." };
+    try {
+      const res = await fetch(`${API_BASE}/api/payernt/wallet/withdraw`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return { success: true, message: data.message };
       }
+      return { success: false, error: data.detail || "Withdrawal failed." };
+    } catch (e: any) {
+      return { success: false, error: e?.message || "Network error during withdrawal." };
     }
-    return { success: true, message: "Withdrawal processed successfully." };
   },
 
   async addBankAccount(bankData: {
@@ -666,84 +425,73 @@ export const payerntApi = {
     confirmAccountNumber?: string;
     ifsc: string;
   }): Promise<{ success: boolean; bankAccount?: any; error?: string }> {
-    if (API_BASE) {
-      try {
-        const res = await fetch(`${API_BASE}/api/paye₹nt/wallet/bank-accounts`, {
-          method: "POST",
-          headers: getAuthHeaders(),
-          body: JSON.stringify(bankData),
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          return { success: true, bankAccount: data.bankAccount };
-        }
-        return { success: false, error: data.detail || "Failed to add bank account." };
-      } catch (e: any) {
-        return { success: false, error: e?.message || "Network error." };
+    try {
+      const res = await fetch(`${API_BASE}/api/payernt/wallet/bank-accounts`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(bankData),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return { success: true, bankAccount: data.bankAccount };
       }
+      return { success: false, error: data.detail || "Failed to add bank account." };
+    } catch (e: any) {
+      return { success: false, error: e?.message || "Network error." };
     }
-    return { success: true };
   },
 
   async deleteBankAccount(bankId: string): Promise<{ success: boolean; error?: string }> {
-    if (API_BASE) {
-      try {
-        const res = await fetch(`${API_BASE}/api/paye₹nt/wallet/bank-accounts/${bankId}`, {
-          method: "DELETE",
-          headers: getAuthHeaders(),
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          return { success: true };
-        }
-      } catch (e) {
-        console.warn("[paye₹nt API] Delete bank account error:", e);
+    try {
+      const res = await fetch(`${API_BASE}/api/payernt/wallet/bank-accounts/${bankId}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return { success: true };
       }
+      return { success: false, error: data.detail || "Failed to delete bank account." };
+    } catch (e: any) {
+      return { success: false, error: e?.message || "Network error." };
     }
-    return { success: true };
   },
 
   // ============================================================
   // NOTIFICATIONS
   // ============================================================
   async getNotifications(): Promise<{ success: boolean; notifications?: LenderNotification[]; error?: string }> {
-    if (API_BASE) {
-      try {
-        const res = await fetch(`${API_BASE}/api/paye₹nt/notifications`, {
-          headers: getAuthHeaders(),
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          return { success: true, notifications: data.notifications };
-        }
-      } catch (e) {
-        console.warn("[paye₹nt API] Get notifications error:", e);
+    try {
+      const res = await fetch(`${API_BASE}/api/payernt/notifications`, {
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return { success: true, notifications: data.notifications };
       }
+      return { success: false, error: data.detail || "Failed to load notifications." };
+    } catch (e: any) {
+      return { success: false, error: e?.message || "Network error." };
     }
-    return { success: false };
   },
 
   async markNotificationRead(id: string): Promise<{ success: boolean }> {
-    if (API_BASE) {
-      try {
-        await fetch(`${API_BASE}/api/paye₹nt/notifications/${id}/read`, {
-          method: "PATCH",
-          headers: getAuthHeaders(),
-        });
-      } catch {}
-    }
+    try {
+      await fetch(`${API_BASE}/api/payernt/notifications/${id}/read`, {
+        method: "PATCH",
+        headers: getAuthHeaders(),
+      });
+    } catch {}
     return { success: true };
   },
 
   async markAllNotificationsRead(): Promise<{ success: boolean }> {
-    if (API_BASE) {
-      try {
-        await fetch(`${API_BASE}/api/paye₹nt/notifications/read-all`, {
-          method: "POST",
-          headers: getAuthHeaders(),
-        });
-      } catch {}
-    }
+    try {
+      await fetch(`${API_BASE}/api/payernt/notifications/read-all`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+      });
+    } catch {}
     return { success: true };
   },
 
@@ -751,57 +499,47 @@ export const payerntApi = {
   // MESSAGES (ADMIN / PRODUCT BASED)
   // ============================================================
   async getMessages(productId?: string): Promise<{ success: boolean; messages?: any[]; unreadCount?: number; error?: string }> {
-    if (API_BASE) {
-      try {
-        const url = productId
-          ? `${API_BASE}/api/paye₹nt/messages?product_id=${encodeURIComponent(productId)}`
-          : `${API_BASE}/api/paye₹nt/messages`;
-        const res = await fetch(url, {
-          headers: getAuthHeaders(),
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          return { success: true, messages: data.messages, unreadCount: data.unreadCount ?? 0 };
-        }
-      } catch (e) {
-        console.warn("[paye₹nt API] Get messages error:", e);
+    try {
+      const url = productId
+        ? `${API_BASE}/api/payernt/messages?product_id=${encodeURIComponent(productId)}`
+        : `${API_BASE}/api/payernt/messages`;
+      const res = await fetch(url, {
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return { success: true, messages: data.messages, unreadCount: data.unreadCount ?? 0 };
       }
+      return { success: false, messages: [], unreadCount: 0, error: data.detail || "Failed to load messages." };
+    } catch (e: any) {
+      return { success: false, messages: [], unreadCount: 0, error: e?.message || "Network error." };
     }
-    return { success: false, messages: [], unreadCount: 0 };
   },
 
   async getUnreadMessagesCount(): Promise<{ success: boolean; unreadCount: number }> {
-    if (API_BASE) {
-      try {
-        const res = await fetch(`${API_BASE}/api/paye₹nt/messages/unread-count`, {
-          headers: getAuthHeaders(),
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          return { success: true, unreadCount: data.unreadCount ?? 0 };
-        }
-      } catch (e) {
-        console.warn("[paye₹nt API] Get unread count error:", e);
+    try {
+      const res = await fetch(`${API_BASE}/api/payernt/messages/unread-count`, {
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return { success: true, unreadCount: data.unreadCount ?? 0 };
       }
-    }
+    } catch {}
     return { success: false, unreadCount: 0 };
   },
 
   async markMessageRead(messageId: string): Promise<{ success: boolean; unreadCount?: number; error?: string }> {
-    if (API_BASE) {
-      try {
-        const res = await fetch(`${API_BASE}/api/paye₹nt/messages/${encodeURIComponent(messageId)}/read`, {
-          method: "PATCH",
-          headers: getAuthHeaders(),
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          return { success: true, unreadCount: data.unreadCount };
-        }
-      } catch (e) {
-        console.warn("[paye₹nt API] Mark message read error:", e);
+    try {
+      const res = await fetch(`${API_BASE}/api/payernt/messages/${encodeURIComponent(messageId)}/read`, {
+        method: "PATCH",
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return { success: true, unreadCount: data.unreadCount };
       }
-    }
+    } catch {}
     return { success: false };
   },
 
@@ -810,23 +548,20 @@ export const payerntApi = {
     receiverId: string;
     content: string;
   }): Promise<{ success: boolean; message?: any; error?: string }> {
-    if (API_BASE) {
-      try {
-        const res = await fetch(`${API_BASE}/api/paye₹nt/messages`, {
-          method: "POST",
-          headers: getAuthHeaders(),
-          body: JSON.stringify(params),
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          return { success: true, message: data.message };
-        }
-        return { success: false, error: data.detail || "Failed to send message." };
-      } catch (e: any) {
-        return { success: false, error: e?.message || "Network error." };
+    try {
+      const res = await fetch(`${API_BASE}/api/payernt/messages`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(params),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return { success: true, message: data.message };
       }
+      return { success: false, error: data.detail || "Failed to send message." };
+    } catch (e: any) {
+      return { success: false, error: e?.message || "Network error." };
     }
-    return { success: true };
   },
 
   async sendAdminMessage(params: {
@@ -840,23 +575,20 @@ export const payerntApi = {
     productName?: string;
     productCategory?: string;
   }): Promise<{ success: boolean; message?: any; error?: string }> {
-    if (API_BASE) {
-      try {
-        const res = await fetch(`${API_BASE}/api/paye₹nt/messages/admin-send`, {
-          method: "POST",
-          headers: getAuthHeaders(),
-          body: JSON.stringify(params),
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          return { success: true, message: data.message };
-        }
-        return { success: false, error: data.detail || "Failed to send admin message." };
-      } catch (e: any) {
-        return { success: false, error: e?.message || "Network error." };
+    try {
+      const res = await fetch(`${API_BASE}/api/payernt/messages/admin-send`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(params),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return { success: true, message: data.message };
       }
+      return { success: false, error: data.detail || "Failed to send admin message." };
+    } catch (e: any) {
+      return { success: false, error: e?.message || "Network error." };
     }
-    return { success: true };
   },
 };
 

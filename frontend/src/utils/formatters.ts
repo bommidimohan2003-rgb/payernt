@@ -5,15 +5,37 @@ import type { Product } from "@/types";
  * Example output: "Hyderabad, Telangana" or "Vijayawada, Andhra Pradesh"
  * Fallback: "Location unavailable"
  */
+function safeTrim(val: unknown): string {
+  if (typeof val === "string") return val.trim();
+  if (typeof val === "number") return String(val).trim();
+  return "";
+}
+
+function parseLocationValue(loc: unknown): string {
+  if (!loc) return "";
+  if (typeof loc === "string") return loc.trim();
+  if (typeof loc === "object" && loc !== null) {
+    const obj = loc as Record<string, unknown>;
+    const area = safeTrim(obj.area || obj.address || obj.landmark || obj.street);
+    const city = safeTrim(obj.city);
+    const state = safeTrim(obj.state);
+    const parts = [area, city, state].filter(Boolean);
+    if (parts.length > 0) return parts.join(", ");
+    const pincode = safeTrim(obj.pincode || obj.postalCode);
+    if (pincode) return pincode;
+  }
+  return "";
+}
+
 export function formatOwnerAddress(product: Product | null | undefined): string {
   if (!product) return "Location unavailable";
 
   const owner = product.owner;
-  const ownerCity = owner?.city?.trim();
-  const ownerState = owner?.state?.trim();
-  const ownerAddr = owner?.address?.trim();
-  const ownerLoc = owner?.location?.trim();
-  const prodLoc = product.location?.trim();
+  const ownerCity = safeTrim(owner?.city) || safeTrim((product as any)?.owner_city);
+  const ownerState = safeTrim(owner?.state) || safeTrim((product as any)?.owner_state);
+  const ownerAddr = safeTrim(owner?.address) || safeTrim((product as any)?.owner_address);
+  const ownerLoc = parseLocationValue(owner?.location);
+  const prodLoc = parseLocationValue(product.location);
 
   // 1. Prefer City, State format
   if (ownerCity && ownerState) {

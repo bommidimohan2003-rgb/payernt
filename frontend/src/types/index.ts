@@ -53,7 +53,7 @@ export interface Product {
   availability_reason?: string | null;
   isReference?: boolean;
   status?: "approved" | "pending" | "rejected";
-  location?: string;
+  location?: string | any;
   owner: {
     name: string;
     avatar: string;
@@ -63,7 +63,7 @@ export interface Product {
     state?: string;
     address?: string;
     pincode?: string;
-    location?: string;
+    location?: string | any;
     status?: string;
   };
   ownerId?: string;

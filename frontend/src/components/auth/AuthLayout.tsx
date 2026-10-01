@@ -152,8 +152,8 @@ export function AuthLayout({
           </div>
         </div>
 
-        {/* RIGHT SIDE ALIGNED FORM CONTAINER */}
-        <div className="relative z-10 w-full max-w-7xl mx-auto flex justify-end">
+        {/* LEFT SIDE ALIGNED FORM CONTAINER */}
+        <div className="relative z-10 w-full max-w-7xl mx-auto flex justify-start">
           <div
             className={cn(
               "w-full card-premium p-5 sm:p-6 shadow-2xl border-white/25 bg-background/95 dark:bg-slate-900/95 backdrop-blur-2xl rounded-3xl space-y-4 transition-all duration-300",

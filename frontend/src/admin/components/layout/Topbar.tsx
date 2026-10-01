@@ -17,11 +17,15 @@ const ROUTE_META: Record<string, { title: string; subtitle: string }> = {
   "/admin/categories": { title: "Categories", subtitle: "Gear categories & taxonomy configuration" },
   "/admin/bookings": { title: "Bookings", subtitle: "Rental operations, schedules & gear dispatch" },
   "/admin/payments": { title: "Payments", subtitle: "Financial settlements, transactions & reconciliation" },
+  "/admin/wallet": { title: "Wallet & Settlements", subtitle: "Financial settlements, transactions & reconciliation" },
   "/admin/reviews": { title: "Reviews", subtitle: "Customer feedback moderation & verified ratings" },
   "/admin/reports": { title: "Reports", subtitle: "Dispute resolution & marketplace compliance" },
   "/admin/notifications": { title: "Notifications", subtitle: "System announcements & communication dispatch" },
   "/admin/support": { title: "Support", subtitle: "Customer inquiries, help tickets & resolutions" },
+  "/admin/messages": { title: "Messages & Inquiries", subtitle: "Customer inquiries, help tickets & resolutions" },
+  "/admin/help": { title: "Help & Support", subtitle: "Platform guidance & ticket assistance" },
   "/admin/activity-logs": { title: "Activity Logs", subtitle: "Security audit trail & administrative event stream" },
+  "/admin/activity": { title: "Activity Logs", subtitle: "Security audit trail & administrative event stream" },
   "/admin/profile": { title: "Profile", subtitle: "Admin account settings & authentication security" },
   "/admin/settings": { title: "Settings", subtitle: "Platform operations & marketplace configuration" },
 };
@@ -32,10 +36,20 @@ export function Topbar() {
   const routerState = useRouterState();
   const currentPath = routerState.location.pathname;
 
-  const currentMeta = ROUTE_META[currentPath] || {
-    title: "Control Center",
-    subtitle: "PAYENT Marketplace Operations",
-  };
+  let currentMeta = ROUTE_META[currentPath];
+  if (!currentMeta) {
+    if (currentPath.startsWith("/admin/products/") && currentPath.length > "/admin/products/".length) {
+      currentMeta = {
+        title: "Product Inspection",
+        subtitle: "Listing verification, specifications & price configuration",
+      };
+    } else {
+      currentMeta = {
+        title: "Control Center",
+        subtitle: "PAYENT Marketplace Operations",
+      };
+    }
+  }
 
   useEffect(() => {
     const unsubscribe = adminWS.onStatusChange((status) => {

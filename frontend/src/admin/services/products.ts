@@ -3,13 +3,6 @@ import { adminApi, AdminProduct, AdminCategory } from "./api";
 const STORAGE_KEY = "payernt_products_v2";
 
 const getStoredProducts = (): any[] => {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
-    }
-  } catch {}
   return [];
 };
 
@@ -18,7 +11,23 @@ const mapToAdminProduct = (p: any): AdminProduct => ({
   title: p.title || p.name || "Equipment Listing",
   description: p.description || "",
   category: p.category || "General",
+  brand: p.brand || p.specs?.brand || "",
+  model: p.model || p.specs?.model || "",
+  year: p.year || p.specs?.year || "",
+  specifications: p.specifications || p.specs || {},
+  features: p.features || p.specs?.features || [],
+  conditionGrade: p.conditionGrade || p.condition?.grade || "Excellent",
+  conditionDetails: p.conditionDetails || p.condition || {},
+  accessories: p.accessories || (p.condition?.accessoriesIncluded ? p.condition.accessoriesIncluded.join(", ") : ""),
+  city: p.city || p.location?.city || "",
+  area: p.area || p.location?.area || "",
+  pincode: p.pincode || p.location?.pincode || "",
+  pickupInstructions: p.pickupInstructions || p.location?.pickupInstructions || "",
   price: Number(p.pricing?.daily || p.price || 0),
+  dailyRate: Number(p.pricing?.daily || p.dailyRate || p.price || 0),
+  weeklyRate: p.pricing?.weekly || p.weeklyRate || null,
+  monthlyRate: p.pricing?.monthly || p.monthlyRate || null,
+  securityDeposit: p.pricing?.securityDeposit || p.securityDeposit || 0,
   rating: Number(p.rating || 5.0),
   reviewsCount: Number(p.totalRentalsCount || 0),
   available: p.availabilityStatus === "available" && (p.verificationStatus === "approved" || p.status === "approved"),
@@ -27,13 +36,25 @@ const mapToAdminProduct = (p: any): AdminProduct => ({
       ? "approved"
       : p.status === "rejected" || p.verificationStatus === "rejected"
       ? "rejected"
+      : p.status === "needs_correction" || p.verificationStatus === "needs_correction"
+      ? "needs_correction"
       : "pending",
-  featured: false,
+  featured: Boolean(p.featured),
   hidden: p.availabilityStatus === "paused",
   image: p.primaryImage || (p.photos && p.photos[0]?.url) || (p.images && p.images[0]) || "",
   images: (p.photos && p.photos.map((ph: any) => ph.url)) || p.images || [],
   documents: p.verificationDocs?.purchaseProofName ? [p.verificationDocs.purchaseProofName] : [],
+  videoUrl: p.videoUrl || (p.verificationDocs?.idProofImageName?.endsWith(".mp4") ? p.verificationDocs.idProofImageName : undefined),
+  approvedPriceRange: p.approvedPriceRange || (p.pricing?.minPrice && p.pricing?.maxPrice ? {
+    minPrice: p.pricing.minPrice,
+    maxPrice: p.pricing.maxPrice,
+    unit: p.pricing.unit || "day",
+    approvedAt: p.pricing.approvedAt,
+    approvedBy: p.pricing.approvedBy,
+  } : undefined),
+  priceHistory: p.priceHistory || [],
   createdAt: p.createdAt || new Date().toISOString(),
+  updatedAt: p.updatedAt,
   owner: {
     id: p.ownerId || p.owner?.id || "user_001",
     name: p.owner?.name || p.owner?.fullName || p.verificationDocs?.ownerFullName || "Mohan Bommidi",
@@ -42,6 +63,9 @@ const mapToAdminProduct = (p: any): AdminProduct => ({
       "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80",
     rating: 5.0,
     email: p.owner?.email || p.verificationDocs?.ownerEmail || "mohan@payent.io",
+    phone: p.owner?.phone || p.verificationDocs?.ownerPhone || "",
+    city: p.location?.city || "",
+    pincode: p.location?.pincode || "",
   },
 });
 
@@ -102,6 +126,54 @@ export const productsService = {
     return this.getProductById(id);
   },
 
+  async setPriceRange(
+    id: string,
+    priceRange: { minPrice: number; maxPrice: number; unit: "day" | "hour" | "week" | "month" },
+  ): Promise<AdminProduct> {
+    try {
+      const response = await adminApi.post(`/products/${encodeURIComponent(id)}/price-range`, priceRange);
+      if (response.data && response.data.id) return response.data;
+    } catch {}
+
+    const stored = getStoredProducts();
+    const updated = stored.map((p) => {
+      if (p.id !== id) return p;
+      const prevRange = p.approvedPriceRange;
+      const historyItem = {
+        id: `ph_${Date.now()}`,
+        minPrice: priceRange.minPrice,
+        maxPrice: priceRange.maxPrice,
+        unit: priceRange.unit,
+        previousMinPrice: prevRange?.minPrice,
+        previousMaxPrice: prevRange?.maxPrice,
+        updatedBy: "Admin Superuser",
+        updatedAt: new Date().toISOString(),
+      };
+      const existingHistory = p.priceHistory || [];
+
+      return {
+        ...p,
+        approvedPriceRange: {
+          ...priceRange,
+          approvedAt: new Date().toISOString(),
+          approvedBy: "Admin Superuser",
+        },
+        priceHistory: [historyItem, ...existingHistory],
+        pricing: {
+          ...(p.pricing || {}),
+          minPrice: priceRange.minPrice,
+          maxPrice: priceRange.maxPrice,
+          unit: priceRange.unit,
+        },
+        updatedAt: new Date().toISOString(),
+      };
+    });
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    window.dispatchEvent(new CustomEvent("payent_products_updated"));
+    return this.getProductById(id);
+  },
+
   async deleteProduct(id: string): Promise<void> {
     try {
       await adminApi.delete(`/products/${encodeURIComponent(id)}`);
@@ -113,13 +185,18 @@ export const productsService = {
     window.dispatchEvent(new CustomEvent("payent_products_updated"));
   },
 
-  async approveProduct(id: string): Promise<AdminProduct> {
+  async approveProduct(
+    id: string,
+    priceRange?: { minPrice: number; maxPrice: number; unit: "day" | "hour" | "week" | "month" },
+  ): Promise<AdminProduct> {
     try {
-      const response = await adminApi.patch(`/products/${encodeURIComponent(id)}/approve`);
+      const payload = priceRange ? { priceRange } : {};
+      const response = await adminApi.patch(`/products/${encodeURIComponent(id)}/approve`, payload);
       if (response.data && response.data.id) return response.data;
     } catch {
       try {
-        const response = await adminApi.post(`/products/${encodeURIComponent(id)}/approve`);
+        const payload = priceRange ? { priceRange } : {};
+        const response = await adminApi.post(`/products/${encodeURIComponent(id)}/approve`, payload);
         if (response.data && response.data.id) return response.data;
       } catch {}
     }
@@ -127,11 +204,17 @@ export const productsService = {
     const stored = getStoredProducts();
     const updated = stored.map((p) => {
       if (p.id !== id) return p;
+      const approvedRange = priceRange || p.approvedPriceRange;
       return {
         ...p,
         status: "approved",
         verificationStatus: "approved",
         availabilityStatus: "available",
+        approvedPriceRange: approvedRange ? {
+          ...approvedRange,
+          approvedAt: new Date().toISOString(),
+          approvedBy: "Admin Superuser",
+        } : p.approvedPriceRange,
         reviewedAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };

@@ -377,27 +377,12 @@ export function ForgotPassword() {
           </div>
         </div>
 
-        {/* Password Strength Requirements Helper */}
-        <div className="p-3 bg-secondary/40 border border-border/50 rounded-xl space-y-1.5 text-[11px] text-muted-foreground">
-          <div className="flex items-center gap-1.5 font-bold text-foreground">
-            <ShieldCheck className="h-3.5 w-3.5 text-primary" />
-            <span>Password Requirements</span>
-          </div>
-          <ul className="list-disc list-inside space-y-0.5 pl-1">
-            <li className={newPassword.length >= 8 ? "text-emerald-500 font-semibold" : ""}>
-              Minimum 8 characters in length
-            </li>
-            <li className={/[A-Z]/.test(newPassword) && /[a-z]/.test(newPassword) ? "text-emerald-500 font-semibold" : ""}>
-              Must include uppercase and lowercase letters
-            </li>
-            <li className={/[0-9]/.test(newPassword) && /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>/?]/.test(newPassword) ? "text-emerald-500 font-semibold" : ""}>
-              Must include at least one number and special character
-            </li>
-            <li className={newPassword && newPassword === confirmPassword ? "text-emerald-500 font-semibold" : ""}>
-              New password and confirm password must match
-            </li>
-          </ul>
-        </div>
+        {/* Single-line password requirement hint when not yet fulfilling all rules */}
+        {newPassword.length > 0 && !(newPassword.length >= 8 && /[A-Z]/.test(newPassword) && /[a-z]/.test(newPassword) && /[0-9]/.test(newPassword) && /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(newPassword)) && (
+          <p className="text-[11px] font-medium text-amber-500 dark:text-amber-400">
+            Must be at least 8 characters with uppercase, lowercase, number & special character (!@#$%^&*...).
+          </p>
+        )}
 
         {/* Password Validation Error Banner */}
         {passwordError && (

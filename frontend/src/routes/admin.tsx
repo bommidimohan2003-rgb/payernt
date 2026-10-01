@@ -1,5 +1,6 @@
-import { createFileRoute, Outlet, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState, lazy, Suspense } from "react";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { getSeoMetadata } from "@/utils/seo";
 import { PermissionDenied } from "@/components/states/PermissionDenied";
 import { LoadingState } from "@/components/states/LoadingState";
@@ -35,6 +36,44 @@ export const Route = createFileRoute("/admin")({
     }),
   component: AdminLayout,
 });
+
+function AdminPageTransitionOutlet() {
+  const currentPath = useRouterState({ select: (s) => s.location.pathname });
+  const shouldReduceMotion = useReducedMotion();
+
+  return (
+    <AnimatePresence mode="wait">
+      <motion.div
+        key={currentPath}
+        initial={{ opacity: 0, y: shouldReduceMotion ? 0 : 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: shouldReduceMotion ? 0 : -4 }}
+        transition={{
+          duration: shouldReduceMotion ? 0 : 0.2,
+          ease: "easeOut",
+        }}
+        className="w-full"
+      >
+        <Suspense
+          fallback={
+            <div className="py-20 flex flex-col items-center justify-center space-y-3">
+              <div className="flex items-center gap-1 font-mono font-black text-sm tracking-widest text-emerald-500">
+                <span>PAYE₹NT</span>
+                <span className="text-muted-foreground/60">/</span>
+                <span className="text-xs text-muted-foreground">OPS</span>
+              </div>
+              <div className="w-16 h-0.5 bg-muted overflow-hidden rounded-full">
+                <div className="w-8 h-full bg-emerald-500 animate-[loading-bar_1s_ease-in-out_infinite]" />
+              </div>
+            </div>
+          }
+        >
+          <Outlet />
+        </Suspense>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
 
 function AdminLayout() {
   const navigate = useNavigate();
@@ -118,7 +157,7 @@ function AdminLayout() {
             <Topbar />
             <main className="flex-grow p-4 md:p-6 lg:p-8 space-y-5 max-w-[1600px] mx-auto w-full">
               <Breadcrumb />
-              <Outlet />
+              <AdminPageTransitionOutlet />
             </main>
             <Footer />
           </div>
@@ -127,4 +166,7 @@ function AdminLayout() {
     </Suspense>
   );
 }
+
+export default Route;
+
 

@@ -246,7 +246,11 @@ export function Navigation4({
     },
   ];
 
-  if (pathname.startsWith("/admin") || pathname === "/payernt") {
+  if (
+    pathname.startsWith("/admin") ||
+    pathname.startsWith("/payernt") ||
+    pathname.startsWith("/paye₹nt")
+  ) {
     return null;
   }
 

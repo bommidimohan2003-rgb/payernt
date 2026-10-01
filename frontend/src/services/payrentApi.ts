@@ -16,17 +16,27 @@ const getApiBase = () => {
   if (typeof window !== "undefined") {
     const win = window as unknown as { PAYENT_API_URL?: string };
     if (win.PAYENT_API_URL) return win.PAYENT_API_URL;
-  }
-  if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL;
-  }
-  if (import.meta.env.VITE_PAYERNT_API_URL) {
-    return import.meta.env.VITE_PAYERNT_API_URL;
-  }
-  if (typeof window !== "undefined") {
     const host = window.location.hostname;
+    if (host === "10.0.2.2") return "http://10.0.2.2:8001";
     const isLocal = host === "localhost" || host === "127.0.0.1";
     if (isLocal) return "http://127.0.0.1:8001";
+    if (host.endsWith(".vercel.app")) return "";
+  }
+  if (import.meta.env.VITE_API_URL) {
+    const apiUrl = import.meta.env.VITE_API_URL;
+    if (typeof window !== "undefined" && window.location.hostname === "10.0.2.2") {
+      return apiUrl.replace(/localhost|127\.0\.0\.1/, "10.0.2.2");
+    }
+    return apiUrl;
+  }
+  if (import.meta.env.VITE_PAYERNT_API_URL) {
+    const apiUrl = import.meta.env.VITE_PAYERNT_API_URL;
+    if (typeof window !== "undefined" && window.location.hostname === "10.0.2.2") {
+      return apiUrl.replace(/localhost|127\.0\.0\.1/, "10.0.2.2");
+    }
+    return apiUrl;
+  }
+  if (typeof window !== "undefined") {
     return window.location.origin;
   }
   return "";

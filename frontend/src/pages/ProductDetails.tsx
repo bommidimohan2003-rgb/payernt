@@ -662,7 +662,7 @@ export default function ProductDetails() {
                 </div>
                 <div className="p-3 rounded-2xl bg-secondary/40 border border-border/60">
                   <span className="text-[10px] uppercase font-bold text-muted-foreground block">Pickup Hub</span>
-                  <span className="font-extrabold text-foreground truncate block mt-0.5">{formatOwnerAddress(product) || product.location || "Direct Handover"}</span>
+                  <span className="font-extrabold text-foreground truncate block mt-0.5">{formatOwnerAddress(product) || "Direct Handover"}</span>
                 </div>
               </div>
             </div>

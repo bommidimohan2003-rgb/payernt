@@ -26,6 +26,7 @@ const getApiBase = () => {
   }
   if (typeof window !== "undefined") {
     const host = window.location.hostname;
+    if (host === "10.0.2.2") return "http://10.0.2.2:8001";
     const isLocal = host === "localhost" || host === "127.0.0.1";
     if (isLocal) return "http://127.0.0.1:8001";
     if (host.endsWith(".vercel.app")) {

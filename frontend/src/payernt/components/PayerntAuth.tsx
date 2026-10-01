@@ -322,7 +322,7 @@ export function PayerntAuth({
       </header>
 
       {/* Main Authentication Card */}
-      <main className="flex-1 flex items-center justify-center px-4 py-8 sm:py-12">
+      <main className="flex-1 flex items-center justify-start px-4 py-8 sm:py-12 sm:px-12 lg:px-20">
         <div className="w-full max-w-lg">
           <AnimatePresence mode="wait">
             {mode === "login" ? (
@@ -336,10 +336,6 @@ export function PayerntAuth({
               >
                 {/* Header */}
                 <div className="text-center space-y-1.5">
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary border border-primary/20 text-xs font-bold uppercase tracking-wider">
-                    <Sparkles className="h-3.5 w-3.5" />
-                    <span>Lender Authentication</span>
-                  </div>
                   <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground font-display">
                     Sign In to paye₹nt
                   </h1>
@@ -557,23 +553,20 @@ export function PayerntAuth({
                   </div>
 
                   {/* CHECK Button */}
-                  <div className="pt-1 pb-1">
+                  <div className="pt-1 pb-1 flex justify-end">
                     <button
                       type="button"
                       onClick={handleCheckUser}
                       disabled={isChecking}
-                      className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-primary/30 bg-primary/10 hover:bg-primary/20 text-primary font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shadow-xs disabled:opacity-60 disabled:cursor-not-allowed"
+                      className="w-[30%] min-w-[110px] flex items-center justify-center gap-2 py-2 px-3 rounded-xl border border-primary/30 bg-primary/10 hover:bg-primary/20 text-primary font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shadow-xs disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                       {isChecking ? (
                         <>
                           <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          <span>Checking Shared Database...</span>
+                          <span>Checking...</span>
                         </>
                       ) : (
-                        <>
-                          <Sparkles className="h-3.5 w-3.5" />
-                          <span>CHECK</span>
-                        </>
+                        <span>CHECK</span>
                       )}
                     </button>
                   </div>
@@ -695,32 +688,12 @@ export function PayerntAuth({
                       )}
                     </div>
 
-                    {/* Dynamic Password Requirements Checklist */}
-                    <div className="p-3.5 rounded-2xl border border-border/80 bg-secondary/30 space-y-1.5 text-[11px]">
-                      <p className="font-bold text-foreground">Password requirements:</p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                        <div className={`flex items-center gap-1.5 ${hasMinLen ? "text-emerald-500 font-semibold" : "text-muted-foreground"}`}>
-                          {hasMinLen ? <CheckCircle2 className="h-3.5 w-3.5 shrink-0" /> : <span className="h-3.5 w-3.5 rounded-full border border-muted-foreground/50 inline-block" />}
-                          <span>Minimum 8 characters</span>
-                        </div>
-                        <div className={`flex items-center gap-1.5 ${hasUppercase ? "text-emerald-500 font-semibold" : "text-muted-foreground"}`}>
-                          {hasUppercase ? <CheckCircle2 className="h-3.5 w-3.5 shrink-0" /> : <span className="h-3.5 w-3.5 rounded-full border border-muted-foreground/50 inline-block" />}
-                          <span>One uppercase letter</span>
-                        </div>
-                        <div className={`flex items-center gap-1.5 ${hasLowercase ? "text-emerald-500 font-semibold" : "text-muted-foreground"}`}>
-                          {hasLowercase ? <CheckCircle2 className="h-3.5 w-3.5 shrink-0" /> : <span className="h-3.5 w-3.5 rounded-full border border-muted-foreground/50 inline-block" />}
-                          <span>One lowercase letter</span>
-                        </div>
-                        <div className={`flex items-center gap-1.5 ${hasNumber ? "text-emerald-500 font-semibold" : "text-muted-foreground"}`}>
-                          {hasNumber ? <CheckCircle2 className="h-3.5 w-3.5 shrink-0" /> : <span className="h-3.5 w-3.5 rounded-full border border-muted-foreground/50 inline-block" />}
-                          <span>One number</span>
-                        </div>
-                        <div className={`flex items-center gap-1.5 sm:col-span-2 ${hasSpecial ? "text-emerald-500 font-semibold" : "text-muted-foreground"}`}>
-                          {hasSpecial ? <CheckCircle2 className="h-3.5 w-3.5 shrink-0" /> : <span className="h-3.5 w-3.5 rounded-full border border-muted-foreground/50 inline-block" />}
-                          <span>One special character (!@#$%^&*...)</span>
-                        </div>
-                      </div>
-                    </div>
+                    {/* Single-line password requirement hint when not yet fulfilling all rules */}
+                    {password.length > 0 && !isPasswordValid && (
+                      <p className="text-[11px] font-medium text-amber-500 dark:text-amber-400">
+                        Must be at least 8 characters with uppercase, lowercase, number & special character (!@#$%^&*...).
+                      </p>
+                    )}
 
                     {/* Confirm Password */}
                     <div className="space-y-1.5">

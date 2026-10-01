@@ -14,6 +14,7 @@ import {
   Compass,
   Sparkles,
   Loader2,
+  CheckCircle2,
 } from "lucide-react";
 import { useMemo, useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
@@ -60,7 +61,11 @@ const schema = z
     password: z
       .string()
       .min(8, "Password must be at least 8 characters")
-      .max(128),
+      .max(128, "Password cannot exceed 128 characters")
+      .refine((p) => /[A-Z]/.test(p), "Password must contain at least one uppercase letter")
+      .refine((p) => /[a-z]/.test(p), "Password must contain at least one lowercase letter")
+      .refine((p) => /[0-9]/.test(p), "Password must contain at least one number")
+      .refine((p) => /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?~`]/.test(p), "Password must contain at least one special character"),
     confirm: z.string().min(1, "Please confirm your password"),
     terms: z.literal(true, {
       errorMap: () => ({ message: "Please accept the Terms & Privacy Policy" }),
@@ -191,6 +196,11 @@ export function RegisterForm() {
   };
 
   const pw = watch("password") ?? "";
+  const hasMinLen = pw.length >= 8;
+  const hasUppercase = /[A-Z]/.test(pw);
+  const hasLowercase = /[a-z]/.test(pw);
+  const hasNumber = /[0-9]/.test(pw);
+  const hasSpecial = /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?~`]/.test(pw);
   const watchIsAdmin = watch("isAdmin") ?? false;
   const level = useMemo(() => strength(pw), [pw]);
   const labels = ["Weak", "Fair", "Good", "Strong", "Excellent"];
@@ -388,23 +398,20 @@ export function RegisterForm() {
       />
 
       {/* CHECK Button */}
-      <div className="pt-1 pb-1">
+      <div className="pt-1 pb-1 flex justify-end">
         <button
           type="button"
           onClick={handleCheckUser}
           disabled={isChecking}
-          className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-primary/30 bg-primary/10 hover:bg-primary/20 text-primary font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shadow-xs disabled:opacity-60 disabled:cursor-not-allowed"
+          className="w-[30%] min-w-[110px] flex items-center justify-center gap-2 py-2 px-3 rounded-xl border border-primary/30 bg-primary/10 hover:bg-primary/20 text-primary font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shadow-xs disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {isChecking ? (
             <>
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              <span>Checking Shared Database...</span>
+              <span>Checking...</span>
             </>
           ) : (
-            <>
-              <Sparkles className="h-3.5 w-3.5" />
-              <span>CHECK</span>
-            </>
+            <span>CHECK</span>
           )}
         </button>
       </div>
@@ -477,32 +484,11 @@ export function RegisterForm() {
         />
       </div>
 
-      {/* Password Strength Indicator */}
-      {pw && (
-        <div className="space-y-1 p-2.5 rounded-xl bg-secondary/50 border border-border/60">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground font-medium">
-              Password Security:
-            </span>
-            <span className="font-bold text-foreground">{labels[level]}</span>
-          </div>
-          <div className="h-1.5 rounded-full bg-secondary overflow-hidden">
-            <div
-              className="h-full transition-all duration-300 rounded-full"
-              style={{
-                width: `${(level / 4) * 100}%`,
-                backgroundColor:
-                  level < 2
-                    ? "#E63946"
-                    : level < 3
-                      ? "#F59E0B"
-                      : level < 4
-                        ? "#3B82F6"
-                        : "#10B981",
-              }}
-            />
-          </div>
-        </div>
+      {/* Single-line password requirement hint when not yet fulfilling all rules */}
+      {pw.length > 0 && !(hasMinLen && hasUppercase && hasLowercase && hasNumber && hasSpecial) && (
+        <p className="text-[11px] font-medium text-amber-500 dark:text-amber-400">
+          Must be at least 8 characters with uppercase, lowercase, number & special character (!@#$%^&*...).
+        </p>
       )}
 
       {showAdminOption && (

@@ -195,8 +195,10 @@ export function advancedSearch(
     const descLower = product.description.toLowerCase();
     const catLower = product.category.toLowerCase();
     const ownerLower = product.owner?.name?.toLowerCase() || "";
+    const rawLoc = product.location;
+    const locStr = typeof rawLoc === "string" ? rawLoc : (rawLoc && typeof rawLoc === "object" ? Object.values(rawLoc).filter(v => typeof v === "string").join(" ") : "");
     const locLower = [
-      product.location,
+      locStr,
       product.owner?.city,
       product.owner?.state,
       product.owner?.address,
@@ -453,12 +455,17 @@ export const METRO_CLUSTERS: Record<string, string[]> = {
 };
 
 export function getProductLocationString(p: Product): string {
+  const rawLoc = p.location;
+  const locStr = typeof rawLoc === "string" ? rawLoc : (rawLoc && typeof rawLoc === "object" ? Object.values(rawLoc).filter(v => typeof v === "string").join(" ") : "");
+  const ownerRawLoc = p.owner?.location;
+  const ownerLocStr = typeof ownerRawLoc === "string" ? ownerRawLoc : (ownerRawLoc && typeof ownerRawLoc === "object" ? Object.values(ownerRawLoc).filter(v => typeof v === "string").join(" ") : "");
+
   const parts = [
-    p.location,
+    locStr,
     p.owner?.city,
     p.owner?.state,
     p.owner?.address,
-    p.owner?.location,
+    ownerLocStr,
     (p as Product & { owner_city?: string }).owner_city,
     (p as Product & { owner_address?: string }).owner_address,
     (p as Product & { owner_state?: string }).owner_state,

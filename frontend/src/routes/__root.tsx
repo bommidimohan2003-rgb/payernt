@@ -9,7 +9,7 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, MotionConfig } from "framer-motion";
 import { HelpChatbot } from "../components/common/HelpChatbot";
 import { api } from "../utils/api";
 import { storage, STORAGE_KEYS } from "../utils/storage";
@@ -146,6 +146,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 );
 
 function RootShell({ children }: { children: ReactNode }) {
+  const isClientOnly = typeof window !== "undefined" && !!document.getElementById("root");
+
+  if (isClientOnly) {
+    return <>{children}</>;
+  }
+
   return (
     <html lang="en">
       <head>
@@ -189,7 +195,8 @@ function RootContent() {
 
   const isGateway = pathname === "/" || pathname === "/select";
   const isPayernt =
-    pathname === "/payernt" ||
+    pathname.startsWith("/payernt") ||
+    pathname.startsWith("/paye₹nt") ||
     pathname === "/become-lender" ||
     pathname === "/lender-portal";
   const hideMainNavigation = isGateway || isPayernt || pathname.startsWith("/admin");
@@ -329,11 +336,13 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <CartProvider>
-        <OriginRevealProvider>
-          <RootContent />
-        </OriginRevealProvider>
-      </CartProvider>
+      <MotionConfig reducedMotion="user">
+        <CartProvider>
+          <OriginRevealProvider>
+            <RootContent />
+          </OriginRevealProvider>
+        </CartProvider>
+      </MotionConfig>
     </QueryClientProvider>
   );
 }

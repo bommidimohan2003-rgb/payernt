@@ -183,23 +183,9 @@ export default function Categories() {
   const [availableOnlyFilter, setAvailableOnlyFilter] = useState<boolean>(false);
 
   const [allProductsList, setAllProductsList] = useState<Product[]>(() => {
-    try {
-      const stored = localStorage.getItem("payernt_products_v2");
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {}
     return storage.get<Product[]>("payent_server_products", []);
   });
   const [isLoadingProducts, setIsLoadingProducts] = useState<boolean>(() => {
-    try {
-      const stored = localStorage.getItem("payernt_products_v2");
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) return false;
-      }
-    } catch {}
     const cached = storage.get<Product[]>("payent_server_products", []);
     return cached.length === 0;
   });
@@ -314,23 +300,18 @@ export default function Categories() {
 
   // Fetch real products from backend and sync with Payernt store
   const fetchPublicProducts = useCallback(() => {
-    try {
-      const stored = localStorage.getItem("payernt_products_v2");
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setAllProductsList(parsed);
-          storage.set("payent_server_products", parsed);
-        }
-      }
-    } catch {}
-
     api
       .getPublicProducts()
       .then((serverProducts) => {
-        if (Array.isArray(serverProducts) && serverProducts.length > 0) {
+        if (Array.isArray(serverProducts)) {
           setAllProductsList(serverProducts);
           storage.set("payent_server_products", serverProducts);
+          if (serverProducts.length === 0) {
+            try {
+              localStorage.removeItem("payernt_products_v2");
+              localStorage.removeItem("paye₹nt_products");
+            } catch {}
+          }
         }
       })
       .catch((err) => {

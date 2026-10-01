@@ -82,8 +82,6 @@ export function Features() {
       ref={ref}
       className="relative py-12 px-4 sm:px-6 overflow-hidden bg-background text-foreground border-t border-border"
     >
-      {/* Subtle Dot Grid */}
-      <div className="absolute inset-0 bg-[radial-gradient(currentColor_1px,transparent_1px)] [background-size:32px_32px] opacity-5 pointer-events-none" />
 
       <div className="relative max-w-7xl mx-auto">
         {/* Section heading */}

@@ -13,9 +13,6 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          if (id.includes("src/admin") || id.includes("src\\admin")) {
-            return "admin-portal";
-          }
           if (id.includes("node_modules")) {
             if (id.includes("lucide-react")) return "vendor-icons";
             if (id.includes("recharts")) return "vendor-charts";

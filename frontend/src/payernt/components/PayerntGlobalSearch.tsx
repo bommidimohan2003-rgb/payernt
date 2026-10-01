@@ -11,10 +11,11 @@ import {
   MessageSquare,
   BarChart3,
   User,
-  HelpCircle,
   CornerDownLeft,
   Sparkles,
 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import type { PayerntProduct, RentalRequest } from "../types";
 
 export interface PageRegistryItem {
   id: string;
@@ -30,8 +31,8 @@ export const PAYERNT_PAGE_REGISTRY: PageRegistryItem[] = [
   {
     id: "home",
     tab: "home",
-    title: "Home Dashboard",
-    description: "Overview, revenue metrics and lending activity",
+    title: "Overview",
+    description: "Revenue metrics, performance charts and live status",
     keywords: ["home", "dashboard", "overview", "main", "command center", "stats", "metrics"],
     icon: Package,
   },
@@ -39,314 +40,392 @@ export const PAYERNT_PAGE_REGISTRY: PageRegistryItem[] = [
     id: "products",
     tab: "products",
     title: "My Listings",
-    description: "Manage listed gear, pricing, and availability schedules",
-    keywords: ["listings", "my listings", "gear", "equipment", "products", "inventory", "items", "catalog", "list"],
+    description: "Manage listed gear, verification status, and daily rates",
+    keywords: ["listings", "my listings", "gear", "equipment", "products", "inventory", "items", "catalog"],
     icon: Layers,
   },
   {
     id: "list",
     tab: "list",
     title: "Create Listing",
-    description: "List new cameras, laptops, drones, or equipment",
+    description: "List new cameras, laptops, audio gear, or equipment",
     keywords: ["create", "create listing", "add gear", "new listing", "post", "upload", "add equipment", "list"],
     icon: Plus,
-    badge: "New",
+    badge: "Action",
   },
   {
     id: "requests",
     tab: "requests",
-    title: "Bookings",
-    description: "Review borrower reservations and handover requests",
-    keywords: ["bookings", "rental requests", "reservations", "rentals", "handover", "orders", "borrow", "book"],
+    title: "Bookings & Handover",
+    description: "Review borrower reservations, handover PINs, and returns",
+    keywords: ["bookings", "rental requests", "reservations", "rentals", "handover", "orders", "borrow", "book", "pin"],
     icon: Calendar,
   },
   {
     id: "wallet",
     tab: "wallet",
-    title: "Wallet & Banking",
-    description: "Balance, escrow holdings, withdrawals and bank accounts",
-    keywords: ["wallet", "balance", "earnings", "earn", "withdraw", "payout", "bank", "escrow", "funds", "revenue", "wal"],
+    title: "Wallet & Payouts",
+    description: "Available balance, escrow holdings, withdrawals and bank account",
+    keywords: ["wallet", "balance", "earnings", "earn", "withdraw", "payout", "bank", "escrow", "funds", "revenue"],
     icon: Wallet,
   },
   {
     id: "messages",
     tab: "messages",
     title: "Messages",
-    description: "Admin notices, product reviews and revision requests",
+    description: "Admin notices, product reviews and platform alerts",
     keywords: ["messages", "msg", "admin", "review", "revision", "chat", "inbox", "alerts", "notifications", "updates"],
     icon: MessageSquare,
   },
   {
     id: "analytics",
     tab: "home",
-    title: "Analytics",
-    description: "Earnings breakdown, revenue charts, and yield performance",
-    keywords: ["analytics", "revenue", "charts", "graphs", "performance", "yield", "reports", "stats", "analyt"],
+    title: "Analytics & Performance",
+    description: "Earnings trends, rental volume and monthly performance",
+    keywords: ["analytics", "revenue", "charts", "graphs", "performance", "yield", "reports", "stats"],
     icon: BarChart3,
   },
   {
     id: "profile",
     tab: "profile",
     title: "Profile & KYC",
-    description: "Identity verification, security PIN and contact settings",
-    keywords: ["profile", "settings", "kyc", "aadhaar", "security", "pin", "contact", "account", "sett", "prof"],
+    description: "Identity verification, security PIN and account details",
+    keywords: ["profile", "settings", "kyc", "aadhaar", "security", "pin", "contact", "account"],
     icon: User,
-  },
-  {
-    id: "support",
-    tab: "profile",
-    title: "Help & Support",
-    description: "Lender documentation, FAQ and dispute assistance",
-    keywords: ["help", "support", "faq", "guide", "dispute", "assistance", "contact support", "docs"],
-    icon: HelpCircle,
   },
 ];
 
 interface PayerntGlobalSearchProps {
+  isOpen: boolean;
+  onClose: () => void;
   onNavigate: (tab: "home" | "products" | "requests" | "wallet" | "profile" | "list" | "messages") => void;
-  onScrollToSection?: (sectionId: string) => void;
+  products?: PayerntProduct[];
+  rentalRequests?: RentalRequest[];
+  onSelectProduct?: (productId: string) => void;
   unreadMessagesCount?: number;
 }
 
 export function PayerntGlobalSearch({
+  isOpen,
+  onClose,
   onNavigate,
-  onScrollToSection,
+  products = [],
+  rentalRequests = [],
+  onSelectProduct,
   unreadMessagesCount = 0,
 }: PayerntGlobalSearchProps) {
-  const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Filter matching pages only when user types
+  // Auto-focus on open
+  useEffect(() => {
+    if (isOpen) {
+      setQuery("");
+      setSelectedIndex(0);
+      setTimeout(() => inputRef.current?.focus(), 50);
+    }
+  }, [isOpen]);
+
+  // Global key shortcut listener for Cmd+K / Ctrl+K and Esc
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        if (isOpen) {
+          onClose();
+        }
+      } else if (e.key === "Escape" && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, [isOpen, onClose]);
+
+  // Filter matching pages
   const matchingPages = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) {
-      return [];
-    }
+    if (!q) return PAYERNT_PAGE_REGISTRY.slice(0, 6);
 
     return PAYERNT_PAGE_REGISTRY.filter((page) => {
-      // Direct match
       if (page.title.toLowerCase().includes(q)) return true;
       if (page.description.toLowerCase().includes(q)) return true;
-      // Keywords fuzzy prefix / substring match
       return page.keywords.some((kw) => kw.includes(q) || q.includes(kw));
     });
   }, [query]);
 
-  // Reset selected index on query change
+  // Filter matching products
+  const matchingProducts = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    return products
+      .filter((p) => {
+        return (
+          p.title?.toLowerCase().includes(q) ||
+          p.category?.toLowerCase().includes(q) ||
+          p.brand?.toLowerCase().includes(q)
+        );
+      })
+      .slice(0, 4);
+  }, [query, products]);
+
+  // Total results combined
+  const totalItemsCount = matchingPages.length + matchingProducts.length;
+
   useEffect(() => {
     setSelectedIndex(0);
   }, [query]);
 
-  // Handle outside click to close dropdown
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(e.target as Node) &&
-        inputRef.current &&
-        !inputRef.current.contains(e.target as Node)
-      ) {
-        setIsOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  // Handle page selection and navigation
   const handleSelectPage = (page: PageRegistryItem) => {
-    setIsOpen(false);
-    setQuery("");
+    onClose();
+    onNavigate(page.tab);
+  };
 
-    if (page.id === "analytics") {
-      onNavigate("home");
-      setTimeout(() => {
-        const el = document.getElementById("analytics-section");
-        if (el) {
-          el.scrollIntoView({ behavior: "smooth" });
-        } else if (onScrollToSection) {
-          onScrollToSection("analytics-section");
-        }
-      }, 100);
+  const handleSelectProductItem = (productId: string) => {
+    onClose();
+    if (onSelectProduct) {
+      onSelectProduct(productId);
     } else {
-      onNavigate(page.tab);
+      onNavigate("products");
     }
   };
 
-  // Keyboard navigation
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (!query.trim()) return;
-
-    if (!isOpen && (e.key === "ArrowDown" || e.key === "Enter")) {
-      setIsOpen(true);
-      return;
-    }
-
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setSelectedIndex((prev) => (matchingPages.length > 0 ? (prev + 1) % matchingPages.length : 0));
+      setSelectedIndex((prev) => (totalItemsCount > 0 ? (prev + 1) % totalItemsCount : 0));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setSelectedIndex((prev) => (matchingPages.length > 0 ? (prev - 1 + matchingPages.length) % matchingPages.length : 0));
+      setSelectedIndex((prev) => (totalItemsCount > 0 ? (prev - 1 + totalItemsCount) % totalItemsCount : 0));
     } else if (e.key === "Enter") {
       e.preventDefault();
-      if (matchingPages.length > 0 && matchingPages[selectedIndex]) {
-        handleSelectPage(matchingPages[selectedIndex]);
+      if (selectedIndex < matchingPages.length) {
+        const page = matchingPages[selectedIndex];
+        if (page) handleSelectPage(page);
+      } else {
+        const prodIndex = selectedIndex - matchingPages.length;
+        const prod = matchingProducts[prodIndex];
+        if (prod) handleSelectProductItem(prod.id);
       }
     } else if (e.key === "Escape") {
-      setIsOpen(false);
-      inputRef.current?.blur();
+      onClose();
     }
   };
 
   return (
-    <div className="relative w-full max-w-xs sm:max-w-md">
-      {/* SEARCH INPUT BAR */}
-      <div className="relative">
-        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-        <input
-          ref={inputRef}
-          type="text"
-          value={query}
-          onFocus={() => {
-            if (query.trim()) setIsOpen(true);
-          }}
-          onChange={(e) => {
-            const val = e.target.value;
-            setQuery(val);
-            setIsOpen(val.trim().length > 0);
-          }}
-          onKeyDown={handleKeyDown}
-          placeholder="Search pages (e.g. wallet, bookings, listings)..."
-          className="w-full pl-9 pr-8 py-2 rounded-xl border border-border/80 bg-card text-xs text-foreground placeholder:text-muted-foreground/80 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all shadow-2xs"
-          aria-label="Global page navigation search"
-        />
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-16 sm:pt-24 px-4">
+          {/* Backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="fixed inset-0 bg-background/80 backdrop-blur-md"
+          />
 
-        {query ? (
-          <button
-            onClick={() => {
-              setQuery("");
-              setIsOpen(false);
-              inputRef.current?.focus();
-            }}
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground cursor-pointer"
+          {/* Modal Command Palette */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96, y: -10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.96, y: -10 }}
+            transition={{ duration: 0.15 }}
+            className="relative w-full max-w-xl bg-card border border-border rounded-2xl shadow-2xl overflow-hidden z-10 flex flex-col"
           >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        ) : (
-          <div className="absolute right-2.5 top-1/2 -translate-y-1/2 hidden sm:flex items-center gap-1 pointer-events-none text-[10px] text-muted-foreground font-mono bg-secondary px-1.5 py-0.5 rounded border border-border/60">
-            <span>⌘K</span>
-          </div>
-        )}
-      </div>
-
-      {/* SEARCH DROPDOWN PANEL */}
-      {isOpen && query.trim().length > 0 && (
-        <div
-          ref={dropdownRef}
-          className="absolute left-0 right-0 top-full mt-2 rounded-2xl border border-border bg-card p-2 shadow-2xl z-50 text-left space-y-1 max-h-96 overflow-y-auto backdrop-blur-md animate-in fade-in-0 zoom-in-95 duration-100"
-        >
-          {/* Header label */}
-          <div className="flex items-center justify-between px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground border-b border-border/50">
-            <span className="flex items-center gap-1.5">
-              <Sparkles className="h-3 w-3 text-emerald-500" />
-              Matching Pages
-            </span>
-            <span className="text-[9px] lowercase font-normal">use ↑↓ arrows to navigate</span>
-          </div>
-
-          {/* Results list */}
-          {matchingPages.length === 0 ? (
-            <div className="p-6 text-center space-y-3">
-              <p className="font-bold text-xs text-foreground">No matching page found</p>
-              <p className="text-[11px] text-muted-foreground">
-                Try searching for:
-              </p>
-              <div className="flex flex-wrap items-center justify-center gap-1.5 pt-1">
-                {["Wallet", "Bookings", "Listings", "Messages", "Analytics"].map((suggestion) => (
-                  <button
-                    key={suggestion}
-                    onClick={() => {
-                      setQuery(suggestion.toLowerCase());
-                      inputRef.current?.focus();
-                    }}
-                    className="px-2 py-1 rounded-lg bg-secondary hover:bg-secondary/80 text-[11px] font-semibold text-foreground border border-border transition-colors cursor-pointer"
-                  >
-                    {suggestion}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : (
-            matchingPages.map((page, index) => {
-              const isSelected = index === selectedIndex;
-              const PageIcon = page.icon;
-              const isMessages = page.id === "messages";
-
-              return (
-                <div
-                  key={page.id}
-                  onClick={() => handleSelectPage(page)}
-                  onMouseEnter={() => setSelectedIndex(index)}
-                  className={`flex items-center justify-between p-2.5 rounded-xl transition-all cursor-pointer ${
-                    isSelected
-                      ? "bg-secondary text-foreground font-bold shadow-2xs"
-                      : "text-foreground hover:bg-secondary/60"
-                  }`}
+            {/* Input Header */}
+            <div className="flex items-center px-4 py-3.5 border-b border-border bg-muted/20">
+              <Search className="h-4 w-4 text-muted-foreground mr-3 shrink-0" />
+              <input
+                ref={inputRef}
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Search pages, products or actions..."
+                className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+              />
+              {query && (
+                <button
+                  onClick={() => {
+                    setQuery("");
+                    inputRef.current?.focus();
+                  }}
+                  className="p-1 rounded-md text-muted-foreground hover:text-foreground mr-1 cursor-pointer"
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div
-                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border ${
-                        isSelected
-                          ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
-                          : "bg-secondary/80 text-muted-foreground border-border"
-                      }`}
-                    >
-                      <PageIcon className="h-4 w-4" />
-                    </div>
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+              <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.5 text-[10px] font-mono rounded bg-muted border border-border text-muted-foreground">
+                ESC
+              </kbd>
+            </div>
 
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold truncate leading-tight">
-                          {page.title}
-                        </span>
-                        {page.badge && (
-                          <span className="px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-black text-[9px] uppercase tracking-wider border border-emerald-500/20">
-                            {page.badge}
-                          </span>
-                        )}
-                        {isMessages && unreadMessagesCount > 0 && (
-                          <span className="px-1.5 py-0.2 rounded-full bg-emerald-500 text-white font-black text-[9px]">
-                            {unreadMessagesCount} new
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[10px] text-muted-foreground truncate font-medium">
-                        {page.description}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-1 pl-2 text-muted-foreground">
-                    {isSelected ? (
-                      <div className="flex items-center gap-1 text-[10px] font-mono text-emerald-600 dark:text-emerald-400">
-                        <CornerDownLeft className="h-3 w-3" />
-                      </div>
-                    ) : (
-                      <ArrowRight className="h-3.5 w-3.5 opacity-40" />
-                    )}
-                  </div>
+            {/* Results Body */}
+            <div className="max-h-96 overflow-y-auto p-2 space-y-1">
+              {/* Pages Section */}
+              {matchingPages.length > 0 && (
+                <div className="px-2 py-1">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground font-semibold">
+                    QUICK ACCESS
+                  </span>
                 </div>
-              );
-            })
-          )}
+              )}
+
+              {matchingPages.map((page, index) => {
+                const isSelected = index === selectedIndex;
+                const PageIcon = page.icon;
+
+                return (
+                  <button
+                    key={page.id}
+                    onClick={() => handleSelectPage(page)}
+                    onMouseEnter={() => setSelectedIndex(index)}
+                    className={`w-full flex items-center justify-between p-2.5 rounded-xl text-left transition-all cursor-pointer ${
+                      isSelected
+                        ? "bg-primary text-primary-foreground shadow-xs"
+                        : "text-foreground hover:bg-muted"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div
+                        className={`p-1.5 rounded-lg border ${
+                          isSelected
+                            ? "bg-primary-foreground/20 border-primary-foreground/30 text-primary-foreground"
+                            : "bg-muted border-border text-muted-foreground"
+                        }`}
+                      >
+                        <PageIcon className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold truncate leading-tight">
+                            {page.title}
+                          </span>
+                          {page.badge && (
+                            <span
+                              className={`px-1.5 py-0.2 rounded text-[9px] font-medium uppercase tracking-wider ${
+                                isSelected
+                                  ? "bg-primary-foreground/20 text-primary-foreground"
+                                  : "bg-primary/10 text-primary"
+                              }`}
+                            >
+                              {page.badge}
+                            </span>
+                          )}
+                        </div>
+                        <p
+                          className={`text-[11px] truncate ${
+                            isSelected ? "text-primary-foreground/80" : "text-muted-foreground"
+                          }`}
+                        >
+                          {page.description}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1 pl-2 shrink-0">
+                      {isSelected ? (
+                        <CornerDownLeft className="h-3.5 w-3.5" />
+                      ) : (
+                        <ArrowRight className="h-3.5 w-3.5 opacity-40" />
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+
+              {/* Matching Products Section */}
+              {matchingProducts.length > 0 && (
+                <>
+                  <div className="px-2 pt-3 pb-1 border-t border-border mt-2">
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground font-semibold">
+                      LISTED GEAR
+                    </span>
+                  </div>
+                  {matchingProducts.map((prod, pIdx) => {
+                    const itemIndex = matchingPages.length + pIdx;
+                    const isSelected = itemIndex === selectedIndex;
+
+                    return (
+                      <button
+                        key={prod.id}
+                        onClick={() => handleSelectProductItem(prod.id)}
+                        onMouseEnter={() => setSelectedIndex(itemIndex)}
+                        className={`w-full flex items-center justify-between p-2.5 rounded-xl text-left transition-all cursor-pointer ${
+                          isSelected
+                            ? "bg-primary text-primary-foreground shadow-xs"
+                            : "text-foreground hover:bg-muted"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div
+                            className={`p-1.5 rounded-lg border ${
+                              isSelected
+                                ? "bg-primary-foreground/20 border-primary-foreground/30 text-primary-foreground"
+                                : "bg-muted border-border text-muted-foreground"
+                            }`}
+                          >
+                            <Package className="h-4 w-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <span className="text-xs font-semibold truncate block leading-tight">
+                              {prod.title}
+                            </span>
+                            <span
+                              className={`text-[10px] font-mono block ${
+                                isSelected ? "text-primary-foreground/80" : "text-muted-foreground"
+                              }`}
+                            >
+                              ₹{prod.dailyRate}/day • {prod.category || "Gear"} • {prod.verificationStatus}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1 pl-2 shrink-0">
+                          {isSelected ? (
+                            <CornerDownLeft className="h-3.5 w-3.5" />
+                          ) : (
+                            <ArrowRight className="h-3.5 w-3.5 opacity-40" />
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </>
+              )}
+
+              {/* Empty State */}
+              {totalItemsCount === 0 && (
+                <div className="py-8 text-center space-y-2">
+                  <p className="text-xs font-medium text-foreground">No matching pages or gear found</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Try searching for "wallet", "listings", "bookings", or "create"
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer Shortcuts */}
+            <div className="px-4 py-2.5 border-t border-border bg-muted/30 flex items-center justify-between text-[11px] text-muted-foreground">
+              <div className="flex items-center gap-3">
+                <span className="flex items-center gap-1">
+                  <kbd className="px-1 rounded bg-muted border border-border font-mono text-[9px]">↑</kbd>
+                  <kbd className="px-1 rounded bg-muted border border-border font-mono text-[9px]">↓</kbd>
+                  <span>Navigate</span>
+                </span>
+                <span className="flex items-center gap-1">
+                  <kbd className="px-1 rounded bg-muted border border-border font-mono text-[9px]">↵</kbd>
+                  <span>Select</span>
+                </span>
+              </div>
+              <span className="font-mono text-[10px]">paYent Command Search</span>
+            </div>
+          </motion.div>
         </div>
       )}
-    </div>
+    </AnimatePresence>
   );
 }
 

@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite dev",
     "start": "vite --host 0.0.0.0 --port $PORT",
-    "dev:backend": "python -m uvicorn backend.main:app --reload --host 127.0.0.1 --port 8001 --reload-dir backend",
+    "dev:backend": "python -m uvicorn backend.main:app --reload --host 0.0.0.0 --port 8001 --reload-dir backend",
     "dev:all": "start npm run dev:backend && npm run dev",
     "build": "vite build",
     "build:dev": "vite build --mode development",

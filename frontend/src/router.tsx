@@ -1,5 +1,5 @@
 import { QueryClient } from "@tanstack/react-query";
-import { createRouter } from "@tanstack/react-router";
+import { createRouter, createHashHistory } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
 
 export const getRouter = () => {
@@ -19,9 +19,12 @@ export const getRouter = () => {
     },
   });
 
+  const isCapacitor = typeof window !== "undefined" && ((window as any).Capacitor || window.location.protocol === "file:" || window.location.hostname === "localhost");
+
   const router = createRouter({
     routeTree,
     context: { queryClient },
+    history: isCapacitor ? createHashHistory() : undefined,
     scrollRestoration: true,
     defaultPreload: "intent",
     defaultPreloadStaleTime: 1000 * 60 * 5,

@@ -17,10 +17,10 @@ import { Pagination } from "../components/layout/Pagination";
 import { productsService } from "../services/products";
 import { AdminProduct } from "../services/api";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
-import { useNavigate, useSearch } from "@tanstack/react-router";
+import { useNavigate, useSearch, Link } from "@tanstack/react-router";
 import { adminWS } from "../services/websocket";
 import { AdminProductImage } from "../components/common/AdminProductImage";
+import { cn } from "@/lib/utils";
 
 export default function Products() {
   const [products, setProducts] = useState<AdminProduct[]>([]);
@@ -161,8 +161,16 @@ export default function Products() {
     }
 
     if (statusFilter !== "all") {
-      if (statusFilter === "live") {
+      if (statusFilter === "live" || statusFilter === "approved") {
         result = result.filter((p) => p.status === "approved" && !p.hidden);
+      } else if (statusFilter === "pending") {
+        result = result.filter((p) => p.status === "pending" || p.status === "under_review");
+      } else if (statusFilter === "needs_correction") {
+        result = result.filter((p) => p.status === "needs_correction");
+      } else if (statusFilter === "price_not_set") {
+        result = result.filter((p) => !p.approvedPriceRange);
+      } else if (statusFilter === "price_set") {
+        result = result.filter((p) => Boolean(p.approvedPriceRange));
       } else if (statusFilter === "suspended") {
         result = result.filter((p) => p.hidden || (!p.available && p.status === "approved"));
       } else {
@@ -198,13 +206,13 @@ export default function Products() {
   const columns: Column<AdminProduct>[] = [
     {
       key: "product",
-      label: "Gear Item",
+      label: "Equipment Item",
       render: (row) => (
         <div className="flex items-center gap-3">
           <AdminProductImage src={row.image} alt={row.title} className="w-10 h-10 rounded-lg" />
           <div className="min-w-0">
             <div className="font-bold text-foreground truncate max-w-xs">{row.title}</div>
-            <div className="text-[11px] text-muted-foreground truncate">{row.category}</div>
+            <div className="text-[11px] text-muted-foreground truncate">{row.category} {row.brand ? `• ${row.brand}` : ""}</div>
           </div>
         </div>
       ),
@@ -220,22 +228,36 @@ export default function Products() {
       ),
     },
     {
-      key: "price",
-      label: "Rental Rate",
-      sortable: true,
-      render: (row) => (
-        <span className="font-mono font-bold text-foreground text-xs">
-          ₹{(row.price || 0).toLocaleString("en-IN")}/day
-        </span>
-      ),
+      key: "priceStatus",
+      label: "Approved Price Range",
+      render: (row) => {
+        if (row.approvedPriceRange) {
+          return (
+            <div className="flex flex-col">
+              <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-xs">
+                ₹{row.approvedPriceRange.minPrice.toLocaleString("en-IN")} — ₹{row.approvedPriceRange.maxPrice.toLocaleString("en-IN")}
+              </span>
+              <span className="text-[9px] font-mono text-muted-foreground uppercase">
+                /{row.approvedPriceRange.unit || "day"} • SET
+              </span>
+            </div>
+          );
+        }
+        return (
+          <span className="inline-block px-2 py-0.5 rounded text-[10px] font-mono font-semibold uppercase bg-muted text-muted-foreground border border-border/60">
+            PRICE NOT SET
+          </span>
+        );
+      },
     },
     {
       key: "status",
-      label: "Approval Status",
+      label: "Review Status",
       sortable: true,
       render: (row) => {
         const isApproved = row.status === "approved";
-        const isPending = row.status === "pending";
+        const isPending = row.status === "pending" || row.status === "under_review";
+        const isNeedsCorrection = row.status === "needs_correction";
         const isRejected = row.status === "rejected";
 
         return (
@@ -247,13 +269,15 @@ export default function Products() {
                   ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
                   : isPending
                   ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
+                  : isNeedsCorrection
+                  ? "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20"
                   : isRejected
                   ? "bg-destructive/10 text-destructive border-destructive/20"
                   : "bg-secondary text-muted-foreground border-border/60"
               )}
             >
               <span className="h-1.5 w-1.5 rounded-full bg-current" />
-              {row.status}
+              {isPending ? "Pending Review" : isNeedsCorrection ? "Needs Revision" : row.status}
             </span>
             {row.hidden && (
               <span className="text-[9px] font-mono text-muted-foreground bg-secondary px-1.5 py-0.5 rounded border border-border/60">
@@ -266,48 +290,29 @@ export default function Products() {
     },
     {
       key: "createdAt",
-      label: "Listed Date",
+      label: "Submitted Date",
       sortable: true,
       render: (row) => (
         <span className="text-xs text-muted-foreground font-mono">
-          {row.createdAt ? new Date(row.createdAt).toLocaleDateString() : "—"}
+          {row.createdAt ? new Date(row.createdAt).toLocaleDateString("en-IN") : "—"}
         </span>
       ),
     },
     {
       key: "actions",
-      label: "Actions",
+      label: "Review & Actions",
       align: "right",
       render: (row) => (
         <div className="flex items-center justify-end gap-1.5">
-          <button
-            onClick={() => navigate({ to: `/admin/products/${row.id}` as unknown as "/admin/dashboard" })}
-            className="p-1.5 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground transition-all cursor-pointer"
-            title="Inspect product detail"
+          <Link
+            to="/admin/products/$id"
+            params={{ id: row.id }}
+            className="px-2.5 py-1 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
+            title="Open complete product review"
           >
-            <Eye className="h-3.5 w-3.5" />
-          </button>
-
-          {row.status === "pending" && (
-            <>
-              <button
-                onClick={() => handleApprove(row.id, row.title)}
-                disabled={actionLoadingId === row.id}
-                className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 border border-emerald-500/20 transition-all cursor-pointer"
-                title="Approve listing"
-              >
-                <CheckCircle className="h-3.5 w-3.5" />
-              </button>
-              <button
-                onClick={() => handleReject(row.id, row.title)}
-                disabled={actionLoadingId === row.id}
-                className="p-1.5 rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20 border border-destructive/20 transition-all cursor-pointer"
-                title="Reject listing"
-              >
-                <XCircle className="h-3.5 w-3.5" />
-              </button>
-            </>
-          )}
+            <span>Review</span>
+            <Eye className="h-3 w-3" />
+          </Link>
 
           <button
             onClick={() => handleToggleHide(row.id)}
@@ -337,10 +342,10 @@ export default function Products() {
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-2 border-b border-border/50">
         <div>
           <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground">
-            Products
+            Products &amp; Moderation
           </h1>
           <p className="text-xs text-muted-foreground mt-0.5 font-medium">
-            Catalog moderation, gear inventory, and listing review workflows
+            Review lender listings, configure approved rental pricing ranges, and manage marketplace catalogue.
           </p>
         </div>
 
@@ -354,12 +359,15 @@ export default function Products() {
         </button>
       </div>
 
-      {/* TABS: ALL | PENDING | LIVE | REJECTED | SUSPENDED */}
+      {/* TABS: ALL | PENDING | APPROVED | REVISION REQUIRED | REJECTED | PRICE NOT SET | PRICE SET */}
       <div className="flex items-center gap-1.5 border-b border-border/40 pb-2 overflow-x-auto no-scrollbar">
         {[
           { id: "all", label: "All Listings" },
           { id: "pending", label: "Pending Review" },
-          { id: "live", label: "Live Active" },
+          { id: "approved", label: "Approved" },
+          { id: "needs_correction", label: "Needs Revision" },
+          { id: "price_not_set", label: "Price Not Set" },
+          { id: "price_set", label: "Price Set" },
           { id: "rejected", label: "Rejected" },
           { id: "suspended", label: "Suspended / Hidden" },
         ].map((tab) => (

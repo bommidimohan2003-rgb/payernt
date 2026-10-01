@@ -171,6 +171,23 @@ export interface PayerntProduct {
   availabilityStatus: ProductAvailability;
   totalRentalsCount: number;
   totalEarningsGenerated: number;
+  approvedPriceRange?: {
+    minPrice: number;
+    maxPrice: number;
+    unit: "day" | "hour" | "week" | "month";
+    approvedAt?: string;
+    approvedBy?: string;
+  };
+  priceHistory?: Array<{
+    id: string;
+    minPrice: number;
+    maxPrice: number;
+    unit: string;
+    previousMinPrice?: number;
+    previousMaxPrice?: number;
+    updatedBy: string;
+    updatedAt: string;
+  }>;
   ownerAccountType?: "paye₹nt";
   vendorSecretPin?: string;
   submittedAt?: string;

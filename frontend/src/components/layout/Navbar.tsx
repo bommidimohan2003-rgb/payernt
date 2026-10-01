@@ -23,21 +23,26 @@ export function Navbar() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const isHome = pathname === "/";
+  const isButton2Home = pathname === "/payant" || pathname === "/payent" || pathname === "/payent/";
+  const isHome = pathname === "/" || isButton2Home;
 
   const handleThemeClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     triggerOriginTransition("theme", e.currentTarget);
     toggle();
   };
 
+  const handleLogoClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    triggerOriginTransition(isButton2Home ? "gateway" : "home", e.currentTarget);
+  };
+
   return (
     <header
       className={cn(
         "sticky top-0 z-40 w-full transition-all duration-300",
-        isHome && "-mb-16 sm:-mb-[68px]",
+        pathname === "/" && "-mb-16 sm:-mb-[68px]",
         scrolled
           ? "bg-white/90 dark:bg-[#05090D]/90 backdrop-blur-xl shadow-xs"
-          : isHome
+          : pathname === "/"
             ? "bg-transparent shadow-none"
             : "bg-white/80 dark:bg-[#05090D]/80 backdrop-blur-xl"
       )}
@@ -46,12 +51,13 @@ export function Navbar() {
         {/* Left: Brand Identity Logo */}
         <div className="flex items-center gap-3">
           <Link
-            to="/payant"
+            to={isButton2Home ? "/" : "/payant"}
             ref={(el) => registerOriginRef("home-logo", el as HTMLElement | null)}
-            onClick={(e) => triggerOriginTransition("home", e.currentTarget)}
-            className="flex items-center gap-3 shrink-0 focus:outline-none group select-none py-1 transition-transform active:scale-96"
+            onClick={handleLogoClick}
+            className="flex items-center gap-3 shrink-0 focus:outline-none group select-none py-1 transition-transform active:scale-96 cursor-pointer"
             id="nav-logo"
-            aria-label="Payent Home"
+            aria-label={isButton2Home ? "Return to Gateway (Choose Experience)" : "Payent Home"}
+            title={isButton2Home ? "Click to return to Gateway" : "Click to go to Payent Home"}
           >
             <LogoIcon showTagline={false} />
           </Link>

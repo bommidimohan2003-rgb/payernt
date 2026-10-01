@@ -39,9 +39,35 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AccountPendingRouteImport } from './routes/account-pending'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as PayerntIndexRouteImport } from './routes/payernt/index'
+import { Route as PayentIndexRouteImport } from './routes/payent/index'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as ProductIdRouteImport } from './routes/product.$id'
+import { Route as PayerntWalletRouteImport } from './routes/payernt/wallet'
+import { Route as PayerntSettingsRouteImport } from './routes/payernt/settings'
+import { Route as PayerntRequestsRouteImport } from './routes/payernt/requests'
+import { Route as PayerntProfileRouteImport } from './routes/payernt/profile'
+import { Route as PayerntProductsRouteImport } from './routes/payernt/products'
+import { Route as PayerntNotificationsRouteImport } from './routes/payernt/notifications'
+import { Route as PayerntMessagesRouteImport } from './routes/payernt/messages'
+import { Route as PayerntListRouteImport } from './routes/payernt/list'
+import { Route as PayerntHelpRouteImport } from './routes/payernt/help'
+import { Route as PayerntEarningsRouteImport } from './routes/payernt/earnings'
+import { Route as PayerntBookingsRouteImport } from './routes/payernt/bookings'
+import { Route as PayerntAnalyticsRouteImport } from './routes/payernt/analytics'
+import { Route as PayerntSplatRouteImport } from './routes/payernt/$'
+import { Route as PayentWishlistRouteImport } from './routes/payent/wishlist'
+import { Route as PayentSettingsRouteImport } from './routes/payent/settings'
+import { Route as PayentProfileRouteImport } from './routes/payent/profile'
+import { Route as PayentNotificationsRouteImport } from './routes/payent/notifications'
+import { Route as PayentMessagesRouteImport } from './routes/payent/messages'
+import { Route as PayentHelpRouteImport } from './routes/payent/help'
+import { Route as PayentExploreRouteImport } from './routes/payent/explore'
+import { Route as PayentCartRouteImport } from './routes/payent/cart'
+import { Route as PayentBookingsRouteImport } from './routes/payent/bookings'
+import { Route as PayentSplatRouteImport } from './routes/payent/$'
 import { Route as DeliveryIdRouteImport } from './routes/delivery.$id'
+import { Route as AdminWalletRouteImport } from './routes/admin/wallet'
 import { Route as AdminUsersRouteImport } from './routes/admin/users'
 import { Route as AdminSupportRouteImport } from './routes/admin/support'
 import { Route as AdminSettingsRouteImport } from './routes/admin/settings'
@@ -51,7 +77,9 @@ import { Route as AdminProfileRouteImport } from './routes/admin/profile'
 import { Route as AdminProductsRouteImport } from './routes/admin/products'
 import { Route as AdminPaymentsRouteImport } from './routes/admin/payments'
 import { Route as AdminNotificationsRouteImport } from './routes/admin/notifications'
+import { Route as AdminMessagesRouteImport } from './routes/admin/messages'
 import { Route as AdminLoginRouteImport } from './routes/admin/login'
+import { Route as AdminHelpRouteImport } from './routes/admin/help'
 import { Route as AdminDashboardRouteImport } from './routes/admin/dashboard'
 import { Route as AdminCategoriesRouteImport } from './routes/admin/categories'
 import { Route as AdminBookingsRouteImport } from './routes/admin/bookings'
@@ -59,7 +87,13 @@ import { Route as AdminApiKeysRouteImport } from './routes/admin/api-keys'
 import { Route as AdminAnalyticsRouteImport } from './routes/admin/analytics'
 import { Route as AdminAgentsRouteImport } from './routes/admin/agents'
 import { Route as AdminActivityLogsRouteImport } from './routes/admin/activity-logs'
+import { Route as AdminActivityRouteImport } from './routes/admin/activity'
+import { Route as AdminSplatRouteImport } from './routes/admin/$'
+import { Route as PayerntProductsCreateRouteImport } from './routes/payernt/products.create'
+import { Route as PayerntProductsIdRouteImport } from './routes/payernt/products.$id'
+import { Route as PayentProductsIdRouteImport } from './routes/payent/products.$id'
 import { Route as AdminProductsIdRouteImport } from './routes/admin/products.$id'
+import { Route as AdminProductsIdReviewRouteImport } from './routes/admin/products.$id.review'
 
 const WishlistRoute = WishlistRouteImport.update({
   id: '/wishlist',
@@ -211,6 +245,16 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PayerntIndexRoute = PayerntIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => PayerntRoute,
+} as any)
+const PayentIndexRoute = PayentIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => PayentRoute,
+} as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -221,10 +265,130 @@ const ProductIdRoute = ProductIdRouteImport.update({
   path: '/product/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PayerntWalletRoute = PayerntWalletRouteImport.update({
+  id: '/wallet',
+  path: '/wallet',
+  getParentRoute: () => PayerntRoute,
+} as any)
+const PayerntSettingsRoute = PayerntSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => PayerntRoute,
+} as any)
+const PayerntRequestsRoute = PayerntRequestsRouteImport.update({
+  id: '/requests',
+  path: '/requests',
+  getParentRoute: () => PayerntRoute,
+} as any)
+const PayerntProfileRoute = PayerntProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => PayerntRoute,
+} as any)
+const PayerntProductsRoute = PayerntProductsRouteImport.update({
+  id: '/products',
+  path: '/products',
+  getParentRoute: () => PayerntRoute,
+} as any)
+const PayerntNotificationsRoute = PayerntNotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
+  getParentRoute: () => PayerntRoute,
+} as any)
+const PayerntMessagesRoute = PayerntMessagesRouteImport.update({
+  id: '/messages',
+  path: '/messages',
+  getParentRoute: () => PayerntRoute,
+} as any)
+const PayerntListRoute = PayerntListRouteImport.update({
+  id: '/list',
+  path: '/list',
+  getParentRoute: () => PayerntRoute,
+} as any)
+const PayerntHelpRoute = PayerntHelpRouteImport.update({
+  id: '/help',
+  path: '/help',
+  getParentRoute: () => PayerntRoute,
+} as any)
+const PayerntEarningsRoute = PayerntEarningsRouteImport.update({
+  id: '/earnings',
+  path: '/earnings',
+  getParentRoute: () => PayerntRoute,
+} as any)
+const PayerntBookingsRoute = PayerntBookingsRouteImport.update({
+  id: '/bookings',
+  path: '/bookings',
+  getParentRoute: () => PayerntRoute,
+} as any)
+const PayerntAnalyticsRoute = PayerntAnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
+  getParentRoute: () => PayerntRoute,
+} as any)
+const PayerntSplatRoute = PayerntSplatRouteImport.update({
+  id: '/$',
+  path: '/$',
+  getParentRoute: () => PayerntRoute,
+} as any)
+const PayentWishlistRoute = PayentWishlistRouteImport.update({
+  id: '/wishlist',
+  path: '/wishlist',
+  getParentRoute: () => PayentRoute,
+} as any)
+const PayentSettingsRoute = PayentSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => PayentRoute,
+} as any)
+const PayentProfileRoute = PayentProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => PayentRoute,
+} as any)
+const PayentNotificationsRoute = PayentNotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
+  getParentRoute: () => PayentRoute,
+} as any)
+const PayentMessagesRoute = PayentMessagesRouteImport.update({
+  id: '/messages',
+  path: '/messages',
+  getParentRoute: () => PayentRoute,
+} as any)
+const PayentHelpRoute = PayentHelpRouteImport.update({
+  id: '/help',
+  path: '/help',
+  getParentRoute: () => PayentRoute,
+} as any)
+const PayentExploreRoute = PayentExploreRouteImport.update({
+  id: '/explore',
+  path: '/explore',
+  getParentRoute: () => PayentRoute,
+} as any)
+const PayentCartRoute = PayentCartRouteImport.update({
+  id: '/cart',
+  path: '/cart',
+  getParentRoute: () => PayentRoute,
+} as any)
+const PayentBookingsRoute = PayentBookingsRouteImport.update({
+  id: '/bookings',
+  path: '/bookings',
+  getParentRoute: () => PayentRoute,
+} as any)
+const PayentSplatRoute = PayentSplatRouteImport.update({
+  id: '/$',
+  path: '/$',
+  getParentRoute: () => PayentRoute,
+} as any)
 const DeliveryIdRoute = DeliveryIdRouteImport.update({
   id: '/delivery/$id',
   path: '/delivery/$id',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AdminWalletRoute = AdminWalletRouteImport.update({
+  id: '/wallet',
+  path: '/wallet',
+  getParentRoute: () => AdminRoute,
 } as any)
 const AdminUsersRoute = AdminUsersRouteImport.update({
   id: '/users',
@@ -271,9 +435,19 @@ const AdminNotificationsRoute = AdminNotificationsRouteImport.update({
   path: '/notifications',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminMessagesRoute = AdminMessagesRouteImport.update({
+  id: '/messages',
+  path: '/messages',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminLoginRoute = AdminLoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminHelpRoute = AdminHelpRouteImport.update({
+  id: '/help',
+  path: '/help',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminDashboardRoute = AdminDashboardRouteImport.update({
@@ -311,10 +485,40 @@ const AdminActivityLogsRoute = AdminActivityLogsRouteImport.update({
   path: '/activity-logs',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminActivityRoute = AdminActivityRouteImport.update({
+  id: '/activity',
+  path: '/activity',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminSplatRoute = AdminSplatRouteImport.update({
+  id: '/$',
+  path: '/$',
+  getParentRoute: () => AdminRoute,
+} as any)
+const PayerntProductsCreateRoute = PayerntProductsCreateRouteImport.update({
+  id: '/create',
+  path: '/create',
+  getParentRoute: () => PayerntProductsRoute,
+} as any)
+const PayerntProductsIdRoute = PayerntProductsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => PayerntProductsRoute,
+} as any)
+const PayentProductsIdRoute = PayentProductsIdRouteImport.update({
+  id: '/products/$id',
+  path: '/products/$id',
+  getParentRoute: () => PayentRoute,
+} as any)
 const AdminProductsIdRoute = AdminProductsIdRouteImport.update({
   id: '/$id',
   path: '/$id',
   getParentRoute: () => AdminProductsRoute,
+} as any)
+const AdminProductsIdReviewRoute = AdminProductsIdReviewRouteImport.update({
+  id: '/review',
+  path: '/review',
+  getParentRoute: () => AdminProductsIdRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -337,8 +541,8 @@ export interface FileRoutesByFullPath {
   '/orders': typeof OrdersRoute
   '/otp': typeof OtpRoute
   '/payant': typeof PayantRoute
-  '/payent': typeof PayentRoute
-  '/payernt': typeof PayerntRoute
+  '/payent': typeof PayentRouteWithChildren
+  '/payernt': typeof PayerntRouteWithChildren
   '/payment': typeof PaymentRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
@@ -348,6 +552,8 @@ export interface FileRoutesByFullPath {
   '/select': typeof SelectRoute
   '/settings': typeof SettingsRoute
   '/wishlist': typeof WishlistRoute
+  '/admin/$': typeof AdminSplatRoute
+  '/admin/activity': typeof AdminActivityRoute
   '/admin/activity-logs': typeof AdminActivityLogsRoute
   '/admin/agents': typeof AdminAgentsRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
@@ -355,7 +561,9 @@ export interface FileRoutesByFullPath {
   '/admin/bookings': typeof AdminBookingsRoute
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/dashboard': typeof AdminDashboardRoute
+  '/admin/help': typeof AdminHelpRoute
   '/admin/login': typeof AdminLoginRoute
+  '/admin/messages': typeof AdminMessagesRoute
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/payments': typeof AdminPaymentsRoute
   '/admin/products': typeof AdminProductsRouteWithChildren
@@ -365,10 +573,40 @@ export interface FileRoutesByFullPath {
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/support': typeof AdminSupportRoute
   '/admin/users': typeof AdminUsersRoute
+  '/admin/wallet': typeof AdminWalletRoute
   '/delivery/$id': typeof DeliveryIdRoute
+  '/payent/$': typeof PayentSplatRoute
+  '/payent/bookings': typeof PayentBookingsRoute
+  '/payent/cart': typeof PayentCartRoute
+  '/payent/explore': typeof PayentExploreRoute
+  '/payent/help': typeof PayentHelpRoute
+  '/payent/messages': typeof PayentMessagesRoute
+  '/payent/notifications': typeof PayentNotificationsRoute
+  '/payent/profile': typeof PayentProfileRoute
+  '/payent/settings': typeof PayentSettingsRoute
+  '/payent/wishlist': typeof PayentWishlistRoute
+  '/payernt/$': typeof PayerntSplatRoute
+  '/payernt/analytics': typeof PayerntAnalyticsRoute
+  '/payernt/bookings': typeof PayerntBookingsRoute
+  '/payernt/earnings': typeof PayerntEarningsRoute
+  '/payernt/help': typeof PayerntHelpRoute
+  '/payernt/list': typeof PayerntListRoute
+  '/payernt/messages': typeof PayerntMessagesRoute
+  '/payernt/notifications': typeof PayerntNotificationsRoute
+  '/payernt/products': typeof PayerntProductsRouteWithChildren
+  '/payernt/profile': typeof PayerntProfileRoute
+  '/payernt/requests': typeof PayerntRequestsRoute
+  '/payernt/settings': typeof PayerntSettingsRoute
+  '/payernt/wallet': typeof PayerntWalletRoute
   '/product/$id': typeof ProductIdRoute
   '/admin/': typeof AdminIndexRoute
-  '/admin/products/$id': typeof AdminProductsIdRoute
+  '/payent/': typeof PayentIndexRoute
+  '/payernt/': typeof PayerntIndexRoute
+  '/admin/products/$id': typeof AdminProductsIdRouteWithChildren
+  '/payent/products/$id': typeof PayentProductsIdRoute
+  '/payernt/products/$id': typeof PayerntProductsIdRoute
+  '/payernt/products/create': typeof PayerntProductsCreateRoute
+  '/admin/products/$id/review': typeof AdminProductsIdReviewRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -389,8 +627,6 @@ export interface FileRoutesByTo {
   '/orders': typeof OrdersRoute
   '/otp': typeof OtpRoute
   '/payant': typeof PayantRoute
-  '/payent': typeof PayentRoute
-  '/payernt': typeof PayerntRoute
   '/payment': typeof PaymentRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
@@ -400,6 +636,8 @@ export interface FileRoutesByTo {
   '/select': typeof SelectRoute
   '/settings': typeof SettingsRoute
   '/wishlist': typeof WishlistRoute
+  '/admin/$': typeof AdminSplatRoute
+  '/admin/activity': typeof AdminActivityRoute
   '/admin/activity-logs': typeof AdminActivityLogsRoute
   '/admin/agents': typeof AdminAgentsRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
@@ -407,7 +645,9 @@ export interface FileRoutesByTo {
   '/admin/bookings': typeof AdminBookingsRoute
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/dashboard': typeof AdminDashboardRoute
+  '/admin/help': typeof AdminHelpRoute
   '/admin/login': typeof AdminLoginRoute
+  '/admin/messages': typeof AdminMessagesRoute
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/payments': typeof AdminPaymentsRoute
   '/admin/products': typeof AdminProductsRouteWithChildren
@@ -417,10 +657,40 @@ export interface FileRoutesByTo {
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/support': typeof AdminSupportRoute
   '/admin/users': typeof AdminUsersRoute
+  '/admin/wallet': typeof AdminWalletRoute
   '/delivery/$id': typeof DeliveryIdRoute
+  '/payent/$': typeof PayentSplatRoute
+  '/payent/bookings': typeof PayentBookingsRoute
+  '/payent/cart': typeof PayentCartRoute
+  '/payent/explore': typeof PayentExploreRoute
+  '/payent/help': typeof PayentHelpRoute
+  '/payent/messages': typeof PayentMessagesRoute
+  '/payent/notifications': typeof PayentNotificationsRoute
+  '/payent/profile': typeof PayentProfileRoute
+  '/payent/settings': typeof PayentSettingsRoute
+  '/payent/wishlist': typeof PayentWishlistRoute
+  '/payernt/$': typeof PayerntSplatRoute
+  '/payernt/analytics': typeof PayerntAnalyticsRoute
+  '/payernt/bookings': typeof PayerntBookingsRoute
+  '/payernt/earnings': typeof PayerntEarningsRoute
+  '/payernt/help': typeof PayerntHelpRoute
+  '/payernt/list': typeof PayerntListRoute
+  '/payernt/messages': typeof PayerntMessagesRoute
+  '/payernt/notifications': typeof PayerntNotificationsRoute
+  '/payernt/products': typeof PayerntProductsRouteWithChildren
+  '/payernt/profile': typeof PayerntProfileRoute
+  '/payernt/requests': typeof PayerntRequestsRoute
+  '/payernt/settings': typeof PayerntSettingsRoute
+  '/payernt/wallet': typeof PayerntWalletRoute
   '/product/$id': typeof ProductIdRoute
   '/admin': typeof AdminIndexRoute
-  '/admin/products/$id': typeof AdminProductsIdRoute
+  '/payent': typeof PayentIndexRoute
+  '/payernt': typeof PayerntIndexRoute
+  '/admin/products/$id': typeof AdminProductsIdRouteWithChildren
+  '/payent/products/$id': typeof PayentProductsIdRoute
+  '/payernt/products/$id': typeof PayerntProductsIdRoute
+  '/payernt/products/create': typeof PayerntProductsCreateRoute
+  '/admin/products/$id/review': typeof AdminProductsIdReviewRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -443,8 +713,8 @@ export interface FileRoutesById {
   '/orders': typeof OrdersRoute
   '/otp': typeof OtpRoute
   '/payant': typeof PayantRoute
-  '/payent': typeof PayentRoute
-  '/payernt': typeof PayerntRoute
+  '/payent': typeof PayentRouteWithChildren
+  '/payernt': typeof PayerntRouteWithChildren
   '/payment': typeof PaymentRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
@@ -454,6 +724,8 @@ export interface FileRoutesById {
   '/select': typeof SelectRoute
   '/settings': typeof SettingsRoute
   '/wishlist': typeof WishlistRoute
+  '/admin/$': typeof AdminSplatRoute
+  '/admin/activity': typeof AdminActivityRoute
   '/admin/activity-logs': typeof AdminActivityLogsRoute
   '/admin/agents': typeof AdminAgentsRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
@@ -461,7 +733,9 @@ export interface FileRoutesById {
   '/admin/bookings': typeof AdminBookingsRoute
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/dashboard': typeof AdminDashboardRoute
+  '/admin/help': typeof AdminHelpRoute
   '/admin/login': typeof AdminLoginRoute
+  '/admin/messages': typeof AdminMessagesRoute
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/payments': typeof AdminPaymentsRoute
   '/admin/products': typeof AdminProductsRouteWithChildren
@@ -471,10 +745,40 @@ export interface FileRoutesById {
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/support': typeof AdminSupportRoute
   '/admin/users': typeof AdminUsersRoute
+  '/admin/wallet': typeof AdminWalletRoute
   '/delivery/$id': typeof DeliveryIdRoute
+  '/payent/$': typeof PayentSplatRoute
+  '/payent/bookings': typeof PayentBookingsRoute
+  '/payent/cart': typeof PayentCartRoute
+  '/payent/explore': typeof PayentExploreRoute
+  '/payent/help': typeof PayentHelpRoute
+  '/payent/messages': typeof PayentMessagesRoute
+  '/payent/notifications': typeof PayentNotificationsRoute
+  '/payent/profile': typeof PayentProfileRoute
+  '/payent/settings': typeof PayentSettingsRoute
+  '/payent/wishlist': typeof PayentWishlistRoute
+  '/payernt/$': typeof PayerntSplatRoute
+  '/payernt/analytics': typeof PayerntAnalyticsRoute
+  '/payernt/bookings': typeof PayerntBookingsRoute
+  '/payernt/earnings': typeof PayerntEarningsRoute
+  '/payernt/help': typeof PayerntHelpRoute
+  '/payernt/list': typeof PayerntListRoute
+  '/payernt/messages': typeof PayerntMessagesRoute
+  '/payernt/notifications': typeof PayerntNotificationsRoute
+  '/payernt/products': typeof PayerntProductsRouteWithChildren
+  '/payernt/profile': typeof PayerntProfileRoute
+  '/payernt/requests': typeof PayerntRequestsRoute
+  '/payernt/settings': typeof PayerntSettingsRoute
+  '/payernt/wallet': typeof PayerntWalletRoute
   '/product/$id': typeof ProductIdRoute
   '/admin/': typeof AdminIndexRoute
-  '/admin/products/$id': typeof AdminProductsIdRoute
+  '/payent/': typeof PayentIndexRoute
+  '/payernt/': typeof PayerntIndexRoute
+  '/admin/products/$id': typeof AdminProductsIdRouteWithChildren
+  '/payent/products/$id': typeof PayentProductsIdRoute
+  '/payernt/products/$id': typeof PayerntProductsIdRoute
+  '/payernt/products/create': typeof PayerntProductsCreateRoute
+  '/admin/products/$id/review': typeof AdminProductsIdReviewRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -509,6 +813,8 @@ export interface FileRouteTypes {
     | '/select'
     | '/settings'
     | '/wishlist'
+    | '/admin/$'
+    | '/admin/activity'
     | '/admin/activity-logs'
     | '/admin/agents'
     | '/admin/analytics'
@@ -516,7 +822,9 @@ export interface FileRouteTypes {
     | '/admin/bookings'
     | '/admin/categories'
     | '/admin/dashboard'
+    | '/admin/help'
     | '/admin/login'
+    | '/admin/messages'
     | '/admin/notifications'
     | '/admin/payments'
     | '/admin/products'
@@ -526,10 +834,40 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/admin/support'
     | '/admin/users'
+    | '/admin/wallet'
     | '/delivery/$id'
+    | '/payent/$'
+    | '/payent/bookings'
+    | '/payent/cart'
+    | '/payent/explore'
+    | '/payent/help'
+    | '/payent/messages'
+    | '/payent/notifications'
+    | '/payent/profile'
+    | '/payent/settings'
+    | '/payent/wishlist'
+    | '/payernt/$'
+    | '/payernt/analytics'
+    | '/payernt/bookings'
+    | '/payernt/earnings'
+    | '/payernt/help'
+    | '/payernt/list'
+    | '/payernt/messages'
+    | '/payernt/notifications'
+    | '/payernt/products'
+    | '/payernt/profile'
+    | '/payernt/requests'
+    | '/payernt/settings'
+    | '/payernt/wallet'
     | '/product/$id'
     | '/admin/'
+    | '/payent/'
+    | '/payernt/'
     | '/admin/products/$id'
+    | '/payent/products/$id'
+    | '/payernt/products/$id'
+    | '/payernt/products/create'
+    | '/admin/products/$id/review'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -550,8 +888,6 @@ export interface FileRouteTypes {
     | '/orders'
     | '/otp'
     | '/payant'
-    | '/payent'
-    | '/payernt'
     | '/payment'
     | '/privacy'
     | '/profile'
@@ -561,6 +897,8 @@ export interface FileRouteTypes {
     | '/select'
     | '/settings'
     | '/wishlist'
+    | '/admin/$'
+    | '/admin/activity'
     | '/admin/activity-logs'
     | '/admin/agents'
     | '/admin/analytics'
@@ -568,7 +906,9 @@ export interface FileRouteTypes {
     | '/admin/bookings'
     | '/admin/categories'
     | '/admin/dashboard'
+    | '/admin/help'
     | '/admin/login'
+    | '/admin/messages'
     | '/admin/notifications'
     | '/admin/payments'
     | '/admin/products'
@@ -578,10 +918,40 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/admin/support'
     | '/admin/users'
+    | '/admin/wallet'
     | '/delivery/$id'
+    | '/payent/$'
+    | '/payent/bookings'
+    | '/payent/cart'
+    | '/payent/explore'
+    | '/payent/help'
+    | '/payent/messages'
+    | '/payent/notifications'
+    | '/payent/profile'
+    | '/payent/settings'
+    | '/payent/wishlist'
+    | '/payernt/$'
+    | '/payernt/analytics'
+    | '/payernt/bookings'
+    | '/payernt/earnings'
+    | '/payernt/help'
+    | '/payernt/list'
+    | '/payernt/messages'
+    | '/payernt/notifications'
+    | '/payernt/products'
+    | '/payernt/profile'
+    | '/payernt/requests'
+    | '/payernt/settings'
+    | '/payernt/wallet'
     | '/product/$id'
     | '/admin'
+    | '/payent'
+    | '/payernt'
     | '/admin/products/$id'
+    | '/payent/products/$id'
+    | '/payernt/products/$id'
+    | '/payernt/products/create'
+    | '/admin/products/$id/review'
   id:
     | '__root__'
     | '/'
@@ -614,6 +984,8 @@ export interface FileRouteTypes {
     | '/select'
     | '/settings'
     | '/wishlist'
+    | '/admin/$'
+    | '/admin/activity'
     | '/admin/activity-logs'
     | '/admin/agents'
     | '/admin/analytics'
@@ -621,7 +993,9 @@ export interface FileRouteTypes {
     | '/admin/bookings'
     | '/admin/categories'
     | '/admin/dashboard'
+    | '/admin/help'
     | '/admin/login'
+    | '/admin/messages'
     | '/admin/notifications'
     | '/admin/payments'
     | '/admin/products'
@@ -631,10 +1005,40 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/admin/support'
     | '/admin/users'
+    | '/admin/wallet'
     | '/delivery/$id'
+    | '/payent/$'
+    | '/payent/bookings'
+    | '/payent/cart'
+    | '/payent/explore'
+    | '/payent/help'
+    | '/payent/messages'
+    | '/payent/notifications'
+    | '/payent/profile'
+    | '/payent/settings'
+    | '/payent/wishlist'
+    | '/payernt/$'
+    | '/payernt/analytics'
+    | '/payernt/bookings'
+    | '/payernt/earnings'
+    | '/payernt/help'
+    | '/payernt/list'
+    | '/payernt/messages'
+    | '/payernt/notifications'
+    | '/payernt/products'
+    | '/payernt/profile'
+    | '/payernt/requests'
+    | '/payernt/settings'
+    | '/payernt/wallet'
     | '/product/$id'
     | '/admin/'
+    | '/payent/'
+    | '/payernt/'
     | '/admin/products/$id'
+    | '/payent/products/$id'
+    | '/payernt/products/$id'
+    | '/payernt/products/create'
+    | '/admin/products/$id/review'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -657,8 +1061,8 @@ export interface RootRouteChildren {
   OrdersRoute: typeof OrdersRoute
   OtpRoute: typeof OtpRoute
   PayantRoute: typeof PayantRoute
-  PayentRoute: typeof PayentRoute
-  PayerntRoute: typeof PayerntRoute
+  PayentRoute: typeof PayentRouteWithChildren
+  PayerntRoute: typeof PayerntRouteWithChildren
   PaymentRoute: typeof PaymentRoute
   PrivacyRoute: typeof PrivacyRoute
   ProfileRoute: typeof ProfileRoute
@@ -884,6 +1288,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/payernt/': {
+      id: '/payernt/'
+      path: '/'
+      fullPath: '/payernt/'
+      preLoaderRoute: typeof PayerntIndexRouteImport
+      parentRoute: typeof PayerntRoute
+    }
+    '/payent/': {
+      id: '/payent/'
+      path: '/'
+      fullPath: '/payent/'
+      preLoaderRoute: typeof PayentIndexRouteImport
+      parentRoute: typeof PayentRoute
+    }
     '/admin/': {
       id: '/admin/'
       path: '/'
@@ -898,12 +1316,180 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProductIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/payernt/wallet': {
+      id: '/payernt/wallet'
+      path: '/wallet'
+      fullPath: '/payernt/wallet'
+      preLoaderRoute: typeof PayerntWalletRouteImport
+      parentRoute: typeof PayerntRoute
+    }
+    '/payernt/settings': {
+      id: '/payernt/settings'
+      path: '/settings'
+      fullPath: '/payernt/settings'
+      preLoaderRoute: typeof PayerntSettingsRouteImport
+      parentRoute: typeof PayerntRoute
+    }
+    '/payernt/requests': {
+      id: '/payernt/requests'
+      path: '/requests'
+      fullPath: '/payernt/requests'
+      preLoaderRoute: typeof PayerntRequestsRouteImport
+      parentRoute: typeof PayerntRoute
+    }
+    '/payernt/profile': {
+      id: '/payernt/profile'
+      path: '/profile'
+      fullPath: '/payernt/profile'
+      preLoaderRoute: typeof PayerntProfileRouteImport
+      parentRoute: typeof PayerntRoute
+    }
+    '/payernt/products': {
+      id: '/payernt/products'
+      path: '/products'
+      fullPath: '/payernt/products'
+      preLoaderRoute: typeof PayerntProductsRouteImport
+      parentRoute: typeof PayerntRoute
+    }
+    '/payernt/notifications': {
+      id: '/payernt/notifications'
+      path: '/notifications'
+      fullPath: '/payernt/notifications'
+      preLoaderRoute: typeof PayerntNotificationsRouteImport
+      parentRoute: typeof PayerntRoute
+    }
+    '/payernt/messages': {
+      id: '/payernt/messages'
+      path: '/messages'
+      fullPath: '/payernt/messages'
+      preLoaderRoute: typeof PayerntMessagesRouteImport
+      parentRoute: typeof PayerntRoute
+    }
+    '/payernt/list': {
+      id: '/payernt/list'
+      path: '/list'
+      fullPath: '/payernt/list'
+      preLoaderRoute: typeof PayerntListRouteImport
+      parentRoute: typeof PayerntRoute
+    }
+    '/payernt/help': {
+      id: '/payernt/help'
+      path: '/help'
+      fullPath: '/payernt/help'
+      preLoaderRoute: typeof PayerntHelpRouteImport
+      parentRoute: typeof PayerntRoute
+    }
+    '/payernt/earnings': {
+      id: '/payernt/earnings'
+      path: '/earnings'
+      fullPath: '/payernt/earnings'
+      preLoaderRoute: typeof PayerntEarningsRouteImport
+      parentRoute: typeof PayerntRoute
+    }
+    '/payernt/bookings': {
+      id: '/payernt/bookings'
+      path: '/bookings'
+      fullPath: '/payernt/bookings'
+      preLoaderRoute: typeof PayerntBookingsRouteImport
+      parentRoute: typeof PayerntRoute
+    }
+    '/payernt/analytics': {
+      id: '/payernt/analytics'
+      path: '/analytics'
+      fullPath: '/payernt/analytics'
+      preLoaderRoute: typeof PayerntAnalyticsRouteImport
+      parentRoute: typeof PayerntRoute
+    }
+    '/payernt/$': {
+      id: '/payernt/$'
+      path: '/$'
+      fullPath: '/payernt/$'
+      preLoaderRoute: typeof PayerntSplatRouteImport
+      parentRoute: typeof PayerntRoute
+    }
+    '/payent/wishlist': {
+      id: '/payent/wishlist'
+      path: '/wishlist'
+      fullPath: '/payent/wishlist'
+      preLoaderRoute: typeof PayentWishlistRouteImport
+      parentRoute: typeof PayentRoute
+    }
+    '/payent/settings': {
+      id: '/payent/settings'
+      path: '/settings'
+      fullPath: '/payent/settings'
+      preLoaderRoute: typeof PayentSettingsRouteImport
+      parentRoute: typeof PayentRoute
+    }
+    '/payent/profile': {
+      id: '/payent/profile'
+      path: '/profile'
+      fullPath: '/payent/profile'
+      preLoaderRoute: typeof PayentProfileRouteImport
+      parentRoute: typeof PayentRoute
+    }
+    '/payent/notifications': {
+      id: '/payent/notifications'
+      path: '/notifications'
+      fullPath: '/payent/notifications'
+      preLoaderRoute: typeof PayentNotificationsRouteImport
+      parentRoute: typeof PayentRoute
+    }
+    '/payent/messages': {
+      id: '/payent/messages'
+      path: '/messages'
+      fullPath: '/payent/messages'
+      preLoaderRoute: typeof PayentMessagesRouteImport
+      parentRoute: typeof PayentRoute
+    }
+    '/payent/help': {
+      id: '/payent/help'
+      path: '/help'
+      fullPath: '/payent/help'
+      preLoaderRoute: typeof PayentHelpRouteImport
+      parentRoute: typeof PayentRoute
+    }
+    '/payent/explore': {
+      id: '/payent/explore'
+      path: '/explore'
+      fullPath: '/payent/explore'
+      preLoaderRoute: typeof PayentExploreRouteImport
+      parentRoute: typeof PayentRoute
+    }
+    '/payent/cart': {
+      id: '/payent/cart'
+      path: '/cart'
+      fullPath: '/payent/cart'
+      preLoaderRoute: typeof PayentCartRouteImport
+      parentRoute: typeof PayentRoute
+    }
+    '/payent/bookings': {
+      id: '/payent/bookings'
+      path: '/bookings'
+      fullPath: '/payent/bookings'
+      preLoaderRoute: typeof PayentBookingsRouteImport
+      parentRoute: typeof PayentRoute
+    }
+    '/payent/$': {
+      id: '/payent/$'
+      path: '/$'
+      fullPath: '/payent/$'
+      preLoaderRoute: typeof PayentSplatRouteImport
+      parentRoute: typeof PayentRoute
+    }
     '/delivery/$id': {
       id: '/delivery/$id'
       path: '/delivery/$id'
       fullPath: '/delivery/$id'
       preLoaderRoute: typeof DeliveryIdRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/admin/wallet': {
+      id: '/admin/wallet'
+      path: '/wallet'
+      fullPath: '/admin/wallet'
+      preLoaderRoute: typeof AdminWalletRouteImport
+      parentRoute: typeof AdminRoute
     }
     '/admin/users': {
       id: '/admin/users'
@@ -968,11 +1554,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminNotificationsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/messages': {
+      id: '/admin/messages'
+      path: '/messages'
+      fullPath: '/admin/messages'
+      preLoaderRoute: typeof AdminMessagesRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/login': {
       id: '/admin/login'
       path: '/login'
       fullPath: '/admin/login'
       preLoaderRoute: typeof AdminLoginRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/help': {
+      id: '/admin/help'
+      path: '/help'
+      fullPath: '/admin/help'
+      preLoaderRoute: typeof AdminHelpRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/dashboard': {
@@ -1024,6 +1624,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminActivityLogsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/activity': {
+      id: '/admin/activity'
+      path: '/activity'
+      fullPath: '/admin/activity'
+      preLoaderRoute: typeof AdminActivityRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/$': {
+      id: '/admin/$'
+      path: '/$'
+      fullPath: '/admin/$'
+      preLoaderRoute: typeof AdminSplatRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/payernt/products/create': {
+      id: '/payernt/products/create'
+      path: '/create'
+      fullPath: '/payernt/products/create'
+      preLoaderRoute: typeof PayerntProductsCreateRouteImport
+      parentRoute: typeof PayerntProductsRoute
+    }
+    '/payernt/products/$id': {
+      id: '/payernt/products/$id'
+      path: '/$id'
+      fullPath: '/payernt/products/$id'
+      preLoaderRoute: typeof PayerntProductsIdRouteImport
+      parentRoute: typeof PayerntProductsRoute
+    }
+    '/payent/products/$id': {
+      id: '/payent/products/$id'
+      path: '/products/$id'
+      fullPath: '/payent/products/$id'
+      preLoaderRoute: typeof PayentProductsIdRouteImport
+      parentRoute: typeof PayentRoute
+    }
     '/admin/products/$id': {
       id: '/admin/products/$id'
       path: '/$id'
@@ -1031,15 +1666,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminProductsIdRouteImport
       parentRoute: typeof AdminProductsRoute
     }
+    '/admin/products/$id/review': {
+      id: '/admin/products/$id/review'
+      path: '/review'
+      fullPath: '/admin/products/$id/review'
+      preLoaderRoute: typeof AdminProductsIdReviewRouteImport
+      parentRoute: typeof AdminProductsIdRoute
+    }
   }
 }
 
+interface AdminProductsIdRouteChildren {
+  AdminProductsIdReviewRoute: typeof AdminProductsIdReviewRoute
+}
+
+const AdminProductsIdRouteChildren: AdminProductsIdRouteChildren = {
+  AdminProductsIdReviewRoute: AdminProductsIdReviewRoute,
+}
+
+const AdminProductsIdRouteWithChildren = AdminProductsIdRoute._addFileChildren(
+  AdminProductsIdRouteChildren,
+)
+
 interface AdminProductsRouteChildren {
-  AdminProductsIdRoute: typeof AdminProductsIdRoute
+  AdminProductsIdRoute: typeof AdminProductsIdRouteWithChildren
 }
 
 const AdminProductsRouteChildren: AdminProductsRouteChildren = {
-  AdminProductsIdRoute: AdminProductsIdRoute,
+  AdminProductsIdRoute: AdminProductsIdRouteWithChildren,
 }
 
 const AdminProductsRouteWithChildren = AdminProductsRoute._addFileChildren(
@@ -1047,6 +1701,8 @@ const AdminProductsRouteWithChildren = AdminProductsRoute._addFileChildren(
 )
 
 interface AdminRouteChildren {
+  AdminSplatRoute: typeof AdminSplatRoute
+  AdminActivityRoute: typeof AdminActivityRoute
   AdminActivityLogsRoute: typeof AdminActivityLogsRoute
   AdminAgentsRoute: typeof AdminAgentsRoute
   AdminAnalyticsRoute: typeof AdminAnalyticsRoute
@@ -1054,7 +1710,9 @@ interface AdminRouteChildren {
   AdminBookingsRoute: typeof AdminBookingsRoute
   AdminCategoriesRoute: typeof AdminCategoriesRoute
   AdminDashboardRoute: typeof AdminDashboardRoute
+  AdminHelpRoute: typeof AdminHelpRoute
   AdminLoginRoute: typeof AdminLoginRoute
+  AdminMessagesRoute: typeof AdminMessagesRoute
   AdminNotificationsRoute: typeof AdminNotificationsRoute
   AdminPaymentsRoute: typeof AdminPaymentsRoute
   AdminProductsRoute: typeof AdminProductsRouteWithChildren
@@ -1064,10 +1722,13 @@ interface AdminRouteChildren {
   AdminSettingsRoute: typeof AdminSettingsRoute
   AdminSupportRoute: typeof AdminSupportRoute
   AdminUsersRoute: typeof AdminUsersRoute
+  AdminWalletRoute: typeof AdminWalletRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
+  AdminSplatRoute: AdminSplatRoute,
+  AdminActivityRoute: AdminActivityRoute,
   AdminActivityLogsRoute: AdminActivityLogsRoute,
   AdminAgentsRoute: AdminAgentsRoute,
   AdminAnalyticsRoute: AdminAnalyticsRoute,
@@ -1075,7 +1736,9 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminBookingsRoute: AdminBookingsRoute,
   AdminCategoriesRoute: AdminCategoriesRoute,
   AdminDashboardRoute: AdminDashboardRoute,
+  AdminHelpRoute: AdminHelpRoute,
   AdminLoginRoute: AdminLoginRoute,
+  AdminMessagesRoute: AdminMessagesRoute,
   AdminNotificationsRoute: AdminNotificationsRoute,
   AdminPaymentsRoute: AdminPaymentsRoute,
   AdminProductsRoute: AdminProductsRouteWithChildren,
@@ -1085,10 +1748,95 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminSettingsRoute: AdminSettingsRoute,
   AdminSupportRoute: AdminSupportRoute,
   AdminUsersRoute: AdminUsersRoute,
+  AdminWalletRoute: AdminWalletRoute,
   AdminIndexRoute: AdminIndexRoute,
 }
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
+interface PayentRouteChildren {
+  PayentSplatRoute: typeof PayentSplatRoute
+  PayentBookingsRoute: typeof PayentBookingsRoute
+  PayentCartRoute: typeof PayentCartRoute
+  PayentExploreRoute: typeof PayentExploreRoute
+  PayentHelpRoute: typeof PayentHelpRoute
+  PayentMessagesRoute: typeof PayentMessagesRoute
+  PayentNotificationsRoute: typeof PayentNotificationsRoute
+  PayentProfileRoute: typeof PayentProfileRoute
+  PayentSettingsRoute: typeof PayentSettingsRoute
+  PayentWishlistRoute: typeof PayentWishlistRoute
+  PayentIndexRoute: typeof PayentIndexRoute
+  PayentProductsIdRoute: typeof PayentProductsIdRoute
+}
+
+const PayentRouteChildren: PayentRouteChildren = {
+  PayentSplatRoute: PayentSplatRoute,
+  PayentBookingsRoute: PayentBookingsRoute,
+  PayentCartRoute: PayentCartRoute,
+  PayentExploreRoute: PayentExploreRoute,
+  PayentHelpRoute: PayentHelpRoute,
+  PayentMessagesRoute: PayentMessagesRoute,
+  PayentNotificationsRoute: PayentNotificationsRoute,
+  PayentProfileRoute: PayentProfileRoute,
+  PayentSettingsRoute: PayentSettingsRoute,
+  PayentWishlistRoute: PayentWishlistRoute,
+  PayentIndexRoute: PayentIndexRoute,
+  PayentProductsIdRoute: PayentProductsIdRoute,
+}
+
+const PayentRouteWithChildren =
+  PayentRoute._addFileChildren(PayentRouteChildren)
+
+interface PayerntProductsRouteChildren {
+  PayerntProductsIdRoute: typeof PayerntProductsIdRoute
+  PayerntProductsCreateRoute: typeof PayerntProductsCreateRoute
+}
+
+const PayerntProductsRouteChildren: PayerntProductsRouteChildren = {
+  PayerntProductsIdRoute: PayerntProductsIdRoute,
+  PayerntProductsCreateRoute: PayerntProductsCreateRoute,
+}
+
+const PayerntProductsRouteWithChildren = PayerntProductsRoute._addFileChildren(
+  PayerntProductsRouteChildren,
+)
+
+interface PayerntRouteChildren {
+  PayerntSplatRoute: typeof PayerntSplatRoute
+  PayerntAnalyticsRoute: typeof PayerntAnalyticsRoute
+  PayerntBookingsRoute: typeof PayerntBookingsRoute
+  PayerntEarningsRoute: typeof PayerntEarningsRoute
+  PayerntHelpRoute: typeof PayerntHelpRoute
+  PayerntListRoute: typeof PayerntListRoute
+  PayerntMessagesRoute: typeof PayerntMessagesRoute
+  PayerntNotificationsRoute: typeof PayerntNotificationsRoute
+  PayerntProductsRoute: typeof PayerntProductsRouteWithChildren
+  PayerntProfileRoute: typeof PayerntProfileRoute
+  PayerntRequestsRoute: typeof PayerntRequestsRoute
+  PayerntSettingsRoute: typeof PayerntSettingsRoute
+  PayerntWalletRoute: typeof PayerntWalletRoute
+  PayerntIndexRoute: typeof PayerntIndexRoute
+}
+
+const PayerntRouteChildren: PayerntRouteChildren = {
+  PayerntSplatRoute: PayerntSplatRoute,
+  PayerntAnalyticsRoute: PayerntAnalyticsRoute,
+  PayerntBookingsRoute: PayerntBookingsRoute,
+  PayerntEarningsRoute: PayerntEarningsRoute,
+  PayerntHelpRoute: PayerntHelpRoute,
+  PayerntListRoute: PayerntListRoute,
+  PayerntMessagesRoute: PayerntMessagesRoute,
+  PayerntNotificationsRoute: PayerntNotificationsRoute,
+  PayerntProductsRoute: PayerntProductsRouteWithChildren,
+  PayerntProfileRoute: PayerntProfileRoute,
+  PayerntRequestsRoute: PayerntRequestsRoute,
+  PayerntSettingsRoute: PayerntSettingsRoute,
+  PayerntWalletRoute: PayerntWalletRoute,
+  PayerntIndexRoute: PayerntIndexRoute,
+}
+
+const PayerntRouteWithChildren =
+  PayerntRoute._addFileChildren(PayerntRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -1110,8 +1858,8 @@ const rootRouteChildren: RootRouteChildren = {
   OrdersRoute: OrdersRoute,
   OtpRoute: OtpRoute,
   PayantRoute: PayantRoute,
-  PayentRoute: PayentRoute,
-  PayerntRoute: PayerntRoute,
+  PayentRoute: PayentRouteWithChildren,
+  PayerntRoute: PayerntRouteWithChildren,
   PaymentRoute: PaymentRoute,
   PrivacyRoute: PrivacyRoute,
   ProfileRoute: ProfileRoute,

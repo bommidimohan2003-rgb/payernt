@@ -262,16 +262,26 @@ app = FastAPI(
     redoc_url=None
 )
 
-# Register Button 1 (paye₹nt) and Rental Lifecycle Routers
-try:
-    from payernt_router import payernt_router, rental_router
-    app.include_router(payernt_router)
-    app.include_router(rental_router)
-except Exception as router_err:
-    logger.warning(f"Notice: Failed to register payernt routers: {router_err}")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex=r".*",
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+)
 
 # Enable GZip compression for payloads >= 500 bytes (reduces large JSON payloads by 85-90%)
 app.add_middleware(GZipMiddleware, minimum_size=500)
+
+# Register Button 1 (paye₹nt) and Rental Lifecycle Routers
+try:
+    from payernt_router import payernt_router, rental_router
+    app.include_router(payernt_router, prefix="/api/payernt")
+    app.include_router(payernt_router, prefix="/api/paye₹nt")
+    app.include_router(rental_router)
+except Exception as router_err:
+    logger.warning(f"Notice: Failed to register payernt routers: {router_err}")
 
 _cache_store = {}
 
@@ -355,6 +365,7 @@ async def custom_cors_and_security_middleware(request: Request, call_next):
         response.headers["Access-Control-Allow-Credentials"] = "true"
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH, HEAD"
         response.headers["Access-Control-Allow-Headers"] = "*"
+        response.headers["Access-Control-Allow-Private-Network"] = "true"
         response.headers["Vary"] = "Origin"
 
     # Defense-in-depth Security Headers
@@ -5353,12 +5364,22 @@ def admin_stats(current_admin: dict = Depends(check_admin_user)):
             payernt_cnt = int(safe_query("SELECT COUNT(*) as count FROM payernt_accounts", default=0))
             payrent_cnt = int(safe_query("SELECT COUNT(*) as count FROM payrent_accounts", default=0))
             admin_cnt = int(safe_query("SELECT COUNT(*) as count FROM admin_accounts", default=0))
-            users_cnt = int(safe_query("SELECT COUNT(*) as count FROM users", default=0))
+            distinct_users_cnt = int(safe_query("""
+                SELECT COUNT(DISTINCT email) as count FROM (
+                    SELECT email FROM users
+                    UNION
+                    SELECT email FROM payernt_accounts
+                    UNION
+                    SELECT email FROM payrent_accounts
+                    UNION
+                    SELECT email FROM admin_accounts
+                ) as combined_users
+            """, default=0))
             
             stats_result["payerntAccounts"] = payernt_cnt
             stats_result["payrentAccounts"] = payrent_cnt
             stats_result["adminAccounts"] = admin_cnt
-            stats_result["totalUsers"] = max(users_cnt, payernt_cnt + payrent_cnt + admin_cnt)
+            stats_result["totalUsers"] = distinct_users_cnt
             stats_result["totalAgents"] = int(safe_query("SELECT COUNT(*) as count FROM agents", default=0))
             
             # Products across payernt_products and custom_products
@@ -6718,6 +6739,21 @@ def _safe_json_parse(val, fallback):
         return fallback
 
 # Products
+class SetProductPriceRangeSchema(BaseModel):
+    minPrice: float
+    maxPrice: float
+    priceUnit: Optional[str] = "PER DAY"
+    notes: Optional[str] = None
+
+class ApproveProductSchema(BaseModel):
+    minPrice: Optional[float] = None
+    maxPrice: Optional[float] = None
+    priceUnit: Optional[str] = None
+
+class RequestProductRevisionSchema(BaseModel):
+    reason: str
+    requiredChanges: Optional[str] = None
+
 @app.get("/api/admin/products")
 def admin_products_list(
     status: Optional[str] = None,
@@ -6738,6 +6774,7 @@ def admin_products_list(
                        p.brand, p.model, p.year, p.description, p.condition_grade, p.city, p.area, p.pincode,
                        p.daily_rate, p.weekly_rate, p.monthly_rate, p.security_deposit, p.available,
                        p.availability_status, p.primary_image, p.images, p.status, p.created_at,
+                       p.min_price, p.max_price, p.price_unit, p.price_status, p.price_approved_at, p.price_approved_by,
                        acc.phone AS owner_phone, acc.avatar AS owner_avatar
                 FROM payernt_products p
                 LEFT JOIN payernt_accounts acc ON LOWER(p.owner_email) = LOWER(acc.email)
@@ -6754,11 +6791,27 @@ def admin_products_list(
                         continue
                 
                 images_list = _safe_json_parse(r.get("images"), [r["primary_image"]] if r.get("primary_image") else [])
+                
+                approved_price_range = None
+                min_p = r.get("min_price")
+                max_p = r.get("max_price")
+                if min_p is not None and max_p is not None:
+                    approved_price_range = {
+                        "minPrice": float(min_p),
+                        "maxPrice": float(max_p),
+                        "priceUnit": r.get("price_unit") or "PER DAY",
+                        "priceStatus": r.get("price_status") or "SET",
+                        "priceApprovedAt": r.get("price_approved_at"),
+                        "priceApprovedBy": r.get("price_approved_by")
+                    }
+
                 products_by_id[p_id] = {
                     "id": p_id,
                     "title": r.get("title") or r.get("name") or "Equipment Listing",
                     "description": r.get("description") or "",
                     "category": r.get("category") or "General",
+                    "brand": r.get("brand") or "Standard",
+                    "model": r.get("model") or "",
                     "price": float(r.get("daily_rate") or 0.0),
                     "rating": 5.0,
                     "reviewsCount": 0,
@@ -6769,6 +6822,8 @@ def admin_products_list(
                     "image": r.get("primary_image") or (images_list[0] if images_list else ""),
                     "images": images_list,
                     "documents": ["purchase_proof.jpg"],
+                    "approvedPriceRange": approved_price_range,
+                    "priceStatus": r.get("price_status") or ("SET" if approved_price_range else "NOT_SET"),
                     "createdAt": str(r.get("created_at") or ""),
                     "owner": {
                         "id": r.get("owner_id") or r.get("owner_email") or "",
@@ -6809,11 +6864,26 @@ def admin_products_list(
                 images_list = _safe_json_parse(r.get("images"), [r["image"]] if r.get("image") else [])
                 docs_list = _safe_json_parse(r.get("documents"), ["purchase_receipt.jpg"])
                 
+                approved_price_range = None
+                min_p = r.get("min_price")
+                max_p = r.get("max_price")
+                if min_p is not None and max_p is not None:
+                    approved_price_range = {
+                        "minPrice": float(min_p),
+                        "maxPrice": float(max_p),
+                        "priceUnit": r.get("price_unit") or "PER DAY",
+                        "priceStatus": r.get("price_status") or "SET",
+                        "priceApprovedAt": r.get("price_approved_at"),
+                        "priceApprovedBy": r.get("price_approved_by")
+                    }
+
                 products_by_id[p_id] = {
                     "id": p_id,
                     "title": r.get("title") or "Product",
                     "description": r.get("description") or "",
                     "category": r.get("category") or "General",
+                    "brand": "Standard",
+                    "model": "",
                     "price": float(r.get("price") or 0.0),
                     "rating": float(r.get("rating") or 5.0),
                     "reviewsCount": int(r.get("reviews") or 0),
@@ -6824,6 +6894,8 @@ def admin_products_list(
                     "image": r.get("image") or "",
                     "images": images_list,
                     "documents": docs_list,
+                    "approvedPriceRange": approved_price_range,
+                    "priceStatus": r.get("price_status") or ("SET" if approved_price_range else "NOT_SET"),
                     "createdAt": str(r.get("created_at") or ""),
                     "owner": {
                         "id": r.get("user_email") or "",
@@ -6861,6 +6933,8 @@ def admin_get_product(id: str, current_admin: dict = Depends(check_admin_user)):
                        p.daily_rate, p.weekly_rate, p.monthly_rate, p.security_deposit,
                        p.min_rental_days, p.max_rental_days,
                        p.available, p.availability_status, p.primary_image, p.images, p.status, p.created_at, p.updated_at,
+                       p.min_price, p.max_price, p.price_unit, p.price_status, p.price_approved_at, p.price_approved_by,
+                       p.price_history, p.video_url, p.revision_notes,
                        acc.phone AS owner_phone, acc.avatar AS owner_avatar, acc.address AS owner_address,
                        p.city AS owner_city, acc.pincode AS owner_pincode, acc.status AS owner_account_status,
                        acc.created_at AS owner_created_at
@@ -6874,6 +6948,7 @@ def admin_get_product(id: str, current_admin: dict = Depends(check_admin_user)):
                 specs_dict = _safe_json_parse(r.get("specifications"), {})
                 features_list = _safe_json_parse(r.get("features"), [])
                 condition_details = _safe_json_parse(r.get("condition_details"), {})
+                price_history = _safe_json_parse(r.get("price_history"), [])
                 st = (r.get("status") or "approved").lower()
                 
                 # Fetch count of products by this owner
@@ -6904,6 +6979,19 @@ def admin_get_product(id: str, current_admin: dict = Depends(check_admin_user)):
                         "customerName": b.get("user_email", "").split("@")[0],
                         "createdAt": str(b.get("created_at") or "")
                     })
+
+                approved_price_range = None
+                min_p = r.get("min_price")
+                max_p = r.get("max_price")
+                if min_p is not None and max_p is not None:
+                    approved_price_range = {
+                        "minPrice": float(min_p),
+                        "maxPrice": float(max_p),
+                        "priceUnit": r.get("price_unit") or "PER DAY",
+                        "priceStatus": r.get("price_status") or "SET",
+                        "priceApprovedAt": r.get("price_approved_at"),
+                        "priceApprovedBy": r.get("price_approved_by")
+                    }
 
                 res_product = {
                     "id": r["id"],
@@ -6937,7 +7025,12 @@ def admin_get_product(id: str, current_admin: dict = Depends(check_admin_user)):
                     "hidden": r.get("availability_status") == "paused",
                     "image": r.get("primary_image") or (images_list[0] if images_list else ""),
                     "images": images_list,
+                    "videoUrl": r.get("video_url") or "",
                     "documents": ["purchase_proof.jpg", "ownership_verification.pdf"],
+                    "approvedPriceRange": approved_price_range,
+                    "priceStatus": r.get("price_status") or ("SET" if approved_price_range else "NOT_SET"),
+                    "priceHistory": price_history,
+                    "revisionNotes": _safe_json_parse(r.get("revision_notes"), {}),
                     "createdAt": str(r.get("created_at") or ""),
                     "updatedAt": str(r.get("updated_at") or ""),
                     "bookings": prod_bookings,
@@ -6979,6 +7072,7 @@ def admin_get_product(id: str, current_admin: dict = Depends(check_admin_user)):
                 if cp:
                     images_list = _safe_json_parse(cp.get("images"), [cp["image"]] if cp.get("image") else [])
                     docs_list = _safe_json_parse(cp.get("documents"), ["purchase_receipt.jpg"])
+                    price_history = _safe_json_parse(cp.get("price_history"), [])
                     
                     user_email = cp.get("user_email") or ""
                     cursor.execute("""
@@ -6999,6 +7093,19 @@ def admin_get_product(id: str, current_admin: dict = Depends(check_admin_user)):
                             "customerName": b.get("user_email", "").split("@")[0],
                             "createdAt": str(b.get("created_at") or "")
                         })
+
+                    approved_price_range = None
+                    min_p = cp.get("min_price")
+                    max_p = cp.get("max_price")
+                    if min_p is not None and max_p is not None:
+                        approved_price_range = {
+                            "minPrice": float(min_p),
+                            "maxPrice": float(max_p),
+                            "priceUnit": cp.get("price_unit") or "PER DAY",
+                            "priceStatus": cp.get("price_status") or "SET",
+                            "priceApprovedAt": cp.get("price_approved_at"),
+                            "priceApprovedBy": cp.get("price_approved_by")
+                        }
 
                     res_product = {
                         "id": cp["id"],
@@ -7032,7 +7139,12 @@ def admin_get_product(id: str, current_admin: dict = Depends(check_admin_user)):
                         "hidden": bool(cp.get("hidden", False)),
                         "image": cp.get("image") or "",
                         "images": images_list,
+                        "videoUrl": cp.get("video_url") or "",
                         "documents": docs_list,
+                        "approvedPriceRange": approved_price_range,
+                        "priceStatus": cp.get("price_status") or ("SET" if approved_price_range else "NOT_SET"),
+                        "priceHistory": price_history,
+                        "revisionNotes": _safe_json_parse(cp.get("revision_notes"), {}),
                         "createdAt": str(cp.get("created_at") or ""),
                         "updatedAt": str(cp.get("created_at") or ""),
                         "bookings": prod_bookings,
@@ -7148,13 +7260,126 @@ def admin_delete_product(id: str, current_admin: dict = Depends(check_admin_user
     broadcast_admin_event("product.deleted", {"id": id})
     return {"success": True}
 
-@app.patch("/api/admin/products/{id}/approve")
-@app.post("/api/admin/products/{id}/approve")
-@app.put("/api/admin/products/{id}/approve")
-def admin_approve_product(id: str, current_admin: dict = Depends(check_admin_user)):
+@app.post("/api/admin/products/{id}/price-range")
+@app.patch("/api/admin/products/{id}/price-range")
+@app.put("/api/admin/products/{id}/price-range")
+def admin_set_product_price_range(id: str, data: SetProductPriceRangeSchema, current_admin: dict = Depends(check_admin_user)):
+    if data.minPrice <= 0:
+        raise HTTPException(status_code=400, detail="Minimum price must be greater than zero.")
+    if data.maxPrice < data.minPrice:
+        raise HTTPException(status_code=400, detail="Maximum price must be greater than or equal to minimum price.")
+    
     existing = admin_get_product(id, current_admin)
     if not existing:
         raise HTTPException(status_code=404, detail="Product not found")
+        
+    admin_name = current_admin.get("full_name") or current_admin.get("email") or "Admin"
+    now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    
+    prev_range = existing.get("approvedPriceRange") or {}
+    prev_min = prev_range.get("minPrice")
+    prev_max = prev_range.get("maxPrice")
+    prev_unit = prev_range.get("priceUnit") or "PER DAY"
+    
+    history_list = existing.get("priceHistory") or []
+    if prev_min is not None and prev_max is not None:
+        history_list.append({
+            "previousMin": prev_min,
+            "previousMax": prev_max,
+            "previousUnit": prev_unit,
+            "newMin": data.minPrice,
+            "newMax": data.maxPrice,
+            "newUnit": data.priceUnit or "PER DAY",
+            "admin": admin_name,
+            "date": now_str
+        })
+        
+    history_json = json.dumps(history_list)
+    unit_str = data.priceUnit or "PER DAY"
+    
+    execute_query("""
+        UPDATE payernt_products
+        SET min_price = %s, max_price = %s, price_unit = %s, price_status = 'SET',
+            price_approved_at = %s, price_approved_by = %s, price_history = %s,
+            daily_rate = %s
+        WHERE id = %s
+    """, (data.minPrice, data.maxPrice, unit_str, now_str, admin_name, history_json, data.minPrice, id))
+    
+    execute_query("""
+        UPDATE custom_products
+        SET min_price = %s, max_price = %s, price_unit = %s, price_status = 'SET',
+            price_approved_at = %s, price_approved_by = %s, price_history = %s,
+            price = %s
+        WHERE id = %s
+    """, (data.minPrice, data.maxPrice, unit_str, now_str, admin_name, history_json, data.minPrice, id))
+    
+    # Audit log
+    execute_query("""
+        INSERT INTO admin_logs (id, timestamp, user_name, action, module, ip_address)
+        VALUES (%s, %s, %s, %s, %s, %s)
+    """, (f"l-{random.randint(100000, 999999)}", now_str, admin_name, f"Set approved rental price range ₹{data.minPrice:.0f} - ₹{data.maxPrice:.0f} / {unit_str} for product {id}", "Inventory", "127.0.0.1"))
+    
+    invalidate_cache("public_custom_products")
+    invalidate_cache("public_categories")
+    invalidate_cache("public_stats")
+    invalidate_cache(f"product:{id}")
+    
+    res_prod = admin_get_product(id, current_admin)
+    broadcast_admin_event("product.updated", res_prod)
+    return res_prod
+
+@app.patch("/api/admin/products/{id}/approve")
+@app.post("/api/admin/products/{id}/approve")
+@app.put("/api/admin/products/{id}/approve")
+def admin_approve_product(id: str, data: Optional[ApproveProductSchema] = None, current_admin: dict = Depends(check_admin_user)):
+    existing = admin_get_product(id, current_admin)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Product not found")
+        
+    admin_name = current_admin.get("full_name") or current_admin.get("email") or "Admin"
+    now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    
+    # Handle price range passed with approval
+    if data and data.minPrice is not None and data.maxPrice is not None:
+        if data.minPrice <= 0:
+            raise HTTPException(status_code=400, detail="Minimum price must be greater than zero.")
+        if data.maxPrice < data.minPrice:
+            raise HTTPException(status_code=400, detail="Maximum price must be greater than or equal to minimum price.")
+        unit_str = data.priceUnit or "PER DAY"
+        execute_query("""
+            UPDATE payernt_products
+            SET min_price = %s, max_price = %s, price_unit = %s, price_status = 'SET',
+                price_approved_at = %s, price_approved_by = %s, daily_rate = %s
+            WHERE id = %s
+        """, (data.minPrice, data.maxPrice, unit_str, now_str, admin_name, data.minPrice, id))
+        execute_query("""
+            UPDATE custom_products
+            SET min_price = %s, max_price = %s, price_unit = %s, price_status = 'SET',
+                price_approved_at = %s, price_approved_by = %s, price = %s
+            WHERE id = %s
+        """, (data.minPrice, data.maxPrice, unit_str, now_str, admin_name, data.minPrice, id))
+    else:
+        # Check that product has a valid price range or fallback to daily_rate if set
+        existing_range = existing.get("approvedPriceRange")
+        if not existing_range:
+            cur_price = existing.get("price") or existing.get("dailyRate") or 0.0
+            if cur_price > 0:
+                min_auto = float(cur_price) * 0.9
+                max_auto = float(cur_price) * 1.2
+                execute_query("""
+                    UPDATE payernt_products
+                    SET min_price = %s, max_price = %s, price_unit = 'PER DAY', price_status = 'SET',
+                        price_approved_at = %s, price_approved_by = %s
+                    WHERE id = %s
+                """, (min_auto, max_auto, now_str, admin_name, id))
+                execute_query("""
+                    UPDATE custom_products
+                    SET min_price = %s, max_price = %s, price_unit = 'PER DAY', price_status = 'SET',
+                        price_approved_at = %s, price_approved_by = %s
+                    WHERE id = %s
+                """, (min_auto, max_auto, now_str, admin_name, id))
+            else:
+                raise HTTPException(status_code=400, detail="PRICE REQUIRED: Please enter and save a valid rental price range before approving this product.")
         
     execute_query("UPDATE payernt_products SET status = 'approved', availability_status = 'available', available = 1 WHERE id = %s", (id,))
     execute_query("UPDATE custom_products SET status = 'approved', available = 1 WHERE id = %s", (id,))
@@ -7173,8 +7398,8 @@ def admin_approve_product(id: str, current_admin: dict = Depends(check_admin_use
                     cursor.execute("SELECT id FROM custom_products WHERE id = %s", (id,))
                     if not cursor.fetchone():
                         cursor.execute("""
-                            INSERT INTO custom_products (id, user_email, title, description, price, image, category, rating, reviews, available, owner_name, owner_avatar, owner_rating, created_at, status, featured, hidden, images, documents)
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            INSERT INTO custom_products (id, user_email, title, description, price, image, category, rating, reviews, available, owner_name, owner_avatar, owner_rating, created_at, status, featured, hidden, images, documents, min_price, max_price, price_unit, price_status, price_approved_at, price_approved_by)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         """, (
                             p_row["id"],
                             p_row["owner_email"],
@@ -7189,12 +7414,18 @@ def admin_approve_product(id: str, current_admin: dict = Depends(check_admin_use
                             p_row.get("owner_name") or "Vendor",
                             "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
                             5.0,
-                            p_row.get("created_at") or datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                            p_row.get("created_at") or now_str,
                             "approved",
                             0,
                             0,
                             p_row.get("images") or "[]",
-                            "[\"purchase_proof.jpg\"]"
+                            "[\"purchase_proof.jpg\"]",
+                            p_row.get("min_price"),
+                            p_row.get("max_price"),
+                            p_row.get("price_unit") or "PER DAY",
+                            p_row.get("price_status") or "SET",
+                            p_row.get("price_approved_at"),
+                            p_row.get("price_approved_by")
                         ))
         finally:
             conn.close()
@@ -7205,16 +7436,66 @@ def admin_approve_product(id: str, current_admin: dict = Depends(check_admin_use
         create_notification(
             email=owner_email,
             title="Product Approved! 🎉",
-            message=f"Your listing '{existing.get('title')}' has been approved by admin and is now live on the marketplace.",
+            message=f"Your listing '{existing.get('title')}' has been approved by admin with the approved rental price range.",
             notif_type="system"
         )
     
     # Audit log
-    now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
     execute_query("""
         INSERT INTO admin_logs (id, timestamp, user_name, action, module, ip_address)
         VALUES (%s, %s, %s, %s, %s, %s)
-    """, (f"l-{random.randint(100000, 999999)}", now_str, current_admin.get("full_name") or "Admin", f"Approved product {id} ({existing.get('title')})", "Inventory", "127.0.0.1"))
+    """, (f"l-{random.randint(100000, 999999)}", now_str, admin_name, f"Approved product {id} ({existing.get('title')})", "Inventory", "127.0.0.1"))
+    
+    invalidate_cache("public_custom_products")
+    invalidate_cache("public_categories")
+    invalidate_cache("public_stats")
+    invalidate_cache(f"product:{id}")
+    res_prod = admin_get_product(id, current_admin)
+    broadcast_admin_event("product.updated", res_prod)
+    return res_prod
+
+@app.post("/api/admin/products/{id}/request-revision")
+@app.patch("/api/admin/products/{id}/request-revision")
+@app.put("/api/admin/products/{id}/request-revision")
+def admin_request_product_revision(id: str, data: RequestProductRevisionSchema, current_admin: dict = Depends(check_admin_user)):
+    existing = admin_get_product(id, current_admin)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Product not found")
+        
+    admin_name = current_admin.get("full_name") or current_admin.get("email") or "Admin"
+    now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    
+    revision_payload = {
+        "reason": data.reason,
+        "requiredChanges": data.requiredChanges or "",
+        "requestedAt": now_str,
+        "admin": admin_name
+    }
+    rev_json = json.dumps(revision_payload)
+    
+    execute_query("UPDATE payernt_products SET status = 'revision_required', availability_status = 'paused', available = 0, revision_notes = %s WHERE id = %s", (rev_json, id))
+    execute_query("UPDATE custom_products SET status = 'revision_required', available = 0, revision_notes = %s WHERE id = %s", (rev_json, id))
+    if id in MOCK_CUSTOM_PRODUCTS:
+        MOCK_CUSTOM_PRODUCTS[id]["status"] = "revision_required"
+        MOCK_CUSTOM_PRODUCTS[id]["available"] = False
+        
+    owner_email = existing.get("owner", {}).get("email") or ""
+    if owner_email:
+        req_msg = f" Reason: {data.reason}."
+        if data.requiredChanges:
+            req_msg += f" Required Changes: {data.requiredChanges}"
+        create_notification(
+            email=owner_email,
+            title="Revision Requested for Product 📝",
+            message=f"Admin has requested revisions for your listing '{existing.get('title')}'.{req_msg}",
+            notif_type="system"
+        )
+        
+    # Audit log
+    execute_query("""
+        INSERT INTO admin_logs (id, timestamp, user_name, action, module, ip_address)
+        VALUES (%s, %s, %s, %s, %s, %s)
+    """, (f"l-{random.randint(100000, 999999)}", now_str, admin_name, f"Requested revision for product {id}: {data.reason}", "Inventory", "127.0.0.1"))
     
     invalidate_cache("public_custom_products")
     invalidate_cache("public_categories")
@@ -7560,8 +7841,8 @@ def admin_bookings_list(current_admin: dict = Depends(check_admin_user)):
             cursor.execute("""
                 SELECT o.*, 
                        u.full_name as customer_name, 
-                       p.owner_name, 
-                       p.user_email as owner_email,
+                       COALESCE(p.owner_name, pp.owner_name) as owner_name, 
+                       COALESCE(p.user_email, pp.owner_email) as owner_email,
                        sec.vendor_pin_verified,
                        sec.renter_pin_verified,
                        sec.otp_verified,
@@ -7570,7 +7851,8 @@ def admin_bookings_list(current_admin: dict = Depends(check_admin_user)):
                 FROM orders o
                 LEFT JOIN users u ON o.user_email = u.email
                 LEFT JOIN custom_products p ON o.product_id = p.id
-                LEFT JOIN rental_security sec ON o.id = sec.order_id
+                LEFT JOIN payernt_products pp ON o.product_id = pp.id
+                LEFT JOIN rental_security sec ON o.id = sec.booking_id
                 ORDER BY o.created_at DESC
             """)
             rows = cursor.fetchall() or []

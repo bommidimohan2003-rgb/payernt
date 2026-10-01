@@ -109,6 +109,22 @@ def init_payernt_tables():
         )
     """)
 
+    def _add_pp_col(col_def: str):
+        try:
+            execute_query(f"ALTER TABLE payernt_products ADD COLUMN {col_def}")
+        except Exception:
+            pass
+
+    _add_pp_col("min_price FLOAT NULL")
+    _add_pp_col("max_price FLOAT NULL")
+    _add_pp_col("price_unit VARCHAR(50) DEFAULT 'PER DAY'")
+    _add_pp_col("price_status VARCHAR(50) DEFAULT 'NOT_SET'")
+    _add_pp_col("price_approved_at VARCHAR(100) NULL")
+    _add_pp_col("price_approved_by VARCHAR(255) NULL")
+    _add_pp_col("price_history LONGTEXT NULL")
+    _add_pp_col("video_url LONGTEXT NULL")
+    _add_pp_col("revision_notes LONGTEXT NULL")
+
     # 3. Rental Security Table (Links Vendor PIN + Renter PIN in ONE canonical record)
     execute_query("""
         CREATE TABLE IF NOT EXISTS rental_security (

@@ -12,7 +12,7 @@
     "preview": "npm run preview --workspace=frontend",
     "lint": "npm run lint --workspace=frontend",
     "format": "npm run format --workspace=frontend",
-    "dev:backend": "cd backend && python -m uvicorn main:app --reload --host 127.0.0.1 --port 8001",
+    "dev:backend": "cd backend && python -m uvicorn main:app --reload --host 0.0.0.0 --port 8001",
     "dev:all": "start npm run dev:backend && npm run dev",
     "test:backend": "cd backend && pytest"
   },
@@ -24,5 +24,10 @@
     "lightningcss": "1.32.0",
     "lightningcss-linux-x64-gnu": "^1.32.0",
     "lightningcss-linux-x64-musl": "^1.32.0"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/cli": "^8.5.2",
+    "@capacitor/core": "^8.5.2"
   }
 }

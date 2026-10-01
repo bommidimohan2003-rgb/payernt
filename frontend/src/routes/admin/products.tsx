@@ -1,5 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { lazy, Suspense, useEffect, useState } from "react";
+import { createFileRoute, useLocation } from "@tanstack/react-router";
+import { lazy, Suspense } from "react";
 import { z } from "zod";
 
 const Products = lazy(() => import("@/admin/pages/Products"));
@@ -7,18 +7,12 @@ const ProductDetails = lazy(() => import("@/admin/pages/ProductDetails"));
 
 const productSearchSchema = z.object({
   search: z.string().optional().catch(""),
+  status: z.string().optional().catch("all"),
 });
 
 function AdminProductsRouteComponent() {
-  const [pathname, setPathname] = useState(window.location.pathname);
-
-  useEffect(() => {
-    const handlePop = () => setPathname(window.location.pathname);
-    window.addEventListener("popstate", handlePop);
-    return () => window.removeEventListener("popstate", handlePop);
-  }, []);
-
-  const pathParts = pathname.split("/").filter(Boolean);
+  const location = useLocation();
+  const pathParts = location.pathname.split("/").filter(Boolean);
   const isDetails = pathParts.length > 2 && pathParts[0] === "admin" && pathParts[1] === "products";
 
   return (
@@ -33,3 +27,4 @@ export const Route = createFileRoute("/admin/products")({
   component: AdminProductsRouteComponent,
 });
 export default Route;
+

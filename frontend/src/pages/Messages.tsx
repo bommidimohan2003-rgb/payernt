@@ -302,15 +302,11 @@ export default function Messages() {
 
     let isSubscribed = true;
 
+    const isEmulator = typeof window !== "undefined" && window.location.hostname === "10.0.2.2";
+    const isLocal = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
     const apiBase =
-      import.meta.env.VITE_API_URL ||
-      (typeof window !== "undefined" &&
-      (window.location.hostname === "localhost" ||
-        window.location.hostname === "127.0.0.1")
-        ? "http://127.0.0.1:8001"
-        : typeof window !== "undefined"
-          ? window.location.origin
-          : "http://127.0.0.1:8001");
+      (typeof window !== "undefined" && (window as any).PAYENT_API_URL) ||
+      (isEmulator ? "http://10.0.2.2:8001" : isLocal ? "http://127.0.0.1:8001" : import.meta.env.VITE_API_URL || (typeof window !== "undefined" ? window.location.origin : "http://127.0.0.1:8001"));
 
     const wsUrl = apiBase.replace(/^http/, "ws") + `/api/conversations/${activeId}/ws?token=${token}`;
 

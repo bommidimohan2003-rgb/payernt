@@ -87,13 +87,22 @@ export function usePayerntStore() {
   // paye₹nt Account & Session State
   const [activeAccount, setActiveAccount] = useState<PayerntAccount | null>(() => {
     try {
+      const token =
+        localStorage.getItem("paye₹nt_token") ||
+        localStorage.getItem("payernt_token") ||
+        localStorage.getItem("payent_token");
       const stored = localStorage.getItem(STORAGE_KEY_ACCOUNT);
-      if (stored) return JSON.parse(stored);
+      if (stored && token) return JSON.parse(stored);
     } catch {}
     return null;
   });
 
-  const isAuthenticated = !!activeAccount;
+  const isAuthenticated = !!(
+    activeAccount &&
+    (localStorage.getItem("paye₹nt_token") ||
+      localStorage.getItem("payernt_token") ||
+      localStorage.getItem("payent_token"))
+  );
 
   const [activeUserId, setActiveUserId] = useState<string>(() => {
     try {
@@ -127,15 +136,21 @@ export function usePayerntStore() {
 
   const isMockItem = (id?: string) =>
     !id ||
-    id.startsWith("prod-mbp") ||
-    id.startsWith("prod-sony") ||
-    id.startsWith("prod-dji") ||
-    id.startsWith("prod-steam") ||
-    id.startsWith("prod-quest") ||
-    id.startsWith("prod-canon") ||
-    id.startsWith("prod-fuji") ||
-    id.startsWith("prod-bmpcc") ||
-    id.startsWith("prod-shure");
+    id.startsWith("prod-") ||
+    id.startsWith("p1") ||
+    id.startsWith("p2") ||
+    id.startsWith("p3") ||
+    id.startsWith("p4") ||
+    id.startsWith("p5") ||
+    id.startsWith("p6") ||
+    id.startsWith("p7") ||
+    id.startsWith("p8") ||
+    id.startsWith("p9") ||
+    id.startsWith("p10") ||
+    id.startsWith("mock") ||
+    id.startsWith("demo_") ||
+    id.startsWith("sample_") ||
+    id.startsWith("test_");
 
   const [wallet, setWallet] = useState<UserWallet>(() => {
     try {
@@ -158,16 +173,7 @@ export function usePayerntStore() {
   });
 
   const [products, setProducts] = useState<PayerntProduct[]>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY_PRODUCTS);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
-          return parsed.filter((p) => !isMockItem(p.id));
-        }
-      }
-    } catch {}
-    return INITIAL_PRODUCTS;
+    return [];
   });
 
   const [draftProduct, setDraftProduct] = useState<Partial<PayerntProduct> | null>(() => {
@@ -345,7 +351,7 @@ export function usePayerntStore() {
         if (stored) {
           const parsed = JSON.parse(stored);
           if (Array.isArray(parsed)) {
-            setProducts(parsed);
+            setProducts(parsed.filter((p: any) => !isMockItem(p.id)));
           }
         }
       } catch {}
@@ -361,13 +367,15 @@ export function usePayerntStore() {
 
   // Sync real paye₹nt backend state upon authentication
   useEffect(() => {
-    if (!activeAccount) return;
+    if (!activeAccount || !isAuthenticated) return;
 
     payerntApi
       .getProducts()
       .then((res) => {
         if (res.success && Array.isArray(res.products)) {
           setProducts(res.products.filter((p) => !isMockItem(p.id)));
+        } else if (res.error && (res.error.includes("401") || res.error.includes("Session expired") || res.error.includes("Authorization"))) {
+          logout();
         }
       })
       .catch(() => {});
@@ -390,6 +398,8 @@ export function usePayerntStore() {
               ? (res.transactions as any).filter((t: any) => !t.id?.startsWith("wtx-00"))
               : prev.transactions,
           }));
+        } else if (res.error && (res.error.includes("401") || res.error.includes("Session expired") || res.error.includes("Authorization"))) {
+          logout();
         }
       })
       .catch(() => {});
@@ -413,7 +423,7 @@ export function usePayerntStore() {
         }
       })
       .catch(() => {});
-  }, [activeAccount]);
+  }, [activeAccount, isAuthenticated, logout]);
 
   const switchDemoUser = (userId: string) => {
     const found = DEMO_USERS.find((u) => u.id === userId);

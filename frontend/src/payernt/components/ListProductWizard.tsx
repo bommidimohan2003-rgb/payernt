@@ -1273,7 +1273,6 @@ export function ListProductWizard({
         pickupInstructions: `Pickup: ${pickupAddressLine}, ${pickupArea}, ${pickupCity}; Drop: ${sameAsPickup ? "Same as pickup" : `${dropAddressLine}, ${dropArea}, ${dropCity}`}`,
       },
       city: pickupCity.trim(),
-      state: pickupState.trim(),
       area: pickupArea.trim() || pickupAddressLine.trim(),
       postalCode: pickupPincode.trim(),
       daily_rate: selectedRentalPrice,
@@ -1527,7 +1526,7 @@ export function ListProductWizard({
   }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6 text-left pb-16">
+    <div className="w-full space-y-6 text-left pb-16">
       {/* Back Button */}
       {onCancel && (
         <div>
@@ -1582,11 +1581,11 @@ export function ListProductWizard({
       </div>
 
       {/* 2-COLUMN DESKTOP LAYOUT (Stages Nav + Workspace) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      <div className="flex flex-col lg:flex-row gap-6 items-start w-full">
         {/* ========================================================================= */}
         {/* 1. LEFT LISTING FLOW (Stages 01 - 05)                                     */}
         {/* ========================================================================= */}
-        <div className="lg:col-span-3 bg-card border border-border/80 rounded-3xl p-5 shadow-xs sticky top-20">
+        <div className="w-full lg:w-72 xl:w-80 shrink-0 bg-card border border-border/80 rounded-3xl p-5 shadow-xs lg:sticky lg:top-20">
           <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-4">
             Listing Stages
           </h3>
@@ -1662,7 +1661,7 @@ export function ListProductWizard({
         {/* ========================================================================= */}
         {/* 2. MAIN WORKSPACE                                                         */}
         {/* ========================================================================= */}
-        <div className="lg:col-span-9 space-y-5">
+        <div className="flex-1 min-w-0 w-full space-y-5">
           <AnimatePresence mode="wait">
             {/* ------------------------------------------------------------------- */}
             {/* STAGE 01: CATEGORY + PRODUCT SPECIFICATIONS                         */}

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   Plus,
   Bell,
@@ -18,44 +18,48 @@ import {
   Sun,
   Moon,
   LogOut,
+  Wallet,
+  Calendar,
+  User,
+  LayoutDashboard,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { LenderNotification, DemoUser, PayerntAccount } from "../types";
 import { useTheme } from "@/hooks/useTheme";
 
 interface PayerntNavbarProps {
-  activeTab: "home" | "products" | "requests" | "wallet" | "profile" | "list";
-  onTabChange: (tab: "home" | "products" | "requests" | "wallet" | "profile" | "list") => void;
-  pendingRequestsCount: number;
-  notifications: LenderNotification[];
-  onMarkNotificationRead: (id: string) => void;
-  onMarkAllNotificationsRead: () => void;
-  onResetDemo: () => void;
+  activeTab?: "home" | "products" | "requests" | "wallet" | "profile" | "list" | "messages" | "analytics" | "settings" | "help";
+  onTabChange?: (tab: "home" | "products" | "requests" | "wallet" | "profile" | "list" | "messages" | "analytics" | "settings" | "help") => void;
+  pendingRequestsCount?: number;
+  notifications?: LenderNotification[];
+  onMarkNotificationRead?: (id: string) => void;
+  onMarkAllNotificationsRead?: () => void;
+  onResetDemo?: () => void;
   activeUser?: DemoUser;
   activeAccount?: PayerntAccount | null;
   onLogout?: () => void;
 }
 
 export function PayerntNavbar({
-  activeTab,
+  activeTab: propActiveTab,
   onTabChange,
-  pendingRequestsCount,
-  notifications,
-  onMarkNotificationRead,
-  onMarkAllNotificationsRead,
-  onResetDemo,
+  pendingRequestsCount = 0,
+  notifications = [],
+  onMarkNotificationRead = () => {},
+  onMarkAllNotificationsRead = () => {},
+  onResetDemo = () => {},
   activeUser,
   activeAccount,
   onLogout,
 }: PayerntNavbarProps) {
   const navigate = useNavigate();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { theme, toggle: toggleTheme } = useTheme();
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
 
   const displayName = activeAccount?.name || activeUser?.fullName || activeUser?.name || "Vendor";
-  const displayAvatar = activeAccount?.avatar || activeUser?.avatar;
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
@@ -69,12 +73,37 @@ export function PayerntNavbar({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const navItems: { id: "home" | "products" | "requests" | "wallet" | "profile"; label: string; badge?: number }[] = [
-    { id: "home", label: "Home" },
-    { id: "products", label: "My Products" },
-    { id: "requests", label: "Rental Requests", badge: pendingRequestsCount > 0 ? pendingRequestsCount : undefined },
-    { id: "wallet", label: "Wallet" },
-    { id: "profile", label: "Profile" },
+  // Compute active tab from route pathname
+  const currentTab = (() => {
+    if (propActiveTab) return propActiveTab;
+    if (pathname === "/payernt" || pathname === "/payernt/") return "home";
+    if (pathname.startsWith("/payernt/products/create") || pathname === "/payernt/list") return "list";
+    if (pathname.startsWith("/payernt/products")) return "products";
+    if (pathname.startsWith("/payernt/bookings") || pathname.startsWith("/payernt/requests")) return "requests";
+    if (pathname.startsWith("/payernt/wallet")) return "wallet";
+    if (pathname.startsWith("/payernt/messages")) return "messages";
+    if (pathname.startsWith("/payernt/analytics") || pathname.startsWith("/payernt/earnings")) return "analytics";
+    if (pathname.startsWith("/payernt/profile")) return "profile";
+    if (pathname.startsWith("/payernt/settings")) return "settings";
+    if (pathname.startsWith("/payernt/help")) return "help";
+    return "home";
+  })();
+
+  const handleNav = (tab: "home" | "products" | "requests" | "wallet" | "profile" | "list" | "messages" | "analytics" | "settings" | "help", path: string) => {
+    if (onTabChange) {
+      onTabChange(tab);
+      // Stay on /payernt — tab-based SPA, no router navigation needed
+      return;
+    }
+    navigate({ to: path as any });
+  };
+
+  const navItems: { id: "home" | "products" | "requests" | "wallet" | "profile"; label: string; path: string; badge?: number }[] = [
+    { id: "home", label: "Home", path: "/payernt" },
+    { id: "products", label: "My Products", path: "/payernt/products" },
+    { id: "requests", label: "Rental Requests", path: "/payernt/bookings", badge: pendingRequestsCount > 0 ? pendingRequestsCount : undefined },
+    { id: "wallet", label: "Wallet", path: "/payernt/wallet" },
+    { id: "profile", label: "Profile", path: "/payernt/profile" },
   ];
 
   return (
@@ -83,8 +112,15 @@ export function PayerntNavbar({
         {/* Brand Section */}
         <div className="flex items-center gap-6">
           <button
-            onClick={() => onTabChange("home")}
+            onClick={() => {
+              if (pathname === "/payernt" || pathname === "/payernt/") {
+                navigate({ to: "/" });
+              } else {
+                handleNav("home", "/payernt");
+              }
+            }}
             className="group flex items-center gap-2.5 text-left cursor-pointer focus:outline-none"
+            title={pathname === "/payernt" || pathname === "/payernt/" ? "Click to return to Gateway" : "Click to go to Lender Home"}
           >
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-foreground text-background font-black text-lg tracking-tight transition-transform group-hover:scale-105 shadow-sm">
               ₹
@@ -102,11 +138,11 @@ export function PayerntNavbar({
           {/* Desktop Nav Links */}
           <nav className="hidden md:flex items-center gap-1">
             {navItems.map((item) => {
-              const isActive = activeTab === item.id;
+              const isActive = currentTab === item.id;
               return (
                 <button
                   key={item.id}
-                  onClick={() => onTabChange(item.id)}
+                  onClick={() => handleNav(item.id, item.path)}
                   className={`relative px-3.5 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-all cursor-pointer ${
                     isActive
                       ? "text-foreground font-bold bg-secondary/80"
@@ -138,12 +174,12 @@ export function PayerntNavbar({
         <div className="flex items-center gap-2 sm:gap-3">
           {/* User Profile Pill */}
           <button
-            onClick={() => onTabChange("profile")}
+            onClick={() => handleNav("profile", "/payernt/profile")}
             className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-border/80 bg-card hover:bg-secondary text-xs font-semibold text-foreground transition-all cursor-pointer shadow-2xs"
             title="View Profile"
           >
             <div className="flex h-5 w-5 items-center justify-center rounded-md bg-gradient-to-br from-emerald-500 to-teal-700 text-white font-black text-[9px]">
-              {displayName.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase() || "LD"}
+              {displayName.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase() || "LD"}
             </div>
             <span className="hidden sm:inline font-bold text-xs max-w-[120px] truncate">{displayName}</span>
           </button>
@@ -231,7 +267,7 @@ export function PayerntNavbar({
 
           {/* Primary Action CTA: List Product */}
           <button
-            onClick={() => onTabChange("list")}
+            onClick={() => handleNav("list", "/payernt/products/create")}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-foreground text-background font-bold text-xs shadow-sm hover:opacity-90 active:scale-98 transition-all cursor-pointer"
           >
             <Plus className="h-3.5 w-3.5 stroke-[3]" />
@@ -272,13 +308,13 @@ export function PayerntNavbar({
             className="md:hidden border-t border-border bg-background/95 px-4 py-3 space-y-2"
           >
             {navItems.map((item) => {
-              const isActive = activeTab === item.id;
+              const isActive = currentTab === item.id;
               return (
                 <button
                   key={item.id}
                   onClick={() => {
-                    onTabChange(item.id);
                     setIsMobileMenuOpen(false);
+                    handleNav(item.id, item.path);
                   }}
                   className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     isActive

@@ -6,13 +6,15 @@ const USER_SPECIFIC_KEYS = new Set([
   "payent:orders",
 ]);
 
-export const PAYENT_CACHE_VERSION = "v6_real_catalog";
+export const PAYENT_CACHE_VERSION = "v8_clean_products";
 
 export function resetPayentCache(): void {
   if (typeof window === "undefined") return;
   try {
     const keysToRemove = [
       "payent_server_products",
+      "payernt_products_v2",
+      "paye₹nt_products",
       "payent_cached_catalog",
       "payent_live_categories",
       "payent:cache:public_custom_products",
