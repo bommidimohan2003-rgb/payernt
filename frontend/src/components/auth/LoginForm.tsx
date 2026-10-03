@@ -122,11 +122,7 @@ export function LoginForm() {
       localStorage.removeItem("pendingProductId");
     }
 
-    if (redirectUrl && redirectUrl.startsWith("/")) {
-      navigate({ to: redirectUrl as any });
-    } else if (pendingProductId) {
-      navigate({ to: `/product/${pendingProductId}` as any });
-    } else if (currentUser?.role === "admin") {
+    if (currentUser?.role === "admin" || currentUser?.role === "superadmin") {
       const userToken = storage.get<string | null>(STORAGE_KEYS.token, null);
       if (userToken) {
         localStorage.setItem("payent:admin:token", userToken);
@@ -144,6 +140,13 @@ export function LoginForm() {
       );
       window.dispatchEvent(new Event("payent:admin:profile-updated"));
       navigate({ to: "/admin/dashboard" });
+      return;
+    }
+
+    if (redirectUrl && redirectUrl.startsWith("/")) {
+      navigate({ to: redirectUrl as any });
+    } else if (pendingProductId) {
+      navigate({ to: `/product/${pendingProductId}` as any });
     } else {
       navigate({ to: "/dashboard" });
     }
