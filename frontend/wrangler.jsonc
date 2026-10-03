@@ -5,5 +5,8 @@
   "compatibility_date": "2026-10-01",
   "observability": {
     "enabled": true
+  },
+  "vars": {
+    "VITE_API_URL": "https://payernt-production.up.railway.app"
   }
 }
