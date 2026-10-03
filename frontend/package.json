@@ -10,9 +10,11 @@
     "dev:all": "start npm run dev:backend && npm run dev",
     "build": "vite build",
     "build:dev": "vite build --mode development",
-    "preview": "vite preview",
+    "preview": "npm run build && wrangler dev",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "deploy": "npm run build && wrangler deploy",
+    "cf-typegen": "wrangler types"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -72,6 +74,7 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.62.5",
     "@eslint/js": "^9.32.0",
     "@tailwindcss/vite": "^4.2.1",
     "@types/node": "^22.16.5",
@@ -89,7 +92,8 @@
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.56.1",
     "vite": "^8.0.16",
-    "vite-tsconfig-paths": "^6.0.2"
+    "vite-tsconfig-paths": "^6.0.2",
+    "wrangler": "^4.147.0"
   },
   "optionalDependencies": {
     "@rolldown/binding-linux-x64-gnu": "1.1.5",

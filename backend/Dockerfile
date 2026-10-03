@@ -1,4 +1,4 @@
-# Production Dockerfile for Payent FastAPI Backend
+# Production Dockerfile for Payent FastAPI Backend (Cloudflare Container Ready)
 FROM python:3.11-slim
 
 # Prevent Python from writing .pyc files & enable unbuffered stdout logging
@@ -15,15 +15,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies from backend directory
-COPY backend/requirements.txt .
+# Install Python dependencies
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application source code from backend directory
-COPY backend/ .
+# Copy application source code
+COPY . .
 
 # Expose server port
 EXPOSE 8000
 
-# Start Uvicorn server: bind to 0.0.0.0 on Railway's dynamic PORT
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Start Uvicorn ASGI server via robust Python starter script
+CMD ["python", "start.py"]

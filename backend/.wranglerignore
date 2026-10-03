@@ -1,0 +1,10 @@
+.git
+.pytest_cache
+tests/
+backups/
+scripts/
+.env*
+*.bat
+*.sh
+Dockerfile
+Procfile

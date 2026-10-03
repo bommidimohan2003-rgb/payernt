@@ -1,0 +1,25 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "payent-backend",
+  "main": "entry.py",
+  "compatibility_date": "2024-04-03",
+  "compatibility_flags": [
+    "python_workers"
+  ],
+  "vars": {
+    "ENV": "development",
+    "IS_PRODUCTION": "false",
+    "ALLOWED_ORIGINS": "https://frontend.bommidimohan2003.workers.dev,http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173",
+    "TIDB_HOST": "gateway01.ap-southeast-1.prod.aws.tidbcloud.com",
+    "TIDB_PORT": "4000",
+    "TIDB_DATABASE": "payent_marketplace_db",
+    "TIDB_SSL": "true",
+    "MYSQL_HOST": "gateway01.ap-southeast-1.prod.aws.tidbcloud.com",
+    "MYSQL_PORT": "4000",
+    "MYSQL_DB": "payent_marketplace_db",
+    "MYSQL_SSL": "true",
+    "JWT_ALGORITHM": "HS256",
+    "ACCESS_TOKEN_EXPIRE_MINUTES": "30",
+    "REFRESH_TOKEN_EXPIRE_DAYS": "7"
+  }
+}

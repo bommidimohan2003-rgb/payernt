@@ -8,3 +8,11 @@ htmlcov
 .env
 .env.*
 !.env.example
+venv/
+.venv/
+.git/
+.wrangler/
+.agent/
+.agents/
+node_modules/
+*.log

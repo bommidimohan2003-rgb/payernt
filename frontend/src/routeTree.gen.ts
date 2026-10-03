@@ -9,230 +9,95 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as WishlistRouteImport } from './routes/wishlist'
-import { Route as SettingsRouteImport } from './routes/settings'
-import { Route as SelectRouteImport } from './routes/select'
-import { Route as ReviewsRouteImport } from './routes/reviews'
-import { Route as ResetPasswordRouteImport } from './routes/reset-password'
-import { Route as RegisterRouteImport } from './routes/register'
-import { Route as ProfileRouteImport } from './routes/profile'
-import { Route as PrivacyRouteImport } from './routes/privacy'
-import { Route as PaymentRouteImport } from './routes/payment'
-import { Route as PayerntRouteImport } from './routes/payernt'
-import { Route as PayentRouteImport } from './routes/payent'
-import { Route as PayantRouteImport } from './routes/payant'
-import { Route as OtpRouteImport } from './routes/otp'
-import { Route as OrdersRouteImport } from './routes/orders'
-import { Route as NotificationsRouteImport } from './routes/notifications'
-import { Route as MessagesRouteImport } from './routes/messages'
-import { Route as LoginRouteImport } from './routes/login'
-import { Route as LenderPortalRouteImport } from './routes/lender-portal'
-import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
-import { Route as DashboardRouteImport } from './routes/dashboard'
-import { Route as ContactRouteImport } from './routes/contact'
-import { Route as CheckoutRouteImport } from './routes/checkout'
-import { Route as CategoriesRouteImport } from './routes/categories'
-import { Route as CartRouteImport } from './routes/cart'
-import { Route as BrowseRouteImport } from './routes/browse'
-import { Route as BecomeLenderRouteImport } from './routes/become-lender'
-import { Route as AdminRouteImport } from './routes/admin'
-import { Route as AccountPendingRouteImport } from './routes/account-pending'
-import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as PayerntIndexRouteImport } from './routes/payernt/index'
-import { Route as PayentIndexRouteImport } from './routes/payent/index'
+import { Route as AboutRouteImport } from './routes/about'
+import { Route as AccountPendingRouteImport } from './routes/account-pending'
+import { Route as AdminRouteImport } from './routes/admin'
+import { Route as BecomeLenderRouteImport } from './routes/become-lender'
+import { Route as BrowseRouteImport } from './routes/browse'
+import { Route as CartRouteImport } from './routes/cart'
+import { Route as CategoriesRouteImport } from './routes/categories'
+import { Route as CheckoutRouteImport } from './routes/checkout'
+import { Route as ContactRouteImport } from './routes/contact'
+import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
+import { Route as LenderPortalRouteImport } from './routes/lender-portal'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as MessagesRouteImport } from './routes/messages'
+import { Route as NotificationsRouteImport } from './routes/notifications'
+import { Route as OrdersRouteImport } from './routes/orders'
+import { Route as OtpRouteImport } from './routes/otp'
+import { Route as PayantRouteImport } from './routes/payant'
+import { Route as PayentRouteImport } from './routes/payent'
+import { Route as PayerntRouteImport } from './routes/payernt'
+import { Route as PaymentRouteImport } from './routes/payment'
+import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as RegisterRouteImport } from './routes/register'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as ReviewsRouteImport } from './routes/reviews'
+import { Route as SelectRouteImport } from './routes/select'
+import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as WishlistRouteImport } from './routes/wishlist'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
-import { Route as ProductIdRouteImport } from './routes/product.$id'
-import { Route as PayerntWalletRouteImport } from './routes/payernt/wallet'
-import { Route as PayerntSettingsRouteImport } from './routes/payernt/settings'
-import { Route as PayerntRequestsRouteImport } from './routes/payernt/requests'
-import { Route as PayerntProfileRouteImport } from './routes/payernt/profile'
-import { Route as PayerntProductsRouteImport } from './routes/payernt/products'
-import { Route as PayerntNotificationsRouteImport } from './routes/payernt/notifications'
-import { Route as PayerntMessagesRouteImport } from './routes/payernt/messages'
-import { Route as PayerntListRouteImport } from './routes/payernt/list'
-import { Route as PayerntHelpRouteImport } from './routes/payernt/help'
-import { Route as PayerntEarningsRouteImport } from './routes/payernt/earnings'
-import { Route as PayerntBookingsRouteImport } from './routes/payernt/bookings'
-import { Route as PayerntAnalyticsRouteImport } from './routes/payernt/analytics'
-import { Route as PayerntSplatRouteImport } from './routes/payernt/$'
-import { Route as PayentWishlistRouteImport } from './routes/payent/wishlist'
-import { Route as PayentSettingsRouteImport } from './routes/payent/settings'
-import { Route as PayentProfileRouteImport } from './routes/payent/profile'
-import { Route as PayentNotificationsRouteImport } from './routes/payent/notifications'
-import { Route as PayentMessagesRouteImport } from './routes/payent/messages'
-import { Route as PayentHelpRouteImport } from './routes/payent/help'
-import { Route as PayentExploreRouteImport } from './routes/payent/explore'
-import { Route as PayentCartRouteImport } from './routes/payent/cart'
-import { Route as PayentBookingsRouteImport } from './routes/payent/bookings'
-import { Route as PayentSplatRouteImport } from './routes/payent/$'
-import { Route as DeliveryIdRouteImport } from './routes/delivery.$id'
-import { Route as AdminWalletRouteImport } from './routes/admin/wallet'
-import { Route as AdminUsersRouteImport } from './routes/admin/users'
-import { Route as AdminSupportRouteImport } from './routes/admin/support'
-import { Route as AdminSettingsRouteImport } from './routes/admin/settings'
-import { Route as AdminReviewsRouteImport } from './routes/admin/reviews'
-import { Route as AdminReportsRouteImport } from './routes/admin/reports'
-import { Route as AdminProfileRouteImport } from './routes/admin/profile'
-import { Route as AdminProductsRouteImport } from './routes/admin/products'
-import { Route as AdminPaymentsRouteImport } from './routes/admin/payments'
-import { Route as AdminNotificationsRouteImport } from './routes/admin/notifications'
-import { Route as AdminMessagesRouteImport } from './routes/admin/messages'
-import { Route as AdminLoginRouteImport } from './routes/admin/login'
-import { Route as AdminHelpRouteImport } from './routes/admin/help'
-import { Route as AdminDashboardRouteImport } from './routes/admin/dashboard'
-import { Route as AdminCategoriesRouteImport } from './routes/admin/categories'
-import { Route as AdminBookingsRouteImport } from './routes/admin/bookings'
-import { Route as AdminApiKeysRouteImport } from './routes/admin/api-keys'
-import { Route as AdminAnalyticsRouteImport } from './routes/admin/analytics'
-import { Route as AdminAgentsRouteImport } from './routes/admin/agents'
-import { Route as AdminActivityLogsRouteImport } from './routes/admin/activity-logs'
-import { Route as AdminActivityRouteImport } from './routes/admin/activity'
 import { Route as AdminSplatRouteImport } from './routes/admin/$'
-import { Route as PayerntProductsCreateRouteImport } from './routes/payernt/products.create'
-import { Route as PayerntProductsIdRouteImport } from './routes/payernt/products.$id'
-import { Route as PayentProductsIdRouteImport } from './routes/payent/products.$id'
+import { Route as AdminActivityRouteImport } from './routes/admin/activity'
+import { Route as AdminActivityLogsRouteImport } from './routes/admin/activity-logs'
+import { Route as AdminAgentsRouteImport } from './routes/admin/agents'
+import { Route as AdminAnalyticsRouteImport } from './routes/admin/analytics'
+import { Route as AdminApiKeysRouteImport } from './routes/admin/api-keys'
+import { Route as AdminBookingsRouteImport } from './routes/admin/bookings'
+import { Route as AdminCategoriesRouteImport } from './routes/admin/categories'
+import { Route as AdminDashboardRouteImport } from './routes/admin/dashboard'
+import { Route as AdminHelpRouteImport } from './routes/admin/help'
+import { Route as AdminLoginRouteImport } from './routes/admin/login'
+import { Route as AdminMessagesRouteImport } from './routes/admin/messages'
+import { Route as AdminNotificationsRouteImport } from './routes/admin/notifications'
+import { Route as AdminPaymentsRouteImport } from './routes/admin/payments'
+import { Route as AdminProductsRouteImport } from './routes/admin/products'
+import { Route as AdminProfileRouteImport } from './routes/admin/profile'
+import { Route as AdminReportsRouteImport } from './routes/admin/reports'
+import { Route as AdminReviewsRouteImport } from './routes/admin/reviews'
+import { Route as AdminSettingsRouteImport } from './routes/admin/settings'
+import { Route as AdminSupportRouteImport } from './routes/admin/support'
+import { Route as AdminUsersRouteImport } from './routes/admin/users'
+import { Route as AdminWalletRouteImport } from './routes/admin/wallet'
+import { Route as DeliveryIdRouteImport } from './routes/delivery.$id'
+import { Route as PayentIndexRouteImport } from './routes/payent/index'
+import { Route as PayentSplatRouteImport } from './routes/payent/$'
+import { Route as PayentBookingsRouteImport } from './routes/payent/bookings'
+import { Route as PayentCartRouteImport } from './routes/payent/cart'
+import { Route as PayentExploreRouteImport } from './routes/payent/explore'
+import { Route as PayentHelpRouteImport } from './routes/payent/help'
+import { Route as PayentMessagesRouteImport } from './routes/payent/messages'
+import { Route as PayentNotificationsRouteImport } from './routes/payent/notifications'
+import { Route as PayentProfileRouteImport } from './routes/payent/profile'
+import { Route as PayentSettingsRouteImport } from './routes/payent/settings'
+import { Route as PayentWishlistRouteImport } from './routes/payent/wishlist'
+import { Route as PayerntIndexRouteImport } from './routes/payernt/index'
+import { Route as PayerntSplatRouteImport } from './routes/payernt/$'
+import { Route as PayerntAnalyticsRouteImport } from './routes/payernt/analytics'
+import { Route as PayerntBookingsRouteImport } from './routes/payernt/bookings'
+import { Route as PayerntEarningsRouteImport } from './routes/payernt/earnings'
+import { Route as PayerntHelpRouteImport } from './routes/payernt/help'
+import { Route as PayerntListRouteImport } from './routes/payernt/list'
+import { Route as PayerntMessagesRouteImport } from './routes/payernt/messages'
+import { Route as PayerntNotificationsRouteImport } from './routes/payernt/notifications'
+import { Route as PayerntProductsRouteImport } from './routes/payernt/products'
+import { Route as PayerntProfileRouteImport } from './routes/payernt/profile'
+import { Route as PayerntRequestsRouteImport } from './routes/payernt/requests'
+import { Route as PayerntSettingsRouteImport } from './routes/payernt/settings'
+import { Route as PayerntWalletRouteImport } from './routes/payernt/wallet'
+import { Route as ProductIdRouteImport } from './routes/product.$id'
 import { Route as AdminProductsIdRouteImport } from './routes/admin/products.$id'
+import { Route as PayentProductsIdRouteImport } from './routes/payent/products.$id'
+import { Route as PayerntProductsIdRouteImport } from './routes/payernt/products.$id'
+import { Route as PayerntProductsCreateRouteImport } from './routes/payernt/products.create'
 import { Route as AdminProductsIdReviewRouteImport } from './routes/admin/products.$id.review'
 
-const WishlistRoute = WishlistRouteImport.update({
-  id: '/wishlist',
-  path: '/wishlist',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SettingsRoute = SettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SelectRoute = SelectRouteImport.update({
-  id: '/select',
-  path: '/select',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ReviewsRoute = ReviewsRouteImport.update({
-  id: '/reviews',
-  path: '/reviews',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ResetPasswordRoute = ResetPasswordRouteImport.update({
-  id: '/reset-password',
-  path: '/reset-password',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const RegisterRoute = RegisterRouteImport.update({
-  id: '/register',
-  path: '/register',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ProfileRoute = ProfileRouteImport.update({
-  id: '/profile',
-  path: '/profile',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PrivacyRoute = PrivacyRouteImport.update({
-  id: '/privacy',
-  path: '/privacy',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PaymentRoute = PaymentRouteImport.update({
-  id: '/payment',
-  path: '/payment',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PayerntRoute = PayerntRouteImport.update({
-  id: '/payernt',
-  path: '/payernt',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PayentRoute = PayentRouteImport.update({
-  id: '/payent',
-  path: '/payent',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PayantRoute = PayantRouteImport.update({
-  id: '/payant',
-  path: '/payant',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const OtpRoute = OtpRouteImport.update({
-  id: '/otp',
-  path: '/otp',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const OrdersRoute = OrdersRouteImport.update({
-  id: '/orders',
-  path: '/orders',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const NotificationsRoute = NotificationsRouteImport.update({
-  id: '/notifications',
-  path: '/notifications',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MessagesRoute = MessagesRouteImport.update({
-  id: '/messages',
-  path: '/messages',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LenderPortalRoute = LenderPortalRouteImport.update({
-  id: '/lender-portal',
-  path: '/lender-portal',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
-  id: '/forgot-password',
-  path: '/forgot-password',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DashboardRoute = DashboardRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ContactRoute = ContactRouteImport.update({
-  id: '/contact',
-  path: '/contact',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CheckoutRoute = CheckoutRouteImport.update({
-  id: '/checkout',
-  path: '/checkout',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CategoriesRoute = CategoriesRouteImport.update({
-  id: '/categories',
-  path: '/categories',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CartRoute = CartRouteImport.update({
-  id: '/cart',
-  path: '/cart',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BrowseRoute = BrowseRouteImport.update({
-  id: '/browse',
-  path: '/browse',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BecomeLenderRoute = BecomeLenderRouteImport.update({
-  id: '/become-lender',
-  path: '/become-lender',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AdminRoute = AdminRouteImport.update({
-  id: '/admin',
-  path: '/admin',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AccountPendingRoute = AccountPendingRouteImport.update({
-  id: '/account-pending',
-  path: '/account-pending',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AboutRoute = AboutRouteImport.update({
@@ -240,254 +105,149 @@ const AboutRoute = AboutRouteImport.update({
   path: '/about',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const AccountPendingRoute = AccountPendingRouteImport.update({
+  id: '/account-pending',
+  path: '/account-pending',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PayerntIndexRoute = PayerntIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => PayerntRoute,
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
 } as any)
-const PayentIndexRoute = PayentIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => PayentRoute,
+const BecomeLenderRoute = BecomeLenderRouteImport.update({
+  id: '/become-lender',
+  path: '/become-lender',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BrowseRoute = BrowseRouteImport.update({
+  id: '/browse',
+  path: '/browse',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CartRoute = CartRouteImport.update({
+  id: '/cart',
+  path: '/cart',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CategoriesRoute = CategoriesRouteImport.update({
+  id: '/categories',
+  path: '/categories',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CheckoutRoute = CheckoutRouteImport.update({
+  id: '/checkout',
+  path: '/checkout',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContactRoute = ContactRouteImport.update({
+  id: '/contact',
+  path: '/contact',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DashboardRoute = DashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
+  id: '/forgot-password',
+  path: '/forgot-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LenderPortalRoute = LenderPortalRouteImport.update({
+  id: '/lender-portal',
+  path: '/lender-portal',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MessagesRoute = MessagesRouteImport.update({
+  id: '/messages',
+  path: '/messages',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NotificationsRoute = NotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OrdersRoute = OrdersRouteImport.update({
+  id: '/orders',
+  path: '/orders',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OtpRoute = OtpRouteImport.update({
+  id: '/otp',
+  path: '/otp',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PayantRoute = PayantRouteImport.update({
+  id: '/payant',
+  path: '/payant',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PayentRoute = PayentRouteImport.update({
+  id: '/payent',
+  path: '/payent',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PayerntRoute = PayerntRouteImport.update({
+  id: '/payernt',
+  path: '/payernt',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PaymentRoute = PaymentRouteImport.update({
+  id: '/payment',
+  path: '/payment',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfileRoute = ProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RegisterRoute = RegisterRouteImport.update({
+  id: '/register',
+  path: '/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReviewsRoute = ReviewsRouteImport.update({
+  id: '/reviews',
+  path: '/reviews',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SelectRoute = SelectRouteImport.update({
+  id: '/select',
+  path: '/select',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WishlistRoute = WishlistRouteImport.update({
+  id: '/wishlist',
+  path: '/wishlist',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => AdminRoute,
-} as any)
-const ProductIdRoute = ProductIdRouteImport.update({
-  id: '/product/$id',
-  path: '/product/$id',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PayerntWalletRoute = PayerntWalletRouteImport.update({
-  id: '/wallet',
-  path: '/wallet',
-  getParentRoute: () => PayerntRoute,
-} as any)
-const PayerntSettingsRoute = PayerntSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => PayerntRoute,
-} as any)
-const PayerntRequestsRoute = PayerntRequestsRouteImport.update({
-  id: '/requests',
-  path: '/requests',
-  getParentRoute: () => PayerntRoute,
-} as any)
-const PayerntProfileRoute = PayerntProfileRouteImport.update({
-  id: '/profile',
-  path: '/profile',
-  getParentRoute: () => PayerntRoute,
-} as any)
-const PayerntProductsRoute = PayerntProductsRouteImport.update({
-  id: '/products',
-  path: '/products',
-  getParentRoute: () => PayerntRoute,
-} as any)
-const PayerntNotificationsRoute = PayerntNotificationsRouteImport.update({
-  id: '/notifications',
-  path: '/notifications',
-  getParentRoute: () => PayerntRoute,
-} as any)
-const PayerntMessagesRoute = PayerntMessagesRouteImport.update({
-  id: '/messages',
-  path: '/messages',
-  getParentRoute: () => PayerntRoute,
-} as any)
-const PayerntListRoute = PayerntListRouteImport.update({
-  id: '/list',
-  path: '/list',
-  getParentRoute: () => PayerntRoute,
-} as any)
-const PayerntHelpRoute = PayerntHelpRouteImport.update({
-  id: '/help',
-  path: '/help',
-  getParentRoute: () => PayerntRoute,
-} as any)
-const PayerntEarningsRoute = PayerntEarningsRouteImport.update({
-  id: '/earnings',
-  path: '/earnings',
-  getParentRoute: () => PayerntRoute,
-} as any)
-const PayerntBookingsRoute = PayerntBookingsRouteImport.update({
-  id: '/bookings',
-  path: '/bookings',
-  getParentRoute: () => PayerntRoute,
-} as any)
-const PayerntAnalyticsRoute = PayerntAnalyticsRouteImport.update({
-  id: '/analytics',
-  path: '/analytics',
-  getParentRoute: () => PayerntRoute,
-} as any)
-const PayerntSplatRoute = PayerntSplatRouteImport.update({
-  id: '/$',
-  path: '/$',
-  getParentRoute: () => PayerntRoute,
-} as any)
-const PayentWishlistRoute = PayentWishlistRouteImport.update({
-  id: '/wishlist',
-  path: '/wishlist',
-  getParentRoute: () => PayentRoute,
-} as any)
-const PayentSettingsRoute = PayentSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => PayentRoute,
-} as any)
-const PayentProfileRoute = PayentProfileRouteImport.update({
-  id: '/profile',
-  path: '/profile',
-  getParentRoute: () => PayentRoute,
-} as any)
-const PayentNotificationsRoute = PayentNotificationsRouteImport.update({
-  id: '/notifications',
-  path: '/notifications',
-  getParentRoute: () => PayentRoute,
-} as any)
-const PayentMessagesRoute = PayentMessagesRouteImport.update({
-  id: '/messages',
-  path: '/messages',
-  getParentRoute: () => PayentRoute,
-} as any)
-const PayentHelpRoute = PayentHelpRouteImport.update({
-  id: '/help',
-  path: '/help',
-  getParentRoute: () => PayentRoute,
-} as any)
-const PayentExploreRoute = PayentExploreRouteImport.update({
-  id: '/explore',
-  path: '/explore',
-  getParentRoute: () => PayentRoute,
-} as any)
-const PayentCartRoute = PayentCartRouteImport.update({
-  id: '/cart',
-  path: '/cart',
-  getParentRoute: () => PayentRoute,
-} as any)
-const PayentBookingsRoute = PayentBookingsRouteImport.update({
-  id: '/bookings',
-  path: '/bookings',
-  getParentRoute: () => PayentRoute,
-} as any)
-const PayentSplatRoute = PayentSplatRouteImport.update({
-  id: '/$',
-  path: '/$',
-  getParentRoute: () => PayentRoute,
-} as any)
-const DeliveryIdRoute = DeliveryIdRouteImport.update({
-  id: '/delivery/$id',
-  path: '/delivery/$id',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AdminWalletRoute = AdminWalletRouteImport.update({
-  id: '/wallet',
-  path: '/wallet',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminUsersRoute = AdminUsersRouteImport.update({
-  id: '/users',
-  path: '/users',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminSupportRoute = AdminSupportRouteImport.update({
-  id: '/support',
-  path: '/support',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminSettingsRoute = AdminSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminReviewsRoute = AdminReviewsRouteImport.update({
-  id: '/reviews',
-  path: '/reviews',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminReportsRoute = AdminReportsRouteImport.update({
-  id: '/reports',
-  path: '/reports',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminProfileRoute = AdminProfileRouteImport.update({
-  id: '/profile',
-  path: '/profile',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminProductsRoute = AdminProductsRouteImport.update({
-  id: '/products',
-  path: '/products',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminPaymentsRoute = AdminPaymentsRouteImport.update({
-  id: '/payments',
-  path: '/payments',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminNotificationsRoute = AdminNotificationsRouteImport.update({
-  id: '/notifications',
-  path: '/notifications',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminMessagesRoute = AdminMessagesRouteImport.update({
-  id: '/messages',
-  path: '/messages',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminLoginRoute = AdminLoginRouteImport.update({
-  id: '/login',
-  path: '/login',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminHelpRoute = AdminHelpRouteImport.update({
-  id: '/help',
-  path: '/help',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminDashboardRoute = AdminDashboardRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminCategoriesRoute = AdminCategoriesRouteImport.update({
-  id: '/categories',
-  path: '/categories',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminBookingsRoute = AdminBookingsRouteImport.update({
-  id: '/bookings',
-  path: '/bookings',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminApiKeysRoute = AdminApiKeysRouteImport.update({
-  id: '/api-keys',
-  path: '/api-keys',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminAnalyticsRoute = AdminAnalyticsRouteImport.update({
-  id: '/analytics',
-  path: '/analytics',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminAgentsRoute = AdminAgentsRouteImport.update({
-  id: '/agents',
-  path: '/agents',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminActivityLogsRoute = AdminActivityLogsRouteImport.update({
-  id: '/activity-logs',
-  path: '/activity-logs',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminActivityRoute = AdminActivityRouteImport.update({
-  id: '/activity',
-  path: '/activity',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminSplatRoute = AdminSplatRouteImport.update({
@@ -495,25 +255,265 @@ const AdminSplatRoute = AdminSplatRouteImport.update({
   path: '/$',
   getParentRoute: () => AdminRoute,
 } as any)
-const PayerntProductsCreateRoute = PayerntProductsCreateRouteImport.update({
-  id: '/create',
-  path: '/create',
-  getParentRoute: () => PayerntProductsRoute,
+const AdminActivityRoute = AdminActivityRouteImport.update({
+  id: '/activity',
+  path: '/activity',
+  getParentRoute: () => AdminRoute,
 } as any)
-const PayerntProductsIdRoute = PayerntProductsIdRouteImport.update({
+const AdminActivityLogsRoute = AdminActivityLogsRouteImport.update({
+  id: '/activity-logs',
+  path: '/activity-logs',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAgentsRoute = AdminAgentsRouteImport.update({
+  id: '/agents',
+  path: '/agents',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAnalyticsRoute = AdminAnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminApiKeysRoute = AdminApiKeysRouteImport.update({
+  id: '/api-keys',
+  path: '/api-keys',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminBookingsRoute = AdminBookingsRouteImport.update({
+  id: '/bookings',
+  path: '/bookings',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminCategoriesRoute = AdminCategoriesRouteImport.update({
+  id: '/categories',
+  path: '/categories',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminDashboardRoute = AdminDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminHelpRoute = AdminHelpRouteImport.update({
+  id: '/help',
+  path: '/help',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminLoginRoute = AdminLoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminMessagesRoute = AdminMessagesRouteImport.update({
+  id: '/messages',
+  path: '/messages',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminNotificationsRoute = AdminNotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminPaymentsRoute = AdminPaymentsRouteImport.update({
+  id: '/payments',
+  path: '/payments',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminProductsRoute = AdminProductsRouteImport.update({
+  id: '/products',
+  path: '/products',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminProfileRoute = AdminProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminReportsRoute = AdminReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminReviewsRoute = AdminReviewsRouteImport.update({
+  id: '/reviews',
+  path: '/reviews',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminSettingsRoute = AdminSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminSupportRoute = AdminSupportRouteImport.update({
+  id: '/support',
+  path: '/support',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminUsersRoute = AdminUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminWalletRoute = AdminWalletRouteImport.update({
+  id: '/wallet',
+  path: '/wallet',
+  getParentRoute: () => AdminRoute,
+} as any)
+const DeliveryIdRoute = DeliveryIdRouteImport.update({
+  id: '/delivery/$id',
+  path: '/delivery/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PayentIndexRoute = PayentIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => PayentRoute,
+} as any)
+const PayentSplatRoute = PayentSplatRouteImport.update({
+  id: '/$',
+  path: '/$',
+  getParentRoute: () => PayentRoute,
+} as any)
+const PayentBookingsRoute = PayentBookingsRouteImport.update({
+  id: '/bookings',
+  path: '/bookings',
+  getParentRoute: () => PayentRoute,
+} as any)
+const PayentCartRoute = PayentCartRouteImport.update({
+  id: '/cart',
+  path: '/cart',
+  getParentRoute: () => PayentRoute,
+} as any)
+const PayentExploreRoute = PayentExploreRouteImport.update({
+  id: '/explore',
+  path: '/explore',
+  getParentRoute: () => PayentRoute,
+} as any)
+const PayentHelpRoute = PayentHelpRouteImport.update({
+  id: '/help',
+  path: '/help',
+  getParentRoute: () => PayentRoute,
+} as any)
+const PayentMessagesRoute = PayentMessagesRouteImport.update({
+  id: '/messages',
+  path: '/messages',
+  getParentRoute: () => PayentRoute,
+} as any)
+const PayentNotificationsRoute = PayentNotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
+  getParentRoute: () => PayentRoute,
+} as any)
+const PayentProfileRoute = PayentProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => PayentRoute,
+} as any)
+const PayentSettingsRoute = PayentSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => PayentRoute,
+} as any)
+const PayentWishlistRoute = PayentWishlistRouteImport.update({
+  id: '/wishlist',
+  path: '/wishlist',
+  getParentRoute: () => PayentRoute,
+} as any)
+const PayerntIndexRoute = PayerntIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => PayerntRoute,
+} as any)
+const PayerntSplatRoute = PayerntSplatRouteImport.update({
+  id: '/$',
+  path: '/$',
+  getParentRoute: () => PayerntRoute,
+} as any)
+const PayerntAnalyticsRoute = PayerntAnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
+  getParentRoute: () => PayerntRoute,
+} as any)
+const PayerntBookingsRoute = PayerntBookingsRouteImport.update({
+  id: '/bookings',
+  path: '/bookings',
+  getParentRoute: () => PayerntRoute,
+} as any)
+const PayerntEarningsRoute = PayerntEarningsRouteImport.update({
+  id: '/earnings',
+  path: '/earnings',
+  getParentRoute: () => PayerntRoute,
+} as any)
+const PayerntHelpRoute = PayerntHelpRouteImport.update({
+  id: '/help',
+  path: '/help',
+  getParentRoute: () => PayerntRoute,
+} as any)
+const PayerntListRoute = PayerntListRouteImport.update({
+  id: '/list',
+  path: '/list',
+  getParentRoute: () => PayerntRoute,
+} as any)
+const PayerntMessagesRoute = PayerntMessagesRouteImport.update({
+  id: '/messages',
+  path: '/messages',
+  getParentRoute: () => PayerntRoute,
+} as any)
+const PayerntNotificationsRoute = PayerntNotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
+  getParentRoute: () => PayerntRoute,
+} as any)
+const PayerntProductsRoute = PayerntProductsRouteImport.update({
+  id: '/products',
+  path: '/products',
+  getParentRoute: () => PayerntRoute,
+} as any)
+const PayerntProfileRoute = PayerntProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => PayerntRoute,
+} as any)
+const PayerntRequestsRoute = PayerntRequestsRouteImport.update({
+  id: '/requests',
+  path: '/requests',
+  getParentRoute: () => PayerntRoute,
+} as any)
+const PayerntSettingsRoute = PayerntSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => PayerntRoute,
+} as any)
+const PayerntWalletRoute = PayerntWalletRouteImport.update({
+  id: '/wallet',
+  path: '/wallet',
+  getParentRoute: () => PayerntRoute,
+} as any)
+const ProductIdRoute = ProductIdRouteImport.update({
+  id: '/product/$id',
+  path: '/product/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminProductsIdRoute = AdminProductsIdRouteImport.update({
   id: '/$id',
   path: '/$id',
-  getParentRoute: () => PayerntProductsRoute,
+  getParentRoute: () => AdminProductsRoute,
 } as any)
 const PayentProductsIdRoute = PayentProductsIdRouteImport.update({
   id: '/products/$id',
   path: '/products/$id',
   getParentRoute: () => PayentRoute,
 } as any)
-const AdminProductsIdRoute = AdminProductsIdRouteImport.update({
+const PayerntProductsIdRoute = PayerntProductsIdRouteImport.update({
   id: '/$id',
   path: '/$id',
-  getParentRoute: () => AdminProductsRoute,
+  getParentRoute: () => PayerntProductsRoute,
+} as any)
+const PayerntProductsCreateRoute = PayerntProductsCreateRouteImport.update({
+  id: '/create',
+  path: '/create',
+  getParentRoute: () => PayerntProductsRoute,
 } as any)
 const AdminProductsIdReviewRoute = AdminProductsIdReviewRouteImport.update({
   id: '/review',
@@ -1078,200 +1078,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/wishlist': {
-      id: '/wishlist'
-      path: '/wishlist'
-      fullPath: '/wishlist'
-      preLoaderRoute: typeof WishlistRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/settings': {
-      id: '/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof SettingsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/select': {
-      id: '/select'
-      path: '/select'
-      fullPath: '/select'
-      preLoaderRoute: typeof SelectRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/reviews': {
-      id: '/reviews'
-      path: '/reviews'
-      fullPath: '/reviews'
-      preLoaderRoute: typeof ReviewsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/reset-password': {
-      id: '/reset-password'
-      path: '/reset-password'
-      fullPath: '/reset-password'
-      preLoaderRoute: typeof ResetPasswordRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/register': {
-      id: '/register'
-      path: '/register'
-      fullPath: '/register'
-      preLoaderRoute: typeof RegisterRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/profile': {
-      id: '/profile'
-      path: '/profile'
-      fullPath: '/profile'
-      preLoaderRoute: typeof ProfileRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/privacy': {
-      id: '/privacy'
-      path: '/privacy'
-      fullPath: '/privacy'
-      preLoaderRoute: typeof PrivacyRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/payment': {
-      id: '/payment'
-      path: '/payment'
-      fullPath: '/payment'
-      preLoaderRoute: typeof PaymentRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/payernt': {
-      id: '/payernt'
-      path: '/payernt'
-      fullPath: '/payernt'
-      preLoaderRoute: typeof PayerntRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/payent': {
-      id: '/payent'
-      path: '/payent'
-      fullPath: '/payent'
-      preLoaderRoute: typeof PayentRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/payant': {
-      id: '/payant'
-      path: '/payant'
-      fullPath: '/payant'
-      preLoaderRoute: typeof PayantRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/otp': {
-      id: '/otp'
-      path: '/otp'
-      fullPath: '/otp'
-      preLoaderRoute: typeof OtpRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/orders': {
-      id: '/orders'
-      path: '/orders'
-      fullPath: '/orders'
-      preLoaderRoute: typeof OrdersRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/notifications': {
-      id: '/notifications'
-      path: '/notifications'
-      fullPath: '/notifications'
-      preLoaderRoute: typeof NotificationsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/messages': {
-      id: '/messages'
-      path: '/messages'
-      fullPath: '/messages'
-      preLoaderRoute: typeof MessagesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/lender-portal': {
-      id: '/lender-portal'
-      path: '/lender-portal'
-      fullPath: '/lender-portal'
-      preLoaderRoute: typeof LenderPortalRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/forgot-password': {
-      id: '/forgot-password'
-      path: '/forgot-password'
-      fullPath: '/forgot-password'
-      preLoaderRoute: typeof ForgotPasswordRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/dashboard': {
-      id: '/dashboard'
-      path: '/dashboard'
-      fullPath: '/dashboard'
-      preLoaderRoute: typeof DashboardRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/contact': {
-      id: '/contact'
-      path: '/contact'
-      fullPath: '/contact'
-      preLoaderRoute: typeof ContactRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/checkout': {
-      id: '/checkout'
-      path: '/checkout'
-      fullPath: '/checkout'
-      preLoaderRoute: typeof CheckoutRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/categories': {
-      id: '/categories'
-      path: '/categories'
-      fullPath: '/categories'
-      preLoaderRoute: typeof CategoriesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/cart': {
-      id: '/cart'
-      path: '/cart'
-      fullPath: '/cart'
-      preLoaderRoute: typeof CartRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/browse': {
-      id: '/browse'
-      path: '/browse'
-      fullPath: '/browse'
-      preLoaderRoute: typeof BrowseRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/become-lender': {
-      id: '/become-lender'
-      path: '/become-lender'
-      fullPath: '/become-lender'
-      preLoaderRoute: typeof BecomeLenderRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/admin': {
-      id: '/admin'
-      path: '/admin'
-      fullPath: '/admin'
-      preLoaderRoute: typeof AdminRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/account-pending': {
-      id: '/account-pending'
-      path: '/account-pending'
-      fullPath: '/account-pending'
-      preLoaderRoute: typeof AccountPendingRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/about': {
@@ -1281,354 +1092,207 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AboutRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/account-pending': {
+      id: '/account-pending'
+      path: '/account-pending'
+      fullPath: '/account-pending'
+      preLoaderRoute: typeof AccountPendingRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/payernt/': {
-      id: '/payernt/'
-      path: '/'
-      fullPath: '/payernt/'
-      preLoaderRoute: typeof PayerntIndexRouteImport
-      parentRoute: typeof PayerntRoute
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/payent/': {
-      id: '/payent/'
-      path: '/'
-      fullPath: '/payent/'
-      preLoaderRoute: typeof PayentIndexRouteImport
-      parentRoute: typeof PayentRoute
+    '/become-lender': {
+      id: '/become-lender'
+      path: '/become-lender'
+      fullPath: '/become-lender'
+      preLoaderRoute: typeof BecomeLenderRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/browse': {
+      id: '/browse'
+      path: '/browse'
+      fullPath: '/browse'
+      preLoaderRoute: typeof BrowseRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cart': {
+      id: '/cart'
+      path: '/cart'
+      fullPath: '/cart'
+      preLoaderRoute: typeof CartRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/categories': {
+      id: '/categories'
+      path: '/categories'
+      fullPath: '/categories'
+      preLoaderRoute: typeof CategoriesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/checkout': {
+      id: '/checkout'
+      path: '/checkout'
+      fullPath: '/checkout'
+      preLoaderRoute: typeof CheckoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/contact': {
+      id: '/contact'
+      path: '/contact'
+      fullPath: '/contact'
+      preLoaderRoute: typeof ContactRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/forgot-password': {
+      id: '/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof ForgotPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/lender-portal': {
+      id: '/lender-portal'
+      path: '/lender-portal'
+      fullPath: '/lender-portal'
+      preLoaderRoute: typeof LenderPortalRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/messages': {
+      id: '/messages'
+      path: '/messages'
+      fullPath: '/messages'
+      preLoaderRoute: typeof MessagesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/notifications': {
+      id: '/notifications'
+      path: '/notifications'
+      fullPath: '/notifications'
+      preLoaderRoute: typeof NotificationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/orders': {
+      id: '/orders'
+      path: '/orders'
+      fullPath: '/orders'
+      preLoaderRoute: typeof OrdersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/otp': {
+      id: '/otp'
+      path: '/otp'
+      fullPath: '/otp'
+      preLoaderRoute: typeof OtpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/payant': {
+      id: '/payant'
+      path: '/payant'
+      fullPath: '/payant'
+      preLoaderRoute: typeof PayantRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/payent': {
+      id: '/payent'
+      path: '/payent'
+      fullPath: '/payent'
+      preLoaderRoute: typeof PayentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/payernt': {
+      id: '/payernt'
+      path: '/payernt'
+      fullPath: '/payernt'
+      preLoaderRoute: typeof PayerntRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/payment': {
+      id: '/payment'
+      path: '/payment'
+      fullPath: '/payment'
+      preLoaderRoute: typeof PaymentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profile': {
+      id: '/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/register': {
+      id: '/register'
+      path: '/register'
+      fullPath: '/register'
+      preLoaderRoute: typeof RegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reviews': {
+      id: '/reviews'
+      path: '/reviews'
+      fullPath: '/reviews'
+      preLoaderRoute: typeof ReviewsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/select': {
+      id: '/select'
+      path: '/select'
+      fullPath: '/select'
+      preLoaderRoute: typeof SelectRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/wishlist': {
+      id: '/wishlist'
+      path: '/wishlist'
+      fullPath: '/wishlist'
+      preLoaderRoute: typeof WishlistRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/admin/': {
       id: '/admin/'
       path: '/'
       fullPath: '/admin/'
       preLoaderRoute: typeof AdminIndexRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/product/$id': {
-      id: '/product/$id'
-      path: '/product/$id'
-      fullPath: '/product/$id'
-      preLoaderRoute: typeof ProductIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/payernt/wallet': {
-      id: '/payernt/wallet'
-      path: '/wallet'
-      fullPath: '/payernt/wallet'
-      preLoaderRoute: typeof PayerntWalletRouteImport
-      parentRoute: typeof PayerntRoute
-    }
-    '/payernt/settings': {
-      id: '/payernt/settings'
-      path: '/settings'
-      fullPath: '/payernt/settings'
-      preLoaderRoute: typeof PayerntSettingsRouteImport
-      parentRoute: typeof PayerntRoute
-    }
-    '/payernt/requests': {
-      id: '/payernt/requests'
-      path: '/requests'
-      fullPath: '/payernt/requests'
-      preLoaderRoute: typeof PayerntRequestsRouteImport
-      parentRoute: typeof PayerntRoute
-    }
-    '/payernt/profile': {
-      id: '/payernt/profile'
-      path: '/profile'
-      fullPath: '/payernt/profile'
-      preLoaderRoute: typeof PayerntProfileRouteImport
-      parentRoute: typeof PayerntRoute
-    }
-    '/payernt/products': {
-      id: '/payernt/products'
-      path: '/products'
-      fullPath: '/payernt/products'
-      preLoaderRoute: typeof PayerntProductsRouteImport
-      parentRoute: typeof PayerntRoute
-    }
-    '/payernt/notifications': {
-      id: '/payernt/notifications'
-      path: '/notifications'
-      fullPath: '/payernt/notifications'
-      preLoaderRoute: typeof PayerntNotificationsRouteImport
-      parentRoute: typeof PayerntRoute
-    }
-    '/payernt/messages': {
-      id: '/payernt/messages'
-      path: '/messages'
-      fullPath: '/payernt/messages'
-      preLoaderRoute: typeof PayerntMessagesRouteImport
-      parentRoute: typeof PayerntRoute
-    }
-    '/payernt/list': {
-      id: '/payernt/list'
-      path: '/list'
-      fullPath: '/payernt/list'
-      preLoaderRoute: typeof PayerntListRouteImport
-      parentRoute: typeof PayerntRoute
-    }
-    '/payernt/help': {
-      id: '/payernt/help'
-      path: '/help'
-      fullPath: '/payernt/help'
-      preLoaderRoute: typeof PayerntHelpRouteImport
-      parentRoute: typeof PayerntRoute
-    }
-    '/payernt/earnings': {
-      id: '/payernt/earnings'
-      path: '/earnings'
-      fullPath: '/payernt/earnings'
-      preLoaderRoute: typeof PayerntEarningsRouteImport
-      parentRoute: typeof PayerntRoute
-    }
-    '/payernt/bookings': {
-      id: '/payernt/bookings'
-      path: '/bookings'
-      fullPath: '/payernt/bookings'
-      preLoaderRoute: typeof PayerntBookingsRouteImport
-      parentRoute: typeof PayerntRoute
-    }
-    '/payernt/analytics': {
-      id: '/payernt/analytics'
-      path: '/analytics'
-      fullPath: '/payernt/analytics'
-      preLoaderRoute: typeof PayerntAnalyticsRouteImport
-      parentRoute: typeof PayerntRoute
-    }
-    '/payernt/$': {
-      id: '/payernt/$'
-      path: '/$'
-      fullPath: '/payernt/$'
-      preLoaderRoute: typeof PayerntSplatRouteImport
-      parentRoute: typeof PayerntRoute
-    }
-    '/payent/wishlist': {
-      id: '/payent/wishlist'
-      path: '/wishlist'
-      fullPath: '/payent/wishlist'
-      preLoaderRoute: typeof PayentWishlistRouteImport
-      parentRoute: typeof PayentRoute
-    }
-    '/payent/settings': {
-      id: '/payent/settings'
-      path: '/settings'
-      fullPath: '/payent/settings'
-      preLoaderRoute: typeof PayentSettingsRouteImport
-      parentRoute: typeof PayentRoute
-    }
-    '/payent/profile': {
-      id: '/payent/profile'
-      path: '/profile'
-      fullPath: '/payent/profile'
-      preLoaderRoute: typeof PayentProfileRouteImport
-      parentRoute: typeof PayentRoute
-    }
-    '/payent/notifications': {
-      id: '/payent/notifications'
-      path: '/notifications'
-      fullPath: '/payent/notifications'
-      preLoaderRoute: typeof PayentNotificationsRouteImport
-      parentRoute: typeof PayentRoute
-    }
-    '/payent/messages': {
-      id: '/payent/messages'
-      path: '/messages'
-      fullPath: '/payent/messages'
-      preLoaderRoute: typeof PayentMessagesRouteImport
-      parentRoute: typeof PayentRoute
-    }
-    '/payent/help': {
-      id: '/payent/help'
-      path: '/help'
-      fullPath: '/payent/help'
-      preLoaderRoute: typeof PayentHelpRouteImport
-      parentRoute: typeof PayentRoute
-    }
-    '/payent/explore': {
-      id: '/payent/explore'
-      path: '/explore'
-      fullPath: '/payent/explore'
-      preLoaderRoute: typeof PayentExploreRouteImport
-      parentRoute: typeof PayentRoute
-    }
-    '/payent/cart': {
-      id: '/payent/cart'
-      path: '/cart'
-      fullPath: '/payent/cart'
-      preLoaderRoute: typeof PayentCartRouteImport
-      parentRoute: typeof PayentRoute
-    }
-    '/payent/bookings': {
-      id: '/payent/bookings'
-      path: '/bookings'
-      fullPath: '/payent/bookings'
-      preLoaderRoute: typeof PayentBookingsRouteImport
-      parentRoute: typeof PayentRoute
-    }
-    '/payent/$': {
-      id: '/payent/$'
-      path: '/$'
-      fullPath: '/payent/$'
-      preLoaderRoute: typeof PayentSplatRouteImport
-      parentRoute: typeof PayentRoute
-    }
-    '/delivery/$id': {
-      id: '/delivery/$id'
-      path: '/delivery/$id'
-      fullPath: '/delivery/$id'
-      preLoaderRoute: typeof DeliveryIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/admin/wallet': {
-      id: '/admin/wallet'
-      path: '/wallet'
-      fullPath: '/admin/wallet'
-      preLoaderRoute: typeof AdminWalletRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/users': {
-      id: '/admin/users'
-      path: '/users'
-      fullPath: '/admin/users'
-      preLoaderRoute: typeof AdminUsersRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/support': {
-      id: '/admin/support'
-      path: '/support'
-      fullPath: '/admin/support'
-      preLoaderRoute: typeof AdminSupportRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/settings': {
-      id: '/admin/settings'
-      path: '/settings'
-      fullPath: '/admin/settings'
-      preLoaderRoute: typeof AdminSettingsRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/reviews': {
-      id: '/admin/reviews'
-      path: '/reviews'
-      fullPath: '/admin/reviews'
-      preLoaderRoute: typeof AdminReviewsRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/reports': {
-      id: '/admin/reports'
-      path: '/reports'
-      fullPath: '/admin/reports'
-      preLoaderRoute: typeof AdminReportsRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/profile': {
-      id: '/admin/profile'
-      path: '/profile'
-      fullPath: '/admin/profile'
-      preLoaderRoute: typeof AdminProfileRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/products': {
-      id: '/admin/products'
-      path: '/products'
-      fullPath: '/admin/products'
-      preLoaderRoute: typeof AdminProductsRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/payments': {
-      id: '/admin/payments'
-      path: '/payments'
-      fullPath: '/admin/payments'
-      preLoaderRoute: typeof AdminPaymentsRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/notifications': {
-      id: '/admin/notifications'
-      path: '/notifications'
-      fullPath: '/admin/notifications'
-      preLoaderRoute: typeof AdminNotificationsRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/messages': {
-      id: '/admin/messages'
-      path: '/messages'
-      fullPath: '/admin/messages'
-      preLoaderRoute: typeof AdminMessagesRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/login': {
-      id: '/admin/login'
-      path: '/login'
-      fullPath: '/admin/login'
-      preLoaderRoute: typeof AdminLoginRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/help': {
-      id: '/admin/help'
-      path: '/help'
-      fullPath: '/admin/help'
-      preLoaderRoute: typeof AdminHelpRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/dashboard': {
-      id: '/admin/dashboard'
-      path: '/dashboard'
-      fullPath: '/admin/dashboard'
-      preLoaderRoute: typeof AdminDashboardRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/categories': {
-      id: '/admin/categories'
-      path: '/categories'
-      fullPath: '/admin/categories'
-      preLoaderRoute: typeof AdminCategoriesRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/bookings': {
-      id: '/admin/bookings'
-      path: '/bookings'
-      fullPath: '/admin/bookings'
-      preLoaderRoute: typeof AdminBookingsRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/api-keys': {
-      id: '/admin/api-keys'
-      path: '/api-keys'
-      fullPath: '/admin/api-keys'
-      preLoaderRoute: typeof AdminApiKeysRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/analytics': {
-      id: '/admin/analytics'
-      path: '/analytics'
-      fullPath: '/admin/analytics'
-      preLoaderRoute: typeof AdminAnalyticsRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/agents': {
-      id: '/admin/agents'
-      path: '/agents'
-      fullPath: '/admin/agents'
-      preLoaderRoute: typeof AdminAgentsRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/activity-logs': {
-      id: '/admin/activity-logs'
-      path: '/activity-logs'
-      fullPath: '/admin/activity-logs'
-      preLoaderRoute: typeof AdminActivityLogsRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/activity': {
-      id: '/admin/activity'
-      path: '/activity'
-      fullPath: '/admin/activity'
-      preLoaderRoute: typeof AdminActivityRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/$': {
@@ -1638,19 +1302,348 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminSplatRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/payernt/products/create': {
-      id: '/payernt/products/create'
-      path: '/create'
-      fullPath: '/payernt/products/create'
-      preLoaderRoute: typeof PayerntProductsCreateRouteImport
-      parentRoute: typeof PayerntProductsRoute
+    '/admin/activity': {
+      id: '/admin/activity'
+      path: '/activity'
+      fullPath: '/admin/activity'
+      preLoaderRoute: typeof AdminActivityRouteImport
+      parentRoute: typeof AdminRoute
     }
-    '/payernt/products/$id': {
-      id: '/payernt/products/$id'
+    '/admin/activity-logs': {
+      id: '/admin/activity-logs'
+      path: '/activity-logs'
+      fullPath: '/admin/activity-logs'
+      preLoaderRoute: typeof AdminActivityLogsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/agents': {
+      id: '/admin/agents'
+      path: '/agents'
+      fullPath: '/admin/agents'
+      preLoaderRoute: typeof AdminAgentsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/analytics': {
+      id: '/admin/analytics'
+      path: '/analytics'
+      fullPath: '/admin/analytics'
+      preLoaderRoute: typeof AdminAnalyticsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/api-keys': {
+      id: '/admin/api-keys'
+      path: '/api-keys'
+      fullPath: '/admin/api-keys'
+      preLoaderRoute: typeof AdminApiKeysRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/bookings': {
+      id: '/admin/bookings'
+      path: '/bookings'
+      fullPath: '/admin/bookings'
+      preLoaderRoute: typeof AdminBookingsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/categories': {
+      id: '/admin/categories'
+      path: '/categories'
+      fullPath: '/admin/categories'
+      preLoaderRoute: typeof AdminCategoriesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/dashboard': {
+      id: '/admin/dashboard'
+      path: '/dashboard'
+      fullPath: '/admin/dashboard'
+      preLoaderRoute: typeof AdminDashboardRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/help': {
+      id: '/admin/help'
+      path: '/help'
+      fullPath: '/admin/help'
+      preLoaderRoute: typeof AdminHelpRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/login': {
+      id: '/admin/login'
+      path: '/login'
+      fullPath: '/admin/login'
+      preLoaderRoute: typeof AdminLoginRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/messages': {
+      id: '/admin/messages'
+      path: '/messages'
+      fullPath: '/admin/messages'
+      preLoaderRoute: typeof AdminMessagesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/notifications': {
+      id: '/admin/notifications'
+      path: '/notifications'
+      fullPath: '/admin/notifications'
+      preLoaderRoute: typeof AdminNotificationsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/payments': {
+      id: '/admin/payments'
+      path: '/payments'
+      fullPath: '/admin/payments'
+      preLoaderRoute: typeof AdminPaymentsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/products': {
+      id: '/admin/products'
+      path: '/products'
+      fullPath: '/admin/products'
+      preLoaderRoute: typeof AdminProductsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/profile': {
+      id: '/admin/profile'
+      path: '/profile'
+      fullPath: '/admin/profile'
+      preLoaderRoute: typeof AdminProfileRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/reports': {
+      id: '/admin/reports'
+      path: '/reports'
+      fullPath: '/admin/reports'
+      preLoaderRoute: typeof AdminReportsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/reviews': {
+      id: '/admin/reviews'
+      path: '/reviews'
+      fullPath: '/admin/reviews'
+      preLoaderRoute: typeof AdminReviewsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/settings': {
+      id: '/admin/settings'
+      path: '/settings'
+      fullPath: '/admin/settings'
+      preLoaderRoute: typeof AdminSettingsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/support': {
+      id: '/admin/support'
+      path: '/support'
+      fullPath: '/admin/support'
+      preLoaderRoute: typeof AdminSupportRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/users': {
+      id: '/admin/users'
+      path: '/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AdminUsersRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/wallet': {
+      id: '/admin/wallet'
+      path: '/wallet'
+      fullPath: '/admin/wallet'
+      preLoaderRoute: typeof AdminWalletRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/delivery/$id': {
+      id: '/delivery/$id'
+      path: '/delivery/$id'
+      fullPath: '/delivery/$id'
+      preLoaderRoute: typeof DeliveryIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/payent/': {
+      id: '/payent/'
+      path: '/'
+      fullPath: '/payent/'
+      preLoaderRoute: typeof PayentIndexRouteImport
+      parentRoute: typeof PayentRoute
+    }
+    '/payent/$': {
+      id: '/payent/$'
+      path: '/$'
+      fullPath: '/payent/$'
+      preLoaderRoute: typeof PayentSplatRouteImport
+      parentRoute: typeof PayentRoute
+    }
+    '/payent/bookings': {
+      id: '/payent/bookings'
+      path: '/bookings'
+      fullPath: '/payent/bookings'
+      preLoaderRoute: typeof PayentBookingsRouteImport
+      parentRoute: typeof PayentRoute
+    }
+    '/payent/cart': {
+      id: '/payent/cart'
+      path: '/cart'
+      fullPath: '/payent/cart'
+      preLoaderRoute: typeof PayentCartRouteImport
+      parentRoute: typeof PayentRoute
+    }
+    '/payent/explore': {
+      id: '/payent/explore'
+      path: '/explore'
+      fullPath: '/payent/explore'
+      preLoaderRoute: typeof PayentExploreRouteImport
+      parentRoute: typeof PayentRoute
+    }
+    '/payent/help': {
+      id: '/payent/help'
+      path: '/help'
+      fullPath: '/payent/help'
+      preLoaderRoute: typeof PayentHelpRouteImport
+      parentRoute: typeof PayentRoute
+    }
+    '/payent/messages': {
+      id: '/payent/messages'
+      path: '/messages'
+      fullPath: '/payent/messages'
+      preLoaderRoute: typeof PayentMessagesRouteImport
+      parentRoute: typeof PayentRoute
+    }
+    '/payent/notifications': {
+      id: '/payent/notifications'
+      path: '/notifications'
+      fullPath: '/payent/notifications'
+      preLoaderRoute: typeof PayentNotificationsRouteImport
+      parentRoute: typeof PayentRoute
+    }
+    '/payent/profile': {
+      id: '/payent/profile'
+      path: '/profile'
+      fullPath: '/payent/profile'
+      preLoaderRoute: typeof PayentProfileRouteImport
+      parentRoute: typeof PayentRoute
+    }
+    '/payent/settings': {
+      id: '/payent/settings'
+      path: '/settings'
+      fullPath: '/payent/settings'
+      preLoaderRoute: typeof PayentSettingsRouteImport
+      parentRoute: typeof PayentRoute
+    }
+    '/payent/wishlist': {
+      id: '/payent/wishlist'
+      path: '/wishlist'
+      fullPath: '/payent/wishlist'
+      preLoaderRoute: typeof PayentWishlistRouteImport
+      parentRoute: typeof PayentRoute
+    }
+    '/payernt/': {
+      id: '/payernt/'
+      path: '/'
+      fullPath: '/payernt/'
+      preLoaderRoute: typeof PayerntIndexRouteImport
+      parentRoute: typeof PayerntRoute
+    }
+    '/payernt/$': {
+      id: '/payernt/$'
+      path: '/$'
+      fullPath: '/payernt/$'
+      preLoaderRoute: typeof PayerntSplatRouteImport
+      parentRoute: typeof PayerntRoute
+    }
+    '/payernt/analytics': {
+      id: '/payernt/analytics'
+      path: '/analytics'
+      fullPath: '/payernt/analytics'
+      preLoaderRoute: typeof PayerntAnalyticsRouteImport
+      parentRoute: typeof PayerntRoute
+    }
+    '/payernt/bookings': {
+      id: '/payernt/bookings'
+      path: '/bookings'
+      fullPath: '/payernt/bookings'
+      preLoaderRoute: typeof PayerntBookingsRouteImport
+      parentRoute: typeof PayerntRoute
+    }
+    '/payernt/earnings': {
+      id: '/payernt/earnings'
+      path: '/earnings'
+      fullPath: '/payernt/earnings'
+      preLoaderRoute: typeof PayerntEarningsRouteImport
+      parentRoute: typeof PayerntRoute
+    }
+    '/payernt/help': {
+      id: '/payernt/help'
+      path: '/help'
+      fullPath: '/payernt/help'
+      preLoaderRoute: typeof PayerntHelpRouteImport
+      parentRoute: typeof PayerntRoute
+    }
+    '/payernt/list': {
+      id: '/payernt/list'
+      path: '/list'
+      fullPath: '/payernt/list'
+      preLoaderRoute: typeof PayerntListRouteImport
+      parentRoute: typeof PayerntRoute
+    }
+    '/payernt/messages': {
+      id: '/payernt/messages'
+      path: '/messages'
+      fullPath: '/payernt/messages'
+      preLoaderRoute: typeof PayerntMessagesRouteImport
+      parentRoute: typeof PayerntRoute
+    }
+    '/payernt/notifications': {
+      id: '/payernt/notifications'
+      path: '/notifications'
+      fullPath: '/payernt/notifications'
+      preLoaderRoute: typeof PayerntNotificationsRouteImport
+      parentRoute: typeof PayerntRoute
+    }
+    '/payernt/products': {
+      id: '/payernt/products'
+      path: '/products'
+      fullPath: '/payernt/products'
+      preLoaderRoute: typeof PayerntProductsRouteImport
+      parentRoute: typeof PayerntRoute
+    }
+    '/payernt/profile': {
+      id: '/payernt/profile'
+      path: '/profile'
+      fullPath: '/payernt/profile'
+      preLoaderRoute: typeof PayerntProfileRouteImport
+      parentRoute: typeof PayerntRoute
+    }
+    '/payernt/requests': {
+      id: '/payernt/requests'
+      path: '/requests'
+      fullPath: '/payernt/requests'
+      preLoaderRoute: typeof PayerntRequestsRouteImport
+      parentRoute: typeof PayerntRoute
+    }
+    '/payernt/settings': {
+      id: '/payernt/settings'
+      path: '/settings'
+      fullPath: '/payernt/settings'
+      preLoaderRoute: typeof PayerntSettingsRouteImport
+      parentRoute: typeof PayerntRoute
+    }
+    '/payernt/wallet': {
+      id: '/payernt/wallet'
+      path: '/wallet'
+      fullPath: '/payernt/wallet'
+      preLoaderRoute: typeof PayerntWalletRouteImport
+      parentRoute: typeof PayerntRoute
+    }
+    '/product/$id': {
+      id: '/product/$id'
+      path: '/product/$id'
+      fullPath: '/product/$id'
+      preLoaderRoute: typeof ProductIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/products/$id': {
+      id: '/admin/products/$id'
       path: '/$id'
-      fullPath: '/payernt/products/$id'
-      preLoaderRoute: typeof PayerntProductsIdRouteImport
-      parentRoute: typeof PayerntProductsRoute
+      fullPath: '/admin/products/$id'
+      preLoaderRoute: typeof AdminProductsIdRouteImport
+      parentRoute: typeof AdminProductsRoute
     }
     '/payent/products/$id': {
       id: '/payent/products/$id'
@@ -1659,12 +1652,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PayentProductsIdRouteImport
       parentRoute: typeof PayentRoute
     }
-    '/admin/products/$id': {
-      id: '/admin/products/$id'
+    '/payernt/products/$id': {
+      id: '/payernt/products/$id'
       path: '/$id'
-      fullPath: '/admin/products/$id'
-      preLoaderRoute: typeof AdminProductsIdRouteImport
-      parentRoute: typeof AdminProductsRoute
+      fullPath: '/payernt/products/$id'
+      preLoaderRoute: typeof PayerntProductsIdRouteImport
+      parentRoute: typeof PayerntProductsRoute
+    }
+    '/payernt/products/create': {
+      id: '/payernt/products/create'
+      path: '/create'
+      fullPath: '/payernt/products/create'
+      preLoaderRoute: typeof PayerntProductsCreateRouteImport
+      parentRoute: typeof PayerntProductsRoute
     }
     '/admin/products/$id/review': {
       id: '/admin/products/$id/review'

@@ -1,12 +1,15 @@
 import os
 from urllib.parse import urlparse
-from dotenv import load_dotenv
 
 # Suppress uv hardlink warning by explicitly setting link mode to copy
 os.environ["UV_LINK_MODE"] = "copy"
 
-# Load .env file if present
-load_dotenv()
+# Load .env file if present (local dev)
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 # Parse DATABASE_URL if provided (e.g. TiDB Cloud / Railway / Cloud)
 DATABASE_URL = os.getenv("DATABASE_URL") or os.getenv("TIDB_DATABASE_URL")

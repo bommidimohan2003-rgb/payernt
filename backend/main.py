@@ -21,12 +21,15 @@ import traceback
 import re
 import urllib.request
 import urllib.parse
-from typing import Optional, List, Set, Tuple
-from dotenv import load_dotenv
+from typing import Optional, List, Set, Tuple, Dict, Any, Union
 from email_service import send_email_smtp, build_password_reset_email_html, build_password_reset_email_text, is_smtp_configured
 
-# Load env variables at application startup
-load_dotenv()
+# Load env variables at application startup if dotenv is available (local dev)
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 from fastapi import FastAPI, HTTPException, Header, Depends, Query, status, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
