@@ -84,26 +84,38 @@ export function Navbar() {
           )}
 
           {mounted && user ? (
-            <Link
-              to="/profile"
-              ref={(el) => registerOriginRef("profile", el as HTMLElement | null)}
-              onClick={(e) => triggerOriginTransition("profile", e.currentTarget)}
-              id="nav-profile-avatar"
-              className="flex items-center gap-2 p-1.5 pl-2 pr-3 sm:pr-4 rounded-xl border border-black/10 dark:border-white/15 bg-white/80 dark:bg-[#0D151D]/80 hover:border-black/20 dark:hover:border-white/30 shadow-xs hover:shadow-sm transition-all active:scale-96"
-            >
-              <img
-                src={
-                  user.profilePhotoUrl ||
-                  user.avatar ||
-                  `https://ui-avatars.com/api/?name=${encodeURIComponent(user.fullName || "User")}&background=161616&color=ffffff`
-                }
-                alt={user.fullName || "User"}
-                className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg object-cover ring-1 ring-black/10 dark:ring-white/20"
-              />
-              <span className="hidden xs:inline sm:inline text-xs sm:text-sm font-bold text-neutral-900 dark:text-white max-w-[100px] sm:max-w-[120px] truncate">
-                {user.fullName?.split(" ")[0] || "Profile"}
-              </span>
-            </Link>
+            <div className="flex items-center gap-2">
+              {(user.role === "admin" || user.role === "superadmin") && (
+                <Link
+                  to="/admin/dashboard"
+                  id="nav-admin-portal-btn"
+                  className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30 text-xs font-bold transition-all shadow-xs active:scale-95"
+                >
+                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                  Admin Portal
+                </Link>
+              )}
+              <Link
+                to={user.role === "admin" || user.role === "superadmin" ? "/admin/dashboard" : "/profile"}
+                ref={(el) => registerOriginRef("profile", el as HTMLElement | null)}
+                onClick={(e) => triggerOriginTransition("profile", e.currentTarget)}
+                id="nav-profile-avatar"
+                className="flex items-center gap-2 p-1.5 pl-2 pr-3 sm:pr-4 rounded-xl border border-black/10 dark:border-white/15 bg-white/80 dark:bg-[#0D151D]/80 hover:border-black/20 dark:hover:border-white/30 shadow-xs hover:shadow-sm transition-all active:scale-96"
+              >
+                <img
+                  src={
+                    user.profilePhotoUrl ||
+                    user.avatar ||
+                    `https://ui-avatars.com/api/?name=${encodeURIComponent(user.fullName || "User")}&background=161616&color=ffffff`
+                  }
+                  alt={user.fullName || "User"}
+                  className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg object-cover ring-1 ring-black/10 dark:ring-white/20"
+                />
+                <span className="hidden xs:inline sm:inline text-xs sm:text-sm font-bold text-neutral-900 dark:text-white max-w-[100px] sm:max-w-[120px] truncate">
+                  {user.role === "admin" || user.role === "superadmin" ? "Admin" : user.fullName?.split(" ")[0] || "Profile"}
+                </span>
+              </Link>
+            </div>
           ) : (
             <div className="flex items-center gap-1.5 sm:gap-2.5">
               <Link
