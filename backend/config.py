@@ -8,33 +8,40 @@ os.environ["UV_LINK_MODE"] = "copy"
 # Load .env file if present
 load_dotenv()
 
-# Parse DATABASE_URL if provided by Railway
-DATABASE_URL = os.getenv("DATABASE_URL")
+# Parse DATABASE_URL if provided (e.g. TiDB Cloud / Railway / Cloud)
+DATABASE_URL = os.getenv("DATABASE_URL") or os.getenv("TIDB_DATABASE_URL")
 
 if DATABASE_URL:
     try:
         url = urlparse(DATABASE_URL)
-        MYSQL_HOST = url.hostname or "localhost"
-        MYSQL_PORT = url.port or 3306
-        MYSQL_USER = url.username or "root"
-        MYSQL_PASSWORD = url.password or ""
+        MYSQL_HOST = url.hostname or "gateway01.ap-southeast-1.prod.aws.tidbcloud.com"
+        MYSQL_PORT = url.port or 4000
+        MYSQL_USER = url.username or "3NNZ4KBh8x122Nu.root"
+        MYSQL_PASSWORD = url.password or "dLNnr55ayiUqR9vU"
         MYSQL_DB = url.path.lstrip("/") or "payent_marketplace_db"
     except Exception as e:
         print(f"Warning: Failed to parse DATABASE_URL: {e}")
-        MYSQL_HOST = os.getenv("MYSQLHOST", os.getenv("MYSQL_HOST", "localhost"))
-        MYSQL_PORT = int(os.getenv("MYSQLPORT", os.getenv("MYSQL_PORT", "3306")))
-        MYSQL_USER = os.getenv("MYSQLUSER", os.getenv("MYSQL_USER", "root"))
-        MYSQL_PASSWORD = os.getenv("MYSQLPASSWORD", os.getenv("MYSQL_PASSWORD", "Bmohan"))
-        MYSQL_DB = os.getenv("MYSQLDATABASE", os.getenv("MYSQL_DB", "payent_marketplace_db"))
+        MYSQL_HOST = os.getenv("TIDB_HOST", os.getenv("MYSQLHOST", os.getenv("MYSQL_HOST", "gateway01.ap-southeast-1.prod.aws.tidbcloud.com")))
+        MYSQL_PORT = int(os.getenv("TIDB_PORT", os.getenv("MYSQLPORT", os.getenv("MYSQL_PORT", "4000"))))
+        MYSQL_USER = os.getenv("TIDB_USER", os.getenv("MYSQLUSER", os.getenv("MYSQL_USER", "3NNZ4KBh8x122Nu.root")))
+        MYSQL_PASSWORD = os.getenv("TIDB_PASSWORD", os.getenv("MYSQLPASSWORD", os.getenv("MYSQL_PASSWORD", "dLNnr55ayiUqR9vU")))
+        MYSQL_DB = os.getenv("TIDB_DATABASE", os.getenv("MYSQLDATABASE", os.getenv("MYSQL_DB", "payent_marketplace_db")))
 else:
-    # Railway environment variable aliases (MYSQLHOST / MYSQL_HOST, etc.)
-    MYSQL_HOST = os.getenv("MYSQLHOST", os.getenv("MYSQL_HOST", "localhost"))
-    MYSQL_PORT = int(os.getenv("MYSQLPORT", os.getenv("MYSQL_PORT", "3306")))
-    MYSQL_USER = os.getenv("MYSQLUSER", os.getenv("MYSQL_USER", "root"))
-    MYSQL_PASSWORD = os.getenv("MYSQLPASSWORD", os.getenv("MYSQL_PASSWORD", "Bmohan"))
-    MYSQL_DB = os.getenv("MYSQLDATABASE", os.getenv("MYSQL_DB", "payent_marketplace_db"))
+    MYSQL_HOST = os.getenv("TIDB_HOST", os.getenv("MYSQLHOST", os.getenv("MYSQL_HOST", "gateway01.ap-southeast-1.prod.aws.tidbcloud.com")))
+    MYSQL_PORT = int(os.getenv("TIDB_PORT", os.getenv("MYSQLPORT", os.getenv("MYSQL_PORT", "4000"))))
+    MYSQL_USER = os.getenv("TIDB_USER", os.getenv("MYSQLUSER", os.getenv("MYSQL_USER", "3NNZ4KBh8x122Nu.root")))
+    MYSQL_PASSWORD = os.getenv("TIDB_PASSWORD", os.getenv("MYSQLPASSWORD", os.getenv("MYSQL_PASSWORD", "dLNnr55ayiUqR9vU")))
+    MYSQL_DB = os.getenv("TIDB_DATABASE", os.getenv("MYSQLDATABASE", os.getenv("MYSQL_DB", "payent_marketplace_db")))
 
-MYSQL_SSL = os.getenv("MYSQL_SSL", "true").lower() in ("true", "1", "yes")
+# TiDB Aliases for modern configuration
+TIDB_HOST = MYSQL_HOST
+TIDB_PORT = MYSQL_PORT
+TIDB_USER = MYSQL_USER
+TIDB_PASSWORD = MYSQL_PASSWORD
+TIDB_DATABASE = MYSQL_DB
+
+MYSQL_SSL = os.getenv("MYSQL_SSL", os.getenv("TIDB_SSL", "true")).lower() in ("true", "1", "yes")
+TIDB_SSL = MYSQL_SSL
 
 # ENVIRONMENT Config
 ENV = os.getenv("ENV", os.getenv("ENVIRONMENT", "development")).lower()

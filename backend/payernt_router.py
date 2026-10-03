@@ -94,14 +94,15 @@ def get_current_payernt_account(authorization: Optional[str] = Header(None)) -> 
         )
 
     account_type = (payload.get("account_type") or payload.get("accountType") or "").strip().lower()
-    email = payload["sub"].strip().lower()
-    account = get_payernt_account_by_email(email)
-
-    if not account and account_type not in ("paye₹nt", "payernt", "admin", "vendor", "lender"):
+    if account_type not in ("paye₹nt", "payernt", "admin", "vendor", "lender"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Forbidden: This endpoint requires a paye₹nt vendor account.",
         )
+
+    email = payload["sub"].strip().lower()
+    account = get_payernt_account_by_email(email)
+
     if not account:
         user_id = payload.get("user_id") or f"PAYERNT_USER_{email}"
         account = {

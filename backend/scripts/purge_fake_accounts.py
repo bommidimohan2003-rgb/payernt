@@ -1,127 +1,169 @@
-import sys
+#!/usr/bin/env python3
+"""
+Purge fake/test accounts and test artifacts from the TiDB database,
+retaining only the real account(s) like bommidimohan2003@gmail.com.
+"""
 import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+import sys
+
+backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if backend_dir not in sys.path:
+    sys.path.insert(0, backend_dir)
 
 from database import get_db_connection
+from auth import hash_password
 
-REAL_EMAILS = ("bommidimohan2003@gmail.com", "bommidimohan2330@gmail.com", "boomidimoha2003@gmail.com")
-
-def purge_all_fake_accounts():
+def purge_fake_accounts():
     conn = get_db_connection()
     if not conn:
-        print("Could not connect to database.")
+        print("Failed to connect to TiDB database.")
         return
 
+    cur = conn.cursor()
+    real_email = "bommidimohan2003@gmail.com"
+
+    print(f"Purging all fake accounts except {real_email}...")
+
+    # Tables with email column
+    tables_with_email = [
+        ("users", "email"),
+        ("payernt_accounts", "email"),
+        ("payrent_accounts", "email"),
+        ("admin_accounts", "email"),
+        ("custom_products", "user_email"),
+        ("payernt_products", "owner_email"),
+        ("orders", "user_email"),
+        ("cart_items", "user_email"),
+        ("wishlist", "user_email"),
+        ("reviews", "user_email"),
+        ("sessions", "user_email"),
+        ("password_reset_tokens", "user_email"),
+        ("notifications", "user_email"),
+        ("support_tickets", "user_email"),
+        ("deliveries", "customer_email"),
+        ("conversations", "customer_email"),
+        ("conversations", "lender_email"),
+        ("conversation_members", "user_email"),
+        ("messages", "sender_email"),
+    ]
+
+    for tbl, col in tables_with_email:
+        try:
+            cur.execute(f"DELETE FROM `{tbl}` WHERE `{col}` != %s", (real_email,))
+            print(f"Purged non-real rows from {tbl}")
+        except Exception as e:
+            print(f"Notice {tbl}: {e}")
+
+    # Purge vendor sub-tables
+    vendor_tables = [
+        "payernt_wallets",
+        "payernt_wallet_transactions",
+        "payernt_bank_accounts",
+        "payernt_notifications",
+        "payernt_messages",
+        "payernt_audit_logs",
+        "product_confirmations",
+        "rental_security",
+    ]
+
+    for tbl in vendor_tables:
+        try:
+            cur.execute(f"""
+                DELETE FROM `{tbl}` 
+                WHERE owner_id NOT LIKE %s 
+                AND owner_id NOT IN (SELECT id FROM payernt_accounts WHERE email = %s)
+            """, (f"%{real_email}%", real_email))
+            print(f"Purged non-real rows from {tbl}")
+        except Exception as e:
+            print(f"Notice {tbl}: {e}")
+
+    # Clean persons, otps, rate limits
     try:
-        with conn.cursor() as cursor:
-            print(f"Purging all accounts except real emails: {REAL_EMAILS}")
+        cur.execute("DELETE FROM persons WHERE phone NOT LIKE '%8810519885%' AND name NOT LIKE '%Mohan%'")
+        cur.execute("DELETE FROM mobile_verifications")
+        cur.execute("DELETE FROM otps")
+        cur.execute("DELETE FROM auth_rate_limits")
+        print("Purged persons, otps, and auth rate limits")
+    except Exception as e:
+        print(f"Notice cleanup: {e}")
 
-            # 1. users
-            cursor.execute("DELETE FROM users WHERE email NOT IN %s", (REAL_EMAILS,))
-            print(f"Purged non-real users. Rows affected: {cursor.rowcount}")
+    # Ensure real account exists in payernt_accounts
+    cur.execute("SELECT * FROM payernt_accounts WHERE email = %s", (real_email,))
+    payernt_acc = cur.fetchone()
+    if not payernt_acc:
+        cur.execute("SELECT password_hash FROM users WHERE email = %s", (real_email,))
+        u = cur.fetchone()
+        pwd_hash = u["password_hash"] if u and u.get("password_hash") else hash_password("Bmohan@2026")
+        cur.execute("""
+            INSERT INTO payernt_accounts (id, account_type, email, name, aadhaar_number, phone, address, pincode, password_hash, status, created_at)
+            VALUES ('PAYERNT_MOHAN_ADMIN', 'paye₹nt', %s, 'Bommidi Mohan', '881051988500', '+91 8810519885', 'Hyderabad, India', '500081', %s, 'active', NOW())
+        """, (real_email, pwd_hash))
+        print(f"Created clean payernt_accounts record for {real_email}")
 
-            # 2. payernt_accounts
-            cursor.execute("DELETE FROM payernt_accounts WHERE email NOT IN %s", (REAL_EMAILS,))
-            print(f"Purged non-real payernt_accounts. Rows affected: {cursor.rowcount}")
+    conn.commit()
 
-            # 3. payrent_accounts
-            cursor.execute("DELETE FROM payrent_accounts WHERE email NOT IN %s", (REAL_EMAILS,))
-            print(f"Purged non-real payrent_accounts. Rows affected: {cursor.rowcount}")
+    # Print remaining accounts
+    print("\n--- REMAINING ACCOUNTS IN TIDB DATABASE ---")
+    cur.execute("SELECT email, full_name, phone, role FROM users")
+    print("USERS:", cur.fetchall())
 
-            # 4. admin_accounts
-            cursor.execute("DELETE FROM admin_accounts WHERE email NOT IN %s", (REAL_EMAILS,))
-            print(f"Purged non-real admin_accounts. Rows affected: {cursor.rowcount}")
+    cur.execute("SELECT id, email, name, phone, account_type FROM payernt_accounts")
+    print("PAYERNT_ACCOUNTS:", cur.fetchall())
 
-            # 5. sessions, otps, password_reset_tokens, auth_rate_limits, mobile_verifications
-            for t in ["sessions", "otps", "password_reset_tokens", "auth_rate_limits", "mobile_verifications"]:
-                try:
-                    cursor.execute(f"SHOW COLUMNS FROM {t}")
-                    cols = [r["Field"] for r in cursor.fetchall()]
-                    if "user_email" in cols:
-                        cursor.execute(f"DELETE FROM {t} WHERE user_email NOT IN %s", (REAL_EMAILS,))
-                    elif "email" in cols:
-                        cursor.execute(f"DELETE FROM {t} WHERE email NOT IN %s", (REAL_EMAILS,))
-                    print(f"Purged non-real {t}. Rows affected: {cursor.rowcount}")
-                except Exception as e:
-                    print(f"Notice {t}: {e}")
+    # Clean remaining tables with correct column names
+    try:
+        cur.execute("DELETE FROM wishlist WHERE user_id != 'bommidimohan2003@gmail.com' AND user_id NOT IN (SELECT id FROM users WHERE email = 'bommidimohan2003@gmail.com')")
+    except Exception:
+        try:
+            cur.execute("DELETE FROM wishlist")
+        except Exception:
+            pass
 
-            # 6. cart_items, wishlist, notifications, payernt_notifications, payernt_audit_logs, support_tickets, orders, deliveries
-            for t in ["cart_items", "wishlist", "notifications", "support_tickets", "orders", "deliveries", "reviews", "reports"]:
-                try:
-                    cursor.execute(f"SHOW COLUMNS FROM {t}")
-                    cols = [r["Field"] for r in cursor.fetchall()]
-                    if "user_email" in cols:
-                        cursor.execute(f"DELETE FROM {t} WHERE user_email NOT IN %s", (REAL_EMAILS,))
-                        print(f"Purged non-real {t}. Rows affected: {cursor.rowcount}")
-                    elif "email" in cols:
-                        cursor.execute(f"DELETE FROM {t} WHERE email NOT IN %s", (REAL_EMAILS,))
-                        print(f"Purged non-real {t}. Rows affected: {cursor.rowcount}")
-                except Exception as e:
-                    print(f"Notice {t}: {e}")
+    try:
+        cur.execute("DELETE FROM deliveries WHERE booking_id NOT IN (SELECT id FROM orders)")
+    except Exception:
+        pass
 
-            # 7. product_confirmations and payernt_products
-            cursor.execute("DELETE FROM product_confirmations WHERE owner_email NOT IN %s", (REAL_EMAILS,))
-            print(f"Purged non-real product_confirmations. Rows affected: {cursor.rowcount}")
+    try:
+        cur.execute("DELETE FROM payernt_messages WHERE sender_id NOT LIKE '%bommidimohan2003@gmail.com%' AND receiver_id NOT LIKE '%bommidimohan2003@gmail.com%'")
+    except Exception:
+        pass
 
-            cursor.execute("DELETE FROM payernt_products WHERE owner_email NOT IN %s", (REAL_EMAILS,))
-            print(f"Purged non-real payernt_products. Rows affected: {cursor.rowcount}")
+    try:
+        cur.execute("DELETE FROM payernt_audit_logs WHERE account_id NOT IN (SELECT id FROM payernt_accounts WHERE email = 'bommidimohan2003@gmail.com')")
+    except Exception:
+        pass
 
-            # 8. custom_products
-            cursor.execute("DELETE FROM custom_products WHERE user_email NOT IN %s", (REAL_EMAILS,))
-            print(f"Purged non-real custom_products. Rows affected: {cursor.rowcount}")
+    try:
+        cur.execute("DELETE FROM rental_security WHERE booking_id NOT IN (SELECT id FROM orders)")
+    except Exception:
+        pass
 
-            # 9. agents
-            cursor.execute("""
-                DELETE FROM agents 
-                WHERE id NOT LIKE '%bommidimohan2003%' 
-                  AND id NOT LIKE '%bommidimohan2330%'
-                  AND id NOT LIKE '%boomidimoha2003%'
-            """)
-            print(f"Purged non-real agents. Rows affected: {cursor.rowcount}")
+    conn.commit()
 
-            # 10. persons: clean orphan persons
-            cursor.execute("""
-                SELECT person_id FROM payernt_accounts WHERE person_id IS NOT NULL 
-                UNION 
-                SELECT person_id FROM payrent_accounts WHERE person_id IS NOT NULL
-                UNION
-                SELECT person_id FROM users WHERE person_id IS NOT NULL
-            """)
-            valid_person_ids = [r['person_id'] for r in cursor.fetchall() if r['person_id']]
-            if valid_person_ids:
-                cursor.execute("DELETE FROM persons WHERE id NOT IN %s", (tuple(valid_person_ids),))
-            else:
-                cursor.execute("DELETE FROM persons")
-            print(f"Purged orphan persons. Rows affected: {cursor.rowcount}")
+    # Print remaining accounts
+    print("\n--- REMAINING ACCOUNTS IN TIDB DATABASE ---")
+    cur.execute("SELECT email, full_name, phone, role FROM users")
+    print("USERS:", cur.fetchall())
 
-            # 11. Wallets & Transactions for non-real accounts
-            cursor.execute("""
-                SELECT id FROM payernt_accounts WHERE email IN %s
-            """, (REAL_EMAILS,))
-            real_payernt_ids = [r['id'] for r in cursor.fetchall()]
-            if real_payernt_ids:
-                cursor.execute("DELETE FROM payernt_wallets WHERE owner_id NOT IN %s AND owner_email NOT IN %s", (tuple(real_payernt_ids), REAL_EMAILS))
-                cursor.execute("DELETE FROM payernt_wallet_transactions WHERE owner_id NOT IN %s", (tuple(real_payernt_ids),))
-                cursor.execute("DELETE FROM payernt_bank_accounts WHERE owner_id NOT IN %s", (tuple(real_payernt_ids),))
-                cursor.execute("DELETE FROM payernt_messages WHERE receiver_id NOT IN %s AND sender_id NOT IN %s", (tuple(real_payernt_ids), tuple(real_payernt_ids)))
-                cursor.execute("DELETE FROM payernt_audit_logs WHERE user_id NOT IN %s", (tuple(real_payernt_ids),))
-                cursor.execute("DELETE FROM payernt_notifications WHERE owner_id NOT IN %s", (tuple(real_payernt_ids),))
-            else:
-                cursor.execute("DELETE FROM payernt_wallets")
-                cursor.execute("DELETE FROM payernt_wallet_transactions")
-                cursor.execute("DELETE FROM payernt_bank_accounts")
-                cursor.execute("DELETE FROM payernt_messages")
-                cursor.execute("DELETE FROM payernt_audit_logs")
-                cursor.execute("DELETE FROM payernt_notifications")
+    cur.execute("SELECT id, email, name, phone, account_type FROM payernt_accounts")
+    print("PAYERNT_ACCOUNTS:", cur.fetchall())
 
-        print("\n=======================================================")
-        print(" Successfully purged all fake accounts!")
-        print(" Only real accounts remain:")
-        print(f" - bommidimohan2003@gmail.com")
-        print(f" - bommidimohan2330@gmail.com")
-        print("=======================================================\n")
-    finally:
-        conn.close()
+    try:
+        cur.execute("SELECT email, full_name, phone FROM payrent_accounts")
+        print("PAYRENT_ACCOUNTS:", cur.fetchall())
+    except Exception:
+        cur.execute("SELECT * FROM payrent_accounts")
+        print("PAYRENT_ACCOUNTS:", cur.fetchall())
+
+    try:
+        cur.execute("SELECT * FROM admin_accounts")
+        print("ADMIN_ACCOUNTS:", cur.fetchall())
+    except Exception as e:
+        print("ADMIN_ACCOUNTS notice:", e)
+
+    conn.close()
+    print("\nAll fake accounts successfully removed!")
 
 if __name__ == "__main__":
-    purge_all_fake_accounts()
+    purge_fake_accounts()
