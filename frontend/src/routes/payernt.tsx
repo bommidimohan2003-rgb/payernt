@@ -2,15 +2,17 @@ import { createFileRoute, Outlet, useRouterState, useNavigate } from "@tanstack/
 import { useReducedMotion, motion, AnimatePresence } from "framer-motion";
 import { PayerntProvider, usePayernt } from "@/payernt/context";
 import { PayerntNavbar } from "@/payernt/components/PayerntNavbar";
+import { PayerntSidebar } from "@/payernt/components/PayerntSidebar";
+import { PayerntMobileBottomNav } from "@/payernt/components/PayerntMobileBottomNav";
 import { PayerntAuth } from "@/payernt/components/PayerntAuth";
 import { getSeoMetadata } from "@/utils/seo";
 
 export const Route = createFileRoute("/payernt")({
   head: () =>
     getSeoMetadata({
-      title: "paye₹nt — Turn Your Products Into Income | Peer-to-Peer Tech Gear Lending",
+      title: "Payernt — Turn Your Products Into Income | Peer-to-Peer Tech Gear Lending",
       description:
-        "List what you own. Get it verified. Rent it out. Earn safely with paye₹nt peer-to-peer gear lending platform.",
+        "List what you own. Get it verified. Rent it out. Earn safely with Payernt peer-to-peer gear lending platform.",
       path: "/payernt",
     }),
   component: PayerntLayoutWrapper,
@@ -51,11 +53,8 @@ function PayerntLayout() {
     markAllNotificationsRead,
     resetToDefaults,
     stats,
+    unreadMessagesCount,
   } = usePayernt();
-
-  const currentPath = useRouterState({ select: (s) => s.location.pathname });
-  const isHomePage = currentPath === "/payernt" || currentPath === "/payernt/";
-  const isWizardPage = currentPath.startsWith("/payernt/products/create") || currentPath === "/payernt/list";
 
   // Strict Authentication Gate for all lender routes
   if (!isAuthenticated) {
@@ -63,8 +62,8 @@ function PayerntLayout() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col font-sans selection:bg-primary selection:text-primary-foreground">
-      {/* Sticky Universal Payernt Navbar */}
+    <div className="min-h-screen bg-[#f8f9fa] dark:bg-[#07090e] text-neutral-900 dark:text-foreground flex flex-col font-sans selection:bg-neutral-200 dark:selection:bg-neutral-800 selection:text-neutral-900 dark:selection:text-white transition-colors duration-200">
+      {/* Sticky Minimal Payernt Navbar */}
       <PayerntNavbar
         pendingRequestsCount={stats.pendingRequestsCount}
         notifications={notifications}
@@ -76,18 +75,26 @@ function PayerntLayout() {
         onLogout={logout}
       />
 
-      {/* Main Single-Page Dynamic Route View */}
-      <main
-        className={`flex-1 w-full ${
-          isHomePage
-            ? "max-w-none p-0"
-            : isWizardPage
-              ? "mx-auto max-w-[1650px] px-4 sm:px-6 lg:px-8 py-6"
-              : "mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 sm:py-8"
-        }`}
-      >
-        <PayerntPageTransitionOutlet />
-      </main>
+      {/* Main Container with Sidebar + Content */}
+      <div className="flex-1 flex w-full max-w-[1700px] mx-auto p-3 sm:p-4 md:p-6 pb-24 md:pb-6 gap-3 sm:gap-5 items-stretch">
+        {/* Left Sidebar (Desktop Only) */}
+        <PayerntSidebar
+          pendingRequestsCount={stats.pendingRequestsCount}
+          unreadMessagesCount={unreadMessagesCount}
+        />
+
+        {/* Dynamic Route View */}
+        <main className="flex-1 min-w-0 w-full">
+          <PayerntPageTransitionOutlet />
+        </main>
+      </div>
+
+      {/* Fixed Mobile Bottom Navigation */}
+      <PayerntMobileBottomNav
+        pendingRequestsCount={stats.pendingRequestsCount}
+        unreadMessagesCount={unreadMessagesCount}
+        onLogout={logout}
+      />
     </div>
   );
 }

@@ -322,6 +322,43 @@ class TestPayerntMasterBackend(unittest.TestCase):
         updated_w = good_wdl.json().get("updatedWallet", {})
         self.assertEqual(float(updated_w["available_balance"]), avail_bal - 5000.0)
 
+    def test_09_dashboard_and_bookings_endpoints(self):
+        """Validates that GET /dashboard and GET /bookings return authoritative data with auth guards."""
+        # 1. Unauthenticated request to /dashboard must fail 401
+        unauth_dash = self.client.get("/api/payernt/dashboard")
+        self.assertEqual(unauth_dash.status_code, 401)
+
+        # 2. Authenticated request to /dashboard returns full aggregated data
+        headers = {"Authorization": f"Bearer {self.vendor_token}"}
+        dash_res = self.client.get("/api/payernt/dashboard", headers=headers)
+        self.assertEqual(dash_res.status_code, 200)
+        dash_data = dash_res.json()
+        self.assertTrue(dash_data.get("success"))
+        self.assertIn("wallet", dash_data)
+        self.assertIn("earnings", dash_data)
+        self.assertIn("listings", dash_data)
+        self.assertIn("rentals", dash_data)
+        self.assertIn("bookings", dash_data)
+        self.assertIn("products", dash_data)
+        self.assertIn("recentActivity", dash_data)
+        self.assertIn("notifications", dash_data)
+        self.assertIn("messages", dash_data)
+
+        # 3. Authenticated request to /bookings returns bookings for this vendor
+        bookings_res = self.client.get("/api/payernt/bookings", headers=headers)
+        self.assertEqual(bookings_res.status_code, 200)
+        bookings_data = bookings_res.json()
+        self.assertTrue(bookings_data.get("success"))
+        self.assertIsInstance(bookings_data.get("bookings"), list)
+
+        # 4. Authenticated request to /earnings/summary returns earnings
+        earnings_res = self.client.get("/api/payernt/earnings/summary", headers=headers)
+        self.assertEqual(earnings_res.status_code, 200)
+        earnings_data = earnings_res.json()
+        self.assertTrue(earnings_data.get("success"))
+        self.assertIn("total", earnings_data)
+        self.assertIn("availableBalance", earnings_data)
+
     @classmethod
     def tearDownClass(cls):
         try:

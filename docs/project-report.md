@@ -202,6 +202,11 @@ The main technical debt areas are clear:
 - [RESOLVED Admin Pending Gear Approvals & Multi-User Listing Pipeline] (1) Root Cause Identification: Traced lender product creation pipeline from `BecomeLender.tsx` -> `api.createCustomProduct` -> FastAPI `POST /api/products/custom` -> MySQL `custom_products` -> Admin API `GET /api/admin/products` -> Admin Dashboard UI `Pending Gear Approvals`; (2) Lender Submission Error Handling: Fixed unhandled exceptions in `BecomeLender.tsx` where API errors were previously masked with `setDone(true)`, adding proper validation, error toasts, and authenticated session verification; (3) Single-Query User Join Optimization: Upgraded `admin_products_list` and `admin_get_product` endpoints in `backend/main.py` with SQL `LEFT JOIN users u ON LOWER(cp.user_email) = LOWER(u.email)` to populate accurate lender profile metadata (`user_full_name`, `user_avatar`, `user_phone`, `user_city`) in a single query avoiding N+1 roundtrips; (4) Status Normalization: Normalized pending status queries across admin endpoints and dashboards (`LOWER(status) IN ('pending', 'under_review')`), ensuring products in either status appear in the review queue; (5) Admin Auth & Token Sanitization: Fixed JWT token handling in Admin API interceptor (`src/admin/services/api.ts`) ensuring unquoted bearer tokens across requests; (6) Realtime Synchronization: Installed `websockets` dependency for FastAPI WebSocket connection at `/api/admin/ws`, wired `payent_products_updated` custom event and `storage` event listeners on admin dashboard for instant cross-tab and WebSocket live synchronization; (7) Multi-User E2E Verification: Tested and verified real submissions from multiple users (`bommidimohan304@gmail.com` and `dsriyogendra@gmail.com`) appearing simultaneously in Admin Pending Approvals (`2 Awaiting Admin Approval`), successfully executed Approve and Reject actions with database confirmation (`approved` -> `available=1`, `rejected` -> `available=0`), and verified automated unittests (5/5 OK) and zero-error frontend build.
 - [RESOLVED Product Submission Database Persistence & LONGTEXT Avatar Truncation Fix] (1) Root Cause Identification: Identified `Data too long for column 'owner_avatar'` when users with full base64 avatars submitted gear listings, where previous try/except blocks swallowed write failures and returned false 200 OK responses; (2) MySQL Schema Migration: Migrated `custom_products.owner_avatar` and `custom_products.image` columns to `LONGTEXT` with auto-migration in `init_db`; (3) Transaction & Persistence Verification: Upgraded `create_custom_product` with explicit rollback on error, verification query before commit, and strict exception re-raising; (4) Client Image Optimization: Added `compressImage` canvas utility in `src/utils/imageUtils.ts` resizing mobile uploads to 1200px max and JPEG compression; (5) Frontend Persistence Confirmation: Upgraded `BecomeLender.tsx` and `api.createCustomProduct` to verify database persistence confirmation before rendering success state; (6) Automated Test Verification: Created `test_fix_persistence_and_admin_approvals.py` verifying multi-user persistence, intentional DB rollback handling, and admin approval/rejection workflows (100% pass).
 - [RESOLVED Post-Submission Secure Product Confirmation Flow (PIN + OTP)] (1) 5-Step Integrity Preservation: Preserved the exact 5-step listing studio flow (`01 Category+Specs`, `02 Photos+Condition`, `03 Availability+Rates`, `04 Location+Terms`, `05 Overview+Submit`) with zero Step 6 in navigation; (2) Server-Authoritative Initial Lifecycle: Submission in Step 5 creates the listing as `PENDING_CONFIRMATION` (`available=False`) and generates a cryptographically random 4-digit Vendor Secret PIN stored securely via SHA-256 hash in `product_confirmations` (never regenerated per booking); (3) Registered Mobile OTP Delivery: Automatically dispatches a 6-digit confirmation code (`f"{secrets.randbelow(900000) + 100000}"`) with 5-minute expiration, 5 max attempts, and 60-second resend cooldown to the owner's registered mobile number (`+91 ******1234`); (4) Premium Post-Submission Confirmation UI (`SecureProductConfirmation.tsx`): Built dedicated post-submission overlay with masked PIN display (`• • • •`), Reveal PIN toggle, Copy PIN button with temporary feedback, security advisories, 6-digit auto-advancing numeric OTP input fields, paste support, resend countdown timer, and dynamic error handling; (5) Server-Authoritative OTP Verification: Implemented `POST /api/paye₹nt/products/{id}/verify-otp` and `POST /api/paye₹nt/products/{id}/resend-otp` transitioning confirmed products to `UNDER_REVIEW` (Pending Admin Review) upon OTP success, while blocking unconfirmed products from public discovery; (6) Automated Test & Build Verification: Verified with `backend/tests/test_listing_confirmation_security.py` (5/5 passed), 100% pass rate across entire backend pytest suite (160/160 tests passing), and clean zero-error Vite 8 / TanStack Start frontend build.
+- [RESOLVED Payernt Lender Home Redesign, Theme Support & Metric Identifiers] (1) Auth Screen Alignment: Moved customer auth (`AuthLayout.tsx`) and lender auth (`PayerntAuth.tsx`) card containers to the right side of the screen (`justify-end`) and removed the left showcase text block on lender login/register; (2) Minimalist Lender Dashboard: Redesigned `PayerntHome.tsx`, `PayerntSidebar.tsx`, and `PayerntNavbar.tsx` to match the minimalist monochrome financial dashboard mockup with zero green accents across both themes; (3) Dynamic Dark/Light Theme Switching: Fixed theme toggle synchronization in `useTheme.ts` ensuring immediate class toggling without corrupted state; (4) Metric Card Identification: Added explicit, responsive metric labels (`Available Balance`, `Total Earnings`, `Active Listings`, `Active Rentals`) above the numbers in all four top metric cards with clean typography and dark/light adaptive styling; (5) Verification: Confirmed clean production build (`npm run build` exits 0) with zero regressions across routes and components.
+- [RESOLVED Dedicated Payernt Mobile Dashboard, Mobile Bottom Nav & Universal Payernt Branding] (1) Mobile-First Dashboard Redesign: Re-architected `PayerntHome.tsx` specifically for mobile devices with a clean 2x2 metric grid (`Wallet`, `Earnings`, `Listings`, `Rentals`), full-width `Upcoming Bookings` and `Your Products` cards with concise real-data empty states, compact `Wallet` card, 5 quick-action touch tiles (`Add Product`, `Bookings`, `Wallet`, `Messages`, `Analytics` with >=44px touch targets), and compact `Recent Activity`; (2) Fixed Mobile Bottom Navigation: Implemented `PayerntMobileBottomNav.tsx` with fixed bottom positioning, `env(safe-area-inset-bottom)` support, 5 primary tabs (`Home`, `Products`, `Bookings`, `Wallet`, `More`), and smooth animated "More Options" bottom sheet; (3) Strict Universal Payernt Branding: Replaced all visible occurrences of "payent" and "paye₹nt" with "Payernt" across lender headers, auth screens, and 15 lender sub-route SEO metadata titles; (4) Strict Monochrome Palette: Zero green used across all cards, active tabs, buttons, and backgrounds in both light and dark modes; (5) Verification: Built successfully with `npm run build` (code 0).
+- [RESOLVED Separation of Settings & Profile Views] (1) Root Cause: Identified that both `/payernt/settings` and `/payernt/profile` previously shared and rendered the identical `LenderProfileView` component; (2) Dedicated Settings View: Developed `LenderSettings.tsx` covering theme mode preferences (Light/Dark switch), notification toggles (booking requests, direct inquiries, wallet & payout alerts), lending rules (instant booking, weekend handovers, mandatory PIN status), and account actions (demo reset, logout); (3) Distinct Profile View: Preserved `LenderProfileView` strictly for identity, KYC, masked Aadhaar verification, address details, and payout bank accounts; (4) Verification: Verified clean compilation with `npm run build` (code 0).
+
+
 
 
 
@@ -867,5 +872,109 @@ Sampling conducted with 15 iterations per endpoint against remote TiDB Cloud dat
 - Automated test suite `backend/tests/test_payernt_master.py` passed **8/8 test suites (100% OK)** covering registration, login, profile, vendor PIN invariance across multiple bookings, rental activation, and wallet withdrawals.
 - Production build `npm run build` completed cleanly with **0 errors**.
 
+### 4. Lender Dashboard UI/UX Redesign & Theme Adaptation
+- **Monochrome Minimal Redesign**: Redesigned `PayerntHome.tsx`, `PayerntNavbar.tsx`, and `PayerntSidebar.tsx` matching the premium minimalist dashboard layout (4 key metrics, upcoming bookings, product inventory, 6 quick-action tiles, wallet summary, and recent activity).
+- **Zero-Green Rule Enforced**: Completely eliminated all green/emerald tones across lender dashboard, using monochrome neutral tones (black, charcoal, white, off-white, light grey).
+- **Dynamic Light/Dark Mode**: All cards, text, icons, progress tracks, sidebars, and navbars dynamically adapt based on theme toggle (`light` / `dark`).
+- **Auth Card Repositioning**: Moved customer and lender login/registration form containers cleanly to the right side of the screen on desktop/tablet viewports.
+- **Responsive Dual Layout (Desktop Mockup & Mobile Preserved)**:
+  - **Large Screen (`lg:` and up)**: Exactly matches the user's mockup screenshot — glossy dark container, `Good morning, Mohan •`, clean date alignment without status pill, 4 metric cards with progress bars and left-aligned values, 12-col layout with Upcoming Bookings, Your Products, 6 quick-action tiles, Wallet summary card, and full-width Recent Activity card.
+  - **Small Screen (`< lg`)**: Preserves the touch-friendly mobile dashboard (2x2 metric cards, 5 quick-action tiles with labels, full-width status cards).
+- **Floating Glassmorphic Mobile Navigation**: Converted mobile bottom navigation into a transparent floating dock (`bg-white/70 dark:bg-[#0b0e14]/75 backdrop-blur-2xl`) hovering cleanly above the viewport edge with smooth glassmorphism.
+- **Brand Wordmark Only**: Displaying the typography wordmark `paye₹nt` (with rupee symbol) and removed logo icon from the navbar.
+- **Removed Online Pills**: Removed both `● Online` and `● System Online` status pills across mobile and desktop headers.
+- **Settings & Profile Decoupled**: Distinct routes (`/payernt/profile` for identity, KYC, and bank accounts; `/payernt/settings` for preferences, notification toggles, and appearance).
 
+---
+
+## 15. Real API Dashboard Integration — Desktop & Mobile Synchronization
+
+### 1. Unified Real API Backend Service
+- **`GET /api/payernt/dashboard`**:
+  - Authenticated via `Depends(get_current_payernt_account)` from `Authorization: Bearer <access_token>`.
+  - Authoritative database aggregation via `get_payernt_vendor_dashboard(vendor_id, email)`:
+    - **Wallet**: Available balance, pending balance, total received, total withdrawn directly from `payernt_wallets` and `payernt_wallet_transactions`.
+    - **Earnings**: Authoritative total earnings, available balance, pending amount, withdrawn amount.
+    - **Listings**: Real counts of total, active, and pending listings from `payernt_products` filtered strictly by `vendor_id`.
+    - **Rentals**: Active count from `rental_security` where `vendor_id = :vendor_id` and status is active/started.
+    - **Bookings**: Real upcoming bookings with product title, renter email/name, dates, daily rate, and rental status.
+    - **Products Preview**: Real lender products list with title, category, daily rate, status, and availability.
+    - **Recent Activity**: Authoritative chronologically sorted activities from real transactions and audit logs.
+    - **Notifications & Messages**: Real unread counts.
+- **`GET /api/payernt/bookings`**: Returns real owner-scoped bookings from `rental_security` joined with `orders` and `payernt_products`.
+- **`GET /api/payernt/earnings/summary`**: Authoritative vendor earnings breakdown.
+
+### 2. Centralized Frontend API Service Layer
+- **`frontend/src/payernt/payerntApiService.ts`**:
+  - `getDashboard()`: Calls `/api/payernt/dashboard` with authorization bearer token.
+  - `getBookings()`: Calls `/api/payernt/bookings`.
+  - `getEarningsSummary()`: Calls `/api/payernt/earnings/summary`.
+  - Zero duplicate API logic in components. Both Desktop and Mobile consume the exact same data methods.
+- **`frontend/src/payernt/store.ts`**:
+  - Orchestrates concurrent data refresh (`refreshDashboard()`).
+  - Synchronizes wallet, products, upcoming bookings, unread notifications, unread messages, and audit activities.
+  - Exposes `isLoadingDashboard`, `dashboardError`, `backendActivities`, and `refreshDashboard` to the application tree.
+  - Handles authentication expiry (401) by gracefully redirecting to login.
+
+### 3. Desktop & Mobile UI Resilience
+- **Zero Mock / Fake Data**: Home dashboard displays real listings, real bookings, and real wallet amounts. Shows clean empty states ("No upcoming bookings", "No listings yet" + "+ Add Product", "No recent activity") when no data exists.
+- **Skeleton Loaders**: Polished animated pulse skeleton states during initial data fetch; eliminates jarring content flashing or fake number placeholders.
+- **Graceful Error Handling**: Error alert banner with one-click "Retry" button on failed network requests.
+- **Brand Consistency**: Wordmark `paye₹nt` displayed consistently with zero green color palette.
+
+### 4. Verification & Automated Test Suite
+- Automated test suite `backend/tests/test_payernt_master.py` and `backend/tests/test_shared_database_integration.py` passed **13/13 tests (100% OK)** including 401 unauthenticated and 200 authenticated checks for `/dashboard`, `/bookings`, and `/earnings/summary`.
+- Production build `npm run build` completed with **0 errors**.
+
+---
+
+## 16. End-to-End Product Submission, Admin Review, & Products Synchronization
+
+### 1. Root Cause Analysis
+- **Admin Invisibility**:
+  1. `create_product_endpoint` in `backend/payernt_router.py` previously hardcoded `status = "pending_confirmation"` waiting for SMS OTP, whereas the frontend wizard completes all 5 listing steps and directly submits for moderation review with `status: "under_review"`. Because the Admin queries `('pending', 'under_review', 'pending_admin_review')`, products submitted in this state were invisible.
+  2. In `backend/main.py`, router registration silently failed during import when a missing `Union` type annotation threw a `NameError`, preventing `/api/payernt/products` and `/api/paye₹nt/products` from registering.
+- **Payernt Products Missing**:
+  1. In `frontend/src/payernt/store.ts`, `isMockItem` was defined to filter out IDs starting with `"prod-"`. Because both the backend database and the frontend generate product IDs prefixed with `"prod-"`, real products were filtered out.
+  2. `addProduct` triggered a duplicate backend `POST` request because `ListProductWizard.tsx` had already submitted the product to the API.
+- **Case-Insensitive Account Type**:
+  1. `get_current_payernt_account` was requiring exact lowercase `account_type == "payernt"`, rejecting valid tokens with `"PAYERNT"` or accounts already registered in `payernt_accounts`.
+
+### 2. Backend & Database Hardening
+- **Authoritative Identity Derivation**:
+  - `POST /api/payernt/products` strictly derives `owner_id`, `owner_email`, and `owner_name` from the authenticated JWT session via `Depends(get_current_payernt_account)`.
+  - Never trusts client-supplied `ownerId` or `accountId`.
+- **Status & Schema Handling**:
+  - `PayerntProductCreateSchema` updated to support `specs`, `photos`, `videoUrl`, `damageDetails`, `customCategoryName`, `verificationDocs`, `verificationStatus`, and `adminPriceRange`.
+  - When submitted for review (`status in ("under_review", "pending_admin_review", "submitted")`), product status is set directly to `"under_review"` in MySQL `payernt_products` with `available = False` and `availability_status = "paused"`.
+  - Audit logs and admin review notifications dispatched on creation.
+- **Data Persistence**:
+  - `create_payernt_product` persists `video_url`, `specifications` (serialized JSON), `min_price`, `max_price`, `price_unit`, `price_status` with `ON DUPLICATE KEY UPDATE`.
+  - `get_payernt_products_by_owner` queries both `owner_id` and `owner_email` to ensure zero lost products.
+- **Admin Endpoints**:
+  - `GET /api/admin/products?status=under_review` immediately returns submitted products.
+  - `GET /api/admin/products/{id}` returns complete specs, 10s condition video, condition details, accessories, and location without exposing sensitive credentials (passwords, JWTs, OTPs).
+  - `POST /api/admin/products/{id}/approve` transitions status to `"approved"` and synchronizes real-time state.
+
+### 3. Frontend Products & KPI Order
+- **`MyProducts.tsx`**:
+  - Displays neutral `"PENDING REVIEW"` status badge for `under_review`, `pending`, and `pending_admin_review` items.
+  - Filter tabs accurately count active, approved, and under review listings.
+  - Media display gracefully falls back to category icons if an image is missing or broken.
+- **Home KPI Reordering (Desktop & Mobile)**:
+  - Top card: `PENDING LISTINGS` (real backend count of gear under review).
+  - Middle 3-column row: `AVAILABLE BALANCE` (`₹0`), `TOTAL EARNINGS` (`₹0`), `ACTIVE LISTINGS` (`00`).
+  - Bottom row: `ACTIVE RENTALS` (`00`).
+  - All metrics powered by live backend endpoint `GET /api/payernt/dashboard`.
+
+### 4. Verification & Automated Test Results
+- Automated end-to-end test passed **6/6 critical checkpoints**:
+  1. Product created in database with status `under_review` and auth-derived owner.
+  2. Payernt Products API returns the product with status `under_review`.
+  3. Admin Pending Listings API finds the product.
+  4. Admin Get Product endpoint returns complete details without sensitive info.
+  5. Admin approve endpoint updates status to `approved`.
+  6. Payernt Products API immediately reflects `approved` status.
+- Pytest suite `tests/test_listing_confirmation_security.py` and `tests/test_admin_product_review_pricing.py` passed **8/8 tests (100% OK)**.
+- Frontend build `npm run build` completed cleanly with **0 errors**.
 

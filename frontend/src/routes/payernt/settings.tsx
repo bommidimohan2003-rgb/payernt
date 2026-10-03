@@ -1,12 +1,12 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { LenderProfileView } from "@/payernt/components/LenderProfile";
+import { LenderSettingsView } from "@/payernt/components/LenderSettings";
 import { usePayernt } from "@/payernt/context";
 import { getSeoMetadata } from "@/utils/seo";
 
 export const Route = createFileRoute("/payernt/settings")({
   head: () =>
     getSeoMetadata({
-      title: "Lender Settings & Account Preferences | paye₹nt",
+      title: "Lender Settings & Account Preferences | Payernt",
       description: "Manage security settings, notifications and payout configurations.",
       path: "/payernt/settings",
     }),
@@ -15,21 +15,11 @@ export const Route = createFileRoute("/payernt/settings")({
 
 function PayerntSettingsRoute() {
   const navigate = useNavigate();
-  const {
-    profile,
-    activeAccount,
-    updateProfile,
-    resetToDefaults,
-    logout,
-  } = usePayernt();
+  const { resetToDefaults, logout } = usePayernt();
 
   return (
-    <LenderProfileView
-      profile={profile}
-      activeAccount={activeAccount}
-      onUpdateProfile={updateProfile}
+    <LenderSettingsView
       onResetDemo={resetToDefaults}
-      onNavigateToProducts={() => navigate({ to: "/payernt/products" })}
       onLogout={logout}
       onBack={() => navigate({ to: "/payernt" })}
     />

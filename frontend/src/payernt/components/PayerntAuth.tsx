@@ -14,7 +14,6 @@ import {
   ArrowLeft,
   CheckCircle2,
   XCircle,
-  Sparkles,
   Sun,
   Moon,
   Info,
@@ -274,7 +273,7 @@ export function PayerntAuth({
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col justify-between selection:bg-primary selection:text-primary-foreground">
+    <div className="min-h-screen bg-background text-foreground flex flex-col justify-between selection:bg-primary selection:text-primary-foreground relative overflow-hidden">
       {/* Top Header Navigation */}
       <header className="w-full border-b border-border/80 bg-background/90 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
@@ -291,12 +290,12 @@ export function PayerntAuth({
 
           {/* Brand Center */}
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-foreground text-background font-black text-base tracking-tight shadow-xs">
-              ₹
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-foreground text-background font-black text-base tracking-tight shadow-xs font-display">
+              P
             </div>
             <div className="flex flex-col text-left">
               <span className="font-extrabold tracking-tight text-lg text-foreground leading-none font-display">
-                paye<span className="font-black font-serif">₹</span>nt
+                Payernt
               </span>
               <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground leading-none mt-0.5">
                 Product Owner Platform
@@ -321,8 +320,13 @@ export function PayerntAuth({
         </div>
       </header>
 
-      {/* Main Authentication Card */}
-      <main className="flex-1 flex items-center justify-start px-4 py-8 sm:py-12 sm:px-12 lg:px-20">
+      {/* Ambient background glow */}
+      <div className="absolute top-1/4 left-10 h-96 w-96 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-1/4 right-10 h-96 w-96 bg-accent/5 rounded-full blur-3xl pointer-events-none" />
+
+      {/* Main Authentication Section - Right-aligned form */}
+      <main className="flex-1 w-full max-w-7xl mx-auto flex items-center justify-center md:justify-end px-4 py-8 sm:py-12 sm:px-8 lg:px-12 z-10">
+        {/* Right Side Authentication Card */}
         <div className="w-full max-w-lg">
           <AnimatePresence mode="wait">
             {mode === "login" ? (
@@ -337,7 +341,7 @@ export function PayerntAuth({
                 {/* Header */}
                 <div className="text-center space-y-1.5">
                   <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground font-display">
-                    Sign In to paye₹nt
+                    Sign In to Payernt
                   </h1>
                   <p className="text-xs sm:text-sm text-muted-foreground">
                     Access your product inventory, earnings wallet, and rental requests.
@@ -423,7 +427,7 @@ export function PayerntAuth({
                       <div className="h-4 w-4 rounded-full border-2 border-background border-t-transparent animate-spin" />
                     ) : (
                       <>
-                        <span>Login to paye₹nt</span>
+                        <span>Login to Payernt</span>
                         <ArrowRight className="h-4 w-4" />
                       </>
                     )}
@@ -433,7 +437,7 @@ export function PayerntAuth({
                 {/* Switch to Register */}
                 <div className="pt-3 border-t border-border/70 text-center space-y-3">
                   <p className="text-xs text-muted-foreground">
-                    Don't have a paye₹nt account?{" "}
+                    Don't have a Payernt account?{" "}
                     <button
                       type="button"
                       onClick={() => {
@@ -464,7 +468,7 @@ export function PayerntAuth({
                     <span>Lender Onboarding</span>
                   </div>
                   <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground font-display">
-                    Create paye₹nt Account
+                    Create Payernt Account
                   </h1>
                   <p className="text-xs sm:text-sm text-muted-foreground">
                     Register as a verified gear owner and start earning rental income.
@@ -740,7 +744,7 @@ export function PayerntAuth({
                       <div className="h-4 w-4 rounded-full border-2 border-background border-t-transparent animate-spin" />
                     ) : (
                       <>
-                        <span>Create paye₹nt Account</span>
+                        <span>Create Payernt Account</span>
                         <ArrowRight className="h-4 w-4" />
                       </>
                     )}
@@ -750,7 +754,7 @@ export function PayerntAuth({
                 {/* Switch to Login */}
                 <div className="pt-3 border-t border-border/70 text-center">
                   <p className="text-xs text-muted-foreground">
-                    Already have a paye₹nt account?{" "}
+                    Already have a Payernt account?{" "}
                     <button
                       type="button"
                       onClick={() => {
@@ -771,7 +775,7 @@ export function PayerntAuth({
 
       {/* Footer */}
       <footer className="w-full border-t border-border/60 py-4 text-center text-[11px] text-muted-foreground">
-        <span>paye₹nt Product Owner & Lending Platform • Protected by End-to-End Encryption</span>
+        <span>Payernt Product Owner & Lending Platform • Protected by End-to-End Encryption</span>
       </footer>
     </div>
   );

@@ -1615,19 +1615,19 @@ export function ListProductWizard({
                     }}
                     disabled={isUpcoming}
                     className={`w-full text-left p-3 rounded-2xl flex items-start gap-3 transition-all ${isActive
-                        ? "bg-primary/10 border border-primary/30 shadow-xs ring-1 ring-primary/20"
-                        : isCompleted
-                          ? "bg-secondary/40 border border-border/60 hover:bg-secondary cursor-pointer"
-                          : "opacity-60 cursor-not-allowed border border-transparent"
+                      ? "bg-primary/10 border border-primary/30 shadow-xs ring-1 ring-primary/20"
+                      : isCompleted
+                        ? "bg-secondary/40 border border-border/60 hover:bg-secondary cursor-pointer"
+                        : "opacity-60 cursor-not-allowed border border-transparent"
                       }`}
                   >
                     {/* Circle Indicator */}
                     <div
                       className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 font-bold text-xs transition-all ${isActive
-                          ? "bg-primary text-primary-foreground shadow-sm"
-                          : isCompleted
-                            ? "bg-emerald-500 text-white"
-                            : "bg-secondary text-muted-foreground border border-border"
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : isCompleted
+                          ? "bg-emerald-500 text-white"
+                          : "bg-secondary text-muted-foreground border border-border"
                         }`}
                     >
                       {isCompleted ? <Check className="h-4 w-4 stroke-[3]" /> : st.num}
@@ -1720,11 +1720,10 @@ export function ListProductWizard({
                             <button
                               type="button"
                               onClick={() => handleSelectCategory(cat.id)}
-                              className={`h-9 w-9 sm:h-10 sm:w-10 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
-                                isSelected
+                              className={`h-9 w-9 sm:h-10 sm:w-10 rounded-lg flex items-center justify-center transition-all cursor-pointer ${isSelected
                                   ? "bg-primary text-primary-foreground shadow-xs scale-105"
                                   : "bg-secondary/50 hover:bg-secondary text-muted-foreground hover:text-foreground active:scale-95"
-                              }`}
+                                }`}
                               title={cat.label}
                             >
                               <IconComp className="h-4.5 w-4.5 sm:h-5 sm:w-5 stroke-[1.9]" />
@@ -2015,13 +2014,12 @@ export function ListProductWizard({
                         <label className="text-xs font-bold text-foreground">
                           Product Media Verification Queue <span className="text-destructive">*</span>
                         </label>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                          frontPhotoUrl && backPhotoUrl && capturedVideoUrl
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${frontPhotoUrl && backPhotoUrl && capturedVideoUrl
                             ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
                             : (frontPhotoUrl ? 1 : 0) + (backPhotoUrl ? 1 : 0) + (capturedVideoUrl ? 1 : 0) > 0
                               ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
                               : "bg-primary/10 text-primary border border-primary/20"
-                        }`}>
+                          }`}>
                           {frontPhotoUrl && backPhotoUrl && capturedVideoUrl
                             ? "Queue Complete (3/3)"
                             : `Queue Progress: ${(frontPhotoUrl ? 1 : 0) + (backPhotoUrl ? 1 : 0) + (capturedVideoUrl ? 1 : 0)}/3 Captured`}
@@ -2182,13 +2180,12 @@ export function ListProductWizard({
                   {/* 3 COMPACT MEDIA SLOTS ON ONE LINE: 1, 2, 3 */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                     {/* SLOT 1: Front View Photo */}
-                    <div className={`p-2.5 rounded-xl border transition-all ${
-                      frontPhotoUrl
+                    <div className={`p-2.5 rounded-xl border transition-all ${frontPhotoUrl
                         ? "bg-card border-emerald-500/40 shadow-xs"
                         : isCameraActive && cameraTarget === "front"
                           ? "bg-primary/5 border-primary ring-1 ring-primary/30"
                           : "bg-card/50 border-dashed border-border"
-                    }`}>
+                      }`}>
                       <div className="flex items-center justify-between mb-1.5">
                         <div className="flex items-center gap-1.5 min-w-0">
                           <span className="h-4 w-4 rounded-full bg-secondary flex items-center justify-center text-[9px] font-bold text-foreground shrink-0">
@@ -2255,13 +2252,12 @@ export function ListProductWizard({
                     </div>
 
                     {/* SLOT 2: Back View Photo */}
-                    <div className={`p-2.5 rounded-xl border transition-all ${
-                      backPhotoUrl
+                    <div className={`p-2.5 rounded-xl border transition-all ${backPhotoUrl
                         ? "bg-card border-emerald-500/40 shadow-xs"
                         : isCameraActive && cameraTarget === "back"
                           ? "bg-primary/5 border-primary ring-1 ring-primary/30"
                           : "bg-card/50 border-dashed border-border"
-                    }`}>
+                      }`}>
                       <div className="flex items-center justify-between mb-1.5">
                         <div className="flex items-center gap-1.5 min-w-0">
                           <span className="h-4 w-4 rounded-full bg-secondary flex items-center justify-center text-[9px] font-bold text-foreground shrink-0">
@@ -2328,13 +2324,12 @@ export function ListProductWizard({
                     </div>
 
                     {/* SLOT 3: 10-Second Live Video */}
-                    <div className={`p-2.5 rounded-xl border transition-all ${
-                      capturedVideoUrl
+                    <div className={`p-2.5 rounded-xl border transition-all ${capturedVideoUrl
                         ? "bg-card border-emerald-500/40 shadow-xs"
                         : isCameraActive && cameraTarget === "video"
                           ? "bg-red-500/5 border-red-500 ring-1 ring-red-500/30"
                           : "bg-card/50 border-dashed border-border"
-                    }`}>
+                      }`}>
                       <div className="flex items-center justify-between mb-1.5">
                         <div className="flex items-center gap-1.5 min-w-0">
                           <span className="h-4 w-4 rounded-full bg-secondary flex items-center justify-center text-[9px] font-bold text-foreground shrink-0">
@@ -2409,11 +2404,10 @@ export function ListProductWizard({
                           key={cg.grade}
                           type="button"
                           onClick={() => setConditionGrade(cg.grade)}
-                          className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
-                            isSelected
+                          className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${isSelected
                               ? "border-primary bg-primary/10 shadow-xs ring-1 ring-primary/20"
                               : "border-border bg-card hover:bg-secondary/50"
-                          }`}
+                            }`}
                         >
                           <div className="flex items-center justify-between gap-1 mb-1">
                             <span className={`text-[11px] font-bold truncate ${isSelected ? "text-primary" : "text-foreground"}`}>
@@ -2438,11 +2432,10 @@ export function ListProductWizard({
                           key={lvl}
                           type="button"
                           onClick={() => setScratches(lvl)}
-                          className={`px-3 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
-                            scratches === lvl
+                          className={`px-3 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${scratches === lvl
                               ? "bg-foreground text-background border-foreground shadow-xs"
                               : "border-border bg-card text-muted-foreground hover:bg-secondary"
-                          }`}
+                            }`}
                         >
                           {lvl}
                         </button>
@@ -2501,8 +2494,8 @@ export function ListProductWizard({
                               else setAccessoriesList((prev) => [...prev, tag]);
                             }}
                             className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-all cursor-pointer flex items-center gap-1 ${isIncluded
-                                ? "bg-primary text-primary-foreground border-primary"
-                                : "bg-card text-muted-foreground border-border hover:bg-secondary"
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : "bg-card text-muted-foreground border-border hover:bg-secondary"
                               }`}
                           >
                             <span>{tag}</span>
@@ -2654,8 +2647,8 @@ export function ListProductWizard({
                       type="button"
                       onClick={() => setLocationMode("manual")}
                       className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${locationMode === "manual"
-                          ? "bg-card text-foreground shadow-xs border border-border"
-                          : "text-muted-foreground hover:text-foreground"
+                        ? "bg-card text-foreground shadow-xs border border-border"
+                        : "text-muted-foreground hover:text-foreground"
                         }`}
                     >
                       <MapPin className="h-3.5 w-3.5" />
@@ -2668,8 +2661,8 @@ export function ListProductWizard({
                         if (!liveCoords) handleFetchLiveLocation();
                       }}
                       className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${locationMode === "gps"
-                          ? "bg-card text-foreground shadow-xs border border-border"
-                          : "text-muted-foreground hover:text-foreground"
+                        ? "bg-card text-foreground shadow-xs border border-border"
+                        : "text-muted-foreground hover:text-foreground"
                         }`}
                     >
                       <Navigation className="h-3.5 w-3.5 text-primary" />
@@ -3194,11 +3187,9 @@ export function ListProductWizard({
                 {/* =============================================================== */}
                 <div className="space-y-2 pt-2 max-w-md">
                   <div
-                    className={`relative w-full h-12 rounded-2xl border transition-colors select-none overflow-hidden flex items-center ${
-                      dragProgress > 0 ? "border-emerald-500/50 bg-emerald-950/20 shadow-xs" : "border-border bg-secondary/40"
-                    } ${
-                      !finalConfirmationChecked || isSubmitting ? "opacity-50 cursor-not-allowed" : "cursor-grab"
-                    }`}
+                    className={`relative w-full h-12 rounded-2xl border transition-colors select-none overflow-hidden flex items-center ${dragProgress > 0 ? "border-emerald-500/50 bg-emerald-950/20 shadow-xs" : "border-border bg-secondary/40"
+                      } ${!finalConfirmationChecked || isSubmitting ? "opacity-50 cursor-not-allowed" : "cursor-grab"
+                      }`}
                   >
                     {/* Animated Green Moving Background Progress Fill */}
                     <div
@@ -3260,11 +3251,10 @@ export function ListProductWizard({
 
                     {/* Visual Knob Indicator */}
                     <div
-                      className={`absolute h-9 w-9 rounded-xl flex items-center justify-center shadow-md pointer-events-none transition-all ${
-                        dragProgress > 0
+                      className={`absolute h-9 w-9 rounded-xl flex items-center justify-center shadow-md pointer-events-none transition-all ${dragProgress > 0
                           ? "bg-emerald-600 text-white shadow-emerald-500/50 scale-105"
                           : "bg-primary text-primary-foreground"
-                      }`}
+                        }`}
                       style={{ left: `calc(${dragProgress}% * 0.85 + 6px)` }}
                     >
                       {dragProgress >= 90 ? (

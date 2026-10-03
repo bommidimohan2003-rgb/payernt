@@ -6,8 +6,8 @@ import { getSeoMetadata } from "@/utils/seo";
 export const Route = createFileRoute("/payernt/list")({
   head: () =>
     getSeoMetadata({
-      title: "List Gear | paye₹nt",
-      description: "List new gear on paye₹nt lender portal.",
+      title: "List Gear | Payernt",
+      description: "List new gear on Payernt lender portal.",
       path: "/payernt/list",
     }),
   component: PayerntListAliasRoute,

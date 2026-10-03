@@ -1,35 +1,19 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { useNavigate, useRouterState } from "@tanstack/react-router";
 import {
-  Plus,
   Bell,
-  CheckCircle2,
-  AlertCircle,
-  Info,
-  Clock,
-  ExternalLink,
-  ChevronRight,
-  Menu,
-  X,
-  ShieldCheck,
-  Sparkles,
-  Layers,
-  UserCheck,
   Sun,
   Moon,
   LogOut,
-  Wallet,
-  Calendar,
-  User,
-  LayoutDashboard,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { LenderNotification, DemoUser, PayerntAccount } from "../types";
 import { useTheme } from "@/hooks/useTheme";
+import { useOriginReveal } from "@/components/navigation/OriginRevealTransition";
 
 interface PayerntNavbarProps {
-  activeTab?: "home" | "products" | "requests" | "wallet" | "profile" | "list" | "messages" | "analytics" | "settings" | "help";
-  onTabChange?: (tab: "home" | "products" | "requests" | "wallet" | "profile" | "list" | "messages" | "analytics" | "settings" | "help") => void;
+  activeTab?: string;
+  onTabChange?: (tab: any) => void;
   pendingRequestsCount?: number;
   notifications?: LenderNotification[];
   onMarkNotificationRead?: (id: string) => void;
@@ -38,29 +22,55 @@ interface PayerntNavbarProps {
   activeUser?: DemoUser;
   activeAccount?: PayerntAccount | null;
   onLogout?: () => void;
+  onToggleSidebar?: () => void;
 }
 
 export function PayerntNavbar({
-  activeTab: propActiveTab,
+  activeTab,
   onTabChange,
   pendingRequestsCount = 0,
   notifications = [],
   onMarkNotificationRead = () => {},
   onMarkAllNotificationsRead = () => {},
-  onResetDemo = () => {},
   activeUser,
   activeAccount,
   onLogout,
+  onToggleSidebar,
 }: PayerntNavbarProps) {
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { triggerOriginTransition } = useOriginReveal();
   const { theme, toggle: toggleTheme } = useTheme();
   const [isNotifOpen, setIsNotifOpen] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
 
-  const displayName = activeAccount?.name || activeUser?.fullName || activeUser?.name || "Vendor";
+  const isHome =
+    (pathname === "/payernt" ||
+      pathname === "/payernt/" ||
+      pathname === "/paye₹nt" ||
+      pathname === "/paye₹nt/") &&
+    (!activeTab || activeTab === "home");
 
+  const handleBrandClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    try {
+      triggerOriginTransition(isHome ? "gateway" : "home", e.currentTarget);
+    } catch {
+      // Safe fallback if outside provider
+    }
+
+    if (isHome) {
+      navigate({ to: "/" as any });
+    } else {
+      if (onTabChange) {
+        onTabChange("home");
+      }
+      navigate({ to: "/payernt" as any });
+    }
+  };
+
+  const displayName = activeAccount?.name || activeUser?.fullName || activeUser?.name || "Mohan";
+  const avatarLetter = (displayName.trim()[0] || "M").toUpperCase();
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   useEffect(() => {
@@ -73,129 +83,53 @@ export function PayerntNavbar({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Compute active tab from route pathname
-  const currentTab = (() => {
-    if (propActiveTab) return propActiveTab;
-    if (pathname === "/payernt" || pathname === "/payernt/") return "home";
-    if (pathname.startsWith("/payernt/products/create") || pathname === "/payernt/list") return "list";
-    if (pathname.startsWith("/payernt/products")) return "products";
-    if (pathname.startsWith("/payernt/bookings") || pathname.startsWith("/payernt/requests")) return "requests";
-    if (pathname.startsWith("/payernt/wallet")) return "wallet";
-    if (pathname.startsWith("/payernt/messages")) return "messages";
-    if (pathname.startsWith("/payernt/analytics") || pathname.startsWith("/payernt/earnings")) return "analytics";
-    if (pathname.startsWith("/payernt/profile")) return "profile";
-    if (pathname.startsWith("/payernt/settings")) return "settings";
-    if (pathname.startsWith("/payernt/help")) return "help";
-    return "home";
-  })();
-
-  const handleNav = (tab: "home" | "products" | "requests" | "wallet" | "profile" | "list" | "messages" | "analytics" | "settings" | "help", path: string) => {
-    if (onTabChange) {
-      onTabChange(tab);
-      // Stay on /payernt — tab-based SPA, no router navigation needed
-      return;
-    }
-    navigate({ to: path as any });
-  };
-
-  const navItems: { id: "home" | "products" | "requests" | "wallet" | "profile"; label: string; path: string; badge?: number }[] = [
-    { id: "home", label: "Home", path: "/payernt" },
-    { id: "products", label: "My Products", path: "/payernt/products" },
-    { id: "requests", label: "Rental Requests", path: "/payernt/bookings", badge: pendingRequestsCount > 0 ? pendingRequestsCount : undefined },
-    { id: "wallet", label: "Wallet", path: "/payernt/wallet" },
-    { id: "profile", label: "Profile", path: "/payernt/profile" },
-  ];
-
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-border/80 bg-background/90 backdrop-blur-xl transition-all">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-        {/* Brand Section */}
-        <div className="flex items-center gap-6">
+    <header className="sticky top-0 z-40 w-full border-b border-neutral-200/60 dark:border-white/[0.06] bg-white/70 dark:bg-[#07090e]/75 backdrop-blur-2xl transition-colors duration-200">
+      <div className="w-full px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+        {/* Left: Brand Name Only (No Logo, No Online Pill) */}
+        <div className="flex items-center">
           <button
-            onClick={() => {
-              if (pathname === "/payernt" || pathname === "/payernt/") {
-                navigate({ to: "/" });
-              } else {
-                handleNav("home", "/payernt");
-              }
-            }}
-            className="group flex items-center gap-2.5 text-left cursor-pointer focus:outline-none"
-            title={pathname === "/payernt" || pathname === "/payernt/" ? "Click to return to Gateway" : "Click to go to Lender Home"}
+            type="button"
+            onClick={handleBrandClick}
+            className="flex items-center text-left cursor-pointer focus:outline-none group select-none transition-transform active:scale-95"
+            title={isHome ? "Return to Gateway (Choose Experience)" : "paye₹nt Home"}
+            aria-label={isHome ? "Return to Gateway (Choose Experience)" : "paye₹nt Home"}
           >
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-foreground text-background font-black text-lg tracking-tight transition-transform group-hover:scale-105 shadow-sm">
-              ₹
-            </div>
-            <div className="flex flex-col">
-              <span className="font-extrabold tracking-tight text-xl text-foreground leading-none font-display">
-                paye<span className="font-black font-serif">₹</span>nt
-              </span>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground leading-none mt-0.5">
-                Product Owner Platform
-              </span>
-            </div>
+            <span className="font-extrabold tracking-tight text-xl sm:text-2xl text-neutral-900 dark:text-white font-display">
+              paye₹nt
+            </span>
           </button>
-
-          {/* Desktop Nav Links */}
-          <nav className="hidden md:flex items-center gap-1">
-            {navItems.map((item) => {
-              const isActive = currentTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => handleNav(item.id, item.path)}
-                  className={`relative px-3.5 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-all cursor-pointer ${
-                    isActive
-                      ? "text-foreground font-bold bg-secondary/80"
-                      : "text-muted-foreground hover:text-foreground hover:bg-secondary/40"
-                  }`}
-                >
-                  <span className="relative z-10 flex items-center gap-1.5">
-                    {item.label}
-                    {item.badge !== undefined && (
-                      <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-extrabold text-primary-foreground">
-                        {item.badge}
-                      </span>
-                    )}
-                  </span>
-                  {isActive && (
-                    <motion.div
-                      layoutId="payerntNavIndicator"
-                      className="absolute inset-0 rounded-lg bg-secondary/80 -z-0"
-                      transition={{ type: "spring", stiffness: 450, damping: 35 }}
-                    />
-                  )}
-                </button>
-              );
-            })}
-          </nav>
         </div>
 
-        {/* Right Action Hub */}
+        {/* Right: Theme Toggle, Notifications, Profile Avatar */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* User Profile Pill */}
+          {/* Theme Toggle Button */}
           <button
-            onClick={() => handleNav("profile", "/payernt/profile")}
-            className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-border/80 bg-card hover:bg-secondary text-xs font-semibold text-foreground transition-all cursor-pointer shadow-2xs"
-            title="View Profile"
+            type="button"
+            onClick={toggleTheme}
+            className="flex h-9 w-9 items-center justify-center rounded-xl text-neutral-700 dark:text-neutral-300 hover:text-black dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
+            aria-label={`Switch to ${theme === "dark" ? "Light" : "Dark"} Mode`}
+            title={`Switch to ${theme === "dark" ? "Light" : "Dark"} Mode`}
           >
-            <div className="flex h-5 w-5 items-center justify-center rounded-md bg-gradient-to-br from-emerald-500 to-teal-700 text-white font-black text-[9px]">
-              {displayName.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase() || "LD"}
-            </div>
-            <span className="hidden sm:inline font-bold text-xs max-w-[120px] truncate">{displayName}</span>
+            {theme === "dark" ? (
+              <Sun className="h-4 w-4 text-neutral-300 hover:text-white transition-transform" />
+            ) : (
+              <Moon className="h-4 w-4 text-neutral-700 hover:text-black transition-transform" />
+            )}
           </button>
 
-          {/* Notifications Dropdown */}
+          {/* Notification Icon */}
           <div className="relative" ref={notifRef}>
             <button
+              type="button"
               onClick={() => setIsNotifOpen(!isNotifOpen)}
-              className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-border/80 bg-card hover:bg-secondary text-foreground transition-all cursor-pointer"
+              className="relative flex h-9 w-9 items-center justify-center rounded-xl text-neutral-700 dark:text-neutral-300 hover:text-black dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
               aria-label="View notifications"
+              title="Notifications"
             >
               <Bell className="h-4 w-4" />
               {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground shadow-xs animate-pulse">
-                  {unreadCount}
-                </span>
+                <span className="absolute top-2 right-2 flex h-2 w-2 rounded-full bg-neutral-900 dark:bg-white shadow-xs animate-pulse" />
               )}
             </button>
 
@@ -206,14 +140,14 @@ export function PayerntNavbar({
                   initial={{ opacity: 0, y: 6, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 6, scale: 0.95 }}
-                  className="absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl border border-border bg-card shadow-2xl p-4 z-50 text-left space-y-3"
+                  className="absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-[#0d1017] shadow-2xl p-4 z-50 text-left space-y-3"
                 >
-                  <div className="flex items-center justify-between border-b border-border/70 pb-2">
-                    <span className="font-bold text-xs">Notifications</span>
+                  <div className="flex items-center justify-between border-b border-neutral-200/80 dark:border-white/10 pb-2">
+                    <span className="font-bold text-xs text-neutral-900 dark:text-white">Notifications</span>
                     {unreadCount > 0 && (
                       <button
                         onClick={onMarkAllNotificationsRead}
-                        className="text-[11px] text-primary hover:underline font-semibold cursor-pointer"
+                        className="text-[11px] text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white font-medium cursor-pointer"
                       >
                         Mark all as read
                       </button>
@@ -222,7 +156,7 @@ export function PayerntNavbar({
 
                   <div className="max-h-64 overflow-y-auto space-y-2 pr-1">
                     {notifications.length === 0 ? (
-                      <p className="text-xs text-muted-foreground text-center py-4">
+                      <p className="text-xs text-neutral-500 dark:text-neutral-400 text-center py-4">
                         No notifications yet.
                       </p>
                     ) : (
@@ -232,15 +166,15 @@ export function PayerntNavbar({
                           onClick={() => onMarkNotificationRead(n.id)}
                           className={`p-2.5 rounded-xl border text-xs transition-colors cursor-pointer ${
                             n.read
-                              ? "border-border/60 bg-secondary/20 text-muted-foreground"
-                              : "border-primary/30 bg-primary/5 text-foreground font-medium"
+                              ? "border-neutral-200/60 dark:border-white/5 bg-neutral-50 dark:bg-white/[0.02] text-neutral-500 dark:text-neutral-400"
+                              : "border-neutral-300 dark:border-white/15 bg-neutral-100/70 dark:bg-white/[0.06] text-neutral-900 dark:text-white font-medium"
                           }`}
                         >
                           <div className="flex items-center justify-between">
-                            <span className="font-bold text-xs">{n.title}</span>
-                            <span className="text-[10px] text-muted-foreground">{n.timestamp}</span>
+                            <span className="font-bold text-xs text-neutral-900 dark:text-white">{n.title}</span>
+                            <span className="text-[10px] text-neutral-500">{n.timestamp}</span>
                           </div>
-                          <p className="text-[11px] text-muted-foreground mt-0.5">{n.message}</p>
+                          <p className="text-[11px] text-neutral-600 dark:text-neutral-400 mt-0.5">{n.message}</p>
                         </div>
                       ))
                     )}
@@ -250,128 +184,18 @@ export function PayerntNavbar({
             </AnimatePresence>
           </div>
 
-          {/* Theme Toggle Button (Dark / Light Mode) */}
+          {/* Profile / Avatar (Monochrome 'M') */}
           <button
             type="button"
-            onClick={toggleTheme}
-            className="flex h-9 w-9 items-center justify-center rounded-xl border border-border/80 bg-card hover:bg-secondary text-foreground transition-all cursor-pointer shadow-2xs"
-            aria-label={`Switch to ${theme === "dark" ? "Light" : "Dark"} Mode`}
-            title={`Switch to ${theme === "dark" ? "Light" : "Dark"} Mode`}
+            onClick={() => navigate({ to: "/payernt/profile" })}
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-neutral-200 hover:bg-neutral-300 border border-neutral-300 text-neutral-900 dark:bg-[#1c202a] dark:hover:bg-[#252b38] dark:border-white/15 dark:text-white font-bold text-xs shadow-sm transition-all cursor-pointer"
+            title={`Profile (${displayName})`}
+            aria-label={`Profile: ${displayName}`}
           >
-            {theme === "dark" ? (
-              <Sun className="h-4 w-4 text-amber-400 hover:rotate-45 transition-transform" />
-            ) : (
-              <Moon className="h-4 w-4 text-foreground/80 hover:-rotate-12 transition-transform" />
-            )}
-          </button>
-
-          {/* Primary Action CTA: List Product */}
-          <button
-            onClick={() => handleNav("list", "/payernt/products/create")}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-foreground text-background font-bold text-xs shadow-sm hover:opacity-90 active:scale-98 transition-all cursor-pointer"
-          >
-            <Plus className="h-3.5 w-3.5 stroke-[3]" />
-            <span className="hidden sm:inline">List Product</span>
-            <span className="sm:hidden">List</span>
-          </button>
-
-          {/* Logout Button (Desktop) */}
-          {onLogout && (
-            <button
-              onClick={onLogout}
-              className="hidden sm:flex h-9 w-9 items-center justify-center rounded-xl border border-border/80 bg-card hover:bg-destructive/10 hover:text-destructive text-muted-foreground transition-colors cursor-pointer"
-              title="Log Out from paye₹nt"
-              aria-label="Log Out from paye₹nt"
-            >
-              <LogOut className="h-4 w-4" />
-            </button>
-          )}
-
-          {/* Mobile Menu Toggle */}
-          <button
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="md:hidden flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-card text-foreground"
-            aria-label="Toggle Navigation Menu"
-          >
-            {isMobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+            {avatarLetter}
           </button>
         </div>
       </div>
-
-      {/* Mobile Drawer Navigation */}
-      <AnimatePresence>
-        {isMobileMenuOpen && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className="md:hidden border-t border-border bg-background/95 px-4 py-3 space-y-2"
-          >
-            {navItems.map((item) => {
-              const isActive = currentTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => {
-                    setIsMobileMenuOpen(false);
-                    handleNav(item.id, item.path);
-                  }}
-                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    isActive
-                      ? "bg-foreground text-background"
-                      : "text-muted-foreground hover:bg-secondary hover:text-foreground"
-                  }`}
-                >
-                  <span>{item.label}</span>
-                  {item.badge !== undefined && (
-                    <span className="px-2 py-0.5 rounded-full bg-primary text-primary-foreground text-[10px]">
-                      {item.badge}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-
-            {/* Mobile Theme Toggle Item */}
-            <div className="pt-2 border-t border-border/60 flex items-center justify-between">
-              <span className="text-xs font-bold text-foreground">Theme</span>
-              <button
-                type="button"
-                onClick={toggleTheme}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border bg-card text-xs font-semibold text-foreground cursor-pointer"
-              >
-                {theme === "dark" ? (
-                  <>
-                    <Sun className="h-3.5 w-3.5 text-amber-400" />
-                    <span>Light Mode</span>
-                  </>
-                ) : (
-                  <>
-                    <Moon className="h-3.5 w-3.5 text-foreground/80" />
-                    <span>Dark Mode</span>
-                  </>
-                )}
-              </button>
-            </div>
-
-            {/* Mobile Logout Action */}
-            {onLogout && (
-              <div className="pt-2 border-t border-border/60">
-                <button
-                  onClick={() => {
-                    setIsMobileMenuOpen(false);
-                    onLogout();
-                  }}
-                  className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
-                >
-                  <LogOut className="h-4 w-4" />
-                  <span>Log Out of paye₹nt</span>
-                </button>
-              </div>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
     </header>
   );
 }

@@ -55,8 +55,8 @@ export function MyProducts({
 
   // Filter products
   const filteredProducts = products.filter((p) => {
-    const isApproved = p.verificationStatus === "approved" || p.verificationStatus === "verified" || p.status === "approved";
-    const isUnderReview = p.verificationStatus === "under_review" || p.verificationStatus === "submitted" || p.status === "under_review";
+    const isApproved = p.verificationStatus === "approved" || p.verificationStatus === "verified" || p.status === "approved" || p.status === "active";
+    const isUnderReview = p.verificationStatus === "under_review" || p.verificationStatus === "submitted" || p.status === "under_review" || p.status === "pending" || p.status === "pending_admin_review" || p.status === "pending_confirmation";
     if (filterTab === "all") return true;
     if (filterTab === "approved") return isApproved;
     if (filterTab === "under_review") return isUnderReview;
@@ -92,14 +92,20 @@ export function MyProducts({
         </span>
       );
     }
-    if (effStatus === "under_review" || effStatus === "submitted") {
+    if (
+      effStatus === "under_review" ||
+      effStatus === "submitted" ||
+      effStatus === "pending" ||
+      effStatus === "pending_admin_review" ||
+      effStatus === "pending_confirmation"
+    ) {
       return (
-        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 flex items-center gap-1">
-          <Clock className="h-3 w-3" /> UNDER ADMIN REVIEW
+        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-neutral-500/10 text-neutral-700 dark:text-neutral-300 border border-neutral-500/20 flex items-center gap-1">
+          <Clock className="h-3 w-3" /> PENDING REVIEW
         </span>
       );
     }
-    if (effStatus === "needs_correction") {
+    if (effStatus === "needs_correction" || effStatus === "revision_required") {
       return (
         <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20 flex items-center gap-1">
           <AlertCircle className="h-3 w-3" /> NEEDS CORRECTION
@@ -113,9 +119,9 @@ export function MyProducts({
         </span>
       );
     }
-    if (effStatus === "approved" || effStatus === "verified") {
+    if (effStatus === "approved" || effStatus === "verified" || effStatus === "active") {
       return (
-        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
+        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-neutral-900 text-white dark:bg-white dark:text-neutral-950 border border-neutral-900 dark:border-white flex items-center gap-1">
           <CheckCircle2 className="h-3 w-3" /> APPROVED & LIVE
         </span>
       );
@@ -165,13 +171,13 @@ export function MyProducts({
           {
             id: "approved",
             label: `Approved & Live (${
-              products.filter((p) => p.verificationStatus === "approved" || p.verificationStatus === "verified" || p.status === "approved").length
+              products.filter((p) => p.verificationStatus === "approved" || p.verificationStatus === "verified" || p.status === "approved" || p.status === "active").length
             })`,
           },
           {
             id: "under_review",
             label: `Under Review (${
-              products.filter((p) => p.verificationStatus === "under_review" || p.verificationStatus === "submitted" || p.status === "under_review").length
+              products.filter((p) => p.verificationStatus === "under_review" || p.verificationStatus === "submitted" || p.status === "under_review" || p.status === "pending" || p.status === "pending_admin_review" || p.status === "pending_confirmation").length
             })`,
           },
           {
@@ -217,6 +223,7 @@ export function MyProducts({
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {filteredProducts.map((product) => {
             const isEditingPrice = editingPriceProductId === product.id;
+            const imgUrl = product.primaryImage || product.photos?.[0]?.url || (product as any).images?.[0] || (product as any).image_url;
 
             return (
               <div
@@ -225,12 +232,23 @@ export function MyProducts({
               >
                 <div className="space-y-3">
                   {/* Top image & status badge */}
-                  <div className="relative rounded-2xl overflow-hidden aspect-[4/3] bg-secondary border border-border/80">
-                    <img
-                      src={product.primaryImage || product.photos[0]?.url}
-                      alt={product.title}
-                      className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-300"
-                    />
+                  <div className="relative rounded-2xl overflow-hidden aspect-[4/3] bg-secondary border border-border/80 flex items-center justify-center">
+                    {imgUrl ? (
+                      <img
+                        src={imgUrl}
+                        alt={product.title}
+                        className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-300"
+                        onError={(e) => {
+                          // Hide broken image and fallback to placeholder
+                          (e.target as HTMLElement).style.display = "none";
+                        }}
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center text-muted-foreground p-4 text-center">
+                        <Package className="h-10 w-10 stroke-[1.2] mb-1 opacity-60" />
+                        <span className="text-[11px] font-medium">{product.category || "Gear"}</span>
+                      </div>
+                    )}
 
                     <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
                       {getStatusBadge(product.verificationStatus, product.status)}

@@ -5,7 +5,7 @@ import { getSeoMetadata } from "@/utils/seo";
 export const Route = createFileRoute("/payernt/$")({
   head: () =>
     getSeoMetadata({
-      title: "Lender Page Not Found | paye₹nt",
+      title: "Lender Page Not Found | Payernt",
       description: "The requested lender page could not be found.",
       path: "/payernt",
     }),

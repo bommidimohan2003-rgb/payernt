@@ -5,8 +5,8 @@ import { getSeoMetadata } from "@/utils/seo";
 export const Route = createFileRoute("/payernt/products/$id")({
   head: ({ params }) =>
     getSeoMetadata({
-      title: `Product #${params.id} | paye₹nt Lender`,
-      description: "Manage and inspect your product listing, rates and live status on paye₹nt.",
+      title: `Product #${params.id} | Payernt Lender`,
+      description: "Manage and inspect your product listing, rates and live status on Payernt.",
       path: `/payernt/products/${params.id}`,
     }),
   component: LenderProductDetailsRoute,

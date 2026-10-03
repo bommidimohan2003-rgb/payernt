@@ -79,6 +79,10 @@ export function PayerntApp() {
     markMessageRead,
     updateProfile,
     resetToDefaults,
+    isLoadingDashboard,
+    dashboardError,
+    backendActivities,
+    refreshDashboard,
   } = usePayerntStore();
 
   // If user is not authenticated in paye₹nt, render dedicated paye₹nt Login / Registration
@@ -105,6 +109,10 @@ export function PayerntApp() {
                 unreadMessagesCount={unreadMessagesCount}
                 activeAccount={activeAccount}
                 activeUser={activeUser}
+                recentActivities={backendActivities}
+                isLoading={isLoadingDashboard}
+                error={dashboardError}
+                onRefresh={refreshDashboard}
                 onNavigate={(tab) => setActiveTab(tab)}
                 onLogout={logout}
                 onMarkNotificationRead={markNotificationRead}

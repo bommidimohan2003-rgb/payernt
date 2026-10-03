@@ -16,7 +16,7 @@ export function useTheme() {
         const isSystemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
         effectiveTheme = isSystemDark ? "dark" : "light";
       }
-    } else {
+    } else if (mode === "light" || mode === "dark") {
       effectiveTheme = mode;
     }
 
@@ -28,8 +28,10 @@ export function useTheme() {
 
   useEffect(() => {
     const stored = storage.get<ThemeMode>(STORAGE_KEYS.theme, "system");
-    setThemeModeState(stored);
-    applyTheme(stored);
+    const validMode: ThemeMode =
+      stored === "light" || stored === "dark" || stored === "system" ? stored : "system";
+    setThemeModeState(validMode);
+    applyTheme(validMode);
 
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
     const handleChange = () => {
@@ -45,16 +47,25 @@ export function useTheme() {
 
   const setThemeMode = useCallback(
     (nextMode: ThemeMode) => {
-      setThemeModeState(nextMode);
-      storage.set(STORAGE_KEYS.theme, nextMode);
-      applyTheme(nextMode);
+      const validMode: ThemeMode =
+        nextMode === "light" || nextMode === "dark" ? nextMode : "system";
+      setThemeModeState(validMode);
+      storage.set(STORAGE_KEYS.theme, validMode);
+      applyTheme(validMode);
     },
     [applyTheme]
   );
 
   const toggle = useCallback(() => {
-    setThemeMode((prev) => (prev === "dark" ? "light" : "dark"));
-  }, [setThemeMode]);
+    // Read current actual class on <html> as definitive source of truth
+    const isCurrentlyDark =
+      typeof document !== "undefined"
+        ? document.documentElement.classList.contains("dark")
+        : resolvedTheme === "dark";
+
+    const nextMode: ThemeMode = isCurrentlyDark ? "light" : "dark";
+    setThemeMode(nextMode);
+  }, [resolvedTheme, setThemeMode]);
 
   return {
     theme: resolvedTheme,
@@ -63,3 +74,5 @@ export function useTheme() {
     toggle,
   };
 }
+
+export default useTheme;

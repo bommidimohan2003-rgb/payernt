@@ -5385,11 +5385,11 @@ def admin_stats(current_admin: dict = Depends(check_admin_user)):
             # Products across payernt_products and custom_products
             pp_total = int(safe_query("SELECT COUNT(*) as count FROM payernt_products", default=0))
             cp_total = int(safe_query("SELECT COUNT(*) as count FROM custom_products", default=0))
-            stats_result["totalProducts"] = max(pp_total, cp_total)
+            stats_result["totalProducts"] = pp_total + cp_total
             
-            pp_pending = int(safe_query("SELECT COUNT(*) as count FROM payernt_products WHERE LOWER(status) IN ('pending', 'under_review')", default=0))
-            cp_pending = int(safe_query("SELECT COUNT(*) as count FROM custom_products WHERE LOWER(status) IN ('pending', 'under_review')", default=0))
-            stats_result["pendingProducts"] = max(pp_pending, cp_pending)
+            pp_pending = int(safe_query("SELECT COUNT(*) as count FROM payernt_products WHERE LOWER(status) IN ('pending', 'under_review', 'pending_admin_review')", default=0))
+            cp_pending = int(safe_query("SELECT COUNT(*) as count FROM custom_products WHERE LOWER(status) IN ('pending', 'under_review', 'pending_admin_review')", default=0))
+            stats_result["pendingProducts"] = pp_pending + cp_pending
             
             pp_approved = int(safe_query("SELECT COUNT(*) as count FROM payernt_products WHERE LOWER(status) = 'approved'", default=0))
             cp_approved = int(safe_query("SELECT COUNT(*) as count FROM custom_products WHERE LOWER(status) = 'approved'", default=0))
@@ -6775,6 +6775,7 @@ def admin_products_list(
                        p.daily_rate, p.weekly_rate, p.monthly_rate, p.security_deposit, p.available,
                        p.availability_status, p.primary_image, p.images, p.status, p.created_at,
                        p.min_price, p.max_price, p.price_unit, p.price_status, p.price_approved_at, p.price_approved_by,
+                       p.video_url,
                        acc.phone AS owner_phone, acc.avatar AS owner_avatar
                 FROM payernt_products p
                 LEFT JOIN payernt_accounts acc ON LOWER(p.owner_email) = LOWER(acc.email)
@@ -6821,6 +6822,7 @@ def admin_products_list(
                     "hidden": r.get("availability_status") == "paused",
                     "image": r.get("primary_image") or (images_list[0] if images_list else ""),
                     "images": images_list,
+                    "videoUrl": r.get("video_url") or "",
                     "documents": ["purchase_proof.jpg"],
                     "approvedPriceRange": approved_price_range,
                     "priceStatus": r.get("price_status") or ("SET" if approved_price_range else "NOT_SET"),
@@ -7169,6 +7171,92 @@ def admin_get_product(id: str, current_admin: dict = Depends(check_admin_user)):
         conn.close()
         
     if not res_product:
+        try:
+            from payernt_database import MOCK_PAYERNT_PRODUCTS
+            if id in MOCK_PAYERNT_PRODUCTS:
+                p = MOCK_PAYERNT_PRODUCTS[id]
+                st = (p.get("status") or "under_review").lower()
+                specs_val = p.get("specifications")
+                specs_parsed = {}
+                if isinstance(specs_val, dict):
+                    specs_parsed = specs_val
+                elif isinstance(specs_val, str) and specs_val.startswith("{"):
+                    try:
+                        specs_parsed = json.loads(specs_val)
+                    except Exception:
+                        specs_parsed = {"notes": specs_val}
+                else:
+                    specs_parsed = {"brand": p.get("brand"), "model": p.get("model")}
+
+                imgs_val = p.get("images") or "[]"
+                images_list = json.loads(imgs_val) if isinstance(imgs_val, str) and imgs_val.startswith("[") else (imgs_val if isinstance(imgs_val, list) else [])
+                cond_val = p.get("condition_details") or "{}"
+                cond_parsed = json.loads(cond_val) if isinstance(cond_val, str) and cond_val.startswith("{") else (cond_val if isinstance(cond_val, dict) else {})
+                feat_val = p.get("features") or "[]"
+                feat_list = json.loads(feat_val) if isinstance(feat_val, str) and feat_val.startswith("[") else (feat_val if isinstance(feat_val, list) else [])
+
+                res_product = {
+                    "id": p["id"],
+                    "title": p.get("title") or p.get("name") or "Equipment Listing",
+                    "category": p.get("category") or "General",
+                    "brand": p.get("brand") or "Standard",
+                    "model": p.get("model") or "",
+                    "year": p.get("year") or "",
+                    "description": p.get("description") or "",
+                    "specifications": specs_parsed,
+                    "features": feat_list,
+                    "conditionGrade": p.get("condition_grade") or "Like New",
+                    "conditionDetails": cond_parsed,
+                    "accessories": p.get("accessories") or "",
+                    "city": p.get("city") or "",
+                    "area": p.get("area") or "",
+                    "pincode": p.get("pincode") or "",
+                    "pickupInstructions": p.get("pickup_instructions") or "Standard pickup instructions.",
+                    "price": float(p.get("daily_rate") or p.get("price") or 0.0),
+                    "dailyRate": float(p.get("daily_rate") or p.get("price") or 0.0),
+                    "weeklyRate": float(p.get("weekly_rate") or 0.0) if p.get("weekly_rate") else None,
+                    "monthlyRate": float(p.get("monthly_rate") or 0.0) if p.get("monthly_rate") else None,
+                    "securityDeposit": 0.0,
+                    "minRentalDays": int(p.get("min_rental_days") or 1),
+                    "maxRentalDays": int(p.get("max_rental_days") or 30),
+                    "rating": 5.0,
+                    "reviewsCount": 0,
+                    "available": bool(st == "approved"),
+                    "status": st,
+                    "featured": False,
+                    "hidden": p.get("availability_status") == "paused",
+                    "image": p.get("primary_image") or (images_list[0] if images_list else ""),
+                    "images": images_list,
+                    "videoUrl": p.get("video_url") or "",
+                    "documents": ["purchase_proof.jpg"],
+                    "approvedPriceRange": None,
+                    "priceStatus": "NOT_SET",
+                    "priceHistory": [],
+                    "revisionNotes": {},
+                    "createdAt": str(p.get("created_at") or ""),
+                    "updatedAt": str(p.get("updated_at") or ""),
+                    "bookings": [],
+                    "owner": {
+                        "id": p.get("owner_id") or p.get("owner_email") or "",
+                        "name": p.get("owner_name") or "Vendor",
+                        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+                        "rating": 5.0,
+                        "email": p.get("owner_email") or "",
+                        "phone": "",
+                        "address": "",
+                        "city": p.get("city") or "",
+                        "pincode": p.get("pincode") or "",
+                        "accountStatus": "ACTIVE",
+                        "verificationStatus": "VERIFIED",
+                        "isVerified": True,
+                        "productsCount": 1,
+                        "createdAt": str(p.get("created_at") or "")
+                    }
+                }
+        except Exception:
+            pass
+
+    if not res_product:
         raise HTTPException(status_code=404, detail="Product not found")
         
     return res_product
@@ -7386,6 +7474,14 @@ def admin_approve_product(id: str, data: Optional[ApproveProductSchema] = None, 
     if id in MOCK_CUSTOM_PRODUCTS:
         MOCK_CUSTOM_PRODUCTS[id]["status"] = "approved"
         MOCK_CUSTOM_PRODUCTS[id]["available"] = True
+    try:
+        from payernt_database import MOCK_PAYERNT_PRODUCTS
+        if id in MOCK_PAYERNT_PRODUCTS:
+            MOCK_PAYERNT_PRODUCTS[id]["status"] = "approved"
+            MOCK_PAYERNT_PRODUCTS[id]["available"] = True
+            MOCK_PAYERNT_PRODUCTS[id]["availability_status"] = "available"
+    except Exception:
+        pass
     
     # If product exists in payernt_products but not yet in custom_products, mirror it for customer discoverability
     conn = get_db_connection()
@@ -7478,6 +7574,14 @@ def admin_request_product_revision(id: str, data: RequestProductRevisionSchema, 
     if id in MOCK_CUSTOM_PRODUCTS:
         MOCK_CUSTOM_PRODUCTS[id]["status"] = "revision_required"
         MOCK_CUSTOM_PRODUCTS[id]["available"] = False
+    try:
+        from payernt_database import MOCK_PAYERNT_PRODUCTS
+        if id in MOCK_PAYERNT_PRODUCTS:
+            MOCK_PAYERNT_PRODUCTS[id]["status"] = "revision_required"
+            MOCK_PAYERNT_PRODUCTS[id]["available"] = False
+            MOCK_PAYERNT_PRODUCTS[id]["availability_status"] = "paused"
+    except Exception:
+        pass
         
     owner_email = existing.get("owner", {}).get("email") or ""
     if owner_email:
@@ -7521,6 +7625,14 @@ def admin_reject_product(id: str, data: Optional[RejectProductSchema] = None, cu
     if id in MOCK_CUSTOM_PRODUCTS:
         MOCK_CUSTOM_PRODUCTS[id]["status"] = "rejected"
         MOCK_CUSTOM_PRODUCTS[id]["available"] = False
+    try:
+        from payernt_database import MOCK_PAYERNT_PRODUCTS
+        if id in MOCK_PAYERNT_PRODUCTS:
+            MOCK_PAYERNT_PRODUCTS[id]["status"] = "rejected"
+            MOCK_PAYERNT_PRODUCTS[id]["available"] = False
+            MOCK_PAYERNT_PRODUCTS[id]["availability_status"] = "paused"
+    except Exception:
+        pass
     
     reason_txt = f" Reason: {data.reason}" if data and data.reason else ""
     owner_email = existing.get("owner", {}).get("email") or ""

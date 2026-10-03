@@ -136,21 +136,10 @@ export function usePayerntStore() {
 
   const isMockItem = (id?: string) =>
     !id ||
-    id.startsWith("prod-") ||
-    id.startsWith("p1") ||
-    id.startsWith("p2") ||
-    id.startsWith("p3") ||
-    id.startsWith("p4") ||
-    id.startsWith("p5") ||
-    id.startsWith("p6") ||
-    id.startsWith("p7") ||
-    id.startsWith("p8") ||
-    id.startsWith("p9") ||
-    id.startsWith("p10") ||
-    id.startsWith("mock") ||
-    id.startsWith("demo_") ||
-    id.startsWith("sample_") ||
-    id.startsWith("test_");
+    id.startsWith("mock-") ||
+    id.startsWith("fake-") ||
+    id.startsWith("dummy-") ||
+    id === "test-gear-1";
 
   const [wallet, setWallet] = useState<UserWallet>(() => {
     try {
@@ -254,6 +243,12 @@ export function usePayerntStore() {
     } catch {}
     return INITIAL_PROFILE;
   });
+
+  // Authoritative Dashboard Synchronization States
+  const [isLoadingDashboard, setIsLoadingDashboard] = useState<boolean>(false);
+  const [dashboardError, setDashboardError] = useState<string | null>(null);
+  const [backendDashboard, setBackendDashboard] = useState<any>(null);
+  const [backendActivities, setBackendActivities] = useState<Array<{ id: string; title: string; timestamp: string; amount?: string }>>([]);
 
   // Login handler
   const login = useCallback((account: PayerntAccount) => {
@@ -365,65 +360,171 @@ export function usePayerntStore() {
     };
   }, []);
 
-  // Sync real paye₹nt backend state upon authentication
-  useEffect(() => {
+  // Authoritative real paye₹nt backend synchronization
+  const refreshDashboard = useCallback(async () => {
     if (!activeAccount || !isAuthenticated) return;
+    setIsLoadingDashboard(true);
+    setDashboardError(null);
 
-    payerntApi
-      .getProducts()
-      .then((res) => {
-        if (res.success && Array.isArray(res.products)) {
-          setProducts(res.products.filter((p) => !isMockItem(p.id)));
-        } else if (res.error && (res.error.includes("401") || res.error.includes("Session expired") || res.error.includes("Authorization"))) {
-          logout();
-        }
-      })
-      .catch(() => {});
+    try {
+      const [dashRes, bookingsRes] = await Promise.all([
+        payerntApi.getDashboard(),
+        payerntApi.getBookings(),
+      ]);
 
-    payerntApi
-      .getWallet()
-      .then((res) => {
-        if (res.success && res.wallet) {
-          const w = res.wallet as any;
+      if (dashRes.success && dashRes.dashboard) {
+        const d = dashRes.dashboard;
+        setBackendDashboard(d);
+
+        // Update wallet
+        if (d.wallet) {
           setWallet((prev) => ({
             ...prev,
-            availableBalance: Number(w.available_balance ?? w.availableBalance ?? prev.availableBalance),
-            pendingBalance: Number(w.pending_amount ?? w.pendingBalance ?? prev.pendingBalance),
-            totalReceived: Number(w.total_received ?? w.totalReceived ?? prev.totalReceived),
-            totalWithdrawn: Number(w.total_withdrawn ?? w.totalWithdrawn ?? prev.totalWithdrawn),
-            bankAccounts: Array.isArray(res.bankAccounts)
-              ? (res.bankAccounts as any).filter((b: any) => !b.id?.startsWith("bank-00"))
-              : prev.bankAccounts,
-            transactions: Array.isArray(res.transactions)
-              ? (res.transactions as any).filter((t: any) => !t.id?.startsWith("wtx-00"))
-              : prev.transactions,
+            availableBalance: Number(d.wallet.availableBalance ?? prev.availableBalance),
+            pendingBalance: Number(d.wallet.pendingAmount ?? prev.pendingBalance),
+            totalReceived: Number(d.wallet.totalReceived ?? prev.totalReceived),
+            totalWithdrawn: Number(d.wallet.totalWithdrawn ?? prev.totalWithdrawn),
           }));
-        } else if (res.error && (res.error.includes("401") || res.error.includes("Session expired") || res.error.includes("Authorization"))) {
+        }
+
+        // Update recent activities
+        if (Array.isArray(d.recentActivity) && d.recentActivity.length > 0) {
+          setBackendActivities(
+            d.recentActivity.map((act: any) => ({
+              id: act.id,
+              title: act.title,
+              timestamp: act.timestamp
+                ? new Date(act.timestamp).toLocaleDateString("en-IN", { day: "numeric", month: "short" })
+                : "Recent",
+              amount: act.amount,
+            }))
+          );
+        }
+
+        // Update products preview if returned
+        if (Array.isArray(d.products) && d.products.length > 0) {
+          setProducts((prev) => {
+            const fetched = d.products.filter((p: any) => !isMockItem(p.id));
+            const map = new Map<string, PayerntProduct>();
+            prev.forEach((p) => map.set(p.id, p));
+            fetched.forEach((p: any) => map.set(p.id, { ...map.get(p.id), ...p }));
+            return Array.from(map.values());
+          });
+        }
+
+        // Update messages unread count
+        if (d.messages?.unread !== undefined) {
+          setUnreadMessagesCount(d.messages.unread);
+        }
+      } else if (dashRes.error) {
+        if (
+          dashRes.error.includes("401") ||
+          dashRes.error.includes("Session expired") ||
+          dashRes.error.includes("Authorization")
+        ) {
           logout();
+          return;
         }
-      })
-      .catch(() => {});
+        setDashboardError(dashRes.error);
+      }
 
-    payerntApi
-      .getNotifications()
-      .then((res) => {
-        if (res.success && Array.isArray(res.notifications)) {
-          setNotifications(res.notifications.filter((n) => n.id !== "notif-1"));
-        }
-      })
-      .catch(() => {});
+      // Update bookings
+      if (bookingsRes.success && Array.isArray(bookingsRes.bookings)) {
+        const mappedRequests: RentalRequest[] = bookingsRes.bookings.map((b: any) => {
+          const daily = Number(b.amount || b.daily_rate || b.dailyRate || 500);
+          return {
+            id: b.bookingId || b.id,
+            productId: b.productId,
+            productTitle: b.productTitle || "Tech Gear",
+            productImage: b.productImage || "",
+            category: b.category || "Tech Gear",
+            renter: {
+              name: b.renterName || (b.renterEmail ? b.renterEmail.split("@")[0] : "Verified Renter"),
+              avatar: "",
+              rating: 5.0,
+              completedRentals: 1,
+              phone: "",
+              email: b.renterEmail || "",
+              city: "",
+            },
+            startDate: b.startDate || "",
+            endDate: b.endDate || "",
+            totalDays: 3,
+            dailyRate: daily,
+            grossRental: daily * 3,
+            platformFee: 0,
+            netEarnings: daily * 3,
+            securityDeposit: 0,
+            status: (b.status === "active" || b.rentalStarted ? "active" : b.status === "completed" ? "completed" : "approved") as RentalRequestStatus,
+            requestDate: b.createdAt || new Date().toISOString(),
+            paymentStatus: b.status === "completed" ? "settled_to_lender" : "paid_to_escrow",
+          };
+        });
+        setRentalRequests(mappedRequests);
+      }
 
-    payerntApi
-      .getMessages()
-      .then((res) => {
-        if (res.success && Array.isArray(res.messages)) {
-          setMessages(res.messages);
-          const count = res.unreadCount ?? res.messages.filter((m: any) => !m.read && !m.is_read).length;
-          setUnreadMessagesCount(count);
-        }
-      })
-      .catch(() => {});
+      // Also fetch full user products and wallet transactions for detail pages
+      const [prodRes, walletRes, notifRes, msgRes] = await Promise.all([
+        payerntApi.getProducts(),
+        payerntApi.getWallet(),
+        payerntApi.getNotifications(),
+        payerntApi.getMessages(),
+      ]);
+
+      if (prodRes.success && Array.isArray(prodRes.products)) {
+        setProducts(prodRes.products.filter((p) => !isMockItem(p.id)));
+      }
+
+      if (walletRes.success && walletRes.wallet) {
+        const w = walletRes.wallet as any;
+        setWallet((prev) => ({
+          ...prev,
+          availableBalance: Number(w.available_balance ?? w.availableBalance ?? prev.availableBalance),
+          pendingBalance: Number(w.pending_amount ?? w.pendingBalance ?? prev.pendingBalance),
+          totalReceived: Number(w.total_received ?? w.totalReceived ?? prev.totalReceived),
+          totalWithdrawn: Number(w.total_withdrawn ?? w.totalWithdrawn ?? prev.totalWithdrawn),
+          bankAccounts: Array.isArray(walletRes.bankAccounts)
+            ? (walletRes.bankAccounts as any).filter((b: any) => !b.id?.startsWith("bank-00"))
+            : prev.bankAccounts,
+          transactions: Array.isArray(walletRes.transactions)
+            ? (walletRes.transactions as any).filter((t: any) => !t.id?.startsWith("wtx-00"))
+            : prev.transactions,
+        }));
+      }
+
+      if (notifRes.success && Array.isArray(notifRes.notifications)) {
+        setNotifications(notifRes.notifications.filter((n) => n.id !== "notif-1"));
+      }
+
+      if (msgRes.success && Array.isArray(msgRes.messages)) {
+        setMessages(msgRes.messages);
+        setUnreadMessagesCount(msgRes.unreadCount ?? msgRes.messages.filter((m: any) => !m.read && !m.is_read).length);
+      }
+    } catch (e: any) {
+      console.warn("[paye₹nt Store] Dashboard refresh error:", e);
+      setDashboardError(e?.message || "Failed to synchronize with server.");
+    } finally {
+      setIsLoadingDashboard(false);
+    }
   }, [activeAccount, isAuthenticated, logout]);
+
+  // Sync real paye₹nt backend state upon authentication and listen for refresh events
+  useEffect(() => {
+    if (!activeAccount || !isAuthenticated) return;
+    refreshDashboard();
+
+    const handleRefresh = () => {
+      refreshDashboard();
+    };
+
+    window.addEventListener("paye₹nt_data_refresh", handleRefresh);
+    window.addEventListener("payernt_data_refresh", handleRefresh);
+    return () => {
+      window.removeEventListener("paye₹nt_data_refresh", handleRefresh);
+      window.removeEventListener("payernt_data_refresh", handleRefresh);
+    };
+  }, [activeAccount, isAuthenticated, refreshDashboard]);
+
 
   const switchDemoUser = (userId: string) => {
     const found = DEMO_USERS.find((u) => u.id === userId);
@@ -479,10 +580,17 @@ export function usePayerntStore() {
 
     setDraftProduct(null);
 
-    // Call real paye₹nt backend
-    payerntApi.createProduct(finalized).catch((err) => {
-      console.warn("[paye₹nt Backend] Listing sync warning:", err);
-    });
+    // Call real paye₹nt backend if not already saved during wizard completion
+    if (!(newProduct as any)._alreadySavedOnBackend) {
+      payerntApi.createProduct(finalized).catch((err) => {
+        console.warn("[paye₹nt Backend] Listing sync warning:", err);
+      });
+    }
+
+    // Refresh real backend data immediately
+    setTimeout(() => {
+      refreshDashboard().catch(() => {});
+    }, 100);
 
     // Trigger notification
     const newNotif: LenderNotification = {
@@ -970,36 +1078,67 @@ export function usePayerntStore() {
   };
 
   // User-isolated product sets (belongs to active paye₹nt account)
-  const currentOwnerId = activeAccount?.accountId || activeUser.id;
-  const userProducts = products.filter(
-    (p) =>
-      p.ownerId === currentOwnerId ||
-      p.ownerId === activeUser.id ||
-      (currentOwnerId === "PAYERNT_USER_001" && (p.ownerId === "user_001" || p.ownerId === "PAYERNT_USER_001"))
-  );
+  const currentOwnerId = activeAccount?.accountId || (activeAccount as any)?.id || activeUser.id;
+  const activeEmail = activeAccount?.email || activeUser.email;
+
+  const userProducts = products.filter((p) => {
+    const pOwnerId = p.ownerId || (p as any).owner_id;
+    const pOwnerEmail = p.ownerEmail || (p as any).owner_email;
+    return (
+      pOwnerId === currentOwnerId ||
+      pOwnerId === activeAccount?.accountId ||
+      pOwnerId === (activeAccount as any)?.id ||
+      pOwnerId === activeUser.id ||
+      (pOwnerEmail && activeEmail && pOwnerEmail.toLowerCase() === activeEmail.toLowerCase()) ||
+      (currentOwnerId === "PAYERNT_USER_001" && (pOwnerId === "user_001" || pOwnerId === "PAYERNT_USER_001"))
+    );
+  });
   const exploreApprovedProducts = products.filter(
-    (p) =>
-      (p.status === "approved" ||
-        p.verificationStatus === "approved" ||
-        p.verificationStatus === "verified") &&
-      p.ownerId !== currentOwnerId &&
-      p.ownerId !== activeUser.id
+    (p) => {
+      const pOwnerId = p.ownerId || (p as any).owner_id;
+      return (
+        (p.status === "approved" ||
+          p.status === "active" ||
+          p.verificationStatus === "approved" ||
+          p.verificationStatus === "verified") &&
+        pOwnerId !== currentOwnerId &&
+        pOwnerId !== activeUser.id
+      );
+    }
   );
 
-  // Aggregated Stats
-  const totalProductsCount = userProducts.length;
-  const activeProductsCount = userProducts.filter(
-    (p) => p.availabilityStatus === "available" && (p.verificationStatus === "approved" || p.verificationStatus === "verified")
-  ).length;
-  const underVerificationCount = userProducts.filter(
-    (p) => p.verificationStatus === "under_review" || p.verificationStatus === "submitted"
-  ).length;
-  const activeRentalsCount = rentalRequests.filter(
-    (r) => r.status === "active" || r.status === "handover"
-  ).length;
-  const pendingRequestsCount = rentalRequests.filter((r) => r.status === "requested").length;
-  const totalEarnings = wallet.availableBalance;
-  const pendingEarnings = wallet.pendingBalance;
+  // Authoritative Aggregated Stats (Backend is single source of truth)
+  const totalProductsCount = backendDashboard?.listings?.total ?? userProducts.length;
+  const activeProductsCount =
+    backendDashboard?.listings?.active ??
+    userProducts.filter(
+      (p) =>
+        p.status === "active" ||
+        p.status === "approved" ||
+        (p.availabilityStatus === "available" &&
+          (p.verificationStatus === "approved" || p.verificationStatus === "verified"))
+    ).length;
+  const underVerificationCount =
+    backendDashboard?.listings?.pending ??
+    userProducts.filter(
+      (p) =>
+        p.status === "pending_confirmation" ||
+        p.status === "under_review" ||
+        p.status === "pending_admin_review" ||
+        p.status === "pending" ||
+        p.verificationStatus === "under_review" ||
+        p.verificationStatus === "submitted"
+    ).length;
+  const activeRentalsCount =
+    backendDashboard?.rentals?.active ??
+    rentalRequests.filter((r) => r.status === "active" || r.status === "handover").length;
+  const pendingRequestsCount =
+    backendDashboard?.bookings?.filter((b: any) => b.status === "pending" || b.status === "security_pending").length ??
+    rentalRequests.filter((r) => r.status === "requested" || r.status === "pending").length;
+  const totalEarnings =
+    backendDashboard?.earnings?.total ??
+    (wallet.totalReceived > 0 ? wallet.totalReceived : wallet.availableBalance);
+  const pendingEarnings = backendDashboard?.wallet?.pendingAmount ?? wallet.pendingBalance;
 
   return {
     activeAccount,
@@ -1021,6 +1160,11 @@ export function usePayerntStore() {
     messages,
     unreadMessagesCount,
     profile,
+    isLoadingDashboard,
+    dashboardError,
+    backendDashboard,
+    backendActivities,
+    refreshDashboard,
     stats: {
       totalProductsCount,
       activeProductsCount,
@@ -1055,4 +1199,5 @@ export function usePayerntStore() {
     resetToDefaults,
   };
 }
+
 

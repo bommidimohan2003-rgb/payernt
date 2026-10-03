@@ -590,6 +590,126 @@ export const payerntApi = {
       return { success: false, error: e?.message || "Network error." };
     }
   },
+
+  // ============================================================
+  // AUTHORITATIVE DASHBOARD, BOOKINGS & EARNINGS APIS
+  // ============================================================
+  async getDashboard(): Promise<{
+    success: boolean;
+    dashboard?: any;
+    wallet?: any;
+    earnings?: any;
+    listings?: any;
+    rentals?: any;
+    bookings?: any[];
+    products?: any[];
+    recentActivity?: any[];
+    notifications?: any;
+    messages?: any;
+    error?: string;
+  }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/payernt/dashboard`, {
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return {
+          success: true,
+          dashboard: data.dashboard,
+          wallet: data.wallet,
+          earnings: data.earnings,
+          listings: data.listings,
+          rentals: data.rentals,
+          bookings: data.bookings ?? [],
+          products: data.products ?? [],
+          recentActivity: data.recentActivity ?? [],
+          notifications: data.notifications,
+          messages: data.messages,
+        };
+      }
+      return {
+        success: false,
+        error: data.detail || data.message || "Failed to load dashboard data.",
+      };
+    } catch (e: any) {
+      return {
+        success: false,
+        error: e?.message || "Unable to connect to dashboard API.",
+      };
+    }
+  },
+
+  async getBookings(limit: number = 50): Promise<{
+    success: boolean;
+    bookings?: any[];
+    total?: number;
+    error?: string;
+  }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/payernt/bookings?limit=${limit}`, {
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return {
+          success: true,
+          bookings: data.bookings ?? [],
+          total: data.total ?? (data.bookings ?? []).length,
+        };
+      }
+      return {
+        success: false,
+        bookings: [],
+        total: 0,
+        error: data.detail || data.message || "Failed to load bookings.",
+      };
+    } catch (e: any) {
+      return {
+        success: false,
+        bookings: [],
+        total: 0,
+        error: e?.message || "Network error loading bookings.",
+      };
+    }
+  },
+
+  async getEarningsSummary(): Promise<{
+    success: boolean;
+    total?: number;
+    availableBalance?: number;
+    pendingAmount?: number;
+    totalWithdrawn?: number;
+    currency?: string;
+    error?: string;
+  }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/payernt/earnings/summary`, {
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return {
+          success: true,
+          total: data.total ?? 0,
+          availableBalance: data.availableBalance ?? 0,
+          pendingAmount: data.pendingAmount ?? 0,
+          totalWithdrawn: data.totalWithdrawn ?? 0,
+          currency: data.currency ?? "INR",
+        };
+      }
+      return {
+        success: false,
+        error: data.detail || data.message || "Failed to load earnings summary.",
+      };
+    } catch (e: any) {
+      return {
+        success: false,
+        error: e?.message || "Network error loading earnings summary.",
+      };
+    }
+  },
 };
 
 export default payerntApi;
+

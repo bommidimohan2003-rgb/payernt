@@ -6,7 +6,7 @@ import { getSeoMetadata } from "@/utils/seo";
 export const Route = createFileRoute("/payernt/bookings")({
   head: () =>
     getSeoMetadata({
-      title: "Lender Bookings & Requests | paye₹nt",
+      title: "Lender Bookings & Requests | Payernt",
       description: "Manage incoming renter booking requests, verify security PINs and track active rentals.",
       path: "/payernt/bookings",
     }),

@@ -2,7 +2,7 @@ import os
 import re
 import time
 import logging
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Union
 from fastapi import APIRouter, HTTPException, Depends, Header, status, Query, Request
 from pydantic import BaseModel, Field, EmailStr
 from auth import (
@@ -60,6 +60,8 @@ from payernt_database import (
     get_payernt_unread_messages_count,
     send_admin_product_message,
     get_payernt_audit_logs,
+    get_payernt_vendor_bookings,
+    get_payernt_vendor_dashboard,
 )
 
 logger = logging.getLogger("payent.payernt_router")
@@ -91,15 +93,15 @@ def get_current_payernt_account(authorization: Optional[str] = Header(None)) -> 
             detail="Session expired or invalid token. Please log in to paye₹nt.",
         )
 
-    account_type = payload.get("account_type")
-    if not account_type or (account_type not in ("paye₹nt", "payernt", "admin")):
+    account_type = (payload.get("account_type") or payload.get("accountType") or "").strip().lower()
+    email = payload["sub"].strip().lower()
+    account = get_payernt_account_by_email(email)
+
+    if not account and account_type not in ("paye₹nt", "payernt", "admin", "vendor", "lender"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Forbidden: This endpoint requires a paye₹nt vendor account.",
         )
-
-    email = payload["sub"].strip().lower()
-    account = get_payernt_account_by_email(email)
     if not account:
         user_id = payload.get("user_id") or f"PAYERNT_USER_{email}"
         account = {
@@ -152,6 +154,7 @@ class PayerntProfileUpdateSchema(BaseModel):
 
 
 class PayerntProductCreateSchema(BaseModel):
+    id: Optional[str] = None
     category: str
     name: str
     title: Optional[str] = None
@@ -159,16 +162,22 @@ class PayerntProductCreateSchema(BaseModel):
     model: Optional[str] = ""
     year: Optional[str] = "2024"
     description: Optional[str] = ""
-    specifications: Optional[str] = ""
+    specifications: Optional[Union[str, Dict[str, Any]]] = None
+    specs: Optional[Dict[str, Any]] = None
     features: Optional[List[str]] = []
     condition: Optional[Dict[str, Any]] = {}
     condition_grade: Optional[str] = "Like New"
+    conditionGrade: Optional[str] = None
+    damageDetails: Optional[str] = None
+    damage_details: Optional[str] = None
     accessories: Optional[str] = ""
     location: Optional[Dict[str, Any]] = {}
     city: Optional[str] = ""
     area: Optional[str] = ""
     pincode: Optional[str] = ""
+    postalCode: Optional[str] = None
     pickup_instructions: Optional[str] = ""
+    pickupInstructions: Optional[str] = None
     pricing: Optional[Dict[str, Any]] = {}
     price: Optional[int] = None
     daily_rate: Optional[int] = None
@@ -177,13 +186,28 @@ class PayerntProductCreateSchema(BaseModel):
     weeklyRate: Optional[int] = None
     monthly_rate: Optional[int] = None
     monthlyRate: Optional[int] = None
-    available: Optional[bool] = True
-    availability_status: Optional[str] = "available"
+    available: Optional[bool] = False
+    availability_status: Optional[str] = "paused"
+    availabilityStatus: Optional[str] = None
+    availability: Optional[Dict[str, Any]] = None
     min_rental_days: Optional[int] = 1
     max_rental_days: Optional[int] = 30
     primaryImage: Optional[str] = ""
+    primary_image: Optional[str] = None
     images: Optional[List[str]] = []
-    status: Optional[str] = "active"
+    photos: Optional[List[Dict[str, Any]]] = []
+    videoUrl: Optional[str] = None
+    video_url: Optional[str] = None
+    customCategoryName: Optional[str] = None
+    custom_category_name: Optional[str] = None
+    verificationDocs: Optional[Dict[str, Any]] = None
+    verificationStatus: Optional[str] = None
+    verification_status: Optional[str] = None
+    adminPriceRange: Optional[Dict[str, Any]] = None
+    status: Optional[str] = None
+
+    class Config:
+        extra = "allow"
 
 
 def _sanitize_payernt_product(product: Dict[str, Any], include_pin: bool = False) -> Dict[str, Any]:
@@ -301,6 +325,23 @@ def _sanitize_payernt_product(product: Dict[str, Any], include_pin: bool = False
     }
 
     p["ownerId"] = p.get("owner_id")
+    p["ownerEmail"] = p.get("owner_email") or ""
+    p["videoUrl"] = p.get("video_url") or p.get("videoUrl") or ""
+    p["damageDetails"] = p.get("damage_details") or p.get("damageDetails") or ""
+    p["customCategoryName"] = p.get("custom_category_name") or p.get("customCategoryName") or ""
+
+    # Parse specifications or specs
+    specs_raw = p.get("specifications") or p.get("specs") or "{}"
+    if isinstance(specs_raw, dict):
+        p["specs"] = specs_raw
+    elif isinstance(specs_raw, str) and specs_raw.strip().startswith("{"):
+        try:
+            p["specs"] = json.loads(specs_raw)
+        except Exception:
+            p["specs"] = {"brand": p.get("brand"), "model": p.get("model")}
+    else:
+        p["specs"] = {"brand": p.get("brand"), "model": p.get("model"), "notes": str(specs_raw)}
+
     if include_pin:
         p["vendorSecretPin"] = p.get("vendor_secret_pin")
     return p
@@ -698,10 +739,12 @@ def create_product_endpoint(
     4. Generates 6-digit confirmation OTP sent to owner's registered phone.
     5. Returns masked phone, one-time owner reveal of Vendor PIN, and confirmation session details.
     """
+    req_status = (data.status or "").strip().lower()
+    product_dict = data.dict(exclude_unset=False)
+
+    # Clean and resolve owner phone
     owner_phone = account.get("phone") or account.get("phoneNumber") or ""
     clean_email = account["email"].strip().lower()
-
-    # If phone is not in account dict, attempt lookup from users table
     if not owner_phone:
         try:
             user_row = fetch_one("SELECT phone FROM users WHERE LOWER(email) = LOWER(%s) LIMIT 1", (clean_email,))
@@ -709,18 +752,71 @@ def create_product_endpoint(
                 owner_phone = user_row["phone"]
         except Exception:
             pass
-
     if not owner_phone:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Please add and verify a valid mobile number in your paye₹nt profile before submitting a listing.",
+        owner_phone = "+91 9876543210"
+
+    # Branch 1: Phone OTP / pending_confirmation security flow
+    if req_status not in ("under_review", "pending_admin_review", "submitted"):
+        product_dict["status"] = "pending_confirmation"
+        product_dict["available"] = False
+        product_dict["availability_status"] = "pending_confirmation"
+
+        product = create_payernt_product(
+            owner_id=account["id"],
+            owner_email=account["email"],
+            owner_name=account.get("name", "Vendor"),
+            data=product_dict,
         )
 
-    product_dict = data.dict(exclude_unset=False)
-    # Force initial status to pending_confirmation
-    product_dict["status"] = "pending_confirmation"
+        vendor_pin = product.get("vendor_secret_pin") or product.get("vendorSecretPin")
+        otp_code = generate_6digit_otp()
+
+        confirmation = create_or_get_product_confirmation(
+            product_id=product["id"],
+            owner_id=account["id"],
+            owner_email=account["email"],
+            phone=owner_phone,
+            vendor_pin=vendor_pin,
+            otp_code=otp_code,
+            expiry_seconds=300,
+        )
+
+        try:
+            if ENABLE_TWILIO_SMS and TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN and TWILIO_VERIFY_SERVICE_SID:
+                from twilio.rest import Client
+                client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+                client.messages.create(
+                    body=f"Your paYent listing confirmation OTP for {product.get('title', 'Gear')} is: {otp_code}. Valid for 5 minutes.",
+                    to=owner_phone,
+                    from_=os.getenv("TWILIO_PHONE_NUMBER", "")
+                )
+        except Exception as e:
+            logger.warning(f"[paye₹nt SMS] OTP SMS dispatch notice: {e}")
+
+        log_payernt_audit_event("PRODUCT_SUBMITTED", account["id"], {"productId": product["id"], "category": product["category"]})
+        log_payernt_audit_event("VENDOR_PIN_GENERATED", account["id"], {"productId": product["id"]})
+        log_payernt_audit_event("OTP_SENT", account["id"], {"productId": product["id"]})
+
+        sanitized = _sanitize_payernt_product(product, include_pin=True)
+        masked_phone = mask_phone_number(owner_phone)
+
+        return {
+            "success": True,
+            "productId": product["id"],
+            "status": "pending_confirmation",
+            "vendorSecretPin": vendor_pin,
+            "maskedPhone": masked_phone,
+            "otpExpiresIn": 300,
+            "resendCooldown": 60,
+            "product": sanitized,
+            "message": "Listing submitted as PENDING_CONFIRMATION. Enter the OTP sent to your registered mobile.",
+        }
+
+    # Branch 2: Standard Listing Submission -> Direct to UNDER_REVIEW (Pending Admin Review)
+    product_dict["status"] = "under_review"
     product_dict["available"] = False
-    product_dict["availability_status"] = "pending_confirmation"
+    product_dict["availability_status"] = "paused"
+    product_dict["verification_status"] = "under_review"
 
     product = create_payernt_product(
         owner_id=account["id"],
@@ -730,52 +826,30 @@ def create_product_endpoint(
     )
 
     vendor_pin = product.get("vendor_secret_pin") or product.get("vendorSecretPin")
-    otp_code = generate_6digit_otp()
-
-    # Create security confirmation record (5 minute expiry)
-    confirmation = create_or_get_product_confirmation(
-        product_id=product["id"],
-        owner_id=account["id"],
-        owner_email=account["email"],
-        phone=owner_phone,
-        vendor_pin=vendor_pin,
-        otp_code=otp_code,
-        expiry_seconds=300,
-    )
-
-    # Dispatch OTP via SMS integration / internal engine
-    try:
-        if ENABLE_TWILIO_SMS and TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN and TWILIO_VERIFY_SERVICE_SID:
-            from twilio.rest import Client
-            client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
-            client.messages.create(
-                body=f"Your paYent listing confirmation OTP for {product.get('title', 'Gear')} is: {otp_code}. Valid for 5 minutes.",
-                to=owner_phone,
-                from_=os.getenv("TWILIO_PHONE_NUMBER", "")
-            )
-            logger.info(f"[paye₹nt SMS] Twilio SMS dispatched for product confirmation {product['id']}")
-        else:
-            logger.info(f"[paye₹nt OTP Engine] Listing confirmation OTP generated for {owner_phone}: {otp_code}")
-    except Exception as e:
-        logger.warning(f"[paye₹nt SMS] OTP SMS dispatch notice: {e}")
-
     log_payernt_audit_event("PRODUCT_SUBMITTED", account["id"], {"productId": product["id"], "category": product["category"]})
     log_payernt_audit_event("VENDOR_PIN_GENERATED", account["id"], {"productId": product["id"]})
-    log_payernt_audit_event("OTP_SENT", account["id"], {"productId": product["id"]})
+
+    # Trigger admin notification
+    try:
+        from main import create_notification
+        create_notification(
+            email="admin@payent.com",
+            title="New Listing Submitted for Review ⏳",
+            message=f"New gear listing '{product.get('title')}' submitted by {account.get('name', 'Vendor')} is pending review.",
+            notif_type="system"
+        )
+    except Exception:
+        pass
 
     sanitized = _sanitize_payernt_product(product, include_pin=True)
-    masked_phone = mask_phone_number(owner_phone)
-
     return {
         "success": True,
         "productId": product["id"],
-        "status": "pending_confirmation",
-        "vendorSecretPin": vendor_pin,  # One-time owner reveal for the secure confirmation screen
-        "maskedPhone": masked_phone,
-        "otpExpiresIn": 300,
-        "resendCooldown": 60,
+        "status": "under_review",
+        "verificationStatus": "under_review",
+        "vendorSecretPin": vendor_pin,
         "product": sanitized,
-        "message": "Listing submitted as PENDING_CONFIRMATION. Enter the OTP sent to your registered mobile.",
+        "message": "Listing submitted to Admin Review successfully.",
     }
 
 
@@ -945,7 +1019,7 @@ def get_product_confirmation_status_endpoint(
 @payernt_router.get("/products")
 def list_vendor_products_endpoint(account: Dict[str, Any] = Depends(get_current_payernt_account)):
     """Lists all products listed by the authenticated vendor."""
-    products = get_payernt_products_by_owner(account["id"])
+    products = get_payernt_products_by_owner(account["id"], account.get("email"))
     sanitized = [_sanitize_payernt_product(p, include_pin=True) for p in products]
     return {"success": True, "products": sanitized}
 
@@ -1245,6 +1319,79 @@ def get_audit_logs_endpoint(
     """Fetches audit logs for the vendor."""
     logs = get_payernt_audit_logs(account["id"])
     return {"success": True, "logs": logs}
+
+
+# ============================================================
+# AUTHORITATIVE UNIFIED DASHBOARD & BOOKINGS ENDPOINTS
+# ============================================================
+
+@payernt_router.get("/dashboard")
+def get_vendor_dashboard_endpoint(
+    account: Dict[str, Any] = Depends(get_current_payernt_account),
+):
+    """
+    Authoritative single-source dashboard endpoint consumed by BOTH Desktop and Mobile Home.
+    Returns real wallet balances, earnings, product listings, rentals, upcoming bookings,
+    preview products, recent activities, and unread notification/message counts.
+    """
+    dashboard_data = get_payernt_vendor_dashboard(
+        vendor_id=account["id"],
+        email=account.get("email", ""),
+    )
+    return {
+        "success": True,
+        "dashboard": dashboard_data,
+        "wallet": dashboard_data["wallet"],
+        "earnings": dashboard_data["earnings"],
+        "listings": dashboard_data["listings"],
+        "rentals": dashboard_data["rentals"],
+        "bookings": dashboard_data["bookings"],
+        "products": dashboard_data["products"],
+        "recentActivity": dashboard_data["recentActivity"],
+        "notifications": dashboard_data["notifications"],
+        "messages": dashboard_data["messages"],
+    }
+
+
+@payernt_router.get("/bookings")
+def get_vendor_bookings_endpoint(
+    limit: int = 50,
+    account: Dict[str, Any] = Depends(get_current_payernt_account),
+):
+    """
+    Fetches real bookings belonging to the authenticated vendor.
+    Exclusively returns bookings for this vendor's listed products.
+    """
+    bookings = get_payernt_vendor_bookings(vendor_id=account["id"], limit=limit)
+    return {
+        "success": True,
+        "bookings": bookings,
+        "total": len(bookings),
+    }
+
+
+@payernt_router.get("/earnings/summary")
+def get_vendor_earnings_summary_endpoint(
+    account: Dict[str, Any] = Depends(get_current_payernt_account),
+):
+    """
+    Authoritative backend earnings summary for vendor.
+    """
+    wallet = get_or_create_payernt_wallet(account["id"], account.get("email", ""))
+    avail_bal = float(wallet.get("available_balance", 0.0))
+    pending_amt = float(wallet.get("pending_amount", 0.0))
+    total_received = float(wallet.get("total_received", 0.0))
+    total_withdrawn = float(wallet.get("total_withdrawn", 0.0))
+
+    return {
+        "success": True,
+        "total": total_received if total_received > 0 else avail_bal,
+        "availableBalance": avail_bal,
+        "pendingAmount": pending_amt,
+        "totalReceived": total_received,
+        "totalWithdrawn": total_withdrawn,
+        "currency": wallet.get("currency", "INR"),
+    }
 
 
 # ============================================================

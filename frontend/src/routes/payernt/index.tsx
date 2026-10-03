@@ -6,7 +6,7 @@ import { getSeoMetadata } from "@/utils/seo";
 export const Route = createFileRoute("/payernt/")({
   head: () =>
     getSeoMetadata({
-      title: "Lender Dashboard | paye₹nt",
+      title: "Lender Dashboard | Payernt",
       description: "Overview of your gear listings, rental requests, earnings and live status.",
       path: "/payernt",
     }),
@@ -27,6 +27,10 @@ function PayerntHomeRoute() {
     unreadMessagesCount,
     activeAccount,
     activeUser,
+    isLoadingDashboard,
+    dashboardError,
+    backendActivities,
+    refreshDashboard,
     logout,
     markNotificationRead,
     markAllNotificationsRead,
@@ -83,6 +87,10 @@ function PayerntHomeRoute() {
       unreadMessagesCount={unreadMessagesCount}
       activeAccount={activeAccount}
       activeUser={activeUser}
+      recentActivities={backendActivities}
+      isLoading={isLoadingDashboard}
+      error={dashboardError}
+      onRefresh={refreshDashboard}
       onNavigate={handleNavigate}
       onLogout={logout}
       onMarkNotificationRead={markNotificationRead}

@@ -5,7 +5,7 @@ import { getSeoMetadata } from "@/utils/seo";
 export const Route = createFileRoute("/payernt/help")({
   head: () =>
     getSeoMetadata({
-      title: "Lender Help & Support | paye₹nt",
+      title: "Lender Help & Support | Payernt",
       description: "Get assistance with equipment insurance, verification, handovers and payouts.",
       path: "/payernt/help",
     }),
@@ -18,11 +18,11 @@ function PayerntHelpRoute() {
   const faqs = [
     {
       q: "How does damage protection & equipment insurance work?",
-      a: "Every verified rental on paye₹nt is backed by comprehensive equipment protection up to the replacement value stated during verification.",
+      a: "Every verified rental on Payernt is backed by comprehensive equipment protection up to the replacement value stated during verification.",
     },
     {
       q: "When are payout earnings released to my bank account?",
-      a: "Rental earnings are credited to your paye₹nt wallet instantly upon successful handover PIN verification and can be withdrawn directly to your verified bank account.",
+      a: "Rental earnings are credited to your Payernt wallet instantly upon successful handover PIN verification and can be withdrawn directly to your verified bank account.",
     },
     {
       q: "What if a borrower fails to return gear on time?",

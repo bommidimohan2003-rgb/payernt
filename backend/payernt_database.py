@@ -855,6 +855,23 @@ def create_payernt_product(
         else 0
     )
 
+    video_val = data.get("videoUrl") or data.get("video_url") or ""
+    damage_val = data.get("damageDetails") or data.get("damage_details") or (condition_raw.get("damageDetails") if isinstance(condition_raw, dict) else "")
+
+    # Specifications serialization
+    specs_dict = data.get("specs") if isinstance(data.get("specs"), dict) else None
+    if specs_dict:
+        specs_serialized = json.dumps(specs_dict)
+    else:
+        raw_specs = data.get("specifications", "")
+        specs_serialized = json.dumps(raw_specs) if isinstance(raw_specs, dict) else str(raw_specs)
+
+    # Admin price range handling
+    apr = data.get("adminPriceRange") or data.get("admin_price_range") or {}
+    min_p = apr.get("minPrice") or apr.get("min_price") if isinstance(apr, dict) else None
+    max_p = apr.get("maxPrice") or apr.get("max_price") if isinstance(apr, dict) else None
+    price_status_val = "SET" if (min_p is not None and max_p is not None) else "NOT_SET"
+
     product = {
         "id": product_id,
         "owner_id": owner_id,
@@ -867,27 +884,32 @@ def create_payernt_product(
         "model": data.get("model", ""),
         "year": str(data.get("year", "2024")),
         "description": data.get("description", ""),
-        "specifications": data.get("specifications", ""),
+        "specifications": specs_serialized,
         "features": features_json,
-        "condition_grade": data.get("condition_grade") or (condition_raw.get("grade") if isinstance(condition_raw, dict) else "Like New"),
+        "condition_grade": data.get("condition_grade") or data.get("conditionGrade") or (condition_raw.get("grade") if isinstance(condition_raw, dict) else "Like New"),
         "condition_details": condition_json,
         "accessories": data.get("accessories", ""),
         "city": data.get("city") or (data.get("location", {}).get("city") if isinstance(data.get("location"), dict) else ""),
         "area": data.get("area") or (data.get("location", {}).get("area") if isinstance(data.get("location"), dict) else ""),
-        "pincode": data.get("pincode") or (data.get("location", {}).get("pincode") if isinstance(data.get("location"), dict) else ""),
-        "pickup_instructions": data.get("pickup_instructions") or (data.get("location", {}).get("pickupInstructions") if isinstance(data.get("location"), dict) else ""),
+        "pincode": data.get("pincode") or data.get("postalCode") or (data.get("location", {}).get("pincode") if isinstance(data.get("location"), dict) else ""),
+        "pickup_instructions": data.get("pickup_instructions") or data.get("pickupInstructions") or (data.get("location", {}).get("pickupInstructions") if isinstance(data.get("location"), dict) else ""),
         "daily_rate": daily_val,
         "weekly_rate": weekly_val,
         "monthly_rate": monthly_val,
         "security_deposit": 0,  # Explicitly ZERO as per strict requirements
-        "available": bool(data.get("available", True)),
-        "availability_status": data.get("availability_status", "available"),
+        "available": bool(data.get("available", False)),
+        "availability_status": data.get("availability_status", "paused"),
         "min_rental_days": int(data.get("min_rental_days", 1)),
         "max_rental_days": int(data.get("max_rental_days", 30)),
         "primary_image": primary_img,
         "images": images_json,
+        "video_url": video_val,
+        "min_price": float(min_p) if min_p is not None else None,
+        "max_price": float(max_p) if max_p is not None else None,
+        "price_unit": "PER DAY",
+        "price_status": price_status_val,
         "vendor_secret_pin": vendor_pin,  # GENERATED ONCE AND PRESERVED FOREVER
-        "status": data.get("status", "active"),
+        "status": data.get("status", "under_review"),
         "created_at": now_iso,
         "updated_at": now_iso,
     }
@@ -899,8 +921,20 @@ def create_payernt_product(
                 description, specifications, features, condition_grade, condition_details, accessories,
                 city, area, pincode, pickup_instructions, daily_rate, weekly_rate, monthly_rate,
                 security_deposit, available, availability_status, min_rental_days, max_rental_days,
-                primary_image, images, vendor_secret_pin, status, created_at, updated_at
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                primary_image, images, video_url, min_price, max_price, price_unit, price_status,
+                vendor_secret_pin, status, created_at, updated_at
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE
+                category = VALUES(category), name = VALUES(name), title = VALUES(title),
+                brand = VALUES(brand), model = VALUES(model), year = VALUES(year),
+                description = VALUES(description), specifications = VALUES(specifications),
+                features = VALUES(features), condition_grade = VALUES(condition_grade),
+                condition_details = VALUES(condition_details), accessories = VALUES(accessories),
+                city = VALUES(city), area = VALUES(area), pincode = VALUES(pincode),
+                pickup_instructions = VALUES(pickup_instructions), daily_rate = VALUES(daily_rate),
+                weekly_rate = VALUES(weekly_rate), monthly_rate = VALUES(monthly_rate),
+                primary_image = VALUES(primary_image), images = VALUES(images), video_url = VALUES(video_url),
+                status = VALUES(status), updated_at = VALUES(updated_at)
         """, (
             product["id"], product["owner_id"], product["owner_email"], product["owner_name"],
             product["category"], product["name"], product["title"], product["brand"], product["model"],
@@ -909,7 +943,8 @@ def create_payernt_product(
             product["city"], product["area"], product["pincode"], product["pickup_instructions"],
             product["daily_rate"], product["weekly_rate"], product["monthly_rate"], product["security_deposit"],
             product["available"], product["availability_status"], product["min_rental_days"], product["max_rental_days"],
-            product["primary_image"], product["images"], product["vendor_secret_pin"], product["status"],
+            product["primary_image"], product["images"], product["video_url"], product["min_price"], product["max_price"],
+            product["price_unit"], product["price_status"], product["vendor_secret_pin"], product["status"],
             product["created_at"], product["updated_at"]
         ))
     except Exception as e:
@@ -943,19 +978,29 @@ def get_payernt_product_by_id(product_id: str, include_pin: bool = False) -> Opt
     return clean
 
 
-def get_payernt_products_by_owner(owner_id: str) -> List[Dict[str, Any]]:
+def get_payernt_products_by_owner(owner_id: str, owner_email: Optional[str] = None) -> List[Dict[str, Any]]:
     """Fetches all products listed by a specific vendor (includes vendorSecretPin for owner review)."""
-    if not owner_id:
+    if not owner_id and not owner_email:
         return []
 
     try:
-        rows = fetch_all("SELECT * FROM payernt_products WHERE owner_id = %s ORDER BY created_at DESC", (owner_id,))
+        if owner_email:
+            rows = fetch_all(
+                "SELECT * FROM payernt_products WHERE owner_id = %s OR (owner_email IS NOT NULL AND LOWER(owner_email) = LOWER(%s)) ORDER BY created_at DESC",
+                (owner_id or "", owner_email)
+            )
+        else:
+            rows = fetch_all("SELECT * FROM payernt_products WHERE owner_id = %s ORDER BY created_at DESC", (owner_id,))
         if rows:
             return rows
     except Exception as e:
         logger.warning(f"DB fetch error for payernt_products by owner: {e}")
 
-    return [p for p in MOCK_PAYERNT_PRODUCTS.values() if p.get("owner_id") == owner_id]
+    clean_email = (owner_email or "").strip().lower()
+    return [
+        p for p in MOCK_PAYERNT_PRODUCTS.values()
+        if (owner_id and p.get("owner_id") == owner_id) or (clean_email and p.get("owner_email", "").strip().lower() == clean_email)
+    ]
 
 
 def get_all_active_payernt_products() -> List[Dict[str, Any]]:
@@ -2393,3 +2438,303 @@ def consume_cross_side_verification_token(token: str, target_account_type: str) 
         "details": details,
         "existing_account_type": rec.get("existing_account_type"),
     }
+
+
+# ============================================================
+# PAYE₹NT VENDOR BOOKINGS & AUTHORITATIVE DASHBOARD AGGREGATION
+# ============================================================
+
+def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50) -> List[Dict[str, Any]]:
+    """
+    Fetches real bookings for products belonging to this authenticated vendor.
+    Queries rental_security records and orders, falling back to mock store if database is offline.
+    """
+    bookings = []
+    seen_ids = set()
+
+    # 1. Query DB rental_security joined with orders and payernt_products
+    try:
+        query = """
+            SELECT 
+                sec.booking_id,
+                sec.product_id,
+                sec.vendor_id,
+                sec.renter_id,
+                sec.status as security_status,
+                sec.vendor_pin_verified,
+                sec.renter_pin_verified,
+                sec.otp_verified,
+                sec.rental_started,
+                sec.rental_started_at,
+                sec.created_at as security_created_at,
+                o.product_title as order_title,
+                o.product_image as order_image,
+                o.user_email as renter_email,
+                o.start_date,
+                o.end_date,
+                o.total,
+                o.status as order_status,
+                o.created_at as order_created_at,
+                pp.title as product_title,
+                pp.primary_image as product_image,
+                pp.category as product_category,
+                pp.daily_rate
+            FROM rental_security sec
+            LEFT JOIN orders o ON sec.booking_id = o.id
+            LEFT JOIN payernt_products pp ON sec.product_id = pp.id
+            WHERE sec.vendor_id = %s OR pp.owner_id = %s
+            ORDER BY sec.created_at DESC
+            LIMIT %s
+        """
+        rows = fetch_all(query, (vendor_id, vendor_id, limit))
+        if rows:
+            for r in rows:
+                b_id = r.get("booking_id")
+                if not b_id or b_id in seen_ids:
+                    continue
+                seen_ids.add(b_id)
+                renter_email = r.get("renter_email") or ""
+                r_name = renter_email.split("@")[0].capitalize() if renter_email else "Customer"
+                bookings.append({
+                    "id": b_id,
+                    "bookingId": b_id,
+                    "productId": r.get("product_id") or "",
+                    "productTitle": r.get("product_title") or r.get("order_title") or "Gear Listing",
+                    "productImage": r.get("product_image") or r.get("order_image") or "",
+                    "category": r.get("product_category") or "Tech Gear",
+                    "renterId": r.get("renter_id") or renter_email or "renter",
+                    "renterName": r_name,
+                    "renterEmail": renter_email,
+                    "startDate": r.get("start_date") or "",
+                    "endDate": r.get("end_date") or "",
+                    "amount": float(r.get("total") or r.get("daily_rate") or 0.0),
+                    "total": float(r.get("total") or r.get("daily_rate") or 0.0),
+                    "status": r.get("order_status") or r.get("security_status") or "pending",
+                    "securityStatus": r.get("security_status") or "security_pending",
+                    "vendorPinVerified": bool(r.get("vendor_pin_verified")),
+                    "renterPinVerified": bool(r.get("renter_pin_verified")),
+                    "otpVerified": bool(r.get("otp_verified")),
+                    "rentalStarted": bool(r.get("rental_started")),
+                    "rentalStartedAt": r.get("rental_started_at"),
+                    "createdAt": r.get("security_created_at") or r.get("order_created_at") or dt.now(timezone.utc).isoformat(),
+                })
+    except Exception as e:
+        logger.warning(f"DB error fetching vendor bookings from rental_security: {e}")
+
+    # 2. Also check orders table for orders whose product is owned by vendor
+    try:
+        orders_query = """
+            SELECT 
+                o.id as booking_id,
+                o.product_id,
+                o.product_title,
+                o.product_image,
+                o.user_email as renter_email,
+                o.start_date,
+                o.end_date,
+                o.total,
+                o.status as order_status,
+                o.created_at,
+                pp.category,
+                pp.daily_rate
+            FROM orders o
+            JOIN payernt_products pp ON o.product_id = pp.id
+            WHERE pp.owner_id = %s
+            ORDER BY o.created_at DESC
+            LIMIT %s
+        """
+        o_rows = fetch_all(orders_query, (vendor_id, limit))
+        if o_rows:
+            for r in o_rows:
+                b_id = r.get("booking_id")
+                if not b_id or b_id in seen_ids:
+                    continue
+                seen_ids.add(b_id)
+                renter_email = r.get("renter_email") or ""
+                r_name = renter_email.split("@")[0].capitalize() if renter_email else "Customer"
+                bookings.append({
+                    "id": b_id,
+                    "bookingId": b_id,
+                    "productId": r.get("product_id") or "",
+                    "productTitle": r.get("product_title") or "Gear Listing",
+                    "productImage": r.get("product_image") or "",
+                    "category": r.get("category") or "Tech Gear",
+                    "renterId": renter_email or "renter",
+                    "renterName": r_name,
+                    "renterEmail": renter_email,
+                    "startDate": r.get("start_date") or "",
+                    "endDate": r.get("end_date") or "",
+                    "amount": float(r.get("total") or r.get("daily_rate") or 0.0),
+                    "total": float(r.get("total") or r.get("daily_rate") or 0.0),
+                    "status": r.get("order_status") or "pending",
+                    "securityStatus": "pending",
+                    "vendorPinVerified": False,
+                    "renterPinVerified": False,
+                    "otpVerified": False,
+                    "rentalStarted": False,
+                    "createdAt": r.get("created_at") or dt.now(timezone.utc).isoformat(),
+                })
+    except Exception as e:
+        logger.warning(f"DB error fetching vendor orders: {e}")
+
+    # 3. Fallback to in-memory mock store if database is offline or empty
+    if not bookings:
+        vendor_products = [p for p in MOCK_PAYERNT_PRODUCTS.values() if p.get("owner_id") == vendor_id]
+        vendor_prod_ids = {p["id"] for p in vendor_products}
+        for sec in MOCK_RENTAL_SECURITIES.values():
+            if sec.get("vendor_id") == vendor_id or sec.get("product_id") in vendor_prod_ids:
+                b_id = sec.get("booking_id")
+                if not b_id or b_id in seen_ids:
+                    continue
+                seen_ids.add(b_id)
+                prod = MOCK_PAYERNT_PRODUCTS.get(sec.get("product_id", ""))
+                daily = float(prod.get("daily_rate", 500) if prod else 500)
+                bookings.append({
+                    "id": b_id,
+                    "bookingId": b_id,
+                    "productId": sec.get("product_id") or "",
+                    "productTitle": prod.get("title", "Tech Gear") if prod else "Tech Gear",
+                    "productImage": prod.get("primary_image", "") if prod else "",
+                    "category": prod.get("category", "Tech") if prod else "Tech",
+                    "renterId": sec.get("renter_id", "renter"),
+                    "renterName": "Customer",
+                    "renterEmail": "",
+                    "startDate": "",
+                    "endDate": "",
+                    "amount": daily,
+                    "total": daily,
+                    "status": sec.get("status", "security_pending"),
+                    "securityStatus": sec.get("status", "security_pending"),
+                    "vendorPinVerified": bool(sec.get("vendor_pin_verified")),
+                    "renterPinVerified": bool(sec.get("renter_pin_verified")),
+                    "otpVerified": bool(sec.get("otp_verified")),
+                    "rentalStarted": bool(sec.get("rental_started")),
+                    "createdAt": sec.get("created_at") or dt.now(timezone.utc).isoformat(),
+                })
+
+    return bookings[:limit]
+
+
+def get_payernt_vendor_dashboard(vendor_id: str, email: str) -> Dict[str, Any]:
+    """
+    Authoritative single-request dashboard aggregation for paye₹nt Home (Desktop and Mobile).
+    Returns real wallet balances, earnings, product listings counts, rental counts,
+    upcoming bookings, products preview, recent activities, and unread notification/message counts.
+    """
+    # 1. Authoritative Wallet & Transactions
+    wallet = get_or_create_payernt_wallet(vendor_id, email)
+    avail_bal = float(wallet.get("available_balance", 0.0))
+    pending_amt = float(wallet.get("pending_amount", 0.0))
+    total_received = float(wallet.get("total_received", 0.0))
+    total_withdrawn = float(wallet.get("total_withdrawn", 0.0))
+
+    transactions = get_payernt_wallet_transactions(vendor_id)
+
+    # 2. Products / Listings
+    products = get_payernt_products_by_owner(vendor_id, email)
+    total_listings = len(products)
+    active_listings = len([p for p in products if p.get("status") in ("active", "approved")])
+    pending_listings = len([p for p in products if p.get("status") in ("pending_confirmation", "pending", "under_review", "pending_admin_review")])
+
+    # 3. Bookings & Rentals
+    bookings = get_payernt_vendor_bookings(vendor_id, limit=20)
+    active_rentals = len([
+        b for b in bookings
+        if b.get("rentalStarted") or b.get("status") in ("active", "ongoing", "in_progress", "handover")
+    ])
+    upcoming_bookings = [
+        b for b in bookings
+        if b.get("status") in ("security_pending", "pending", "confirmed", "approved", "active")
+    ][:5]
+
+    # 4. Recent Activities from Audit Logs & Transactions
+    activities = []
+    # Add transactions
+    for tx in transactions[:6]:
+        tx_type = tx.get("type", "transaction")
+        amt = float(tx.get("amount", 0.0))
+        amt_str = f"+₹{amt:,.0f}" if tx_type == "credit" else f"-₹{amt:,.0f}"
+        activities.append({
+            "id": f"tx_{tx.get('id')}",
+            "title": tx.get("description") or ("Payment received" if tx_type == "credit" else "Payout withdrawal"),
+            "timestamp": tx.get("created_at") or "",
+            "amount": amt_str,
+            "type": tx_type,
+            "createdAt": tx.get("created_at") or "",
+        })
+
+    # Add audit logs
+    audit_logs = get_payernt_audit_logs(vendor_id, limit=6)
+    action_titles = {
+        "PRODUCT_CREATED": "Product listing submitted",
+        "PRODUCT_APPROVED": "Product approved by Admin",
+        "PRODUCT_UPDATED": "Listing updated",
+        "WALLET_CREDIT": "Earnings credited to wallet",
+        "WALLET_WITHDRAW": "Withdrawal requested",
+        "RENTAL_SECURITY_CREATED": "New booking received",
+        "PROFILE_UPDATE": "Profile updated",
+        "OTP_RESENT": "Verification code resent",
+    }
+    for log in audit_logs:
+        action = log.get("action", "")
+        if action in action_titles:
+            activities.append({
+                "id": f"audit_{log.get('id')}",
+                "title": action_titles[action],
+                "timestamp": log.get("created_at") or "",
+                "amount": None,
+                "type": "audit",
+                "createdAt": log.get("created_at") or "",
+            })
+
+    # Sort activities by timestamp descending
+    activities.sort(key=lambda x: str(x.get("createdAt", "")), reverse=True)
+    recent_activities = activities[:6]
+
+    # 5. Notifications & Messages counts
+    notifs = get_payernt_notifications(vendor_id)
+    unread_notifs = len([n for n in notifs if not (n.get("is_read") or n.get("read"))])
+    unread_msgs = get_payernt_unread_messages_count(vendor_id)
+
+    # 6. Preview products (first 4 items with sanitized fields)
+    preview_products = []
+    for p in products[:4]:
+        clean_p = dict(p)
+        clean_p.pop("vendor_secret_pin", None)
+        preview_products.append(clean_p)
+
+    return {
+        "wallet": {
+            "availableBalance": avail_bal,
+            "pendingAmount": pending_amt,
+            "totalReceived": total_received,
+            "totalWithdrawn": total_withdrawn,
+            "currency": wallet.get("currency", "INR"),
+        },
+        "earnings": {
+            "total": total_received if total_received > 0 else avail_bal,
+            "available": avail_bal,
+            "pending": pending_amt,
+            "withdrawn": total_withdrawn,
+        },
+        "listings": {
+            "total": total_listings,
+            "active": active_listings,
+            "pending": pending_listings,
+        },
+        "rentals": {
+            "active": active_rentals,
+            "total": len(bookings),
+        },
+        "bookings": upcoming_bookings,
+        "products": preview_products,
+        "recentActivity": recent_activities,
+        "notifications": {
+            "unread": unread_notifs,
+            "total": len(notifs),
+        },
+        "messages": {
+            "unread": unread_msgs,
+        },
+    }
+

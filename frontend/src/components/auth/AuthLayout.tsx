@@ -108,8 +108,8 @@ export function AuthLayout({
             </motion.div>
           </AnimatePresence>
 
-          {/* Light subtle scrim for text readability without obscuring clear background photos */}
-          <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/40 to-black/70" />
+          {/* Light subtle scrim for text readability with darker emphasis on right for form contrast */}
+          <div className="absolute inset-0 bg-gradient-to-r from-black/30 via-black/40 to-black/75" />
         </div>
 
         {/* LEFT CORNER FLOATING BADGE & CONTROLS */}
@@ -152,8 +152,8 @@ export function AuthLayout({
           </div>
         </div>
 
-        {/* LEFT SIDE ALIGNED FORM CONTAINER */}
-        <div className="relative z-10 w-full max-w-7xl mx-auto flex justify-start">
+        {/* RIGHT SIDE ALIGNED FORM CONTAINER */}
+        <div className="relative z-10 w-full max-w-7xl mx-auto flex justify-center md:justify-end">
           <div
             className={cn(
               "w-full card-premium p-5 sm:p-6 shadow-2xl border-white/25 bg-background/95 dark:bg-slate-900/95 backdrop-blur-2xl rounded-3xl space-y-4 transition-all duration-300",

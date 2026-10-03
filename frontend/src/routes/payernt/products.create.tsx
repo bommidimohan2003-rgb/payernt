@@ -6,7 +6,7 @@ import { getSeoMetadata } from "@/utils/seo";
 export const Route = createFileRoute("/payernt/products/create")({
   head: () =>
     getSeoMetadata({
-      title: "List Product for Rent | paye₹nt",
+      title: "List Product for Rent | Payernt",
       description: "List your cameras, laptops, audio and gear to start earning rental income.",
       path: "/payernt/products/create",
     }),
