@@ -130,6 +130,19 @@ export default function Users() {
       if (selectedUser && (selectedUser.id === id || selectedUser.email === id || selectedUser.accountId === id)) {
         setSelectedUser((prev) => prev ? { ...prev, ...updated, status: "APPROVED", verified: true } : null);
       }
+      
+      // Notify other tabs / pending approval screens instantly
+      try {
+        if (typeof BroadcastChannel !== "undefined") {
+          const bc = new BroadcastChannel("payent-account-approval");
+          bc.postMessage({ id, email: id, type, action: "APPROVED" });
+          bc.close();
+        }
+      } catch {}
+      try {
+        localStorage.setItem("payent_approved_event", JSON.stringify({ email: id, type, timestamp: Date.now() }));
+      } catch {}
+
       toast.success(`${type || "User"} account approved and verified.`);
     } catch {
       toast.error("Failed to approve user.");

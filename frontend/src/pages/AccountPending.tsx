@@ -102,14 +102,22 @@ export default function AccountPending() {
           const raw = String(res.status).toUpperCase();
           if (raw === "APPROVED" || raw === "ACTIVE" || res.is_approved) {
             setStatus("APPROVED");
-            toast.success("Account Approved! You can now access your workspace.");
+            toast.success("Account Approved! Opening your login portal...");
+            
+            // Auto redirect to respective login portal
             setTimeout(() => {
               if (isPayernt) {
-                navigate({ to: "/payernt/auth" as any });
+                (navigate as any)({
+                  to: "/payernt/auth",
+                  search: targetEmail ? { email: targetEmail } : undefined,
+                });
               } else {
-                navigate({ to: "/login" as any });
+                (navigate as any)({
+                  to: "/login",
+                  search: targetEmail ? { email: targetEmail } : undefined,
+                });
               }
-            }, 1800);
+            }, 1200);
           } else if (raw === "REJECTED" || raw === "DECLINED") {
             setStatus("REJECTED");
             if (res.rejectionReason) {
@@ -131,13 +139,55 @@ export default function AccountPending() {
     [isPayernt, targetEmail, navigate]
   );
 
-  // Initial check and periodic polling (every 10 seconds)
+  // Fast real-time polling, window focus, visibility, cross-tab events
   useEffect(() => {
+    // 1. Initial check
     checkStatus(false);
+
+    // 2. Fast background poll (every 2.5s while pending)
     const interval = setInterval(() => {
       checkStatus(false);
-    }, 10000);
-    return () => clearInterval(interval);
+    }, 2500);
+
+    // 3. Focus & Visibility event handlers
+    const handleFocus = () => checkStatus(false);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        checkStatus(false);
+      }
+    };
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === "payent_approved_event" || e.key === "payent:admin:user_approved") {
+        checkStatus(false);
+      }
+    };
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("storage", handleStorage);
+
+    // 4. BroadcastChannel for instant cross-tab sync
+    let channel: BroadcastChannel | null = null;
+    try {
+      if (typeof BroadcastChannel !== "undefined") {
+        channel = new BroadcastChannel("payent-account-approval");
+        channel.onmessage = () => {
+          checkStatus(false);
+        };
+      }
+    } catch {
+      // Channel fallback
+    }
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("storage", handleStorage);
+      if (channel) {
+        channel.close();
+      }
+    };
   }, [checkStatus]);
 
   // Handle Edit & Resubmit Submission

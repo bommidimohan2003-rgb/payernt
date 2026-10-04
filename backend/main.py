@@ -1867,37 +1867,83 @@ def get_me(current_user_email: str = Depends(get_current_user_email)):
 
 @app.get("/api/auth/status")
 @app.get("/api/users/me/status")
+@app.get("/api/status")
 def get_auth_status(
     email: Optional[str] = None,
+    type: Optional[str] = Query(None),
     authorization: Optional[str] = Header(None)
 ):
     clean_email = None
-    if authorization and authorization.startswith("Bearer "):
+    if email:
+        clean_email = email.strip().lower()
+    elif authorization and authorization.startswith("Bearer "):
         token = authorization.split(" ")[1]
         try:
             payload = decode_access_token(token, expected_type="access")
             if payload and "sub" in payload:
-                clean_email = payload.get("sub")
+                clean_email = payload.get("sub", "").strip().lower()
         except Exception:
             pass
-    if not clean_email and email:
-        clean_email = email.strip().lower()
 
     if not clean_email:
         raise HTTPException(status_code=401, detail="Authentication token or email required.")
 
-    clean_email = clean_email.strip().lower()
-    user = get_user(clean_email)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found.")
-    status_val = (user.get("status") or "pending").lower()
-    is_approved = status_val in ("approved", "active")
+    account_type_req = (type or "").lower().strip()
+    status_val = "PENDING_REVIEW"
+    rejection_reason = None
+    reviewed_by = None
+    reviewed_at = None
+    matched_type = "Payrent"
+    role_val = "customer"
+
+    # If checking Payernt / Vendor / Lender
+    if "payernt" in account_type_req or "vendor" in account_type_req or "lender" in account_type_req:
+        from payernt_database import get_payernt_account_by_email
+        p_acc = get_payernt_account_by_email(clean_email)
+        if p_acc:
+            raw_s = str(p_acc.get("status", "PENDING_REVIEW")).upper()
+            status_val = "APPROVED" if raw_s in ("APPROVED", "ACTIVE") else ("REJECTED" if raw_s == "REJECTED" else "PENDING_REVIEW")
+            rejection_reason = p_acc.get("rejection_reason")
+            reviewed_by = p_acc.get("reviewed_by")
+            reviewed_at = p_acc.get("reviewed_at")
+            matched_type = "Payernt"
+            role_val = "lender"
+    else:
+        user = get_user(clean_email)
+        if user:
+            raw_s = str(user.get("status", "PENDING_REVIEW")).upper()
+            role_val = user.get("role", "customer")
+            if role_val in ("admin", "superadmin"):
+                status_val = "APPROVED"
+            else:
+                status_val = "APPROVED" if raw_s in ("APPROVED", "ACTIVE") else ("REJECTED" if raw_s == "REJECTED" else "PENDING_REVIEW")
+            rejection_reason = user.get("rejection_reason")
+            reviewed_by = user.get("reviewed_by")
+            reviewed_at = user.get("reviewed_at")
+            matched_type = "Payernt" if role_val == "lender" or user.get("account_type") == "paye₹nt" else "Payrent"
+        else:
+            from payernt_database import get_payernt_account_by_email
+            p_acc = get_payernt_account_by_email(clean_email)
+            if p_acc:
+                raw_s = str(p_acc.get("status", "PENDING_REVIEW")).upper()
+                status_val = "APPROVED" if raw_s in ("APPROVED", "ACTIVE") else ("REJECTED" if raw_s == "REJECTED" else "PENDING_REVIEW")
+                rejection_reason = p_acc.get("rejection_reason")
+                reviewed_by = p_acc.get("reviewed_by")
+                reviewed_at = p_acc.get("reviewed_at")
+                matched_type = "Payernt"
+                role_val = "lender"
+
+    is_approved = status_val == "APPROVED"
     return {
         "email": clean_email,
         "status": status_val,
         "is_approved": is_approved,
-        "role": user.get("role", "customer"),
-        "verified": bool(user.get("verified") or is_approved)
+        "accountType": matched_type,
+        "role": role_val,
+        "verified": is_approved,
+        "rejectionReason": rejection_reason,
+        "reviewedBy": reviewed_by,
+        "reviewedAt": reviewed_at,
     }
 
 @app.get("/api/profile/stats")
@@ -6895,75 +6941,7 @@ def resubmit_account(data: ResubmitAccountSchema):
     }
 
 
-@app.get("/api/auth/status")
-@app.get("/api/status")
-def get_auth_account_status(email: Optional[str] = None, type: Optional[str] = None, authorization: Optional[str] = Header(None)):
-    """Fetches real-time review/account status from the database for Under Review screen."""
-    clean_email = None
-    if email:
-        clean_email = email.lower().strip()
-    elif authorization and authorization.startswith("Bearer "):
-        try:
-            tok = authorization.split(" ")[1]
-            dec = decode_access_token(tok)
-            if dec and "sub" in dec:
-                clean_email = dec["sub"].lower().strip()
-        except Exception:
-            pass
 
-    if not clean_email:
-        raise HTTPException(status_code=400, detail="Email or valid auth token is required to check account status.")
-
-    account_type_req = (type or "").lower().strip()
-    status_val = "PENDING_REVIEW"
-    rejection_reason = None
-    reviewed_by = None
-    reviewed_at = None
-    matched_type = "Payrent"
-
-    # 1. If checking Payernt or general
-    if "payernt" in account_type_req or "vendor" in account_type_req:
-        from payernt_database import get_payernt_account_by_email
-        p_acc = get_payernt_account_by_email(clean_email)
-        if p_acc:
-            raw_s = str(p_acc.get("status", "PENDING_REVIEW")).upper()
-            status_val = "APPROVED" if raw_s in ("APPROVED", "ACTIVE") else ("REJECTED" if raw_s == "REJECTED" else "PENDING_REVIEW")
-            rejection_reason = p_acc.get("rejection_reason")
-            reviewed_by = p_acc.get("reviewed_by")
-            reviewed_at = p_acc.get("reviewed_at")
-            matched_type = "Payernt"
-    else:
-        user = get_user(clean_email)
-        if user:
-            raw_s = str(user.get("status", "PENDING_REVIEW")).upper()
-            if user.get("role") in ("admin", "superadmin"):
-                status_val = "APPROVED"
-            else:
-                status_val = "APPROVED" if raw_s in ("APPROVED", "ACTIVE") else ("REJECTED" if raw_s == "REJECTED" else "PENDING_REVIEW")
-            rejection_reason = user.get("rejection_reason")
-            reviewed_by = user.get("reviewed_by")
-            reviewed_at = user.get("reviewed_at")
-            matched_type = "Payernt" if user.get("role") == "lender" or user.get("account_type") == "paye₹nt" else "Payrent"
-        else:
-            from payernt_database import get_payernt_account_by_email
-            p_acc = get_payernt_account_by_email(clean_email)
-            if p_acc:
-                raw_s = str(p_acc.get("status", "PENDING_REVIEW")).upper()
-                status_val = "APPROVED" if raw_s in ("APPROVED", "ACTIVE") else ("REJECTED" if raw_s == "REJECTED" else "PENDING_REVIEW")
-                rejection_reason = p_acc.get("rejection_reason")
-                reviewed_by = p_acc.get("reviewed_by")
-                reviewed_at = p_acc.get("reviewed_at")
-                matched_type = "Payernt"
-
-    return {
-        "status": status_val,
-        "is_approved": status_val == "APPROVED",
-        "accountType": matched_type,
-        "email": clean_email,
-        "rejectionReason": rejection_reason,
-        "reviewedBy": reviewed_by,
-        "reviewedAt": reviewed_at,
-    }
 
 # Agents
 @app.get("/api/admin/agents")
