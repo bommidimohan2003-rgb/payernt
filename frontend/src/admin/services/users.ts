@@ -23,13 +23,19 @@ export const usersService = {
     return response.data;
   },
 
-  async approveUser(id: string): Promise<AdminUser> {
-    const response = await adminApi.patch(`/users/${encodeURIComponent(id)}/approve`);
+  async approveUser(id: string, type?: string): Promise<AdminUser> {
+    const url = type
+      ? `/users/${encodeURIComponent(id)}/approve?type=${encodeURIComponent(type)}`
+      : `/users/${encodeURIComponent(id)}/approve`;
+    const response = await adminApi.patch(url);
     return response.data?.user || response.data;
   },
 
-  async rejectUser(id: string, reason?: string): Promise<AdminUser> {
-    const response = await adminApi.patch(`/users/${encodeURIComponent(id)}/reject`, { reason });
+  async rejectUser(id: string, reason?: string, type?: string): Promise<AdminUser> {
+    const url = type
+      ? `/users/${encodeURIComponent(id)}/reject?type=${encodeURIComponent(type)}`
+      : `/users/${encodeURIComponent(id)}/reject`;
+    const response = await adminApi.patch(url, { reason, accountType: type });
     return response.data?.user || response.data;
   },
 

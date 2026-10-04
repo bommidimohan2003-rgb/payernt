@@ -157,8 +157,11 @@ class CheckRegistrationSchema(BaseModel):
 class PayerntRegisterSchema(BaseModel):
     name: str = Field(..., min_length=2, max_length=100)
     email: EmailStr
-    aadhaarNumber: str = Field(..., min_length=12, max_length=20)
-    phoneNumber: str = Field(..., min_length=10, max_length=15)
+    aadhaarNumber: Optional[str] = None
+    aadhaar_number: Optional[str] = None
+    phoneNumber: Optional[str] = None
+    phone: Optional[str] = None
+    mobile: Optional[str] = None
     address: str = Field(..., min_length=5)
     pincode: str = Field(..., min_length=6, max_length=10)
     password: str = Field(..., min_length=8)
@@ -509,7 +512,8 @@ def register_payernt_vendor(data: PayerntRegisterSchema):
         )
 
     # Validate Aadhaar format: exactly 12 digits
-    clean_aadhaar = re.sub(r"\s+", "", data.aadhaarNumber)
+    raw_aadhaar = data.aadhaarNumber or data.aadhaar_number or ""
+    clean_aadhaar = re.sub(r"\s+", "", raw_aadhaar)
     if not re.match(r"^\d{12}$", clean_aadhaar):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -517,7 +521,8 @@ def register_payernt_vendor(data: PayerntRegisterSchema):
         )
 
     # Validate Indian mobile number
-    clean_phone = re.sub(r"[^\d+]", "", data.phoneNumber)
+    raw_phone = data.phoneNumber or data.phone or data.mobile or ""
+    clean_phone = re.sub(r"[^\d+]", "", raw_phone)
     if len(re.sub(r"\D", "", clean_phone)) < 10:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -545,7 +550,7 @@ def register_payernt_vendor(data: PayerntRegisterSchema):
             name=data.name,
             email=data.email,
             aadhaar_number=clean_aadhaar,
-            phone=data.phoneNumber,
+            phone=clean_phone,
             address=data.address,
             pincode=clean_pincode,
             password=data.password,
@@ -553,36 +558,22 @@ def register_payernt_vendor(data: PayerntRegisterSchema):
     except ValueError as err:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(err))
 
-    # Generate JWT access & refresh tokens
-    token_payload = {
-        "sub": account["email"],
-        "account_type": "paye₹nt",
-        "user_id": account["id"],
-        "name": account["name"],
-        "role": "vendor",
-    }
-    access_token = create_access_token(token_payload)
-    refresh_token = create_refresh_token(token_payload)
-
-    sanitized = _sanitize_payernt_account(account)
-
     return {
         "success": True,
-        "message": "paye₹nt vendor account created successfully.",
+        "status": "PENDING_REVIEW",
+        "accountType": "Payernt",
+        "message": "Your account has been created successfully. Our Admin team is currently reviewing your submitted information.",
         "user": {
             "id": account["id"],
             "name": account["name"],
             "email": account["email"],
-            "accountType": "paye₹nt",
+            "accountType": "Payernt",
+            "status": "PENDING_REVIEW",
         },
         "userId": account["id"],
-        "accountType": "paye₹nt",
         "name": account["name"],
         "email": account["email"],
         "role": "vendor",
-        "account": sanitized,
-        "token": access_token,
-        "refreshToken": refresh_token,
     }
 
 
@@ -614,10 +605,40 @@ def login_payernt_vendor(data: PayerntLoginSchema, request: Request = None):
             detail="Invalid email or password for paye₹nt vendor account.",
         )
 
-    if account.get("status") in ("suspended", "banned", "inactive"):
+    account_status = str(account.get("status", "PENDING_REVIEW")).upper()
+
+    if account_status in ("PENDING_REVIEW", "PENDING", "UNVERIFIED"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Your paye₹nt vendor account is inactive or suspended. Please contact support.",
+            detail={
+                "status": "PENDING_REVIEW",
+                "accountType": "Payernt",
+                "email": clean_email,
+                "message": "Your account is still under review. Our Admin team is currently reviewing your submitted information."
+            },
+        )
+
+    if account_status in ("REJECTED", "DECLINED"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "status": "REJECTED",
+                "accountType": "Payernt",
+                "email": clean_email,
+                "rejectionReason": account.get("rejection_reason") or "Your submitted information could not be verified.",
+                "message": "Your account was not approved."
+            },
+        )
+
+    if account_status in ("SUSPENDED", "BANNED", "INACTIVE"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "status": "SUSPENDED",
+                "accountType": "Payernt",
+                "email": clean_email,
+                "message": "Your paye₹nt vendor account is inactive or suspended. Please contact support."
+            },
         )
 
     try:
@@ -1593,3 +1614,77 @@ def complete_rental_endpoint(
     if not success:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
     return {"success": True, "message": msg}
+
+
+class PayerntResubmitSchema(BaseModel):
+    email: EmailStr
+    name: Optional[str] = None
+    phoneNumber: Optional[str] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    pincode: Optional[str] = None
+    aadhaarNumber: Optional[str] = None
+    aadhaar_number: Optional[str] = None
+
+
+@payernt_router.post("/auth/resubmit")
+@payernt_router.post("/resubmit")
+def resubmit_payernt_vendor(data: PayerntResubmitSchema):
+    """Resubmits updated vendor details for Admin review."""
+    clean_email = (data.email or "").strip().lower()
+    acc = get_payernt_account_by_email(clean_email)
+    if not acc:
+        raise HTTPException(status_code=404, detail="Payernt account not found.")
+
+    resubmit_payernt_account(
+        email=clean_email,
+        name=data.name,
+        phone=data.phoneNumber or data.phone,
+        address=data.address,
+        pincode=data.pincode,
+        aadhaar_number=data.aadhaarNumber or data.aadhaar_number,
+    )
+
+    return {
+        "success": True,
+        "status": "PENDING_REVIEW",
+        "accountType": "Payernt",
+        "message": "Your vendor details have been updated and resubmitted for Admin review.",
+    }
+
+
+@payernt_router.get("/auth/status")
+@payernt_router.get("/status")
+def get_payernt_status(email: Optional[str] = None, authorization: Optional[str] = Header(None)):
+    """Fetches real-time Payernt account review status."""
+    clean_email = None
+    if email:
+        clean_email = email.lower().strip()
+    elif authorization and authorization.startswith("Bearer "):
+        try:
+            payload = decode_access_token(authorization.split(" ")[1], expected_type="access")
+            if payload and "sub" in payload:
+                clean_email = payload["sub"].lower().strip()
+        except Exception:
+            pass
+
+    if not clean_email:
+        raise HTTPException(status_code=400, detail="Email is required to check account status.")
+
+    acc = get_payernt_account_by_email(clean_email)
+    if not acc:
+        raise HTTPException(status_code=404, detail="Payernt account not found.")
+
+    raw_status = str(acc.get("status", "PENDING_REVIEW")).upper()
+    status_val = "APPROVED" if raw_status in ("APPROVED", "ACTIVE") else ("REJECTED" if raw_status == "REJECTED" else "PENDING_REVIEW")
+
+    return {
+        "status": status_val,
+        "is_approved": status_val == "APPROVED",
+        "accountType": "Payernt",
+        "email": clean_email,
+        "name": acc.get("name"),
+        "rejectionReason": acc.get("rejection_reason"),
+        "reviewedBy": acc.get("reviewed_by"),
+        "reviewedAt": acc.get("reviewed_at"),
+    }

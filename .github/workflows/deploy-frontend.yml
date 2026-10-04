@@ -31,7 +31,19 @@ jobs:
 
       - name: Build Production Frontend Bundle
         working-directory: frontend
-        run: npm run build
+        run: |
+          npm run build
+          node -e '
+            const fs = require("fs");
+            const p = "dist/server/wrangler.json";
+            if (fs.existsSync(p)) {
+              const cfg = JSON.parse(fs.readFileSync(p, "utf8"));
+              if (cfg.triggers && Object.keys(cfg.triggers).length === 0) delete cfg.triggers;
+              const invalid = ["definedEnvironments","exports","connect","ai_search_namespaces","ai_search","agent_memory","k2","secrets_store_secrets","artifacts","unsafe_hello_world","flagship","worker_loaders","ratelimits","vpc_services","vpc_networks","python_modules"];
+              invalid.forEach(k => delete cfg[k]);
+              fs.writeFileSync(p, JSON.stringify(cfg, null, 2));
+            }
+          '
 
       - name: Deploy to Cloudflare Workers
         working-directory: frontend
@@ -39,4 +51,5 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: 7f869b14a5749ca6c71a2fde55154883
         run: npx wrangler deploy --config dist/server/wrangler.json
+
 

@@ -62,6 +62,10 @@ export default function Dashboard() {
   const [approvingUserId, setApprovingUserId] = useState<string | null>(null);
   const [rejectingUserId, setRejectingUserId] = useState<string | null>(null);
 
+  const [selectedPendingUser, setSelectedPendingUser] = useState<AdminUser | null>(null);
+  const [rejectModalTarget, setRejectModalTarget] = useState<{ id: string; name: string; type?: string } | null>(null);
+  const [rejectReasonInput, setRejectReasonInput] = useState("");
+
   const currentUser = authService.getCurrentUser();
 
   const greeting = useMemo(() => {
@@ -116,14 +120,15 @@ export default function Dashboard() {
             !u.email?.endsWith("@example.com") &&
             !u.email?.endsWith("@test.com") &&
             !u.email?.includes("reset_test_") &&
-            (u.status === "pending" ||
-              (u as any).verificationStatus === "pending" ||
+            (String(u.status).toUpperCase() === "PENDING_REVIEW" ||
+              String(u.status).toUpperCase() === "PENDING" ||
+              String((u as any).verificationStatus).toUpperCase() === "PENDING" ||
               !u.verified ||
               u.status === "unverified" ||
               u.payerntAccount?.verificationStatus === "pending" ||
               u.payerntAccount?.accountStatus === "pending")
         );
-        setPendingUsers(unverified.slice(0, 6));
+        setPendingUsers(unverified.slice(0, 8));
       }
 
       if (ticketsData.status === "fulfilled") {
@@ -151,11 +156,15 @@ export default function Dashboard() {
     const unsubProductCreated = adminWS.subscribe("product.created", () => fetchDashboardData());
     const unsubBookingCreated = adminWS.subscribe("booking.created", () => fetchDashboardData());
     const unsubPayment = adminWS.subscribe("payment.created", () => fetchDashboardData());
+    const unsubUserRegistered = adminWS.subscribe("user.registered", () => fetchDashboardData());
+    const unsubUserUpdated = adminWS.subscribe("user.updated", () => fetchDashboardData());
 
     return () => {
       unsubProductCreated();
       unsubBookingCreated();
       unsubPayment();
+      unsubUserRegistered();
+      unsubUserUpdated();
     };
   }, [fetchDashboardData]);
 
@@ -199,12 +208,15 @@ export default function Dashboard() {
     }
   };
 
-  const handleApproveUser = async (id: string, name: string) => {
+  const handleApproveUser = async (id: string, name: string, type?: string) => {
     try {
       setApprovingUserId(id);
-      await usersService.approveUser(id);
+      await usersService.approveUser(id, type);
       setPendingUsers((prev) => prev.filter((u) => u.id !== id && u.email !== id));
-      toast.success(`User account "${name}" approved & verified.`);
+      if (selectedPendingUser && (selectedPendingUser.id === id || selectedPendingUser.email === id)) {
+        setSelectedPendingUser(null);
+      }
+      toast.success(`${type === "Payernt" ? "Payernt" : "Payrent"} user account "${name}" approved & verified.`);
       if (stats) {
         setStats({
           ...stats,
@@ -218,17 +230,35 @@ export default function Dashboard() {
     }
   };
 
-  const handleRejectUser = async (id: string, name: string) => {
+  const handleConfirmRejectUser = async () => {
+    if (!rejectModalTarget) return;
+    const { id, name, type } = rejectModalTarget;
     try {
       setRejectingUserId(id);
-      await usersService.rejectUser(id);
+      const reason = rejectReasonInput.trim() || "Information needs correction.";
+      await usersService.rejectUser(id, reason, type);
       setPendingUsers((prev) => prev.filter((u) => u.id !== id && u.email !== id));
-      toast.info(`User account "${name}" verification rejected.`);
+      if (selectedPendingUser && (selectedPendingUser.id === id || selectedPendingUser.email === id)) {
+        setSelectedPendingUser(null);
+      }
+      setRejectModalTarget(null);
+      setRejectReasonInput("");
+      toast.info(`Account "${name}" rejected (Reason: ${reason}).`);
     } catch {
       toast.error("Failed to reject user verification.");
     } finally {
       setRejectingUserId(null);
     }
+  };
+
+  const handleOpenUserReview = async (u: AdminUser) => {
+    setSelectedPendingUser(u);
+    try {
+      const full = await usersService.getUserById(u.email || u.id);
+      if (full) {
+        setSelectedPendingUser(full);
+      }
+    } catch {}
   };
 
   const adminName = currentUser?.fullName?.split(" ")[0] || currentUser?.email?.split("@")[0] || "Admin";
@@ -363,19 +393,19 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* USER REVIEW ACCOUNT SECTION */}
+        {/* PENDING USER ACCOUNTS SECTION */}
         <div className="rounded-xl border border-border/70 bg-card p-5 space-y-3 shadow-xs">
           <div className="flex items-center justify-between pb-3 border-b border-border/40">
             <div className="flex items-center gap-2">
               <UserCheck className="h-4 w-4 text-foreground/80" />
               <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                User Review Accounts
+                Pending User Accounts
               </h3>
             </div>
             <div className="flex items-center gap-2">
               {pendingUsers.length > 0 && (
-                <span className="px-2 py-0.5 text-[10px] font-mono font-semibold rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
-                  {pendingUsers.length} pending
+                <span className="px-2 py-0.5 text-[10px] font-mono font-semibold rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                  {pendingUsers.length} under review
                 </span>
               )}
               <Link
@@ -394,48 +424,77 @@ export default function Dashboard() {
               <span>All user accounts & KYC profiles reviewed. Queue clear.</span>
             </div>
           ) : (
-            <div className="divide-y divide-border/30 max-h-[300px] overflow-y-auto pr-1">
+            <div className="divide-y divide-border/30 max-h-[340px] overflow-y-auto pr-1">
               {pendingUsers.map((u) => {
                 const displayName = u.fullName || u.email.split("@")[0] || "User";
-                const isVendor = u.accountType === "payernt" || u.accountType === "vendor" || u.payerntAccount !== null;
+                const isPayerntAccount =
+                  u.accountType?.toLowerCase().includes("payernt") ||
+                  u.role === "lender" ||
+                  u.role === "vendor" ||
+                  (u.id && u.id.toLowerCase().includes("payernt"));
+                const accountTypeDisplay = isPayerntAccount ? "Payernt" : "Payrent";
+
                 return (
-                  <div key={u.id} className="py-2.5 first:pt-0 last:pb-0 flex items-center justify-between gap-2.5">
+                  <div key={u.accountId || u.id} className="py-3 first:pt-0 last:pb-0 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-9 h-9 rounded-md bg-secondary/80 flex items-center justify-center text-xs font-semibold uppercase border border-border/40 shrink-0">
+                      <div className="w-9 h-9 rounded-xl bg-secondary/80 flex items-center justify-center text-xs font-bold uppercase border border-border/40 shrink-0">
                         {displayName.slice(0, 2)}
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5">
-                          <h4 className="text-xs font-medium text-foreground truncate">
+                          <h4 className="text-xs font-semibold text-foreground truncate">
                             {displayName}
                           </h4>
-                          <span className={cn(
-                            "px-1 py-0.2 text-[9px] font-medium rounded uppercase",
-                            isVendor ? "bg-purple-500/10 text-purple-600 dark:text-purple-400" : "bg-blue-500/10 text-blue-600 dark:text-blue-400"
-                          )}>
-                            {isVendor ? "Vendor" : "Customer"}
+                          <span
+                            className={cn(
+                              "px-1.5 py-0.2 text-[9px] font-mono font-bold rounded uppercase tracking-wider",
+                              isPayerntAccount
+                                ? "bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20"
+                                : "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
+                            )}
+                          >
+                            {accountTypeDisplay}
                           </span>
                         </div>
-                        <p className="text-[11px] text-muted-foreground truncate">
+                        <p className="text-[11px] text-muted-foreground truncate font-mono">
                           {u.email} {u.phone ? `• ${u.phone}` : ""}
                         </p>
+                        <div className="flex items-center gap-2 mt-0.5 text-[10px] text-muted-foreground font-mono">
+                          <span>{u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "Today"}</span>
+                          <span>•</span>
+                          <span className="text-amber-600 dark:text-amber-400 font-medium">Under Review</span>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1 shrink-0">
+                    <div className="flex items-center gap-1.5 shrink-0">
                       <button
-                        onClick={() => handleApproveUser(u.id, displayName)}
-                        disabled={approvingUserId === u.id || rejectingUserId === u.id}
-                        className="p-1.5 rounded-md hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-transparent hover:border-emerald-500/30 transition-colors cursor-pointer"
-                        title="Approve & Verify Account"
+                        onClick={() => handleOpenUserReview(u)}
+                        className="px-2.5 py-1 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground text-[11px] font-medium border border-border/60 transition-colors cursor-pointer flex items-center gap-1"
+                        title="View complete submitted information"
+                      >
+                        <Eye className="h-3 w-3" />
+                        <span>Details</span>
+                      </button>
+                      <button
+                        onClick={() => handleApproveUser(u.accountId || u.id, displayName, accountTypeDisplay)}
+                        disabled={approvingUserId === (u.accountId || u.id) || rejectingUserId === (u.accountId || u.id)}
+                        className="p-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 transition-colors cursor-pointer disabled:opacity-50"
+                        title={`Approve ${accountTypeDisplay} Account`}
                       >
                         <UserCheck className="h-3.5 w-3.5" />
                       </button>
                       <button
-                        onClick={() => handleRejectUser(u.id, displayName)}
-                        disabled={approvingUserId === u.id || rejectingUserId === u.id}
-                        className="p-1.5 rounded-md hover:bg-red-500/10 text-[#FF1744] border border-transparent hover:border-red-500/30 transition-colors cursor-pointer"
-                        title="Reject Account Verification"
+                        onClick={() =>
+                          setRejectModalTarget({
+                            id: u.accountId || u.id,
+                            name: displayName,
+                            type: accountTypeDisplay,
+                          })
+                        }
+                        disabled={approvingUserId === (u.accountId || u.id) || rejectingUserId === (u.accountId || u.id)}
+                        className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-[#FF1744] border border-red-500/30 transition-colors cursor-pointer disabled:opacity-50"
+                        title={`Reject ${accountTypeDisplay} Account`}
                       >
                         <UserX className="h-3.5 w-3.5" />
                       </button>
@@ -784,20 +843,201 @@ export default function Dashboard() {
           </div>
 
           <div className="p-3.5 rounded-lg border border-border/60 bg-secondary/20">
-            <span className="text-[11px] text-muted-foreground block">Completed Bookings</span>
-            <span className="text-sm font-semibold font-mono text-foreground mt-0.5 block">
-              {stats?.monthlyBookings || 0} Fulfilled
-            </span>
-          </div>
-
-          <div className="p-3.5 rounded-lg border border-border/60 bg-secondary/20">
-            <span className="text-[11px] text-muted-foreground block">Pending Reports</span>
-            <span className="text-sm font-semibold font-mono text-foreground mt-0.5 block">
-              {stats?.pendingReports || 0} Open
+            <span className="text-[11px] text-muted-foreground block">Platform Status</span>
+            <span className="text-sm font-semibold font-mono text-emerald-400 mt-0.5 block flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              Operational
             </span>
           </div>
         </div>
       </div>
+
+      {/* ============================================================ */}
+      {/* VIEW DETAILS MODAL FOR PENDING USER ACCOUNTS */}
+      {/* ============================================================ */}
+      {selectedPendingUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-6 shadow-2xl relative text-left space-y-5">
+            <button
+              type="button"
+              onClick={() => setSelectedPendingUser(null)}
+              className="absolute right-4 top-4 p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {(() => {
+              const u = selectedPendingUser;
+              const isPayernt =
+                u.accountType?.toLowerCase().includes("payernt") ||
+                u.role === "lender" ||
+                u.role === "vendor" ||
+                (u.id && u.id.toLowerCase().includes("payernt"));
+              const typeLabel = isPayernt ? "Payernt" : "Payrent";
+              const rawAadh = u.aadhaarNumber || (u as any).aadhaarMasked || u.payerntAccount?.aadhaarMasked;
+              const rawPan = (u as any).panNumber || (u as any).panMasked || u.payrentAccount?.panMasked;
+
+              return (
+                <>
+                  <div className="flex items-center gap-3 pb-3 border-b border-border/50">
+                    <div className="w-10 h-10 rounded-xl bg-secondary/80 flex items-center justify-center font-bold text-sm text-foreground uppercase border border-border/40 shrink-0">
+                      {(u.fullName || u.email || "U").slice(0, 2)}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-base font-bold text-foreground">
+                          {u.fullName || u.email.split("@")[0] || "User Details"}
+                        </h2>
+                        <span
+                          className={cn(
+                            "px-2 py-0.5 text-[10px] font-mono font-bold rounded uppercase tracking-wider",
+                            isPayernt
+                              ? "bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20"
+                              : "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
+                          )}
+                        >
+                          {typeLabel}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground font-mono">{u.email}</p>
+                    </div>
+                  </div>
+
+                  {/* Submitted Registration Information */}
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div className="p-2.5 rounded-xl bg-secondary/40 border border-border/40 space-y-0.5">
+                      <span className="text-[10px] font-semibold text-muted-foreground uppercase">Full Name</span>
+                      <p className="font-medium text-foreground">{u.fullName || "—"}</p>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-secondary/40 border border-border/40 space-y-0.5">
+                      <span className="text-[10px] font-semibold text-muted-foreground uppercase">Email Address</span>
+                      <p className="font-medium text-foreground font-mono truncate">{u.email}</p>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-secondary/40 border border-border/40 space-y-0.5">
+                      <span className="text-[10px] font-semibold text-muted-foreground uppercase">Phone Number</span>
+                      <p className="font-medium text-foreground font-mono">{u.phone || "—"}</p>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-secondary/40 border border-border/40 space-y-0.5">
+                      <span className="text-[10px] font-semibold text-muted-foreground uppercase">
+                        {isPayernt ? "Aadhaar Number" : "PAN Number"}
+                      </span>
+                      <p className="font-medium text-foreground font-mono">
+                        {isPayernt ? (rawAadh || "—") : (rawPan || "—")}
+                      </p>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-secondary/40 border border-border/40 space-y-0.5 col-span-2">
+                      <span className="text-[10px] font-semibold text-muted-foreground uppercase">Complete Address</span>
+                      <p className="font-medium text-foreground">{u.address || "—"}</p>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-secondary/40 border border-border/40 space-y-0.5">
+                      <span className="text-[10px] font-semibold text-muted-foreground uppercase">Pincode</span>
+                      <p className="font-medium text-foreground font-mono">{u.pincode || "—"}</p>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-secondary/40 border border-border/40 space-y-0.5">
+                      <span className="text-[10px] font-semibold text-muted-foreground uppercase">Registered On</span>
+                      <p className="font-medium text-foreground font-mono">
+                        {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "—"}
+                      </p>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-secondary/40 border border-border/40 space-y-0.5 col-span-2">
+                      <span className="text-[10px] font-semibold text-muted-foreground uppercase">Current Status</span>
+                      <div className="flex items-center gap-1.5 font-semibold text-amber-600 dark:text-amber-400">
+                        <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                        <span className="capitalize">{u.status || "PENDING_REVIEW"}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions inside modal */}
+                  <div className="pt-3 border-t border-border/50 flex items-center justify-end gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRejectModalTarget({
+                          id: u.accountId || u.id,
+                          name: u.fullName || u.email,
+                          type: typeLabel,
+                        });
+                      }}
+                      className="px-4 py-2 rounded-xl border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-[#FF1744] text-xs font-semibold transition-colors cursor-pointer"
+                    >
+                      Reject Account
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleApproveUser(u.accountId || u.id, u.fullName || u.email, typeLabel)}
+                      className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-sm cursor-pointer"
+                    >
+                      Approve Account
+                    </button>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* REJECTION REASON MODAL DIALOG */}
+      {/* ============================================================ */}
+      {rejectModalTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl relative text-left space-y-4">
+            <button
+              type="button"
+              onClick={() => {
+                setRejectModalTarget(null);
+                setRejectReasonInput("");
+              }}
+              className="absolute right-4 top-4 p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-foreground">
+                Reject {rejectModalTarget.type || "User"} Account
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                Provide a clear rejection reason for <span className="font-semibold text-foreground">{rejectModalTarget.name}</span> so they can correct their information and resubmit.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-foreground">Rejection Reason</label>
+              <textarea
+                rows={3}
+                value={rejectReasonInput}
+                onChange={(e) => setRejectReasonInput(e.target.value)}
+                placeholder="e.g. Address information needs correction or identity document is illegible."
+                className="w-full rounded-xl border border-border bg-background p-3 text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-red-500/40 resize-none"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setRejectModalTarget(null);
+                  setRejectReasonInput("");
+                }}
+                className="px-4 py-2 rounded-xl border border-border text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmRejectUser}
+                disabled={rejectingUserId !== null}
+                className="px-5 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold transition-all shadow-sm cursor-pointer disabled:opacity-50"
+              >
+                {rejectingUserId ? "Rejecting..." : "Confirm Rejection"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

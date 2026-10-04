@@ -82,6 +82,22 @@ export function LoginForm() {
     const res = await login(data.email, data.password);
     if (!res.ok) {
       const msg = res.error ?? "Invalid email or password.";
+      const lower = msg.toLowerCase();
+      if (
+        lower.includes("under review") ||
+        lower.includes("not approved") ||
+        lower.includes("pending") ||
+        lower.includes("rejected") ||
+        (res as any)?.status === "PENDING_REVIEW" ||
+        (res as any)?.status === "REJECTED"
+      ) {
+        toast.info(msg);
+        navigate({
+          to: "/account-pending",
+          search: { type: "payrent", email: data.email } as any,
+        });
+        return;
+      }
       if (msg.toLowerCase().includes("password")) {
         setError("password", { type: "server", message: msg });
       } else if (

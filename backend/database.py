@@ -22,7 +22,7 @@ import uuid
 import time
 import secrets
 import random
-from typing import Optional, List, Set, Dict, Tuple
+from typing import Optional, List, Set, Dict, Tuple, Any
 from datetime import datetime as dt, timezone, timedelta
 from config import MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DB, MYSQL_SSL
 
@@ -1089,7 +1089,8 @@ def create_user(
     clean_email = email.strip().lower()
     clean_aadhaar = "".join(c for c in str(aadhaar_number) if c.isdigit()) if aadhaar_number else None
     clean_pan = str(pan_number).strip().upper() if pan_number else None
-    user_status = status if status else ("approved" if role == "admin" else "active")
+    user_status = status if status else ("approved" if role in ("admin", "superadmin") else "PENDING_REVIEW")
+    is_verified = bool(role in ("admin", "superadmin"))
 
     if not person_id:
         try:
@@ -1112,8 +1113,12 @@ def create_user(
         "pan_number": clean_pan,
         "account_type": account_type or "pay₹ent",
         "status": user_status,
-        "verified": True,
-        "created_at": created_at
+        "rejection_reason": None,
+        "reviewed_by": None,
+        "reviewed_at": None,
+        "verified": is_verified,
+        "created_at": created_at,
+        "updated_at": created_at
     }
     MOCK_USERS[clean_email] = user_data
     invalidate_user_cache(clean_email)
@@ -1130,17 +1135,17 @@ def create_user(
     else:
         try:
             execute_query("""
-                INSERT INTO payrent_accounts (id, person_id, email, phone, password_hash, full_name, role, account_type, pan_number, status, verified, address, city, pincode, created_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                ON DUPLICATE KEY UPDATE full_name=VALUES(full_name), password_hash=VALUES(password_hash), status=VALUES(status), person_id=VALUES(person_id)
-            """, (f"PAYRENT_USER_{clean_email}", person_id, clean_email, phone, password_hash, full_name, role, account_type or "pay₹ent", clean_pan, user_status, 1, address, city, pincode, created_at))
+                INSERT INTO payrent_accounts (id, person_id, email, phone, password_hash, full_name, role, account_type, pan_number, status, rejection_reason, reviewed_by, reviewed_at, verified, address, city, pincode, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE full_name=VALUES(full_name), password_hash=VALUES(password_hash), status=VALUES(status), person_id=VALUES(person_id), updated_at=VALUES(updated_at)
+            """, (f"PAYRENT_USER_{clean_email}", person_id, clean_email, phone, password_hash, full_name, role, account_type or "pay₹ent", clean_pan, user_status, None, None, None, int(is_verified), address, city, pincode, created_at, created_at))
         except Exception as e:
             print(f"Notice: Database write error in payrent_accounts: {e}")
 
     try:
         execute_query(
-            "INSERT INTO users (email, person_id, phone, password_hash, full_name, role, address, city, pincode, aadhaar_number, pan_number, account_type, status, verified, created_at) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) ON DUPLICATE KEY UPDATE full_name=VALUES(full_name), password_hash=VALUES(password_hash), status=VALUES(status), person_id=VALUES(person_id)",
-            (clean_email, person_id, phone, password_hash, full_name, role, address, city, pincode, clean_aadhaar, clean_pan, account_type or "pay₹ent", user_status, 1, created_at)
+            "INSERT INTO users (email, person_id, phone, password_hash, full_name, role, address, city, pincode, aadhaar_number, pan_number, account_type, status, rejection_reason, reviewed_by, reviewed_at, verified, created_at, updated_at) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) ON DUPLICATE KEY UPDATE full_name=VALUES(full_name), password_hash=VALUES(password_hash), status=VALUES(status), person_id=VALUES(person_id), updated_at=VALUES(updated_at)",
+            (clean_email, person_id, phone, password_hash, full_name, role, address, city, pincode, clean_aadhaar, clean_pan, account_type or "pay₹ent", user_status, None, None, None, int(is_verified), created_at, created_at)
         )
     except Exception as e:
         print(f"Notice: Database write error in create_user: {e}")
@@ -1168,9 +1173,72 @@ def create_user(
         "panNumber": clean_pan,
         "panMasked": f"XXXXX{clean_pan[-5:]}" if clean_pan and len(clean_pan) == 10 else None,
         "status": user_status,
-        "verified": True,
-        "createdAt": created_at
+        "verified": is_verified,
     }
+
+
+def resubmit_payrent_account(
+    email: str,
+    full_name: str = None,
+    phone: str = None,
+    address: str = None,
+    city: str = None,
+    pincode: str = None,
+    pan_number: str = None,
+    aadhaar_number: str = None,
+) -> Optional[Dict[str, Any]]:
+    """Resets a rejected pay₹ent (renter/customer) account back to PENDING_REVIEW with updated details."""
+    clean_email = (email or "").strip().lower()
+    user = get_user(clean_email)
+    if not user:
+        return None
+
+    now_iso = dt.now(timezone.utc).isoformat()
+    clean_phone = phone.strip() if phone else user.get("phone", "")
+    clean_name = full_name.strip() if full_name else (user.get("full_name") or user.get("name", ""))
+    clean_address = address.strip() if address else user.get("address", "")
+    clean_city = city.strip() if city else user.get("city", "")
+    clean_pincode = pincode.strip() if pincode else user.get("pincode", "")
+    clean_pan = str(pan_number).strip().upper() if pan_number else user.get("pan_number")
+    clean_aadhaar = str(aadhaar_number).strip() if aadhaar_number else user.get("aadhaar_number")
+
+    try:
+        execute_query("""
+            UPDATE payrent_accounts
+            SET full_name = %s, phone = %s, address = %s, city = %s, pincode = %s, pan_number = %s,
+                status = 'PENDING_REVIEW', rejection_reason = NULL, reviewed_by = NULL, reviewed_at = NULL, updated_at = %s
+            WHERE email = %s
+        """, (clean_name, clean_phone, clean_address, clean_city, clean_pincode, clean_pan, now_iso, clean_email))
+    except Exception as e:
+        logger.warning(f"DB update error in resubmit_payrent_account (payrent_accounts): {e}")
+
+    try:
+        execute_query("""
+            UPDATE users
+            SET full_name = %s, phone = %s, address = %s, city = %s, pincode = %s, pan_number = %s, aadhaar_number = %s,
+                status = 'PENDING_REVIEW', rejection_reason = NULL, reviewed_by = NULL, reviewed_at = NULL, updated_at = %s
+            WHERE email = %s
+        """, (clean_name, clean_phone, clean_address, clean_city, clean_pincode, clean_pan, clean_aadhaar, now_iso, clean_email))
+    except Exception as e:
+        logger.warning(f"DB update error in resubmit_payrent_account (users): {e}")
+
+    invalidate_user_cache(clean_email)
+    if clean_email in MOCK_USERS:
+        MOCK_USERS[clean_email].update({
+            "full_name": clean_name,
+            "phone": clean_phone,
+            "address": clean_address,
+            "city": clean_city,
+            "pincode": clean_pincode,
+            "pan_number": clean_pan,
+            "status": "PENDING_REVIEW",
+            "rejection_reason": None,
+            "reviewed_by": None,
+            "reviewed_at": None,
+            "updated_at": now_iso
+        })
+
+    return get_user(clean_email)
 
 def get_user_by_firebase_uid(firebase_uid: str):
     if not firebase_uid:

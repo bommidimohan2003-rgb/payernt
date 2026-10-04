@@ -155,6 +155,12 @@ export function PayerntAuth({
         if (res.success && res.account) {
           toast.success(`Welcome back, ${res.account.name}!`);
           onAuthSuccess(res.account);
+        } else if (res.status === "PENDING_REVIEW" || res.status === "REJECTED") {
+          toast.info(res.error || "Your Payernt account is under administrative review.");
+          navigate({
+            to: "/account-pending",
+            search: { type: "payernt", email: cleanEmail } as any,
+          });
         } else {
           const msg = res.error || "Invalid email or password.";
           setLoginErrors({ general: msg });
@@ -163,6 +169,14 @@ export function PayerntAuth({
       })
       .catch((err) => {
         setIsLoggingIn(false);
+        if (err?.status === "PENDING_REVIEW" || err?.status === "REJECTED" || err?.accountStatus) {
+          toast.info(err?.message || "Your Payernt account is under administrative review.");
+          navigate({
+            to: "/account-pending",
+            search: { type: "payernt", email: cleanEmail } as any,
+          });
+          return;
+        }
         const msg = err?.message || "Failed to sign in. Please try again.";
         setLoginErrors({ general: msg });
         toast.error(msg);
@@ -258,9 +272,12 @@ export function PayerntAuth({
       })
       .then((res) => {
         setIsRegistering(false);
-        if (res.success && res.account) {
-          toast.success("paye₹nt vendor account created successfully!");
-          onAuthSuccess(res.account);
+        if (res.success) {
+          toast.success("Payernt vendor account created successfully! Submitted for Admin review.");
+          navigate({
+            to: "/account-pending",
+            search: { type: "payernt", email: cleanEmail } as any,
+          });
         } else {
           const msg = res.error || "Failed to create account.";
           toast.error(msg);

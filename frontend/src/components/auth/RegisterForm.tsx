@@ -268,78 +268,41 @@ export function RegisterForm() {
       const userObj = res.user || res.account || {};
       const accountId = userObj.accountId || `PAYRENT_USER_${data.email}`;
       const panMasked = userObj.panMasked || `XXXXX${panUpper.slice(5)}`;
-      const createdUser: UserType = {
-        id: userObj.id || userObj.email || data.email,
-        accountId,
-        accountType: "pay₹ent",
-        fullName: userObj.fullName || userObj.name || data.fullName,
-        email: userObj.email || data.email,
-        phone: userObj.phone || data.phone,
-        address: userObj.address || data.address,
-        city: userObj.city || data.city || "India",
-        pincode: userObj.pincode || data.pincode,
-        panNumber: panUpper,
-        panMasked,
-        role: userObj.role || "customer",
-        status: userObj.status || "active",
-        country: "India",
-      };
+      const createdRole = userObj.role || (data.isAdmin ? "admin" : "customer");
+      const createdStatus = userObj.status || "PENDING_REVIEW";
 
-      const authToken = res.token;
-      if (authToken) {
-        storage.set(STORAGE_KEYS.token, authToken);
-      }
-      storage.set(STORAGE_KEYS.currentUser, createdUser);
-      if (res.refreshToken) {
-        storage.set(STORAGE_KEYS.refreshToken, res.refreshToken);
-      }
-
-      if (typeof window !== "undefined") {
-        localStorage.setItem(
-          "pay₹ent_session",
-          JSON.stringify({
-            accountId,
-            accountType: "pay₹ent",
-            email: createdUser.email,
-            name: createdUser.fullName,
-            loggedInAt: new Date().toISOString(),
-          })
-        );
-        localStorage.setItem("pay₹ent_account", JSON.stringify(createdUser));
-        window.dispatchEvent(new CustomEvent("payent:storage_change"));
-      }
-
-      toast.success("Account created successfully!");
-
-      const searchParams =
-        typeof window !== "undefined"
-          ? new URLSearchParams(window.location.search)
-          : null;
-      const redirectUrl =
-        searchParams?.get("redirect") ||
-        searchParams?.get("returnUrl") ||
-        (typeof window !== "undefined"
-          ? localStorage.getItem("pay₹ent_pending_product_redirect")
-          : null);
-      const pendingProductId =
-        typeof window !== "undefined"
-          ? localStorage.getItem("pendingProductId")
-          : null;
-
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("pay₹ent_pending_product_redirect");
-        localStorage.removeItem("pendingProductId");
-      }
-
-      if (redirectUrl && redirectUrl.startsWith("/")) {
-        navigate({ to: redirectUrl as any });
-      } else if (pendingProductId) {
-        navigate({ to: `/product/${pendingProductId}` as any });
-      } else if (createdUser.role === "admin") {
+      if (createdRole === "admin" && res.token) {
+        const createdUser: UserType = {
+          id: userObj.id || userObj.email || data.email,
+          accountId,
+          accountType: "pay₹ent",
+          fullName: userObj.fullName || userObj.name || data.fullName,
+          email: userObj.email || data.email,
+          phone: userObj.phone || data.phone,
+          address: userObj.address || data.address,
+          city: userObj.city || data.city || "India",
+          pincode: userObj.pincode || data.pincode,
+          panNumber: panUpper,
+          panMasked,
+          role: "admin",
+          status: "active",
+          country: "India",
+        };
+        storage.set(STORAGE_KEYS.token, res.token);
+        storage.set(STORAGE_KEYS.currentUser, createdUser);
+        localStorage.setItem("payent:admin:token", res.token);
+        localStorage.setItem("payent:admin:current_user", JSON.stringify(createdUser));
+        toast.success("Admin account created successfully!");
         navigate({ to: "/admin/dashboard" });
-      } else {
-        navigate({ to: "/categories" });
+        return;
       }
+
+      // Normal Payrent Customer Registration -> Route immediately to Account Under Review
+      toast.success("Account created successfully! Your account is currently under review by our Admin team.");
+      navigate({
+        to: "/account-pending",
+        search: { type: "payrent", email: data.email } as any,
+      });
     } catch (err) {
       const msg =
         (err as { message?: string })?.message ?? "Failed to create account.";

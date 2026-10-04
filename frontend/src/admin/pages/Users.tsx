@@ -118,17 +118,19 @@ export default function Users() {
     }
   };
 
-  // User actions
-  const handleApprove = async (id: string) => {
-    if (!confirm("Are you sure you want to approve and verify this user account?")) return;
+  // User actions & rejection modal
+  const [rejectModalTarget, setRejectModalTarget] = useState<{ id: string; name: string; type?: string } | null>(null);
+  const [rejectReasonInput, setRejectReasonInput] = useState("");
+
+  const handleApprove = async (id: string, type?: string) => {
     try {
       setActionLoading(true);
-      const updated = await usersService.approveUser(id);
-      setUsers((prev) => prev.map((u) => ((u.id === id || u.email === id) ? { ...u, ...updated, status: "approved", verified: true } : u)));
-      if (selectedUser && (selectedUser.id === id || selectedUser.email === id)) {
-        setSelectedUser((prev) => prev ? { ...prev, ...updated, status: "approved", verified: true } : null);
+      const updated = await usersService.approveUser(id, type);
+      setUsers((prev) => prev.map((u) => ((u.id === id || u.email === id || u.accountId === id) ? { ...u, ...updated, status: "APPROVED", verified: true } : u)));
+      if (selectedUser && (selectedUser.id === id || selectedUser.email === id || selectedUser.accountId === id)) {
+        setSelectedUser((prev) => prev ? { ...prev, ...updated, status: "APPROVED", verified: true } : null);
       }
-      toast.success("User account approved and verified.");
+      toast.success(`${type || "User"} account approved and verified.`);
     } catch {
       toast.error("Failed to approve user.");
     } finally {
@@ -136,16 +138,20 @@ export default function Users() {
     }
   };
 
-  const handleReject = async (id: string) => {
-    const reason = prompt("Enter reason for rejection (optional):") || undefined;
+  const handleConfirmReject = async () => {
+    if (!rejectModalTarget) return;
+    const { id, name, type } = rejectModalTarget;
     try {
       setActionLoading(true);
-      const updated = await usersService.rejectUser(id, reason);
-      setUsers((prev) => prev.map((u) => ((u.id === id || u.email === id) ? { ...u, ...updated, status: "rejected" } : u)));
-      if (selectedUser && (selectedUser.id === id || selectedUser.email === id)) {
-        setSelectedUser((prev) => prev ? { ...prev, ...updated, status: "rejected" } : null);
+      const reason = rejectReasonInput.trim() || "Submitted information needs correction.";
+      const updated = await usersService.rejectUser(id, reason, type);
+      setUsers((prev) => prev.map((u) => ((u.id === id || u.email === id || u.accountId === id) ? { ...u, ...updated, status: "REJECTED" } : u)));
+      if (selectedUser && (selectedUser.id === id || selectedUser.email === id || selectedUser.accountId === id)) {
+        setSelectedUser((prev) => prev ? { ...prev, ...updated, status: "REJECTED" } : null);
       }
-      toast.info("User account registration rejected.");
+      setRejectModalTarget(null);
+      setRejectReasonInput("");
+      toast.info(`Account "${name}" rejected (Reason: ${reason}).`);
     } catch {
       toast.error("Failed to reject user.");
     } finally {
@@ -278,15 +284,16 @@ export default function Users() {
       label: "Status",
       sortable: true,
       render: (row) => {
-        const isApproved = row.status === "approved" || row.status === "active";
-        const isPending = row.status === "pending";
-        const isSuspended = row.status === "suspended";
-        const isRejected = row.status === "rejected";
+        const rawStatus = String(row.status || "").toUpperCase();
+        const isApproved = rawStatus === "APPROVED" || rawStatus === "ACTIVE";
+        const isPending = rawStatus === "PENDING" || rawStatus === "PENDING_REVIEW" || rawStatus === "UNVERIFIED";
+        const isSuspended = rawStatus === "SUSPENDED";
+        const isRejected = rawStatus === "REJECTED" || rawStatus === "DECLINED";
 
         return (
           <span
             className={cn(
-              "px-2 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider border inline-flex items-center gap-1",
+              "px-2 py-0.5 rounded text-[10px] font-mono font-medium uppercase tracking-wider border inline-flex items-center gap-1",
               isApproved
                 ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
                 : isPending
@@ -296,8 +303,8 @@ export default function Users() {
                 : "bg-secondary text-muted-foreground border-border/60"
             )}
           >
-            <span className="h-1.5 w-1.5 rounded-full bg-current" />
-            {row.status || "active"}
+            <span className={cn("h-1.5 w-1.5 rounded-full", isPending ? "bg-amber-500 animate-pulse" : "bg-current")} />
+            {isPending ? "Pending Review" : (row.status || "active")}
           </span>
         );
       },
@@ -325,60 +332,74 @@ export default function Users() {
       key: "actions",
       label: "Actions",
       align: "right",
-      render: (row) => (
-        <div className="flex items-center justify-end gap-1.5">
-          <button
-            onClick={() => handleOpenUser(row)}
-            className="p-1.5 rounded-md hover:bg-secondary text-foreground transition-colors cursor-pointer"
-            title="Inspect complete user record"
-          >
-            <Eye className="h-3.5 w-3.5" />
-          </button>
+      render: (row) => {
+        const rawStatus = String(row.status || "").toUpperCase();
+        const isPending = rawStatus === "PENDING" || rawStatus === "PENDING_REVIEW" || rawStatus === "UNVERIFIED";
+        const isSuspended = rawStatus === "SUSPENDED";
+        const isPayernt = row.accountType?.toLowerCase().includes("payernt") || row.role === "lender" || row.role === "vendor";
+        const typeLabel = isPayernt ? "Payernt" : "Payrent";
 
-          {row.status === "pending" && (
-            <>
+        return (
+          <div className="flex items-center justify-end gap-1.5">
+            <button
+              onClick={() => handleOpenUser(row)}
+              className="p-1.5 rounded-md hover:bg-secondary text-foreground transition-colors cursor-pointer"
+              title="Inspect complete user record"
+            >
+              <Eye className="h-3.5 w-3.5" />
+            </button>
+
+            {isPending && (
+              <>
+                <button
+                  onClick={() => handleApprove(row.accountId || row.id || row.email, typeLabel)}
+                  disabled={actionLoading}
+                  className="p-1.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 transition-colors cursor-pointer"
+                  title={`Approve ${typeLabel} user`}
+                >
+                  <CheckCircle className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  onClick={() =>
+                    setRejectModalTarget({
+                      id: row.accountId || row.id || row.email,
+                      name: row.fullName || row.email,
+                      type: typeLabel,
+                    })
+                  }
+                  disabled={actionLoading}
+                  className="p-1.5 rounded-md bg-red-500/10 text-[#FF1744] hover:bg-red-500/20 border border-red-500/20 transition-colors cursor-pointer"
+                  title={`Reject ${typeLabel} user`}
+                >
+                  <XCircle className="h-3.5 w-3.5" />
+                </button>
+              </>
+            )}
+
+            {isSuspended ? (
               <button
-                onClick={() => handleApprove(row.id || row.email)}
+                onClick={() => handleActivate(row.id || row.email)}
                 disabled={actionLoading}
                 className="p-1.5 rounded-md bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 border border-emerald-500/20 transition-colors cursor-pointer"
-                title="Approve user"
+                title="Reactivate user"
               >
-                <CheckCircle className="h-3.5 w-3.5" />
+                <UserCheck className="h-3.5 w-3.5" />
               </button>
-              <button
-                onClick={() => handleReject(row.id || row.email)}
-                disabled={actionLoading}
-                className="p-1.5 rounded-md bg-red-500/10 text-[#FF1744] hover:bg-red-500/20 border border-red-500/20 transition-colors cursor-pointer"
-                title="Reject user"
-              >
-                <XCircle className="h-3.5 w-3.5" />
-              </button>
-            </>
-          )}
-
-          {row.status === "suspended" ? (
-            <button
-              onClick={() => handleActivate(row.id || row.email)}
-              disabled={actionLoading}
-              className="p-1.5 rounded-md bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 border border-emerald-500/20 transition-colors cursor-pointer"
-              title="Reactivate user"
-            >
-              <UserCheck className="h-3.5 w-3.5" />
-            </button>
-          ) : (
-            row.status !== "pending" && (
-              <button
-                onClick={() => handleSuspend(row.id || row.email)}
-                disabled={actionLoading}
-                className="p-1.5 rounded-md hover:bg-red-500/10 text-muted-foreground hover:text-[#FF1744] transition-colors cursor-pointer"
-                title="Suspend user"
-              >
-                <ShieldAlert className="h-3.5 w-3.5" />
-              </button>
-            )
-          )}
-        </div>
-      ),
+            ) : (
+              !isPending && (
+                <button
+                  onClick={() => handleSuspend(row.id || row.email)}
+                  disabled={actionLoading}
+                  className="p-1.5 rounded-md hover:bg-red-500/10 text-muted-foreground hover:text-[#FF1744] transition-colors cursor-pointer"
+                  title="Suspend user"
+                >
+                  <ShieldAlert className="h-3.5 w-3.5" />
+                </button>
+              )
+            )}
+          </div>
+        );
+      },
     },
   ];
 
@@ -869,14 +890,20 @@ export default function Users() {
               {selectedUser.status === "pending" ? (
                 <>
                   <button
-                    onClick={() => handleApprove(selectedUser.id || selectedUser.email)}
+                    onClick={() => handleApprove(selectedUser.accountId || selectedUser.id || selectedUser.email, selectedUser.accountType)}
                     disabled={actionLoading}
                     className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-all cursor-pointer"
                   >
                     Approve Account
                   </button>
                   <button
-                    onClick={() => handleReject(selectedUser.id || selectedUser.email)}
+                    onClick={() => {
+                      setRejectModalTarget({
+                        id: selectedUser.accountId || selectedUser.id || selectedUser.email,
+                        name: selectedUser.fullName || selectedUser.email,
+                        type: selectedUser.accountType,
+                      });
+                    }}
                     disabled={actionLoading}
                     className="flex-1 py-2.5 rounded-xl bg-destructive hover:bg-destructive/90 text-white font-bold text-xs transition-all cursor-pointer"
                   >

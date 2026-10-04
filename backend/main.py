@@ -107,6 +107,7 @@ from database import (
     delete_custom_product,
     toggle_custom_product_availability,
     update_custom_product,
+    resubmit_payrent_account,
     revoke_token,
     is_token_revoked,
     record_failed_auth_attempt,
@@ -1051,7 +1052,8 @@ def register_verify(data: RegisterVerifySchema, request: Request):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=pwd_err)
 
     hashed = hash_password(data.password)
-    user_status = "approved" if role == "admin" else "active"
+    user_status = "APPROVED" if role == "admin" else "PENDING_REVIEW"
+    is_verified = bool(role == "admin")
 
     from payernt_database import get_or_create_person
     person_id = data.person_id or data.personId or get_or_create_person(display_name, clean_phone)
@@ -1077,14 +1079,16 @@ def register_verify(data: RegisterVerifySchema, request: Request):
     logger.info(f"User registration successful for {clean_email} with role={role}, status={user_status}")
     
     account_id = f"PAYRENT_USER_{clean_email}"
-    token_payload = {
-        "sub": clean_email,
-        "account_type": "pay₹ent",
-        "user_id": account_id,
-        "person_id": person_id,
-        "role": role,
-    }
-    token = create_access_token(token_payload)
+    token = None
+    if role == "admin":
+        token_payload = {
+            "sub": clean_email,
+            "account_type": "pay₹ent",
+            "user_id": account_id,
+            "person_id": person_id,
+            "role": role,
+        }
+        token = create_access_token(token_payload)
     
     user_record = {
         "id": clean_email,
@@ -1102,7 +1106,7 @@ def register_verify(data: RegisterVerifySchema, request: Request):
         "panNumber": clean_pan,
         "panMasked": f"XXXXX{clean_pan[-5:]}" if clean_pan and len(clean_pan) == 10 else None,
         "status": user_status,
-        "verified": True,
+        "verified": is_verified,
         "createdAt": datetime.datetime.now(datetime.timezone.utc).isoformat()
     }
     
@@ -1111,7 +1115,9 @@ def register_verify(data: RegisterVerifySchema, request: Request):
     return {
         "success": True, 
         "token": token,
-        "message": "pay₹ent account created successfully.",
+        "status": user_status,
+        "accountType": "Payrent",
+        "message": "Your account has been created successfully. Our Admin team is currently reviewing your submitted information.",
         "account": user_record,
         "user": user_record
     }
@@ -1350,11 +1356,39 @@ def login(data: LoginRequestSchema, request: Request, response: Response):
             detail="Invalid email or password."
         )
 
-    if user.get("status") == "suspended":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account suspended. Please contact support."
-        )
+    user_status = str(user.get("status", "")).upper()
+    if user.get("role") not in ("admin", "superadmin"):
+        if user_status in ("PENDING_REVIEW", "PENDING", "UNVERIFIED"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "status": "PENDING_REVIEW",
+                    "accountType": "Payrent",
+                    "email": user["email"],
+                    "message": "Your account is still under review. Our Admin team is currently reviewing your submitted information."
+                }
+            )
+        if user_status in ("REJECTED", "DECLINED"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "status": "REJECTED",
+                    "accountType": "Payrent",
+                    "email": user["email"],
+                    "rejectionReason": user.get("rejection_reason") or "Your submitted information could not be verified.",
+                    "message": "Your account was not approved."
+                }
+            )
+        if user_status in ("SUSPENDED", "INACTIVE", "BANNED"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "status": "SUSPENDED",
+                    "accountType": "Payrent",
+                    "email": user["email"],
+                    "message": "Your account has been suspended. Please contact support."
+                }
+            )
 
     # Clear lockout on success
     clear_failed_auth_attempts(ip_key)
@@ -5845,65 +5879,87 @@ def admin_users_list(current_admin: dict = Depends(check_admin_user)):
     if not conn:
         return []
     
-    users_by_email = {}
+    users_by_id = {}
     try:
         with conn.cursor() as cursor:
             # 1. Payernt (Vendor) accounts
-            cursor.execute("SELECT id, email, name, phone, address, pincode, status, avatar, created_at FROM payernt_accounts ORDER BY created_at DESC")
+            cursor.execute("SELECT id, email, name, phone, address, pincode, status, aadhaar_number, rejection_reason, reviewed_by, reviewed_at, avatar, created_at FROM payernt_accounts ORDER BY created_at DESC")
             for r in (cursor.fetchall() or []):
                 em = r["email"].lower().strip()
-                users_by_email[em] = {
-                    "id": r["email"],
+                status_str = r.get("status") or "PENDING_REVIEW"
+                is_approved = status_str.upper() in ("APPROVED", "ACTIVE")
+                raw_aadh = r.get("aadhaar_number") or ""
+                masked_aadh = f"XXXX-XXXX-{raw_aadh[-4:]}" if len(raw_aadh) >= 4 else (raw_aadh if raw_aadh else None)
+                
+                users_by_id[f"payernt_{em}"] = {
+                    "id": em,
+                    "accountId": r.get("id") or f"PAYERNT_USER_{em}",
                     "fullName": r.get("name") or em.split("@")[0],
+                    "name": r.get("name") or em.split("@")[0],
                     "email": r["email"],
                     "phone": r.get("phone") or "",
-                    "address": r.get("address"),
+                    "address": r.get("address") or "",
                     "city": "",
-                    "pincode": r.get("pincode"),
+                    "pincode": r.get("pincode") or "",
+                    "aadhaarNumber": masked_aadh,
+                    "aadhaarMasked": masked_aadh,
                     "role": "lender",
-                    "accountType": "paye₹nt",
-                    "status": r.get("status") or "active",
-                    "verified": True,
+                    "accountType": "Payernt",
+                    "status": status_str,
+                    "rejectionReason": r.get("rejection_reason"),
+                    "reviewedBy": r.get("reviewed_by"),
+                    "reviewedAt": r.get("reviewed_at"),
+                    "verified": is_approved,
                     "avatar": r.get("avatar") or f"https://ui-avatars.com/api/?name={urllib.parse.quote(r.get('name') or em)}&background=0D151D&color=fff",
                     "createdAt": str(r.get("created_at") or "")
                 }
 
             # 2. Payrent (Customer) accounts
-            cursor.execute("SELECT email, full_name, phone, address, pincode, status, avatar, created_at FROM payrent_accounts ORDER BY created_at DESC")
+            cursor.execute("SELECT id, email, full_name, phone, address, city, pincode, status, pan_number, rejection_reason, reviewed_by, reviewed_at, avatar, created_at FROM payrent_accounts ORDER BY created_at DESC")
             for r in (cursor.fetchall() or []):
                 em = r["email"].lower().strip()
-                if em in users_by_email:
-                    users_by_email[em]["role"] = "both"
-                    users_by_email[em]["accountType"] = "paye₹nt + pay₹ent"
-                else:
-                    users_by_email[em] = {
-                        "id": r["email"],
-                        "fullName": r.get("full_name") or em.split("@")[0],
-                        "email": r["email"],
-                        "phone": r.get("phone") or "",
-                        "address": r.get("address"),
-                        "city": "",
-                        "pincode": r.get("pincode"),
-                        "role": "customer",
-                        "accountType": "pay₹ent",
-                        "status": r.get("status") or "active",
-                        "verified": True,
-                        "avatar": r.get("avatar") or f"https://ui-avatars.com/api/?name={urllib.parse.quote(r.get('full_name') or em)}&background=0D151D&color=fff",
-                        "createdAt": str(r.get("created_at") or "")
-                    }
+                status_str = r.get("status") or "PENDING_REVIEW"
+                is_approved = status_str.upper() in ("APPROVED", "ACTIVE")
+                raw_pan = r.get("pan_number") or ""
+                masked_pan = f"XXXXX{raw_pan[-5:]}" if len(raw_pan) == 10 else (raw_pan if raw_pan else None)
+                
+                users_by_id[f"payrent_{em}"] = {
+                    "id": em,
+                    "accountId": r.get("id") or f"PAYRENT_USER_{em}",
+                    "fullName": r.get("full_name") or em.split("@")[0],
+                    "name": r.get("full_name") or em.split("@")[0],
+                    "email": r["email"],
+                    "phone": r.get("phone") or "",
+                    "address": r.get("address") or "",
+                    "city": r.get("city") or "",
+                    "pincode": r.get("pincode") or "",
+                    "panNumber": masked_pan,
+                    "panMasked": masked_pan,
+                    "role": "customer",
+                    "accountType": "Payrent",
+                    "status": status_str,
+                    "rejectionReason": r.get("rejection_reason"),
+                    "reviewedBy": r.get("reviewed_by"),
+                    "reviewedAt": r.get("reviewed_at"),
+                    "verified": is_approved,
+                    "avatar": r.get("avatar") or f"https://ui-avatars.com/api/?name={urllib.parse.quote(r.get('full_name') or em)}&background=0D151D&color=fff",
+                    "createdAt": str(r.get("created_at") or "")
+                }
 
             # 3. Admin accounts
             cursor.execute("SELECT id, email, full_name, phone, address, city, pincode, status, verified, avatar, created_at FROM admin_accounts ORDER BY created_at DESC")
             for r in (cursor.fetchall() or []):
                 em = r["email"].lower().strip()
-                users_by_email[em] = {
-                    "id": r["email"],
+                users_by_id[f"admin_{em}"] = {
+                    "id": em,
+                    "accountId": r.get("id") or f"ADMIN_{em}",
                     "fullName": r.get("full_name") or "Administrator",
+                    "name": r.get("full_name") or "Administrator",
                     "email": r["email"],
                     "phone": r.get("phone") or "",
-                    "address": r.get("address"),
-                    "city": r.get("city"),
-                    "pincode": r.get("pincode"),
+                    "address": r.get("address") or "",
+                    "city": r.get("city") or "",
+                    "pincode": r.get("pincode") or "",
                     "role": "admin",
                     "accountType": "Admin",
                     "status": r.get("status") or "active",
@@ -5911,34 +5967,14 @@ def admin_users_list(current_admin: dict = Depends(check_admin_user)):
                     "avatar": r.get("avatar") or "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
                     "createdAt": str(r.get("created_at") or "")
                 }
-
-            # 4. Fallback legacy users table
-            cursor.execute("SELECT email, phone, full_name, role, status, verified, avatar, address, city, pincode, created_at FROM users ORDER BY created_at DESC")
-            for r in (cursor.fetchall() or []):
-                em = r["email"].lower().strip()
-                if em not in users_by_email:
-                    users_by_email[em] = {
-                        "id": r["email"],
-                        "fullName": r.get("full_name") or em.split("@")[0],
-                        "email": r["email"],
-                        "phone": r.get("phone") or "",
-                        "address": r.get("address"),
-                        "city": r.get("city"),
-                        "pincode": r.get("pincode"),
-                        "role": r.get("role") or "customer",
-                        "accountType": "Standard",
-                        "status": r.get("status") or "active",
-                        "verified": bool(r.get("verified")),
-                        "avatar": r.get("avatar") or "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
-                        "createdAt": str(r.get("created_at") or "")
-                    }
     except Exception as e:
         logger.warning(f"[admin_users_list] error: {e}")
     finally:
         if conn:
             conn.close()
-        
-    return list(users_by_email.values())
+    return list(users_by_id.values())
+
+
 
 @app.get("/api/admin/users/payernt")
 def admin_payernt_users_list(current_admin: dict = Depends(check_admin_user)):
@@ -6549,96 +6585,384 @@ def admin_get_user_details(id: str, current_admin: dict = Depends(check_admin_us
 @app.patch("/api/admin/users/{id}/approve")
 @app.post("/api/admin/users/{id}/approve")
 @app.put("/api/admin/users/{id}/approve")
-def admin_approve_user(id: str, current_admin: dict = Depends(check_admin_user)):
-    user = get_user(id)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+def admin_approve_user(id: str, type: Optional[str] = Query(None), current_admin: dict = Depends(check_admin_user)):
+    clean_id = id.strip().lower()
+    now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    admin_identifier = current_admin.get("email") or current_admin.get("full_name") or "Admin"
+    
+    req_type = (type or "").strip().lower()
+    is_payernt_target = req_type == "payernt" or clean_id.startswith("payernt") or clean_id.startswith("lender")
+    is_payrent_target = req_type == "payrent" or clean_id.startswith("payrent")
+
+    # If neither explicitly targeted by ID prefix or param, inspect if an accountId was passed
+    if not is_payernt_target and not is_payrent_target:
+        # Check if ID exists in payernt_accounts specifically
+        p_match = execute_query("SELECT id, email FROM payernt_accounts WHERE id = %s", (id,))
+        if p_match:
+            is_payernt_target = True
+        else:
+            r_match = execute_query("SELECT id, email FROM payrent_accounts WHERE id = %s", (id,))
+            if r_match:
+                is_payrent_target = True
+
+    if is_payernt_target:
+        execute_query("""
+            UPDATE payernt_accounts
+            SET status = 'APPROVED', reviewed_by = %s, reviewed_at = %s, rejection_reason = NULL, updated_at = %s
+            WHERE LOWER(email) = %s OR id = %s
+        """, (admin_identifier, now_str, now_str, clean_id, id))
+    elif is_payrent_target:
+        execute_query("""
+            UPDATE payrent_accounts
+            SET status = 'APPROVED', verified = 1, reviewed_by = %s, reviewed_at = %s, rejection_reason = NULL, updated_at = %s
+            WHERE LOWER(email) = %s OR id = %s
+        """, (admin_identifier, now_str, now_str, clean_id, id))
+        execute_query("""
+            UPDATE users
+            SET status = 'APPROVED', verified = 1, reviewed_by = %s, reviewed_at = %s, rejection_reason = NULL, updated_at = %s
+            WHERE LOWER(email) = %s
+        """, (admin_identifier, now_str, now_str, clean_id))
+    else:
+        # Check which account is pending review for this email
+        p_pending = execute_query("SELECT id FROM payernt_accounts WHERE LOWER(email) = %s AND UPPER(status) = 'PENDING_REVIEW'", (clean_id,))
+        r_pending = execute_query("SELECT id FROM payrent_accounts WHERE LOWER(email) = %s AND UPPER(status) = 'PENDING_REVIEW'", (clean_id,))
         
-    execute_query("UPDATE users SET status = 'approved', verified = 1 WHERE email = %s", (id,))
-    invalidate_user_cache(id)
+        if p_pending and not r_pending:
+            execute_query("""
+                UPDATE payernt_accounts
+                SET status = 'APPROVED', reviewed_by = %s, reviewed_at = %s, rejection_reason = NULL, updated_at = %s
+                WHERE LOWER(email) = %s OR id = %s
+            """, (admin_identifier, now_str, now_str, clean_id, id))
+        elif r_pending and not p_pending:
+            execute_query("""
+                UPDATE payrent_accounts
+                SET status = 'APPROVED', verified = 1, reviewed_by = %s, reviewed_at = %s, rejection_reason = NULL, updated_at = %s
+                WHERE LOWER(email) = %s OR id = %s
+            """, (admin_identifier, now_str, now_str, clean_id, id))
+            execute_query("""
+                UPDATE users
+                SET status = 'APPROVED', verified = 1, reviewed_by = %s, reviewed_at = %s, rejection_reason = NULL, updated_at = %s
+                WHERE LOWER(email) = %s
+            """, (admin_identifier, now_str, now_str, clean_id))
+        else:
+            # Update both if both pending or generic
+            execute_query("""
+                UPDATE payernt_accounts
+                SET status = 'APPROVED', reviewed_by = %s, reviewed_at = %s, rejection_reason = NULL, updated_at = %s
+                WHERE LOWER(email) = %s OR id = %s
+            """, (admin_identifier, now_str, now_str, clean_id, id))
+            execute_query("""
+                UPDATE payrent_accounts
+                SET status = 'APPROVED', verified = 1, reviewed_by = %s, reviewed_at = %s, rejection_reason = NULL, updated_at = %s
+                WHERE LOWER(email) = %s OR id = %s
+            """, (admin_identifier, now_str, now_str, clean_id, id))
+            execute_query("""
+                UPDATE users
+                SET status = 'APPROVED', verified = 1, reviewed_by = %s, reviewed_at = %s, rejection_reason = NULL, updated_at = %s
+                WHERE LOWER(email) = %s
+            """, (admin_identifier, now_str, now_str, clean_id))
+
+    invalidate_user_cache(clean_id)
     
     # Audit log
-    now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
     execute_query("""
         INSERT INTO admin_logs (id, timestamp, user_name, action, module, ip_address)
         VALUES (%s, %s, %s, %s, %s, %s)
-    """, (f"l-{random.randint(100000, 999999)}", now_str, current_admin["full_name"], f"Approved user account {id}", "Users", "127.0.0.1"))
+    """, (f"l-{random.randint(100000, 999999)}", now_str, current_admin.get("full_name", "Admin"), f"Approved user account {clean_id} (Type: {req_type or 'All'})", "Users", "127.0.0.1"))
     
     # Dispatch notification to the approved user
     create_notification(
-        email=id,
-        title="Creator Account Approved! 🎉",
-        message="Your creator account has been approved by admin. You can now list gear and book rentals.",
+        email=clean_id,
+        title="Account Approved! 🎉",
+        message="Your account has been reviewed and approved by our Admin team. You can now log in and access your workspace.",
         notif_type="system"
     )
     
-    updated = get_user(id)
+    updated = get_user(clean_id) or {}
     res_user = {
-        "id": updated["email"],
-        "fullName": updated["full_name"],
-        "email": updated["email"],
-        "phone": updated["phone"],
-        "role": updated["role"],
-        "status": "approved",
+        "id": updated.get("email", clean_id),
+        "fullName": updated.get("full_name") or updated.get("name") or clean_id.split("@")[0],
+        "email": updated.get("email", clean_id),
+        "phone": updated.get("phone", ""),
+        "role": updated.get("role", "customer"),
+        "status": "APPROVED",
         "verified": True,
-        "avatar": updated["avatar"] or updated.get("profile_photo_url") or "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
+        "reviewedBy": admin_identifier,
+        "reviewedAt": now_str,
+        "avatar": updated.get("avatar") or updated.get("profile_photo_url") or "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
         "profilePhotoUrl": updated.get("profile_photo_url") or updated.get("avatar"),
-        "createdAt": updated["created_at"]
+        "createdAt": str(updated.get("created_at", ""))
     }
     broadcast_admin_event("user.updated", res_user)
     return {
         "success": True,
-        "message": f"User {id} approved successfully.",
+        "message": f"User {clean_id} approved successfully.",
         "user": res_user
     }
 
+
 class RejectUserSchema(BaseModel):
     reason: Optional[str] = None
+    accountType: Optional[str] = None
+    account_type: Optional[str] = None
+
 
 @app.patch("/api/admin/users/{id}/reject")
 @app.post("/api/admin/users/{id}/reject")
 @app.put("/api/admin/users/{id}/reject")
-def admin_reject_user(id: str, data: Optional[RejectUserSchema] = None, current_admin: dict = Depends(check_admin_user)):
-    user = get_user(id)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-        
-    execute_query("UPDATE users SET status = 'rejected' WHERE email = %s", (id,))
-    invalidate_user_cache(id)
-    
-    reason_txt = f" (Reason: {data.reason})" if data and data.reason else ""
+def admin_reject_user(id: str, data: Optional[RejectUserSchema] = None, type: Optional[str] = Query(None), current_admin: dict = Depends(check_admin_user)):
+    clean_id = id.strip().lower()
     now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    admin_identifier = current_admin.get("email") or current_admin.get("full_name") or "Admin"
+    rejection_reason = (data.reason.strip() if data and data.reason else "Your submitted information could not be verified.")
+
+    req_type = (type or (data.accountType if data else None) or (data.account_type if data else None) or "").strip().lower()
+    is_payernt_target = req_type == "payernt" or clean_id.startswith("payernt") or clean_id.startswith("lender")
+    is_payrent_target = req_type == "payrent" or clean_id.startswith("payrent")
+
+    if not is_payernt_target and not is_payrent_target:
+        p_match = execute_query("SELECT id, email FROM payernt_accounts WHERE id = %s", (id,))
+        if p_match:
+            is_payernt_target = True
+        else:
+            r_match = execute_query("SELECT id, email FROM payrent_accounts WHERE id = %s", (id,))
+            if r_match:
+                is_payrent_target = True
+
+    if is_payernt_target:
+        execute_query("""
+            UPDATE payernt_accounts
+            SET status = 'REJECTED', rejection_reason = %s, reviewed_by = %s, reviewed_at = %s, updated_at = %s
+            WHERE LOWER(email) = %s OR id = %s
+        """, (rejection_reason, admin_identifier, now_str, now_str, clean_id, id))
+    elif is_payrent_target:
+        execute_query("""
+            UPDATE payrent_accounts
+            SET status = 'REJECTED', rejection_reason = %s, reviewed_by = %s, reviewed_at = %s, updated_at = %s
+            WHERE LOWER(email) = %s OR id = %s
+        """, (rejection_reason, admin_identifier, now_str, now_str, clean_id, id))
+        execute_query("""
+            UPDATE users
+            SET status = 'REJECTED', rejection_reason = %s, reviewed_by = %s, reviewed_at = %s, updated_at = %s
+            WHERE LOWER(email) = %s
+        """, (rejection_reason, admin_identifier, now_str, now_str, clean_id))
+    else:
+        # Check which account is pending review for this email
+        p_pending = execute_query("SELECT id FROM payernt_accounts WHERE LOWER(email) = %s AND UPPER(status) = 'PENDING_REVIEW'", (clean_id,))
+        r_pending = execute_query("SELECT id FROM payrent_accounts WHERE LOWER(email) = %s AND UPPER(status) = 'PENDING_REVIEW'", (clean_id,))
+        
+        if p_pending and not r_pending:
+            execute_query("""
+                UPDATE payernt_accounts
+                SET status = 'REJECTED', rejection_reason = %s, reviewed_by = %s, reviewed_at = %s, updated_at = %s
+                WHERE LOWER(email) = %s OR id = %s
+            """, (rejection_reason, admin_identifier, now_str, now_str, clean_id, id))
+        elif r_pending and not p_pending:
+            execute_query("""
+                UPDATE payrent_accounts
+                SET status = 'REJECTED', rejection_reason = %s, reviewed_by = %s, reviewed_at = %s, updated_at = %s
+                WHERE LOWER(email) = %s OR id = %s
+            """, (rejection_reason, admin_identifier, now_str, now_str, clean_id, id))
+            execute_query("""
+                UPDATE users
+                SET status = 'REJECTED', rejection_reason = %s, reviewed_by = %s, reviewed_at = %s, updated_at = %s
+                WHERE LOWER(email) = %s
+            """, (rejection_reason, admin_identifier, now_str, now_str, clean_id))
+        else:
+            execute_query("""
+                UPDATE payernt_accounts
+                SET status = 'REJECTED', rejection_reason = %s, reviewed_by = %s, reviewed_at = %s, updated_at = %s
+                WHERE LOWER(email) = %s OR id = %s
+            """, (rejection_reason, admin_identifier, now_str, now_str, clean_id, id))
+            execute_query("""
+                UPDATE payrent_accounts
+                SET status = 'REJECTED', rejection_reason = %s, reviewed_by = %s, reviewed_at = %s, updated_at = %s
+                WHERE LOWER(email) = %s OR id = %s
+            """, (rejection_reason, admin_identifier, now_str, now_str, clean_id, id))
+            execute_query("""
+                UPDATE users
+                SET status = 'REJECTED', rejection_reason = %s, reviewed_by = %s, reviewed_at = %s, updated_at = %s
+                WHERE LOWER(email) = %s
+            """, (rejection_reason, admin_identifier, now_str, now_str, clean_id))
+
+    invalidate_user_cache(clean_id)
+    
+    # Audit log
     execute_query("""
         INSERT INTO admin_logs (id, timestamp, user_name, action, module, ip_address)
         VALUES (%s, %s, %s, %s, %s, %s)
-    """, (f"l-{random.randint(100000, 999999)}", now_str, current_admin["full_name"], f"Rejected user account {id}{reason_txt}", "Users", "127.0.0.1"))
+    """, (f"l-{random.randint(100000, 999999)}", now_str, current_admin.get("full_name", "Admin"), f"Rejected user account {clean_id} (Reason: {rejection_reason})", "Users", "127.0.0.1"))
     
     # Dispatch notification to user
     create_notification(
-        email=id,
-        title="Account Status Update",
-        message=f"Your account application could not be approved at this time.{reason_txt}",
+        email=clean_id,
+        title="Account Review Update",
+        message=f"Your account application was not approved: {rejection_reason}. Please update your details to resubmit.",
         notif_type="system"
     )
     
-    updated = get_user(id)
+    updated = get_user(clean_id) or {}
     res_user = {
-        "id": updated["email"],
-        "fullName": updated["full_name"],
-        "email": updated["email"],
-        "phone": updated["phone"],
-        "role": updated["role"],
-        "status": "rejected",
-        "verified": bool(updated.get("verified", False)),
-        "avatar": updated["avatar"] or updated.get("profile_photo_url") or "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
+        "id": updated.get("email", clean_id),
+        "fullName": updated.get("full_name") or updated.get("name") or clean_id.split("@")[0],
+        "email": updated.get("email", clean_id),
+        "phone": updated.get("phone", ""),
+        "role": updated.get("role", "customer"),
+        "status": "REJECTED",
+        "rejectionReason": rejection_reason,
+        "reviewedBy": admin_identifier,
+        "reviewedAt": now_str,
+        "verified": False,
+        "avatar": updated.get("avatar") or updated.get("profile_photo_url") or "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
         "profilePhotoUrl": updated.get("profile_photo_url") or updated.get("avatar"),
-        "createdAt": updated["created_at"]
+        "createdAt": str(updated.get("created_at", ""))
     }
     broadcast_admin_event("user.updated", res_user)
     return {
         "success": True,
-        "message": f"User {id} rejected.",
+        "message": f"User {clean_id} rejected.",
         "user": res_user
+    }
+
+
+class ResubmitAccountSchema(BaseModel):
+    email: EmailStr
+    fullName: Optional[str] = None
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    phoneNumber: Optional[str] = None
+    address: Optional[str] = None
+    city: Optional[str] = None
+    pincode: Optional[str] = None
+    aadhaarNumber: Optional[str] = None
+    aadhaar_number: Optional[str] = None
+    panNumber: Optional[str] = None
+    pan_number: Optional[str] = None
+    accountType: Optional[str] = None
+
+
+@app.post("/api/auth/resubmit")
+@app.post("/api/resubmit")
+def resubmit_account(data: ResubmitAccountSchema):
+    """Resubmits updated details for a rejected account and changes status back to PENDING_REVIEW."""
+    clean_email = data.email.lower().strip()
+    target_type = (data.accountType or "").lower().strip()
+
+    name = data.fullName or data.name
+    phone = data.phoneNumber or data.phone
+    aadhaar = data.aadhaarNumber or data.aadhaar_number
+    pan = data.panNumber or data.pan_number
+
+    is_payernt = "payernt" in target_type or "vendor" in target_type or "lender" in target_type
+    is_payrent = "payrent" in target_type or "customer" in target_type or "renter" in target_type
+
+    updated_any = False
+
+    if is_payernt or not is_payrent:
+        from payernt_database import resubmit_payernt_account, get_payernt_account_by_email
+        p_acc = get_payernt_account_by_email(clean_email)
+        if p_acc:
+            resubmit_payernt_account(
+                email=clean_email,
+                name=name,
+                phone=phone,
+                address=data.address,
+                pincode=data.pincode,
+                aadhaar_number=aadhaar
+            )
+            updated_any = True
+
+    if is_payrent or not updated_any:
+        resubmit_payrent_account(
+            email=clean_email,
+            full_name=name,
+            phone=phone,
+            address=data.address,
+            city=data.city,
+            pincode=data.pincode,
+            pan_number=pan,
+            aadhaar_number=aadhaar
+        )
+        updated_any = True
+
+    broadcast_admin_event("user.updated", {"email": clean_email, "status": "PENDING_REVIEW"})
+
+    return {
+        "success": True,
+        "status": "PENDING_REVIEW",
+        "accountType": "Payernt" if is_payernt else "Payrent",
+        "message": "Your details have been updated and resubmitted for Admin review. Our team will review your submitted information shortly."
+    }
+
+
+@app.get("/api/auth/status")
+@app.get("/api/status")
+def get_auth_account_status(email: Optional[str] = None, type: Optional[str] = None, authorization: Optional[str] = Header(None)):
+    """Fetches real-time review/account status from the database for Under Review screen."""
+    clean_email = None
+    if email:
+        clean_email = email.lower().strip()
+    elif authorization and authorization.startswith("Bearer "):
+        try:
+            tok = authorization.split(" ")[1]
+            dec = decode_access_token(tok)
+            if dec and "sub" in dec:
+                clean_email = dec["sub"].lower().strip()
+        except Exception:
+            pass
+
+    if not clean_email:
+        raise HTTPException(status_code=400, detail="Email or valid auth token is required to check account status.")
+
+    account_type_req = (type or "").lower().strip()
+    status_val = "PENDING_REVIEW"
+    rejection_reason = None
+    reviewed_by = None
+    reviewed_at = None
+    matched_type = "Payrent"
+
+    # 1. If checking Payernt or general
+    if "payernt" in account_type_req or "vendor" in account_type_req:
+        from payernt_database import get_payernt_account_by_email
+        p_acc = get_payernt_account_by_email(clean_email)
+        if p_acc:
+            raw_s = str(p_acc.get("status", "PENDING_REVIEW")).upper()
+            status_val = "APPROVED" if raw_s in ("APPROVED", "ACTIVE") else ("REJECTED" if raw_s == "REJECTED" else "PENDING_REVIEW")
+            rejection_reason = p_acc.get("rejection_reason")
+            reviewed_by = p_acc.get("reviewed_by")
+            reviewed_at = p_acc.get("reviewed_at")
+            matched_type = "Payernt"
+    else:
+        user = get_user(clean_email)
+        if user:
+            raw_s = str(user.get("status", "PENDING_REVIEW")).upper()
+            if user.get("role") in ("admin", "superadmin"):
+                status_val = "APPROVED"
+            else:
+                status_val = "APPROVED" if raw_s in ("APPROVED", "ACTIVE") else ("REJECTED" if raw_s == "REJECTED" else "PENDING_REVIEW")
+            rejection_reason = user.get("rejection_reason")
+            reviewed_by = user.get("reviewed_by")
+            reviewed_at = user.get("reviewed_at")
+            matched_type = "Payernt" if user.get("role") == "lender" or user.get("account_type") == "paye₹nt" else "Payrent"
+        else:
+            from payernt_database import get_payernt_account_by_email
+            p_acc = get_payernt_account_by_email(clean_email)
+            if p_acc:
+                raw_s = str(p_acc.get("status", "PENDING_REVIEW")).upper()
+                status_val = "APPROVED" if raw_s in ("APPROVED", "ACTIVE") else ("REJECTED" if raw_s == "REJECTED" else "PENDING_REVIEW")
+                rejection_reason = p_acc.get("rejection_reason")
+                reviewed_by = p_acc.get("reviewed_by")
+                reviewed_at = p_acc.get("reviewed_at")
+                matched_type = "Payernt"
+
+    return {
+        "status": status_val,
+        "is_approved": status_val == "APPROVED",
+        "accountType": matched_type,
+        "email": clean_email,
+        "rejectionReason": rejection_reason,
+        "reviewedBy": reviewed_by,
+        "reviewedAt": reviewed_at,
     }
 
 # Agents

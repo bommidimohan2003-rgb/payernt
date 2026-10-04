@@ -327,6 +327,18 @@ export const api = {
           }
           return data;
         }
+        if (res.status === 403) {
+          const data = await res.json().catch(() => ({}));
+          const detail = typeof data?.detail === "object" ? data.detail : {};
+          const statusVal = detail.status || data.status || "PENDING_REVIEW";
+          const err = new Error(detail.message || data.message || "Your account is currently under administrative review.");
+          (err as any).status = statusVal;
+          (err as any).accountStatus = statusVal;
+          (err as any).rejectionReason = detail.rejectionReason || data.rejectionReason;
+          (err as any).accountType = detail.accountType || data.accountType || "Payrent";
+          (err as any).email = detail.email || email;
+          throw err;
+        }
         if (res.status === 400 || res.status === 401) {
           const data = await res.json().catch(() => ({}));
           throw new Error(parseApiError(data, "Invalid email or password."));
@@ -334,7 +346,16 @@ export const api = {
       }
     } catch (err: unknown) {
       const errorMsg = (err as Error)?.message || "";
-      if (errorMsg.includes("Invalid") || errorMsg.includes("Incorrect")) {
+      if (
+        errorMsg.includes("Invalid") ||
+        errorMsg.includes("Incorrect") ||
+        errorMsg.includes("under review") ||
+        errorMsg.includes("not approved") ||
+        errorMsg.includes("suspended") ||
+        (err as any)?.accountStatus ||
+        (err as any)?.status === "PENDING_REVIEW" ||
+        (err as any)?.status === "REJECTED"
+      ) {
         throw err;
       }
     }
@@ -357,6 +378,56 @@ export const api = {
       role: mockUser.role,
       user: mockUser,
     };
+  },
+
+  async getAuthStatus(token?: string | null, email?: string | null, type?: string | null) {
+    try {
+      if (API_BASE) {
+        const queryParams = new URLSearchParams();
+        if (email) queryParams.set("email", email);
+        if (type) queryParams.set("type", type);
+        const url = `${API_BASE}/api/auth/status?${queryParams.toString()}`;
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+
+        const res = await fetch(url, { headers });
+        if (res.ok) {
+          return await res.json();
+        }
+      }
+    } catch (e) {
+      console.warn("getAuthStatus check error:", e);
+    }
+    return { status: "PENDING_REVIEW", is_approved: false };
+  },
+
+  async resubmitAccount(data: {
+    email: string;
+    fullName?: string;
+    name?: string;
+    phone?: string;
+    phoneNumber?: string;
+    address?: string;
+    city?: string;
+    pincode?: string;
+    panNumber?: string;
+    aadhaarNumber?: string;
+    accountType?: string;
+  }) {
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/resubmit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      const resData = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(resData.detail || resData.message || "Failed to resubmit account details.");
+      }
+      return resData;
+    } catch (err: any) {
+      throw new Error(err?.message || "Failed to resubmit account details.");
+    }
   },
 
   async forgotPasswordRequest(email: string, recovery_token?: string) {
@@ -779,33 +850,6 @@ export const api = {
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
       throw new Error(parseApiError(data, "Failed to revoke session."));
-    }
-    return await res.json();
-  },
-
-  async getAuthStatus(token?: string): Promise<{
-    email: string;
-    status: string;
-    is_approved: boolean;
-    role: string;
-    verified: boolean;
-  }> {
-    if (!API_BASE) {
-      const cached = storage.get<Record<string, unknown> | null>(STORAGE_KEYS.currentUser, null);
-      return {
-        email: (cached?.email as string) || "user@payent.in",
-        status: (cached?.status as string) || "active",
-        is_approved: cached?.status === "active" || cached?.status === "approved",
-        role: (cached?.role as string) || "customer",
-        verified: true,
-      };
-    }
-    const res = await this.fetchWithAuth(`${API_BASE}/api/auth/status`, {
-      method: "GET",
-    });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(parseApiError(data, "Failed to fetch auth status."));
     }
     return await res.json();
   },

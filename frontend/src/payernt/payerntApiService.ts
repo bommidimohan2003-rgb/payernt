@@ -118,7 +118,15 @@ export const payerntApi = {
     pincode: string;
     password: string;
     confirmPassword?: string;
-  }): Promise<{ success: boolean; account?: PayerntAccount; token?: string; error?: string }> {
+  }): Promise<{
+    success: boolean;
+    status?: string;
+    accountType?: string;
+    account?: PayerntAccount;
+    token?: string;
+    error?: string;
+    message?: string;
+  }> {
     try {
       const res = await fetch(`${API_BASE}/api/payernt/auth/register`, {
         method: "POST",
@@ -130,7 +138,14 @@ export const payerntApi = {
         if (data.token) {
           localStorage.setItem("paye₹nt_token", data.token);
         }
-        return { success: true, account: data.account, token: data.token };
+        return {
+          success: true,
+          status: data.status || "PENDING_REVIEW",
+          accountType: "Payernt",
+          account: data.account,
+          token: data.token,
+          message: data.message,
+        };
       }
       return {
         success: false,
@@ -144,7 +159,15 @@ export const payerntApi = {
   async login(params: {
     email: string;
     password: string;
-  }): Promise<{ success: boolean; account?: PayerntAccount; token?: string; error?: string }> {
+  }): Promise<{
+    success: boolean;
+    status?: string;
+    accountType?: string;
+    rejectionReason?: string;
+    account?: PayerntAccount;
+    token?: string;
+    error?: string;
+  }> {
     try {
       const res = await fetch(`${API_BASE}/api/payernt/auth/login`, {
         method: "POST",
@@ -173,6 +196,16 @@ export const payerntApi = {
         }
         return { success: true, account: data.account, token: data.token };
       }
+      if (res.status === 403) {
+        const detail = typeof data?.detail === "object" ? data.detail : {};
+        return {
+          success: false,
+          status: detail.status || data.status || "PENDING_REVIEW",
+          accountType: detail.accountType || data.accountType || "Payernt",
+          rejectionReason: detail.rejectionReason || data.rejectionReason,
+          error: detail.message || data.message || "Your Payernt account is currently under review.",
+        };
+      }
       return {
         success: false,
         error: data.detail || data.message || "Invalid credentials for paye₹nt account.",
@@ -183,6 +216,54 @@ export const payerntApi = {
         error: e?.message || "Unable to reach server. Please check your network connection.",
       };
     }
+  },
+
+  async resubmit(params: {
+    name?: string;
+    email: string;
+    aadhaarNumber?: string;
+    phoneNumber?: string;
+    address?: string;
+    pincode?: string;
+  }): Promise<{ success: boolean; status?: string; message?: string; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/payernt/auth/resubmit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: params.name,
+          email: params.email,
+          aadhaarNumber: params.aadhaarNumber,
+          phoneNumber: params.phoneNumber,
+          address: params.address,
+          pincode: params.pincode,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        return { success: true, status: data.status || "PENDING_REVIEW", message: data.message };
+      }
+      return { success: false, error: data.detail || data.message || "Failed to resubmit details." };
+    } catch (e: any) {
+      return { success: false, error: e?.message || "Unable to connect to the server." };
+    }
+  },
+
+  async getStatus(email: string): Promise<{
+    status: string;
+    is_approved: boolean;
+    accountType?: string;
+    rejectionReason?: string;
+  }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/status?email=${encodeURIComponent(email)}&type=payernt`);
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (e) {
+      console.warn("Payernt status fetch error:", e);
+    }
+    return { status: "PENDING_REVIEW", is_approved: false, accountType: "Payernt" };
   },
 
   async logout(): Promise<{ success: boolean }> {

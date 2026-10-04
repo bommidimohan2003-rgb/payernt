@@ -435,16 +435,20 @@ def create_payernt_account(
         "address": address.strip(),
         "pincode": pincode.strip(),
         "password_hash": pwd_hash,
-        "status": "active",
+        "status": "PENDING_REVIEW",
+        "rejection_reason": None,
+        "reviewed_by": None,
+        "reviewed_at": None,
         "avatar": f"https://ui-avatars.com/api/?name={name.strip().replace(' ', '+')}&background=0c0c0c&color=ffffff",
         "created_at": now_iso,
         "last_login_at": now_iso,
+        "updated_at": now_iso,
     }
 
     try:
         execute_query("""
-            INSERT INTO payernt_accounts (id, person_id, account_type, email, name, aadhaar_number, phone, address, pincode, password_hash, status, avatar, created_at, last_login_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO payernt_accounts (id, person_id, account_type, email, name, aadhaar_number, phone, address, pincode, password_hash, status, rejection_reason, reviewed_by, reviewed_at, avatar, created_at, last_login_at, updated_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
             account["id"],
             account.get("person_id"),
@@ -457,9 +461,13 @@ def create_payernt_account(
             account["pincode"],
             account["password_hash"],
             account["status"],
+            account["rejection_reason"],
+            account["reviewed_by"],
+            account["reviewed_at"],
             account["avatar"],
             account["created_at"],
             account["last_login_at"],
+            account["updated_at"],
         ))
     except Exception as e:
         logger.warning(f"DB insert failed for payernt_account, falling back to memory: {e}")
@@ -475,8 +483,61 @@ def create_payernt_account(
     # Initialize wallet for vendor
     get_or_create_payernt_wallet(account_id, clean_email)
     # Log audit event
-    log_payernt_audit_event("REGISTER", account_id, {"email": clean_email, "name": name})
+    log_payernt_audit_event("REGISTER", account_id, {"email": clean_email, "name": name, "status": "PENDING_REVIEW"})
     return account
+
+
+def resubmit_payernt_account(
+    email: str,
+    name: str = None,
+    phone: str = None,
+    address: str = None,
+    pincode: str = None,
+    aadhaar_number: str = None,
+) -> Optional[Dict[str, Any]]:
+    """Updates and resets a rejected paye₹nt account back to PENDING_REVIEW."""
+    clean_email = (email or "").strip().lower()
+    acc = get_payernt_account_by_email(clean_email)
+    if not acc:
+        return None
+
+    now_iso = dt.now(timezone.utc).isoformat()
+    clean_phone = phone.strip() if phone else acc.get("phone", "")
+    clean_name = name.strip() if name else acc.get("name", "")
+    clean_address = address.strip() if address else acc.get("address", "")
+    clean_pincode = re.sub(r"\D", "", pincode) if pincode else acc.get("pincode", "")
+    
+    masked_aadhaar = acc.get("aadhaar_number")
+    if aadhaar_number:
+        clean_aadhaar = re.sub(r"\D", "", aadhaar_number.strip())
+        masked_aadhaar = f"XXXX-XXXX-{clean_aadhaar[-4:]}" if len(clean_aadhaar) >= 4 else f"XXXX-XXXX-{clean_aadhaar}"
+
+    try:
+        execute_query("""
+            UPDATE payernt_accounts
+            SET name = %s, phone = %s, address = %s, pincode = %s, aadhaar_number = %s,
+                status = 'PENDING_REVIEW', rejection_reason = NULL, reviewed_by = NULL, reviewed_at = NULL, updated_at = %s
+            WHERE email = %s
+        """, (clean_name, clean_phone, clean_address, clean_pincode, masked_aadhaar, now_iso, clean_email))
+    except Exception as e:
+        logger.warning(f"DB update error in resubmit_payernt_account: {e}")
+
+    if clean_email in MOCK_PAYERNT_ACCOUNTS:
+        MOCK_PAYERNT_ACCOUNTS[clean_email].update({
+            "name": clean_name,
+            "phone": clean_phone,
+            "address": clean_address,
+            "pincode": clean_pincode,
+            "aadhaar_number": masked_aadhaar,
+            "status": "PENDING_REVIEW",
+            "rejection_reason": None,
+            "reviewed_by": None,
+            "reviewed_at": None,
+            "updated_at": now_iso,
+        })
+
+    log_payernt_audit_event("RESUBMIT", acc.get("id"), {"email": clean_email, "name": clean_name})
+    return get_payernt_account_by_email(clean_email)
 
 
 def get_payernt_account_by_email(email: str) -> Optional[Dict[str, Any]]:
