@@ -45,6 +45,12 @@ from payernt_database import (
     verify_renter_pin_backend,
     verify_vendor_pin_backend,
     verify_handover_otp_backend,
+    generate_handover_otp,
+    verify_handover_otp,
+    vendor_prepare_product,
+    activate_rental_transactional,
+    add_payernt_pending_earnings,
+    settle_payernt_earnings,
     complete_rental_and_credit_vendor,
     get_or_create_payernt_wallet,
     withdraw_payernt_wallet,
@@ -70,6 +76,7 @@ logger = logging.getLogger("payent.payernt_router")
 
 payernt_router = APIRouter(tags=["paye₹nt - Vendor/Lender Backend"])
 rental_router = APIRouter(prefix="/api/bookings", tags=["Rental Lifecycle & Security"])
+delivery_handover_router = APIRouter(prefix="/api/deliveries", tags=["Delivery & Handover OTP"])
 
 
 # ============================================================
@@ -1605,6 +1612,43 @@ def verify_otp_endpoint(
     return {"success": True, "message": msg}
 
 
+@rental_router.post("/{booking_id}/activate-rental")
+@rental_router.post("/{booking_id}/security/activate")
+def activate_rental_endpoint(
+    booking_id: str,
+    authorization: Optional[str] = Header(None),
+):
+    """
+    Authoritative, transactional rental activation:
+    1. Verifies handover and OTP states.
+    2. Combines Vendor PIN + Renter PIN to deterministic 8-digit secret.
+    3. Atomically starts rental (orders.status='active', deliveries.status='COMPLETED', rental_security.status='active').
+    4. Starts vendor pending earnings in wallet idempotently.
+    5. Sends notifications to Renter, Vendor, and Admin.
+    """
+    user_id = ""
+    if authorization and authorization.startswith("Bearer "):
+        payload = decode_access_token(authorization.split(" ")[1], expected_type="access")
+        if payload:
+            user_id = payload.get("user_id", "")
+
+    valid, msg, record = activate_rental_transactional(booking_id, user_id)
+    if not valid:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
+
+    sanitized = sanitize_security_record_for_user(record, "renter", user_id) if record else None
+    return {
+        "success": True,
+        "message": msg,
+        "rentalStatus": "active",
+        "deliveryStatus": "COMPLETED",
+        "rentalStartedAt": record.get("rental_started_at") or record.get("activated_at"),
+        "earningsStatus": "ACTIVE",
+        "bookingStatus": "active",
+        "security": sanitized
+    }
+
+
 @rental_router.post("/{booking_id}/complete")
 def complete_rental_endpoint(
     booking_id: str,
@@ -1614,6 +1658,118 @@ def complete_rental_endpoint(
     if not success:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
     return {"success": True, "message": msg}
+
+
+# ============================================================
+# VENDOR PREPARE & DELIVERY HANDOVER OTP ENDPOINTS
+# ============================================================
+
+@payernt_router.post("/bookings/{booking_id}/prepare")
+@payernt_router.post("/paye₹nt/bookings/{booking_id}/prepare")
+@payernt_router.post("/payernt/bookings/{booking_id}/prepare")
+def vendor_prepare_product_endpoint(
+    booking_id: str,
+    current_vendor: Dict[str, Any] = Depends(get_current_payernt_account),
+):
+    """
+    Vendor prepares product for delivery:
+    1. Validates authenticated vendor owns product.
+    2. Secures 4-digit Vendor Secret PIN.
+    3. Updates deliveryStatus to 'WAITING_FOR_DELIVERY_BOY'.
+    4. Notifies delivery workflow.
+    """
+    vendor_id = current_vendor.get("id") or current_vendor.get("email")
+    vendor_email = current_vendor.get("email")
+    valid, msg, data = vendor_prepare_product(booking_id, vendor_id, vendor_email)
+    if not valid:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
+    return {
+        "success": True,
+        "message": msg,
+        "data": data,
+        "vendorSecretPin": data.get("vendorSecretPin"),
+        "deliveryStatus": data.get("deliveryStatus")
+    }
+
+
+class SendHandoverOtpSchema(BaseModel):
+    phone: Optional[str] = None
+    userId: Optional[str] = None
+
+
+class VerifyHandoverOtpSchema(BaseModel):
+    otp: str = Field(..., min_length=1)
+
+
+@delivery_handover_router.post("/{booking_id}/vendor-otp/send")
+def send_vendor_handover_otp_endpoint(booking_id: str, data: Optional[SendHandoverOtpSchema] = None):
+    """Sends OTP to vendor for pickup verification."""
+    phone = data.phone if data else ""
+    uid = data.userId if data else ""
+    if not phone:
+        sec = get_rental_security_record(booking_id)
+        if sec:
+            v_acc = get_payernt_account_by_id(sec.get("vendor_id", ""))
+            if v_acc:
+                phone = v_acc.get("phone", "")
+    res = generate_handover_otp(booking_id, uid or "vendor", phone or "+91 98765 43210", purpose="VENDOR_HANDOVER")
+    return res
+
+
+@delivery_handover_router.post("/{booking_id}/vendor-otp/verify")
+def verify_vendor_handover_otp_endpoint(booking_id: str, data: VerifyHandoverOtpSchema):
+    """Verifies vendor handover OTP (Vendor -> Delivery Boy)."""
+    valid, msg, rec = verify_handover_otp(booking_id, purpose="VENDOR_HANDOVER", entered_otp=data.otp)
+    if not valid:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
+    return {
+        "success": True,
+        "message": msg,
+        "deliveryStatus": "PICKED_UP_FROM_VENDOR",
+        "vendorHandoverVerified": True
+    }
+
+
+@delivery_handover_router.post("/{booking_id}/renter-otp/send")
+def send_renter_handover_otp_endpoint(booking_id: str, data: Optional[SendHandoverOtpSchema] = None):
+    """Sends OTP to renter for arrival / receipt verification."""
+    phone = data.phone if data else ""
+    uid = data.userId if data else ""
+    if not phone:
+        sec = get_rental_security_record(booking_id)
+        if sec:
+            r_user = fetch_one("SELECT phone FROM users WHERE email = %s", (sec.get("renter_id"),))
+            if r_user:
+                phone = r_user.get("phone", "")
+    res = generate_handover_otp(booking_id, uid or "renter", phone or "+91 98765 43211", purpose="RENTER_HANDOVER")
+    return res
+
+
+@delivery_handover_router.post("/{booking_id}/renter-otp/verify")
+def verify_renter_handover_otp_endpoint(
+    booking_id: str,
+    data: VerifyHandoverOtpSchema,
+    authorization: Optional[str] = Header(None)
+):
+    """Verifies renter handover OTP and reveals private 4-digit Renter PIN."""
+    user_id = ""
+    if authorization and authorization.startswith("Bearer "):
+        payload = decode_access_token(authorization.split(" ")[1], expected_type="access")
+        if payload:
+            user_id = payload.get("user_id", "")
+
+    valid, msg, rec = verify_handover_otp(booking_id, purpose="RENTER_HANDOVER", entered_otp=data.otp, user_id=user_id)
+    if not valid:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
+    
+    r_pin = rec.get("renter_secret_pin") if rec else None
+    return {
+        "success": True,
+        "message": msg,
+        "deliveryStatus": "RENTER_VERIFIED",
+        "renterHandoverVerified": True,
+        "renterSecretPin": r_pin
+    }
 
 
 class PayerntResubmitSchema(BaseModel):

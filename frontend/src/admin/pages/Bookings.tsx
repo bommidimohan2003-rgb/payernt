@@ -253,23 +253,30 @@ export default function Bookings() {
         const isCancelled = row.status === "cancelled";
 
         return (
-          <span
-            className={cn(
-              "px-2 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider border inline-flex items-center gap-1",
-              isCompleted
-                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
-                : isActive
-                ? "bg-secondary text-foreground border-border/70"
-                : isPending
-                ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
-                : isCancelled
-                ? "bg-red-500/10 text-[#FF1744] border-red-500/20"
-                : "bg-secondary text-muted-foreground border-border/60"
+          <div className="space-y-1">
+            <span
+              className={cn(
+                "px-2 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider border inline-flex items-center gap-1",
+                isCompleted
+                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                  : isActive
+                  ? "bg-secondary text-foreground border-border/70"
+                  : isPending
+                  ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
+                  : isCancelled
+                  ? "bg-red-500/10 text-[#FF1744] border-red-500/20"
+                  : "bg-secondary text-muted-foreground border-border/60"
+              )}
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-current" />
+              {row.status}
+            </span>
+            {row.deliveryStatus && (
+              <span className="block text-[9px] font-mono text-muted-foreground uppercase">
+                {row.deliveryStatus.replace(/_/g, " ")}
+              </span>
             )}
-          >
-            <span className="h-1.5 w-1.5 rounded-full bg-current" />
-            {row.status}
-          </span>
+          </div>
         );
       },
     },
@@ -285,7 +292,7 @@ export default function Bookings() {
               setModalOpen(true);
             }}
             className="p-1.5 rounded-md hover:bg-secondary text-foreground transition-colors cursor-pointer"
-            title="Inspect booking"
+            title="Inspect booking & handover lifecycle"
           >
             <Eye className="h-3.5 w-3.5" />
           </button>
@@ -463,6 +470,117 @@ export default function Bookings() {
               <div className="p-3 rounded-xl bg-secondary/40 border border-border/60 flex justify-between items-center">
                 <span className="text-muted-foreground">Total Fee</span>
                 <span className="font-mono font-black text-sm text-foreground">₹{(selectedBooking.amount || 0).toLocaleString("en-IN")}</span>
+              </div>
+
+              {/* Handover & Delivery Lifecycle Section */}
+              <div className="p-3.5 rounded-xl border border-border bg-card space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase font-bold text-muted-foreground">Handover & Delivery Status</span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary border border-primary/20 uppercase">
+                    {(selectedBooking.deliveryStatus || "WAITING_FOR_ADMIN").replace(/_/g, " ")}
+                  </span>
+                </div>
+
+                {selectedBooking.deliveryBoyName && (
+                  <div className="text-[11px] text-muted-foreground flex justify-between">
+                    <span>Courier Assigned:</span>
+                    <span className="font-bold text-foreground">
+                      {selectedBooking.deliveryBoyName} ({selectedBooking.deliveryBoyPhone || "Active"})
+                    </span>
+                  </div>
+                )}
+
+                {/* Handover timestamps */}
+                <div className="text-[10px] text-muted-foreground space-y-0.5 pt-1 border-t border-border/40 font-mono">
+                  {selectedBooking.pickedUpAt && (
+                    <div className="flex justify-between">
+                      <span>Courier Picked Up:</span>
+                      <span>{new Date(selectedBooking.pickedUpAt).toLocaleTimeString()}</span>
+                    </div>
+                  )}
+                  {selectedBooking.arrivedAtRenterAt && (
+                    <div className="flex justify-between">
+                      <span>Arrived at Renter:</span>
+                      <span>{new Date(selectedBooking.arrivedAtRenterAt).toLocaleTimeString()}</span>
+                    </div>
+                  )}
+                  {selectedBooking.rentalSecurity?.activatedAt && (
+                    <div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-bold">
+                      <span>Rental Activated & Earnings Started:</span>
+                      <span>{new Date(selectedBooking.rentalSecurity.activatedAt).toLocaleTimeString()}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Admin Handover Dispatch Controls */}
+                <div className="flex flex-wrap gap-2 pt-2 border-t border-border/40">
+                  {(!selectedBooking.deliveryStatus || selectedBooking.deliveryStatus === "WAITING_FOR_ADMIN") && (
+                    <button
+                      onClick={async () => {
+                        try {
+                          setActionLoading(true);
+                          await bookingsService.processBooking(selectedBooking.id);
+                          toast.success(`Booking #${selectedBooking.id} marked as Processing.`);
+                          fetchBookings(true);
+                          setSelectedBooking((prev) => prev ? { ...prev, deliveryStatus: "ADMIN_PROCESSING" } : null);
+                        } catch {
+                          toast.error("Failed to process booking.");
+                        } finally {
+                          setActionLoading(false);
+                        }
+                      }}
+                      disabled={actionLoading}
+                      className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-[11px] font-bold shadow-xs cursor-pointer"
+                    >
+                      Process Booking
+                    </button>
+                  )}
+
+                  {(selectedBooking.deliveryStatus === "ADMIN_PROCESSING" || selectedBooking.deliveryStatus === "WAITING_FOR_ADMIN") && (
+                    <button
+                      onClick={async () => {
+                        try {
+                          setActionLoading(true);
+                          await bookingsService.notifyVendor(selectedBooking.id);
+                          toast.success(`Vendor notified to prepare gear for booking #${selectedBooking.id}.`);
+                          fetchBookings(true);
+                          setSelectedBooking((prev) => prev ? { ...prev, deliveryStatus: "READY_FOR_VENDOR" } : null);
+                        } catch {
+                          toast.error("Failed to notify vendor.");
+                        } finally {
+                          setActionLoading(false);
+                        }
+                      }}
+                      disabled={actionLoading}
+                      className="px-3 py-1.5 rounded-lg bg-amber-500 text-white text-[11px] font-bold shadow-xs cursor-pointer"
+                    >
+                      Notify Vendor (Ready for Pickup)
+                    </button>
+                  )}
+
+                  <button
+                    onClick={async () => {
+                      const name = prompt("Enter Delivery Courier Name:", selectedBooking.deliveryBoyName || "Express Courier");
+                      if (!name) return;
+                      const phone = prompt("Enter Courier Phone:", selectedBooking.deliveryBoyPhone || "+91 98765 43210");
+                      try {
+                        setActionLoading(true);
+                        await bookingsService.assignDelivery(selectedBooking.id, { deliveryBoyName: name, deliveryBoyPhone: phone || "" });
+                        toast.success(`Assigned courier ${name} to booking #${selectedBooking.id}.`);
+                        fetchBookings(true);
+                        setSelectedBooking((prev) => prev ? { ...prev, deliveryBoyName: name, deliveryBoyPhone: phone || "" } : null);
+                      } catch {
+                        toast.error("Failed to assign courier.");
+                      } finally {
+                        setActionLoading(false);
+                      }
+                    }}
+                    disabled={actionLoading}
+                    className="px-3 py-1.5 rounded-lg border border-border bg-secondary hover:bg-secondary/80 text-foreground text-[11px] font-bold cursor-pointer"
+                  >
+                    Assign Courier
+                  </button>
+                </div>
               </div>
             </div>
 

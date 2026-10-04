@@ -23,4 +23,19 @@ export const bookingsService = {
     const response = await adminApi.post(`/bookings/${encodeURIComponent(id)}/refund`);
     return response.data;
   },
+
+  async processBooking(id: string): Promise<{ success: boolean; bookingId: string; deliveryStatus: string }> {
+    const response = await adminApi.post(`/bookings/${encodeURIComponent(id)}/process`);
+    return response.data;
+  },
+
+  async notifyVendor(id: string): Promise<{ success: boolean; bookingId: string; deliveryStatus: string; vendorNotified: boolean }> {
+    const response = await adminApi.post(`/bookings/${encodeURIComponent(id)}/notify-vendor`);
+    return response.data;
+  },
+
+  async assignDelivery(id: string, payload: { deliveryBoyId?: string; deliveryBoyName?: string; deliveryBoyPhone?: string }): Promise<{ success: boolean; bookingId: string; deliveryBoyName?: string; deliveryBoyPhone?: string }> {
+    const response = await adminApi.post(`/bookings/${encodeURIComponent(id)}/assign-delivery`, payload);
+    return response.data;
+  },
 };

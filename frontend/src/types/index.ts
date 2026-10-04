@@ -233,9 +233,18 @@ export type DeliveryStatus =
   | "PENDING"
   | "PREPARING"
   | "READY"
+  | "WAITING_FOR_ADMIN"
+  | "ADMIN_PROCESSING"
+  | "READY_FOR_VENDOR"
+  | "WAITING_FOR_DELIVERY_BOY"
+  | "PICKED_UP_FROM_VENDOR"
   | "OUT_FOR_DELIVERY"
   | "NEAR_DESTINATION"
+  | "ARRIVED_AT_RENTER"
+  | "RENTER_VERIFIED"
+  | "RENTAL_ACTIVATED"
   | "DELIVERED"
+  | "COMPLETED"
   | "CANCELLED";
 
 export interface DeliveryLocationUpdate {
@@ -261,6 +270,13 @@ export interface Delivery {
   current_latitude?: number | null;
   current_longitude?: number | null;
   eta_minutes?: number | null;
+  delivery_boy_id?: string | null;
+  delivery_boy_name?: string | null;
+  delivery_boy_phone?: string | null;
+  vendor_otp_verified?: boolean;
+  renter_otp_verified?: boolean;
+  picked_up_at?: string | null;
+  arrived_at_renter_at?: string | null;
   started_at?: string | null;
   near_destination_at?: string | null;
   delivered_at?: string | null;

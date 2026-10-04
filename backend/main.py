@@ -281,10 +281,11 @@ app.add_middleware(GZipMiddleware, minimum_size=500)
 
 # Register Button 1 (paye₹nt) and Rental Lifecycle Routers
 try:
-    from payernt_router import payernt_router, rental_router
+    from payernt_router import payernt_router, rental_router, delivery_handover_router
     app.include_router(payernt_router, prefix="/api/payernt")
     app.include_router(payernt_router, prefix="/api/paye₹nt")
     app.include_router(rental_router)
+    app.include_router(delivery_handover_router)
 except Exception as router_err:
     logger.warning(f"Notice: Failed to register payernt routers: {router_err}")
 
@@ -8309,15 +8310,28 @@ def admin_bookings_list(current_admin: dict = Depends(check_admin_user)):
                        u.full_name as customer_name, 
                        COALESCE(p.owner_name, pp.owner_name) as owner_name, 
                        COALESCE(p.user_email, pp.owner_email) as owner_email,
+                       d.status as delivery_status,
+                       d.delivery_boy_id,
+                       d.delivery_boy_name,
+                       d.delivery_boy_phone,
+                       d.pickup_location,
+                       d.delivery_address,
+                       d.picked_up_at,
+                       d.arrived_at_renter_at,
+                       d.completed_at as delivered_at,
                        sec.vendor_pin_verified,
                        sec.renter_pin_verified,
                        sec.otp_verified,
                        sec.rental_started,
-                       sec.status as security_status
+                       sec.status as security_status,
+                       sec.activated_at,
+                       sec.vendor_otp_verified as sec_vendor_otp_verified,
+                       sec.renter_otp_verified as sec_renter_otp_verified
                 FROM orders o
                 LEFT JOIN users u ON o.user_email = u.email
                 LEFT JOIN custom_products p ON o.product_id = p.id
                 LEFT JOIN payernt_products pp ON o.product_id = pp.id
+                LEFT JOIN deliveries d ON o.id = d.booking_id
                 LEFT JOIN rental_security sec ON o.id = sec.booking_id
                 ORDER BY o.created_at DESC
             """)
@@ -8340,16 +8354,110 @@ def admin_bookings_list(current_admin: dict = Depends(check_admin_user)):
             "endDate": r["end_date"],
             "amount": r["total"],
             "status": r.get("status") or "pending",
+            "deliveryStatus": r.get("delivery_status") or "WAITING_FOR_ADMIN",
+            "deliveryBoyId": r.get("delivery_boy_id"),
+            "deliveryBoyName": r.get("delivery_boy_name"),
+            "deliveryBoyPhone": r.get("delivery_boy_phone"),
+            "pickupLocation": r.get("pickup_location"),
+            "deliveryAddress": r.get("delivery_address"),
+            "pickedUpAt": r.get("picked_up_at"),
+            "arrivedAtRenterAt": r.get("arrived_at_renter_at"),
+            "deliveredAt": r.get("delivered_at"),
             "rentalSecurity": {
                 "vendorPinVerified": bool(r.get("vendor_pin_verified")),
                 "renterPinVerified": bool(r.get("renter_pin_verified")),
                 "otpVerified": bool(r.get("otp_verified")),
                 "rentalStarted": bool(r.get("rental_started")),
-                "securityStatus": r.get("security_status") or "pending"
+                "securityStatus": r.get("security_status") or "pending",
+                "activatedAt": r.get("activated_at"),
+                "vendorOtpVerified": bool(r.get("sec_vendor_otp_verified")),
+                "renterOtpVerified": bool(r.get("sec_renter_otp_verified"))
             },
             "createdAt": r["created_at"]
         })
     return res
+
+class AdminAssignDeliveryPayload(BaseModel):
+    deliveryBoyId: Optional[str] = None
+    deliveryBoyName: Optional[str] = None
+    deliveryBoyPhone: Optional[str] = None
+
+@app.post("/api/admin/bookings/{id}/process")
+def admin_process_booking(id: str, current_admin: dict = Depends(check_admin_user)):
+    from database import update_delivery_status
+    now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    # Transition delivery status to ADMIN_PROCESSING
+    update_delivery_status(id, "ADMIN_PROCESSING")
+    execute_query("""
+        INSERT INTO admin_logs (id, timestamp, user_name, action, module, ip_address)
+        VALUES (%s, %s, %s, %s, %s, %s)
+    """, (f"l-{random.randint(100000, 999999)}", now_str, current_admin["full_name"], f"Processed booking {id}", "Orders", "127.0.0.1"))
+    broadcast_admin_event("booking.processed", {"bookingId": id, "deliveryStatus": "ADMIN_PROCESSING"})
+    return {"success": True, "bookingId": id, "deliveryStatus": "ADMIN_PROCESSING"}
+
+@app.post("/api/admin/bookings/{id}/notify-vendor")
+def admin_notify_vendor(id: str, current_admin: dict = Depends(check_admin_user)):
+    from database import update_delivery_status
+    from payernt_database import add_payernt_notification
+    now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    
+    # Update delivery status to READY_FOR_VENDOR
+    update_delivery_status(id, "READY_FOR_VENDOR")
+    
+    # Get vendor/owner id
+    conn = get_db_connection()
+    vendor_id = ""
+    title = ""
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT o.product_id, o.product_title, COALESCE(p.user_email, pp.owner_email, pp.owner_id) as owner_id
+                FROM orders o
+                LEFT JOIN custom_products p ON o.product_id = p.id
+                LEFT JOIN payernt_products pp ON o.product_id = pp.id
+                WHERE o.id = %s
+            """, (id,))
+            row = cursor.fetchone()
+            if row:
+                vendor_id = row.get("owner_id") or ""
+                title = row.get("product_title") or "Product"
+    finally:
+        conn.close()
+        
+    if vendor_id:
+        add_payernt_notification(
+            owner_id=vendor_id,
+            title="Product Ready for Preparation",
+            message=f"Booking #{id} for '{title}' has been processed by Admin and is ready for delivery preparation. Please prepare the product.",
+            type_="booking",
+            action_route="products"
+        )
+        
+    execute_query("""
+        INSERT INTO admin_logs (id, timestamp, user_name, action, module, ip_address)
+        VALUES (%s, %s, %s, %s, %s, %s)
+    """, (f"l-{random.randint(100000, 999999)}", now_str, current_admin["full_name"], f"Notified vendor for booking {id}", "Orders", "127.0.0.1"))
+    broadcast_admin_event("booking.vendor_notified", {"bookingId": id, "deliveryStatus": "READY_FOR_VENDOR"})
+    return {"success": True, "bookingId": id, "deliveryStatus": "READY_FOR_VENDOR", "vendorNotified": bool(vendor_id)}
+
+@app.post("/api/admin/bookings/{id}/assign-delivery")
+def admin_assign_delivery(id: str, payload: AdminAssignDeliveryPayload, current_admin: dict = Depends(check_admin_user)):
+    from database import execute_query
+    now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    
+    execute_query("""
+        UPDATE deliveries 
+        SET delivery_boy_id = %s, delivery_boy_name = %s, delivery_boy_phone = %s, updated_at = %s
+        WHERE booking_id = %s
+    """, (payload.deliveryBoyId or f"db-{random.randint(1000,9999)}", payload.deliveryBoyName or "Express Courier", payload.deliveryBoyPhone or "+91 98765 43210", now_str, id))
+    
+    execute_query("""
+        INSERT INTO admin_logs (id, timestamp, user_name, action, module, ip_address)
+        VALUES (%s, %s, %s, %s, %s, %s)
+    """, (f"l-{random.randint(100000, 999999)}", now_str, current_admin["full_name"], f"Assigned delivery boy {payload.deliveryBoyName} to booking {id}", "Orders", "127.0.0.1"))
+    
+    broadcast_admin_event("booking.delivery_assigned", {"bookingId": id, "deliveryBoyName": payload.deliveryBoyName})
+    return {"success": True, "bookingId": id, "deliveryBoyName": payload.deliveryBoyName, "deliveryBoyPhone": payload.deliveryBoyPhone}
 
 @app.post("/api/admin/bookings/{id}/cancel")
 def admin_cancel_booking(id: str, current_admin: dict = Depends(check_admin_user)):

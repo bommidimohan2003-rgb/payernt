@@ -29,6 +29,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { rentalSecurityService } from "@/services/rentalSecurityService";
+import { payerntApi } from "../payerntApiService";
 import type { RentalRequest, RentalRequestStatus } from "../types";
 
 interface RentalRequestsProps {
@@ -85,6 +86,94 @@ export function RentalRequests({
   const [pinError, setPinError] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const pinInputRefs = React.useRef<(HTMLInputElement | null)[]>([]);
+
+  // Vendor Preparation & Secret PIN Modal State
+  const [vendorPinModal, setVendorPinModal] = useState<{
+    isOpen: boolean;
+    bookingId: string;
+    pin: string;
+    productTitle: string;
+  } | null>(null);
+  const [isPreparing, setIsPreparing] = useState(false);
+
+  // Delivery Boy Pickup OTP Modal State
+  const [deliveryBoyOtpModal, setDeliveryBoyOtpModal] = useState<{
+    isOpen: boolean;
+    bookingId: string;
+    otp: string;
+    phoneMasked?: string;
+    isSubmitting: boolean;
+    error: string | null;
+  } | null>(null);
+
+  const handlePrepareProductForDelivery = async (req: RentalRequest) => {
+    setIsPreparing(true);
+    try {
+      const res = await payerntApi.prepareProductForDelivery(req.id);
+      if (res.success && res.vendorSecretPin) {
+        setVendorPinModal({
+          isOpen: true,
+          bookingId: req.id,
+          pin: res.vendorSecretPin,
+          productTitle: req.productTitle,
+        });
+        toast.success("Product prepared! Status updated to Waiting for Delivery Boy.");
+        onAdvanceLifecycle(req.id, "accepted");
+      } else {
+        toast.error(res.error || "Failed to prepare product for delivery.");
+      }
+    } catch (e: any) {
+      toast.error(e?.message || "Error preparing product for delivery.");
+    } finally {
+      setIsPreparing(false);
+    }
+  };
+
+  const handleSendVendorPickupOtp = async (bookingId: string) => {
+    try {
+      const res = await payerntApi.sendVendorHandoverOtp(bookingId);
+      if (res.success) {
+        setDeliveryBoyOtpModal({
+          isOpen: true,
+          bookingId,
+          otp: "",
+          phoneMasked: res.targetPhoneMasked,
+          isSubmitting: false,
+          error: null,
+        });
+        toast.info(res.message || "OTP sent for pickup verification.");
+      } else {
+        toast.error(res.error || "Failed to send pickup OTP.");
+      }
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to send pickup OTP.");
+    }
+  };
+
+  const handleVerifyVendorPickupOtp = async () => {
+    if (!deliveryBoyOtpModal || deliveryBoyOtpModal.otp.length < 4) return;
+    setDeliveryBoyOtpModal((prev) => prev ? { ...prev, isSubmitting: true, error: null } : null);
+    try {
+      const res = await payerntApi.verifyVendorHandoverOtp(
+        deliveryBoyOtpModal.bookingId,
+        deliveryBoyOtpModal.otp
+      );
+      if (res.success) {
+        toast.success("Pickup verified! Product handed over to delivery courier.");
+        const currentBookingId = deliveryBoyOtpModal.bookingId;
+        setDeliveryBoyOtpModal(null);
+        onAdvanceLifecycle(currentBookingId, "handover");
+      } else {
+        setDeliveryBoyOtpModal((prev) =>
+          prev ? { ...prev, isSubmitting: false, error: res.error || "Invalid OTP code." } : null
+        );
+      }
+    } catch (e: any) {
+      setDeliveryBoyOtpModal((prev) =>
+        prev ? { ...prev, isSubmitting: false, error: e?.message || "Verification failed." } : null
+      );
+    }
+  };
 
   const handleOpenHandoverModal = (req: RentalRequest) => {
     rentalSecurityService.getOrCreateSecurityRecord({
@@ -572,15 +661,48 @@ export function RentalRequests({
                     </div>
                   )}
 
-                  {/* 2. When ACCEPTED: Handover Action */}
+                  {/* 2. When ACCEPTED: Handover & Preparation Actions */}
                   {req.status === "accepted" && (
-                    <div className="flex items-center gap-3 w-full sm:w-auto">
+                    <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
                       <button
-                        onClick={() => handleOpenHandoverModal(req)}
-                        className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-primary text-primary-foreground font-bold text-xs shadow-md hover:opacity-90 active:scale-98 cursor-pointer flex items-center justify-center gap-2"
+                        onClick={() => handlePrepareProductForDelivery(req)}
+                        disabled={isPreparing}
+                        className="px-5 py-3 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs shadow-md active:scale-98 cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        <PackageCheck className="h-4 w-4" />
+                        <span>{isPreparing ? "Preparing..." : "Prepare Product for Delivery"}</span>
+                      </button>
+
+                      <button
+                        onClick={() => handleSendVendorPickupOtp(req.id)}
+                        className="px-5 py-3 rounded-2xl bg-primary text-primary-foreground font-bold text-xs shadow-md hover:opacity-90 active:scale-98 cursor-pointer flex items-center justify-center gap-2"
                       >
                         <Truck className="h-4 w-4" />
-                        <span>Confirm Handover to Borrower (Start Rental)</span>
+                        <span>Verify Delivery Boy Pickup (OTP)</span>
+                      </button>
+
+                      <button
+                        onClick={() => handleOpenHandoverModal(req)}
+                        className="px-4 py-3 rounded-2xl border border-border bg-card hover:bg-secondary text-foreground text-xs font-semibold cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        <KeyRound className="h-4 w-4" />
+                        <span>Direct Handover PIN</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {/* 2.1 When in HANDOVER state (Waiting for Delivery Boy or in transit) */}
+                  {req.status === "handover" && (
+                    <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+                      <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 text-xs font-semibold">
+                        <Truck className="h-3.5 w-3.5" />
+                        <span>In Delivery Transit / Handover to Borrower</span>
+                      </div>
+                      <button
+                        onClick={() => handleOpenHandoverModal(req)}
+                        className="px-4 py-2 rounded-xl bg-primary text-primary-foreground font-bold text-xs shadow-sm hover:opacity-90 cursor-pointer"
+                      >
+                        Authorize Handover
                       </button>
                     </div>
                   )}
@@ -644,6 +766,184 @@ export function RentalRequests({
           })}
         </div>
       )}
+
+      {/* ========================================================= */}
+      {/* VENDOR SECRET PIN MODAL (PRIVATE TO VENDOR)               */}
+      {/* ========================================================= */}
+      <AnimatePresence>
+        {vendorPinModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 select-none">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setVendorPinModal(null)}
+              className="fixed inset-0 bg-black/80 backdrop-blur-md"
+            />
+
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 12 }}
+              transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+              className="relative w-full max-w-md rounded-3xl border border-border bg-card p-6 sm:p-8 space-y-6 shadow-2xl text-center z-10"
+            >
+              <div className="flex justify-between items-start">
+                <div className="h-12 w-12 rounded-2xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center shadow-xs">
+                  <PackageCheck className="h-6 w-6" />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setVendorPinModal(null)}
+                  className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary transition-all cursor-pointer"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="space-y-1.5 text-left">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[10px] font-bold uppercase tracking-wider">
+                  <Lock className="h-3 w-3" />
+                  <span>Private Vendor Security PIN</span>
+                </div>
+                <h3 className="text-xl font-bold tracking-tight text-foreground font-display">
+                  Product Prepared for Delivery
+                </h3>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Your product is ready. Below is your private 4-digit Vendor Secret PIN.
+                </p>
+              </div>
+
+              {/* Secure PIN Display */}
+              <div className="p-5 rounded-2xl border border-amber-500/30 bg-amber-500/5 text-center space-y-2">
+                <span className="text-[11px] uppercase font-bold text-muted-foreground block">
+                  Your Private Vendor Secret PIN
+                </span>
+                <div className="font-mono text-4xl font-black text-foreground tracking-[0.3em] bg-card py-3 px-6 rounded-2xl border border-border inline-block shadow-inner">
+                  {vendorPinModal.pin}
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-2">
+                  🔒 Keep this PIN secure. Do not share with courier or renter.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-secondary/40 border border-border/60 text-left text-xs text-muted-foreground space-y-1">
+                <span className="font-bold text-foreground block">Next Steps:</span>
+                <p>1. Status updated to <span className="font-semibold text-foreground">Waiting for Delivery Boy</span>.</p>
+                <p>2. Complete mobile OTP verification when the courier arrives for pickup.</p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setVendorPinModal(null)}
+                className="w-full py-3 px-4 rounded-2xl bg-foreground text-background text-xs font-bold shadow-md hover:opacity-95 transition-all cursor-pointer"
+              >
+                Acknowledge & Close
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ========================================================= */}
+      {/* DELIVERY BOY PICKUP OTP VERIFICATION MODAL                */}
+      {/* ========================================================= */}
+      <AnimatePresence>
+        {deliveryBoyOtpModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 select-none">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setDeliveryBoyOtpModal(null)}
+              className="fixed inset-0 bg-black/80 backdrop-blur-md"
+            />
+
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 12 }}
+              transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+              className="relative w-full max-w-md rounded-3xl border border-border bg-card p-6 sm:p-8 space-y-6 shadow-2xl text-center z-10"
+            >
+              <div className="flex justify-between items-start">
+                <div className="h-12 w-12 rounded-2xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center shadow-xs">
+                  <Truck className="h-6 w-6" />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDeliveryBoyOtpModal(null)}
+                  className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary transition-all cursor-pointer"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="space-y-1.5 text-left">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-wider">
+                  <ShieldCheck className="h-3 w-3" />
+                  <span>Pickup Handover Verification</span>
+                </div>
+                <h3 className="text-xl font-bold tracking-tight text-foreground font-display">
+                  Courier Pickup OTP
+                </h3>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Enter the 6-digit OTP received on your mobile {deliveryBoyOtpModal.phoneMasked ? `(${deliveryBoyOtpModal.phoneMasked})` : ""} to confirm handover to the delivery courier.
+                </p>
+              </div>
+
+              <div className="space-y-3 text-left">
+                <input
+                  type="text"
+                  maxLength={6}
+                  value={deliveryBoyOtpModal.otp}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, "").slice(0, 6);
+                    setDeliveryBoyOtpModal((prev) => prev ? { ...prev, otp: val, error: null } : null);
+                  }}
+                  placeholder="Enter 6-Digit OTP"
+                  className="w-full text-center font-mono text-2xl font-black rounded-2xl border border-border bg-background text-foreground py-3 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all shadow-xs"
+                />
+
+                {deliveryBoyOtpModal.error && (
+                  <p className="text-xs text-destructive font-medium flex items-center gap-1.5">
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                    <span>{deliveryBoyOtpModal.error}</span>
+                  </p>
+                )}
+              </div>
+
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setDeliveryBoyOtpModal(null)}
+                  className="flex-1 py-3 px-4 rounded-2xl border border-border bg-card hover:bg-secondary text-foreground text-xs font-bold transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleVerifyVendorPickupOtp}
+                  disabled={deliveryBoyOtpModal.otp.length < 4 || deliveryBoyOtpModal.isSubmitting}
+                  className="flex-1 py-3 px-4 rounded-2xl bg-foreground text-background text-xs font-bold shadow-md hover:opacity-95 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-98"
+                >
+                  {deliveryBoyOtpModal.isSubmitting ? (
+                    <>
+                      <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                      <span>Verifying...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="h-4 w-4" />
+                      <span>Confirm Pickup</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* ========================================================= */}
       {/* HANDOVER SECURITY CLEARANCE MODAL                         */}

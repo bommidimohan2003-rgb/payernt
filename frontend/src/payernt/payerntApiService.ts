@@ -802,6 +802,106 @@ export const payerntApi = {
       };
     }
   },
+
+  async prepareProductForDelivery(bookingId: string): Promise<{
+    success: boolean;
+    bookingId?: string;
+    deliveryStatus?: string;
+    vendorSecretPin?: string;
+    message?: string;
+    error?: string;
+  }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/payernt/bookings/${encodeURIComponent(bookingId)}/prepare`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return {
+          success: true,
+          bookingId: data.bookingId,
+          deliveryStatus: data.deliveryStatus,
+          vendorSecretPin: data.vendorSecretPin,
+          message: data.message,
+        };
+      }
+      return {
+        success: false,
+        error: data.detail || data.message || "Failed to prepare product for delivery.",
+      };
+    } catch (e: any) {
+      return {
+        success: false,
+        error: e?.message || "Network error while preparing product for delivery.",
+      };
+    }
+  },
+
+  async sendVendorHandoverOtp(bookingId: string): Promise<{
+    success: boolean;
+    message?: string;
+    targetPhoneMasked?: string;
+    expiresInSeconds?: number;
+    error?: string;
+  }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/deliveries/${encodeURIComponent(bookingId)}/vendor-otp/send`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return {
+          success: true,
+          message: data.message,
+          targetPhoneMasked: data.targetPhoneMasked,
+          expiresInSeconds: data.expiresInSeconds,
+        };
+      }
+      return {
+        success: false,
+        error: data.detail || data.message || "Failed to send vendor handover OTP.",
+      };
+    } catch (e: any) {
+      return {
+        success: false,
+        error: e?.message || "Network error while sending vendor handover OTP.",
+      };
+    }
+  },
+
+  async verifyVendorHandoverOtp(bookingId: string, otp: string): Promise<{
+    success: boolean;
+    deliveryStatus?: string;
+    message?: string;
+    error?: string;
+  }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/deliveries/${encodeURIComponent(bookingId)}/vendor-otp/verify`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ otp }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return {
+          success: true,
+          deliveryStatus: data.deliveryStatus,
+          message: data.message,
+        };
+      }
+      return {
+        success: false,
+        error: data.detail || data.message || "Failed to verify vendor handover OTP.",
+      };
+    } catch (e: any) {
+      return {
+        success: false,
+        error: e?.message || "Network error while verifying vendor handover OTP.",
+      };
+    }
+  },
 };
 
 export default payerntApi;

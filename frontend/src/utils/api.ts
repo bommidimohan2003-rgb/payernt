@@ -1949,6 +1949,60 @@ export const api = {
     return await res.json();
   },
 
+  async sendRenterHandoverOtp(
+    bookingId: string,
+  ): Promise<{ success: boolean; message: string; targetPhoneMasked?: string; expiresInSeconds?: number }> {
+    const res = await this.fetchWithAuth(
+      `${API_BASE}/api/deliveries/${bookingId}/renter-otp/send`,
+      {
+        method: "POST",
+      },
+    );
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(parseApiError(data, "Failed to send renter OTP"));
+    }
+    return await res.json();
+  },
+
+  async verifyRenterHandoverOtp(
+    bookingId: string,
+    otp: string,
+  ): Promise<{ success: boolean; deliveryStatus: string; renterSecretPin?: string; message: string }> {
+    const res = await this.fetchWithAuth(
+      `${API_BASE}/api/deliveries/${bookingId}/renter-otp/verify`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ otp }),
+      },
+    );
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(parseApiError(data, "Failed to verify renter OTP"));
+    }
+    return await res.json();
+  },
+
+  async activateRental(
+    bookingId: string,
+    renterPin?: string,
+  ): Promise<{ success: boolean; bookingId: string; rentalStatus: string; deliveryStatus: string; rentalStartedAt: string; message: string }> {
+    const res = await this.fetchWithAuth(
+      `${API_BASE}/api/bookings/${bookingId}/activate-rental`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ renterPin: renterPin || "" }),
+      },
+    );
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(parseApiError(data, "Failed to activate rental"));
+    }
+    return await res.json();
+  },
+
   // --- Real-time Booking Conversations API ---
   async getBookingConversation(
     token: string,

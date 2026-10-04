@@ -208,6 +208,25 @@ export interface AdminBooking {
   amount: number;
   status: "pending" | "confirmed" | "active" | "completed" | "cancelled" | string;
   paymentStatus?: "paid" | "pending" | "refunded" | "failed" | "successful" | "captured" | string;
+  deliveryStatus?: string;
+  deliveryBoyId?: string;
+  deliveryBoyName?: string;
+  deliveryBoyPhone?: string;
+  pickupLocation?: string;
+  deliveryAddress?: string;
+  pickedUpAt?: string;
+  arrivedAtRenterAt?: string;
+  deliveredAt?: string;
+  rentalSecurity?: {
+    vendorPinVerified?: boolean;
+    renterPinVerified?: boolean;
+    otpVerified?: boolean;
+    rentalStarted?: boolean;
+    securityStatus?: string;
+    activatedAt?: string;
+    vendorOtpVerified?: boolean;
+    renterOtpVerified?: boolean;
+  };
   createdAt: string;
 }
 
