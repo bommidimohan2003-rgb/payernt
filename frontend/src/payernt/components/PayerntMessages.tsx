@@ -215,7 +215,7 @@ export function PayerntMessages({
           <button
             onClick={onBack}
             className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-card text-foreground hover:bg-secondary transition-all cursor-pointer shadow-xs"
-            title="Back to Dashboard"
+            title="Back to Home"
           >
             <ArrowLeft className="h-4 w-4" />
           </button>

@@ -43,7 +43,7 @@ export function LenderSettingsView({
 
   return (
     <div className="max-w-3xl mx-auto space-y-6 text-left pb-16 px-1 sm:px-0">
-      {/* Back to Dashboard Button */}
+      {/* Back to Home Button */}
       {onBack && (
         <div>
           <button
@@ -52,7 +52,7 @@ export function LenderSettingsView({
             className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-[#10141d] hover:bg-neutral-50 dark:hover:bg-white/[0.04] text-xs font-semibold text-neutral-800 dark:text-neutral-200 transition-all cursor-pointer shadow-xs group"
           >
             <ArrowLeft className="h-3.5 w-3.5 group-hover:-translate-x-0.5 transition-transform" />
-            <span>{tCommon.back} to {tCommon.dashboard}</span>
+            <span>Back to Home</span>
           </button>
         </div>
       )}
