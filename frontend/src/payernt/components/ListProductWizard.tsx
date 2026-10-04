@@ -821,12 +821,13 @@ export function ListProductWizard({
   );
   const [capturedVideoUrl, setCapturedVideoUrl] = useState<string>(initialDraft?.videoUrl || "");
 
-  // Live Camera state
-  const [isCameraActive, setIsCameraActive] = useState<boolean>(false);
-  const [cameraTarget, setCameraTarget] = useState<"front" | "back" | "video">("front");
-  const [isRecordingVideo, setIsRecordingVideo] = useState<boolean>(false);
-  const [videoCountdown, setVideoCountdown] = useState<number>(10);
-  const [cameraError, setCameraError] = useState<string | null>(null);
+  // Direct Device Camera & Media state
+  const [videoDuration, setVideoDuration] = useState<string>("10s");
+  const [isProcessingMedia, setIsProcessingMedia] = useState<boolean>(false);
+  const [mediaError, setMediaError] = useState<string | null>(null);
+  const frontPhotoInputRef = useRef<HTMLInputElement | null>(null);
+  const backPhotoInputRef = useRef<HTMLInputElement | null>(null);
+  const videoInputRef = useRef<HTMLInputElement | null>(null);
 
   // Condition details
   const [conditionGrade, setConditionGrade] = useState<ProductCondition["grade"]>(
@@ -939,172 +940,165 @@ export function ListProductWizard({
   const [finalConfirmationChecked, setFinalConfirmationChecked] = useState(false);
   const [dragProgress, setDragProgress] = useState(0);
 
-  // Media & Camera Refs
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const mediaStreamRef = useRef<MediaStream | null>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const videoChunksRef = useRef<Blob[]>([]);
-  const videoTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Computed Current Listing Location Display (Place Name Only, No GPS Coordinates)
-  const currentListingLocationDisplay = useMemo(() => {
-    const parts = [pickupArea, pickupCity].filter(Boolean);
-    if (parts.length > 0) return parts.join(", ");
-    if (pickupCity) return pickupCity;
-    if (pickupAddressLine && !pickupAddressLine.toLowerCase().includes("gps verified")) {
-      return pickupAddressLine;
-    }
-    return pickupArea || pickupCity || "Pickup Location";
-  }, [pickupAddressLine, pickupArea, pickupCity]);
-
-  const currentDropLocationDisplay = useMemo(() => {
-    if (sameAsPickup) return currentListingLocationDisplay;
-    const parts = [dropArea, dropCity].filter(Boolean);
-    if (parts.length > 0) return parts.join(", ");
-    if (dropCity) return dropCity;
-    if (dropAddressLine) return dropAddressLine;
-    return "Drop location not set";
-  }, [sameAsPickup, currentListingLocationDisplay, dropAddressLine, dropArea, dropCity]);
-
-  // Clean up media stream on unmount
-  const stopMediaStream = useCallback(() => {
-    if (mediaStreamRef.current) {
-      mediaStreamRef.current.getTracks().forEach((track) => track.stop());
-      mediaStreamRef.current = null;
-    }
-    if (videoTimerRef.current) {
-      clearInterval(videoTimerRef.current);
-      videoTimerRef.current = null;
-    }
-    setIsCameraActive(false);
-    setIsRecordingVideo(false);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      stopMediaStream();
-    };
-  }, [stopMediaStream]);
-
-  // Start Live Camera for Front, Back, or Video
-  const startCamera = async (target: "front" | "back" | "video") => {
-    setCameraTarget(target);
-    setCameraError(null);
-    stopMediaStream();
-
-    try {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error("Camera API is not supported in this browser.");
-      }
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: target === "back" ? "environment" : "user",
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
-        audio: target === "video",
-      });
-      mediaStreamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
-      }
-      setIsCameraActive(true);
-    } catch (err: any) {
-      console.warn("[Camera] Live capture error:", err);
-      setCameraError(
-        err.name === "NotAllowedError" || err.name === "PermissionDeniedError"
-          ? "Camera access permission was denied. Please allow camera permissions in browser settings."
-          : "Unable to connect to camera hardware."
-      );
+  // Direct Camera Trigger Handlers
+  const handleTriggerFrontCamera = () => {
+    setMediaError(null);
+    if (frontPhotoInputRef.current) {
+      frontPhotoInputRef.current.click();
     }
   };
 
-  // Capture Still Photo (Sequential Front -> Back flow)
-  const capturePhoto = () => {
-    if (!videoRef.current) return;
-    try {
-      const video = videoRef.current;
-      const canvas = document.createElement("canvas");
-      canvas.width = video.videoWidth || 1280;
-      canvas.height = video.videoHeight || 720;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
-
-      if (cameraTarget === "front") {
-        setFrontPhotoUrl(dataUrl);
-        if (!backPhotoUrl) {
-          toast.success("Front view captured! Switching to Back view...");
-          // Smoothly advance to back view
-          setTimeout(() => {
-            startCamera("back");
-          }, 450);
-        } else {
-          toast.success("Front view updated.");
-          stopMediaStream();
-        }
-      } else {
-        setBackPhotoUrl(dataUrl);
-        toast.success("Back view captured! Both photos saved.");
-        stopMediaStream();
-      }
-    } catch (e) {
-      toast.error("Failed to capture photo frame.");
+  const handleTriggerBackCamera = () => {
+    setMediaError(null);
+    if (backPhotoInputRef.current) {
+      backPhotoInputRef.current.click();
     }
   };
 
-  // Start 10-Second Live Video Recording
-  const start10SecondVideoRecording = () => {
-    if (!mediaStreamRef.current) return;
-    videoChunksRef.current = [];
-    setVideoCountdown(10);
-    setIsRecordingVideo(true);
+  const handleTriggerVideoCamera = () => {
+    setMediaError(null);
+    if (videoInputRef.current) {
+      videoInputRef.current.click();
+    }
+  };
 
-    try {
-      const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
-        ? "video/webm;codecs=vp9"
-        : MediaRecorder.isTypeSupported("video/webm")
-          ? "video/webm"
-          : "video/mp4";
+  // Process & Optimize Captured Photo (Direct Camera)
+  const handlePhotoFileCapture = (e: React.ChangeEvent<HTMLInputElement>, slot: "front" | "back") => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-      const recorder = new MediaRecorder(mediaStreamRef.current, { mimeType });
-      mediaRecorderRef.current = recorder;
+    if (!file.type.startsWith("image/")) {
+      setMediaError("Invalid image format. Please take a photo with your device camera.");
+      toast.error("Invalid image format. Please take a photo with your device camera.");
+      return;
+    }
 
-      recorder.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0) {
-          videoChunksRef.current.push(e.data);
-        }
-      };
+    if (file.size > 30 * 1024 * 1024) {
+      setMediaError("Photo size is too large (maximum 30MB). Please retake.");
+      toast.error("Photo size is too large (maximum 30MB). Please retake.");
+      return;
+    }
 
-      recorder.onstop = () => {
-        const blob = new Blob(videoChunksRef.current, { type: mimeType });
-        const videoUrl = URL.createObjectURL(blob);
-        setCapturedVideoUrl(videoUrl);
-        setIsRecordingVideo(false);
-        stopMediaStream();
-        toast.success("10-second condition video recorded successfully.");
-      };
+    setIsProcessingMedia(true);
+    setMediaError(null);
 
-      recorder.start(500);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const rawDataUrl = event.target?.result as string;
+      if (!rawDataUrl) {
+        setIsProcessingMedia(false);
+        setMediaError("Failed to read photo data. Please try again.");
+        toast.error("Failed to read photo data. Please try again.");
+        return;
+      }
 
-      // Countdown Timer for exactly 10 seconds
-      let remaining = 10;
-      videoTimerRef.current = setInterval(() => {
-        remaining -= 1;
-        setVideoCountdown(remaining);
-        if (remaining <= 0) {
-          if (videoTimerRef.current) clearInterval(videoTimerRef.current);
-          if (recorder.state === "recording") {
-            recorder.stop();
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const maxDim = 1920;
+          let width = img.width;
+          let height = img.height;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
           }
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            const optimized = canvas.toDataURL("image/jpeg", 0.88);
+            if (slot === "front") {
+              setFrontPhotoUrl(optimized);
+              toast.success("Front photo captured successfully.");
+            } else {
+              setBackPhotoUrl(optimized);
+              toast.success("Back photo captured successfully.");
+            }
+          } else {
+            if (slot === "front") setFrontPhotoUrl(rawDataUrl);
+            else setBackPhotoUrl(rawDataUrl);
+          }
+        } catch {
+          if (slot === "front") setFrontPhotoUrl(rawDataUrl);
+          else setBackPhotoUrl(rawDataUrl);
+        } finally {
+          setIsProcessingMedia(false);
         }
-      }, 1000);
-    } catch (err: any) {
-      toast.error("Failed to start video recorder.");
-      setIsRecordingVideo(false);
+      };
+      img.onerror = () => {
+        setIsProcessingMedia(false);
+        setMediaError("Corrupted photo file. Please retake.");
+        toast.error("Corrupted photo file. Please retake.");
+      };
+      img.src = rawDataUrl;
+    };
+    reader.onerror = () => {
+      setIsProcessingMedia(false);
+      setMediaError("Failed to access camera photo.");
+      toast.error("Failed to access camera photo.");
+    };
+    reader.readAsDataURL(file);
+
+    e.target.value = "";
+  };
+
+  // Process & Validate Captured 10s Inspection Video
+  const handleVideoFileCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("video/")) {
+      setMediaError("Invalid video format. Please record a valid inspection video.");
+      toast.error("Invalid video format. Please record a valid inspection video.");
+      return;
     }
+
+    if (file.size > 150 * 1024 * 1024) {
+      setMediaError("Video file is too large (maximum 150MB). Please record a 10-second clip.");
+      toast.error("Video file is too large (maximum 150MB). Please record a 10-second clip.");
+      return;
+    }
+
+    setIsProcessingMedia(true);
+    setMediaError(null);
+
+    const blobUrl = URL.createObjectURL(file);
+
+    const tempVideo = document.createElement("video");
+    tempVideo.preload = "metadata";
+    tempVideo.onloadedmetadata = () => {
+      window.URL.revokeObjectURL(tempVideo.src);
+      const durationSec = Math.round(tempVideo.duration || 0);
+
+      if (tempVideo.duration > 11.5) {
+        setMediaError(`Recorded video is ${durationSec}s. Inspection video must be 10 seconds or less.`);
+        toast.error(`Video exceeds 10-second limit (${durationSec}s). Please record a clip of 10s or less.`);
+        setIsProcessingMedia(false);
+        return;
+      }
+
+      setCapturedVideoUrl(blobUrl);
+      setVideoDuration(durationSec > 0 ? `${durationSec}s` : "10s");
+      setIsProcessingMedia(false);
+      toast.success("10-second inspection video saved.");
+    };
+
+    tempVideo.onerror = () => {
+      setCapturedVideoUrl(blobUrl);
+      setVideoDuration("10s");
+      setIsProcessingMedia(false);
+      toast.success("Inspection video saved.");
+    };
+
+    tempVideo.src = blobUrl;
+    e.target.value = "";
   };
 
   // Real-time GPS Reverse Geocoding to Auto-Fill Location Fields
@@ -1334,16 +1328,8 @@ export function ListProductWizard({
     }
 
     if (stage === 2) {
-      if (!frontPhotoUrl) {
-        toast.error("Please capture the Front View photo.");
-        return false;
-      }
-      if (!backPhotoUrl) {
-        toast.error("Please capture the Back View photo.");
-        return false;
-      }
-      if (!capturedVideoUrl) {
-        toast.error("Please record the 10-second condition video.");
+      if (!frontPhotoUrl || !backPhotoUrl || !capturedVideoUrl) {
+        toast.error("Complete all required product media.");
         return false;
       }
       if (visibleDamage && !damageDescription.trim()) {
@@ -1999,393 +1985,322 @@ export function ListProductWizard({
                     </span>
                   </div>
                   <h2 className="text-xl font-extrabold text-foreground mt-1">
-                    Live Photos & 10s Condition Video
+                    Product Media
                   </h2>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Capture front & back optical evidence and a continuous 10-second inspection video.
+                    Capture the required product evidence.
                   </p>
                 </div>
 
-                {/* 1. COMPACT UNIFIED MEDIA CAPTURE & QUEUE SECTION (1, 2, 3) */}
-                <div className="p-3 sm:p-4 rounded-xl bg-secondary/15 border border-border space-y-2.5">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <div>
+                {/* Hidden native camera file inputs */}
+                <input
+                  ref={frontPhotoInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={(e) => handlePhotoFileCapture(e, "front")}
+                />
+                <input
+                  ref={backPhotoInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={(e) => handlePhotoFileCapture(e, "back")}
+                />
+                <input
+                  ref={videoInputRef}
+                  type="file"
+                  accept="video/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={handleVideoFileCapture}
+                />
+
+                {/* Error Banner */}
+                {mediaError && (
+                  <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs space-y-1.5 animate-in fade-in">
+                    <p className="font-semibold flex items-center gap-1.5">
+                      <AlertCircle className="h-4 w-4 shrink-0" />
+                      <span>{mediaError}</span>
+                    </p>
+                    <p className="text-[11px] opacity-90">Please ensure camera permissions are allowed and try again.</p>
+                  </div>
+                )}
+
+                {/* 3 DIRECT CAMERA CAPTURE CARDS */}
+                <div className="space-y-3">
+                  {/* CARD 1: FRONT PHOTO */}
+                  <div className={`p-3.5 rounded-xl border transition-all ${
+                    frontPhotoUrl
+                      ? "bg-card border-border shadow-xs"
+                      : "bg-card/60 border-border/80"
+                  }`}>
+                    <div className="flex items-center justify-between mb-2.5">
                       <div className="flex items-center gap-2">
-                        <label className="text-xs font-bold text-foreground">
-                          Product Media Verification Queue <span className="text-destructive">*</span>
-                        </label>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${frontPhotoUrl && backPhotoUrl && capturedVideoUrl
-                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
-                            : (frontPhotoUrl ? 1 : 0) + (backPhotoUrl ? 1 : 0) + (capturedVideoUrl ? 1 : 0) > 0
-                              ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
-                              : "bg-primary/10 text-primary border border-primary/20"
-                          }`}>
-                          {frontPhotoUrl && backPhotoUrl && capturedVideoUrl
-                            ? "Queue Complete (3/3)"
-                            : `Queue Progress: ${(frontPhotoUrl ? 1 : 0) + (backPhotoUrl ? 1 : 0) + (capturedVideoUrl ? 1 : 0)}/3 Captured`}
+                        <span className={`h-4.5 w-4.5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                          frontPhotoUrl
+                            ? "bg-foreground text-background"
+                            : "bg-secondary text-muted-foreground border border-border"
+                        }`}>
+                          {frontPhotoUrl ? "✓" : "1"}
+                        </span>
+                        <span className="text-xs font-bold text-foreground">
+                          Front Photo <span className="text-destructive">*</span>
                         </span>
                       </div>
-                      <p className="text-[11px] text-muted-foreground mt-0.5">
-                        Capture all 3 verification media slots on one single queue: 1. Front View, 2. Back View, 3. 10s Inspection Video.
-                      </p>
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                        frontPhotoUrl
+                          ? "bg-secondary text-foreground border border-border"
+                          : "bg-secondary/60 text-muted-foreground"
+                      }`}>
+                        {frontPhotoUrl ? "Captured" : "Pending"}
+                      </span>
                     </div>
 
-                    {!isCameraActive && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (!frontPhotoUrl) startCamera("front");
-                          else if (!backPhotoUrl) startCamera("back");
-                          else if (!capturedVideoUrl) startCamera("video");
-                          else startCamera("front");
-                        }}
-                        className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-bold shadow-xs hover:opacity-95 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-1.5 shrink-0 self-start sm:self-auto"
-                      >
-                        <Camera className="h-3.5 w-3.5" />
-                        <span>
-                          {!frontPhotoUrl && !backPhotoUrl && !capturedVideoUrl
-                            ? "Start Media Queue (1, 2, 3)"
-                            : !frontPhotoUrl
-                              ? "Capture 1 • Front"
-                              : !backPhotoUrl
-                                ? "Capture 2 • Back"
-                                : !capturedVideoUrl
-                                  ? "Record 3 • Video"
-                                  : "Retake Media"}
-                        </span>
-                      </button>
-                    )}
-                  </div>
-
-                  {/* IN-SECTION LIVE CAMERA / VIDEO VIEWFINDER */}
-                  {isCameraActive && (
-                    <div className="border border-primary rounded-xl p-3 bg-black text-white space-y-2.5 shadow-lg animate-in zoom-in-95">
-                      <div className="flex items-center justify-between">
+                    {frontPhotoUrl ? (
+                      <div className="space-y-2.5">
+                        <div className="relative h-44 sm:h-52 rounded-lg overflow-hidden border border-border bg-black">
+                          <img
+                            src={frontPhotoUrl}
+                            alt="Front View Evidence"
+                            className="w-full h-full object-contain"
+                          />
+                        </div>
                         <div className="flex items-center gap-2">
-                          <span className="h-2 w-2 rounded-full bg-red-500 animate-ping" />
-                          <span className="text-xs font-bold text-primary flex items-center gap-1.5">
-                            {cameraTarget === "video" ? <Video className="h-3.5 w-3.5" /> : <Camera className="h-3.5 w-3.5" />}
-                            <span>
-                              {cameraTarget === "front"
-                                ? "Slot 1 of 3: Front View Photo"
-                                : cameraTarget === "back"
-                                  ? "Slot 2 of 3: Back View Photo"
-                                  : "Slot 3 of 3: 10-Second Live Video"}
-                            </span>
-                          </span>
+                          <button
+                            type="button"
+                            onClick={handleTriggerFrontCamera}
+                            disabled={isProcessingMedia}
+                            className="flex-1 py-2 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground text-xs font-bold cursor-pointer transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+                          >
+                            <RefreshCw className="h-3.5 w-3.5" />
+                            <span>Retake</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setFrontPhotoUrl("")}
+                            className="px-3.5 py-2 rounded-lg bg-secondary/50 hover:bg-destructive/10 text-muted-foreground hover:text-destructive text-xs font-semibold cursor-pointer transition-colors flex items-center justify-center gap-1.5"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            <span>Remove</span>
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="py-6 px-4 rounded-lg border border-dashed border-border flex flex-col items-center justify-center gap-2.5 bg-secondary/10 text-center">
+                        <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center text-foreground">
+                          <Camera className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-foreground">Front View</p>
+                          <p className="text-[11px] text-muted-foreground mt-0.5">
+                            Position front of equipment clearly in frame.
+                          </p>
                         </div>
                         <button
                           type="button"
-                          onClick={stopMediaStream}
-                          className="px-2 py-0.5 rounded-md bg-white/20 hover:bg-white/30 text-white text-[10px] font-semibold flex items-center gap-1 cursor-pointer"
+                          onClick={handleTriggerFrontCamera}
+                          disabled={isProcessingMedia}
+                          className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-bold shadow-xs hover:opacity-95 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
                         >
-                          <X className="h-3 w-3" />
-                          <span>Close</span>
+                          <Camera className="h-3.5 w-3.5" />
+                          <span>Take Photo</span>
                         </button>
                       </div>
+                    )}
+                  </div>
 
-                      {/* Live Viewport */}
-                      <div className="relative aspect-[16/9] max-h-56 mx-auto rounded-lg overflow-hidden bg-zinc-900 flex items-center justify-center border border-white/10">
-                        <video
-                          ref={videoRef}
-                          playsInline
-                          muted
-                          autoPlay
-                          className="w-full h-full object-cover"
-                        />
-
-                        {/* Video Recording Countdown Overlay */}
-                        {isRecordingVideo && (
-                          <div className="absolute top-2.5 right-2.5 bg-red-600 text-white px-2.5 py-0.5 rounded-full text-xs font-bold font-mono flex items-center gap-1 animate-pulse shadow z-10">
-                            <span className="h-1.5 w-1.5 rounded-full bg-white" />
-                            <span>00:0{videoCountdown} / 10s</span>
-                          </div>
-                        )}
-
-                        {/* Framing Overlay for Photos */}
-                        {cameraTarget !== "video" && (
-                          <div className="absolute inset-3 border border-white/30 rounded-lg pointer-events-none flex flex-col justify-between p-2">
-                            <div className="text-[9px] font-mono text-white/80 bg-black/50 px-1.5 py-0.5 rounded self-start">
-                              <span>ALIGN {cameraTarget === "front" ? "FRONT" : "BACK"}</span>
-                            </div>
-                            <div className="text-center">
-                              <span className="text-[10px] font-medium text-white/90 bg-black/60 px-2.5 py-0.5 rounded-full">
-                                {cameraTarget === "front"
-                                  ? "Position Front of Equipment"
-                                  : "Position Rear / Ports"}
-                              </span>
-                            </div>
-                          </div>
-                        )}
+                  {/* CARD 2: BACK PHOTO */}
+                  <div className={`p-3.5 rounded-xl border transition-all ${
+                    backPhotoUrl
+                      ? "bg-card border-border shadow-xs"
+                      : "bg-card/60 border-border/80"
+                  }`}>
+                    <div className="flex items-center justify-between mb-2.5">
+                      <div className="flex items-center gap-2">
+                        <span className={`h-4.5 w-4.5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                          backPhotoUrl
+                            ? "bg-foreground text-background"
+                            : "bg-secondary text-muted-foreground border border-border"
+                        }`}>
+                          {backPhotoUrl ? "✓" : "2"}
+                        </span>
+                        <span className="text-xs font-bold text-foreground">
+                          Back Photo <span className="text-destructive">*</span>
+                        </span>
                       </div>
-
-                      {/* Viewfinder Action Trigger */}
-                      <div className="flex items-center justify-between gap-2 pt-0.5">
-                        <div className="text-[10px] text-white/70 truncate">
-                          {cameraTarget === "front"
-                            ? "After Front, automatically switches to Back."
-                            : cameraTarget === "back"
-                              ? "Snapping saves photo to Slot 2."
-                              : "Click Start to record 10s inspection video."}
-                        </div>
-
-                        {cameraTarget !== "video" ? (
-                          <button
-                            type="button"
-                            onClick={capturePhoto}
-                            className="px-4 py-1.5 rounded-lg bg-primary text-primary-foreground font-bold text-xs shadow-md hover:opacity-95 active:scale-95 cursor-pointer flex items-center gap-1.5 shrink-0"
-                          >
-                            <Camera className="h-3.5 w-3.5" />
-                            <span>Snap {cameraTarget === "front" ? "Front (1/3)" : "Back (2/3)"}</span>
-                          </button>
-                        ) : (
-                          <div>
-                            {!isRecordingVideo ? (
-                              <button
-                                type="button"
-                                onClick={start10SecondVideoRecording}
-                                className="px-4 py-1.5 rounded-lg bg-red-600 text-white font-bold text-xs shadow-md hover:bg-red-700 active:scale-95 cursor-pointer flex items-center gap-1.5 shrink-0"
-                              >
-                                <Play className="h-3.5 w-3.5" />
-                                <span>Start 10s Recording</span>
-                              </button>
-                            ) : (
-                              <div className="text-[11px] font-bold text-red-400 animate-pulse flex items-center gap-1">
-                                <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
-                                <span>Recording ({videoCountdown}s left)...</span>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {cameraError && (
-                    <div className="p-2.5 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs space-y-1">
-                      <p className="font-bold flex items-center gap-1">
-                        <AlertCircle className="h-3.5 w-3.5" />
-                        <span>{cameraError}</span>
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => startCamera(cameraTarget)}
-                        className="text-[10px] underline font-semibold cursor-pointer"
-                      >
-                        Try Again
-                      </button>
-                    </div>
-                  )}
-
-                  {/* 3 COMPACT MEDIA SLOTS ON ONE LINE: 1, 2, 3 */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                    {/* SLOT 1: Front View Photo */}
-                    <div className={`p-2.5 rounded-xl border transition-all ${frontPhotoUrl
-                        ? "bg-card border-emerald-500/40 shadow-xs"
-                        : isCameraActive && cameraTarget === "front"
-                          ? "bg-primary/5 border-primary ring-1 ring-primary/30"
-                          : "bg-card/50 border-dashed border-border"
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                        backPhotoUrl
+                          ? "bg-secondary text-foreground border border-border"
+                          : "bg-secondary/60 text-muted-foreground"
                       }`}>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <span className="h-4 w-4 rounded-full bg-secondary flex items-center justify-center text-[9px] font-bold text-foreground shrink-0">
-                            1
-                          </span>
-                          <span className="text-[11px] font-bold text-foreground truncate">1. Front Photo</span>
-                        </div>
-                        {frontPhotoUrl ? (
-                          <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-0.5 bg-emerald-500/10 px-1.5 py-0.2 rounded shrink-0">
-                            <Check className="h-2.5 w-2.5" /> Saved
-                          </span>
-                        ) : isCameraActive && cameraTarget === "front" ? (
-                          <span className="text-[9px] text-primary font-bold animate-pulse shrink-0">
-                            Active
-                          </span>
-                        ) : (
-                          <span className="text-[9px] text-muted-foreground font-medium shrink-0">Pending</span>
-                        )}
-                      </div>
-
-                      {frontPhotoUrl ? (
-                        <div className="relative h-20 sm:h-22 rounded-lg overflow-hidden border border-border bg-secondary group">
-                          <img src={frontPhotoUrl} alt="Queue Slot 1 Front" className="w-full h-full object-cover" />
-                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => setPreviewPhotoModal(frontPhotoUrl)}
-                              className="p-1 rounded bg-white/20 hover:bg-white/30 text-white backdrop-blur-xs cursor-pointer"
-                              title="Preview"
-                            >
-                              <Eye className="h-3 w-3" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => startCamera("front")}
-                              className="p-1 rounded bg-white/20 hover:bg-white/30 text-white backdrop-blur-xs cursor-pointer"
-                              title="Retake"
-                            >
-                              <RefreshCw className="h-3 w-3" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setFrontPhotoUrl("")}
-                              className="p-1 rounded bg-red-500/80 hover:bg-red-500 text-white cursor-pointer"
-                              title="Remove"
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="h-20 sm:h-22 rounded-lg border border-dashed border-border/80 flex flex-col items-center justify-center gap-0.5 bg-secondary/10 p-1.5 text-center">
-                          <Camera className="h-3.5 w-3.5 text-muted-foreground/70" />
-                          <span className="text-[9px] text-muted-foreground">Front Angle</span>
-                          <button
-                            type="button"
-                            onClick={() => startCamera("front")}
-                            className="mt-0.5 px-2 py-0.5 rounded bg-secondary hover:bg-secondary/80 text-foreground text-[9px] font-bold cursor-pointer"
-                          >
-                            Snap 1
-                          </button>
-                        </div>
-                      )}
+                        {backPhotoUrl ? "Captured" : "Pending"}
+                      </span>
                     </div>
 
-                    {/* SLOT 2: Back View Photo */}
-                    <div className={`p-2.5 rounded-xl border transition-all ${backPhotoUrl
-                        ? "bg-card border-emerald-500/40 shadow-xs"
-                        : isCameraActive && cameraTarget === "back"
-                          ? "bg-primary/5 border-primary ring-1 ring-primary/30"
-                          : "bg-card/50 border-dashed border-border"
-                      }`}>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <span className="h-4 w-4 rounded-full bg-secondary flex items-center justify-center text-[9px] font-bold text-foreground shrink-0">
-                            2
-                          </span>
-                          <span className="text-[11px] font-bold text-foreground truncate">2. Back Photo</span>
+                    {backPhotoUrl ? (
+                      <div className="space-y-2.5">
+                        <div className="relative h-44 sm:h-52 rounded-lg overflow-hidden border border-border bg-black">
+                          <img
+                            src={backPhotoUrl}
+                            alt="Back View Evidence"
+                            className="w-full h-full object-contain"
+                          />
                         </div>
-                        {backPhotoUrl ? (
-                          <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-0.5 bg-emerald-500/10 px-1.5 py-0.2 rounded shrink-0">
-                            <Check className="h-2.5 w-2.5" /> Saved
-                          </span>
-                        ) : isCameraActive && cameraTarget === "back" ? (
-                          <span className="text-[9px] text-primary font-bold animate-pulse shrink-0">
-                            Active
-                          </span>
-                        ) : (
-                          <span className="text-[9px] text-muted-foreground font-medium shrink-0">Pending</span>
-                        )}
-                      </div>
-
-                      {backPhotoUrl ? (
-                        <div className="relative h-20 sm:h-22 rounded-lg overflow-hidden border border-border bg-secondary group">
-                          <img src={backPhotoUrl} alt="Queue Slot 2 Back" className="w-full h-full object-cover" />
-                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => setPreviewPhotoModal(backPhotoUrl)}
-                              className="p-1 rounded bg-white/20 hover:bg-white/30 text-white backdrop-blur-xs cursor-pointer"
-                              title="Preview"
-                            >
-                              <Eye className="h-3 w-3" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => startCamera("back")}
-                              className="p-1 rounded bg-white/20 hover:bg-white/30 text-white backdrop-blur-xs cursor-pointer"
-                              title="Retake"
-                            >
-                              <RefreshCw className="h-3 w-3" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setBackPhotoUrl("")}
-                              className="p-1 rounded bg-red-500/80 hover:bg-red-500 text-white cursor-pointer"
-                              title="Remove"
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="h-20 sm:h-22 rounded-lg border border-dashed border-border/80 flex flex-col items-center justify-center gap-0.5 bg-secondary/10 p-1.5 text-center">
-                          <Camera className="h-3.5 w-3.5 text-muted-foreground/70" />
-                          <span className="text-[9px] text-muted-foreground">Rear / Ports</span>
+                        <div className="flex items-center gap-2">
                           <button
                             type="button"
-                            onClick={() => startCamera("back")}
-                            className="mt-0.5 px-2 py-0.5 rounded bg-secondary hover:bg-secondary/80 text-foreground text-[9px] font-bold cursor-pointer"
+                            onClick={handleTriggerBackCamera}
+                            disabled={isProcessingMedia}
+                            className="flex-1 py-2 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground text-xs font-bold cursor-pointer transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
                           >
-                            Snap 2
+                            <RefreshCw className="h-3.5 w-3.5" />
+                            <span>Retake</span>
                           </button>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* SLOT 3: 10-Second Live Video */}
-                    <div className={`p-2.5 rounded-xl border transition-all ${capturedVideoUrl
-                        ? "bg-card border-emerald-500/40 shadow-xs"
-                        : isCameraActive && cameraTarget === "video"
-                          ? "bg-red-500/5 border-red-500 ring-1 ring-red-500/30"
-                          : "bg-card/50 border-dashed border-border"
-                      }`}>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <span className="h-4 w-4 rounded-full bg-secondary flex items-center justify-center text-[9px] font-bold text-foreground shrink-0">
-                            3
-                          </span>
-                          <span className="text-[11px] font-bold text-foreground truncate">3. 10s Video</span>
-                        </div>
-                        {capturedVideoUrl ? (
-                          <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-0.5 bg-emerald-500/10 px-1.5 py-0.2 rounded shrink-0">
-                            <Check className="h-2.5 w-2.5" /> Ready
-                          </span>
-                        ) : isCameraActive && cameraTarget === "video" ? (
-                          <span className="text-[9px] text-red-500 font-bold animate-pulse shrink-0">
-                            {isRecordingVideo ? `${videoCountdown}s` : "Active"}
-                          </span>
-                        ) : (
-                          <span className="text-[9px] text-muted-foreground font-medium shrink-0">Pending</span>
-                        )}
-                      </div>
-
-                      {capturedVideoUrl ? (
-                        <div className="relative h-20 sm:h-22 rounded-lg overflow-hidden border border-border bg-black group">
-                          <video src={capturedVideoUrl} controls playsInline className="w-full h-full object-cover" />
-                          <div className="absolute top-1 right-1 flex gap-1 z-10">
-                            <button
-                              type="button"
-                              onClick={() => startCamera("video")}
-                              className="p-1 rounded bg-black/60 hover:bg-black/80 text-white backdrop-blur-xs cursor-pointer"
-                              title="Retake Video"
-                            >
-                              <RefreshCw className="h-3 w-3" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setCapturedVideoUrl("")}
-                              className="p-1 rounded bg-red-600/80 hover:bg-red-600 text-white cursor-pointer"
-                              title="Remove Video"
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="h-20 sm:h-22 rounded-lg border border-dashed border-border/80 flex flex-col items-center justify-center gap-0.5 bg-secondary/10 p-1.5 text-center">
-                          <Video className="h-3.5 w-3.5 text-red-500/70" />
-                          <span className="text-[9px] text-muted-foreground">10s Walkthrough</span>
                           <button
                             type="button"
-                            onClick={() => startCamera("video")}
-                            className="mt-0.5 px-2 py-0.5 rounded bg-secondary hover:bg-secondary/80 text-foreground text-[9px] font-bold cursor-pointer"
+                            onClick={() => setBackPhotoUrl("")}
+                            className="px-3.5 py-2 rounded-lg bg-secondary/50 hover:bg-destructive/10 text-muted-foreground hover:text-destructive text-xs font-semibold cursor-pointer transition-colors flex items-center justify-center gap-1.5"
                           >
-                            Record 3
+                            <Trash2 className="h-3.5 w-3.5" />
+                            <span>Remove</span>
                           </button>
                         </div>
-                      )}
+                      </div>
+                    ) : (
+                      <div className="py-6 px-4 rounded-lg border border-dashed border-border flex flex-col items-center justify-center gap-2.5 bg-secondary/10 text-center">
+                        <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center text-foreground">
+                          <Camera className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-foreground">Back View</p>
+                          <p className="text-[11px] text-muted-foreground mt-0.5">
+                            Position rear panel, ports, or serial tag.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleTriggerBackCamera}
+                          disabled={isProcessingMedia}
+                          className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-bold shadow-xs hover:opacity-95 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                        >
+                          <Camera className="h-3.5 w-3.5" />
+                          <span>Take Photo</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* CARD 3: 10-SECOND INSPECTION VIDEO */}
+                  <div className={`p-3.5 rounded-xl border transition-all ${
+                    capturedVideoUrl
+                      ? "bg-card border-border shadow-xs"
+                      : "bg-card/60 border-border/80"
+                  }`}>
+                    <div className="flex items-center justify-between mb-2.5">
+                      <div className="flex items-center gap-2">
+                        <span className={`h-4.5 w-4.5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                          capturedVideoUrl
+                            ? "bg-foreground text-background"
+                            : "bg-secondary text-muted-foreground border border-border"
+                        }`}>
+                          {capturedVideoUrl ? "✓" : "3"}
+                        </span>
+                        <span className="text-xs font-bold text-foreground">
+                          10s Inspection Video <span className="text-destructive">*</span>
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        {capturedVideoUrl && (
+                          <span className="text-[10px] font-mono font-bold bg-secondary px-2 py-0.5 rounded-md text-foreground border border-border">
+                            {videoDuration}
+                          </span>
+                        )}
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                          capturedVideoUrl
+                            ? "bg-secondary text-foreground border border-border"
+                            : "bg-secondary/60 text-muted-foreground"
+                        }`}>
+                          {capturedVideoUrl ? "Captured" : "Pending"}
+                        </span>
+                      </div>
                     </div>
+
+                    {capturedVideoUrl ? (
+                      <div className="space-y-2.5">
+                        <div className="relative h-44 sm:h-52 rounded-lg overflow-hidden border border-border bg-black">
+                          <video
+                            src={capturedVideoUrl}
+                            controls
+                            playsInline
+                            className="w-full h-full object-contain"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={handleTriggerVideoCamera}
+                            disabled={isProcessingMedia}
+                            className="flex-1 py-2 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground text-xs font-bold cursor-pointer transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+                          >
+                            <RefreshCw className="h-3.5 w-3.5" />
+                            <span>Retake</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setCapturedVideoUrl("")}
+                            className="px-3.5 py-2 rounded-lg bg-secondary/50 hover:bg-destructive/10 text-muted-foreground hover:text-destructive text-xs font-semibold cursor-pointer transition-colors flex items-center justify-center gap-1.5"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            <span>Remove</span>
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="py-6 px-4 rounded-lg border border-dashed border-border flex flex-col items-center justify-center gap-2.5 bg-secondary/10 text-center">
+                        <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center text-foreground">
+                          <Video className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-foreground">10-Second Inspection Video</p>
+                          <p className="text-[11px] text-muted-foreground mt-0.5">
+                            Record a continuous walkaround video (maximum 10 seconds).
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleTriggerVideoCamera}
+                          disabled={isProcessingMedia}
+                          className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-bold shadow-xs hover:opacity-95 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                        >
+                          <Video className="h-3.5 w-3.5" />
+                          <span>Record Video</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* COMPACT COMPLETION SUMMARY */}
+                <div className="p-3 rounded-xl bg-secondary/30 border border-border flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-foreground">Media</span>
+                    <span className="text-xs font-mono font-semibold text-muted-foreground">
+                      {(frontPhotoUrl ? 1 : 0) + (backPhotoUrl ? 1 : 0) + (capturedVideoUrl ? 1 : 0)} / 3 complete
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-[11px] font-semibold text-muted-foreground">
+                    <span className={frontPhotoUrl ? "text-foreground font-bold" : ""}>
+                      {frontPhotoUrl ? "✓" : "○"} Front
+                    </span>
+                    <span className={backPhotoUrl ? "text-foreground font-bold" : ""}>
+                      {backPhotoUrl ? "✓" : "○"} Back
+                    </span>
+                    <span className={capturedVideoUrl ? "text-foreground font-bold" : ""}>
+                      {capturedVideoUrl ? "✓" : "○"} Video
+                    </span>
                   </div>
                 </div>
 
