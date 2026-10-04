@@ -332,7 +332,10 @@ export const adminApi = axios.create({
 adminApi.interceptors.request.use((config) => {
   let token =
     localStorage.getItem("payent:admin:token") ||
-    localStorage.getItem("payent:token");
+    localStorage.getItem("payent:token") ||
+    localStorage.getItem("paye₹nt_token") ||
+    localStorage.getItem("payernt_token");
+
   if (token) {
     token = token.trim();
     if (token.startsWith('"') && token.endsWith('"')) {
@@ -352,11 +355,9 @@ adminApi.interceptors.response.use(
     if (status === 401 && typeof window !== "undefined") {
       localStorage.removeItem("payent:admin:token");
       localStorage.removeItem("payent:admin:current_user");
-      localStorage.removeItem("payent:token");
-      localStorage.removeItem("payent:currentUser");
 
-      if (window.location.pathname !== "/admin/login") {
-        window.location.href = "/admin/login";
+      if (window.location.pathname !== "/login") {
+        window.location.href = "/login?redirect=/admin/dashboard";
       }
     }
     return Promise.reject(error);

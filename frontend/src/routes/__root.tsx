@@ -263,7 +263,7 @@ function RootComponent() {
     // Global session expiration handler (silent redirect with NO popups/modals)
     const handleSessionExpired = (e: Event) => {
       const customEv = e as CustomEvent<{
-        loginPath?: "/login" | "/admin/login";
+        loginPath?: "/login";
       }>;
       storage.remove(STORAGE_KEYS.token);
       storage.remove(STORAGE_KEYS.refreshToken);
@@ -272,9 +272,9 @@ function RootComponent() {
         localStorage.removeItem("payent:admin:token");
         localStorage.removeItem("payent:admin:current_user");
         const currentPath = window.location.pathname;
-        const targetLoginBase = customEv.detail?.loginPath || (currentPath.startsWith("/admin") ? "/admin/login" : "/login");
+        const targetLoginBase = customEv.detail?.loginPath || "/login";
 
-        if (currentPath === "/login" || currentPath === "/admin/login") {
+        if (currentPath === "/login") {
           return;
         }
 

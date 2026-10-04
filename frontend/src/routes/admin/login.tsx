@@ -1,19 +1,12 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { lazy, Suspense } from "react";
-
-const AdminLogin = lazy(() => import("@/admin/pages/Login"));
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/admin/login")({
-  component: () => (
-    <Suspense
-      fallback={
-        <div className="h-screen flex items-center justify-center bg-background">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-        </div>
-      }
-    >
-      <AdminLogin />
-    </Suspense>
-  ),
+  beforeLoad: () => {
+    throw redirect({
+      to: "/login",
+      search: { redirect: "/admin/dashboard" } as any,
+    });
+  },
+  component: () => null,
 });
 export default Route;

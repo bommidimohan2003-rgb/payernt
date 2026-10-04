@@ -148,6 +148,7 @@ from database import (
     revoke_db_session,
     revoke_db_session_by_token,
     revoke_all_user_sessions,
+    revoke_cross_side_user_sessions,
     get_user_active_sessions,
     cleanup_expired_sessions,
     is_session_revoked,
@@ -819,6 +820,15 @@ def get_current_user_email(authorization: Optional[str] = Header(None)) -> str:
             detail="Session has been revoked or expired."
         )
 
+    # Check account type authorization: prevent Payernt vendor tokens from accessing Payrent customer endpoints
+    account_type = (payload.get("account_type") or payload.get("accountType") or "").strip().lower()
+    role = str(payload.get("role") or "").strip().lower()
+    if account_type in ("paye₹nt", "payernt", "vendor") and role not in ("admin", "superadmin", "customer", "renter", "user"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: This endpoint requires a payrent customer account.",
+        )
+
     user_email = payload["sub"].strip().lower()
     user = get_user(user_email)
     if not user:
@@ -1350,10 +1360,32 @@ def login(data: LoginRequestSchema, request: Request, response: Response):
     clear_failed_auth_attempts(ip_key)
     clear_failed_auth_attempts(user_key)
 
+    # 1. Enforce single active user-side session: Revoke any active Payernt sessions
+    revoke_cross_side_user_sessions(user["email"], user.get("person_id"), logging_in_account_type="payrent")
+
+    # 2. Invalidate previous bearer token if present in headers (session switching)
+    auth_header = request.headers.get("authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        try:
+            prev_tok = auth_header.split(" ")[1]
+            prev_dec = decode_access_token(prev_tok, expected_type="access")
+            if prev_dec and "jti" in prev_dec:
+                revoke_token(prev_dec["jti"], prev_dec.get("sub", ""), prev_dec.get("exp", 0))
+        except Exception:
+            pass
+
     # Generate session ID, 30-minute access token and 7-day refresh token
-    session_id = f"sess-{uuid.uuid4()}"
-    access_token = create_access_token({"sub": user["email"], "role": user["role"], "sid": session_id})
-    refresh_token = create_refresh_token({"sub": user["email"], "role": user["role"], "sid": session_id})
+    session_id = f"sess-payrent-{uuid.uuid4()}"
+    token_claims = {
+        "sub": user["email"],
+        "account_type": "pay₹ent",
+        "accountType": "pay₹ent",
+        "role": user.get("role", "customer"),
+        "person_id": user.get("person_id"),
+        "sid": session_id,
+    }
+    access_token = create_access_token(token_claims)
+    refresh_token = create_refresh_token(token_claims)
 
     # Detect user-agent & device metadata
     user_agent = request.headers.get("user-agent", "Unknown Browser")
@@ -1361,7 +1393,7 @@ def login(data: LoginRequestSchema, request: Request, response: Response):
     expires_at_str = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=7)).isoformat()
 
     # Store hashed session entry in TiDB Cloud database
-    create_db_session(session_id, user["email"], refresh_token, device_name, client_ip, user_agent, expires_at_str)
+    create_db_session(session_id, user["email"], refresh_token, device_name, client_ip, user_agent, expires_at_str, account_type="payrent")
 
     # Set refresh token in HttpOnly, Secure cookie
     response.set_cookie(
@@ -1376,6 +1408,9 @@ def login(data: LoginRequestSchema, request: Request, response: Response):
     display_name = user.get("full_name") or clean_email.split("@")[0]
     user_record = {
         "id": user["email"],
+        "accountId": f"PAYRENT_USER_{clean_email}",
+        "accountType": "pay₹ent",
+        "personId": user.get("person_id"),
         "fullName": display_name,
         "email": user["email"],
         "phone": user.get("phone", ""),
@@ -1394,6 +1429,7 @@ def login(data: LoginRequestSchema, request: Request, response: Response):
         "token": access_token,
         "refreshToken": refresh_token,
         "expiresIn": 1800,
+        "accountType": "pay₹ent",
         "role": user["role"],
         "user": user_record,
         "message": "Login successful."
@@ -1746,6 +1782,7 @@ def mask_pan(pan: Optional[str]) -> str:
     return clean
 
 @app.get("/api/me")
+@app.get("/api/auth/me")
 @app.get("/api/users/me")
 @app.get("/api/profile")
 def get_me(current_user_email: str = Depends(get_current_user_email)):
@@ -5118,14 +5155,17 @@ def poll_admin_events(since: Optional[str] = None, current_admin: dict = Depends
 class AdminRegisterSchema(BaseModel):
     email: str
     password: str
-    full_name: Optional[str] = "Admin User"
+    full_name: Optional[str] = None
+    fullName: Optional[str] = None
     phone: Optional[str] = "0000000000"
     admin_code: Optional[str] = None
+    adminCode: Optional[str] = None
 
 @app.post("/api/admin/auth/register")
 def admin_register(data: AdminRegisterSchema):
     clean_email = data.email.lower().strip()
-    if not data.admin_code or data.admin_code != ADMIN_SETUP_CODE:
+    code = data.admin_code or data.adminCode
+    if not code or (code != ADMIN_SETUP_CODE and code != ADMIN_CREATION_SECRET):
         logger.warning(f"Unauthorized admin registration attempt for {clean_email}")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, 
@@ -5135,6 +5175,8 @@ def admin_register(data: AdminRegisterSchema):
     valid_pass, msg = validate_password_strength(data.password)
     if not valid_pass:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
+
+    display_name = data.full_name or data.fullName or clean_email.split("@")[0]
 
     existing = get_user(clean_email)
     if existing:
@@ -5152,7 +5194,7 @@ def admin_register(data: AdminRegisterSchema):
         email=clean_email,
         phone=data.phone or "+10000000000",
         password_hash=hashed,
-        full_name=data.full_name or clean_email.split("@")[0],
+        full_name=display_name,
         role="admin",
         status="approved"
     )
@@ -5198,15 +5240,22 @@ def admin_login(data: LoginRequestSchema, request: Request, response: Response):
     clear_failed_auth_attempts(ip_key)
     clear_failed_auth_attempts(user_key)
 
-    session_id = f"sess-{uuid.uuid4()}"
-    access_token = create_access_token({"sub": user["email"], "role": user["role"], "sid": session_id})
-    refresh_token = create_refresh_token({"sub": user["email"], "role": user["role"], "sid": session_id})
+    session_id = f"sess-admin-{uuid.uuid4()}"
+    token_claims = {
+        "sub": user["email"],
+        "account_type": "admin",
+        "accountType": "admin",
+        "role": user["role"],
+        "sid": session_id,
+    }
+    access_token = create_access_token(token_claims)
+    refresh_token = create_refresh_token(token_claims)
 
     user_agent = request.headers.get("user-agent", "Unknown Browser")
     device_name = "Desktop" if ("Windows" in user_agent or "Macintosh" in user_agent or "Linux" in user_agent) and "Mobile" not in user_agent else ("Mobile" if "Mobile" in user_agent or "Android" in user_agent or "iPhone" in user_agent else "Web Browser")
     expires_at_str = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=7)).isoformat()
 
-    create_db_session(session_id, user["email"], refresh_token, device_name, client_ip, user_agent, expires_at_str)
+    create_db_session(session_id, user["email"], refresh_token, device_name, client_ip, user_agent, expires_at_str, account_type="admin")
 
     response.set_cookie(
         key="payent_refresh_token",

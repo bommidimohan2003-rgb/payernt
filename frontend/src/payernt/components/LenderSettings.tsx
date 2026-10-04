@@ -5,7 +5,6 @@ import {
   Sun,
   Moon,
   ArrowLeft,
-  RotateCcw,
   LogOut,
   Sliders,
   CheckCircle2,
@@ -274,20 +273,6 @@ export function LenderSettingsView({
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3 pt-2">
-          {onResetDemo && (
-            <button
-              type="button"
-              onClick={() => {
-                onResetDemo();
-                toast.success("Demo environment reset to initial defaults.");
-              }}
-              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-neutral-300 dark:border-white/10 bg-white dark:bg-white/[0.04] hover:bg-neutral-100 dark:hover:bg-white/[0.08] text-xs font-bold text-neutral-700 dark:text-neutral-300 transition-all cursor-pointer"
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-              <span>{tCommon.resetDemoState}</span>
-            </button>
-          )}
-
           {onLogout && (
             <button
               type="button"

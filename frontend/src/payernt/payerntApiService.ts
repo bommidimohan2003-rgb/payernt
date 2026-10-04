@@ -47,9 +47,7 @@ function getAuthHeaders(): Record<string, string> {
   try {
     let token =
       localStorage.getItem("paye₹nt_token") ||
-      localStorage.getItem("payernt_token") ||
-      localStorage.getItem("payent_token") ||
-      localStorage.getItem("payent:token");
+      localStorage.getItem("payernt_token");
     if (token) {
       token = token.trim();
       if (token.startsWith('"') && token.endsWith('"')) {
@@ -158,6 +156,18 @@ export const payerntApi = {
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.success) {
+        // 1. Invalidate Payrent customer state (single active user-side session)
+        try {
+          localStorage.removeItem("payent:token");
+          localStorage.removeItem("payent:currentUser");
+          localStorage.removeItem("payent:refreshToken");
+          localStorage.removeItem("pay₹ent_session");
+          localStorage.removeItem("pay₹ent_account");
+          localStorage.removeItem("payent_token");
+          window.dispatchEvent(new CustomEvent("payent-session-expired"));
+          window.dispatchEvent(new CustomEvent("payent:storage_change"));
+        } catch {}
+
         if (data.token) {
           localStorage.setItem("paye₹nt_token", data.token);
         }
@@ -177,10 +187,12 @@ export const payerntApi = {
 
   async logout(): Promise<{ success: boolean }> {
     try {
+      const headers = getAuthHeaders();
       localStorage.removeItem("paye₹nt_token");
+      localStorage.removeItem("payernt_token");
       await fetch(`${API_BASE}/api/payernt/auth/logout`, {
         method: "POST",
-        headers: getAuthHeaders(),
+        headers,
       }).catch(() => {});
     } catch {}
     return { success: true };

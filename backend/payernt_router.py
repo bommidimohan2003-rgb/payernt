@@ -2,8 +2,10 @@ import os
 import re
 import time
 import logging
+import uuid
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict, Any, Union
-from fastapi import APIRouter, HTTPException, Depends, Header, status, Query, Request
+from fastapi import APIRouter, HTTPException, Depends, Header, status, Query, Request, Response
 from pydantic import BaseModel, Field, EmailStr
 from auth import (
     hash_password,
@@ -93,8 +95,30 @@ def get_current_payernt_account(authorization: Optional[str] = Header(None)) -> 
             detail="Session expired or invalid token. Please log in to paye₹nt.",
         )
 
+    # Server-side token & session revocation verification
+    from database import is_token_revoked, is_session_revoked
+    jti = payload.get("jti")
+    if jti and is_token_revoked(jti):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has been revoked or logged out.",
+        )
+
+    sid = payload.get("sid")
+    if sid and is_session_revoked(sid):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session has been revoked or expired.",
+        )
+
     account_type = (payload.get("account_type") or payload.get("accountType") or "").strip().lower()
-    if account_type not in ("paye₹nt", "payernt", "admin", "vendor", "lender"):
+    role = str(payload.get("role") or "").strip().lower()
+    if account_type in ("pay₹ent", "payrent", "customer") and role not in ("admin", "superadmin"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: This endpoint requires a paye₹nt vendor account.",
+        )
+    if account_type not in ("paye₹nt", "payernt", "admin", "vendor", "lender") and role not in ("vendor", "admin", "superadmin"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Forbidden: This endpoint requires a paye₹nt vendor account.",
@@ -563,7 +587,7 @@ def register_payernt_vendor(data: PayerntRegisterSchema):
 
 
 @payernt_router.post("/auth/login")
-def login_payernt_vendor(data: PayerntLoginSchema):
+def login_payernt_vendor(data: PayerntLoginSchema, request: Request = None):
     """Authenticates a paye₹nt Product Owner / Lender."""
     clean_email = (data.email or "").strip().lower()
     if not clean_email:
@@ -583,35 +607,6 @@ def login_payernt_vendor(data: PayerntLoginSchema):
     if account and account.get("password_hash"):
         if verify_password(data.password, account["password_hash"]):
             authenticated = True
-        else:
-            # Check if password matches in standard users table (pay₹ent renter side)
-            from database import get_user
-            std_user = get_user(clean_email)
-            if std_user and std_user.get("password_hash") and verify_password(data.password, std_user["password_hash"]):
-                authenticated = True
-    elif not account:
-        # Account not found in payernt_accounts - check standard users table
-        from database import get_user
-        std_user = get_user(clean_email)
-        if std_user and std_user.get("password_hash") and verify_password(data.password, std_user["password_hash"]):
-            # Auto-provision paye₹nt vendor account for this verified person
-            from payernt_database import create_payernt_account
-            try:
-                account = create_payernt_account(
-                    name=std_user.get("full_name") or std_user.get("name") or clean_email.split("@")[0],
-                    email=clean_email,
-                    aadhaar_number=std_user.get("aadhaar_number") or std_user.get("pan_number") or "XXXX-XXXX-0000",
-                    phone=std_user.get("phone") or "0000000000",
-                    address=std_user.get("address") or "",
-                    pincode=std_user.get("pincode") or "000000",
-                    password=data.password,
-                )
-                authenticated = True
-            except Exception as prov_err:
-                logger.warning(f"Notice: Failed to auto-provision payernt account for {clean_email}: {prov_err}")
-                account = get_payernt_account_by_email(clean_email)
-                if account and account.get("password_hash") and verify_password(data.password, account["password_hash"]):
-                    authenticated = True
 
     if not authenticated or not account:
         raise HTTPException(
@@ -626,15 +621,38 @@ def login_payernt_vendor(data: PayerntLoginSchema):
         )
 
     try:
+        from database import revoke_cross_side_user_sessions, create_db_session, revoke_token
+        # 1. Enforce single active user-side session: Revoke any active Payrent sessions
+        revoke_cross_side_user_sessions(account["email"], account.get("person_id"), logging_in_account_type="payernt")
+
+        # 2. Invalidate previous bearer token if present in headers (session switching)
+        if request and request.headers.get("authorization"):
+            auth_header = request.headers.get("authorization")
+            if auth_header and auth_header.startswith("Bearer "):
+                try:
+                    prev_tok = auth_header.split(" ")[1]
+                    prev_dec = decode_access_token(prev_tok, expected_type="access")
+                    if prev_dec and "jti" in prev_dec:
+                        revoke_token(prev_dec["jti"], prev_dec.get("sub", ""), prev_dec.get("exp", 0))
+                except Exception:
+                    pass
+
+        session_id = f"sess-payernt-{uuid.uuid4()}"
         token_payload = {
             "sub": account["email"],
             "account_type": "paye₹nt",
+            "accountType": "paye₹nt",
             "user_id": account["id"],
             "name": account.get("name", "Vendor"),
             "role": "vendor",
+            "person_id": account.get("person_id"),
+            "sid": session_id,
         }
         access_token = create_access_token(token_payload)
         refresh_token = create_refresh_token(token_payload)
+
+        expires_at_str = (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
+        create_db_session(session_id, account["email"], refresh_token, "Desktop", "unknown", "PayerntApp", expires_at_str, account_type="payernt")
 
         sanitized = _sanitize_payernt_account(account)
 
@@ -656,6 +674,8 @@ def login_payernt_vendor(data: PayerntLoginSchema):
             "token": access_token,
             "refreshToken": refresh_token,
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception(f"Unexpected error during paye₹nt login for {clean_email}")
         raise HTTPException(
@@ -665,8 +685,17 @@ def login_payernt_vendor(data: PayerntLoginSchema):
 
 
 @payernt_router.post("/auth/logout")
-def logout_payernt_vendor():
-    """Logs out from paye₹nt."""
+def logout_payernt_vendor(request: Request = None, response: Response = None, authorization: Optional[str] = Header(None)):
+    """Logs out from paye₹nt and revokes active token/session."""
+    from database import revoke_token, revoke_db_session
+    if authorization and authorization.startswith("Bearer "):
+        access_tok = authorization.split(" ")[1]
+        payload = decode_access_token(access_tok, expected_type="access")
+        if payload:
+            if "jti" in payload:
+                revoke_token(payload["jti"], payload.get("sub", ""), payload.get("exp", 0))
+            if "sid" in payload:
+                revoke_db_session(payload["sid"])
     return {"success": True, "message": "Logged out from paye₹nt."}
 
 

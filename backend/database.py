@@ -368,15 +368,18 @@ def init_db(force: bool = False):
             device_name VARCHAR(255) NULL,
             ip_address VARCHAR(100) NULL,
             user_agent TEXT NULL,
+            account_type VARCHAR(50) DEFAULT 'payrent',
             created_at VARCHAR(100) NOT NULL,
             last_used_at VARCHAR(100) NOT NULL,
             expires_at VARCHAR(100) NOT NULL,
             revoked_at VARCHAR(100) NULL
         )
     """)
+    add_column_safely("sessions", "account_type", "VARCHAR(50) DEFAULT 'payrent'")
     add_index_safely("sessions", "idx_sessions_user_email", "user_email")
     add_index_safely("sessions", "idx_sessions_token_hash", "refresh_token_hash")
     add_index_safely("sessions", "idx_sessions_expires_at", "expires_at")
+    add_index_safely("sessions", "idx_sessions_account_type", "account_type")
     add_index_safely("sessions", "idx_sessions_user_active", "user_email, revoked_at, expires_at")
 
     # Create OTPs table (preserved for user registration verification)
@@ -2799,14 +2802,21 @@ def hash_refresh_token(token: str) -> str:
     """Compute SHA-256 hash of refresh token for secure database storage."""
     return hashlib.sha256(token.encode('utf-8')).hexdigest()
 
-def create_db_session(session_id: str, user_email: str, raw_refresh_token: str, device_name: str, ip_address: str, user_agent: str, expires_at_str: str) -> bool:
+def create_db_session(session_id: str, user_email: str, raw_refresh_token: str, device_name: str, ip_address: str, user_agent: str, expires_at_str: str, account_type: str = "payrent") -> bool:
     clean_email = user_email.strip().lower()
     token_hash = hash_refresh_token(raw_refresh_token)
     now_str = dt.now(timezone.utc).isoformat()
-    return execute_query("""
-        INSERT INTO sessions (id, user_email, refresh_token_hash, device_name, ip_address, user_agent, created_at, last_used_at, expires_at)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-    """, (session_id, clean_email, token_hash, device_name, ip_address, user_agent, now_str, now_str, expires_at_str))
+    norm_acc = "payernt" if account_type.lower() in ("payernt", "paye₹nt", "vendor") else ("admin" if account_type.lower() == "admin" else "payrent")
+    try:
+        return execute_query("""
+            INSERT INTO sessions (id, user_email, refresh_token_hash, device_name, ip_address, user_agent, account_type, created_at, last_used_at, expires_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (session_id, clean_email, token_hash, device_name, ip_address, user_agent, norm_acc, now_str, now_str, expires_at_str))
+    except Exception:
+        return execute_query("""
+            INSERT INTO sessions (id, user_email, refresh_token_hash, device_name, ip_address, user_agent, created_at, last_used_at, expires_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (session_id, clean_email, token_hash, device_name, ip_address, user_agent, now_str, now_str, expires_at_str))
 
 def get_valid_db_session(raw_refresh_token: str) -> Optional[dict]:
     token_hash = hash_refresh_token(raw_refresh_token)
@@ -2849,6 +2859,80 @@ def revoke_all_user_sessions(user_email: str) -> bool:
     clean_email = user_email.strip().lower()
     now_str = dt.now(timezone.utc).isoformat()
     return execute_query("UPDATE sessions SET revoked_at = %s WHERE LOWER(user_email) = LOWER(%s) AND revoked_at IS NULL", (now_str, clean_email))
+
+def revoke_cross_side_user_sessions(user_email: str, person_id: Optional[str] = None, logging_in_account_type: str = "payrent") -> bool:
+    """
+    Enforces the single active user-side session rule.
+    When logging into Payrent, revokes any active Payernt sessions for this person/identity.
+    When logging into Payernt, revokes any active Payrent sessions for this person/identity.
+    Admin sessions remain independent.
+    """
+    VALID_SESSIONS.clear()
+    clean_email = user_email.strip().lower()
+    now_str = dt.now(timezone.utc).isoformat()
+
+    # Collect associated emails for this person
+    target_emails = {clean_email}
+    try:
+        if person_id:
+            rows_payrent = fetch_all("SELECT email FROM payrent_accounts WHERE person_id = %s", (person_id,)) or []
+            rows_users = fetch_all("SELECT email FROM users WHERE person_id = %s", (person_id,)) or []
+            rows_payernt = fetch_all("SELECT email FROM payernt_accounts WHERE person_id = %s", (person_id,)) or []
+            for r in rows_payrent + rows_users + rows_payernt:
+                if r and r.get("email"):
+                    target_emails.add(r["email"].strip().lower())
+        else:
+            p_user = fetch_one("SELECT person_id, phone FROM users WHERE email = %s", (clean_email,))
+            p_payernt = fetch_one("SELECT person_id, phone FROM payernt_accounts WHERE email = %s", (clean_email,))
+            pid = (p_user and p_user.get("person_id")) or (p_payernt and p_payernt.get("person_id"))
+            if pid:
+                rows_payrent = fetch_all("SELECT email FROM payrent_accounts WHERE person_id = %s", (pid,)) or []
+                rows_users = fetch_all("SELECT email FROM users WHERE person_id = %s", (pid,)) or []
+                rows_payernt = fetch_all("SELECT email FROM payernt_accounts WHERE person_id = %s", (pid,)) or []
+                for r in rows_payrent + rows_users + rows_payernt:
+                    if r and r.get("email"):
+                        target_emails.add(r["email"].strip().lower())
+            phone = (p_user and p_user.get("phone")) or (p_payernt and p_payernt.get("phone"))
+            if phone:
+                rows_u = fetch_all("SELECT email FROM users WHERE phone = %s", (phone,)) or []
+                rows_p = fetch_all("SELECT email FROM payernt_accounts WHERE phone = %s", (phone,)) or []
+                for r in rows_u + rows_p:
+                    if r and r.get("email"):
+                        target_emails.add(r["email"].strip().lower())
+    except Exception as e:
+        logger.warning(f"Notice: cross-side email discovery error: {e}")
+
+    norm_target = "payrent" if logging_in_account_type.lower() in ("payrent", "pay₹ent", "customer") else "payernt"
+    for em in target_emails:
+        try:
+            if norm_target == "payrent":
+                # Revoke payernt sessions
+                execute_query("""
+                    UPDATE sessions 
+                    SET revoked_at = %s 
+                    WHERE LOWER(user_email) = LOWER(%s) 
+                      AND (account_type IN ('payernt', 'paye₹nt', 'vendor') OR account_type IS NULL)
+                      AND account_type NOT IN ('admin')
+                      AND revoked_at IS NULL
+                """, (now_str, em))
+            else:
+                # Revoke payrent sessions
+                execute_query("""
+                    UPDATE sessions 
+                    SET revoked_at = %s 
+                    WHERE LOWER(user_email) = LOWER(%s) 
+                      AND (account_type IN ('payrent', 'pay₹ent', 'customer') OR account_type IS NULL)
+                      AND account_type NOT IN ('admin')
+                      AND revoked_at IS NULL
+                """, (now_str, em))
+        except Exception:
+            execute_query("""
+                UPDATE sessions 
+                SET revoked_at = %s 
+                WHERE LOWER(user_email) = LOWER(%s) AND revoked_at IS NULL
+            """, (now_str, em))
+
+    return True
 
 def get_user_active_sessions(user_email: str) -> List[dict]:
     clean_email = user_email.strip().lower()

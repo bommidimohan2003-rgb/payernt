@@ -218,6 +218,19 @@ export function useAuth() {
           }
         }
 
+        // 1. Enforce single active user-side session: Invalidate Payernt state on client
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("paye₹nt_token");
+          localStorage.removeItem("payernt_token");
+          localStorage.removeItem("paye₹nt_account");
+          localStorage.removeItem("payernt_account");
+          localStorage.removeItem("paye₹nt_session");
+          localStorage.removeItem("payernt_session");
+          localStorage.removeItem("paye₹nt_active_user");
+          localStorage.removeItem("payernt_active_user");
+          window.dispatchEvent(new CustomEvent("paye₹nt_auth_change", { detail: null }));
+        }
+
         storage.set(STORAGE_KEYS.currentUser, loggedUser);
         if (typeof window !== "undefined") {
           localStorage.setItem(
@@ -232,7 +245,7 @@ export function useAuth() {
           );
           localStorage.setItem("pay₹ent_account", JSON.stringify(loggedUser));
         }
-        if (loggedUser.role === "admin" && typeof window !== "undefined") {
+        if ((loggedUser.role === "admin" || (loggedUser as any).role === "superadmin") && typeof window !== "undefined") {
           localStorage.setItem("payent:admin:token", res.token);
           localStorage.setItem("payent:admin:current_user", JSON.stringify(loggedUser));
           window.dispatchEvent(new Event("payent:admin:profile-updated"));
@@ -285,9 +298,6 @@ export function useAuth() {
       localStorage.setItem("payent:signed_out", "true");
       localStorage.removeItem("pay₹ent_session");
       localStorage.removeItem("pay₹ent_account");
-      localStorage.removeItem("payent:admin:token");
-      localStorage.removeItem("payent:admin:current_user");
-      window.dispatchEvent(new Event("payent:admin:profile-updated"));
       window.dispatchEvent(new CustomEvent("payent:storage_change"));
       window.location.href = "/";
     }

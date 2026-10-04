@@ -32,16 +32,12 @@ export const authService = {
       };
 
       if (typeof window !== "undefined") {
-        localStorage.removeItem("payent:signed_out");
         localStorage.setItem("payent:admin:token", response.data.token);
         localStorage.setItem(
           "payent:admin:current_user",
           JSON.stringify(userPayload),
         );
-        localStorage.setItem("payent:token", response.data.token);
-        localStorage.setItem("payent:currentUser", JSON.stringify(userPayload));
         window.dispatchEvent(new Event("payent:admin:profile-updated"));
-        window.dispatchEvent(new CustomEvent("payent:storage_change"));
       }
       return { success: true, token: response.data.token, user: userPayload };
     }
@@ -73,8 +69,7 @@ export const authService = {
       localStorage.removeItem("payent:admin:token");
       localStorage.removeItem("payent:admin:current_user");
       window.dispatchEvent(new Event("payent:admin:profile-updated"));
-      window.dispatchEvent(new CustomEvent("payent:storage_change"));
-      window.location.href = "/";
+      window.location.href = "/login";
     }
   },
 
@@ -85,69 +80,88 @@ export const authService = {
 
   isAuthenticated(): boolean {
     if (typeof window === "undefined") return false;
-    const adminToken = localStorage.getItem("payent:admin:token");
-    if (adminToken) return true;
-    const currentUserRaw = localStorage.getItem("payent:currentUser");
-    if (currentUserRaw) {
-      try {
-        const u = JSON.parse(currentUserRaw);
-        return u?.role === "admin";
-      } catch {
-        return false;
-      }
-    }
-    return false;
+    const adminUser = this.getCurrentUser();
+    return adminUser !== null && (adminUser.role === "admin" || (adminUser as any).role === "superadmin");
   },
 
   getCurrentUser(): AdminUser | null {
-    if (typeof window !== "undefined") {
-      const adminUser = localStorage.getItem("payent:admin:current_user");
-      if (adminUser) {
-        try {
-          const u = JSON.parse(adminUser);
-          if (u && (u.email || u.fullName)) {
-            return {
-              id: u.email || u.id || "",
-              fullName: u.fullName || u.email?.split("@")[0] || "Administrator",
-              email: u.email || "",
-              phone: u.phone || "",
-              role: (u.role as AdminUser["role"]) || "admin",
-              status: u.status || "active",
-              verified: true,
-              avatar:
-                u.avatar ||
-                `https://ui-avatars.com/api/?name=${encodeURIComponent(u.fullName || u.email || "Admin")}&background=10b981&color=fff`,
-              createdAt: u.createdAt || new Date().toISOString(),
-            };
-          }
-        } catch {
-          // fallback
-        }
-      }
+    if (typeof window === "undefined") return null;
 
-      const currentUserRaw = localStorage.getItem("payent:currentUser");
-      if (currentUserRaw) {
-        try {
-          const u = JSON.parse(currentUserRaw);
-          if (u && (u.email || u.fullName) && u.role === "admin") {
-            return {
-              id: u.email || u.id || "",
-              fullName: u.fullName || u.email?.split("@")[0] || "Administrator",
-              email: u.email || "",
-              phone: u.phone || "",
-              role: "admin",
-              status: u.status || "active",
-              verified: true,
-              avatar:
-                u.avatar ||
-                `https://ui-avatars.com/api/?name=${encodeURIComponent(u.fullName || u.email || "Admin")}&background=10b981&color=fff`,
-              createdAt: u.createdAt || new Date().toISOString(),
-            };
-          }
-        } catch {
-          // fallback
+    // 1. Direct admin storage
+    const adminUserStr = localStorage.getItem("payent:admin:current_user");
+    if (adminUserStr) {
+      try {
+        const u = JSON.parse(adminUserStr);
+        if (u && (u.role === "admin" || u.role === "superadmin")) {
+          return {
+            id: u.email || u.id || "",
+            fullName: u.fullName || u.name || u.email?.split("@")[0] || "Administrator",
+            email: u.email || "",
+            phone: u.phone || "",
+            role: "admin",
+            status: u.status || "active",
+            verified: true,
+            avatar:
+              u.avatar ||
+              `https://ui-avatars.com/api/?name=${encodeURIComponent(u.fullName || u.name || u.email || "Admin")}&background=10b981&color=fff`,
+            createdAt: u.createdAt || new Date().toISOString(),
+          };
         }
-      }
+      } catch {}
+    }
+
+    // 2. Payrent user storage (if role === 'admin' or 'superadmin')
+    const customerUserStr = localStorage.getItem("payent:currentUser");
+    const customerToken = localStorage.getItem("payent:token");
+    if (customerUserStr && customerToken) {
+      try {
+        const u = JSON.parse(customerUserStr);
+        if (u && (u.role === "admin" || u.role === "superadmin")) {
+          localStorage.setItem("payent:admin:token", customerToken);
+          const adminPayload: AdminUser = {
+            id: u.email || u.id || "",
+            fullName: u.fullName || u.name || u.email?.split("@")[0] || "Administrator",
+            email: u.email || "",
+            phone: u.phone || "",
+            role: "admin",
+            status: u.status || "active",
+            verified: true,
+            avatar:
+              u.avatar ||
+              `https://ui-avatars.com/api/?name=${encodeURIComponent(u.fullName || u.name || u.email || "Admin")}&background=10b981&color=fff`,
+            createdAt: new Date().toISOString(),
+          };
+          localStorage.setItem("payent:admin:current_user", JSON.stringify(adminPayload));
+          return adminPayload;
+        }
+      } catch {}
+    }
+
+    // 3. Payernt vendor storage (if role === 'admin' or 'superadmin')
+    const payerntAccountStr = localStorage.getItem("paye₹nt_account") || localStorage.getItem("payernt_account");
+    const payerntToken = localStorage.getItem("paye₹nt_token") || localStorage.getItem("payernt_token");
+    if (payerntAccountStr && payerntToken) {
+      try {
+        const u = JSON.parse(payerntAccountStr);
+        if (u && (u.role === "admin" || u.role === "superadmin")) {
+          localStorage.setItem("payent:admin:token", payerntToken);
+          const adminPayload: AdminUser = {
+            id: u.email || u.id || u.accountId || "",
+            fullName: u.name || u.fullName || u.email?.split("@")[0] || "Administrator",
+            email: u.email || "",
+            phone: u.phone || "",
+            role: "admin",
+            status: u.status || "active",
+            verified: true,
+            avatar:
+              u.avatar ||
+              `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name || u.fullName || u.email || "Admin")}&background=10b981&color=fff`,
+            createdAt: new Date().toISOString(),
+          };
+          localStorage.setItem("payent:admin:current_user", JSON.stringify(adminPayload));
+          return adminPayload;
+        }
+      } catch {}
     }
 
     return null;

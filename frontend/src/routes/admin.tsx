@@ -80,14 +80,8 @@ function AdminLayout() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isDenied, setIsDenied] = useState(false);
-  const isLoginPage = typeof window !== "undefined" && window.location.pathname === "/admin/login";
 
   useEffect(() => {
-    if (isLoginPage) {
-      setLoading(false);
-      return;
-    }
-
     import("@/admin/services/auth").then(({ authService }) => {
       const loggedIn = authService.isAuthenticated();
       const currentUser = authService.getCurrentUser();
@@ -95,14 +89,17 @@ function AdminLayout() {
       if (!loggedIn) {
         setIsAuthenticated(false);
         setLoading(false);
-        navigate({ to: "/admin/login" });
+        navigate({
+          to: "/login",
+          search: { redirect: "/admin/dashboard" } as any,
+        });
         return;
       }
 
       setIsAuthenticated(true);
 
       // If user is authenticated but not an admin role, show PermissionDenied
-      if (currentUser && currentUser.role !== "admin") {
+      if (currentUser && currentUser.role !== "admin" && (currentUser as any).role !== "superadmin") {
         setIsDenied(true);
       } else {
         setIsDenied(false);
@@ -110,11 +107,7 @@ function AdminLayout() {
 
       setLoading(false);
     });
-  }, [navigate, isLoginPage]);
-
-  if (isLoginPage) {
-    return <Outlet />;
-  }
+  }, [navigate]);
 
   if (loading) {
     return (
