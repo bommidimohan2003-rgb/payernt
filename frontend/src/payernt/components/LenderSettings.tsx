@@ -2,21 +2,18 @@ import React, { useState } from "react";
 import {
   Settings,
   Bell,
-  Shield,
-  Moon,
   Sun,
-  Lock,
+  Moon,
   ArrowLeft,
   RotateCcw,
   LogOut,
   Sliders,
   CheckCircle2,
-  KeyRound,
-  CreditCard,
-  Zap,
+  Globe,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useTheme } from "@/hooks/useTheme";
+import { useLanguage, LanguageSelector } from "@/i18n";
 
 interface LenderSettingsProps {
   onBack?: () => void;
@@ -30,6 +27,7 @@ export function LenderSettingsView({
   onResetDemo,
 }: LenderSettingsProps) {
   const { theme, toggle: toggleTheme } = useTheme();
+  const { tCommon, tPayernt } = useLanguage();
 
   // Notification states
   const [notifyBookings, setNotifyBookings] = useState(true);
@@ -39,10 +37,9 @@ export function LenderSettingsView({
   // Rental preferences
   const [instantBooking, setInstantBooking] = useState(false);
   const [weekendAvailability, setWeekendAvailability] = useState(true);
-  const [strictDeposit, setStrictDeposit] = useState(true);
 
   const handleSave = () => {
-    toast.success("Settings saved successfully!");
+    toast.success(tCommon.saveChanges + " successful!");
   };
 
   return (
@@ -56,7 +53,7 @@ export function LenderSettingsView({
             className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-[#10141d] hover:bg-neutral-50 dark:hover:bg-white/[0.04] text-xs font-semibold text-neutral-800 dark:text-neutral-200 transition-all cursor-pointer shadow-xs group"
           >
             <ArrowLeft className="h-3.5 w-3.5 group-hover:-translate-x-0.5 transition-transform" />
-            <span>Back to Dashboard</span>
+            <span>{tCommon.back} to {tCommon.dashboard}</span>
           </button>
         </div>
       )}
@@ -69,10 +66,10 @@ export function LenderSettingsView({
           </div>
           <div>
             <h1 className="text-xl sm:text-2xl font-black text-neutral-900 dark:text-white tracking-tight font-display">
-              Settings
+              {tPayernt.lenderSettings}
             </h1>
             <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
-              Manage your preferences, notifications, and security options.
+              {tCommon.settings} &bull; {tPayernt.tagline}
             </p>
           </div>
         </div>
@@ -85,8 +82,8 @@ export function LenderSettingsView({
             <Sun className="h-4 w-4" />
           </div>
           <div>
-            <h2 className="text-sm font-bold text-neutral-900 dark:text-white">Appearance</h2>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400">Customize display theme and currency</p>
+            <h2 className="text-sm font-bold text-neutral-900 dark:text-white">{tCommon.appearance}</h2>
+            <p className="text-xs text-neutral-500 dark:text-neutral-400">{tCommon.theme}</p>
           </div>
         </div>
 
@@ -94,8 +91,10 @@ export function LenderSettingsView({
           {/* Theme Selector */}
           <div className="py-3 flex items-center justify-between">
             <div>
-              <p className="text-xs font-bold text-neutral-900 dark:text-white">Theme Mode</p>
-              <p className="text-[11px] text-neutral-500 dark:text-neutral-400">Currently using {theme} mode</p>
+              <p className="text-xs font-bold text-neutral-900 dark:text-white">{tCommon.themeMode}</p>
+              <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                {theme === "dark" ? tCommon.darkMode : tCommon.lightMode}
+              </p>
             </div>
             <button
               type="button"
@@ -105,12 +104,12 @@ export function LenderSettingsView({
               {theme === "dark" ? (
                 <>
                   <Sun className="h-3.5 w-3.5 text-neutral-300" />
-                  <span>Switch to Light</span>
+                  <span>{tCommon.switchToLight}</span>
                 </>
               ) : (
                 <>
                   <Moon className="h-3.5 w-3.5 text-neutral-700" />
-                  <span>Switch to Dark</span>
+                  <span>{tCommon.switchToDark}</span>
                 </>
               )}
             </button>
@@ -119,25 +118,40 @@ export function LenderSettingsView({
           {/* Currency */}
           <div className="py-3 flex items-center justify-between">
             <div>
-              <p className="text-xs font-bold text-neutral-900 dark:text-white">Platform Currency</p>
-              <p className="text-[11px] text-neutral-500 dark:text-neutral-400">Fixed to Indian Rupee</p>
+              <p className="text-xs font-bold text-neutral-900 dark:text-white">{tCommon.currency}</p>
+              <p className="text-[11px] text-neutral-500 dark:text-neutral-400">Indian Rupee (INR)</p>
             </div>
             <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-lg bg-neutral-100 dark:bg-white/[0.06] text-neutral-800 dark:text-neutral-200">
-              ₹ INR
+              {tCommon.inrCurrency}
             </span>
           </div>
         </div>
       </div>
 
-      {/* 2. Notification Preferences */}
+      {/* 2. Languages Selection Card */}
+      <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#10141d] border border-neutral-200/90 dark:border-white/[0.08] shadow-xs space-y-4">
+        <div className="flex items-center gap-2.5">
+          <div className="p-2 rounded-xl bg-neutral-100 dark:bg-white/[0.06] text-neutral-800 dark:text-neutral-200">
+            <Globe className="h-4 w-4" />
+          </div>
+          <div>
+            <h2 className="text-sm font-bold text-neutral-900 dark:text-white">{tCommon.languages}</h2>
+            <p className="text-xs text-neutral-500 dark:text-neutral-400">{tCommon.selectLanguage} (English, తెలుగు, हिन्दी)</p>
+          </div>
+        </div>
+
+        <LanguageSelector />
+      </div>
+
+      {/* 3. Notification Preferences */}
       <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#10141d] border border-neutral-200/90 dark:border-white/[0.08] shadow-xs space-y-4">
         <div className="flex items-center gap-2.5">
           <div className="p-2 rounded-xl bg-neutral-100 dark:bg-white/[0.06] text-neutral-800 dark:text-neutral-200">
             <Bell className="h-4 w-4" />
           </div>
           <div>
-            <h2 className="text-sm font-bold text-neutral-900 dark:text-white">Notification Preferences</h2>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400">Choose what alerts and updates you receive</p>
+            <h2 className="text-sm font-bold text-neutral-900 dark:text-white">{tCommon.notificationPreferences}</h2>
+            <p className="text-xs text-neutral-500 dark:text-neutral-400">{tCommon.notifications}</p>
           </div>
         </div>
 
@@ -145,8 +159,8 @@ export function LenderSettingsView({
           {/* Booking Alerts */}
           <div className="py-3 flex items-center justify-between">
             <div className="pr-4">
-              <p className="text-xs font-bold text-neutral-900 dark:text-white">Booking Requests</p>
-              <p className="text-[11px] text-neutral-500 dark:text-neutral-400">Get notified when a customer requests to rent your gear</p>
+              <p className="text-xs font-bold text-neutral-900 dark:text-white">{tCommon.bookingAlerts}</p>
+              <p className="text-[11px] text-neutral-500 dark:text-neutral-400">{tPayernt.rentalRequests}</p>
             </div>
             <input
               type="checkbox"
@@ -159,8 +173,8 @@ export function LenderSettingsView({
           {/* Message Alerts */}
           <div className="py-3 flex items-center justify-between">
             <div className="pr-4">
-              <p className="text-xs font-bold text-neutral-900 dark:text-white">Direct Messages</p>
-              <p className="text-[11px] text-neutral-500 dark:text-neutral-400">Receive alerts when renters send inquiries or inspection notes</p>
+              <p className="text-xs font-bold text-neutral-900 dark:text-white">{tCommon.messageAlerts}</p>
+              <p className="text-[11px] text-neutral-500 dark:text-neutral-400">{tCommon.messages}</p>
             </div>
             <input
               type="checkbox"
@@ -173,8 +187,8 @@ export function LenderSettingsView({
           {/* Payout Alerts */}
           <div className="py-3 flex items-center justify-between">
             <div className="pr-4">
-              <p className="text-xs font-bold text-neutral-900 dark:text-white">Wallet & Payouts</p>
-              <p className="text-[11px] text-neutral-500 dark:text-neutral-400">Get instant updates when rental earnings are credited or withdrawn</p>
+              <p className="text-xs font-bold text-neutral-900 dark:text-white">{tCommon.payoutAlerts}</p>
+              <p className="text-[11px] text-neutral-500 dark:text-neutral-400">{tPayernt.walletAndPayouts}</p>
             </div>
             <input
               type="checkbox"
@@ -186,15 +200,15 @@ export function LenderSettingsView({
         </div>
       </div>
 
-      {/* 3. Rental & Handover Preferences */}
+      {/* 4. Rental & Handover Preferences */}
       <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#10141d] border border-neutral-200/90 dark:border-white/[0.08] shadow-xs space-y-4">
         <div className="flex items-center gap-2.5">
           <div className="p-2 rounded-xl bg-neutral-100 dark:bg-white/[0.06] text-neutral-800 dark:text-neutral-200">
             <Sliders className="h-4 w-4" />
           </div>
           <div>
-            <h2 className="text-sm font-bold text-neutral-900 dark:text-white">Lending Preferences</h2>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400">Configure how renters interact with your equipment listings</p>
+            <h2 className="text-sm font-bold text-neutral-900 dark:text-white">{tPayernt.lendingPreferences}</h2>
+            <p className="text-xs text-neutral-500 dark:text-neutral-400">{tPayernt.tagline}</p>
           </div>
         </div>
 
@@ -202,8 +216,8 @@ export function LenderSettingsView({
           {/* Instant Booking */}
           <div className="py-3 flex items-center justify-between">
             <div className="pr-4">
-              <p className="text-xs font-bold text-neutral-900 dark:text-white">Instant Booking</p>
-              <p className="text-[11px] text-neutral-500 dark:text-neutral-400">Allow pre-verified renters to book gear without manual approval</p>
+              <p className="text-xs font-bold text-neutral-900 dark:text-white">{tPayernt.instantBooking}</p>
+              <p className="text-[11px] text-neutral-500 dark:text-neutral-400">{tPayernt.instantBookingDesc}</p>
             </div>
             <input
               type="checkbox"
@@ -216,8 +230,8 @@ export function LenderSettingsView({
           {/* Weekend Availability */}
           <div className="py-3 flex items-center justify-between">
             <div className="pr-4">
-              <p className="text-xs font-bold text-neutral-900 dark:text-white">Weekend Availability</p>
-              <p className="text-[11px] text-neutral-500 dark:text-neutral-400">Accept equipment pickup and dropoff on Saturdays and Sundays</p>
+              <p className="text-xs font-bold text-neutral-900 dark:text-white">{tPayernt.weekendAvailability}</p>
+              <p className="text-[11px] text-neutral-500 dark:text-neutral-400">{tPayernt.weekendAvailabilityDesc}</p>
             </div>
             <input
               type="checkbox"
@@ -230,12 +244,12 @@ export function LenderSettingsView({
           {/* Security PIN Requirement */}
           <div className="py-3 flex items-center justify-between">
             <div>
-              <p className="text-xs font-bold text-neutral-900 dark:text-white">Mandatory Handover PIN Verification</p>
-              <p className="text-[11px] text-neutral-500 dark:text-neutral-400">Protected by 4-digit Vendor Secret PIN</p>
+              <p className="text-xs font-bold text-neutral-900 dark:text-white">{tPayernt.handoverPin}</p>
+              <p className="text-[11px] text-neutral-500 dark:text-neutral-400">{tPayernt.handoverPinDesc}</p>
             </div>
             <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-neutral-100 dark:bg-white/[0.08] text-neutral-800 dark:text-neutral-200">
               <CheckCircle2 className="h-3 w-3" />
-              <span>Enforced</span>
+              <span>{tPayernt.enforced}</span>
             </span>
           </div>
         </div>
@@ -248,15 +262,15 @@ export function LenderSettingsView({
           onClick={handleSave}
           className="px-5 py-2.5 rounded-xl bg-neutral-900 text-white dark:bg-white dark:text-black font-bold text-xs shadow-sm hover:opacity-90 active:scale-98 transition-all cursor-pointer"
         >
-          Save Preferences
+          {tCommon.saveChanges}
         </button>
       </div>
 
-      {/* 4. Danger Zone */}
+      {/* 5. Danger Zone */}
       <div className="p-4 sm:p-5 rounded-2xl bg-neutral-50 dark:bg-[#10141d]/60 border border-neutral-200/90 dark:border-white/[0.08] shadow-xs space-y-4">
         <div>
-          <h2 className="text-sm font-bold text-neutral-900 dark:text-white">Account Actions</h2>
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">Reset local session or sign out</p>
+          <h2 className="text-sm font-bold text-neutral-900 dark:text-white">{tCommon.accountActions}</h2>
+          <p className="text-xs text-neutral-500 dark:text-neutral-400">{tCommon.dangerZone}</p>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3 pt-2">
@@ -270,7 +284,7 @@ export function LenderSettingsView({
               className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-neutral-300 dark:border-white/10 bg-white dark:bg-white/[0.04] hover:bg-neutral-100 dark:hover:bg-white/[0.08] text-xs font-bold text-neutral-700 dark:text-neutral-300 transition-all cursor-pointer"
             >
               <RotateCcw className="h-3.5 w-3.5" />
-              <span>Reset Demo State</span>
+              <span>{tCommon.resetDemoState}</span>
             </button>
           )}
 
@@ -281,7 +295,7 @@ export function LenderSettingsView({
               className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-neutral-300 dark:border-white/10 bg-white dark:bg-white/[0.04] hover:bg-neutral-100 dark:hover:bg-white/[0.08] text-xs font-bold text-neutral-700 dark:text-neutral-300 transition-all cursor-pointer"
             >
               <LogOut className="h-3.5 w-3.5" />
-              <span>Log Out of Payernt</span>
+              <span>{tPayernt.logoutPayernt}</span>
             </button>
           )}
         </div>

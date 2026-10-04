@@ -10,6 +10,7 @@ import {
   Zap,
   Clock,
 } from "lucide-react";
+import { useLanguage } from "@/i18n";
 import type {
   PayerntProduct,
   RentalRequest,
@@ -71,6 +72,7 @@ export function PayerntHome({
   onSelectProductForManage,
 }: PayerntHomeProps) {
   // Extract user's display name
+  const { tCommon, tPayernt } = useLanguage();
   const rawName =
     activeAccount?.name ||
     activeUser?.fullName ||
@@ -83,10 +85,10 @@ export function PayerntHome({
   const currentHour = new Date().getHours();
   const greeting =
     currentHour < 12
-      ? "Good morning,"
+      ? tPayernt.goodMorning
       : currentHour < 18
-      ? "Good afternoon,"
-      : "Good evening,";
+      ? tPayernt.goodAfternoon
+      : tPayernt.goodEvening;
 
   // Formatted date string (e.g. "Wed, 01 Oct 2025")
   const formattedDate = new Intl.DateTimeFormat("en-GB", {
@@ -188,7 +190,7 @@ export function PayerntHome({
               <div className="flex items-center gap-2">
                 <Wallet className="h-4 w-4 text-neutral-600 dark:text-neutral-400" />
                 <span className="text-xs font-semibold text-neutral-600 dark:text-neutral-400">
-                  Balance
+                  {tPayernt.availableBalance}
                 </span>
               </div>
               <ChevronRight className="h-3.5 w-3.5 text-neutral-400 group-hover:text-neutral-700 dark:text-neutral-500 dark:group-hover:text-neutral-300 group-hover:translate-x-0.5 transition-transform" />
@@ -202,7 +204,7 @@ export function PayerntHome({
                 </p>
               )}
               <p className="text-[10px] text-neutral-500 dark:text-neutral-400 font-medium mt-0.5 truncate">
-                Available balance
+                {tPayernt.walletFunds}
               </p>
             </div>
           </button>
@@ -217,7 +219,7 @@ export function PayerntHome({
               <div className="flex items-center gap-2">
                 <BarChart3 className="h-4 w-4 text-neutral-600 dark:text-neutral-400" />
                 <span className="text-xs font-semibold text-neutral-600 dark:text-neutral-400">
-                  Earnings
+                  {tPayernt.totalEarnings}
                 </span>
               </div>
               <ChevronRight className="h-3.5 w-3.5 text-neutral-400 group-hover:text-neutral-700 dark:text-neutral-500 dark:group-hover:text-neutral-300 group-hover:translate-x-0.5 transition-transform" />
@@ -231,7 +233,7 @@ export function PayerntHome({
                 </p>
               )}
               <p className="text-[10px] text-neutral-500 dark:text-neutral-400 font-medium mt-0.5 truncate">
-                Total income earned
+                {tPayernt.totalIncomeEarned}
               </p>
             </div>
           </button>
@@ -246,7 +248,7 @@ export function PayerntHome({
               <div className="flex items-center gap-2">
                 <Package className="h-4 w-4 text-neutral-600 dark:text-neutral-400" />
                 <span className="text-xs font-semibold text-neutral-600 dark:text-neutral-400">
-                  Listings
+                  {tPayernt.listings}
                 </span>
               </div>
               <ChevronRight className="h-3.5 w-3.5 text-neutral-400 group-hover:text-neutral-700 dark:text-neutral-500 dark:group-hover:text-neutral-300 group-hover:translate-x-0.5 transition-transform" />
@@ -260,7 +262,7 @@ export function PayerntHome({
                 </p>
               )}
               <p className="text-[10px] text-neutral-500 dark:text-neutral-400 font-medium mt-0.5 truncate">
-                Gear listed for rent
+                {tPayernt.gearListed}
               </p>
             </div>
           </button>
@@ -275,7 +277,7 @@ export function PayerntHome({
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-neutral-600 dark:text-neutral-400" />
                 <span className="text-xs font-semibold text-neutral-600 dark:text-neutral-400">
-                  Rentals
+                  {tPayernt.activeRentals}
                 </span>
               </div>
               <ChevronRight className="h-3.5 w-3.5 text-neutral-400 group-hover:text-neutral-700 dark:text-neutral-500 dark:group-hover:text-neutral-300 group-hover:translate-x-0.5 transition-transform" />
@@ -289,7 +291,7 @@ export function PayerntHome({
                 </p>
               )}
               <p className="text-[10px] text-neutral-500 dark:text-neutral-400 font-medium mt-0.5 truncate">
-                Active bookings
+                {tPayernt.activeBookings}
               </p>
             </div>
           </button>
@@ -449,7 +451,7 @@ export function PayerntHome({
         {/* Mobile Quick Actions */}
         <div className="pt-1">
           <h2 className="text-xs font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 mb-2.5 px-0.5">
-            Quick Actions
+            {tPayernt.quickActions}
           </h2>
           <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
             <button
@@ -461,7 +463,7 @@ export function PayerntHome({
                 <Plus className="h-4 w-4 stroke-[2.5]" />
               </div>
               <span className="text-xs font-bold text-neutral-900 dark:text-white leading-tight">
-                Add Product
+                {tPayernt.addProduct}
               </span>
             </button>
 
@@ -474,7 +476,7 @@ export function PayerntHome({
                 <Calendar className="h-4 w-4" />
               </div>
               <span className="text-xs font-bold text-neutral-900 dark:text-white leading-tight">
-                Bookings
+                {tCommon.bookings}
               </span>
             </button>
 
@@ -487,7 +489,7 @@ export function PayerntHome({
                 <Wallet className="h-4 w-4" />
               </div>
               <span className="text-xs font-bold text-neutral-900 dark:text-white leading-tight">
-                Wallet
+                {tCommon.wallet}
               </span>
             </button>
 
@@ -500,7 +502,7 @@ export function PayerntHome({
                 <MessageSquare className="h-4 w-4" />
               </div>
               <span className="text-xs font-bold text-neutral-900 dark:text-white leading-tight">
-                Messages
+                {tCommon.messages}
               </span>
             </button>
 
@@ -513,7 +515,7 @@ export function PayerntHome({
                 <BarChart3 className="h-4 w-4" />
               </div>
               <span className="text-xs font-bold text-neutral-900 dark:text-white leading-tight">
-                Analytics
+                {tCommon.analytics}
               </span>
             </button>
           </div>
@@ -523,7 +525,7 @@ export function PayerntHome({
         <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#10141d] border border-neutral-200/90 dark:border-white/[0.08] shadow-xs dark:shadow-md">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-bold text-neutral-900 dark:text-white font-display">
-              Recent Activity
+              {tPayernt.recentActivity}
             </span>
             <button
               type="button"
@@ -538,7 +540,7 @@ export function PayerntHome({
             <div className="flex flex-col items-center justify-center py-6 text-center">
               <Clock className="h-7 w-7 text-neutral-400 dark:text-neutral-500 mb-2 stroke-[1.5]" />
               <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
-                No recent activity
+                {tPayernt.noRecentActivity}
               </p>
             </div>
           ) : (
@@ -597,7 +599,7 @@ export function PayerntHome({
           <div className="relative z-10 flex items-start justify-between">
             <div>
               <p className="text-2xl font-bold text-neutral-500 dark:text-neutral-300 font-display tracking-tight">
-                Good morning,
+                {greeting}
               </p>
               <div className="flex items-center gap-2 mt-0.5">
                 <h1 className="text-3xl lg:text-4xl font-black text-neutral-900 dark:text-white font-display tracking-tight">
@@ -631,10 +633,10 @@ export function PayerntHome({
                     </div>
                     <div className="min-w-0">
                       <p className="text-xs font-bold text-neutral-900 dark:text-white uppercase tracking-tight truncate">
-                        AVAILABLE BALANCE
+                        {tPayernt.availableBalance}
                       </p>
                       <p className="text-[11px] text-neutral-500 dark:text-neutral-400 font-medium truncate">
-                        Wallet funds
+                        {tPayernt.walletFunds}
                       </p>
                     </div>
                   </div>
@@ -671,10 +673,10 @@ export function PayerntHome({
                     </div>
                     <div className="min-w-0">
                       <p className="text-xs font-bold text-neutral-900 dark:text-white uppercase tracking-tight truncate">
-                        TOTAL EARNINGS
+                        {tPayernt.totalEarnings}
                       </p>
                       <p className="text-[11px] text-neutral-500 dark:text-neutral-400 font-medium truncate">
-                        Total income earned
+                        {tPayernt.totalIncomeEarned}
                       </p>
                     </div>
                   </div>
@@ -711,10 +713,10 @@ export function PayerntHome({
                     </div>
                     <div className="min-w-0">
                       <p className="text-xs font-bold text-neutral-900 dark:text-white uppercase tracking-tight truncate">
-                        ACTIVE LISTINGS
+                        {tPayernt.listings}
                       </p>
                       <p className="text-[11px] text-neutral-500 dark:text-neutral-400 font-medium truncate">
-                        Gear listed for rent
+                        {tPayernt.gearListed}
                       </p>
                     </div>
                   </div>
@@ -751,10 +753,10 @@ export function PayerntHome({
                     </div>
                     <div className="min-w-0">
                       <p className="text-xs font-bold text-neutral-900 dark:text-white uppercase tracking-tight truncate">
-                        ACTIVE RENTALS
+                        {tPayernt.activeRentals}
                       </p>
                       <p className="text-[11px] text-neutral-500 dark:text-neutral-400 font-medium truncate">
-                        Active bookings and handovers
+                        {tPayernt.activeBookings}
                       </p>
                     </div>
                   </div>

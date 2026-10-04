@@ -20,6 +20,7 @@ import { CartProvider } from "@/hooks/useCart";
 import { CartDrawer } from "@/components/cart/CartDrawer";
 import { AppPreloader } from "@/components/common/AppPreloader";
 import { Navigation4 } from "@/components/navigation/Navigation4";
+import { LanguageProvider } from "@/i18n";
 
 import appCss from "../styles.css?url";
 
@@ -337,11 +338,13 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <MotionConfig reducedMotion="user">
-        <CartProvider>
-          <OriginRevealProvider>
-            <RootContent />
-          </OriginRevealProvider>
-        </CartProvider>
+        <LanguageProvider>
+          <CartProvider>
+            <OriginRevealProvider>
+              <RootContent />
+            </OriginRevealProvider>
+          </CartProvider>
+        </LanguageProvider>
       </MotionConfig>
     </QueryClientProvider>
   );

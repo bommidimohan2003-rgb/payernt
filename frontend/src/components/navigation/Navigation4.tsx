@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useCart } from "@/hooks/useCart";
 import { useOriginReveal } from "./OriginRevealTransition";
+import { useLanguage } from "@/i18n";
 
 export interface Navigation4Item {
   id: string;
@@ -214,24 +215,26 @@ export function Navigation4({
     return pathname === to;
   };
 
+  const { tCommon, tPayrent } = useLanguage();
+
   const mainItems: Navigation4Item[] = [
     {
       id: "home",
-      label: "Home",
+      label: tCommon.home,
       icon: <Home className="h-4 w-4 sm:h-[18px] sm:w-[18px] md:h-[19px] md:w-[19px] stroke-[1.6]" />,
       isActive: pathname === "/payant" || pathname === "/payent",
       onClick: () => navigate({ to: "/payant" }),
     },
     {
       id: "browse",
-      label: "Explore",
+      label: tCommon.explore,
       icon: <Compass className="h-4 w-4 sm:h-[18px] sm:w-[18px] md:h-[19px] md:w-[19px] stroke-[1.6]" />,
       isActive: isRouteActive("/browse"),
       onClick: () => navigate({ to: "/browse" }),
     },
     {
       id: "cart",
-      label: "Cart",
+      label: tCommon.cart,
       icon: <ShoppingBag className="h-4 w-4 sm:h-[18px] sm:w-[18px] md:h-[19px] md:w-[19px] stroke-[1.6]" />,
       badge: cartCount > 0 ? cartCount : undefined,
       isActive: isRouteActive("/cart"),
@@ -239,7 +242,7 @@ export function Navigation4({
     },
     {
       id: "dashboard",
-      label: "User Dashboard",
+      label: tPayrent.userDashboard,
       icon: <LayoutDashboard className="h-4 w-4 sm:h-[18px] sm:w-[18px] md:h-[19px] md:w-[19px] stroke-[1.6]" />,
       isActive: isRouteActive("/dashboard"),
       onClick: () => navigate({ to: "/dashboard" }),

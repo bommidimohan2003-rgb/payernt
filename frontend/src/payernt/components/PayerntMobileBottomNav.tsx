@@ -10,11 +10,13 @@ import {
   BarChart3,
   HelpCircle,
   Settings,
+  Globe,
   User,
   LogOut,
   X,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useLanguage, LanguageModal } from "@/i18n";
 
 interface PayerntMobileBottomNavProps {
   pendingRequestsCount?: number;
@@ -30,6 +32,8 @@ export function PayerntMobileBottomNav({
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [isMoreOpen, setIsMoreOpen] = useState(false);
+  const [isLangModalOpen, setIsLangModalOpen] = useState(false);
+  const { tCommon, language } = useLanguage();
 
   const currentTab = (() => {
     if (pathname === "/payernt" || pathname === "/payernt/") return "home";
@@ -44,31 +48,37 @@ export function PayerntMobileBottomNav({
     navigate({ to: path as any });
   };
 
+  const getLanguageLabel = () => {
+    if (language === "te") return "తెలుగు";
+    if (language === "hi") return "हिन्दी";
+    return "English";
+  };
+
   const primaryTabs = [
-    { id: "home", label: "Home", icon: Home, path: "/payernt" },
-    { id: "products", label: "Products", icon: Package, path: "/payernt/products" },
+    { id: "home", label: tCommon.home, icon: Home, path: "/payernt" },
+    { id: "products", label: tCommon.products, icon: Package, path: "/payernt/products" },
     {
       id: "bookings",
-      label: "Bookings",
+      label: tCommon.bookings,
       icon: Calendar,
       path: "/payernt/bookings",
       badge: pendingRequestsCount > 0 ? pendingRequestsCount : undefined,
     },
-    { id: "wallet", label: "Wallet", icon: Wallet, path: "/payernt/wallet" },
+    { id: "wallet", label: tCommon.wallet, icon: Wallet, path: "/payernt/wallet" },
   ];
 
   const moreItems = [
     {
       id: "messages",
-      label: "Messages",
+      label: tCommon.messages,
       icon: MessageSquare,
       path: "/payernt/messages",
       badge: unreadMessagesCount > 0 ? unreadMessagesCount : undefined,
     },
-    { id: "analytics", label: "Analytics", icon: BarChart3, path: "/payernt/analytics" },
-    { id: "help", label: "Help & Support", icon: HelpCircle, path: "/payernt/help" },
-    { id: "settings", label: "Settings", icon: Settings, path: "/payernt/settings" },
-    { id: "profile", label: "Profile", icon: User, path: "/payernt/profile" },
+    { id: "analytics", label: tCommon.analytics, icon: BarChart3, path: "/payernt/analytics" },
+    { id: "help", label: tCommon.helpAndSupport, icon: HelpCircle, path: "/payernt/help" },
+    { id: "settings", label: tCommon.settings, icon: Settings, path: "/payernt/settings" },
+    { id: "profile", label: tCommon.profile, icon: User, path: "/payernt/profile" },
   ];
 
   return (
@@ -80,78 +90,78 @@ export function PayerntMobileBottomNav({
           aria-label="Mobile Bottom Navigation"
         >
           <div className="grid grid-cols-5 items-center w-full">
-          {primaryTabs.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = currentTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => handleNav(tab.path)}
-                className={`relative flex flex-col items-center justify-center min-h-[48px] py-1 px-1 rounded-xl transition-all cursor-pointer ${
-                  isActive
-                    ? "text-neutral-950 dark:text-white"
-                    : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
-                }`}
-                aria-label={tab.label}
-              >
-                <div
-                  className={`flex items-center justify-center h-7 w-7 rounded-lg transition-colors ${
-                    isActive ? "bg-neutral-100 dark:bg-white/[0.12]" : ""
+            {primaryTabs.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = currentTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => handleNav(tab.path)}
+                  className={`relative flex flex-col items-center justify-center min-h-[48px] py-1 px-1 rounded-xl transition-all cursor-pointer ${
+                    isActive
+                      ? "text-neutral-950 dark:text-white"
+                      : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
                   }`}
+                  aria-label={tab.label}
                 >
-                  <Icon className="h-4.5 w-4.5 stroke-[1.9]" />
-                </div>
-                <span
-                  className={`text-[10px] tracking-tight mt-0.5 leading-none ${
-                    isActive ? "font-bold text-neutral-950 dark:text-white" : "font-medium"
-                  }`}
-                >
-                  {tab.label}
-                </span>
-
-                {tab.badge !== undefined && (
-                  <span className="absolute top-0.5 right-3 flex h-3.5 min-w-3.5 px-1 items-center justify-center rounded-full bg-neutral-900 dark:bg-white text-[9px] font-black text-white dark:text-black">
-                    {tab.badge}
+                  <div
+                    className={`flex items-center justify-center h-7 w-7 rounded-lg transition-colors ${
+                      isActive ? "bg-neutral-100 dark:bg-white/[0.12]" : ""
+                    }`}
+                  >
+                    <Icon className="h-4.5 w-4.5 stroke-[1.9]" />
+                  </div>
+                  <span
+                    className={`text-[10px] tracking-tight mt-0.5 leading-none truncate max-w-full px-0.5 ${
+                      isActive ? "font-bold text-neutral-950 dark:text-white" : "font-medium"
+                    }`}
+                  >
+                    {tab.label}
                   </span>
-                )}
-              </button>
-            );
-          })}
 
-          {/* 5th Tab: More */}
-          <button
-            type="button"
-            onClick={() => setIsMoreOpen(true)}
-            className={`relative flex flex-col items-center justify-center min-h-[48px] py-1 px-1 rounded-xl transition-all cursor-pointer ${
-              isMoreOpen
-                ? "text-neutral-950 dark:text-white"
-                : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
-            }`}
-            aria-label="More navigation items"
-          >
-            <div
-              className={`flex items-center justify-center h-7 w-7 rounded-lg transition-colors ${
-                isMoreOpen ? "bg-neutral-100 dark:bg-white/[0.12]" : ""
-              }`}
-            >
-              <MoreHorizontal className="h-4.5 w-4.5 stroke-[1.9]" />
-            </div>
-            <span
-              className={`text-[10px] tracking-tight mt-0.5 leading-none ${
-                isMoreOpen ? "font-bold text-neutral-950 dark:text-white" : "font-medium"
-              }`}
-            >
-              More
-            </span>
+                  {tab.badge !== undefined && (
+                    <span className="absolute top-0.5 right-3 flex h-3.5 min-w-3.5 px-1 items-center justify-center rounded-full bg-neutral-900 dark:bg-white text-[9px] font-black text-white dark:text-black">
+                      {tab.badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
 
-            {unreadMessagesCount > 0 && (
-              <span className="absolute top-0.5 right-3 flex h-2 w-2 rounded-full bg-neutral-900 dark:bg-white" />
-            )}
-          </button>
-        </div>
-      </nav>
-    </div>
+            {/* 5th Tab: More */}
+            <button
+              type="button"
+              onClick={() => setIsMoreOpen(true)}
+              className={`relative flex flex-col items-center justify-center min-h-[48px] py-1 px-1 rounded-xl transition-all cursor-pointer ${
+                isMoreOpen
+                  ? "text-neutral-950 dark:text-white"
+                  : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+              }`}
+              aria-label={tCommon.more}
+            >
+              <div
+                className={`flex items-center justify-center h-7 w-7 rounded-lg transition-colors ${
+                  isMoreOpen ? "bg-neutral-100 dark:bg-white/[0.12]" : ""
+                }`}
+              >
+                <MoreHorizontal className="h-4.5 w-4.5 stroke-[1.9]" />
+              </div>
+              <span
+                className={`text-[10px] tracking-tight mt-0.5 leading-none ${
+                  isMoreOpen ? "font-bold text-neutral-950 dark:text-white" : "font-medium"
+                }`}
+              >
+                {tCommon.more}
+              </span>
+
+              {unreadMessagesCount > 0 && (
+                <span className="absolute top-0.5 right-3 flex h-2 w-2 rounded-full bg-neutral-900 dark:bg-white" />
+              )}
+            </button>
+          </div>
+        </nav>
+      </div>
 
       {/* More Menu Sheet Modal */}
       <AnimatePresence>
@@ -178,13 +188,13 @@ export function PayerntMobileBottomNav({
               <div className="flex items-center justify-between pb-1">
                 <div className="w-10 h-1 bg-neutral-300 dark:bg-neutral-700 rounded-full mx-auto absolute left-1/2 -translate-x-1/2 top-2.5" />
                 <span className="text-sm font-bold text-neutral-900 dark:text-white font-display">
-                  More Options
+                  {tCommon.moreOptions}
                 </span>
                 <button
                   type="button"
                   onClick={() => setIsMoreOpen(false)}
                   className="h-8 w-8 rounded-full bg-neutral-100 hover:bg-neutral-200 dark:bg-white/[0.06] dark:hover:bg-white/10 flex items-center justify-center text-neutral-700 dark:text-neutral-300 cursor-pointer"
-                  aria-label="Close menu"
+                  aria-label={tCommon.close}
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -216,6 +226,26 @@ export function PayerntMobileBottomNav({
                   );
                 })}
 
+                {/* Languages Option directly below Settings */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMoreOpen(false);
+                    setIsLangModalOpen(true);
+                  }}
+                  className="w-full flex items-center justify-between p-3 rounded-2xl text-xs font-bold text-neutral-700 dark:text-neutral-300 hover:text-black dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/[0.06] active:scale-[0.99] transition-all min-h-[48px] cursor-pointer"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-xl bg-neutral-100 dark:bg-white/[0.06] text-neutral-800 dark:text-neutral-200">
+                      <Globe className="h-4 w-4 stroke-[1.8]" />
+                    </div>
+                    <span className="text-sm font-semibold">{tCommon.languages}</span>
+                  </div>
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded-lg bg-neutral-200/80 dark:bg-white/10 text-neutral-800 dark:text-neutral-200">
+                    {getLanguageLabel()}
+                  </span>
+                </button>
+
                 {onLogout && (
                   <div className="pt-2 border-t border-neutral-200/80 dark:border-white/10 mt-2">
                     <button
@@ -229,7 +259,7 @@ export function PayerntMobileBottomNav({
                       <div className="p-2 rounded-xl bg-neutral-100 dark:bg-white/[0.06] text-neutral-700 dark:text-neutral-300">
                         <LogOut className="h-4 w-4" />
                       </div>
-                      <span className="text-sm font-semibold">Log Out of paye₹nt</span>
+                      <span className="text-sm font-semibold">{tCommon.logout}</span>
                     </button>
                   </div>
                 )}
@@ -238,6 +268,8 @@ export function PayerntMobileBottomNav({
           </div>
         )}
       </AnimatePresence>
+
+      <LanguageModal isOpen={isLangModalOpen} onClose={() => setIsLangModalOpen(false)} />
     </>
   );
 }
