@@ -696,6 +696,7 @@ export function ListProductWizard({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showFullTermsModal, setShowFullTermsModal] = useState(false);
   const [previewPhotoModal, setPreviewPhotoModal] = useState<string | null>(null);
+  const [previewVideoModal, setPreviewVideoModal] = useState<string | null>(null);
 
   // STAGE 01 — Category & Specifications
   const [category, setCategory] = useState<string>(initialDraft?.category || "");
@@ -2029,269 +2030,248 @@ export function ListProductWizard({
                   </div>
                 )}
 
-                {/* 3 DIRECT CAMERA CAPTURE CARDS */}
-                <div className="space-y-3">
-                  {/* CARD 1: FRONT PHOTO */}
-                  <div className={`p-3.5 rounded-xl border transition-all ${
-                    frontPhotoUrl
-                      ? "bg-card border-border shadow-xs"
-                      : "bg-card/60 border-border/80"
-                  }`}>
-                    <div className="flex items-center justify-between mb-2.5">
-                      <div className="flex items-center gap-2">
-                        <span className={`h-4.5 w-4.5 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                          frontPhotoUrl
-                            ? "bg-foreground text-background"
-                            : "bg-secondary text-muted-foreground border border-border"
-                        }`}>
-                          {frontPhotoUrl ? "✓" : "1"}
-                        </span>
-                        <span className="text-xs font-bold text-foreground">
-                          Front Photo <span className="text-destructive">*</span>
-                        </span>
-                      </div>
-                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                {/* 1. ONE PRODUCT MEDIA SECTION — EXACTLY THREE COMPACT CARDS IN ONE ROW */}
+                <div className="space-y-2">
+                  <div
+                    className="grid grid-cols-3 gap-1.5 sm:gap-3"
+                    style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}
+                  >
+                    {/* CARD 1: FRONT PHOTO */}
+                    <div
+                      className={`p-1.5 sm:p-3 rounded-lg sm:rounded-xl border flex flex-col justify-between transition-all text-center min-w-0 ${
                         frontPhotoUrl
-                          ? "bg-secondary text-foreground border border-border"
-                          : "bg-secondary/60 text-muted-foreground"
-                      }`}>
-                        {frontPhotoUrl ? "Captured" : "Pending"}
-                      </span>
-                    </div>
-
-                    {frontPhotoUrl ? (
-                      <div className="space-y-2.5">
-                        <div className="relative h-44 sm:h-52 rounded-lg overflow-hidden border border-border bg-black">
-                          <img
-                            src={frontPhotoUrl}
-                            alt="Front View Evidence"
-                            className="w-full h-full object-contain"
-                          />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={handleTriggerFrontCamera}
-                            disabled={isProcessingMedia}
-                            className="flex-1 py-2 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground text-xs font-bold cursor-pointer transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
-                          >
-                            <RefreshCw className="h-3.5 w-3.5" />
-                            <span>Retake</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setFrontPhotoUrl("")}
-                            className="px-3.5 py-2 rounded-lg bg-secondary/50 hover:bg-destructive/10 text-muted-foreground hover:text-destructive text-xs font-semibold cursor-pointer transition-colors flex items-center justify-center gap-1.5"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                            <span>Remove</span>
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="py-6 px-4 rounded-lg border border-dashed border-border flex flex-col items-center justify-center gap-2.5 bg-secondary/10 text-center">
-                        <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center text-foreground">
-                          <Camera className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <p className="text-xs font-bold text-foreground">Front View</p>
-                          <p className="text-[11px] text-muted-foreground mt-0.5">
-                            Position front of equipment clearly in frame.
-                          </p>
-                        </div>
+                          ? "bg-card border-border shadow-xs"
+                          : "bg-card/60 border-border/80"
+                      }`}
+                    >
+                      <div className="flex flex-col items-center gap-1 min-w-0">
                         <button
                           type="button"
                           onClick={handleTriggerFrontCamera}
                           disabled={isProcessingMedia}
-                          className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-bold shadow-xs hover:opacity-95 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                          title="Open Camera"
+                          className="h-8 w-8 sm:h-11 sm:w-11 rounded-full bg-secondary hover:bg-secondary/80 text-foreground flex items-center justify-center cursor-pointer transition-colors active:scale-95 disabled:opacity-50 shrink-0"
                         >
-                          <Camera className="h-3.5 w-3.5" />
-                          <span>Take Photo</span>
+                          <Camera className="h-4 w-4 sm:h-5 sm:w-5" />
                         </button>
+                        <p className="text-[10px] sm:text-xs font-bold text-foreground truncate w-full">
+                          Front Photo
+                        </p>
+                        <span
+                          className={`text-[8.5px] sm:text-[10px] font-semibold px-1.5 py-0.2 rounded-full truncate ${
+                            frontPhotoUrl
+                              ? "bg-secondary text-foreground border border-border"
+                              : "bg-secondary/60 text-muted-foreground"
+                          }`}
+                        >
+                          {frontPhotoUrl ? "✓ Captured" : "Pending"}
+                        </span>
                       </div>
-                    )}
-                  </div>
 
-                  {/* CARD 2: BACK PHOTO */}
-                  <div className={`p-3.5 rounded-xl border transition-all ${
-                    backPhotoUrl
-                      ? "bg-card border-border shadow-xs"
-                      : "bg-card/60 border-border/80"
-                  }`}>
-                    <div className="flex items-center justify-between mb-2.5">
-                      <div className="flex items-center gap-2">
-                        <span className={`h-4.5 w-4.5 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                          backPhotoUrl
-                            ? "bg-foreground text-background"
-                            : "bg-secondary text-muted-foreground border border-border"
-                        }`}>
-                          {backPhotoUrl ? "✓" : "2"}
-                        </span>
-                        <span className="text-xs font-bold text-foreground">
-                          Back Photo <span className="text-destructive">*</span>
-                        </span>
-                      </div>
-                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                        backPhotoUrl
-                          ? "bg-secondary text-foreground border border-border"
-                          : "bg-secondary/60 text-muted-foreground"
-                      }`}>
-                        {backPhotoUrl ? "Captured" : "Pending"}
-                      </span>
+                      {frontPhotoUrl ? (
+                        <div className="mt-2 space-y-1 sm:space-y-1.5 w-full">
+                          <div className="relative h-14 sm:h-22 rounded-md sm:rounded-lg overflow-hidden border border-border bg-black">
+                            <img
+                              src={frontPhotoUrl}
+                              alt="Front View"
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1 w-full">
+                            <button
+                              type="button"
+                              onClick={() => setPreviewPhotoModal(frontPhotoUrl)}
+                              className="w-full py-1 sm:py-1.5 px-1 rounded-md bg-secondary hover:bg-secondary/80 text-foreground text-[9px] sm:text-xs font-bold cursor-pointer transition-colors truncate"
+                            >
+                              View Photo
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleTriggerFrontCamera}
+                              disabled={isProcessingMedia}
+                              className="w-full py-1 sm:py-1.5 px-1 rounded-md bg-secondary/50 hover:bg-secondary/80 text-muted-foreground hover:text-foreground text-[9px] sm:text-xs font-semibold cursor-pointer transition-colors truncate disabled:opacity-50"
+                            >
+                              Retake
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="mt-2.5 w-full">
+                          <button
+                            type="button"
+                            onClick={handleTriggerFrontCamera}
+                            disabled={isProcessingMedia}
+                            className="w-full py-1.5 sm:py-2 px-1 rounded-md sm:rounded-lg bg-primary text-primary-foreground text-[9.5px] sm:text-xs font-bold shadow-xs hover:opacity-95 active:scale-95 transition-all cursor-pointer truncate disabled:opacity-50"
+                          >
+                            Take Photo
+                          </button>
+                        </div>
+                      )}
                     </div>
 
-                    {backPhotoUrl ? (
-                      <div className="space-y-2.5">
-                        <div className="relative h-44 sm:h-52 rounded-lg overflow-hidden border border-border bg-black">
-                          <img
-                            src={backPhotoUrl}
-                            alt="Back View Evidence"
-                            className="w-full h-full object-contain"
-                          />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={handleTriggerBackCamera}
-                            disabled={isProcessingMedia}
-                            className="flex-1 py-2 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground text-xs font-bold cursor-pointer transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
-                          >
-                            <RefreshCw className="h-3.5 w-3.5" />
-                            <span>Retake</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setBackPhotoUrl("")}
-                            className="px-3.5 py-2 rounded-lg bg-secondary/50 hover:bg-destructive/10 text-muted-foreground hover:text-destructive text-xs font-semibold cursor-pointer transition-colors flex items-center justify-center gap-1.5"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                            <span>Remove</span>
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="py-6 px-4 rounded-lg border border-dashed border-border flex flex-col items-center justify-center gap-2.5 bg-secondary/10 text-center">
-                        <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center text-foreground">
-                          <Camera className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <p className="text-xs font-bold text-foreground">Back View</p>
-                          <p className="text-[11px] text-muted-foreground mt-0.5">
-                            Position rear panel, ports, or serial tag.
-                          </p>
-                        </div>
+                    {/* CARD 2: BACK PHOTO */}
+                    <div
+                      className={`p-1.5 sm:p-3 rounded-lg sm:rounded-xl border flex flex-col justify-between transition-all text-center min-w-0 ${
+                        backPhotoUrl
+                          ? "bg-card border-border shadow-xs"
+                          : "bg-card/60 border-border/80"
+                      }`}
+                    >
+                      <div className="flex flex-col items-center gap-1 min-w-0">
                         <button
                           type="button"
                           onClick={handleTriggerBackCamera}
                           disabled={isProcessingMedia}
-                          className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-bold shadow-xs hover:opacity-95 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                          title="Open Camera"
+                          className="h-8 w-8 sm:h-11 sm:w-11 rounded-full bg-secondary hover:bg-secondary/80 text-foreground flex items-center justify-center cursor-pointer transition-colors active:scale-95 disabled:opacity-50 shrink-0"
                         >
-                          <Camera className="h-3.5 w-3.5" />
-                          <span>Take Photo</span>
+                          <Camera className="h-4 w-4 sm:h-5 sm:w-5" />
                         </button>
+                        <p className="text-[10px] sm:text-xs font-bold text-foreground truncate w-full">
+                          Back Photo
+                        </p>
+                        <span
+                          className={`text-[8.5px] sm:text-[10px] font-semibold px-1.5 py-0.2 rounded-full truncate ${
+                            backPhotoUrl
+                              ? "bg-secondary text-foreground border border-border"
+                              : "bg-secondary/60 text-muted-foreground"
+                          }`}
+                        >
+                          {backPhotoUrl ? "✓ Captured" : "Pending"}
+                        </span>
                       </div>
-                    )}
-                  </div>
 
-                  {/* CARD 3: 10-SECOND INSPECTION VIDEO */}
-                  <div className={`p-3.5 rounded-xl border transition-all ${
-                    capturedVideoUrl
-                      ? "bg-card border-border shadow-xs"
-                      : "bg-card/60 border-border/80"
-                  }`}>
-                    <div className="flex items-center justify-between mb-2.5">
-                      <div className="flex items-center gap-2">
-                        <span className={`h-4.5 w-4.5 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                          capturedVideoUrl
-                            ? "bg-foreground text-background"
-                            : "bg-secondary text-muted-foreground border border-border"
-                        }`}>
-                          {capturedVideoUrl ? "✓" : "3"}
-                        </span>
-                        <span className="text-xs font-bold text-foreground">
-                          10s Inspection Video <span className="text-destructive">*</span>
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        {capturedVideoUrl && (
-                          <span className="text-[10px] font-mono font-bold bg-secondary px-2 py-0.5 rounded-md text-foreground border border-border">
-                            {videoDuration}
-                          </span>
-                        )}
-                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                          capturedVideoUrl
-                            ? "bg-secondary text-foreground border border-border"
-                            : "bg-secondary/60 text-muted-foreground"
-                        }`}>
-                          {capturedVideoUrl ? "Captured" : "Pending"}
-                        </span>
-                      </div>
+                      {backPhotoUrl ? (
+                        <div className="mt-2 space-y-1 sm:space-y-1.5 w-full">
+                          <div className="relative h-14 sm:h-22 rounded-md sm:rounded-lg overflow-hidden border border-border bg-black">
+                            <img
+                              src={backPhotoUrl}
+                              alt="Back View"
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1 w-full">
+                            <button
+                              type="button"
+                              onClick={() => setPreviewPhotoModal(backPhotoUrl)}
+                              className="w-full py-1 sm:py-1.5 px-1 rounded-md bg-secondary hover:bg-secondary/80 text-foreground text-[9px] sm:text-xs font-bold cursor-pointer transition-colors truncate"
+                            >
+                              View Photo
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleTriggerBackCamera}
+                              disabled={isProcessingMedia}
+                              className="w-full py-1 sm:py-1.5 px-1 rounded-md bg-secondary/50 hover:bg-secondary/80 text-muted-foreground hover:text-foreground text-[9px] sm:text-xs font-semibold cursor-pointer transition-colors truncate disabled:opacity-50"
+                            >
+                              Retake
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="mt-2.5 w-full">
+                          <button
+                            type="button"
+                            onClick={handleTriggerBackCamera}
+                            disabled={isProcessingMedia}
+                            className="w-full py-1.5 sm:py-2 px-1 rounded-md sm:rounded-lg bg-primary text-primary-foreground text-[9.5px] sm:text-xs font-bold shadow-xs hover:opacity-95 active:scale-95 transition-all cursor-pointer truncate disabled:opacity-50"
+                          >
+                            Take Photo
+                          </button>
+                        </div>
+                      )}
                     </div>
 
-                    {capturedVideoUrl ? (
-                      <div className="space-y-2.5">
-                        <div className="relative h-44 sm:h-52 rounded-lg overflow-hidden border border-border bg-black">
-                          <video
-                            src={capturedVideoUrl}
-                            controls
-                            playsInline
-                            className="w-full h-full object-contain"
-                          />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={handleTriggerVideoCamera}
-                            disabled={isProcessingMedia}
-                            className="flex-1 py-2 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground text-xs font-bold cursor-pointer transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
-                          >
-                            <RefreshCw className="h-3.5 w-3.5" />
-                            <span>Retake</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setCapturedVideoUrl("")}
-                            className="px-3.5 py-2 rounded-lg bg-secondary/50 hover:bg-destructive/10 text-muted-foreground hover:text-destructive text-xs font-semibold cursor-pointer transition-colors flex items-center justify-center gap-1.5"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                            <span>Remove</span>
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="py-6 px-4 rounded-lg border border-dashed border-border flex flex-col items-center justify-center gap-2.5 bg-secondary/10 text-center">
-                        <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center text-foreground">
-                          <Video className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <p className="text-xs font-bold text-foreground">10-Second Inspection Video</p>
-                          <p className="text-[11px] text-muted-foreground mt-0.5">
-                            Record a continuous walkaround video (maximum 10 seconds).
-                          </p>
-                        </div>
+                    {/* CARD 3: 10S VIDEO */}
+                    <div
+                      className={`p-1.5 sm:p-3 rounded-lg sm:rounded-xl border flex flex-col justify-between transition-all text-center min-w-0 ${
+                        capturedVideoUrl
+                          ? "bg-card border-border shadow-xs"
+                          : "bg-card/60 border-border/80"
+                      }`}
+                    >
+                      <div className="flex flex-col items-center gap-1 min-w-0">
                         <button
                           type="button"
                           onClick={handleTriggerVideoCamera}
                           disabled={isProcessingMedia}
-                          className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-bold shadow-xs hover:opacity-95 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                          title="Open Video Camera"
+                          className="h-8 w-8 sm:h-11 sm:w-11 rounded-full bg-secondary hover:bg-secondary/80 text-foreground flex items-center justify-center cursor-pointer transition-colors active:scale-95 disabled:opacity-50 shrink-0"
                         >
-                          <Video className="h-3.5 w-3.5" />
-                          <span>Record Video</span>
+                          <Video className="h-4 w-4 sm:h-5 sm:w-5" />
                         </button>
+                        <p className="text-[10px] sm:text-xs font-bold text-foreground truncate w-full">
+                          10s Video
+                        </p>
+                        <span
+                          className={`text-[8.5px] sm:text-[10px] font-semibold px-1.5 py-0.2 rounded-full truncate ${
+                            capturedVideoUrl
+                              ? "bg-secondary text-foreground border border-border"
+                              : "bg-secondary/60 text-muted-foreground"
+                          }`}
+                        >
+                          {capturedVideoUrl ? "✓ Captured" : "Pending"}
+                        </span>
                       </div>
-                    )}
+
+                      {capturedVideoUrl ? (
+                        <div className="mt-2 space-y-1 sm:space-y-1.5 w-full">
+                          <div className="relative h-14 sm:h-22 rounded-md sm:rounded-lg overflow-hidden border border-border bg-black">
+                            <video
+                              src={capturedVideoUrl}
+                              playsInline
+                              muted
+                              className="w-full h-full object-cover"
+                            />
+                            <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                              <span className="text-[8px] sm:text-[9.5px] font-mono font-bold bg-black/70 text-white px-1 py-0.5 rounded">
+                                {videoDuration}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex flex-col gap-1 w-full">
+                            <button
+                              type="button"
+                              onClick={() => setPreviewVideoModal(capturedVideoUrl)}
+                              className="w-full py-1 sm:py-1.5 px-1 rounded-md bg-secondary hover:bg-secondary/80 text-foreground text-[9px] sm:text-xs font-bold cursor-pointer transition-colors truncate"
+                            >
+                              View Video
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleTriggerVideoCamera}
+                              disabled={isProcessingMedia}
+                              className="w-full py-1 sm:py-1.5 px-1 rounded-md bg-secondary/50 hover:bg-secondary/80 text-muted-foreground hover:text-foreground text-[9px] sm:text-xs font-semibold cursor-pointer transition-colors truncate disabled:opacity-50"
+                            >
+                              Retake
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="mt-2.5 w-full">
+                          <button
+                            type="button"
+                            onClick={handleTriggerVideoCamera}
+                            disabled={isProcessingMedia}
+                            className="w-full py-1.5 sm:py-2 px-1 rounded-md sm:rounded-lg bg-primary text-primary-foreground text-[9.5px] sm:text-xs font-bold shadow-xs hover:opacity-95 active:scale-95 transition-all cursor-pointer truncate disabled:opacity-50"
+                          >
+                            Record Video
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 
                 {/* COMPACT COMPLETION SUMMARY */}
-                <div className="p-3 rounded-xl bg-secondary/30 border border-border flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-foreground">Media</span>
-                    <span className="text-xs font-mono font-semibold text-muted-foreground">
-                      {(frontPhotoUrl ? 1 : 0) + (backPhotoUrl ? 1 : 0) + (capturedVideoUrl ? 1 : 0)} / 3 complete
+                <div className="p-2.5 sm:p-3 rounded-xl bg-secondary/30 border border-border flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-1.5 font-bold text-foreground">
+                    <span>Media</span>
+                    <span className="font-mono text-muted-foreground">
+                      {(frontPhotoUrl ? 1 : 0) + (backPhotoUrl ? 1 : 0) + (capturedVideoUrl ? 1 : 0)} / 3 captured
                     </span>
                   </div>
-                  <div className="flex items-center gap-2 text-[11px] font-semibold text-muted-foreground">
+                  <div className="flex items-center gap-2 text-[10.5px] sm:text-xs font-semibold text-muted-foreground">
                     <span className={frontPhotoUrl ? "text-foreground font-bold" : ""}>
                       {frontPhotoUrl ? "✓" : "○"} Front
                     </span>
@@ -3271,7 +3251,7 @@ export function ListProductWizard({
 
       {/* PHOTO PREVIEW MODAL */}
       {previewPhotoModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="relative max-w-2xl w-full">
             <button
               type="button"
@@ -3283,7 +3263,29 @@ export function ListProductWizard({
             <img
               src={previewPhotoModal}
               alt="Photo preview"
-              className="w-full max-h-[80vh] object-contain rounded-2xl border border-white/20 shadow-2xl"
+              className="w-full max-h-[80vh] object-contain rounded-2xl border border-white/20 shadow-2xl bg-black"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* VIDEO PREVIEW MODAL */}
+      {previewVideoModal && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="relative max-w-2xl w-full">
+            <button
+              type="button"
+              onClick={() => setPreviewVideoModal(null)}
+              className="absolute -top-10 right-0 text-white hover:opacity-80 cursor-pointer p-1"
+            >
+              <X className="h-6 w-6" />
+            </button>
+            <video
+              src={previewVideoModal}
+              controls
+              autoPlay
+              playsInline
+              className="w-full max-h-[80vh] object-contain rounded-2xl border border-white/20 shadow-2xl bg-black"
             />
           </div>
         </div>
