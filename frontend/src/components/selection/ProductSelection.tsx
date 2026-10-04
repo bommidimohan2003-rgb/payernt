@@ -243,7 +243,7 @@ export function ProductSelection() {
   }, [mouseX, mouseY, shouldReduceMotion]);
 
   // Smooth architectural easing curve
-  const smoothEase = [0.16, 1, 0.3, 1];
+  const smoothEase: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
   // Navigation handler with cinematic exit sequence
   const handleSelect = (

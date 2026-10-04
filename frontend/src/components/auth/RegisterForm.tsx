@@ -206,7 +206,7 @@ export function RegisterForm() {
   const labels = ["Weak", "Fair", "Good", "Strong", "Excellent"];
 
   const showAdminOption = useMemo(() => {
-    if (typeof window !== "undefined") return false;
+    if (typeof window === "undefined") return false;
     const params = new URLSearchParams(window.location.search);
     for (const [key, value] of params.entries()) {
       if (

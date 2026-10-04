@@ -44,8 +44,8 @@ export function LenderEarnings({
     (t) => t.payoutStatus === "processing" || t.payoutStatus === "upcoming"
   );
 
-  const totalSettledEarnings = settledTransactions.reduce((sum, t) => sum + t.netPayout, 0);
-  const totalPendingEarnings = pendingTransactions.reduce((sum, t) => sum + t.netPayout, 0);
+  const totalSettledEarnings = settledTransactions.reduce((sum, t) => sum + (t.netPayout ?? 0), 0);
+  const totalPendingEarnings = pendingTransactions.reduce((sum, t) => sum + (t.netPayout ?? 0), 0);
   const completedRentalsCount = settledTransactions.length;
 
   const handleSavePayoutSettings = (e: React.FormEvent) => {
@@ -224,13 +224,13 @@ export function LenderEarnings({
                       {tx.rentalPeriod} ({tx.rentalDays}d)
                     </td>
                     <td className="py-3.5 px-4 text-foreground font-semibold">
-                      ₹{tx.grossRental.toLocaleString("en-IN")}
+                      ₹{(tx.grossRental ?? 0).toLocaleString("en-IN")}
                     </td>
                     <td className="py-3.5 px-4 text-emerald-600 dark:text-emerald-400 font-bold">
                       ₹0 (Direct)
                     </td>
                     <td className="py-3.5 px-4 text-foreground font-extrabold text-sm">
-                      ₹{tx.netPayout.toLocaleString("en-IN")}
+                      ₹{(tx.netPayout ?? 0).toLocaleString("en-IN")}
                     </td>
                     <td className="py-3.5 px-4">
                       {tx.payoutStatus === "settled" ? (

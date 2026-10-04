@@ -11,6 +11,8 @@ export type ProductAvailability = "available" | "paused" | "rented" | "unavailab
 
 export type RentalRequestStatus =
   | "requested"
+  | "pending"
+  | "approved"
   | "accepted"
   | "handover"
   | "active"
@@ -125,6 +127,8 @@ export interface VerificationDocuments {
 export interface PayerntProduct {
   id: string;
   ownerId: string;
+  ownerEmail?: string;
+  owner_email?: string;
   owner?: {
     id?: string;
     name?: string;
@@ -145,12 +149,13 @@ export interface PayerntProduct {
   features?: string[];
   photos: ProductPhoto[];
   images?: string[];
+  image?: string;
   primaryImage: string;
   videoUrl?: string;
   specs: ProductSpecs;
   condition: ProductCondition;
   damageDetails?: string;
-  accessories?: string;
+  accessories?: string | string[];
   location: ProductLocation;
   city?: string;
   area?: string;
@@ -158,6 +163,11 @@ export interface PayerntProduct {
   pickupDetails?: string;
   pricing: RentalPricing;
   price?: number;
+  pricePerDay?: number;
+  fairMarketPrice?: number;
+  securityDeposit?: number;
+  replacementValue?: number;
+  isAvailable?: boolean;
   daily_rate?: number;
   dailyRate?: number;
   weekly_rate?: number;
@@ -233,6 +243,7 @@ export interface RentalRequest {
   totalDays: number;
   dailyRate: number;
   grossRental: number;
+  totalPrice?: number;
   platformFee: number;
   netEarnings: number;
   securityDeposit: number;
@@ -243,21 +254,24 @@ export interface RentalRequest {
 
 export interface EarningTransaction {
   id: string;
-  orderId: string;
-  productId: string;
-  productTitle: string;
-  productImage: string;
-  renterName: string;
-  rentalPeriod: string;
-  rentalDays: number;
-  grossRental: number;
-  platformFee: number;
-  netPayout: number;
-  securityDeposit: number;
-  depositStatus: "refunded_to_renter" | "retained_for_damage" | "in_escrow";
-  payoutStatus: "settled" | "processing" | "upcoming";
-  payoutDate: string;
-  payoutMethod: string;
+  orderId?: string;
+  productId?: string;
+  productTitle?: string;
+  productImage?: string;
+  renterName?: string;
+  rentalPeriod?: string;
+  rentalDays?: number;
+  grossRental?: number;
+  platformFee?: number;
+  netPayout?: number;
+  amount?: number;
+  description?: string;
+  timestamp?: string;
+  securityDeposit?: number;
+  depositStatus?: "refunded_to_renter" | "retained_for_damage" | "in_escrow";
+  payoutStatus?: "settled" | "processing" | "upcoming";
+  payoutDate?: string;
+  payoutMethod?: string;
 }
 
 export type AdminMessageType =
@@ -312,6 +326,11 @@ export interface PayerntAccount {
   aadhaarNumber: string; // Masked e.g. "XXXX XXXX 9012"
   address: string;
   pincode: string;
+  role?: string;
+  status?: string;
+  isApproved?: boolean;
+  is_approved?: boolean;
+  verified?: boolean;
   avatar?: string;
   createdAt: string;
   passwordHash?: string; // Mock password hash for frontend demo
@@ -322,6 +341,7 @@ export interface LenderProfile {
   accountId?: string;
   accountType?: "paye₹nt";
   name: string;
+  fullName?: string;
   email: string;
   phone: string;
   avatar: string;

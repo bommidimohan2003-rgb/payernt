@@ -238,8 +238,11 @@ export const payrentApi = {
 
   async logout(): Promise<void> {
     try {
-      await api.logout();
+      const token = storage.get<string | null>(STORAGE_KEYS.token, null);
+      if (token) await api.logout(token);
     } catch {
+      // Ignore
+    } finally {
       storage.remove(STORAGE_KEYS.token);
       storage.remove(STORAGE_KEYS.currentUser);
     }
@@ -252,14 +255,17 @@ export const payrentApi = {
   },
 
   async updateProfile(updates: Partial<User>): Promise<User | null> {
-    return await api.updateProfile(updates as any);
+    const token = storage.get<string | null>(STORAGE_KEYS.token, null);
+    if (!token) return null;
+    return (await api.updateProfile(token, updates as any)) as User | null;
   },
 
   // ============================================================
   // PRODUCTS & EXPLORE
   // ============================================================
   async getProducts(): Promise<Product[]> {
-    return await api.getPublicProducts();
+    const prods = await api.getPublicProducts();
+    return prods || [];
   },
 
   async getProduct(id: string): Promise<Product | null> {
@@ -274,34 +280,97 @@ export const payrentApi = {
   // CART
   // ============================================================
   async getCart(): Promise<CartResponse> {
-    return await api.getCart();
+    const items = storage.get<CartItem[]>(STORAGE_KEYS.cart, []);
+    const subtotal = items.reduce(
+      (acc, item) => acc + (item.pricePerDay || item.daily_price || item.price || 0) * (item.days || 1) * (item.quantity || 1),
+      0
+    );
+    const tax = Math.round(subtotal * 0.18);
+    const total = subtotal + tax;
+    return {
+      items,
+      count: items.length,
+      subtotal,
+      tax,
+      total,
+    };
   },
 
   async addToCart(productId: string, startDate?: string, endDate?: string): Promise<CartResponse> {
-    return await api.addToCart(productId, startDate, endDate);
+    const prod = await api.getProduct(productId);
+    const currentItems = storage.get<CartItem[]>(STORAGE_KEYS.cart, []);
+    const dailyPrice = Number(prod?.price || 0);
+    const newItem: CartItem = {
+      id: `cart_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      user_email: storage.get<{ email?: string } | null>(STORAGE_KEYS.currentUser, null)?.email || "guest",
+      product_id: productId,
+      productId,
+      title: prod?.title || "Gear Item",
+      productTitle: prod?.title || "Gear Item",
+      price: dailyPrice,
+      daily_price: dailyPrice,
+      pricePerDay: dailyPrice,
+      image: prod?.image || prod?.images?.[0] || "",
+      productImage: prod?.image || prod?.images?.[0] || "",
+      category: prod?.category || "Gear",
+      city: prod?.city || "Bangalore",
+      days: 1,
+      quantity: 1,
+      start_date: startDate || new Date().toISOString(),
+      startDate: startDate || new Date().toISOString(),
+      end_date: endDate || new Date(Date.now() + 86400000).toISOString(),
+      endDate: endDate || new Date(Date.now() + 86400000).toISOString(),
+      total_price: dailyPrice,
+      is_available: true,
+    };
+    const updated = [...currentItems.filter((i) => (i.productId || i.product_id) !== productId), newItem];
+    storage.set(STORAGE_KEYS.cart, updated);
+    return await this.getCart();
   },
 
   async removeFromCart(productId: string): Promise<CartResponse> {
-    return await api.removeFromCart(productId);
+    const currentItems = storage.get<CartItem[]>(STORAGE_KEYS.cart, []);
+    const updated = currentItems.filter((i) => (i.productId || i.product_id) !== productId);
+    storage.set(STORAGE_KEYS.cart, updated);
+    return await this.getCart();
   },
 
   async clearCart(): Promise<void> {
-    return await api.clearCart();
+    storage.set(STORAGE_KEYS.cart, []);
   },
 
   // ============================================================
   // WISHLIST
   // ============================================================
   async getWishlist(): Promise<string[]> {
-    return await api.getWishlist();
+    const token = storage.get<string | null>(STORAGE_KEYS.token, null);
+    if (!token) return storage.get<string[]>(STORAGE_KEYS.wishlist, []);
+    return await api.getWishlist(token);
   },
 
   async addWishlist(productId: string): Promise<string[]> {
-    return await api.toggleWishlist(productId);
+    const token = storage.get<string | null>(STORAGE_KEYS.token, null);
+    if (!token) {
+      const list = storage.get<string[]>(STORAGE_KEYS.wishlist, []);
+      if (!list.includes(productId)) {
+        const next = [...list, productId];
+        storage.set(STORAGE_KEYS.wishlist, next);
+        return next;
+      }
+      return list;
+    }
+    return await api.toggleWishlist(token, productId);
   },
 
   async removeWishlist(productId: string): Promise<string[]> {
-    return await api.toggleWishlist(productId);
+    const token = storage.get<string | null>(STORAGE_KEYS.token, null);
+    if (!token) {
+      const list = storage.get<string[]>(STORAGE_KEYS.wishlist, []);
+      const next = list.filter((id) => (id !== productId));
+      storage.set(STORAGE_KEYS.wishlist, next);
+      return next;
+    }
+    return await api.toggleWishlist(token, productId);
   },
 
   // ============================================================
@@ -314,11 +383,18 @@ export const payrentApi = {
     deliveryAddress?: string;
   }): Promise<{ success: boolean; booking?: any; order?: Order; error?: string }> {
     try {
-      const order = await api.createOrder({
+      const token = storage.get<string | null>(STORAGE_KEYS.token, null);
+      if (!token) throw new Error("Authentication required");
+      const order = await api.createOrder(token, {
+        id: `ord_${Date.now()}`,
         productId: params.productId,
+        productTitle: "Gear Rental",
+        productImage: "",
         startDate: params.startDate,
         endDate: params.endDate,
-        deliveryAddress: params.deliveryAddress || "",
+        total: 0,
+        status: "active",
+        createdAt: new Date().toISOString(),
       });
       return { success: true, order };
     } catch (err: any) {
@@ -327,7 +403,9 @@ export const payrentApi = {
   },
 
   async getBookings(): Promise<Order[]> {
-    return await api.getOrders();
+    const token = storage.get<string | null>(STORAGE_KEYS.token, null);
+    if (!token) return storage.get<Order[]>(STORAGE_KEYS.orders, []);
+    return await api.getOrders(token);
   },
 
   async getBookingSecurity(bookingId: string): Promise<{ success: boolean; security?: RentalSecurity; error?: string }> {
@@ -398,11 +476,16 @@ export const payrentApi = {
   // MESSAGES & CONVERSATIONS
   // ============================================================
   async getConversations(): Promise<Conversation[]> {
-    return await api.getConversations();
+    const token = storage.get<string | null>(STORAGE_KEYS.token, null);
+    if (!token) return [];
+    return await api.getMessages(token);
   },
 
   async getMessages(conversationId: string): Promise<ConversationMessage[]> {
-    return await api.getMessages(conversationId);
+    const token = storage.get<string | null>(STORAGE_KEYS.token, null);
+    if (!token) return [];
+    const conv = await api.getConversation(token, conversationId);
+    return conv?.messages || [];
   },
 
   async sendMessage(params: {
@@ -411,18 +494,33 @@ export const payrentApi = {
     productId?: string;
     conversationId?: string;
   }): Promise<ConversationMessage> {
-    return await api.sendMessage(params);
+    const token = storage.get<string | null>(STORAGE_KEYS.token, null);
+    if (!token) throw new Error("Authentication required");
+    if (params.conversationId) {
+      await api.sendRealtimeMessage(token, params.conversationId, params.content);
+    }
+    return {
+      id: `msg_${Date.now()}`,
+      sender: "me",
+      senderType: "user",
+      content: params.content,
+      timestamp: new Date().toISOString(),
+    };
   },
 
   // ============================================================
   // NOTIFICATIONS
   // ============================================================
   async getNotifications(): Promise<any[]> {
-    return await api.getNotifications();
+    const token = storage.get<string | null>(STORAGE_KEYS.token, null);
+    if (!token) return [];
+    return await api.getNotifications(token);
   },
 
-  async markNotificationRead(id: string): Promise<void> {
-    return await api.markNotificationRead(id);
+  async markNotificationRead(id?: string): Promise<void> {
+    const token = storage.get<string | null>(STORAGE_KEYS.token, null);
+    if (!token) return;
+    await api.markNotificationsRead(token);
   },
 };
 

@@ -13,7 +13,7 @@ import { PayerntMessages } from "./components/PayerntMessages";
 
 export function PayerntApp() {
   const [activeTab, setActiveTab] = useState<
-    "home" | "products" | "requests" | "wallet" | "profile" | "list" | "messages"
+    "home" | "products" | "requests" | "wallet" | "profile" | "list" | "messages" | "analytics"
   >(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
@@ -25,9 +25,10 @@ export function PayerntApp() {
         tabParam === "wallet" ||
         tabParam === "profile" ||
         tabParam === "list" ||
-        tabParam === "messages"
+        tabParam === "messages" ||
+        tabParam === "analytics"
       ) {
-        return tabParam;
+        return tabParam as any;
       }
     }
     return "home";

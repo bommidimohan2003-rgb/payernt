@@ -849,7 +849,10 @@ export function ListProductWizard({
       return initialDraft.condition.accessoriesIncluded;
     }
     if (initialDraft?.accessories) {
-      return initialDraft.accessories.split(",").map((s) => s.trim()).filter(Boolean);
+      if (Array.isArray(initialDraft.accessories)) {
+        return initialDraft.accessories.map((s) => String(s).trim()).filter(Boolean);
+      }
+      return String(initialDraft.accessories).split(",").map((s: string) => s.trim()).filter(Boolean);
     }
     return [];
   });
@@ -914,6 +917,17 @@ export function ListProductWizard({
   const [dropArea, setDropArea] = useState("");
   const [dropCity, setDropCity] = useState("");
   const [dropPincode, setDropPincode] = useState("");
+
+  const currentListingLocationDisplay = useMemo(() => {
+    const parts = [pickupArea || pickupAddressLine, pickupCity, pickupPincode].filter(Boolean);
+    return parts.length > 0 ? parts.join(", ") : "Location not set";
+  }, [pickupArea, pickupAddressLine, pickupCity, pickupPincode]);
+
+  const currentDropLocationDisplay = useMemo(() => {
+    if (sameAsPickup) return currentListingLocationDisplay;
+    const parts = [dropArea || dropAddressLine, dropCity, dropPincode].filter(Boolean);
+    return parts.length > 0 ? parts.join(", ") : currentListingLocationDisplay;
+  }, [sameAsPickup, currentListingLocationDisplay, dropArea, dropAddressLine, dropCity, dropPincode]);
 
   // STAGE 04 — Terms Acceptance
   const [agreedToTerms, setAgreedToTerms] = useState(

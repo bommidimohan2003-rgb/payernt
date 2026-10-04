@@ -77,7 +77,10 @@ export function LenderProductDetails({ productId: propId }: { productId?: string
     product.verificationStatus === "under_review" ||
     product.verificationStatus === "submitted" ||
     product.status === "under_review";
-  const isAvailable = product.availability === "available" || product.isAvailable;
+  const isAvailable =
+    product.availabilityStatus === "available" ||
+    (typeof product.availability === "string" && product.availability === "available") ||
+    Boolean(product.isAvailable);
 
   const handlePriceSave = () => {
     const val = Number(newPrice);
@@ -206,20 +209,27 @@ export function LenderProductDetails({ productId: propId }: { productId?: string
             )}
 
             {/* Included Accessories */}
-            {product.accessories && product.accessories.length > 0 && (
+            {product.accessories && (Array.isArray(product.accessories) ? product.accessories.length > 0 : String(product.accessories).trim().length > 0) && (
               <div className="pt-3 border-t border-border/70">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                   Included Accessories
                 </h3>
                 <div className="flex flex-wrap gap-2 mt-2">
-                  {product.accessories.map((acc, i) => (
-                    <span
-                      key={i}
-                      className="px-2.5 py-1 rounded-lg bg-secondary text-secondary-foreground text-xs font-medium"
-                    >
-                      {acc}
-                    </span>
-                  ))}
+                  {(Array.isArray(product.accessories)
+                    ? product.accessories
+                    : String(product.accessories).split(",")
+                  ).map((acc, i) => {
+                    const label = typeof acc === "string" ? acc.trim() : String(acc);
+                    if (!label) return null;
+                    return (
+                      <span
+                        key={i}
+                        className="px-2.5 py-1 rounded-lg bg-secondary text-secondary-foreground text-xs font-medium"
+                      >
+                        {label}
+                      </span>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -287,7 +297,9 @@ export function LenderProductDetails({ productId: propId }: { productId?: string
               <div className="flex justify-between">
                 <span>Location</span>
                 <span className="font-bold text-foreground">
-                  {product.location || product.city || "Available locally"}
+                  {typeof product.location === "object" && product.location !== null
+                    ? [product.location.city, product.location.state].filter(Boolean).join(", ") || product.city || "Available locally"
+                    : String(product.location || product.city || "Available locally")}
                 </span>
               </div>
             </div>

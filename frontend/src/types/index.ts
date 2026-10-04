@@ -23,7 +23,7 @@ export interface User {
   pan_masked?: string;
   accountId?: string;
   accountType?: "pay₹ent" | "paye₹nt";
-  role?: "user" | "admin" | "customer" | "lender";
+  role?: "user" | "admin" | "superadmin" | "customer" | "lender";
   status?: "pending" | "approved" | "rejected" | "suspended" | "active";
   createdAt?: string;
   bio?: string;
@@ -54,6 +54,8 @@ export interface Product {
   isReference?: boolean;
   status?: "approved" | "pending" | "rejected";
   location?: string | any;
+  city?: string;
+  area?: string;
   owner: {
     name: string;
     avatar: string;
@@ -184,15 +186,22 @@ export interface CartItem {
   id: string;
   user_email: string;
   product_id: string;
+  productId?: string;
   title: string;
+  productTitle?: string;
   price: number;
   daily_price: number;
+  pricePerDay?: number;
   image: string;
+  productImage?: string;
   category: string;
   city: string;
   start_date: string;
+  startDate?: string;
   end_date: string;
+  endDate?: string;
   days: number;
+  quantity?: number;
   total_price: number;
   is_available: boolean;
   conflict_reason?: string | null;

@@ -244,6 +244,10 @@ class AdminWebSocketService {
     };
   }
 
+  public onEvent(callback: Listener): () => void {
+    return this.subscribe("*", callback);
+  }
+
   private emit(event: WSEvent) {
     const callbacks = this.listeners.get(event.type);
     if (callbacks) {

@@ -6,11 +6,12 @@ import axios from "axios";
 
 export interface AdminUser {
   id: string;
+  accountId?: string;
   fullName: string;
   email: string;
   phone: string;
-  role: "admin" | "agent" | "user" | "customer" | "both";
-  status: "active" | "suspended" | "pending" | "rejected" | "approved";
+  role: "admin" | "agent" | "user" | "customer" | "both" | "lender" | "vendor" | string;
+  status: "active" | "suspended" | "pending" | "rejected" | "approved" | "PENDING_REVIEW" | "REJECTED" | "APPROVED" | string;
   verified: boolean;
   avatar: string;
   profilePhotoUrl?: string;
@@ -24,6 +25,7 @@ export interface AdminUser {
   website?: string;
   upiId?: string;
   aadhaarMasked?: string;
+  aadhaarNumber?: string;
   accountType?: string;
   createdAt: string;
   payerntAccount?: {
@@ -204,7 +206,8 @@ export interface AdminBooking {
   startDate: string;
   endDate: string;
   amount: number;
-  status: "pending" | "active" | "completed" | "cancelled";
+  status: "pending" | "confirmed" | "active" | "completed" | "cancelled" | string;
+  paymentStatus?: "paid" | "pending" | "refunded" | "failed" | "successful" | "captured" | string;
   createdAt: string;
 }
 
@@ -214,8 +217,8 @@ export interface AdminPayment {
   customerId: string;
   customerName: string;
   amount: number;
-  status: "successful" | "refunded" | "failed";
-  method: "Credit Card" | "PayPal" | "Apple Pay" | "Bank Transfer";
+  status: "successful" | "refunded" | "failed" | "captured" | "pending" | string;
+  method: "Credit Card" | "PayPal" | "Apple Pay" | "Bank Transfer" | "UPI" | string;
   invoiceUrl: string;
   createdAt: string;
 }

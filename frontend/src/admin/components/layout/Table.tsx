@@ -21,6 +21,7 @@ interface TableProps<T> {
   sortOrder?: "asc" | "desc";
   emptyTitle?: string;
   emptyDescription?: string;
+  emptyMessage?: string;
   className?: string;
 }
 
@@ -33,6 +34,7 @@ export function Table<T>({
   sortOrder,
   emptyTitle,
   emptyDescription,
+  emptyMessage,
   className,
 }: TableProps<T>) {
   return (
@@ -98,7 +100,7 @@ export function Table<T>({
               <tr>
                 <td colSpan={columns.length} className="py-12 px-4">
                   <EmptyState
-                    title={emptyTitle || "No records found"}
+                    title={emptyTitle || emptyMessage || "No records found"}
                     description={emptyDescription || "No entries available in this operational view."}
                   />
                 </td>

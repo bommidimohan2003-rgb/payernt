@@ -5,6 +5,7 @@ interface PaginationProps {
   currentPage: number;
   totalItems: number;
   itemsPerPage: number;
+  totalPages?: number;
   onPageChange: (page: number) => void;
   onItemsPerPageChange?: (limit: number) => void;
 }
