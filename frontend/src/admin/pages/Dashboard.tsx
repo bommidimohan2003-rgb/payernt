@@ -113,12 +113,15 @@ export default function Dashboard() {
       if (usersData.status === "fulfilled") {
         const unverified = usersData.value.filter(
           (u) =>
-            u.status === "pending" ||
-            (u as any).verificationStatus === "pending" ||
-            !u.verified ||
-            u.status === "unverified" ||
-            u.payerntAccount?.verificationStatus === "pending" ||
-            u.payerntAccount?.accountStatus === "pending"
+            !u.email?.endsWith("@example.com") &&
+            !u.email?.endsWith("@test.com") &&
+            !u.email?.includes("reset_test_") &&
+            (u.status === "pending" ||
+              (u as any).verificationStatus === "pending" ||
+              !u.verified ||
+              u.status === "unverified" ||
+              u.payerntAccount?.verificationStatus === "pending" ||
+              u.payerntAccount?.accountStatus === "pending")
         );
         setPendingUsers(unverified.slice(0, 6));
       }
@@ -285,7 +288,7 @@ export default function Dashboard() {
       {/* ============================================================ */}
       {/* TOP PRIORITY REVIEW SECTION: Pending Listings & User Review Accounts */}
       {/* ============================================================ */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="flex flex-col gap-6">
         {/* PENDING LISTINGS REVIEW QUEUE */}
         <div className="rounded-xl border border-border/70 bg-card p-5 space-y-3 shadow-xs">
           <div className="flex items-center justify-between pb-3 border-b border-border/40">
