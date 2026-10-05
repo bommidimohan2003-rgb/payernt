@@ -1145,10 +1145,10 @@ def create_user(
     else:
         try:
             execute_query("""
-                INSERT INTO payrent_accounts (id, person_id, email, phone, password_hash, full_name, role, account_type, pan_number, status, rejection_reason, reviewed_by, reviewed_at, verified, address, city, pincode, created_at, updated_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO payrent_accounts (person_id, email, phone, password_hash, full_name, role, account_type, pan_number, status, rejection_reason, reviewed_by, reviewed_at, verified, address, city, pincode, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON DUPLICATE KEY UPDATE full_name=VALUES(full_name), password_hash=VALUES(password_hash), status=VALUES(status), person_id=VALUES(person_id), updated_at=VALUES(updated_at)
-            """, (f"PAYRENT_USER_{clean_email}", person_id, clean_email, phone, password_hash, full_name, role, account_type or "pay₹ent", clean_pan, user_status, None, None, None, int(is_verified), address, city, pincode, created_at, created_at))
+            """, (person_id, clean_email, phone, password_hash, full_name, role, account_type or "pay₹ent", clean_pan, user_status, None, None, None, int(is_verified), address, city, pincode, created_at, created_at))
         except Exception as e:
             print(f"Notice: Database write error in payrent_accounts: {e}")
 
