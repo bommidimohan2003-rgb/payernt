@@ -4,13 +4,12 @@ import {
   Bell,
   Sun,
   Moon,
-  Globe,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { LenderNotification, DemoUser, PayerntAccount } from "../types";
 import { useTheme } from "@/hooks/useTheme";
 import { useOriginReveal } from "@/components/navigation/OriginRevealTransition";
-import { useLanguage, LanguageModal } from "@/i18n";
+import { useLanguage } from "@/i18n";
 
 interface PayerntNavbarProps {
   activeTab?: string;
@@ -42,9 +41,8 @@ export function PayerntNavbar({
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { triggerOriginTransition } = useOriginReveal();
   const { theme, toggle: toggleTheme } = useTheme();
-  const { tCommon, language } = useLanguage();
+  const { tCommon } = useLanguage();
   const [isNotifOpen, setIsNotifOpen] = useState(false);
-  const [isLangModalOpen, setIsLangModalOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
 
   const isHome =
@@ -76,12 +74,6 @@ export function PayerntNavbar({
   const avatarLetter = (displayName.trim()[0] || "M").toUpperCase();
   const unreadCount = notifications.filter((n) => !n.read).length;
 
-  const getLanguageShortCode = () => {
-    if (language === "te") return "తె";
-    if (language === "hi") return "हि";
-    return "EN";
-  };
-
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
@@ -111,21 +103,8 @@ export function PayerntNavbar({
             </button>
           </div>
 
-          {/* Right: Language, Theme Toggle, Notifications, Profile Avatar */}
+          {/* Right: Theme Toggle, Notifications, Profile Avatar */}
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Language Switcher Button */}
-            <button
-              type="button"
-              onClick={() => setIsLangModalOpen(true)}
-              className="h-9 px-2.5 flex items-center gap-1.5 rounded-xl text-neutral-700 dark:text-neutral-300 hover:text-black dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/[0.06] transition-colors cursor-pointer border border-neutral-200/60 dark:border-white/10"
-              aria-label={`${tCommon.languages}: ${language}`}
-              title={`${tCommon.languages} (${language.toUpperCase()})`}
-            >
-              <Globe className="h-4 w-4" />
-              <span className="text-xs font-bold font-mono uppercase">
-                {getLanguageShortCode()}
-              </span>
-            </button>
 
             {/* Theme Toggle Button */}
             <button
@@ -221,8 +200,6 @@ export function PayerntNavbar({
           </div>
         </div>
       </header>
-
-      <LanguageModal isOpen={isLangModalOpen} onClose={() => setIsLangModalOpen(false)} />
     </>
   );
 }

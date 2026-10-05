@@ -1,20 +1,19 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { ArrowRight, Sun, Moon, Globe } from "lucide-react";
+import { ArrowRight, Sun, Moon } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 import { cn } from "@/lib/utils";
 import { LogoIcon } from "@/components/common/LogoIcon";
 import { useOriginReveal } from "@/components/navigation/OriginRevealTransition";
-import { useLanguage, LanguageModal } from "@/i18n";
+import { useLanguage } from "@/i18n";
 
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [isLangModalOpen, setIsLangModalOpen] = useState(false);
   const { user } = useAuth();
   const { theme, toggle } = useTheme();
-  const { tCommon, language } = useLanguage();
+  const { tCommon } = useLanguage();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { triggerOriginTransition, registerOriginRef } = useOriginReveal();
 
@@ -36,12 +35,6 @@ export function Navbar() {
 
   const handleLogoClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
     triggerOriginTransition(isButton2Home ? "gateway" : "home", e.currentTarget);
-  };
-
-  const getLanguageShortCode = () => {
-    if (language === "te") return "తె";
-    if (language === "hi") return "हि";
-    return "EN";
   };
 
   return (
@@ -73,24 +66,8 @@ export function Navbar() {
             </Link>
           </div>
 
-          {/* Right: Language Selector, Theme Toggle & Auth / Profile Controls */}
+          {/* Right: Theme Toggle & Auth / Profile Controls */}
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Language Selector Button */}
-            {mounted && (
-              <button
-                type="button"
-                onClick={() => setIsLangModalOpen(true)}
-                aria-label={`Select Language (current: ${language})`}
-                title={`${tCommon.languages} (${language.toUpperCase()})`}
-                className="h-9 sm:h-10 px-2 sm:px-2.5 rounded-xl bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10 text-neutral-700 hover:text-neutral-950 dark:text-neutral-300 dark:hover:text-white border border-black/5 dark:border-white/10 flex items-center gap-1.5 transition-all cursor-pointer shrink-0 active:scale-96"
-              >
-                <Globe className="h-4 w-4 stroke-[1.7]" />
-                <span className="text-[11px] sm:text-xs font-bold font-mono uppercase">
-                  {getLanguageShortCode()}
-                </span>
-              </button>
-            )}
-
             {/* Theme Toggle Button matching Dock Container Icon Style */}
             {mounted && (
               <button
@@ -169,8 +146,6 @@ export function Navbar() {
           </div>
         </div>
       </header>
-
-      <LanguageModal isOpen={isLangModalOpen} onClose={() => setIsLangModalOpen(false)} />
     </>
   );
 }
