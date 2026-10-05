@@ -126,9 +126,23 @@ export default function Users() {
     try {
       setActionLoading(true);
       const updated = await usersService.approveUser(id, type);
-      setUsers((prev) => prev.map((u) => ((u.id === id || u.email === id || u.accountId === id) ? { ...u, ...updated, status: "APPROVED", verified: true } : u)));
-      if (selectedUser && (selectedUser.id === id || selectedUser.email === id || selectedUser.accountId === id)) {
-        setSelectedUser((prev) => prev ? { ...prev, ...updated, status: "APPROVED", verified: true } : null);
+      setUsers((prev) =>
+        prev.map((u) => {
+          const matches =
+            (u.accountId && u.accountId === id) ||
+            (u.id === id && (!type || !u.accountType || u.accountType.toLowerCase().includes(type.toLowerCase()))) ||
+            (u.email === id && (!type || !u.accountType || u.accountType.toLowerCase().includes(type.toLowerCase())));
+          return matches ? { ...u, ...updated, status: "APPROVED", verified: true } : u;
+        })
+      );
+      if (selectedUser) {
+        const selMatches =
+          (selectedUser.accountId && selectedUser.accountId === id) ||
+          (selectedUser.id === id && (!type || !selectedUser.accountType || selectedUser.accountType.toLowerCase().includes(type.toLowerCase()))) ||
+          (selectedUser.email === id && (!type || !selectedUser.accountType || selectedUser.accountType.toLowerCase().includes(type.toLowerCase())));
+        if (selMatches) {
+          setSelectedUser((prev) => (prev ? { ...prev, ...updated, status: "APPROVED", verified: true } : null));
+        }
       }
       
       // Notify other tabs / pending approval screens instantly
@@ -158,9 +172,23 @@ export default function Users() {
       setActionLoading(true);
       const reason = rejectReasonInput.trim() || "Submitted information needs correction.";
       const updated = await usersService.rejectUser(id, reason, type);
-      setUsers((prev) => prev.map((u) => ((u.id === id || u.email === id || u.accountId === id) ? { ...u, ...updated, status: "REJECTED" } : u)));
-      if (selectedUser && (selectedUser.id === id || selectedUser.email === id || selectedUser.accountId === id)) {
-        setSelectedUser((prev) => prev ? { ...prev, ...updated, status: "REJECTED" } : null);
+      setUsers((prev) =>
+        prev.map((u) => {
+          const matches =
+            (u.accountId && u.accountId === id) ||
+            (u.id === id && (!type || !u.accountType || u.accountType.toLowerCase().includes(type.toLowerCase()))) ||
+            (u.email === id && (!type || !u.accountType || u.accountType.toLowerCase().includes(type.toLowerCase())));
+          return matches ? { ...u, ...updated, status: "REJECTED", rejectionReason: reason } : u;
+        })
+      );
+      if (selectedUser) {
+        const selMatches =
+          (selectedUser.accountId && selectedUser.accountId === id) ||
+          (selectedUser.id === id && (!type || !selectedUser.accountType || selectedUser.accountType.toLowerCase().includes(type.toLowerCase()))) ||
+          (selectedUser.email === id && (!type || !selectedUser.accountType || selectedUser.accountType.toLowerCase().includes(type.toLowerCase())));
+        if (selMatches) {
+          setSelectedUser((prev) => (prev ? { ...prev, ...updated, status: "REJECTED", rejectionReason: reason } : null));
+        }
       }
       setRejectModalTarget(null);
       setRejectReasonInput("");
@@ -210,9 +238,25 @@ export default function Users() {
 
     // Platform Tab filter
     if (platformTab === "payernt") {
-      result = result.filter((u) => u.role === "agent" || u.role === "both" || u.accountType?.toLowerCase().includes("payernt") || u.accountType?.toLowerCase().includes("both"));
+      result = result.filter(
+        (u) =>
+          u.role === "agent" ||
+          u.role === "lender" ||
+          u.role === "vendor" ||
+          u.role === "both" ||
+          u.accountType?.toLowerCase().includes("payernt") ||
+          u.accountType?.toLowerCase().includes("both")
+      );
     } else if (platformTab === "payrent") {
-      result = result.filter((u) => u.role === "customer" || u.role === "user" || u.role === "both" || u.accountType?.toLowerCase().includes("payrent") || u.accountType?.toLowerCase().includes("both"));
+      result = result.filter(
+        (u) =>
+          u.role === "customer" ||
+          u.role === "user" ||
+          u.role === "renter" ||
+          u.role === "both" ||
+          u.accountType?.toLowerCase().includes("payrent") ||
+          u.accountType?.toLowerCase().includes("both")
+      );
     }
 
     if (search.trim()) {
@@ -220,14 +264,31 @@ export default function Users() {
       result = result.filter(
         (u) =>
           (u.fullName && u.fullName.toLowerCase().includes(q)) ||
+          (u.name && u.name.toLowerCase().includes(q)) ||
           (u.email && u.email.toLowerCase().includes(q)) ||
           (u.id && u.id.toLowerCase().includes(q)) ||
+          (u.accountId && u.accountId.toLowerCase().includes(q)) ||
           (u.phone && u.phone.includes(q))
       );
     }
 
     if (statusFilter !== "all") {
-      result = result.filter((u) => u.status === statusFilter);
+      result = result.filter((u) => {
+        const s = String(u.status || "").toUpperCase();
+        if (statusFilter === "pending") {
+          return s === "PENDING_REVIEW" || s === "PENDING" || s === "UNVERIFIED" || !u.verified;
+        }
+        if (statusFilter === "active") {
+          return s === "APPROVED" || s === "ACTIVE" || (u.verified && s !== "SUSPENDED" && s !== "REJECTED");
+        }
+        if (statusFilter === "rejected") {
+          return s === "REJECTED" || s === "DECLINED";
+        }
+        if (statusFilter === "suspended") {
+          return s === "SUSPENDED";
+        }
+        return s.toLowerCase() === statusFilter.toLowerCase();
+      });
     }
 
     result.sort((a, b) => {

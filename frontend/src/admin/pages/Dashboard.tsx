@@ -117,18 +117,20 @@ export default function Dashboard() {
       if (usersData.status === "fulfilled") {
         const unverified = usersData.value.filter(
           (u) =>
-            !u.email?.endsWith("@example.com") &&
-            !u.email?.endsWith("@test.com") &&
-            !u.email?.includes("reset_test_") &&
+            !u.email?.toLowerCase().endsWith("@example.com") &&
+            !u.email?.toLowerCase().endsWith("@test.com") &&
+            !u.email?.toLowerCase().includes("reset_test_") &&
             (String(u.status).toUpperCase() === "PENDING_REVIEW" ||
               String(u.status).toUpperCase() === "PENDING" ||
               String((u as any).verificationStatus).toUpperCase() === "PENDING" ||
               !u.verified ||
-              u.status === "unverified" ||
+              String(u.status).toLowerCase() === "unverified" ||
               u.payerntAccount?.verificationStatus === "pending" ||
-              u.payerntAccount?.accountStatus === "pending")
+              u.payerntAccount?.accountStatus === "pending" ||
+              u.payrentAccount?.verificationStatus === "pending" ||
+              u.payrentAccount?.accountStatus === "pending")
         );
-        setPendingUsers(unverified.slice(0, 8));
+        setPendingUsers(unverified);
       }
 
       if (ticketsData.status === "fulfilled") {
@@ -212,9 +214,22 @@ export default function Dashboard() {
     try {
       setApprovingUserId(id);
       await usersService.approveUser(id, type);
-      setPendingUsers((prev) => prev.filter((u) => u.id !== id && u.email !== id));
-      if (selectedPendingUser && (selectedPendingUser.id === id || selectedPendingUser.email === id)) {
-        setSelectedPendingUser(null);
+      setPendingUsers((prev) =>
+        prev.filter((u) => {
+          if (u.accountId && u.accountId === id) return false;
+          if (u.id === id && (!type || !u.accountType || u.accountType.toLowerCase().includes(type.toLowerCase()))) return false;
+          if (u.email === id && (!type || !u.accountType || u.accountType.toLowerCase().includes(type.toLowerCase()))) return false;
+          return true;
+        })
+      );
+      if (selectedPendingUser) {
+        const selMatches =
+          (selectedPendingUser.accountId && selectedPendingUser.accountId === id) ||
+          (selectedPendingUser.id === id && (!type || !selectedPendingUser.accountType || selectedPendingUser.accountType.toLowerCase().includes(type.toLowerCase()))) ||
+          (selectedPendingUser.email === id && (!type || !selectedPendingUser.accountType || selectedPendingUser.accountType.toLowerCase().includes(type.toLowerCase())));
+        if (selMatches) {
+          setSelectedPendingUser(null);
+        }
       }
       toast.success(`${type === "Payernt" ? "Payernt" : "Payrent"} user account "${name}" approved & verified.`);
       if (stats) {
@@ -237,9 +252,22 @@ export default function Dashboard() {
       setRejectingUserId(id);
       const reason = rejectReasonInput.trim() || "Information needs correction.";
       await usersService.rejectUser(id, reason, type);
-      setPendingUsers((prev) => prev.filter((u) => u.id !== id && u.email !== id));
-      if (selectedPendingUser && (selectedPendingUser.id === id || selectedPendingUser.email === id)) {
-        setSelectedPendingUser(null);
+      setPendingUsers((prev) =>
+        prev.filter((u) => {
+          if (u.accountId && u.accountId === id) return false;
+          if (u.id === id && (!type || !u.accountType || u.accountType.toLowerCase().includes(type.toLowerCase()))) return false;
+          if (u.email === id && (!type || !u.accountType || u.accountType.toLowerCase().includes(type.toLowerCase()))) return false;
+          return true;
+        })
+      );
+      if (selectedPendingUser) {
+        const selMatches =
+          (selectedPendingUser.accountId && selectedPendingUser.accountId === id) ||
+          (selectedPendingUser.id === id && (!type || !selectedPendingUser.accountType || selectedPendingUser.accountType.toLowerCase().includes(type.toLowerCase()))) ||
+          (selectedPendingUser.email === id && (!type || !selectedPendingUser.accountType || selectedPendingUser.accountType.toLowerCase().includes(type.toLowerCase())));
+        if (selMatches) {
+          setSelectedPendingUser(null);
+        }
       }
       setRejectModalTarget(null);
       setRejectReasonInput("");

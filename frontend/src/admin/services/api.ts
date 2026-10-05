@@ -8,6 +8,7 @@ export interface AdminUser {
   id: string;
   accountId?: string;
   fullName: string;
+  name?: string;
   email: string;
   phone: string;
   role: "admin" | "agent" | "user" | "customer" | "both" | "lender" | "vendor" | string;
