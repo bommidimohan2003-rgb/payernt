@@ -14,8 +14,8 @@ import {
   ShoppingBag,
   ArrowUpRight,
   ArrowDownRight,
-  Sparkles,
-  UploadCloud,
+  PackagePlus,
+  Package,
 } from "lucide-react";
 
 // ============================================================================
@@ -927,9 +927,12 @@ export function ProductSelection() {
                       <p className="text-xs sm:text-sm font-bold text-foreground uppercase tracking-wider">
                         LENDER
                       </p>
-                      <span className="p-1 rounded-lg bg-foreground/5 border border-border text-foreground/80">
-                        <UploadCloud className="w-3.5 h-3.5" />
-                      </span>
+                      <div
+                        className="relative w-7 h-7 rounded-full bg-foreground/5 border border-border flex items-center justify-center text-foreground/90 shrink-0"
+                        title="Upload Gear to Inventory"
+                      >
+                        <PackagePlus className="w-3.5 h-3.5" />
+                      </div>
                     </div>
 
                     <div className="text-[8px] sm:text-[9px] font-mono uppercase tracking-widest text-muted-foreground/75 mt-1">
@@ -973,9 +976,16 @@ export function ProductSelection() {
                       <p className="text-xs sm:text-sm font-bold text-foreground uppercase tracking-wider">
                         RENTER
                       </p>
-                      <span className="p-1 rounded-lg bg-foreground/5 border border-border text-foreground/80">
-                        <Sparkles className="w-3.5 h-3.5" />
-                      </span>
+                      {/* Bag with product being added indicator */}
+                      <div
+                        className="relative w-7 h-7 rounded-full bg-foreground/5 border border-border flex items-center justify-center text-foreground/90 shrink-0"
+                        title="Add Product to Rental Bag"
+                      >
+                        <ShoppingBag className="w-3.5 h-3.5" />
+                        <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-foreground text-background rounded-full flex items-center justify-center text-[7px] font-black leading-none">
+                          +
+                        </span>
+                      </div>
                     </div>
 
                     <div className="text-[8px] sm:text-[9px] font-mono uppercase tracking-widest text-muted-foreground/75 mt-1">
