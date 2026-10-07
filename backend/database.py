@@ -883,6 +883,66 @@ def init_db(force: bool = False):
     add_column_safely("message_attachments", "file_name VARCHAR(255) NULL")
     add_index_safely("message_attachments", "idx_ma_message_id", "message_id")
 
+    # Create devices table for Secure Device Identity / My Security QR
+    execute_query("""
+        CREATE TABLE IF NOT EXISTS devices (
+            id VARCHAR(255) PRIMARY KEY,
+            account_id VARCHAR(255) NOT NULL,
+            device_id VARCHAR(255) UNIQUE NOT NULL,
+            device_type VARCHAR(100) DEFAULT 'LAPTOP',
+            device_name VARCHAR(255) NOT NULL,
+            brand VARCHAR(100) NULL,
+            model VARCHAR(100) NULL,
+            serial_number VARCHAR(255) NULL,
+            security_id VARCHAR(255) UNIQUE NOT NULL,
+            qr_token VARCHAR(255) UNIQUE NOT NULL,
+            qr_token_hash VARCHAR(255) NULL,
+            qr_status VARCHAR(50) DEFAULT 'ACTIVE',
+            device_status VARCHAR(50) DEFAULT 'ACTIVE',
+            registered_at VARCHAR(100) NOT NULL,
+            updated_at VARCHAR(100) NULL,
+            last_verified_at VARCHAR(100) NULL,
+            notes TEXT NULL
+        )
+    """)
+    add_index_safely("devices", "idx_devices_account_id", "account_id")
+    add_index_safely("devices", "idx_devices_device_id", "device_id")
+    add_index_safely("devices", "idx_devices_security_id", "security_id")
+    add_index_safely("devices", "idx_devices_qr_token", "qr_token")
+    add_index_safely("devices", "idx_devices_status", "device_status")
+
+    # Create device_security_history table
+    execute_query("""
+        CREATE TABLE IF NOT EXISTS device_security_history (
+            id VARCHAR(255) PRIMARY KEY,
+            device_id VARCHAR(255) NOT NULL,
+            event_type VARCHAR(100) NOT NULL,
+            description TEXT NOT NULL,
+            actor_email VARCHAR(255) NULL,
+            ip_address VARCHAR(100) NULL,
+            created_at VARCHAR(100) NOT NULL
+        )
+    """)
+    add_index_safely("device_security_history", "idx_dsh_device_id", "device_id")
+    add_index_safely("device_security_history", "idx_dsh_created_at", "created_at")
+
+    # Create device_transfers table
+    execute_query("""
+        CREATE TABLE IF NOT EXISTS device_transfers (
+            id VARCHAR(255) PRIMARY KEY,
+            device_id VARCHAR(255) NOT NULL,
+            current_owner_email VARCHAR(255) NOT NULL,
+            target_owner_email VARCHAR(255) NOT NULL,
+            status VARCHAR(50) DEFAULT 'PENDING',
+            created_at VARCHAR(100) NOT NULL,
+            completed_at VARCHAR(100) NULL
+        )
+    """)
+    add_index_safely("device_transfers", "idx_dt_device_id", "device_id")
+    add_index_safely("device_transfers", "idx_dt_current_owner", "current_owner_email")
+    add_index_safely("device_transfers", "idx_dt_target_owner", "target_owner_email")
+    add_index_safely("device_transfers", "idx_dt_status", "status")
+
     # Seed initial data if tables are empty
     conn = get_db_connection()
     try:
@@ -897,6 +957,45 @@ def init_db(force: bool = False):
                     VALUES ('bommidimohan2003@gmail.com', '+91 8810519885', %s, 'Bommidi Mohan', 'admin', %s, %s, 'active', TRUE)
                 """, (hashed_pwd, created_at, created_at))
                 print("Seeded admin user bommidimohan2003@gmail.com into users table.")
+
+            # Seed default registered devices if none exist
+            cursor.execute("SELECT COUNT(*) as count FROM devices WHERE account_id = 'bommidimohan2003@gmail.com'")
+            if cursor.fetchone()["count"] == 0:
+                dev1_id = "DEV-LT-829174"
+                sec1_id = "PY-LT-7F42-9186"
+                tok1 = "pYnt_sec_tok_829174_7f42_9186_m3max"
+                tok1_hash = hashlib.sha256(tok1.encode()).hexdigest()
+                now_iso = dt.now(timezone.utc).isoformat()
+                cursor.execute("""
+                    INSERT INTO devices (id, account_id, device_id, device_type, device_name, brand, model, serial_number, security_id, qr_token, qr_token_hash, qr_status, device_status, registered_at, updated_at, notes)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, ("dev_mbp_16_m3max", "bommidimohan2003@gmail.com", dev1_id, "LAPTOP", "MacBook Pro 16\" M3 Max", "Apple", "MacBookPro18,1", "C02G1234MD6R", sec1_id, tok1, tok1_hash, "ACTIVE", "ACTIVE", now_iso, now_iso, "Tamper sticker positioned over primary chassis mounting screw."))
+
+                cursor.execute("""
+                    INSERT INTO device_security_history (id, device_id, event_type, description, actor_email, ip_address, created_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s), (%s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    f"dsh-{uuid.uuid4().hex[:10]}", dev1_id, "DEVICE_REGISTERED", "Device registered under paYent account bommidimohan2003@gmail.com", "bommidimohan2003@gmail.com", "127.0.0.1", now_iso,
+                    f"dsh-{uuid.uuid4().hex[:10]}", dev1_id, "QR_GENERATED", "Cryptographic Security QR generated and activated", "bommidimohan2003@gmail.com", "127.0.0.1", now_iso
+                ))
+
+                dev2_id = "DEV-LT-928170"
+                sec2_id = "PY-LT-3B19-4821"
+                tok2 = "pYnt_sec_tok_928170_3b19_4821_xps15"
+                tok2_hash = hashlib.sha256(tok2.encode()).hexdigest()
+                cursor.execute("""
+                    INSERT INTO devices (id, account_id, device_id, device_type, device_name, brand, model, serial_number, security_id, qr_token, qr_token_hash, qr_status, device_status, registered_at, updated_at, notes)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, ("dev_dell_xps_15", "bommidimohan2003@gmail.com", dev2_id, "LAPTOP", "Dell XPS 15 9530 (OLED)", "Dell", "XPS 9530", "8F92-K109", sec2_id, tok2, tok2_hash, "ACTIVE", "ACTIVE", now_iso, now_iso, "Anchored across center-rear chassis mounting screws."))
+
+                cursor.execute("""
+                    INSERT INTO device_security_history (id, device_id, event_type, description, actor_email, ip_address, created_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s), (%s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    f"dsh-{uuid.uuid4().hex[:10]}", dev2_id, "DEVICE_REGISTERED", "Device registered under paYent account bommidimohan2003@gmail.com", "bommidimohan2003@gmail.com", "127.0.0.1", now_iso,
+                    f"dsh-{uuid.uuid4().hex[:10]}", dev2_id, "QR_GENERATED", "Cryptographic Security QR generated and activated", "bommidimohan2003@gmail.com", "127.0.0.1", now_iso
+                ))
+                print("Seeded registered laptop devices for bommidimohan2003@gmail.com.")
 
         conn.commit()
     finally:
@@ -963,6 +1062,86 @@ MOCK_CONVERSATION_MEMBERS = {}
 MOCK_MESSAGES = {}
 MOCK_MESSAGE_ATTACHMENTS = {}
 MOCK_PASSWORD_RESET_TOKENS = {}
+MOCK_DEVICES = {
+    "DEV-LT-829174": {
+        "id": "dev_mbp_16_m3max",
+        "account_id": "bommidimohan2003@gmail.com",
+        "device_id": "DEV-LT-829174",
+        "device_type": "LAPTOP",
+        "device_name": "MacBook Pro 16\" M3 Max",
+        "brand": "Apple",
+        "model": "MacBookPro18,1",
+        "serial_number": "C02G1234MD6R",
+        "security_id": "PY-LT-7F42-9186",
+        "qr_token": "pYnt_sec_tok_829174_7f42_9186_m3max",
+        "qr_token_hash": hashlib.sha256("pYnt_sec_tok_829174_7f42_9186_m3max".encode()).hexdigest(),
+        "qr_status": "ACTIVE",
+        "device_status": "ACTIVE",
+        "registered_at": "2026-03-15T10:30:00.000Z",
+        "updated_at": "2026-03-15T10:30:00.000Z",
+        "last_verified_at": None,
+        "notes": "Tamper sticker positioned over primary chassis mounting screw."
+    },
+    "DEV-LT-928170": {
+        "id": "dev_dell_xps_15",
+        "account_id": "bommidimohan2003@gmail.com",
+        "device_id": "DEV-LT-928170",
+        "device_type": "LAPTOP",
+        "device_name": "Dell XPS 15 9530 (OLED)",
+        "brand": "Dell",
+        "model": "XPS 9530",
+        "serial_number": "8F92-K109",
+        "security_id": "PY-LT-3B19-4821",
+        "qr_token": "pYnt_sec_tok_928170_3b19_4821_xps15",
+        "qr_token_hash": hashlib.sha256("pYnt_sec_tok_928170_3b19_4821_xps15".encode()).hexdigest(),
+        "qr_status": "ACTIVE",
+        "device_status": "ACTIVE",
+        "registered_at": "2026-03-20T14:15:00.000Z",
+        "updated_at": "2026-03-20T14:15:00.000Z",
+        "last_verified_at": None,
+        "notes": "Anchored across center-rear chassis mounting screws."
+    }
+}
+MOCK_DEVICE_SECURITY_HISTORY = [
+    {
+        "id": "dsh_init_1",
+        "device_id": "DEV-LT-829174",
+        "event_type": "DEVICE_REGISTERED",
+        "description": "Device registered under paYent account bommidimohan2003@gmail.com",
+        "actor_email": "bommidimohan2003@gmail.com",
+        "ip_address": "127.0.0.1",
+        "created_at": "2026-03-15T10:30:00.000Z"
+    },
+    {
+        "id": "dsh_init_2",
+        "device_id": "DEV-LT-829174",
+        "event_type": "QR_GENERATED",
+        "description": "Cryptographic Security QR generated and activated",
+        "actor_email": "bommidimohan2003@gmail.com",
+        "ip_address": "127.0.0.1",
+        "created_at": "2026-03-15T10:30:00.000Z"
+    },
+    {
+        "id": "dsh_init_3",
+        "device_id": "DEV-LT-928170",
+        "event_type": "DEVICE_REGISTERED",
+        "description": "Device registered under paYent account bommidimohan2003@gmail.com",
+        "actor_email": "bommidimohan2003@gmail.com",
+        "ip_address": "127.0.0.1",
+        "created_at": "2026-03-20T14:15:00.000Z"
+    },
+    {
+        "id": "dsh_init_4",
+        "device_id": "DEV-LT-928170",
+        "event_type": "QR_GENERATED",
+        "description": "Cryptographic Security QR generated and activated",
+        "actor_email": "bommidimohan2003@gmail.com",
+        "ip_address": "127.0.0.1",
+        "created_at": "2026-03-20T14:15:00.000Z"
+    }
+]
+MOCK_DEVICE_TRANSFERS = []
+
 
 _user_cache = {}
 
@@ -4945,4 +5124,504 @@ def get_total_unread_messages_count(user_email: str) -> int:
     # Fallback to counting in-memory
     convs = get_user_conversations(clean_user)
     return sum(c.get("unreadCount", 0) for c in convs)
+
+# =========================================================================
+# SECURE DEVICE IDENTITY & MY SECURITY QR FUNCTIONS
+# =========================================================================
+
+def generate_device_identifiers(device_type: str = "LAPTOP") -> Tuple[str, str, str]:
+    """
+    Generates cryptographically random non-sequential identifiers:
+    - device_id: DEV-LT-XXXXXX
+    - security_id: PY-LT-XXXX-XXXX
+    - qr_token: pYnt_sec_tok_...
+    """
+    prefix = "LT" if device_type.upper() in ("LAPTOP", "MACBOOK", "ULTRABOOK") else "DV"
+    rand_dev = secrets.token_hex(3).upper()
+    device_id = f"DEV-{prefix}-{rand_dev}"
+    
+    sec_part1 = secrets.token_hex(2).upper()
+    sec_part2 = secrets.token_hex(2).upper()
+    security_id = f"PY-{prefix}-{sec_part1}-{sec_part2}"
+    
+    qr_token = f"pYnt_sec_{secrets.token_urlsafe(28)}"
+    return device_id, security_id, qr_token
+
+def record_device_security_event(device_id: str, event_type: str, description: str,
+                                 actor_email: Optional[str] = None, ip_address: Optional[str] = None) -> dict:
+    """
+    Records an immutable audit event for a device in MySQL and in-memory history.
+    """
+    event_id = f"dsh-{uuid.uuid4().hex[:12]}"
+    now_iso = dt.now(timezone.utc).isoformat()
+    clean_dev = (device_id or "").strip()
+    clean_actor = (actor_email or "").strip().lower() if actor_email else "system"
+    clean_ip = (ip_address or "").strip() or "127.0.0.1"
+
+    execute_query("""
+        INSERT INTO device_security_history (id, device_id, event_type, description, actor_email, ip_address, created_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+    """, (event_id, clean_dev, event_type, description, clean_actor, clean_ip, now_iso))
+
+    event_record = {
+        "id": event_id,
+        "device_id": clean_dev,
+        "event_type": event_type,
+        "description": description,
+        "actor_email": clean_actor,
+        "ip_address": clean_ip,
+        "created_at": now_iso
+    }
+    MOCK_DEVICE_SECURITY_HISTORY.insert(0, event_record)
+    return event_record
+
+def get_devices_by_account(account_id: str) -> List[dict]:
+    """
+    Retrieves all registered devices belonging to a user account.
+    """
+    clean_email = (account_id or "").strip().lower()
+    if not clean_email:
+        return []
+
+    try:
+        rows = fetch_all("""
+            SELECT * FROM devices 
+            WHERE LOWER(account_id) = %s 
+            ORDER BY registered_at DESC
+        """, (clean_email,))
+        if rows:
+            return rows
+    except Exception as e:
+        logger.warning(f"DB read error in get_devices_by_account: {e}")
+
+    # Fallback to in-memory
+    return [d for d in MOCK_DEVICES.values() if d.get("account_id", "").lower() == clean_email]
+
+def get_device_by_id(device_id: str) -> Optional[dict]:
+    """
+    Retrieves a single device by its device_id or primary ID.
+    """
+    clean_id = (device_id or "").strip()
+    if not clean_id:
+        return None
+
+    try:
+        row = fetch_one("""
+            SELECT * FROM devices 
+            WHERE device_id = %s OR id = %s
+        """, (clean_id, clean_id))
+        if row:
+            return row
+    except Exception as e:
+        logger.warning(f"DB read error in get_device_by_id: {e}")
+
+    # Fallback to in-memory
+    for dev in MOCK_DEVICES.values():
+        if dev.get("device_id") == clean_id or dev.get("id") == clean_id:
+            return dev
+    return None
+
+def get_device_by_security_id(security_id: str) -> Optional[dict]:
+    clean_sec = (security_id or "").strip()
+    if not clean_sec:
+        return None
+
+    try:
+        row = fetch_one("SELECT * FROM devices WHERE security_id = %s", (clean_sec,))
+        if row:
+            return row
+    except Exception as e:
+        logger.warning(f"DB read error in get_device_by_security_id: {e}")
+
+    for dev in MOCK_DEVICES.values():
+        if dev.get("security_id") == clean_sec:
+            return dev
+    return None
+
+def get_device_by_qr_token(qr_token: str) -> Optional[dict]:
+    """
+    Public resolution of a device by its cryptographic QR token.
+    """
+    clean_tok = (qr_token or "").strip()
+    if not clean_tok:
+        return None
+
+    try:
+        row = fetch_one("SELECT * FROM devices WHERE qr_token = %s", (clean_tok,))
+        if row:
+            return row
+    except Exception as e:
+        logger.warning(f"DB read error in get_device_by_qr_token: {e}")
+
+    for dev in MOCK_DEVICES.values():
+        if dev.get("qr_token") == clean_tok:
+            return dev
+    return None
+
+def create_registered_device(account_id: str, device_name: str, brand: str = "Apple",
+                             model: str = "", serial_number: str = "",
+                             device_type: str = "LAPTOP", notes: str = "",
+                             ip_address: Optional[str] = None) -> dict:
+    """
+    Registers a new device with unique cryptographic tokens and initial security audit log.
+    """
+    clean_account = (account_id or "").strip().lower()
+    clean_name = (device_name or "").strip()
+    clean_brand = (brand or "Other").strip()
+    clean_model = (model or "").strip()
+    clean_serial = (serial_number or "").strip()
+    clean_type = (device_type or "LAPTOP").strip().upper()
+    now_iso = dt.now(timezone.utc).isoformat()
+    internal_id = f"dev_{uuid.uuid4().hex[:12]}"
+
+    device_id, security_id, qr_token = generate_device_identifiers(clean_type)
+    qr_token_hash = hashlib.sha256(qr_token.encode()).hexdigest()
+
+    execute_query("""
+        INSERT INTO devices (id, account_id, device_id, device_type, device_name, brand, model, serial_number, security_id, qr_token, qr_token_hash, qr_status, device_status, registered_at, updated_at, notes)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'ACTIVE', 'ACTIVE', %s, %s, %s)
+    """, (internal_id, clean_account, device_id, clean_type, clean_name, clean_brand, clean_model, clean_serial, security_id, qr_token, qr_token_hash, now_iso, now_iso, notes))
+
+    device_obj = {
+        "id": internal_id,
+        "account_id": clean_account,
+        "device_id": device_id,
+        "device_type": clean_type,
+        "device_name": clean_name,
+        "brand": clean_brand,
+        "model": clean_model,
+        "serial_number": clean_serial,
+        "security_id": security_id,
+        "qr_token": qr_token,
+        "qr_token_hash": qr_token_hash,
+        "qr_status": "ACTIVE",
+        "device_status": "ACTIVE",
+        "registered_at": now_iso,
+        "updated_at": now_iso,
+        "last_verified_at": None,
+        "notes": notes
+    }
+    MOCK_DEVICES[device_id] = device_obj
+
+    # Record registration event
+    record_device_security_event(
+        device_id=device_id,
+        event_type="DEVICE_REGISTERED",
+        description=f"Device '{clean_name}' registered under account {clean_account}",
+        actor_email=clean_account,
+        ip_address=ip_address
+    )
+    record_device_security_event(
+        device_id=device_id,
+        event_type="QR_GENERATED",
+        description="Initial cryptographic Security QR generated and activated",
+        actor_email=clean_account,
+        ip_address=ip_address
+    )
+
+    return device_obj
+
+def update_device_status_db(device_id: str, device_status: str, qr_status: Optional[str] = None) -> bool:
+    """
+    Updates status of a registered device (e.g. ACTIVE, REPORTED_LOST, REPORTED_STOLEN, SUSPENDED).
+    """
+    clean_id = (device_id or "").strip()
+    now_iso = dt.now(timezone.utc).isoformat()
+
+    fields = ["device_status = %s", "updated_at = %s"]
+    params = [device_status, now_iso]
+
+    if qr_status:
+        fields.append("qr_status = %s")
+        params.append(qr_status)
+
+    params.extend([clean_id, clean_id])
+    execute_query(f"UPDATE devices SET {', '.join(fields)} WHERE device_id = %s OR id = %s", tuple(params))
+
+
+    # Update in-memory
+    for dev in MOCK_DEVICES.values():
+        if dev.get("device_id") == clean_id or dev.get("id") == clean_id:
+            dev["device_status"] = device_status
+            if qr_status:
+                dev["qr_status"] = qr_status
+            dev["updated_at"] = now_iso
+            return True
+    return True
+
+def regenerate_device_qr_db(device_id: str) -> Optional[dict]:
+    """
+    Invalidates existing QR and generates a fresh cryptographic token & Security ID.
+    """
+    clean_id = (device_id or "").strip()
+    dev = get_device_by_id(clean_id)
+    if not dev:
+        return None
+
+    device_type = dev.get("device_type", "LAPTOP")
+    _, new_security_id, new_qr_token = generate_device_identifiers(device_type)
+    new_hash = hashlib.sha256(new_qr_token.encode()).hexdigest()
+    now_iso = dt.now(timezone.utc).isoformat()
+
+    execute_query("""
+        UPDATE devices 
+        SET security_id = %s, qr_token = %s, qr_token_hash = %s, qr_status = 'ACTIVE', updated_at = %s
+        WHERE device_id = %s OR id = %s
+    """, (new_security_id, new_qr_token, new_hash, now_iso, clean_id, clean_id))
+
+    dev["security_id"] = new_security_id
+    dev["qr_token"] = new_qr_token
+    dev["qr_token_hash"] = new_hash
+    dev["qr_status"] = "ACTIVE"
+    dev["updated_at"] = now_iso
+
+    return dev
+
+def touch_device_last_verified(device_id: str, ip_address: Optional[str] = None):
+    """
+    Updates last_verified_at timestamp when public QR verification scan occurs.
+    """
+    clean_id = (device_id or "").strip()
+    now_iso = dt.now(timezone.utc).isoformat()
+    execute_query("UPDATE devices SET last_verified_at = %s WHERE device_id = %s OR id = %s", (now_iso, clean_id, clean_id))
+    for dev in MOCK_DEVICES.values():
+        if dev.get("device_id") == clean_id or dev.get("id") == clean_id:
+            dev["last_verified_at"] = now_iso
+            break
+    record_device_security_event(
+        device_id=clean_id,
+        event_type="QR_VERIFIED",
+        description="Public Security QR code scanned and verified",
+        actor_email="public_verifier",
+        ip_address=ip_address
+    )
+
+def get_device_security_history_db(device_id: Optional[str] = None, account_id: Optional[str] = None) -> List[dict]:
+    """
+    Retrieves chronological security event audit logs.
+    """
+    clean_dev = (device_id or "").strip()
+    clean_acc = (account_id or "").strip().lower()
+
+    if clean_dev:
+        try:
+            rows = fetch_all("""
+                SELECT * FROM device_security_history 
+                WHERE device_id = %s 
+                ORDER BY created_at DESC
+            """, (clean_dev,))
+            if rows:
+                return rows
+        except Exception as e:
+            logger.warning(f"DB read error in get_device_security_history_db: {e}")
+        return [h for h in MOCK_DEVICE_SECURITY_HISTORY if h.get("device_id") == clean_dev]
+
+    if clean_acc:
+        # Get all devices for this account then fetch history
+        devs = get_devices_by_account(clean_acc)
+        dev_ids = [d.get("device_id") for d in devs if d.get("device_id")]
+        if not dev_ids:
+            return []
+        try:
+            placeholders = ", ".join(["%s"] * len(dev_ids))
+            rows = fetch_all(f"""
+                SELECT * FROM device_security_history 
+                WHERE device_id IN ({placeholders})
+                ORDER BY created_at DESC
+            """, tuple(dev_ids))
+            if rows:
+                return rows
+        except Exception as e:
+            logger.warning(f"DB read error in account security history: {e}")
+        return [h for h in MOCK_DEVICE_SECURITY_HISTORY if h.get("device_id") in dev_ids]
+
+    return MOCK_DEVICE_SECURITY_HISTORY
+
+def create_device_transfer_db(device_id: str, current_owner: str, target_owner: str) -> dict:
+    """
+    Initiates a pending ownership transfer for a registered device.
+    """
+    transfer_id = f"dt-{uuid.uuid4().hex[:12]}"
+    now_iso = dt.now(timezone.utc).isoformat()
+    clean_dev = (device_id or "").strip()
+    clean_cur = (current_owner or "").strip().lower()
+    clean_tar = (target_owner or "").strip().lower()
+
+    execute_query("""
+        INSERT INTO device_transfers (id, device_id, current_owner_email, target_owner_email, status, created_at)
+        VALUES (%s, %s, %s, %s, 'PENDING', %s)
+    """, (transfer_id, clean_dev, clean_cur, clean_tar, now_iso))
+
+    update_device_status_db(clean_dev, "TRANSFER_PENDING", qr_status="TRANSFER_PENDING")
+
+    record_device_security_event(
+        device_id=clean_dev,
+        event_type="OWNERSHIP_TRANSFER_REQUESTED",
+        description=f"Ownership transfer initiated from {clean_cur} to {clean_tar}",
+        actor_email=clean_cur
+    )
+
+    t_record = {
+        "id": transfer_id,
+        "device_id": clean_dev,
+        "current_owner_email": clean_cur,
+        "target_owner_email": clean_tar,
+        "status": "PENDING",
+        "created_at": now_iso,
+        "completed_at": None
+    }
+    MOCK_DEVICE_TRANSFERS.insert(0, t_record)
+    return t_record
+
+def get_pending_transfers_db(email: str) -> dict:
+    """
+    Returns incoming and outgoing pending device transfers.
+    """
+    clean_email = (email or "").strip().lower()
+    outgoing = None
+    incoming = None
+    try:
+        outgoing = fetch_all("""
+            SELECT t.*, d.device_name, d.security_id, d.brand, d.model 
+            FROM device_transfers t
+            LEFT JOIN devices d ON d.device_id = t.device_id
+            WHERE LOWER(t.current_owner_email) = %s AND t.status = 'PENDING'
+            ORDER BY t.created_at DESC
+        """, (clean_email,))
+        incoming = fetch_all("""
+            SELECT t.*, d.device_name, d.security_id, d.brand, d.model 
+            FROM device_transfers t
+            LEFT JOIN devices d ON d.device_id = t.device_id
+            WHERE LOWER(t.target_owner_email) = %s AND t.status = 'PENDING'
+            ORDER BY t.created_at DESC
+        """, (clean_email,))
+    except Exception as e:
+        logger.warning(f"DB read error in get_pending_transfers_db: {e}")
+
+    if not outgoing and not incoming:
+        out_mock = [t for t in MOCK_DEVICE_TRANSFERS if t.get("current_owner_email", "").lower() == clean_email and t.get("status") == "PENDING"]
+        in_mock = [t for t in MOCK_DEVICE_TRANSFERS if t.get("target_owner_email", "").lower() == clean_email and t.get("status") == "PENDING"]
+        return {"outgoing": out_mock, "incoming": in_mock}
+
+    return {
+        "outgoing": outgoing or [],
+        "incoming": incoming or []
+    }
+
+
+
+def accept_device_transfer_db(transfer_id: str, target_email: str) -> bool:
+    """
+    Target owner accepts ownership transfer. Device ownership updates to new account.
+    """
+    clean_tid = (transfer_id or "").strip()
+    clean_target = (target_email or "").strip().lower()
+    now_iso = dt.now(timezone.utc).isoformat()
+
+    transfer = fetch_one("SELECT * FROM device_transfers WHERE id = %s", (clean_tid,))
+    if not transfer:
+        for t in MOCK_DEVICE_TRANSFERS:
+            if t.get("id") == clean_tid:
+                transfer = t
+                break
+
+    if not transfer or transfer.get("target_owner_email", "").lower() != clean_target or transfer.get("status") != "PENDING":
+        return False
+
+    device_id = transfer.get("device_id")
+    prev_owner = transfer.get("current_owner_email")
+
+    execute_query("""
+        UPDATE device_transfers 
+        SET status = 'ACCEPTED', completed_at = %s 
+        WHERE id = %s
+    """, (now_iso, clean_tid))
+
+    execute_query("""
+        UPDATE devices 
+        SET account_id = %s, device_status = 'ACTIVE', qr_status = 'ACTIVE', updated_at = %s 
+        WHERE device_id = %s OR id = %s
+    """, (clean_target, now_iso, device_id, device_id))
+
+    # Update in-memory
+    transfer["status"] = "ACCEPTED"
+    transfer["completed_at"] = now_iso
+    for dev in MOCK_DEVICES.values():
+        if dev.get("device_id") == device_id or dev.get("id") == device_id:
+            dev["account_id"] = clean_target
+            dev["device_status"] = "ACTIVE"
+            dev["qr_status"] = "ACTIVE"
+            dev["updated_at"] = now_iso
+
+    record_device_security_event(
+        device_id=device_id,
+        event_type="OWNERSHIP_TRANSFER_COMPLETED",
+        description=f"Ownership transfer completed from {prev_owner} to {clean_target}",
+        actor_email=clean_target
+    )
+    return True
+
+def cancel_device_transfer_db(transfer_id: str, owner_email: str) -> bool:
+    """
+    Cancels a pending ownership transfer.
+    """
+    clean_tid = (transfer_id or "").strip()
+    clean_owner = (owner_email or "").strip().lower()
+    now_iso = dt.now(timezone.utc).isoformat()
+
+    transfer = fetch_one("SELECT * FROM device_transfers WHERE id = %s", (clean_tid,))
+    if not transfer:
+        for t in MOCK_DEVICE_TRANSFERS:
+            if t.get("id") == clean_tid:
+                transfer = t
+                break
+
+    if not transfer or (transfer.get("current_owner_email", "").lower() != clean_owner and transfer.get("target_owner_email", "").lower() != clean_owner) or transfer.get("status") != "PENDING":
+        return False
+
+    device_id = transfer.get("device_id")
+
+    execute_query("UPDATE device_transfers SET status = 'CANCELLED', completed_at = %s WHERE id = %s", (now_iso, clean_tid))
+    execute_query("UPDATE devices SET device_status = 'ACTIVE', qr_status = 'ACTIVE', updated_at = %s WHERE device_id = %s OR id = %s", (now_iso, device_id, device_id))
+
+    transfer["status"] = "CANCELLED"
+    transfer["completed_at"] = now_iso
+    for dev in MOCK_DEVICES.values():
+        if dev.get("device_id") == device_id or dev.get("id") == device_id:
+            dev["device_status"] = "ACTIVE"
+            dev["qr_status"] = "ACTIVE"
+            dev["updated_at"] = now_iso
+
+    record_device_security_event(
+        device_id=device_id,
+        event_type="OWNERSHIP_TRANSFER_CANCELLED",
+        description=f"Ownership transfer cancelled by {clean_owner}",
+        actor_email=clean_owner
+    )
+    return True
+
+def get_all_devices_admin_db() -> List[dict]:
+    """
+    Admin listing of all registered devices across the platform.
+    """
+    try:
+        rows = fetch_all("""
+            SELECT id, account_id, device_id, device_type, device_name, brand, model, serial_number, security_id, qr_status, device_status, registered_at, updated_at, last_verified_at, notes
+            FROM devices 
+            ORDER BY registered_at DESC
+        """)
+        if rows:
+            return rows
+    except Exception as e:
+        logger.warning(f"DB read error in get_all_devices_admin_db: {e}")
+
+    # Return safe mock list
+    safe_list = []
+    for d in MOCK_DEVICES.values():
+        safe_copy = dict(d)
+        safe_copy.pop("qr_token", None)
+        safe_copy.pop("qr_token_hash", None)
+        safe_list.append(safe_copy)
+    return safe_list
+
 

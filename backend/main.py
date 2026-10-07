@@ -199,8 +199,27 @@ from database import (
     update_api_key_db,
     delete_api_key_db,
     touch_api_key_last_used_db,
-    MOCK_API_KEYS
+    MOCK_API_KEYS,
+    get_devices_by_account,
+    get_device_by_id,
+    get_device_by_security_id,
+    get_device_by_qr_token,
+    create_registered_device,
+    update_device_status_db,
+    regenerate_device_qr_db,
+    record_device_security_event,
+    get_device_security_history_db,
+    create_device_transfer_db,
+    get_pending_transfers_db,
+    accept_device_transfer_db,
+    cancel_device_transfer_db,
+    get_all_devices_admin_db,
+    touch_device_last_verified,
+    MOCK_DEVICES,
+    MOCK_DEVICE_SECURITY_HISTORY,
+    MOCK_DEVICE_TRANSFERS
 )
+
 from recommendations_ml import check_data_sufficiency, compute_and_save_item_similarities
 from search_ml import ml_search_engine
 from auth import (
@@ -10055,6 +10074,453 @@ def get_search_stats():
         ml_search_engine.build_index(catalog)
 
     popular_queries = get_popular_search_queries(limit=6)
+    return {
+        "success": True,
+        "total_indexed": ml_search_engine.total_documents,
+        "popular_queries": popular_queries
+    }
+
+# ===========================================================================
+# SECURE DEVICE IDENTITY & MY SECURITY QR ENDPOINTS
+# ===========================================================================
+
+class DeviceRegisterSchema(BaseModel):
+    deviceName: str
+    brand: Optional[str] = "Apple"
+    model: Optional[str] = ""
+    serialNumber: Optional[str] = ""
+    deviceType: Optional[str] = "LAPTOP"
+    notes: Optional[str] = ""
+
+class DevicePasswordVerifySchema(BaseModel):
+    password: str
+
+class DeviceActionWithPasswordSchema(BaseModel):
+    password: str
+    notes: Optional[str] = ""
+
+class DeviceTransferRequestSchema(BaseModel):
+    targetEmail: EmailStr
+    password: str
+
+class AdminDeviceStatusUpdateSchema(BaseModel):
+    deviceStatus: str
+    qrStatus: Optional[str] = None
+    notes: Optional[str] = None
+
+def _sanitize_device_for_user(dev: dict, include_qr: bool = False) -> dict:
+    """Helper to return clean camelCase device data and withhold raw QR secret unless verified."""
+    res = {
+        "id": dev.get("id"),
+        "accountId": dev.get("account_id"),
+        "deviceId": dev.get("device_id"),
+        "deviceType": dev.get("device_type", "LAPTOP"),
+        "deviceName": dev.get("device_name"),
+        "brand": dev.get("brand", ""),
+        "model": dev.get("model", ""),
+        "serialNumber": dev.get("serial_number", ""),
+        "securityId": dev.get("security_id"),
+        "qrStatus": dev.get("qr_status", "ACTIVE"),
+        "deviceStatus": dev.get("device_status", "ACTIVE"),
+        "registeredAt": dev.get("registered_at"),
+        "updatedAt": dev.get("updated_at"),
+        "lastVerifiedAt": dev.get("last_verified_at"),
+        "notes": dev.get("notes", "")
+    }
+    if include_qr:
+        res["qrToken"] = dev.get("qr_token")
+        res["qrUrl"] = f"/verify/device/{dev.get('qr_token')}"
+    return res
+
+@app.get("/api/devices")
+def get_user_registered_devices(current_user_email: str = Depends(get_current_user_email)):
+    """
+    GET /api/devices
+    List all registered devices belonging to the authenticated user.
+    """
+    devices = get_devices_by_account(current_user_email)
+    return {
+        "success": True,
+        "devices": [_sanitize_device_for_user(d, include_qr=False) for d in devices]
+    }
+
+@app.post("/api/devices")
+def register_new_device(data: DeviceRegisterSchema, request: Request, current_user_email: str = Depends(get_current_user_email)):
+    """
+    POST /api/devices
+    Registers a new laptop device under the authenticated account.
+    """
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    new_dev = create_registered_device(
+        account_id=current_user_email,
+        device_name=data.deviceName,
+        brand=data.brand or "Other",
+        model=data.model or "",
+        serial_number=data.serialNumber or "",
+        device_type=data.deviceType or "LAPTOP",
+        notes=data.notes or "",
+        ip_address=client_ip
+    )
+    return {
+        "success": True,
+        "message": "Device successfully registered with unique Security QR identity.",
+        "device": _sanitize_device_for_user(new_dev, include_qr=False)
+    }
+
+@app.get("/api/devices/{device_id}")
+def get_device_details(device_id: str, current_user_email: str = Depends(get_current_user_email)):
+    """
+    GET /api/devices/{device_id}
+    Retrieves metadata for a registered device (requires user ownership).
+    """
+    dev = get_device_by_id(device_id)
+    if not dev or dev.get("account_id", "").lower() != current_user_email.lower():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found.")
+    return {
+        "success": True,
+        "device": _sanitize_device_for_user(dev, include_qr=False)
+    }
+
+@app.post("/api/devices/{device_id}/verify-password")
+def verify_device_password_and_reveal_qr(device_id: str, data: DevicePasswordVerifySchema,
+                                         request: Request, current_user_email: str = Depends(get_current_user_email)):
+    """
+    POST /api/devices/{device_id}/verify-password
+    PASSWORD-ONLY SECURITY:
+    Authenticates the user's account password server-side before revealing the cryptographic Security QR.
+    Rate-limits failed password attempts to protect device security.
+    """
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    rate_key = f"qr_reveal_pwd:{current_user_email.lower()}"
+
+    is_locked, lock_secs = record_failed_auth_attempt(rate_key, max_attempts=5, lock_duration_secs=900)
+    if is_locked:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Too many incorrect password attempts. Please wait {lock_secs // 60 + 1} minutes before trying again."
+        )
+
+    user = get_user(current_user_email)
+    if not user or not user.get("password_hash") or not verify_password(data.password, user["password_hash"]):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect password. Please try again."
+        )
+
+    clear_failed_auth_attempts(rate_key)
+
+    dev = get_device_by_id(device_id)
+    if not dev or dev.get("account_id", "").lower() != current_user_email.lower():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found.")
+
+    # Record security audit event
+    record_device_security_event(
+        device_id=dev.get("device_id", device_id),
+        event_type="QR_REVEALED",
+        description="Security QR revealed after successful account password verification",
+        actor_email=current_user_email,
+        ip_address=client_ip
+    )
+
+    return {
+        "success": True,
+        "qrToken": dev.get("qr_token"),
+        "qrUrl": f"/verify/device/{dev.get('qr_token')}",
+        "securityId": dev.get("security_id"),
+        "device": _sanitize_device_for_user(dev, include_qr=True)
+    }
+
+@app.post("/api/devices/{device_id}/regenerate-qr")
+def regenerate_device_qr(device_id: str, data: DevicePasswordVerifySchema,
+                         request: Request, current_user_email: str = Depends(get_current_user_email)):
+    """
+    POST /api/devices/{device_id}/regenerate-qr
+    Regenerates a fresh cryptographic QR token & Security ID after password verification.
+    """
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    user = get_user(current_user_email)
+    if not user or not user.get("password_hash") or not verify_password(data.password, user["password_hash"]):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect password. Please try again.")
+
+    dev = get_device_by_id(device_id)
+    if not dev or dev.get("account_id", "").lower() != current_user_email.lower():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found.")
+
+    updated_dev = regenerate_device_qr_db(device_id)
+    if not updated_dev:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to regenerate QR token.")
+
+    record_device_security_event(
+        device_id=dev.get("device_id", device_id),
+        event_type="QR_REGENERATED",
+        description="Security QR regenerated; previous token invalidated and new security identity assigned",
+        actor_email=current_user_email,
+        ip_address=client_ip
+    )
+
+    return {
+        "success": True,
+        "message": "New Security QR generated successfully.",
+        "qrToken": updated_dev.get("qr_token"),
+        "qrUrl": f"/verify/device/{updated_dev.get('qr_token')}",
+        "securityId": updated_dev.get("security_id"),
+        "device": _sanitize_device_for_user(updated_dev, include_qr=True)
+    }
+
+@app.post("/api/devices/{device_id}/report-lost")
+def report_device_lost(device_id: str, data: DeviceActionWithPasswordSchema,
+                       request: Request, current_user_email: str = Depends(get_current_user_email)):
+    """
+    POST /api/devices/{device_id}/report-lost
+    Reports device as lost after password verification.
+    """
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    user = get_user(current_user_email)
+    if not user or not user.get("password_hash") or not verify_password(data.password, user["password_hash"]):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect password. Please try again.")
+
+    dev = get_device_by_id(device_id)
+    if not dev or dev.get("account_id", "").lower() != current_user_email.lower():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found.")
+
+    update_device_status_db(device_id, "REPORTED_LOST")
+    desc = f"Device reported lost by owner. Notes: {data.notes}" if data.notes else "Device reported lost by owner"
+    record_device_security_event(
+        device_id=dev.get("device_id", device_id),
+        event_type="DEVICE_REPORTED_LOST",
+        description=desc,
+        actor_email=current_user_email,
+        ip_address=client_ip
+    )
+    return {"success": True, "message": "Device status updated to REPORTED LOST."}
+
+@app.post("/api/devices/{device_id}/report-stolen")
+def report_device_stolen(device_id: str, data: DeviceActionWithPasswordSchema,
+                         request: Request, current_user_email: str = Depends(get_current_user_email)):
+    """
+    POST /api/devices/{device_id}/report-stolen
+    Reports device as stolen after password verification.
+    """
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    user = get_user(current_user_email)
+    if not user or not user.get("password_hash") or not verify_password(data.password, user["password_hash"]):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect password. Please try again.")
+
+    dev = get_device_by_id(device_id)
+    if not dev or dev.get("account_id", "").lower() != current_user_email.lower():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found.")
+
+    update_device_status_db(device_id, "REPORTED_STOLEN")
+    desc = f"Device reported stolen by owner. Notes: {data.notes}" if data.notes else "Device reported stolen by owner"
+    record_device_security_event(
+        device_id=dev.get("device_id", device_id),
+        event_type="DEVICE_REPORTED_STOLEN",
+        description=desc,
+        actor_email=current_user_email,
+        ip_address=client_ip
+    )
+    return {"success": True, "message": "Device status updated to REPORTED STOLEN."}
+
+@app.post("/api/devices/{device_id}/restore")
+def restore_device_status(device_id: str, data: DevicePasswordVerifySchema,
+                          request: Request, current_user_email: str = Depends(get_current_user_email)):
+    """
+    POST /api/devices/{device_id}/restore
+    Restores device status back to ACTIVE after password verification.
+    """
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    user = get_user(current_user_email)
+    if not user or not user.get("password_hash") or not verify_password(data.password, user["password_hash"]):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect password. Please try again.")
+
+    dev = get_device_by_id(device_id)
+    if not dev or dev.get("account_id", "").lower() != current_user_email.lower():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found.")
+
+    update_device_status_db(device_id, "ACTIVE", qr_status="ACTIVE")
+    record_device_security_event(
+        device_id=dev.get("device_id", device_id),
+        event_type="DEVICE_RESTORED",
+        description="Device status restored to ACTIVE by owner",
+        actor_email=current_user_email,
+        ip_address=client_ip
+    )
+    return {"success": True, "message": "Device restored to ACTIVE status."}
+
+@app.get("/api/devices/{device_id}/security-history")
+def get_device_history(device_id: str, current_user_email: str = Depends(get_current_user_email)):
+    """
+    GET /api/devices/{device_id}/security-history
+    Audit timeline for a single registered device.
+    """
+    dev = get_device_by_id(device_id)
+    if not dev or dev.get("account_id", "").lower() != current_user_email.lower():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found.")
+    history = get_device_security_history_db(device_id=dev.get("device_id", device_id))
+    return {"success": True, "history": history}
+
+@app.get("/api/devices-security-history")
+def get_all_user_devices_history(current_user_email: str = Depends(get_current_user_email)):
+    """
+    GET /api/devices-security-history
+    Full security audit timeline across all devices owned by the user.
+    """
+    history = get_device_security_history_db(account_id=current_user_email)
+    return {"success": True, "history": history}
+
+@app.post("/api/devices/{device_id}/transfer")
+def initiate_device_transfer(device_id: str, data: DeviceTransferRequestSchema,
+                             current_user_email: str = Depends(get_current_user_email)):
+    """
+    POST /api/devices/{device_id}/transfer
+    Initiate ownership transfer to another user.
+    """
+    user = get_user(current_user_email)
+    if not user or not user.get("password_hash") or not verify_password(data.password, user["password_hash"]):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect password. Please try again.")
+
+    dev = get_device_by_id(device_id)
+    if not dev or dev.get("account_id", "").lower() != current_user_email.lower():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found.")
+
+    clean_target = data.targetEmail.strip().lower()
+    if clean_target == current_user_email.lower():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot transfer device to your own account.")
+
+    transfer_record = create_device_transfer_db(dev.get("device_id", device_id), current_user_email, clean_target)
+    return {
+        "success": True,
+        "message": f"Ownership transfer requested to {clean_target}.",
+        "transfer": transfer_record
+    }
+
+@app.get("/api/device-transfers/pending")
+def get_pending_transfers(current_user_email: str = Depends(get_current_user_email)):
+    """
+    GET /api/device-transfers/pending
+    Returns pending incoming and outgoing device transfers.
+    """
+    transfers = get_pending_transfers_db(current_user_email)
+    return {"success": True, "transfers": transfers}
+
+@app.post("/api/device-transfers/{transfer_id}/accept")
+def accept_transfer(transfer_id: str, current_user_email: str = Depends(get_current_user_email)):
+    """
+    POST /api/device-transfers/{transfer_id}/accept
+    Target recipient accepts device ownership transfer.
+    """
+    success = accept_device_transfer_db(transfer_id, current_user_email)
+    if not success:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Could not accept transfer. Invalid or expired request.")
+    return {"success": True, "message": "Device ownership successfully transferred to your account."}
+
+@app.post("/api/device-transfers/{transfer_id}/cancel")
+def cancel_transfer(transfer_id: str, current_user_email: str = Depends(get_current_user_email)):
+    """
+    POST /api/device-transfers/{transfer_id}/cancel
+    Cancels a pending ownership transfer.
+    """
+    success = cancel_device_transfer_db(transfer_id, current_user_email)
+    if not success:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Could not cancel transfer.")
+    return {"success": True, "message": "Device transfer cancelled successfully."}
+
+# ===========================================================================
+# PUBLIC DEVICE VERIFICATION ENDPOINT (NO LOGIN REQUIRED)
+# ===========================================================================
+
+@app.get("/api/verify/device/{token}")
+def public_verify_device_qr(token: str, request: Request):
+    """
+    GET /api/verify/device/{token}
+    Public endpoint: verifies scanned QR code token.
+    DOES NOT EXPOSE PRIVATE OWNER INFORMATION (no email, phone, Aadhaar, PAN, address, or bank data).
+    Returns verified status, device ID, security ID, device status, and registration timestamp.
+    """
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    clean_tok = (token or "").strip()
+
+    dev = get_device_by_qr_token(clean_tok)
+    if not dev or dev.get("qr_status") == "DEACTIVATED":
+        return {
+            "verified": False,
+            "status": "INVALID",
+            "message": "This QR code is not registered in the paYent system."
+        }
+
+    # Touch last verified timestamp and log security scan
+    touch_device_last_verified(dev.get("device_id", ""), ip_address=client_ip)
+
+    return {
+        "verified": True,
+        "deviceId": dev.get("device_id"),
+        "securityId": dev.get("security_id"),
+        "deviceName": dev.get("device_name"),
+        "brand": dev.get("brand", ""),
+        "model": dev.get("model", ""),
+        "deviceType": dev.get("device_type", "LAPTOP"),
+        "deviceStatus": dev.get("device_status", "ACTIVE"),
+        "qrStatus": dev.get("qr_status", "ACTIVE"),
+        "registeredAt": dev.get("registered_at"),
+        "lastVerifiedAt": dev.get("last_verified_at"),
+        "notes": dev.get("notes", "")
+    }
+
+# ===========================================================================
+# ADMIN DEVICE MANAGEMENT ENDPOINTS
+# ===========================================================================
+
+@app.get("/api/admin/devices")
+def admin_list_devices(current_admin: dict = Depends(check_admin_user)):
+    """
+    GET /api/admin/devices
+    Admin endpoint to view all registered devices across the platform.
+    """
+    devices = get_all_devices_admin_db()
+    return {"success": True, "devices": devices}
+
+@app.get("/api/admin/devices/{device_id}")
+def admin_get_device_detail(device_id: str, current_admin: dict = Depends(check_admin_user)):
+    """
+    GET /api/admin/devices/{device_id}
+    Admin endpoint to inspect device details and complete audit history.
+    """
+    dev = get_device_by_id(device_id)
+    if not dev:
+        raise HTTPException(status_code=404, detail="Device not found.")
+    history = get_device_security_history_db(device_id=dev.get("device_id", device_id))
+    safe_dev = dict(dev)
+    safe_dev.pop("qr_token", None)
+    safe_dev.pop("qr_token_hash", None)
+    return {
+        "success": True,
+        "device": safe_dev,
+        "history": history
+    }
+
+@app.post("/api/admin/devices/{device_id}/status")
+def admin_update_device_status(device_id: str, data: AdminDeviceStatusUpdateSchema,
+                               request: Request, current_admin: dict = Depends(check_admin_user)):
+    """
+    POST /api/admin/devices/{device_id}/status
+    Admin status management (e.g. SUSPENDED, ACTIVE, DEACTIVATED).
+    """
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    dev = get_device_by_id(device_id)
+    if not dev:
+        raise HTTPException(status_code=404, detail="Device not found.")
+
+    update_device_status_db(device_id, data.deviceStatus, qr_status=data.qrStatus)
+    record_device_security_event(
+        device_id=dev.get("device_id", device_id),
+        event_type=f"ADMIN_STATUS_CHANGE_{data.deviceStatus}",
+        description=f"Admin {current_admin['email']} updated device status to {data.deviceStatus}. {data.notes or ''}",
+        actor_email=current_admin["email"],
+        ip_address=client_ip
+    )
+    return {"success": True, "message": f"Device status updated to {data.deviceStatus}."}
+
+
 
 
 # ---------------------------------------------------------------------------

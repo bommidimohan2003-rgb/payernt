@@ -89,10 +89,12 @@ import { Route as PayerntRequestsRouteImport } from './routes/payernt/requests'
 import { Route as PayerntSettingsRouteImport } from './routes/payernt/settings'
 import { Route as PayerntWalletRouteImport } from './routes/payernt/wallet'
 import { Route as ProductIdRouteImport } from './routes/product.$id'
+import { Route as VerifyTokenRouteImport } from './routes/verify.$token'
 import { Route as AdminProductsIdRouteImport } from './routes/admin/products.$id'
 import { Route as PayentProductsIdRouteImport } from './routes/payent/products.$id'
 import { Route as PayerntProductsIdRouteImport } from './routes/payernt/products.$id'
 import { Route as PayerntProductsCreateRouteImport } from './routes/payernt/products.create'
+import { Route as VerifyDeviceTokenRouteImport } from './routes/verify.device.$token'
 import { Route as AdminProductsIdReviewRouteImport } from './routes/admin/products.$id.review'
 
 const IndexRoute = IndexRouteImport.update({
@@ -495,6 +497,11 @@ const ProductIdRoute = ProductIdRouteImport.update({
   path: '/product/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const VerifyTokenRoute = VerifyTokenRouteImport.update({
+  id: '/verify/$token',
+  path: '/verify/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminProductsIdRoute = AdminProductsIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -514,6 +521,11 @@ const PayerntProductsCreateRoute = PayerntProductsCreateRouteImport.update({
   id: '/create',
   path: '/create',
   getParentRoute: () => PayerntProductsRoute,
+} as any)
+const VerifyDeviceTokenRoute = VerifyDeviceTokenRouteImport.update({
+  id: '/verify/device/$token',
+  path: '/verify/device/$token',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AdminProductsIdReviewRoute = AdminProductsIdReviewRouteImport.update({
   id: '/review',
@@ -599,6 +611,7 @@ export interface FileRoutesByFullPath {
   '/payernt/settings': typeof PayerntSettingsRoute
   '/payernt/wallet': typeof PayerntWalletRoute
   '/product/$id': typeof ProductIdRoute
+  '/verify/$token': typeof VerifyTokenRoute
   '/admin/': typeof AdminIndexRoute
   '/payent/': typeof PayentIndexRoute
   '/payernt/': typeof PayerntIndexRoute
@@ -606,6 +619,7 @@ export interface FileRoutesByFullPath {
   '/payent/products/$id': typeof PayentProductsIdRoute
   '/payernt/products/$id': typeof PayerntProductsIdRoute
   '/payernt/products/create': typeof PayerntProductsCreateRoute
+  '/verify/device/$token': typeof VerifyDeviceTokenRoute
   '/admin/products/$id/review': typeof AdminProductsIdReviewRoute
 }
 export interface FileRoutesByTo {
@@ -683,6 +697,7 @@ export interface FileRoutesByTo {
   '/payernt/settings': typeof PayerntSettingsRoute
   '/payernt/wallet': typeof PayerntWalletRoute
   '/product/$id': typeof ProductIdRoute
+  '/verify/$token': typeof VerifyTokenRoute
   '/admin': typeof AdminIndexRoute
   '/payent': typeof PayentIndexRoute
   '/payernt': typeof PayerntIndexRoute
@@ -690,6 +705,7 @@ export interface FileRoutesByTo {
   '/payent/products/$id': typeof PayentProductsIdRoute
   '/payernt/products/$id': typeof PayerntProductsIdRoute
   '/payernt/products/create': typeof PayerntProductsCreateRoute
+  '/verify/device/$token': typeof VerifyDeviceTokenRoute
   '/admin/products/$id/review': typeof AdminProductsIdReviewRoute
 }
 export interface FileRoutesById {
@@ -771,6 +787,7 @@ export interface FileRoutesById {
   '/payernt/settings': typeof PayerntSettingsRoute
   '/payernt/wallet': typeof PayerntWalletRoute
   '/product/$id': typeof ProductIdRoute
+  '/verify/$token': typeof VerifyTokenRoute
   '/admin/': typeof AdminIndexRoute
   '/payent/': typeof PayentIndexRoute
   '/payernt/': typeof PayerntIndexRoute
@@ -778,6 +795,7 @@ export interface FileRoutesById {
   '/payent/products/$id': typeof PayentProductsIdRoute
   '/payernt/products/$id': typeof PayerntProductsIdRoute
   '/payernt/products/create': typeof PayerntProductsCreateRoute
+  '/verify/device/$token': typeof VerifyDeviceTokenRoute
   '/admin/products/$id/review': typeof AdminProductsIdReviewRoute
 }
 export interface FileRouteTypes {
@@ -860,6 +878,7 @@ export interface FileRouteTypes {
     | '/payernt/settings'
     | '/payernt/wallet'
     | '/product/$id'
+    | '/verify/$token'
     | '/admin/'
     | '/payent/'
     | '/payernt/'
@@ -867,6 +886,7 @@ export interface FileRouteTypes {
     | '/payent/products/$id'
     | '/payernt/products/$id'
     | '/payernt/products/create'
+    | '/verify/device/$token'
     | '/admin/products/$id/review'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -944,6 +964,7 @@ export interface FileRouteTypes {
     | '/payernt/settings'
     | '/payernt/wallet'
     | '/product/$id'
+    | '/verify/$token'
     | '/admin'
     | '/payent'
     | '/payernt'
@@ -951,6 +972,7 @@ export interface FileRouteTypes {
     | '/payent/products/$id'
     | '/payernt/products/$id'
     | '/payernt/products/create'
+    | '/verify/device/$token'
     | '/admin/products/$id/review'
   id:
     | '__root__'
@@ -1031,6 +1053,7 @@ export interface FileRouteTypes {
     | '/payernt/settings'
     | '/payernt/wallet'
     | '/product/$id'
+    | '/verify/$token'
     | '/admin/'
     | '/payent/'
     | '/payernt/'
@@ -1038,6 +1061,7 @@ export interface FileRouteTypes {
     | '/payent/products/$id'
     | '/payernt/products/$id'
     | '/payernt/products/create'
+    | '/verify/device/$token'
     | '/admin/products/$id/review'
   fileRoutesById: FileRoutesById
 }
@@ -1074,6 +1098,8 @@ export interface RootRouteChildren {
   WishlistRoute: typeof WishlistRoute
   DeliveryIdRoute: typeof DeliveryIdRoute
   ProductIdRoute: typeof ProductIdRoute
+  VerifyTokenRoute: typeof VerifyTokenRoute
+  VerifyDeviceTokenRoute: typeof VerifyDeviceTokenRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1638,6 +1664,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProductIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/verify/$token': {
+      id: '/verify/$token'
+      path: '/verify/$token'
+      fullPath: '/verify/$token'
+      preLoaderRoute: typeof VerifyTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/products/$id': {
       id: '/admin/products/$id'
       path: '/$id'
@@ -1665,6 +1698,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/payernt/products/create'
       preLoaderRoute: typeof PayerntProductsCreateRouteImport
       parentRoute: typeof PayerntProductsRoute
+    }
+    '/verify/device/$token': {
+      id: '/verify/device/$token'
+      path: '/verify/device/$token'
+      fullPath: '/verify/device/$token'
+      preLoaderRoute: typeof VerifyDeviceTokenRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/admin/products/$id/review': {
       id: '/admin/products/$id/review'
@@ -1871,6 +1911,8 @@ const rootRouteChildren: RootRouteChildren = {
   WishlistRoute: WishlistRoute,
   DeliveryIdRoute: DeliveryIdRoute,
   ProductIdRoute: ProductIdRoute,
+  VerifyTokenRoute: VerifyTokenRoute,
+  VerifyDeviceTokenRoute: VerifyDeviceTokenRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
