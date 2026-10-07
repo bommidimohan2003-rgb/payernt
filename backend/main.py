@@ -842,13 +842,18 @@ def get_current_user_email(authorization: Optional[str] = Header(None)) -> str:
             detail="Session has been revoked or expired."
         )
 
-    # Check account type authorization: prevent Payernt vendor tokens from accessing Payrent customer endpoints
+    # Account type & role validation
     account_type = (payload.get("account_type") or payload.get("accountType") or "").strip().lower()
     role = str(payload.get("role") or "").strip().lower()
-    if account_type in ("paye₹nt", "payernt", "vendor") and role not in ("admin", "superadmin", "customer", "renter", "user"):
+    # Allow all valid platform roles (customers, lenders, vendors, owners, admins, etc.)
+    valid_roles = (
+        "admin", "superadmin", "customer", "renter", "user", "lender",
+        "vendor", "owner", "partner", "host", "merchant", "payernt", "paye₹nt", ""
+    )
+    if role and role not in valid_roles:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Forbidden: This endpoint requires a payrent customer account.",
+            detail="Forbidden: Invalid or unauthorized account role.",
         )
 
     user_email = payload["sub"].strip().lower()
