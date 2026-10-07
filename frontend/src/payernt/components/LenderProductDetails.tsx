@@ -17,6 +17,7 @@ import {
   Tag,
   Layers,
   Sparkles,
+  Video,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -234,6 +235,36 @@ export function LenderProductDetails({ productId: propId }: { productId?: string
               </div>
             )}
           </div>
+
+          {/* 10-Second Equipment Inspection Video */}
+          {(product.videoUrl || (product as any).video_url) && (
+            <div className="p-5 rounded-2xl border border-border bg-card space-y-3.5 shadow-2xs text-left">
+              <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                <div className="flex items-center gap-1.5 text-foreground">
+                  <Video className="w-4 h-4 text-primary" />
+                  <span>Verified 10s Inspection Video</span>
+                </div>
+                <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded-full">
+                  <ShieldCheck className="w-3 h-3" /> Recorded Live Check
+                </span>
+              </div>
+
+              <div className="relative rounded-2xl overflow-hidden bg-black border border-border aspect-video group">
+                <video
+                  src={product.videoUrl || (product as any).video_url}
+                  controls
+                  playsInline
+                  preload="metadata"
+                  className="w-full h-full object-contain"
+                />
+              </div>
+
+              <p className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                Your recorded physical equipment condition evidence securely stored on Cloud CDN.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Right Column: Rate Card, KYC & Actions */}

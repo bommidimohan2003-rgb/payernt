@@ -23,6 +23,7 @@ import {
   DollarSign,
   SlidersHorizontal,
   ArrowLeft,
+  Video,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -253,6 +254,13 @@ export function MyProducts({
                     <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
                       {getStatusBadge(product.verificationStatus, product.status)}
                     </div>
+
+                    {(product.videoUrl || (product as any).video_url) && (
+                      <div className="absolute top-2.5 right-2.5 bg-black/80 backdrop-blur-md px-2 py-0.5 rounded-lg text-[10px] font-bold text-white flex items-center gap-1 border border-white/20 shadow-xs">
+                        <Video className="h-3 w-3 text-primary" />
+                        <span>10s Video</span>
+                      </div>
+                    )}
 
                     <div className="absolute bottom-2.5 right-2.5 bg-background/90 backdrop-blur-md px-3 py-1 rounded-xl text-xs font-mono font-bold text-foreground border border-border shadow-xs">
                       ₹{product.pricing?.daily ?? (product as any).daily_rate ?? (product as any).dailyRate ?? product.price ?? 500}/day
@@ -507,6 +515,34 @@ export function MyProducts({
                 </div>
               </div>
             </div>
+
+            {/* 10-Second Inspection Video Player */}
+            {(selectedProduct.videoUrl || (selectedProduct as any).video_url) && (
+              <div className="p-4 sm:p-5 rounded-2xl bg-secondary/40 border border-border space-y-3 animate-in fade-in">
+                <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  <div className="flex items-center gap-1.5 text-foreground">
+                    <Video className="h-4 w-4 text-primary" />
+                    <span>Verified 10-Second Inspection Video</span>
+                  </div>
+                  <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded-full">
+                    <ShieldCheck className="h-3 w-3" /> Live Evidence
+                  </span>
+                </div>
+                <div className="relative rounded-2xl overflow-hidden bg-black border border-border aspect-video max-h-[340px]">
+                  <video
+                    src={selectedProduct.videoUrl || (selectedProduct as any).video_url}
+                    controls
+                    playsInline
+                    preload="metadata"
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+                <p className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+                  <ShieldCheck className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                  Your 10-second inspection video recorded during listing to verify physical gear condition.
+                </p>
+              </div>
+            )}
 
             {/* Bottom Actions */}
             <div className="flex items-center justify-between pt-4 border-t border-border">

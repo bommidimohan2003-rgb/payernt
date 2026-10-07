@@ -3458,66 +3458,83 @@ export function ListProductWizard({
 
       {/* 10-SECOND LIVE CAMERA VIDEO RECORDER MODAL */}
       {isLiveVideoModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
-          <div className="relative max-w-lg w-full bg-card border border-border rounded-3xl overflow-hidden shadow-2xl flex flex-col">
+        <div className="fixed inset-0 z-50 bg-black/92 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 md:p-6 animate-in fade-in duration-200">
+          <div className="relative max-w-4xl w-full bg-card border border-border/80 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[95vh]">
             {/* Header */}
-            <div className="px-5 py-4 border-b border-border/80 flex items-center justify-between bg-card">
-              <div className="flex items-center gap-2">
-                <div className={`h-2.5 w-2.5 rounded-full ${isRecordingVideo ? "bg-red-500 animate-ping" : "bg-primary"}`} />
-                <h3 className="text-sm font-bold text-foreground">
-                  {isRecordingVideo ? "Recording 10s Inspection..." : "10-Second Inspection Camera"}
-                </h3>
+            <div className="px-5 py-3.5 border-b border-border/80 flex items-center justify-between bg-card shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className={`h-3 w-3 rounded-full ${isRecordingVideo ? "bg-red-500 animate-ping" : "bg-primary"}`} />
+                <div>
+                  <h3 className="text-sm sm:text-base font-extrabold text-foreground">
+                    {isRecordingVideo ? "🔴 Recording 10s Equipment Inspection" : "10-Second Live Camera Inspection"}
+                  </h3>
+                  <p className="text-[11px] text-muted-foreground hidden sm:block">
+                    Record a smooth 360° physical condition check of the equipment.
+                  </p>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={closeLiveVideoModal}
-                className="p-1.5 rounded-xl hover:bg-secondary text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
+                className="p-2 rounded-xl hover:bg-secondary text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
+                title="Close Camera"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            {/* Video Viewfinder */}
-            <div className="relative aspect-video bg-black flex items-center justify-center overflow-hidden">
+            {/* Video Viewfinder — Large Screen */}
+            <div className="relative w-full h-[52vh] sm:h-[62vh] min-h-[360px] max-h-[640px] bg-black flex items-center justify-center overflow-hidden">
               <video
                 ref={liveVideoFeedRef}
                 autoPlay
                 playsInline
                 muted
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover sm:object-contain bg-black"
               />
 
               {/* Ready countdown overlay before recording starts */}
               {readyCountdown !== null && !isRecordingVideo && (
-                <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex flex-col items-center justify-center text-white pointer-events-none p-4">
-                  <div className="h-20 w-20 rounded-full bg-primary/90 text-primary-foreground font-mono text-4xl font-black flex items-center justify-center shadow-2xl animate-bounce">
+                <div className="absolute inset-0 bg-black/50 backdrop-blur-xs flex flex-col items-center justify-center text-white pointer-events-none p-4 animate-in fade-in">
+                  <div className="h-24 w-24 sm:h-28 sm:w-28 rounded-full bg-primary/95 text-primary-foreground font-mono text-5xl sm:text-6xl font-black flex items-center justify-center shadow-2xl animate-bounce">
                     {readyCountdown}
                   </div>
-                  <p className="text-xs font-bold text-white mt-3 drop-shadow-md">
-                    Starting 10-second inspection video...
+                  <p className="text-sm sm:text-base font-bold text-white mt-4 drop-shadow-lg">
+                    Get Ready! Starting 10-second inspection video...
+                  </p>
+                  <p className="text-xs text-white/80 mt-1 drop-shadow-md">
+                    Hold device steady & showcase all angles
                   </p>
                 </div>
               )}
 
               {/* Countdown overlay during recording */}
               {isRecordingVideo && (
-                <div className="absolute inset-0 bg-black/20 flex flex-col items-center justify-between p-4 pointer-events-none">
-                  <div className="flex items-center gap-2 bg-red-600/90 text-white font-mono text-xs font-bold px-3 py-1 rounded-full animate-pulse shadow-lg">
-                    <span className="h-2 w-2 rounded-full bg-white animate-ping" />
-                    LIVE 00:0{10 - videoCountdown}
+                <div className="absolute inset-0 bg-black/10 flex flex-col items-center justify-between p-4 sm:p-6 pointer-events-none">
+                  {/* Top Status Bar */}
+                  <div className="w-full flex items-center justify-between">
+                    <div className="flex items-center gap-2 bg-red-600/90 text-white font-mono text-xs sm:text-sm font-bold px-3.5 py-1.5 rounded-full animate-pulse shadow-lg backdrop-blur-xs">
+                      <span className="h-2.5 w-2.5 rounded-full bg-white animate-ping" />
+                      REC 00:0{10 - videoCountdown}
+                    </div>
+
+                    <div className="bg-black/70 backdrop-blur-xs text-white text-[11px] font-semibold px-3 py-1 rounded-full border border-white/20">
+                      10s Auto-Timer
+                    </div>
                   </div>
 
-                  <div className="flex flex-col items-center">
-                    <div className="h-16 w-16 rounded-full bg-black/75 border-2 border-red-500 text-white font-mono text-2xl font-black flex items-center justify-center shadow-2xl">
+                  {/* Center Countdown Meter */}
+                  <div className="flex flex-col items-center drop-shadow-xl">
+                    <div className="h-20 w-20 sm:h-24 sm:w-24 rounded-full bg-black/80 border-4 border-red-500 text-white font-mono text-3xl sm:text-4xl font-black flex items-center justify-center shadow-2xl animate-pulse">
                       {videoCountdown}s
                     </div>
-                    <p className="text-[10px] text-white/90 font-semibold mt-2 drop-shadow-md">
-                      Auto-stopping & saving at 0s
+                    <p className="text-xs text-white font-bold mt-2.5 drop-shadow-md bg-black/60 px-3 py-1 rounded-full">
+                      Auto-stopping at 0 seconds
                     </p>
                   </div>
 
-                  {/* Progress bar */}
-                  <div className="w-full bg-white/30 h-1.5 rounded-full overflow-hidden">
+                  {/* Bottom Progress bar */}
+                  <div className="w-full bg-white/30 h-2 rounded-full overflow-hidden shadow-md">
                     <div
                       className="bg-red-500 h-full transition-all duration-1000 ease-linear"
                       style={{ width: `${((10 - videoCountdown) / 10) * 100}%` }}
@@ -3528,39 +3545,39 @@ export function ListProductWizard({
 
               {/* Uploading Spinner */}
               {isUploadingRecordedVideo && (
-                <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center gap-3 text-white p-4">
-                  <RefreshCw className="h-8 w-8 animate-spin text-primary" />
-                  <p className="text-sm font-bold">Uploading 10s video to Cloudinary CDN...</p>
-                  <p className="text-xs text-white/70">Securing inspection video on cloud</p>
+                <div className="absolute inset-0 bg-black/85 flex flex-col items-center justify-center gap-3.5 text-white p-6 z-20 animate-in fade-in">
+                  <RefreshCw className="h-10 w-10 animate-spin text-primary" />
+                  <p className="text-base sm:text-lg font-bold">Securing 10s video on Cloudinary CDN...</p>
+                  <p className="text-xs sm:text-sm text-white/75">Uploading high-definition condition evidence</p>
                 </div>
               )}
             </div>
 
-            {/* Controls */}
-            <div className="p-4 bg-card border-t border-border/80 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-semibold">
-                <Camera className="h-3.5 w-3.5 text-primary" />
-                <span>Live Camera Verification</span>
+            {/* Controls Bar */}
+            <div className="p-4 sm:p-5 bg-card border-t border-border/80 flex items-center justify-between gap-4 shrink-0">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground font-semibold">
+                <Camera className="h-4 w-4 text-primary shrink-0" />
+                <span className="hidden sm:inline">Verified Live Recording • Full Sensor Resolution</span>
               </div>
 
-              <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-3">
                 {isRecordingVideo ? (
                   <button
                     type="button"
                     onClick={stopRecordingEarly}
-                    className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold flex items-center justify-center gap-2 cursor-pointer shadow-lg active:scale-95 transition-all"
+                    className="px-6 py-2.5 sm:py-3 rounded-2xl bg-red-600 hover:bg-red-700 text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 cursor-pointer shadow-lg active:scale-95 transition-all"
                   >
-                    <div className="h-3 w-3 bg-white rounded-xs" />
-                    Stop & Save Now
+                    <div className="h-3.5 w-3.5 bg-white rounded-xs" />
+                    Stop & Save
                   </button>
                 ) : (
                   <button
                     type="button"
                     onClick={() => start10SecondRecording()}
                     disabled={isUploadingRecordedVideo || readyCountdown !== null}
-                    className="px-6 py-2.5 rounded-xl bg-primary hover:opacity-90 text-primary-foreground text-xs font-bold flex items-center justify-center gap-2 cursor-pointer shadow-md active:scale-95 transition-all disabled:opacity-50"
+                    className="px-7 py-2.5 sm:py-3 rounded-2xl bg-primary hover:opacity-90 text-primary-foreground text-xs sm:text-sm font-bold flex items-center justify-center gap-2 cursor-pointer shadow-md active:scale-95 transition-all disabled:opacity-50"
                   >
-                    <div className="h-3 w-3 rounded-full bg-red-500 animate-pulse" />
+                    <div className="h-3.5 w-3.5 rounded-full bg-red-500 animate-pulse" />
                     {readyCountdown !== null ? `Starting in ${readyCountdown}s...` : "Record 10s Now"}
                   </button>
                 )}
