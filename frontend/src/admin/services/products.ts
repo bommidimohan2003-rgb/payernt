@@ -44,7 +44,7 @@ const mapToAdminProduct = (p: any): AdminProduct => ({
   image: p.primaryImage || (p.photos && p.photos[0]?.url) || (p.images && p.images[0]) || "",
   images: (p.photos && p.photos.map((ph: any) => ph.url)) || p.images || [],
   documents: p.verificationDocs?.purchaseProofName ? [p.verificationDocs.purchaseProofName] : [],
-  videoUrl: p.videoUrl || (p.verificationDocs?.idProofImageName?.endsWith(".mp4") ? p.verificationDocs.idProofImageName : undefined),
+  videoUrl: p.videoUrl || p.video_url || p.video || (p.verificationDocs?.idProofImageName?.endsWith(".mp4") ? p.verificationDocs.idProofImageName : undefined),
   approvedPriceRange: p.approvedPriceRange || (p.pricing?.minPrice && p.pricing?.maxPrice ? {
     minPrice: p.pricing.minPrice,
     maxPrice: p.pricing.maxPrice,

@@ -31,6 +31,7 @@ import {
   FileCheck,
   Building2,
   Package,
+  ExternalLink,
 } from "lucide-react";
 import { productsService } from "../services/products";
 import { usersService } from "../services/users";
@@ -65,6 +66,7 @@ export default function ProductDetails() {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [videoModalOpen, setVideoModalOpen] = useState(false);
+  const [videoLoadError, setVideoLoadError] = useState(false);
   const [activeNavSection, setActiveNavSection] = useState("product");
 
   // Price Management State (Fixed Single Price)
@@ -1094,14 +1096,72 @@ export default function ProductDetails() {
                 <span>10-Second Equipment Condition Video</span>
               </div>
               <button
-                onClick={() => setVideoModalOpen(false)}
+                onClick={() => {
+                  setVideoModalOpen(false);
+                  setVideoLoadError(false);
+                }}
                 className="p-1 rounded-lg text-muted-foreground hover:text-foreground cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="aspect-video bg-black rounded-xl overflow-hidden">
-              <video src={product.videoUrl} controls autoPlay className="w-full h-full object-contain" />
+
+            {/* Warning if video URL is a temporary browser session blob */}
+            {product.videoUrl.startsWith("blob:") && (
+              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs space-y-1">
+                <p className="font-bold flex items-center gap-1.5">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>Temporary Local Session Preview</span>
+                </p>
+                <p className="text-[11px] opacity-90 leading-relaxed">
+                  This product was listed with a local browser preview URL from a previous session. New product listings recorded with the live camera are permanently hosted on Cloudinary CDN.
+                </p>
+              </div>
+            )}
+
+            <div className="relative aspect-video bg-black rounded-xl overflow-hidden flex items-center justify-center">
+              {!videoLoadError ? (
+                <video
+                  src={product.videoUrl}
+                  controls
+                  playsInline
+                  preload="metadata"
+                  crossOrigin="anonymous"
+                  onError={() => setVideoLoadError(true)}
+                  className="w-full h-full object-contain"
+                />
+              ) : (
+                <div className="p-6 text-center text-white space-y-3">
+                  <AlertCircle className="w-10 h-10 text-amber-500 mx-auto" />
+                  <div>
+                    <p className="text-sm font-bold">Video stream could not be loaded directly</p>
+                    <p className="text-xs text-white/70 mt-1 max-w-md mx-auto">
+                      The video link may be an expired local session URL or require external playback.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => window.open(product.videoUrl, "_blank")}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:opacity-90 transition-opacity cursor-pointer shadow-md"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" /> Open Direct Video Link
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between text-xs text-muted-foreground pt-1 border-t border-border/60">
+              <span className="font-mono text-[11px] truncate max-w-xs sm:max-w-md">
+                URL: {product.videoUrl}
+              </span>
+              <button
+                type="button"
+                onClick={() => window.open(product.videoUrl, "_blank")}
+                className="text-primary hover:underline font-semibold flex items-center gap-1 shrink-0 ml-2 cursor-pointer"
+              >
+                <span>Direct Link</span>
+                <ExternalLink className="w-3 h-3" />
+              </button>
             </div>
           </div>
         </div>
