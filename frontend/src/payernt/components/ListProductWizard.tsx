@@ -1098,10 +1098,11 @@ export function ListProductWizard({
         try {
           const cloudUrl = await uploadVideoToCloudinary(videoFile);
           setCapturedVideoUrl(cloudUrl);
-          toast.success("10s inspection video uploaded & secured on Cloudinary CDN.", { id: toastId });
-        } catch (uploadErr) {
-          console.warn("Cloudinary upload fallback:", uploadErr);
-          toast.info("10s inspection video saved locally.", { id: toastId });
+          toast.success("10s inspection video uploaded & secured on Cloud CDN.", { id: toastId });
+        } catch (uploadErr: any) {
+          console.error("Cloudinary video upload failed:", uploadErr);
+          setMediaError(`Failed to upload video to Cloud CDN: ${uploadErr?.message || "Upload error"}. Please re-record.`);
+          toast.error("Video upload to cloud failed. Please try recording again.", { id: toastId });
         } finally {
           setIsUploadingRecordedVideo(false);
           setIsLiveVideoModalOpen(false);
@@ -1437,7 +1438,7 @@ export function ListProductWizard({
       photos: photosArr,
       images: photosArr.map((p) => p.url),
       primaryImage: frontPhotoUrl || backPhotoUrl || "",
-      videoUrl: capturedVideoUrl || undefined,
+      videoUrl: capturedVideoUrl && !capturedVideoUrl.startsWith("blob:") ? capturedVideoUrl : undefined,
       specs: {
         brand: brand.trim() || undefined,
         model: model.trim() || undefined,
