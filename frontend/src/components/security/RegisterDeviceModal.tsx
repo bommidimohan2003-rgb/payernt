@@ -6,13 +6,15 @@ import { deviceService, RegisteredDevice } from "@/services/deviceService";
 interface RegisterDeviceModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: (newDevice: RegisteredDevice) => void;
+  onSuccess?: (newDevice: RegisteredDevice) => void;
+  onDeviceRegistered?: (newDevice: RegisteredDevice) => void;
 }
 
 export const RegisterDeviceModal: React.FC<RegisterDeviceModalProps> = ({
   isOpen,
   onClose,
   onSuccess,
+  onDeviceRegistered,
 }) => {
   const [deviceName, setDeviceName] = useState("");
   const [brand, setBrand] = useState("Apple");
@@ -43,11 +45,31 @@ export const RegisterDeviceModal: React.FC<RegisterDeviceModalProps> = ({
         deviceType,
         notes: notes.trim(),
       });
-      onSuccess(res.device);
+      onSuccess?.(res.device);
+      onDeviceRegistered?.(res.device);
       onClose();
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { detail?: string } } };
-      setError(axiosErr?.response?.data?.detail || "Failed to register device. Please try again.");
+      const axiosErr = err as {
+        response?: {
+          data?: {
+            detail?: string | Array<{ msg?: string }>;
+            message?: string;
+          };
+        };
+        message?: string;
+      };
+      const detail = axiosErr?.response?.data?.detail;
+      let msg = "";
+      if (typeof detail === "string") {
+        msg = detail;
+      } else if (Array.isArray(detail) && detail[0]?.msg) {
+        msg = detail[0].msg;
+      } else if (typeof axiosErr?.response?.data?.message === "string") {
+        msg = axiosErr.response.data.message;
+      } else if (axiosErr?.message) {
+        msg = axiosErr.message;
+      }
+      setError(msg || "Failed to register device. Please try again.");
     } finally {
       setLoading(false);
     }

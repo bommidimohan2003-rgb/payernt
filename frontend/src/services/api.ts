@@ -4,19 +4,21 @@ const getApiBase = () => {
   if (typeof window !== "undefined") {
     const win = window as unknown as { PAYENT_API_URL?: string };
     if (win.PAYENT_API_URL) return win.PAYENT_API_URL;
-  }
-  if (typeof window !== "undefined") {
     const host = window.location.hostname;
     if (host === "10.0.2.2") return "http://10.0.2.2:8001";
     const isLocal = host === "localhost" || host === "127.0.0.1";
     if (isLocal) return "http://127.0.0.1:8001";
-    if (host.endsWith(".vercel.app")) {
-      return "";
-    }
-    return window.location.origin;
+    if (host.endsWith(".vercel.app")) return "";
   }
   if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL;
+    const apiUrl = import.meta.env.VITE_API_URL;
+    if (typeof window !== "undefined" && window.location.hostname === "10.0.2.2") {
+      return apiUrl.replace(/localhost|127\.0\.0\.1/, "10.0.2.2");
+    }
+    return apiUrl;
+  }
+  if (typeof window !== "undefined") {
+    return window.location.origin;
   }
   return "";
 };
@@ -29,15 +31,25 @@ export const api = axios.create({
 
 api.interceptors.request.use((config) => {
   if (typeof window !== "undefined") {
-    const token = window.localStorage.getItem("payent:token");
+    const token =
+      window.localStorage.getItem("payent:token") ||
+      window.localStorage.getItem("token") ||
+      window.localStorage.getItem("payent_token") ||
+      window.localStorage.getItem("payernt_token") ||
+      window.localStorage.getItem("paye₹nt_token");
     if (token) {
       config.headers.set("Authorization", `Bearer ${token}`);
     }
-    const user = window.localStorage.getItem("payent:currentUser");
+    const user =
+      window.localStorage.getItem("payent:currentUser") ||
+      window.localStorage.getItem("currentUser") ||
+      window.localStorage.getItem("payent_user") ||
+      window.localStorage.getItem("payernt_user");
     if (user) {
       try {
         const parsed = JSON.parse(user);
         if (parsed?.id) config.headers.set("X-User-Id", parsed.id);
+        if (parsed?.email) config.headers.set("X-User-Email", parsed.email);
       } catch {
         /* ignore */
       }
