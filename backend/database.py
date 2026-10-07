@@ -1958,6 +1958,7 @@ def get_all_approved_custom_products(limit: Optional[int] = None, offset: int = 
                     if limit is not None and limit > 0:
                         cursor.execute("""
                             SELECT cp.id, cp.user_email, cp.title, cp.description, cp.price, cp.image,
+                                   cp.images, cp.video_url,
                                    cp.category, cp.rating, cp.reviews, cp.available, cp.status,
                                    cp.owner_name, cp.owner_avatar, cp.owner_rating, cp.featured, cp.created_at,
                                    u.address AS owner_address, 
@@ -1978,6 +1979,7 @@ def get_all_approved_custom_products(limit: Optional[int] = None, offset: int = 
                     else:
                         cursor.execute("""
                             SELECT cp.id, cp.user_email, cp.title, cp.description, cp.price, cp.image,
+                                   cp.images, cp.video_url,
                                    cp.category, cp.rating, cp.reviews, cp.available, cp.status,
                                    cp.owner_name, cp.owner_avatar, cp.owner_rating, cp.featured, cp.created_at,
                                    u.address AS owner_address, 

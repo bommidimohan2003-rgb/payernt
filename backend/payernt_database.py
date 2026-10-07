@@ -1115,9 +1115,9 @@ def get_payernt_products_by_owner(owner_id: str, owner_email: Optional[str] = No
 
 
 def get_all_active_payernt_products() -> List[Dict[str, Any]]:
-    """Fetches all active products for the public/renter Explore page. NEVER returns vendor_secret_pin."""
+    """Fetches all active/approved products for the public/renter Explore page. NEVER returns vendor_secret_pin."""
     try:
-        rows = fetch_all("SELECT * FROM payernt_products WHERE status = 'active' ORDER BY created_at DESC")
+        rows = fetch_all("SELECT * FROM payernt_products WHERE status IN ('active', 'approved') ORDER BY created_at DESC")
         if rows:
             clean_list = []
             for r in rows:
@@ -1130,7 +1130,7 @@ def get_all_active_payernt_products() -> List[Dict[str, Any]]:
 
     clean_list = []
     for p in MOCK_PAYERNT_PRODUCTS.values():
-        if p.get("status") == "active":
+        if p.get("status") in ("active", "approved"):
             c = dict(p)
             c.pop("vendor_secret_pin", None)
             clean_list.append(c)

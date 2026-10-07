@@ -221,7 +221,6 @@ export const api = {
     if (!id) return null;
     const key = String(id);
     const cached = this.getCachedProduct(key);
-    if (cached) return cached;
 
     if (API_BASE) {
       try {
@@ -256,6 +255,7 @@ export const api = {
       /* ignore */
     }
 
+    if (cached) return cached;
     return null;
   },
 
