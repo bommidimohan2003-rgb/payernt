@@ -9,6 +9,14 @@ import {
 import { useNavigate } from "@tanstack/react-router";
 import { useOriginReveal } from "@/components/navigation/OriginRevealTransition";
 import { useTheme } from "@/hooks/useTheme";
+import {
+  Coins,
+  ShoppingBag,
+  ArrowUpRight,
+  ArrowDownRight,
+  Sparkles,
+  UploadCloud,
+} from "lucide-react";
 
 // ============================================================================
 // THEME SWITCHER
@@ -896,13 +904,17 @@ export function ProductSelection() {
                     }
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.35, delay: 0.18, ease: smoothEase }}
-                    className="cursor-pointer outline-none select-none text-left p-3.5 sm:p-4 border border-border/80 hover:border-foreground/60 rounded-2xl bg-card/60 active:scale-95 transition-all focus-visible:ring-1 focus-visible:ring-foreground/40 flex flex-col justify-between backdrop-blur-md shadow-sm"
-                    style={{ minHeight: "125px" }}
+                    className="group cursor-pointer outline-none select-none text-left p-3.5 sm:p-4 border border-border/80 hover:border-foreground/60 rounded-2xl bg-card/60 active:scale-95 transition-all focus-visible:ring-1 focus-visible:ring-foreground/40 flex flex-col justify-between backdrop-blur-md shadow-sm"
+                    style={{ minHeight: "130px" }}
                   >
                     <div>
-                      <span className="text-[9px] font-mono tracking-widest text-muted-foreground/80 uppercase">
-                        LENDING
-                      </span>
+                      <div className="flex items-center justify-between w-full">
+                        <span className="text-[9px] font-mono tracking-widest text-muted-foreground/90 uppercase flex items-center gap-1.5">
+                          <Coins className="w-3 h-3 text-foreground/80" />
+                          LENDING
+                        </span>
+                        <ArrowUpRight className="w-3.5 h-3.5 text-muted-foreground/60 group-hover:text-foreground transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                      </div>
                       <div className="mt-1">
                         <ChoiceTitle
                           name="paye₹nt"
@@ -911,11 +923,16 @@ export function ProductSelection() {
                       </div>
                     </div>
 
-                    <p className="text-xs sm:text-sm font-bold text-foreground uppercase tracking-wider mt-1.5">
-                      LENDER
-                    </p>
+                    <div className="flex items-center justify-between w-full mt-1.5">
+                      <p className="text-xs sm:text-sm font-bold text-foreground uppercase tracking-wider">
+                        LENDER
+                      </p>
+                      <span className="p-1 rounded-lg bg-foreground/5 border border-border text-foreground/80">
+                        <UploadCloud className="w-3.5 h-3.5" />
+                      </span>
+                    </div>
 
-                    <div className="text-[8px] sm:text-[9px] font-mono uppercase tracking-widest text-muted-foreground/75 mt-1.5">
+                    <div className="text-[8px] sm:text-[9px] font-mono uppercase tracking-widest text-muted-foreground/75 mt-1">
                       LENDMORE, EARNMORE
                     </div>
                   </motion.button>
@@ -933,13 +950,17 @@ export function ProductSelection() {
                     }
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.35, delay: 0.24, ease: smoothEase }}
-                    className="cursor-pointer outline-none select-none text-left p-3.5 sm:p-4 border border-border/80 hover:border-foreground/60 rounded-2xl bg-card/60 active:scale-95 transition-all focus-visible:ring-1 focus-visible:ring-foreground/40 flex flex-col justify-between backdrop-blur-md shadow-sm"
-                    style={{ minHeight: "125px" }}
+                    className="group cursor-pointer outline-none select-none text-left p-3.5 sm:p-4 border border-border/80 hover:border-foreground/60 rounded-2xl bg-card/60 active:scale-95 transition-all focus-visible:ring-1 focus-visible:ring-foreground/40 flex flex-col justify-between backdrop-blur-md shadow-sm"
+                    style={{ minHeight: "130px" }}
                   >
                     <div>
-                      <span className="text-[9px] font-mono tracking-widest text-muted-foreground/80 uppercase">
-                        RENTING
-                      </span>
+                      <div className="flex items-center justify-between w-full">
+                        <span className="text-[9px] font-mono tracking-widest text-muted-foreground/90 uppercase flex items-center gap-1.5">
+                          <ShoppingBag className="w-3 h-3 text-foreground/80" />
+                          RENTING
+                        </span>
+                        <ArrowDownRight className="w-3.5 h-3.5 text-muted-foreground/60 group-hover:text-foreground transition-transform group-hover:translate-x-0.5 group-hover:translate-y-0.5" />
+                      </div>
                       <div className="mt-1">
                         <ChoiceTitle
                           name="pay₹ent"
@@ -948,11 +969,16 @@ export function ProductSelection() {
                       </div>
                     </div>
 
-                    <p className="text-xs sm:text-sm font-bold text-foreground uppercase tracking-wider mt-1.5">
-                      RENTER
-                    </p>
+                    <div className="flex items-center justify-between w-full mt-1.5">
+                      <p className="text-xs sm:text-sm font-bold text-foreground uppercase tracking-wider">
+                        RENTER
+                      </p>
+                      <span className="p-1 rounded-lg bg-foreground/5 border border-border text-foreground/80">
+                        <Sparkles className="w-3.5 h-3.5" />
+                      </span>
+                    </div>
 
-                    <div className="text-[8px] sm:text-[9px] font-mono uppercase tracking-widest text-muted-foreground/75 mt-1.5">
+                    <div className="text-[8px] sm:text-[9px] font-mono uppercase tracking-widest text-muted-foreground/75 mt-1">
                       RENTMORE, SAVEMORE
                     </div>
                   </motion.button>
