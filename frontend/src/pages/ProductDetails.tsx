@@ -558,12 +558,30 @@ export default function ProductDetails() {
     ],
   };
 
-  const gallery =
-    Array.isArray(product.images) && product.images.length > 0
-      ? product.images.filter(Boolean)
-      : Array.isArray(product.rotationFrames) && product.rotationFrames.length > 0
-        ? product.rotationFrames.filter(Boolean)
-        : [product.image || "/placeholder.png"];
+  const gallery = useMemo(() => {
+    if (!product) return [];
+    let imgs = product.images;
+    if (typeof imgs === "string") {
+      try {
+        const parsed = JSON.parse(imgs);
+        if (Array.isArray(parsed)) imgs = parsed;
+      } catch {
+        imgs = [imgs];
+      }
+    }
+    if (!Array.isArray(imgs)) imgs = [];
+    imgs = imgs.filter(Boolean);
+    const prim = product.image || (product as any).primary_image;
+    if (prim && !imgs.includes(prim)) {
+      imgs = [prim, ...imgs];
+    } else if (!imgs.length && prim) {
+      imgs = [prim];
+    }
+    if (imgs.length === 0 && Array.isArray(product.rotationFrames) && product.rotationFrames.length > 0) {
+      imgs = product.rotationFrames.filter(Boolean);
+    }
+    return imgs.length > 0 ? imgs : [product.image || "/placeholder.png"];
+  }, [product]);
 
   const brand = getProductBrand(product);
   const isWishlisted = has(product.id);
@@ -632,6 +650,7 @@ export default function ProductDetails() {
                 primaryImage={product.image}
                 productTitle={product.title}
                 angles={gallery}
+                videoUrl={product.videoUrl || (product as any).video_url}
                 onWishlistToggle={() => toggle(product.id)}
                 isWishlisted={has(product.id)}
               />

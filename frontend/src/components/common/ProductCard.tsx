@@ -13,6 +13,8 @@ import {
   Package,
   MessageSquare,
   Calendar,
+  Video,
+  Layers,
 } from "lucide-react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
@@ -312,6 +314,22 @@ export function ProductCard({
                 <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
                 <span>{product.rating?.toFixed(1) || "5.0"}</span>
               </div>
+
+              {/* Inspection Video Available Badge */}
+              {(product.videoUrl || (product as any).video_url) && (
+                <div className="flex items-center gap-1 bg-sky-500/25 backdrop-blur-md text-sky-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-sky-400/40 shadow-sm" title="10s Inspection Video Available">
+                  <Video className="h-3 w-3 text-sky-400" />
+                  <span>Video</span>
+                </div>
+              )}
+
+              {/* Multiple Photos Badge */}
+              {Array.isArray(product.images) && product.images.length > 1 && (
+                <div className="flex items-center gap-1 bg-black/60 backdrop-blur-md text-neutral-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-white/15 shadow-sm" title={`${product.images.length} Photos Available`}>
+                  <Layers className="h-3 w-3 text-neutral-300" />
+                  <span>{product.images.length}</span>
+                </div>
+              )}
             </div>
 
             {/* Top Right: Message & Wishlist Buttons */}

@@ -3071,13 +3071,26 @@ def format_product_dict(p: dict, is_summary: bool = False, booked_pids_set: Opti
     if not raw_img and images_list:
         raw_img = str(images_list[0]).strip()
 
+    v_url = str(p.get("video_url") or p.get("videoUrl") or "").strip()
+
     return {
         "id": str(p.get("id", "")),
         "title": str(p.get("title", "")),
+        "name": str(p.get("name") or p.get("title") or ""),
         "description": str(p.get("description", "")),
-        "price": float(p.get("price") if p.get("price") is not None else 0),
+        "price": float(p.get("price") if p.get("price") is not None else (p.get("daily_rate") or 0)),
+        "daily_rate": float(p.get("daily_rate") if p.get("daily_rate") is not None else (p.get("price") or 0)),
         "image": raw_img,
+        "primary_image": p.get("primary_image") or raw_img,
         "images": images_list,
+        "video_url": v_url or None,
+        "videoUrl": v_url or None,
+        "brand": str(p.get("brand") or ""),
+        "model": str(p.get("model") or ""),
+        "year": str(p.get("year") or "2024"),
+        "condition": str(p.get("condition") or p.get("condition_grade") or "Pristine / Mint"),
+        "specifications": p.get("specifications"),
+        "accessories": str(p.get("accessories") or ""),
         "category": str(p.get("category") or ""),
         "rating": float(p.get("rating") if p.get("rating") is not None else 5.0),
         "reviews": int(p.get("reviews") if p.get("reviews") is not None else 0),
@@ -3086,6 +3099,8 @@ def format_product_dict(p: dict, is_summary: bool = False, booked_pids_set: Opti
         "availability_reason": reason,
         "status": str(p.get("status") or "approved"),
         "location": location_str,
+        "city": city or None,
+        "area": str(p.get("area") or ""),
         "owner": {
             "name": owner_name,
             "email": None if is_public else (owner_email or None),
@@ -3127,14 +3142,35 @@ def fetch_public_listings(
             payernt_items = get_all_active_payernt_products()
             for p in payernt_items:
                 if not any(str(l.get("id")) == str(p.get("id")) for l in listings):
+                    raw_imgs = p.get("images")
+                    if isinstance(raw_imgs, str) and raw_imgs.startswith("["):
+                        try:
+                            parsed_imgs = json.loads(raw_imgs)
+                        except Exception:
+                            parsed_imgs = [p.get("primary_image")] if p.get("primary_image") else []
+                    elif isinstance(raw_imgs, list):
+                        parsed_imgs = raw_imgs
+                    else:
+                        parsed_imgs = [p.get("primary_image")] if p.get("primary_image") else []
+                    
+                    v_url = p.get("video_url") or ""
+
                     listings.append({
                         "id": p.get("id"),
                         "title": p.get("title") or p.get("name"),
                         "name": p.get("name"),
+                        "brand": p.get("brand", ""),
+                        "model": p.get("model", ""),
                         "description": p.get("description"),
                         "price": p.get("daily_rate", 999),
-                        "image": p.get("primary_image"),
+                        "daily_rate": p.get("daily_rate", 999),
+                        "image": p.get("primary_image") or (parsed_imgs[0] if parsed_imgs else ""),
+                        "primary_image": p.get("primary_image"),
+                        "images": parsed_imgs,
+                        "video_url": v_url or None,
+                        "videoUrl": v_url or None,
                         "category": p.get("category", "tech"),
+                        "condition": p.get("condition_grade", "Like New"),
                         "rating": 4.9,
                         "reviews": 12,
                         "available": p.get("available", True),
@@ -3167,6 +3203,18 @@ def fetch_product_by_id(id: str, response: Response):
                 from payernt_database import get_payernt_product_by_id
                 p = get_payernt_product_by_id(id, include_pin=False)
                 if p:
+                    v_url = p.get("video_url") or ""
+                    raw_imgs = p.get("images")
+                    if isinstance(raw_imgs, str) and raw_imgs.startswith("["):
+                        try:
+                            parsed_imgs = json.loads(raw_imgs)
+                        except Exception:
+                            parsed_imgs = [p.get("primary_image")] if p.get("primary_image") else []
+                    elif isinstance(raw_imgs, list):
+                        parsed_imgs = raw_imgs
+                    else:
+                        parsed_imgs = [p.get("primary_image")] if p.get("primary_image") else []
+
                     return {
                         "id": p.get("id"),
                         "title": p.get("title") or p.get("name"),
@@ -3180,9 +3228,11 @@ def fetch_product_by_id(id: str, response: Response):
                         "daily_rate": p.get("daily_rate", 999),
                         "weekly_rate": p.get("weekly_rate", 0),
                         "monthly_rate": p.get("monthly_rate", 0),
-                        "image": p.get("primary_image"),
+                        "image": p.get("primary_image") or (parsed_imgs[0] if parsed_imgs else ""),
                         "primary_image": p.get("primary_image"),
-                        "images": json.loads(p.get("images")) if isinstance(p.get("images"), str) and p.get("images").startswith("[") else [p.get("primary_image")],
+                        "images": parsed_imgs,
+                        "video_url": v_url or None,
+                        "videoUrl": v_url or None,
                         "category": p.get("category", "tech"),
                         "condition": p.get("condition_grade", "Like New"),
                         "accessories": p.get("accessories", ""),

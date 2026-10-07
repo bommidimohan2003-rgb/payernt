@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { motion, useMotionValue, useTransform, animate } from "framer-motion";
+import { motion, useMotionValue, useTransform, animate, AnimatePresence } from "framer-motion";
 import {
   Clock,
   Heart,
@@ -8,6 +8,14 @@ import {
   ArrowRight,
   Package,
   ShoppingBag,
+  ChevronLeft,
+  ChevronRight,
+  Play,
+  Video,
+  Sparkles,
+  X,
+  ShieldCheck,
+  Film,
 } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import type { Product } from "@/types";
@@ -93,6 +101,43 @@ export function BrowseSwipeDeck({
   const nextProduct = queue[1] || null;
   const thirdProduct = queue[2] || null;
 
+  // Extract all images for the active product
+  const productImages = useMemo(() => {
+    if (!activeProduct) return [];
+    let imgs = activeProduct.images || [];
+    if (typeof imgs === "string") {
+      try {
+        const parsed = JSON.parse(imgs);
+        if (Array.isArray(parsed)) imgs = parsed;
+      } catch {
+        imgs = [imgs];
+      }
+    }
+    if (!Array.isArray(imgs)) imgs = [];
+    imgs = imgs.filter(Boolean);
+    const prim = getProductPrimaryImage(activeProduct);
+    if (prim && !imgs.includes(prim)) {
+      imgs = [prim, ...imgs];
+    } else if (!imgs.length && prim) {
+      imgs = [prim];
+    }
+    return imgs;
+  }, [activeProduct]);
+
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [showVideoModal, setShowVideoModal] = useState(false);
+
+  useEffect(() => {
+    setActiveImageIndex(0);
+    setShowVideoModal(false);
+  }, [activeProduct?.id]);
+
+  const activeVideoUrl =
+    activeProduct?.videoUrl ||
+    activeProduct?.video_url ||
+    (activeProduct as any)?.video_url ||
+    null;
+
   // Preload next 1-2 product images to guarantee zero flicker / blank card
   useEffect(() => {
     const nextImgUrl = getProductPrimaryImage(nextProduct);
@@ -117,7 +162,9 @@ export function BrowseSwipeDeck({
 
   const [imageErrorMap, setImageErrorMap] = useState<Record<string, boolean>>({});
 
-  const displayImage = activeProduct ? getProductPrimaryImage(activeProduct) : "";
+  const displayImage =
+    productImages[activeImageIndex] ||
+    (activeProduct ? getProductPrimaryImage(activeProduct) : "");
 
   // Motion values for real-time physics tracking on the active card
   const x = useMotionValue(0);
@@ -568,43 +615,137 @@ export function BrowseSwipeDeck({
             </div>
           )}
 
-          {/* TOP CONTROLS: Real Availability & Wishlist */}
+          {/* TOP CONTROLS: Real Availability, 10s Video Badge & Wishlist */}
           <div className="absolute top-3.5 left-3.5 right-3.5 flex items-center justify-between z-20 pointer-events-auto">
-            {/* Availability Badge */}
-            <div
-              onPointerDownCapture={(e) => e.stopPropagation()}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {isAvailable ? (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-black/60 backdrop-blur-md px-2.5 py-0.5 text-[11px] font-bold text-emerald-400 border border-emerald-500/30 shadow-md">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <span>Available</span>
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-black/70 backdrop-blur-md px-2.5 py-0.5 text-[11px] font-bold text-neutral-300 border border-white/10 shadow-md">
-                  <Clock className="h-3 w-3 text-neutral-400" />
-                  <span>Not Available</span>
-                </span>
+            {/* Left Top Badges */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {/* Availability Badge */}
+              <div
+                onPointerDownCapture={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {isAvailable ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-black/60 backdrop-blur-md px-2.5 py-0.5 text-[11px] font-bold text-emerald-400 border border-emerald-500/30 shadow-md">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>Available</span>
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-black/70 backdrop-blur-md px-2.5 py-0.5 text-[11px] font-bold text-neutral-300 border border-white/10 shadow-md">
+                    <Clock className="h-3 w-3 text-neutral-400" />
+                    <span>Not Available</span>
+                  </span>
+                )}
+              </div>
+
+              {/* 10s Equipment Video Badge */}
+              {activeVideoUrl && (
+                <button
+                  type="button"
+                  onPointerDownCapture={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    setShowVideoModal(true);
+                  }}
+                  aria-label="Watch 10s Equipment Inspection Video"
+                  title="Watch verified inspection video"
+                  className="inline-flex items-center gap-1 rounded-full bg-emerald-500 hover:bg-emerald-400 text-black px-2.5 py-0.5 text-[10px] font-extrabold shadow-md transition-all active:scale-95 cursor-pointer backdrop-blur-md"
+                >
+                  <Play className="h-2.5 w-2.5 fill-black text-black" />
+                  <span>10s Video</span>
+                </button>
               )}
             </div>
 
-            {/* Wishlist Toggle Button */}
-            <button
-              type="button"
-              onPointerDownCapture={(e) => e.stopPropagation()}
-              onClick={handleWishlistToggle}
-              aria-label="Toggle Wishlist"
-              className="h-8 w-8 rounded-full bg-black/60 hover:bg-black/85 backdrop-blur-md text-white/90 hover:text-red-500 transition-colors shadow-md border border-white/20 flex items-center justify-center cursor-pointer"
-            >
-              <Heart
-                className={cn(
-                  "h-3.5 w-3.5 transition-all",
-                  has(activeProduct.id) &&
-                    "fill-red-500 text-red-500 scale-110",
-                )}
-              />
-            </button>
+            {/* Right Top: Wishlist & Photo Counter */}
+            <div className="flex items-center gap-1.5">
+              {productImages.length > 1 && (
+                <span className="px-2 py-0.5 rounded-full bg-black/60 backdrop-blur-md text-white text-[10px] font-bold border border-white/15 shadow-sm">
+                  {activeImageIndex + 1}/{productImages.length}
+                </span>
+              )}
+
+              {/* Wishlist Toggle Button */}
+              <button
+                type="button"
+                onPointerDownCapture={(e) => e.stopPropagation()}
+                onClick={handleWishlistToggle}
+                aria-label="Toggle Wishlist"
+                className="h-8 w-8 rounded-full bg-black/60 hover:bg-black/85 backdrop-blur-md text-white/90 hover:text-red-500 transition-colors shadow-md border border-white/20 flex items-center justify-center cursor-pointer"
+              >
+                <Heart
+                  className={cn(
+                    "h-3.5 w-3.5 transition-all",
+                    has(activeProduct.id) &&
+                      "fill-red-500 text-red-500 scale-110",
+                  )}
+                />
+              </button>
+            </div>
           </div>
+
+          {/* MULTI-PHOTO TOP DOTS (If >1 photos exist) */}
+          {productImages.length > 1 && (
+            <div
+              onPointerDownCapture={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+              className="absolute top-12 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 bg-black/50 backdrop-blur-md px-2 py-0.5 rounded-full border border-white/10 pointer-events-auto"
+            >
+              {productImages.map((_, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActiveImageIndex(idx);
+                  }}
+                  aria-label={`View photo ${idx + 1}`}
+                  className={cn(
+                    "h-1.5 rounded-full transition-all cursor-pointer",
+                    activeImageIndex === idx
+                      ? "w-4 bg-emerald-400"
+                      : "w-1.5 bg-white/40 hover:bg-white/70"
+                  )}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* MULTI-PHOTO LEFT & RIGHT CHEVRONS (If >1 photos exist) */}
+          {productImages.length > 1 && (
+            <>
+              <button
+                type="button"
+                onPointerDownCapture={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  setActiveImageIndex((prev) =>
+                    prev > 0 ? prev - 1 : productImages.length - 1
+                  );
+                }}
+                aria-label="Previous product image"
+                className="absolute left-2 top-1/2 -translate-y-1/2 z-20 h-7 w-7 rounded-full bg-black/60 hover:bg-black/85 text-white backdrop-blur-md border border-white/20 flex items-center justify-center opacity-75 hover:opacity-100 transition-all shadow-md active:scale-95 cursor-pointer pointer-events-auto"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onPointerDownCapture={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  setActiveImageIndex((prev) =>
+                    prev < productImages.length - 1 ? prev + 1 : 0
+                  );
+                }}
+                aria-label="Next product image"
+                className="absolute right-2 top-1/2 -translate-y-1/2 z-20 h-7 w-7 rounded-full bg-black/60 hover:bg-black/85 text-white backdrop-blur-md border border-white/20 flex items-center justify-center opacity-75 hover:opacity-100 transition-all shadow-md active:scale-95 cursor-pointer pointer-events-auto"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </>
+          )}
 
           {/* BOTTOM IMAGE OVERLAY: Clean, Compact Text on Image */}
           <div className="absolute bottom-0 inset-x-0 p-4 space-y-1.5 z-20 pointer-events-none text-left">
@@ -703,6 +844,68 @@ export function BrowseSwipeDeck({
           </button>
         )}
       </div>
+
+      {/* Inspection Video Modal for Direct Explore Playback */}
+      <AnimatePresence>
+        {showVideoModal && activeVideoUrl && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="relative w-full max-w-lg rounded-3xl bg-card border border-border shadow-2xl overflow-hidden p-5 space-y-4 text-left"
+            >
+              <div className="flex items-center justify-between pb-2 border-b border-border/60">
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-8 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
+                    <Video className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-extrabold text-foreground">
+                      Verified 10s Inspection Video
+                    </h4>
+                    <p className="text-[11px] text-muted-foreground">
+                      {activeProduct?.title} • 100% Physical Check
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowVideoModal(false)}
+                  className="h-8 w-8 rounded-full bg-secondary hover:bg-secondary/80 text-foreground flex items-center justify-center transition-colors cursor-pointer"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="relative rounded-2xl overflow-hidden bg-black aspect-video border border-border/80 shadow-inner">
+                <video
+                  src={activeVideoUrl}
+                  controls
+                  autoPlay
+                  playsInline
+                  className="w-full h-full object-contain"
+                />
+              </div>
+
+              <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-1">
+                <span className="flex items-center gap-1 text-emerald-500 font-medium">
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  Recorded prior to listing to verify pristine gear condition.
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowVideoModal(false)}
+                  className="px-4 py-1.5 rounded-full bg-primary text-primary-foreground text-xs font-bold shadow-xs hover:opacity-90 cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -129,6 +129,46 @@ async function getCachedOrFetch<T>(
   return executeFetch();
 }
 
+export function normalizeProductData(raw: any): Product {
+  if (!raw || typeof raw !== "object") return raw;
+  let imgs: string[] = [];
+  const rawImgs = raw.images;
+  if (typeof rawImgs === "string" && rawImgs.trim().startsWith("[")) {
+    try {
+      const parsed = JSON.parse(rawImgs);
+      if (Array.isArray(parsed)) imgs = parsed.filter(Boolean);
+    } catch {
+      imgs = [rawImgs.trim()];
+    }
+  } else if (Array.isArray(rawImgs)) {
+    imgs = rawImgs.filter(Boolean);
+  } else if (typeof rawImgs === "string" && rawImgs.trim()) {
+    imgs = [rawImgs.trim()];
+  }
+
+  const primaryImg = (
+    raw.image ||
+    raw.primary_image ||
+    (imgs.length > 0 ? imgs[0] : "")
+  ).trim();
+
+  if (primaryImg && !imgs.includes(primaryImg)) {
+    imgs = [primaryImg, ...imgs];
+  } else if (!imgs.length && primaryImg) {
+    imgs = [primaryImg];
+  }
+
+  const vUrl = (raw.videoUrl || raw.video_url || "").trim() || undefined;
+
+  return {
+    ...raw,
+    image: primaryImg || (imgs[0] || ""),
+    images: imgs,
+    videoUrl: vUrl,
+    video_url: vUrl,
+  };
+}
+
 export const api = {
   invalidateCache(keyPrefix?: string) {
     if (!keyPrefix) {
@@ -152,8 +192,9 @@ export const api = {
 
   cacheProduct(product: Product): void {
     if (product && product.id) {
-      const key = String(product.id);
-      _productCache.set(key, product);
+      const normalized = normalizeProductData(product);
+      const key = String(normalized.id);
+      _productCache.set(key, normalized);
     }
   },
 
@@ -161,15 +202,16 @@ export const api = {
     if (!id) return null;
     const key = String(id);
     const inMem = _productCache.get(key);
-    if (inMem) return inMem;
+    if (inMem) return normalizeProductData(inMem);
     const fromStorage = storage.get<Product[]>("payent_server_products", []);
     if (Array.isArray(fromStorage)) {
       const found = fromStorage.find(
         (p) => String(p?.id).toLowerCase() === key.toLowerCase() || String(p?.id) === key
       );
       if (found) {
-        _productCache.set(key, found);
-        return found;
+        const norm = normalizeProductData(found);
+        _productCache.set(key, norm);
+        return norm;
       }
     }
     return null;
@@ -185,11 +227,9 @@ export const api = {
       try {
         const res = await fetch(`${API_BASE}/api/products/${encodeURIComponent(key)}`);
         if (res.ok) {
-          const product = await res.json();
-          if (product && product.id) {
-            if (!product.image && Array.isArray(product.images) && product.images.length > 0) {
-              product.image = product.images[0];
-            }
+          const raw = await res.json();
+          if (raw && raw.id) {
+            const product = normalizeProductData(raw);
             this.cacheProduct(product);
             return product;
           }
@@ -207,8 +247,9 @@ export const api = {
           (p) => String(p?.id).toLowerCase() === key.toLowerCase() || String(p?.id) === key
         );
         if (match) {
-          this.cacheProduct(match);
-          return match;
+          const product = normalizeProductData(match);
+          this.cacheProduct(product);
+          return product;
         }
       }
     } catch {
@@ -1095,15 +1136,15 @@ export const api = {
           }
         }
         if (Array.isArray(items)) {
-          items.forEach((p) => {
-            if (p && p.id) {
-              if (!p.image && Array.isArray(p.images) && p.images.length > 0) {
-                p.image = p.images[0];
-              }
-              _productCache.set(String(p.id), p);
+          const normalizedItems = items.map((p) => {
+            const norm = normalizeProductData(p);
+            if (norm && norm.id) {
+              _productCache.set(String(norm.id), norm);
             }
+            return norm;
           });
-          storage.set("payent_server_products", items);
+          storage.set("payent_server_products", normalizedItems);
+          return normalizedItems;
         }
         return items;
       },

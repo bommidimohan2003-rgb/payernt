@@ -5369,6 +5369,15 @@ def regenerate_device_qr_db(device_id: str) -> Optional[dict]:
         WHERE device_id = %s OR id = %s
     """, (new_security_id, new_qr_token, new_hash, now_iso, clean_id, clean_id))
 
+    for d in MOCK_DEVICES.values():
+        if d.get("device_id") == clean_id or d.get("id") == clean_id:
+            d["security_id"] = new_security_id
+            d["qr_token"] = new_qr_token
+            d["qr_token_hash"] = new_hash
+            d["qr_status"] = "ACTIVE"
+            d["updated_at"] = now_iso
+            break
+
     dev["security_id"] = new_security_id
     dev["qr_token"] = new_qr_token
     dev["qr_token_hash"] = new_hash
