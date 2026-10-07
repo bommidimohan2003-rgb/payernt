@@ -16,6 +16,9 @@ import {
   ArrowDownRight,
   PackagePlus,
   Package,
+  ShieldCheck,
+  Zap,
+  Sparkles,
 } from "lucide-react";
 
 // ============================================================================
