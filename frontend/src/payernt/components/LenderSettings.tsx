@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Settings,
   Bell,
@@ -9,10 +9,23 @@ import {
   Sliders,
   CheckCircle2,
   Globe,
+  ShieldCheck,
+  QrCode,
+  Laptop,
+  History,
+  ArrowRightLeft,
+  Activity,
+  Plus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useTheme } from "@/hooks/useTheme";
 import { useLanguage, LanguageSelector } from "@/i18n";
+import { SecurityQRCard } from "@/components/security/SecurityQRCard";
+import { MyDevicesTab } from "@/components/security/MyDevicesTab";
+import { SecurityHistoryTab } from "@/components/security/SecurityHistoryTab";
+import { OwnershipTransferTab } from "@/components/security/OwnershipTransferTab";
+import { RegisterDeviceModal } from "@/components/security/RegisterDeviceModal";
+import { RegisteredDevice, deviceService } from "@/services/deviceService";
 
 interface LenderSettingsProps {
   onBack?: () => void;
@@ -27,6 +40,41 @@ export function LenderSettingsView({
 }: LenderSettingsProps) {
   const { theme, toggle: toggleTheme } = useTheme();
   const { tCommon, tPayernt } = useLanguage();
+
+  // Security & Device Identity State
+  const [securityTab, setSecurityTab] = useState<"qr" | "devices" | "status" | "history" | "transfers">("qr");
+  const [devices, setDevices] = useState<RegisteredDevice[]>([]);
+  const [loadingDevices, setLoadingDevices] = useState(true);
+  const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
+
+  const fetchDevices = async () => {
+    setLoadingDevices(true);
+    try {
+      const res = await deviceService.getDevices();
+      setDevices(res.devices || []);
+    } catch (err) {
+      console.error("Failed to load registered devices", err);
+    } finally {
+      setLoadingDevices(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDevices();
+  }, []);
+
+  const handleSelectDeviceForQR = (deviceId: string) => {
+    setSecurityTab("qr");
+  };
+
+  const handleDeviceRegistered = (newDev: RegisteredDevice) => {
+    setDevices((prev) => [newDev, ...prev]);
+    setSecurityTab("qr");
+  };
+
+  const activeCount = devices.filter((d) => d.deviceStatus === "ACTIVE").length;
+  const lostCount = devices.filter((d) => d.deviceStatus === "REPORTED_LOST").length;
+  const stolenCount = devices.filter((d) => d.deviceStatus === "REPORTED_STOLEN").length;
 
   // Notification states
   const [notifyBookings, setNotifyBookings] = useState(true);
@@ -74,7 +122,181 @@ export function LenderSettingsView({
         </div>
       </div>
 
-      {/* 1. Appearance & Theme */}
+      {/* ========================================================================= */}
+      {/* SECTION 1: SECURITY & DEVICE IDENTITY (MY SECURITY QR) */}
+      {/* ========================================================================= */}
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <div className="h-8 w-8 rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center">
+              <ShieldCheck className="h-4 w-4" />
+            </div>
+            <div>
+              <h2 className="text-base sm:text-lg font-extrabold text-neutral-900 dark:text-white font-display tracking-tight">
+                Security & Device Identity
+              </h2>
+              <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                Cryptographic QR verification, device registration & anti-theft protection
+              </p>
+            </div>
+          </div>
+          <span className="text-[11px] font-mono text-neutral-400 self-start sm:self-auto">
+            {devices.length} Registered {devices.length === 1 ? "Laptop" : "Laptops"}
+          </span>
+        </div>
+
+        {/* Navigation Sub-Tabs */}
+        <div className="flex items-center gap-1.5 p-1.5 rounded-2xl bg-neutral-100 dark:bg-[#0D151D] border border-neutral-200 dark:border-white/10 overflow-x-auto scrollbar-none">
+          <button
+            type="button"
+            onClick={() => setSecurityTab("qr")}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${
+              securityTab === "qr"
+                ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-sm"
+                : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+            }`}
+          >
+            <QrCode className="h-3.5 w-3.5 text-sky-500" />
+            My Security QR
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSecurityTab("devices")}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${
+              securityTab === "devices"
+                ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-sm"
+                : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+            }`}
+          >
+            <Laptop className="h-3.5 w-3.5" />
+            My Devices
+            {devices.length > 0 && (
+              <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-neutral-200 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-200">
+                {devices.length}
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSecurityTab("status")}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${
+              securityTab === "status"
+                ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-sm"
+                : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+            }`}
+          >
+            <Activity className="h-3.5 w-3.5 text-emerald-500" />
+            Device Status
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSecurityTab("history")}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${
+              securityTab === "history"
+                ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-sm"
+                : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+            }`}
+          >
+            <History className="h-3.5 w-3.5" />
+            Security History
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSecurityTab("transfers")}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${
+              securityTab === "transfers"
+                ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-sm"
+                : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+            }`}
+          >
+            <ArrowRightLeft className="h-3.5 w-3.5" />
+            Ownership Transfer
+          </button>
+        </div>
+
+        {/* Sub-Tab 1: My Security QR */}
+        {securityTab === "qr" && (
+          <SecurityQRCard
+            devices={devices}
+            onRefreshDevices={fetchDevices}
+            onOpenRegisterModal={() => setIsRegisterModalOpen(true)}
+          />
+        )}
+
+        {/* Sub-Tab 2: My Devices */}
+        {securityTab === "devices" && (
+          <MyDevicesTab
+            devices={devices}
+            onSelectDeviceForQR={handleSelectDeviceForQR}
+            onRefreshDevices={fetchDevices}
+            onOpenRegisterModal={() => setIsRegisterModalOpen(true)}
+          />
+        )}
+
+        {/* Sub-Tab 3: Device Status Overview */}
+        {securityTab === "status" && (
+          <div className="p-5 sm:p-6 bg-white dark:bg-[#10141d] border border-neutral-200/90 dark:border-white/[0.08] rounded-2xl shadow-xs space-y-5">
+            <div>
+              <h3 className="text-base font-bold text-neutral-900 dark:text-white font-display">
+                Hardware Registry & Security Status
+              </h3>
+              <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
+                Real-time status breakdown of registered laptop hardware units.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="p-4 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/40 space-y-1">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                  Active & Verified
+                </div>
+                <div className="text-2xl font-extrabold text-emerald-700 dark:text-emerald-300 font-mono">
+                  {activeCount}
+                </div>
+                <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                  Cryptographic QR authenticated & scannable.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 space-y-1">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                  Reported Lost
+                </div>
+                <div className="text-2xl font-extrabold text-amber-700 dark:text-amber-300 font-mono">
+                  {lostCount}
+                </div>
+                <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                  Flagged with public security alert.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-xl bg-rose-50/60 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/40 space-y-1">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
+                  Reported Stolen
+                </div>
+                <div className="text-2xl font-extrabold text-rose-700 dark:text-rose-300 font-mono">
+                  {stolenCount}
+                </div>
+                <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                  Flagged with prohibited transfer warning.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Sub-Tab 4: Security History */}
+        {securityTab === "history" && <SecurityHistoryTab />}
+
+        {/* Sub-Tab 5: Ownership Transfer */}
+        {securityTab === "transfers" && <OwnershipTransferTab onRefreshDevices={fetchDevices} />}
+      </div>
+
+      {/* 2. Appearance & Theme */}
       <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#10141d] border border-neutral-200/90 dark:border-white/[0.08] shadow-xs space-y-4">
         <div className="flex items-center gap-2.5">
           <div className="p-2 rounded-xl bg-neutral-100 dark:bg-white/[0.06] text-neutral-800 dark:text-neutral-200">
@@ -127,7 +349,7 @@ export function LenderSettingsView({
         </div>
       </div>
 
-      {/* 2. Languages Selection Card */}
+      {/* 3. Languages Selection Card */}
       <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#10141d] border border-neutral-200/90 dark:border-white/[0.08] shadow-xs space-y-4">
         <div className="flex items-center gap-2.5">
           <div className="p-2 rounded-xl bg-neutral-100 dark:bg-white/[0.06] text-neutral-800 dark:text-neutral-200">
@@ -142,7 +364,7 @@ export function LenderSettingsView({
         <LanguageSelector />
       </div>
 
-      {/* 3. Notification Preferences */}
+      {/* 4. Notification Preferences */}
       <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#10141d] border border-neutral-200/90 dark:border-white/[0.08] shadow-xs space-y-4">
         <div className="flex items-center gap-2.5">
           <div className="p-2 rounded-xl bg-neutral-100 dark:bg-white/[0.06] text-neutral-800 dark:text-neutral-200">
@@ -199,7 +421,7 @@ export function LenderSettingsView({
         </div>
       </div>
 
-      {/* 4. Rental & Handover Preferences */}
+      {/* 5. Rental & Handover Preferences */}
       <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#10141d] border border-neutral-200/90 dark:border-white/[0.08] shadow-xs space-y-4">
         <div className="flex items-center gap-2.5">
           <div className="p-2 rounded-xl bg-neutral-100 dark:bg-white/[0.06] text-neutral-800 dark:text-neutral-200">
@@ -265,7 +487,7 @@ export function LenderSettingsView({
         </button>
       </div>
 
-      {/* 5. Danger Zone */}
+      {/* 6. Danger Zone */}
       <div className="p-4 sm:p-5 rounded-2xl bg-neutral-50 dark:bg-[#10141d]/60 border border-neutral-200/90 dark:border-white/[0.08] shadow-xs space-y-4">
         <div>
           <h2 className="text-sm font-bold text-neutral-900 dark:text-white">{tCommon.accountActions}</h2>
@@ -285,6 +507,15 @@ export function LenderSettingsView({
           )}
         </div>
       </div>
+
+      {/* Device Registration Modal */}
+      {isRegisterModalOpen && (
+        <RegisterDeviceModal
+          isOpen={isRegisterModalOpen}
+          onClose={() => setIsRegisterModalOpen(false)}
+          onDeviceRegistered={handleDeviceRegistered}
+        />
+      )}
     </div>
   );
 }
