@@ -4,47 +4,16 @@ from urllib.parse import urlparse
 # Suppress uv hardlink warning by explicitly setting link mode to copy
 os.environ["UV_LINK_MODE"] = "copy"
 
-# Load .env file if present (local dev)
+# Load .env file if present (local development)
 try:
     from dotenv import load_dotenv
-    load_dotenv()
+    backend_env = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+    if os.path.exists(backend_env):
+        load_dotenv(backend_env)
+    else:
+        load_dotenv()
 except ImportError:
     pass
-
-# Parse DATABASE_URL if provided (e.g. TiDB Cloud / Railway / Cloud)
-DATABASE_URL = os.getenv("DATABASE_URL") or os.getenv("TIDB_DATABASE_URL")
-
-if DATABASE_URL:
-    try:
-        url = urlparse(DATABASE_URL)
-        MYSQL_HOST = url.hostname or "gateway01.ap-southeast-1.prod.aws.tidbcloud.com"
-        MYSQL_PORT = url.port or 4000
-        MYSQL_USER = url.username or "3NNZ4KBh8x122Nu.root"
-        MYSQL_PASSWORD = url.password or "dLNnr55ayiUqR9vU"
-        MYSQL_DB = url.path.lstrip("/") or "payent_marketplace_db"
-    except Exception as e:
-        print(f"Warning: Failed to parse DATABASE_URL: {e}")
-        MYSQL_HOST = os.getenv("TIDB_HOST", os.getenv("MYSQLHOST", os.getenv("MYSQL_HOST", "gateway01.ap-southeast-1.prod.aws.tidbcloud.com")))
-        MYSQL_PORT = int(os.getenv("TIDB_PORT", os.getenv("MYSQLPORT", os.getenv("MYSQL_PORT", "4000"))))
-        MYSQL_USER = os.getenv("TIDB_USER", os.getenv("MYSQLUSER", os.getenv("MYSQL_USER", "3NNZ4KBh8x122Nu.root")))
-        MYSQL_PASSWORD = os.getenv("TIDB_PASSWORD", os.getenv("MYSQLPASSWORD", os.getenv("MYSQL_PASSWORD", "dLNnr55ayiUqR9vU")))
-        MYSQL_DB = os.getenv("TIDB_DATABASE", os.getenv("MYSQLDATABASE", os.getenv("MYSQL_DB", "payent_marketplace_db")))
-else:
-    MYSQL_HOST = os.getenv("TIDB_HOST", os.getenv("MYSQLHOST", os.getenv("MYSQL_HOST", "gateway01.ap-southeast-1.prod.aws.tidbcloud.com")))
-    MYSQL_PORT = int(os.getenv("TIDB_PORT", os.getenv("MYSQLPORT", os.getenv("MYSQL_PORT", "4000"))))
-    MYSQL_USER = os.getenv("TIDB_USER", os.getenv("MYSQLUSER", os.getenv("MYSQL_USER", "3NNZ4KBh8x122Nu.root")))
-    MYSQL_PASSWORD = os.getenv("TIDB_PASSWORD", os.getenv("MYSQLPASSWORD", os.getenv("MYSQL_PASSWORD", "dLNnr55ayiUqR9vU")))
-    MYSQL_DB = os.getenv("TIDB_DATABASE", os.getenv("MYSQLDATABASE", os.getenv("MYSQL_DB", "payent_marketplace_db")))
-
-# TiDB Aliases for modern configuration
-TIDB_HOST = MYSQL_HOST
-TIDB_PORT = MYSQL_PORT
-TIDB_USER = MYSQL_USER
-TIDB_PASSWORD = MYSQL_PASSWORD
-TIDB_DATABASE = MYSQL_DB
-
-MYSQL_SSL = os.getenv("MYSQL_SSL", os.getenv("TIDB_SSL", "true")).lower() in ("true", "1", "yes")
-TIDB_SSL = MYSQL_SSL
 
 # ENVIRONMENT Config
 ENV = os.getenv("ENV", os.getenv("ENVIRONMENT", "development")).lower()
@@ -62,19 +31,66 @@ def assert_testing_allowed():
             "To execute tests against dedicated environments, set ENV=testing or use an isolated test database."
         )
 
-# Security & Secrets Audit
-DEFAULT_SECRET = "payent_super_secret_key_change_me_in_production"
-JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", DEFAULT_SECRET)
-ADMIN_CREATION_SECRET = os.getenv("ADMIN_CREATION_SECRET", os.getenv("ADMIN_SETUP_CODE", "PAYENT-ADMIN-SECRET-2026"))
-RAZORPAY_WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET", "")
+# Parse DATABASE_URL if provided (e.g. TiDB Cloud / Railway / Cloud)
+DATABASE_URL = os.getenv("DATABASE_URL") or os.getenv("TIDB_DATABASE_URL")
+
+if DATABASE_URL:
+    try:
+        url = urlparse(DATABASE_URL)
+        MYSQL_HOST = url.hostname or ""
+        MYSQL_PORT = url.port or 4000
+        MYSQL_USER = url.username or ""
+        MYSQL_PASSWORD = url.password or ""
+        MYSQL_DB = url.path.lstrip("/") or "payent_marketplace_db"
+    except Exception as e:
+        print(f"Warning: Failed to parse DATABASE_URL: {e}")
+        MYSQL_HOST = os.getenv("TIDB_HOST", os.getenv("MYSQLHOST", os.getenv("MYSQL_HOST", "")))
+        MYSQL_PORT = int(os.getenv("TIDB_PORT", os.getenv("MYSQLPORT", os.getenv("MYSQL_PORT", "4000"))))
+        MYSQL_USER = os.getenv("TIDB_USER", os.getenv("MYSQLUSER", os.getenv("MYSQL_USER", "")))
+        MYSQL_PASSWORD = os.getenv("TIDB_PASSWORD", os.getenv("MYSQLPASSWORD", os.getenv("MYSQL_PASSWORD", "")))
+        MYSQL_DB = os.getenv("TIDB_DATABASE", os.getenv("MYSQLDATABASE", os.getenv("MYSQL_DB", "payent_marketplace_db")))
+else:
+    MYSQL_HOST = os.getenv("TIDB_HOST", os.getenv("MYSQLHOST", os.getenv("MYSQL_HOST", "localhost" if not IS_PRODUCTION else "")))
+    MYSQL_PORT = int(os.getenv("TIDB_PORT", os.getenv("MYSQLPORT", os.getenv("MYSQL_PORT", "4000" if not IS_PRODUCTION else "4000"))))
+    MYSQL_USER = os.getenv("TIDB_USER", os.getenv("MYSQLUSER", os.getenv("MYSQL_USER", "root" if not IS_PRODUCTION else "")))
+    MYSQL_PASSWORD = os.getenv("TIDB_PASSWORD", os.getenv("MYSQLPASSWORD", os.getenv("MYSQL_PASSWORD", "")))
+    MYSQL_DB = os.getenv("TIDB_DATABASE", os.getenv("MYSQLDATABASE", os.getenv("MYSQL_DB", "payent_marketplace_db")))
+
+# TiDB Aliases for modern configuration
+TIDB_HOST = MYSQL_HOST
+TIDB_PORT = MYSQL_PORT
+TIDB_USER = MYSQL_USER
+TIDB_PASSWORD = MYSQL_PASSWORD
+TIDB_DATABASE = MYSQL_DB
+
+MYSQL_SSL = os.getenv("MYSQL_SSL", os.getenv("TIDB_SSL", "true")).lower() in ("true", "1", "yes")
+TIDB_SSL = MYSQL_SSL
+TIDB_SSL_CA = os.getenv("TIDB_SSL_CA", os.getenv("MYSQL_SSL_CA", ""))
+
+# Fail-fast security validation for production mode
+if IS_PRODUCTION:
+    if not MYSQL_HOST or not MYSQL_USER or not MYSQL_PASSWORD:
+        raise RuntimeError(
+            "FATAL SECURITY CONFIGURATION: Production database credentials (DATABASE_URL or TIDB_HOST / TIDB_USER / TIDB_PASSWORD) "
+            "are missing. Set required database environment variables in Railway service settings."
+        )
+
+# Security & Secrets
+DEFAULT_INSECURE_SECRET = "payent_super_secret_key_change_me_in_production"
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "" if IS_PRODUCTION else "payent_dev_jwt_secret_key_2026_local_only")
 
 if IS_PRODUCTION:
-    if not JWT_SECRET_KEY or JWT_SECRET_KEY == DEFAULT_SECRET:
-        print("[CONFIG WARNING]: JWT_SECRET_KEY is using default secret. Set JWT_SECRET_KEY env var in production.")
-    if not MYSQL_PASSWORD or MYSQL_PASSWORD == "Bmohan":
-        print("[CONFIG WARNING]: MYSQL_PASSWORD is using default value. Set MYSQL_PASSWORD env var in production.")
-    if not RAZORPAY_WEBHOOK_SECRET:
-        print("[CONFIG WARNING]: RAZORPAY_WEBHOOK_SECRET is unconfigured. Set RAZORPAY_WEBHOOK_SECRET env var in production.")
+    if not JWT_SECRET_KEY or JWT_SECRET_KEY == DEFAULT_INSECURE_SECRET:
+        raise RuntimeError(
+            "FATAL SECURITY CONFIGURATION: JWT_SECRET_KEY must be explicitly set to a high-entropy secret in production."
+        )
+
+ADMIN_CREATION_SECRET = os.getenv("ADMIN_CREATION_SECRET", os.getenv("ADMIN_SETUP_CODE", "" if IS_PRODUCTION else "PAYENT-ADMIN-SECRET-2026"))
+if IS_PRODUCTION and not ADMIN_CREATION_SECRET:
+    print("[CONFIG WARNING]: ADMIN_CREATION_SECRET is unconfigured in production. Bootstrap admin creation will be disabled.")
+
+ADMIN_SETUP_CODE = os.getenv("ADMIN_SETUP_CODE", "" if IS_PRODUCTION else "PAYENT-ADMIN-2026")
+RAZORPAY_WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET", "")
 
 JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 if JWT_ALGORITHM not in ["HS256", "HS384", "HS512"]:
@@ -84,30 +100,52 @@ if JWT_ALGORITHM not in ["HS256", "HS384", "HS512"]:
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))  # 30 minutes
 REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7"))        # 7 days
 
-# CORS Config
-ALLOWED_ORIGINS_RAW = os.getenv("ALLOWED_ORIGINS", "*")
-ALLOWED_ORIGINS = [origin.strip() for origin in ALLOWED_ORIGINS_RAW.split(",") if origin.strip()]
+# CORS Configuration — Strict Origin Whitelist
+DEFAULT_TRUSTED_ORIGINS = [
+    "https://frontend.bommidimohan2003.workers.dev",
+    "https://payent.in",
+    "https://www.payent.in",
+    "https://payernt-production.up.railway.app",
+]
 
-# Twilio Verify Config (Twilio SMS integration disabled; using secure internal DB OTP engine)
+DEV_LOCAL_ORIGINS = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:3000",
+    "http://localhost:8001",
+    "http://127.0.0.1:8001",
+    "http://10.0.2.2:8001",
+    "http://testserver",
+]
+
+ALLOWED_ORIGINS_RAW = os.getenv("ALLOWED_ORIGINS", "")
+if ALLOWED_ORIGINS_RAW and ALLOWED_ORIGINS_RAW.strip() != "*":
+    ALLOWED_ORIGINS = [origin.strip() for origin in ALLOWED_ORIGINS_RAW.split(",") if origin.strip() and origin.strip() != "*"]
+else:
+    ALLOWED_ORIGINS = list(DEFAULT_TRUSTED_ORIGINS)
+
+if not IS_PRODUCTION:
+    for dev_origin in DEV_LOCAL_ORIGINS:
+        if dev_origin not in ALLOWED_ORIGINS:
+            ALLOWED_ORIGINS.append(dev_origin)
+
+# Twilio Verify Config (Optional / Fallback)
 ENABLE_TWILIO_SMS = os.getenv("ENABLE_TWILIO_SMS", "false").lower() == "true"
 TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID", "")
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN", "")
 TWILIO_VERIFY_SERVICE_SID = os.getenv("TWILIO_VERIFY_SERVICE_SID", "")
 DISABLE_TWILIO_FOR_FIREBASE = os.getenv("DISABLE_TWILIO_FOR_FIREBASE", "true").lower() == "true"
 
-# Admin Registration Config
-ADMIN_SETUP_CODE = os.getenv("ADMIN_SETUP_CODE", "PAYENT-ADMIN-2026")
-
 # Payment Gateway (Razorpay) Config
 RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID", "")
 RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET", "")
-RAZORPAY_WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET", "")
 
 if IS_PRODUCTION:
     if not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET:
-        print("Warning: Production RAZORPAY_KEY_ID or RAZORPAY_KEY_SECRET is missing. Payment processing will operate in test fallback mode.")
+        print("Notice: Production RAZORPAY_KEY_ID or RAZORPAY_KEY_SECRET is unconfigured. Real-time payments require Railway environment keys.")
     if not RAZORPAY_WEBHOOK_SECRET:
-        print("Warning: Production RAZORPAY_WEBHOOK_SECRET is missing. Register webhook secret in backend environment variables.")
+        print("Notice: Production RAZORPAY_WEBHOOK_SECRET is unconfigured. Webhook verification requires Railway environment key.")
 
 # SMTP & Email Delivery Config
 SMTP_HOST = os.getenv("SMTP_HOST", "")
@@ -118,6 +156,7 @@ SMTP_USE_TLS = os.getenv("SMTP_USE_TLS", "true").lower() in ("true", "1", "yes")
 SMTP_USE_SSL = os.getenv("SMTP_USE_SSL", "false").lower() in ("true", "1", "yes")
 MAIL_FROM = os.getenv("MAIL_FROM", os.getenv("SMTP_FROM_EMAIL", "no-reply@payent.in"))
 MAIL_FROM_NAME = os.getenv("MAIL_FROM_NAME", "Payent Security")
-FRONTEND_URL = os.getenv("FRONTEND_URL", os.getenv("BASE_URL", "https://payent.in"))
+FRONTEND_URL = os.getenv("FRONTEND_URL", os.getenv("BASE_URL", "https://frontend.bommidimohan2003.workers.dev"))
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", os.getenv("VITE_GOOGLE_CLIENT_ID", ""))
+
 

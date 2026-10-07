@@ -289,11 +289,11 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r".*",
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"],
     allow_headers=["*"],
-    expose_headers=["*"],
+    expose_headers=["X-Request-ID"],
 )
 
 # Enable GZip compression for payloads >= 500 bytes (reduces large JSON payloads by 85-90%)
@@ -336,6 +336,7 @@ DEV_ORIGINS = {
     "http://127.0.0.1:5173",
     "http://localhost:8001",
     "http://127.0.0.1:8001",
+    "http://10.0.2.2:8001",
     "http://testserver",
 }
 
@@ -345,9 +346,10 @@ def is_origin_allowed(origin: Optional[str]) -> bool:
     if origin in ALLOWED_ORIGINS and origin != "*":
         return True
     if not IS_PRODUCTION:
-        if origin in DEV_ORIGINS or origin.startswith("http://localhost:") or origin.startswith("http://127.0.0.1:"):
+        if origin in DEV_ORIGINS or origin.startswith("http://localhost:") or origin.startswith("http://127.0.0.1:") or origin.startswith("http://10.0.2.2:"):
             return True
-    if origin.endswith(".vercel.app") or origin.endswith(".up.railway.app"):
+    # In production, verify trusted Cloudflare domains
+    if origin == "https://frontend.bommidimohan2003.workers.dev" or origin == "https://payent.in" or origin == "https://www.payent.in":
         return True
     return False
 

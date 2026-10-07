@@ -10,7 +10,7 @@ export interface WSEvent<T = unknown> {
 
 type Listener = (event: WSEvent) => void;
 
-const DEFAULT_RAILWAY_HOST = "rentwise-pro-production.up.railway.app";
+const DEFAULT_RAILWAY_HOST = "payernt-production.up.railway.app";
 
 function getWebSocketUrl(token: string): string {
   let apiBase = import.meta.env.VITE_API_URL || "";

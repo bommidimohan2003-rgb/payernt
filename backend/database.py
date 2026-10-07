@@ -24,15 +24,32 @@ import secrets
 import random
 from typing import Optional, List, Set, Dict, Tuple, Any
 from datetime import datetime as dt, timezone, timedelta
-from config import MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DB, MYSQL_SSL
+from config import MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DB, MYSQL_SSL, TIDB_SSL_CA, IS_PRODUCTION
 
 logger = logging.getLogger("payent.database")
 
 def get_ssl_kwargs():
-    if MYSQL_SSL or "tidbcloud.com" in (MYSQL_HOST or "").lower():
+    """
+    Configure secure verified TLS for TiDB Cloud / MySQL database connections.
+    Enforces CERT_REQUIRED and hostname verification in production.
+    """
+    is_tidb = "tidbcloud.com" in (MYSQL_HOST or "").lower()
+    if MYSQL_SSL or is_tidb:
         ctx = ssl.create_default_context()
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
+        if TIDB_SSL_CA and os.path.exists(TIDB_SSL_CA):
+            try:
+                ctx.load_verify_locations(cafile=TIDB_SSL_CA)
+            except Exception as e:
+                logger.warning(f"Failed to load custom TIDB_SSL_CA '{TIDB_SSL_CA}': {e}")
+        
+        # Enforce strict TLS certificate and hostname verification for TiDB Cloud and in production
+        if is_tidb or IS_PRODUCTION:
+            ctx.check_hostname = True
+            ctx.verify_mode = ssl.CERT_REQUIRED
+        else:
+            ctx.check_hostname = True
+            ctx.verify_mode = ssl.CERT_REQUIRED
+
         return {"ssl": ctx}
     return {}
 
