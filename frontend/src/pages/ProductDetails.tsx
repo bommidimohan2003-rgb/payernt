@@ -23,6 +23,7 @@ import {
   User,
   Package,
   KeyRound,
+  Video,
 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -634,6 +635,35 @@ export default function ProductDetails() {
                 onWishlistToggle={() => toggle(product.id)}
                 isWishlisted={has(product.id)}
               />
+            )}
+
+            {/* 10-Second Equipment Inspection Video from TiDB/Cloudinary */}
+            {(product.videoUrl || (product as any).video_url) && (
+              <div className="rounded-3xl bg-card border border-border/80 p-5 space-y-3.5 shadow-xs text-left">
+                <div className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Video className="h-4 w-4 text-primary" />
+                    <span>Verified 10s Inspection Video</span>
+                  </div>
+                  <span className="inline-flex items-center gap-1 text-[10px] text-primary font-bold bg-primary/10 px-2.5 py-0.5 rounded-full">
+                    <Sparkles className="h-3 w-3" /> 100% Physical Check
+                  </span>
+                </div>
+
+                <div className="relative rounded-2xl overflow-hidden bg-black border border-border/80 aspect-video group">
+                  <video
+                    src={product.videoUrl || (product as any).video_url}
+                    controls
+                    playsInline
+                    preload="metadata"
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+                <p className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+                  <ShieldCheck className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                  Live inspection video recorded by the lender prior to listing to verify pristine condition.
+                </p>
+              </div>
             )}
 
             {/* Specifications & Verified Gear Details */}

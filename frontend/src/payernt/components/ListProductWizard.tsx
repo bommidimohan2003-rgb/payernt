@@ -823,6 +823,17 @@ export function ListProductWizard({
   );
   const [capturedVideoUrl, setCapturedVideoUrl] = useState<string>(initialDraft?.videoUrl || "");
 
+  // Live 10-Second Camera Video Recorder state
+  const [isLiveVideoModalOpen, setIsLiveVideoModalOpen] = useState(false);
+  const [isRecordingVideo, setIsRecordingVideo] = useState(false);
+  const [videoCountdown, setVideoCountdown] = useState<number>(10);
+  const [isUploadingRecordedVideo, setIsUploadingRecordedVideo] = useState(false);
+  const liveVideoFeedRef = useRef<HTMLVideoElement | null>(null);
+  const videoMediaStreamRef = useRef<MediaStream | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const videoTimerIntervalRef = useRef<any>(null);
+  const recordedBlobsRef = useRef<Blob[]>([]);
+
   // Direct Device Camera & Media state
   const [videoDuration, setVideoDuration] = useState<string>("10s");
   const [isProcessingMedia, setIsProcessingMedia] = useState<boolean>(false);
@@ -971,11 +982,147 @@ export function ListProductWizard({
     }
   };
 
+  // Live 10-Second In-App Camera Controller (Auto-stops at exactly 10s)
+  const startLiveCamera = async () => {
+    try {
+      setIsLiveVideoModalOpen(true);
+      setVideoCountdown(10);
+      setIsRecordingVideo(false);
+      setMediaError(null);
+      recordedBlobsRef.current = [];
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: true,
+      });
+      videoMediaStreamRef.current = stream;
+      if (liveVideoFeedRef.current) {
+        liveVideoFeedRef.current.srcObject = stream;
+        liveVideoFeedRef.current.play().catch(() => {});
+      }
+    } catch (err: any) {
+      console.warn("Camera access failed, fallback to native file picker:", err);
+      toast.info("Camera access unavailable. Opening file selector.");
+      setIsLiveVideoModalOpen(false);
+      if (videoInputRef.current) {
+        videoInputRef.current.click();
+      }
+    }
+  };
+
+  const stopLiveCameraStream = () => {
+    if (videoMediaStreamRef.current) {
+      videoMediaStreamRef.current.getTracks().forEach((track) => track.stop());
+      videoMediaStreamRef.current = null;
+    }
+    if (videoTimerIntervalRef.current) {
+      clearInterval(videoTimerIntervalRef.current);
+      videoTimerIntervalRef.current = null;
+    }
+  };
+
+  const closeLiveVideoModal = () => {
+    if (isRecordingVideo && mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
+    stopLiveCameraStream();
+    setIsRecordingVideo(false);
+    setIsLiveVideoModalOpen(false);
+    setIsUploadingRecordedVideo(false);
+  };
+
+  const start10SecondRecording = () => {
+    if (!videoMediaStreamRef.current) return;
+    recordedBlobsRef.current = [];
+    setVideoCountdown(10);
+    setIsRecordingVideo(true);
+
+    let mimeType = "video/webm;codecs=vp9";
+    if (typeof MediaRecorder !== "undefined" && typeof MediaRecorder.isTypeSupported === "function") {
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = MediaRecorder.isTypeSupported("video/webm")
+          ? "video/webm"
+          : MediaRecorder.isTypeSupported("video/mp4")
+            ? "video/mp4"
+            : "";
+      }
+    }
+    const options: MediaRecorderOptions = mimeType ? { mimeType } : {};
+
+    try {
+      const recorder = new MediaRecorder(videoMediaStreamRef.current, options);
+      mediaRecorderRef.current = recorder;
+
+      recorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          recordedBlobsRef.current.push(event.data);
+        }
+      };
+
+      recorder.onstop = async () => {
+        stopLiveCameraStream();
+        setIsRecordingVideo(false);
+        setIsUploadingRecordedVideo(true);
+
+        const mimeType = recorder.mimeType || "video/webm";
+        const superBuffer = new Blob(recordedBlobsRef.current, { type: mimeType });
+        const videoFile = new File([superBuffer], `inspection_${Date.now()}.${mimeType.includes("mp4") ? "mp4" : "webm"}`, { type: mimeType });
+
+        const previewUrl = URL.createObjectURL(superBuffer);
+        setCapturedVideoUrl(previewUrl);
+        setVideoDuration("10s");
+
+        const toastId = toast.loading("Uploading 10s inspection video to Cloud CDN...");
+        try {
+          const cloudUrl = await uploadVideoToCloudinary(videoFile);
+          setCapturedVideoUrl(cloudUrl);
+          toast.success("10s inspection video uploaded & secured on CDN.", { id: toastId });
+        } catch (uploadErr) {
+          console.warn("Cloudinary upload fallback:", uploadErr);
+          toast.info("10s inspection video saved locally.", { id: toastId });
+        } finally {
+          setIsUploadingRecordedVideo(false);
+          setIsLiveVideoModalOpen(false);
+        }
+      };
+
+      recorder.start(500);
+
+      // Start 10-second countdown with AUTOMATED AUTO-STOP at 0 seconds
+      let timeLeft = 10;
+      if (videoTimerIntervalRef.current) clearInterval(videoTimerIntervalRef.current);
+      videoTimerIntervalRef.current = setInterval(() => {
+        timeLeft -= 1;
+        setVideoCountdown(timeLeft);
+        if (timeLeft <= 0) {
+          // AUTOMATICALLY STOP RECORDING AT EXACTLY 10 SECONDS
+          clearInterval(videoTimerIntervalRef.current);
+          videoTimerIntervalRef.current = null;
+          if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+            mediaRecorderRef.current.stop();
+          }
+        }
+      }, 1000);
+    } catch (err) {
+      console.error("Failed to start MediaRecorder:", err);
+      toast.error("Could not start video recording on this device.");
+      setIsRecordingVideo(false);
+    }
+  };
+
+  const stopRecordingEarly = () => {
+    if (videoTimerIntervalRef.current) {
+      clearInterval(videoTimerIntervalRef.current);
+      videoTimerIntervalRef.current = null;
+    }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
+  };
+
   const handleTriggerVideoCamera = () => {
     setMediaError(null);
-    if (videoInputRef.current) {
-      videoInputRef.current.click();
-    }
+    startLiveCamera();
   };
 
   // Process & Optimize Captured Photo (Direct Camera / Cloudinary Upload)
@@ -3289,6 +3436,116 @@ export function ListProductWizard({
               >
                 I Understand
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 10-SECOND LIVE CAMERA VIDEO RECORDER MODAL */}
+      {isLiveVideoModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+          <div className="relative max-w-lg w-full bg-card border border-border rounded-3xl overflow-hidden shadow-2xl flex flex-col">
+            {/* Header */}
+            <div className="px-5 py-4 border-b border-border/80 flex items-center justify-between bg-card">
+              <div className="flex items-center gap-2">
+                <div className={`h-2.5 w-2.5 rounded-full ${isRecordingVideo ? "bg-red-500 animate-ping" : "bg-primary"}`} />
+                <h3 className="text-sm font-bold text-foreground">
+                  {isRecordingVideo ? "Recording 10s Inspection..." : "10-Second Inspection Camera"}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={closeLiveVideoModal}
+                className="p-1.5 rounded-xl hover:bg-secondary text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Video Viewfinder */}
+            <div className="relative aspect-video bg-black flex items-center justify-center overflow-hidden">
+              <video
+                ref={liveVideoFeedRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full h-full object-cover"
+              />
+
+              {/* Countdown overlay during recording */}
+              {isRecordingVideo && (
+                <div className="absolute inset-0 bg-black/20 flex flex-col items-center justify-between p-4 pointer-events-none">
+                  <div className="flex items-center gap-2 bg-red-600/90 text-white font-mono text-xs font-bold px-3 py-1 rounded-full animate-pulse shadow-lg">
+                    <span className="h-2 w-2 rounded-full bg-white animate-ping" />
+                    REC 00:0{10 - videoCountdown}
+                  </div>
+
+                  <div className="flex flex-col items-center">
+                    <div className="h-16 w-16 rounded-full bg-black/75 border-2 border-red-500 text-white font-mono text-2xl font-black flex items-center justify-center shadow-2xl">
+                      {videoCountdown}s
+                    </div>
+                    <p className="text-[10px] text-white/90 font-semibold mt-2 drop-shadow-md">
+                      Auto-stopping at 0s
+                    </p>
+                  </div>
+
+                  {/* Progress bar */}
+                  <div className="w-full bg-white/30 h-1.5 rounded-full overflow-hidden">
+                    <div
+                      className="bg-red-500 h-full transition-all duration-1000 ease-linear"
+                      style={{ width: `${((10 - videoCountdown) / 10) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Uploading Spinner */}
+              {isUploadingRecordedVideo && (
+                <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center gap-3 text-white p-4">
+                  <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+                  <p className="text-sm font-bold">Uploading 10s video to Cloudinary CDN...</p>
+                  <p className="text-xs text-white/70">Securing inspection video on cloud</p>
+                </div>
+              )}
+            </div>
+
+            {/* Controls */}
+            <div className="p-4 bg-card border-t border-border/80 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  closeLiveVideoModal();
+                  if (videoInputRef.current) {
+                    videoInputRef.current.click();
+                  }
+                }}
+                className="text-xs text-muted-foreground hover:text-foreground font-semibold flex items-center gap-1.5 cursor-pointer"
+              >
+                <Upload className="h-3.5 w-3.5" /> Or choose video file
+              </button>
+
+              <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+                {isRecordingVideo ? (
+                  <button
+                    type="button"
+                    onClick={stopRecordingEarly}
+                    className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold flex items-center justify-center gap-2 cursor-pointer shadow-lg active:scale-95 transition-all"
+                  >
+                    <div className="h-3 w-3 bg-white rounded-xs" />
+                    Stop & Save Now
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={start10SecondRecording}
+                    disabled={isUploadingRecordedVideo}
+                    className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-primary hover:opacity-90 text-primary-foreground text-xs font-bold flex items-center justify-center gap-2 cursor-pointer shadow-md active:scale-95 transition-all disabled:opacity-50"
+                  >
+                    <div className="h-3 w-3 rounded-full bg-red-500 animate-pulse" />
+                    Start 10s Recording
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>

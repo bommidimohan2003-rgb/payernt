@@ -43,6 +43,8 @@ export interface Product {
   price: number;
   image: string;
   images?: string[];
+  videoUrl?: string;
+  video_url?: string;
   angleImages?: { label: string; image: string }[];
   rotationFrames?: string[];
   category: string;
