@@ -55,6 +55,7 @@ import type {
 } from "../types";
 import { usePayerntStore } from "../store";
 import { payerntApi } from "../payerntApiService";
+import { uploadVideoToCloudinary, uploadImageToCloudinary } from "@/utils/cloudinary";
 
 interface ListProductWizardProps {
   initialDraft?: Partial<PayerntProduct> | null;
@@ -977,7 +978,7 @@ export function ListProductWizard({
     }
   };
 
-  // Process & Optimize Captured Photo (Direct Camera)
+  // Process & Optimize Captured Photo (Direct Camera / Cloudinary Upload)
   const handlePhotoFileCapture = (e: React.ChangeEvent<HTMLInputElement>, slot: "front" | "back") => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -1008,7 +1009,7 @@ export function ListProductWizard({
       }
 
       const img = new Image();
-      img.onload = () => {
+      img.onload = async () => {
         try {
           const maxDim = 1920;
           let width = img.width;
@@ -1026,19 +1027,29 @@ export function ListProductWizard({
           canvas.width = width;
           canvas.height = height;
           const ctx = canvas.getContext("2d");
+          let optimized = rawDataUrl;
           if (ctx) {
             ctx.drawImage(img, 0, 0, width, height);
-            const optimized = canvas.toDataURL("image/jpeg", 0.88);
+            optimized = canvas.toDataURL("image/jpeg", 0.88);
+          }
+
+          // Set immediate local preview
+          if (slot === "front") setFrontPhotoUrl(optimized);
+          else setBackPhotoUrl(optimized);
+
+          // Upload to Cloudinary in background for permanent hosting
+          try {
+            const cloudUrl = await uploadImageToCloudinary(optimized);
             if (slot === "front") {
-              setFrontPhotoUrl(optimized);
-              toast.success("Front photo captured successfully.");
+              setFrontPhotoUrl(cloudUrl);
+              toast.success("Front photo uploaded and secured.");
             } else {
-              setBackPhotoUrl(optimized);
-              toast.success("Back photo captured successfully.");
+              setBackPhotoUrl(cloudUrl);
+              toast.success("Back photo uploaded and secured.");
             }
-          } else {
-            if (slot === "front") setFrontPhotoUrl(rawDataUrl);
-            else setBackPhotoUrl(rawDataUrl);
+          } catch (uploadErr) {
+            console.warn("Cloudinary photo upload fallback to local data:", uploadErr);
+            toast.success(slot === "front" ? "Front photo saved." : "Back photo saved.");
           }
         } catch {
           if (slot === "front") setFrontPhotoUrl(rawDataUrl);
@@ -1064,7 +1075,7 @@ export function ListProductWizard({
     e.target.value = "";
   };
 
-  // Process & Validate Captured 10s Inspection Video
+  // Process & Validate Captured 10s Inspection Video (Direct Cloudinary Upload)
   const handleVideoFileCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -1088,7 +1099,7 @@ export function ListProductWizard({
 
     const tempVideo = document.createElement("video");
     tempVideo.preload = "metadata";
-    tempVideo.onloadedmetadata = () => {
+    tempVideo.onloadedmetadata = async () => {
       window.URL.revokeObjectURL(tempVideo.src);
       const durationSec = Math.round(tempVideo.duration || 0);
 
@@ -1101,15 +1112,35 @@ export function ListProductWizard({
 
       setCapturedVideoUrl(blobUrl);
       setVideoDuration(durationSec > 0 ? `${durationSec}s` : "10s");
-      setIsProcessingMedia(false);
-      toast.success("10-second inspection video saved.");
+
+      // Upload video directly to Cloudinary CDN
+      const toastId = toast.loading("Uploading 10s inspection video to Cloud CDN...");
+      try {
+        const cloudUrl = await uploadVideoToCloudinary(file);
+        setCapturedVideoUrl(cloudUrl);
+        toast.success("Inspection video uploaded & permanently secured on CDN.", { id: toastId });
+      } catch (err: any) {
+        console.warn("Cloudinary video upload fallback:", err);
+        toast.info("Video preview saved locally.", { id: toastId });
+      } finally {
+        setIsProcessingMedia(false);
+      }
     };
 
-    tempVideo.onerror = () => {
+    tempVideo.onerror = async () => {
       setCapturedVideoUrl(blobUrl);
       setVideoDuration("10s");
-      setIsProcessingMedia(false);
-      toast.success("Inspection video saved.");
+      const toastId = toast.loading("Uploading inspection video to Cloud CDN...");
+      try {
+        const cloudUrl = await uploadVideoToCloudinary(file);
+        setCapturedVideoUrl(cloudUrl);
+        toast.success("Inspection video uploaded & permanently secured on CDN.", { id: toastId });
+      } catch (err: any) {
+        console.warn("Cloudinary video upload fallback:", err);
+        toast.info("Video preview saved.", { id: toastId });
+      } finally {
+        setIsProcessingMedia(false);
+      }
     };
 
     tempVideo.src = blobUrl;
