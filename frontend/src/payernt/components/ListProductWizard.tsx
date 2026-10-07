@@ -827,11 +827,13 @@ export function ListProductWizard({
   const [isLiveVideoModalOpen, setIsLiveVideoModalOpen] = useState(false);
   const [isRecordingVideo, setIsRecordingVideo] = useState(false);
   const [videoCountdown, setVideoCountdown] = useState<number>(10);
+  const [readyCountdown, setReadyCountdown] = useState<number | null>(null);
   const [isUploadingRecordedVideo, setIsUploadingRecordedVideo] = useState(false);
   const liveVideoFeedRef = useRef<HTMLVideoElement | null>(null);
   const videoMediaStreamRef = useRef<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const videoTimerIntervalRef = useRef<any>(null);
+  const readyTimerIntervalRef = useRef<any>(null);
   const recordedBlobsRef = useRef<Blob[]>([]);
 
   // Direct Device Camera & Media state
@@ -840,7 +842,6 @@ export function ListProductWizard({
   const [mediaError, setMediaError] = useState<string | null>(null);
   const frontPhotoInputRef = useRef<HTMLInputElement | null>(null);
   const backPhotoInputRef = useRef<HTMLInputElement | null>(null);
-  const videoInputRef = useRef<HTMLInputElement | null>(null);
 
   // Condition details
   const [conditionGrade, setConditionGrade] = useState<ProductCondition["grade"]>(
@@ -982,12 +983,13 @@ export function ListProductWizard({
     }
   };
 
-  // Live 10-Second In-App Camera Controller (Auto-stops at exactly 10s)
+  // Live 10-Second Camera Controller — Directly opens camera & automatically records for 10s
   const startLiveCamera = async () => {
     try {
       setIsLiveVideoModalOpen(true);
       setVideoCountdown(10);
       setIsRecordingVideo(false);
+      setReadyCountdown(3);
       setMediaError(null);
       recordedBlobsRef.current = [];
 
@@ -1000,13 +1002,26 @@ export function ListProductWizard({
         liveVideoFeedRef.current.srcObject = stream;
         liveVideoFeedRef.current.play().catch(() => {});
       }
+
+      // Automated Ready Countdown: 3s -> 2s -> 1s -> Auto-start 10-second recording
+      let readySec = 3;
+      if (readyTimerIntervalRef.current) clearInterval(readyTimerIntervalRef.current);
+      readyTimerIntervalRef.current = setInterval(() => {
+        readySec -= 1;
+        if (readySec > 0) {
+          setReadyCountdown(readySec);
+        } else {
+          clearInterval(readyTimerIntervalRef.current);
+          readyTimerIntervalRef.current = null;
+          setReadyCountdown(null);
+          start10SecondRecording(stream);
+        }
+      }, 1000);
     } catch (err: any) {
-      console.warn("Camera access failed, fallback to native file picker:", err);
-      toast.info("Camera access unavailable. Opening file selector.");
+      console.warn("Camera access failed:", err);
+      toast.error("Camera permission denied. Camera is required for verified inspection video.");
       setIsLiveVideoModalOpen(false);
-      if (videoInputRef.current) {
-        videoInputRef.current.click();
-      }
+      setMediaError("Camera permission denied. Please allow camera access to record inspection video.");
     }
   };
 
@@ -1019,6 +1034,10 @@ export function ListProductWizard({
       clearInterval(videoTimerIntervalRef.current);
       videoTimerIntervalRef.current = null;
     }
+    if (readyTimerIntervalRef.current) {
+      clearInterval(readyTimerIntervalRef.current);
+      readyTimerIntervalRef.current = null;
+    }
   };
 
   const closeLiveVideoModal = () => {
@@ -1027,15 +1046,18 @@ export function ListProductWizard({
     }
     stopLiveCameraStream();
     setIsRecordingVideo(false);
+    setReadyCountdown(null);
     setIsLiveVideoModalOpen(false);
     setIsUploadingRecordedVideo(false);
   };
 
-  const start10SecondRecording = () => {
-    if (!videoMediaStreamRef.current) return;
+  const start10SecondRecording = (activeStream?: MediaStream) => {
+    const stream = activeStream || videoMediaStreamRef.current;
+    if (!stream) return;
     recordedBlobsRef.current = [];
     setVideoCountdown(10);
     setIsRecordingVideo(true);
+    setReadyCountdown(null);
 
     let mimeType = "video/webm;codecs=vp9";
     if (typeof MediaRecorder !== "undefined" && typeof MediaRecorder.isTypeSupported === "function") {
@@ -1050,7 +1072,7 @@ export function ListProductWizard({
     const options: MediaRecorderOptions = mimeType ? { mimeType } : {};
 
     try {
-      const recorder = new MediaRecorder(videoMediaStreamRef.current, options);
+      const recorder = new MediaRecorder(stream, options);
       mediaRecorderRef.current = recorder;
 
       recorder.ondataavailable = (event) => {
@@ -1064,9 +1086,9 @@ export function ListProductWizard({
         setIsRecordingVideo(false);
         setIsUploadingRecordedVideo(true);
 
-        const mimeType = recorder.mimeType || "video/webm";
-        const superBuffer = new Blob(recordedBlobsRef.current, { type: mimeType });
-        const videoFile = new File([superBuffer], `inspection_${Date.now()}.${mimeType.includes("mp4") ? "mp4" : "webm"}`, { type: mimeType });
+        const chosenMime = recorder.mimeType || "video/webm";
+        const superBuffer = new Blob(recordedBlobsRef.current, { type: chosenMime });
+        const videoFile = new File([superBuffer], `inspection_${Date.now()}.${chosenMime.includes("mp4") ? "mp4" : "webm"}`, { type: chosenMime });
 
         const previewUrl = URL.createObjectURL(superBuffer);
         setCapturedVideoUrl(previewUrl);
@@ -1076,7 +1098,7 @@ export function ListProductWizard({
         try {
           const cloudUrl = await uploadVideoToCloudinary(videoFile);
           setCapturedVideoUrl(cloudUrl);
-          toast.success("10s inspection video uploaded & secured on CDN.", { id: toastId });
+          toast.success("10s inspection video uploaded & secured on Cloudinary CDN.", { id: toastId });
         } catch (uploadErr) {
           console.warn("Cloudinary upload fallback:", uploadErr);
           toast.info("10s inspection video saved locally.", { id: toastId });
@@ -1088,7 +1110,7 @@ export function ListProductWizard({
 
       recorder.start(500);
 
-      // Start 10-second countdown with AUTOMATED AUTO-STOP at 0 seconds
+      // Start 10-second countdown with AUTOMATIC AUTO-STOP at 0 seconds
       let timeLeft = 10;
       if (videoTimerIntervalRef.current) clearInterval(videoTimerIntervalRef.current);
       videoTimerIntervalRef.current = setInterval(() => {
@@ -2201,14 +2223,6 @@ export function ListProductWizard({
                   capture="environment"
                   className="hidden"
                   onChange={(e) => handlePhotoFileCapture(e, "back")}
-                />
-                <input
-                  ref={videoInputRef}
-                  type="file"
-                  accept="video/*"
-                  capture="environment"
-                  className="hidden"
-                  onChange={handleVideoFileCapture}
                 />
 
                 {/* Error Banner */}
@@ -3472,12 +3486,24 @@ export function ListProductWizard({
                 className="w-full h-full object-cover"
               />
 
+              {/* Ready countdown overlay before recording starts */}
+              {readyCountdown !== null && !isRecordingVideo && (
+                <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex flex-col items-center justify-center text-white pointer-events-none p-4">
+                  <div className="h-20 w-20 rounded-full bg-primary/90 text-primary-foreground font-mono text-4xl font-black flex items-center justify-center shadow-2xl animate-bounce">
+                    {readyCountdown}
+                  </div>
+                  <p className="text-xs font-bold text-white mt-3 drop-shadow-md">
+                    Starting 10-second inspection video...
+                  </p>
+                </div>
+              )}
+
               {/* Countdown overlay during recording */}
               {isRecordingVideo && (
                 <div className="absolute inset-0 bg-black/20 flex flex-col items-center justify-between p-4 pointer-events-none">
                   <div className="flex items-center gap-2 bg-red-600/90 text-white font-mono text-xs font-bold px-3 py-1 rounded-full animate-pulse shadow-lg">
                     <span className="h-2 w-2 rounded-full bg-white animate-ping" />
-                    REC 00:0{10 - videoCountdown}
+                    LIVE 00:0{10 - videoCountdown}
                   </div>
 
                   <div className="flex flex-col items-center">
@@ -3485,7 +3511,7 @@ export function ListProductWizard({
                       {videoCountdown}s
                     </div>
                     <p className="text-[10px] text-white/90 font-semibold mt-2 drop-shadow-md">
-                      Auto-stopping at 0s
+                      Auto-stopping & saving at 0s
                     </p>
                   </div>
 
@@ -3510,26 +3536,18 @@ export function ListProductWizard({
             </div>
 
             {/* Controls */}
-            <div className="p-4 bg-card border-t border-border/80 flex flex-col sm:flex-row items-center justify-between gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  closeLiveVideoModal();
-                  if (videoInputRef.current) {
-                    videoInputRef.current.click();
-                  }
-                }}
-                className="text-xs text-muted-foreground hover:text-foreground font-semibold flex items-center gap-1.5 cursor-pointer"
-              >
-                <Upload className="h-3.5 w-3.5" /> Or choose video file
-              </button>
+            <div className="p-4 bg-card border-t border-border/80 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-semibold">
+                <Camera className="h-3.5 w-3.5 text-primary" />
+                <span>Live Camera Verification</span>
+              </div>
 
-              <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+              <div className="flex items-center gap-2.5">
                 {isRecordingVideo ? (
                   <button
                     type="button"
                     onClick={stopRecordingEarly}
-                    className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold flex items-center justify-center gap-2 cursor-pointer shadow-lg active:scale-95 transition-all"
+                    className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold flex items-center justify-center gap-2 cursor-pointer shadow-lg active:scale-95 transition-all"
                   >
                     <div className="h-3 w-3 bg-white rounded-xs" />
                     Stop & Save Now
@@ -3537,12 +3555,12 @@ export function ListProductWizard({
                 ) : (
                   <button
                     type="button"
-                    onClick={start10SecondRecording}
-                    disabled={isUploadingRecordedVideo}
-                    className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-primary hover:opacity-90 text-primary-foreground text-xs font-bold flex items-center justify-center gap-2 cursor-pointer shadow-md active:scale-95 transition-all disabled:opacity-50"
+                    onClick={() => start10SecondRecording()}
+                    disabled={isUploadingRecordedVideo || readyCountdown !== null}
+                    className="px-6 py-2.5 rounded-xl bg-primary hover:opacity-90 text-primary-foreground text-xs font-bold flex items-center justify-center gap-2 cursor-pointer shadow-md active:scale-95 transition-all disabled:opacity-50"
                   >
                     <div className="h-3 w-3 rounded-full bg-red-500 animate-pulse" />
-                    Start 10s Recording
+                    {readyCountdown !== null ? `Starting in ${readyCountdown}s...` : "Record 10s Now"}
                   </button>
                 )}
               </div>
