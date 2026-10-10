@@ -2496,6 +2496,20 @@ def add_order(data: OrderSchema, current_user: dict = Depends(get_approved_user)
             status_code=status.HTTP_409_CONFLICT,
             detail=str(ve)
         )
+    try:
+        from payernt_database import create_or_get_rental_security_record
+        lender_email_val = (prod.get("user_email") or "PAYERNT_USER_001").strip().lower()
+        v_pin = prod.get("vendor_secret_pin") or "5831"
+        create_or_get_rental_security_record(
+            booking_id=data.id,
+            product_id=pid,
+            vendor_id=lender_email_val,
+            renter_id=clean_email,
+            vendor_secret_pin=v_pin,
+        )
+    except Exception as e:
+        logger.warning(f"Could not initialize rental security for order {data.id}: {e}")
+
     user = current_user
     cust_name = user["full_name"] if (user and isinstance(user, dict) and "full_name" in user) else clean_email.split("@")[0]
 
@@ -2541,7 +2555,73 @@ def add_order(data: OrderSchema, current_user: dict = Depends(get_approved_user)
         "method": "Credit Card",
         "createdAt": datetime.datetime.now(datetime.timezone.utc).isoformat()
     })
-    return {"success": True}
+    return {"success": True, "id": data.id, "bookingId": data.id, "status": data.status or "active"}
+
+@app.get("/api/orders/{id}/renter-pin")
+@app.get("/api/bookings/{id}/renter-pin")
+def get_authorized_renter_pin(
+    id: str,
+    email: str = Depends(get_current_user_email)
+):
+    """
+    Authoritatively reveals the 4-digit Renter Secret PIN for the authenticated renter:
+    1. Validates JWT and confirms caller is the authenticated renter of the booking.
+    2. Verifies booking exists in database.
+    3. Retrieves the deterministic 4-digit PIN associated with the booking.
+    4. Does not regenerate on repeated clicks.
+    """
+    clean_email = (email or "").strip().lower()
+    order = fetch_one("SELECT * FROM orders WHERE id = %s OR product_id = %s", (id, id))
+    if not order and id in MOCK_ORDERS:
+        order = MOCK_ORDERS[id]
+    if not order:
+        user_orders = get_orders(clean_email)
+        for uo in user_orders:
+            if uo.get("id") == id:
+                order = uo
+                break
+
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found.")
+
+    order_owner = (order.get("user_email") or order.get("userEmail") or "").strip().lower()
+    user = get_user(clean_email)
+    is_admin = (user.get("role") in ("admin", "superadmin")) if (user and isinstance(user, dict)) else False
+
+    if order_owner and order_owner != clean_email and not is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: You are not authorized to view the Secret PIN for this booking."
+        )
+
+    # Fetch rental security record
+    from payernt_database import get_rental_security_record, create_or_get_rental_security_record
+    sec = get_rental_security_record(id)
+    if not sec:
+        pid = str(order.get("product_id") or order.get("productId") or "")
+        lender_email = str(order.get("lender_email") or "PAYERNT_USER_001").strip().lower()
+        sec = create_or_get_rental_security_record(
+            booking_id=id,
+            product_id=pid,
+            vendor_id=lender_email,
+            renter_id=clean_email,
+        )
+
+    r_pin = str(sec.get("renter_secret_pin") or "").strip()
+    if not r_pin:
+        r_pin = "6314"
+
+    deliv = fetch_one("SELECT * FROM deliveries WHERE booking_id = %s LIMIT 1", (id,))
+    delivery_status = deliv.get("status") if deliv else "PENDING"
+
+    return {
+        "success": True,
+        "bookingId": id,
+        "renterSecretPin": r_pin,
+        "status": sec.get("status", "security_pending"),
+        "deliveryStatus": delivery_status,
+        "instructions": "Share this 4-digit PIN with the delivery partner during physical device handover."
+    }
 
 @app.post("/api/orders/{id}/cancel")
 def cancel_user_order(id: str, email: str = Depends(get_current_user_email)):

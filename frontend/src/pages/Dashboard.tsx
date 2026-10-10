@@ -20,14 +20,13 @@ import {
   Compass,
   KeyRound,
 } from "lucide-react";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { toast } from "sonner";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
 import { useAuth } from "@/hooks/useAuth";
 import { useWishlist } from "@/hooks/useWishlist";
 import { STORAGE_KEYS, storage } from "@/utils/storage";
 import { api } from "@/utils/api";
-import { rentalSecurityService } from "@/services/rentalSecurityService";
 import type { Order, Product, Notification } from "@/types";
 import { Button } from "@/components/common/Button";
 import { getOptimizedImageUrl } from "@/utils/images";
@@ -54,6 +53,8 @@ export default function Dashboard() {
     const cached = storage.get<Order[]>(STORAGE_KEYS.orders, []);
     return cached.length === 0;
   });
+  const [revealedPins, setRevealedPins] = useState<Record<string, { pin: string; instructions?: string }>>({});
+  const [loadingPinOrderId, setLoadingPinOrderId] = useState<string | null>(null);
 
   const token = storage.get<string | null>(STORAGE_KEYS.token, null);
 
@@ -61,13 +62,12 @@ export default function Dashboard() {
     if (ready && !user) navigate({ to: "/login" });
   }, [ready, user, navigate]);
 
-  useEffect(() => {
+  const fetchDashboardData = useCallback(() => {
     if (!token) {
       setLoadingOrders(false);
       return;
     }
 
-    // Run independent dashboard requests concurrently
     Promise.allSettled([
       api.getOrders(token),
       api.getCustomProducts(token),
@@ -75,7 +75,11 @@ export default function Dashboard() {
       api.getPublicProducts(),
     ]).then(([ordersRes, listingsRes, alertsRes, publicRes]) => {
       if (ordersRes.status === "fulfilled" && Array.isArray(ordersRes.value)) {
-        setOrders(ordersRes.value);
+        const localOrders = storage.get<Order[]>(STORAGE_KEYS.orders, []);
+        const backendOrderIds = new Set(ordersRes.value.map((o) => o.id));
+        const missingLocal = localOrders.filter((o) => !backendOrderIds.has(o.id));
+        const combinedOrders = [...ordersRes.value, ...missingLocal];
+        setOrders(combinedOrders);
       }
       if (listingsRes.status === "fulfilled" && Array.isArray(listingsRes.value)) {
         setMyListings(listingsRes.value);
@@ -90,6 +94,57 @@ export default function Dashboard() {
       setLoadingOrders(false);
     });
   }, [token]);
+
+  useEffect(() => {
+    fetchDashboardData();
+    const handleOrdersUpdated = () => {
+      api.invalidateCache("user_orders");
+      fetchDashboardData();
+    };
+    window.addEventListener("payent_orders_updated", handleOrdersUpdated);
+    return () => {
+      window.removeEventListener("payent_orders_updated", handleOrdersUpdated);
+    };
+  }, [fetchDashboardData]);
+
+  const handleRevealSecretPin = async (orderId: string) => {
+    if (revealedPins[orderId]) {
+      setRevealedPins((prev) => {
+        const next = { ...prev };
+        delete next[orderId];
+        return next;
+      });
+      return;
+    }
+
+    if (!token) {
+      toast.error("Please log in to view your Secret PIN.");
+      return;
+    }
+
+    setLoadingPinOrderId(orderId);
+    try {
+      const res = await api.getRenterSecretPin(token, orderId);
+      if (res && res.renterSecretPin) {
+        setRevealedPins((prev) => ({
+          ...prev,
+          [orderId]: {
+            pin: res.renterSecretPin,
+            instructions: res.instructions,
+          },
+        }));
+        toast.success("Renter Secret PIN revealed.");
+      } else {
+        toast.error("PIN is not available yet for this booking.");
+      }
+    } catch (err: unknown) {
+      console.warn("PIN fetch notice:", err);
+      const e = err as { message?: string };
+      toast.error(e?.message || "Failed to retrieve Renter Secret PIN.");
+    } finally {
+      setLoadingPinOrderId(null);
+    }
+  };
 
   const handleCancelOrder = (orderId: string) => {
     if (!token) return;
@@ -364,20 +419,38 @@ export default function Dashboard() {
                             {o.startDate || o.start_date || "Today"} → {o.endDate || o.end_date || "Upcoming"}
                           </div>
                           <div className="text-[11px] font-mono text-neutral-400 mt-0.5">
-                            ID: {o.id.slice(0, 8)}...
+                            ID: #{o.id}
                           </div>
-                          {(() => {
-                            const sec = rentalSecurityService.getSecurityRecord(o.id);
-                            if (sec && sec.renterSecretPin) {
-                              return (
-                                <div className="inline-flex items-center gap-1.5 px-2 py-0.5 mt-1 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-mono font-bold" title="Provide this PIN to the lender during device handover">
-                                  <KeyRound className="h-3 w-3" />
-                                  <span>Renter PIN: {sec.renterSecretPin}</span>
-                                </div>
-                              );
-                            }
-                            return null;
-                          })()}
+
+                          {/* Reveal Secret PIN Button / Revealed State */}
+                          <div className="mt-2 flex items-center gap-2 flex-wrap">
+                            {revealedPins[o.id] ? (
+                              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs">
+                                <KeyRound className="h-3.5 w-3.5 shrink-0" />
+                                <span className="text-[11px] font-medium">Secret PIN:</span>
+                                <span className="font-mono text-sm font-black tracking-widest bg-amber-500/20 px-2 py-0.5 rounded-md text-foreground">
+                                  {revealedPins[o.id].pin}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRevealSecretPin(o.id)}
+                                  className="text-[10px] text-muted-foreground hover:text-foreground underline cursor-pointer ml-1"
+                                >
+                                  Hide
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleRevealSecretPin(o.id)}
+                                disabled={loadingPinOrderId === o.id || o.status === "cancelled"}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-amber-500/30 hover:bg-amber-500/10 text-amber-700 dark:text-amber-300 text-xs font-semibold transition-colors disabled:opacity-50 cursor-pointer"
+                              >
+                                <KeyRound className="h-3.5 w-3.5 text-amber-500" />
+                                <span>{loadingPinOrderId === o.id ? "Retrieving PIN..." : "Reveal Secret PIN"}</span>
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
 

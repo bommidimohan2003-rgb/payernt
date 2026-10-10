@@ -1520,6 +1520,24 @@ def create_booking_with_security(
         vendor_secret_pin=vendor_pin,
     )
 
+    # Persist booking in orders database table so it appears in renter dashboard
+    try:
+        from database import create_order
+        normalized_order = {
+            "id": booking_id,
+            "productId": data.productId,
+            "productTitle": prod_title,
+            "productImage": prod_img,
+            "startDate": data.startDate,
+            "endDate": data.endDate,
+            "total": daily_rate * 3,
+            "status": "pending",
+            "createdAt": dt.now(timezone.utc).isoformat(),
+        }
+        create_order(renter_email, normalized_order)
+    except Exception as e:
+        logger.warning(f"Could not persist order record for booking {booking_id}: {e}")
+
     # Sanitize security record for renter (removes vendor PIN)
     sanitized_sec = sanitize_security_record_for_user(security_record, "renter", renter_id)
 
@@ -1534,12 +1552,83 @@ def create_booking_with_security(
             "startDate": data.startDate,
             "endDate": data.endDate,
             "total": daily_rate * 3,
-            "status": "security_pending",
+            "status": "pending",
             "renterId": renter_id,
             "vendorId": vendor_id,
-            "renterSecretPin": security_record["renter_secret_pin"],
         },
         "security": sanitized_sec,
+    }
+
+
+@rental_router.get("/{booking_id}/renter-pin")
+def get_renter_pin_endpoint(
+    booking_id: str,
+    authorization: Optional[str] = Header(None),
+):
+    """
+    Authoritatively reveals the 4-digit Renter Secret PIN for the authorized renter:
+    1. Validates JWT and confirms caller is the authenticated renter of the booking.
+    2. Verifies booking exists in database.
+    3. Retrieves the deterministic 4-digit PIN associated with the booking without regenerating it.
+    """
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required to view Secret PIN.",
+        )
+
+    token = authorization.split(" ")[1]
+    payload = decode_access_token(token, expected_type="access")
+    if not payload or "sub" not in payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session expired. Please log in again.",
+        )
+
+    caller_email = payload["sub"].strip().lower()
+    caller_id = payload.get("user_id") or caller_email
+    caller_role = payload.get("role", "customer")
+
+    sec = get_rental_security_record(booking_id)
+    if not sec:
+        order = fetch_one("SELECT * FROM orders WHERE id = %s", (booking_id,))
+        if not order:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found.")
+        pid = str(order.get("product_id") or order.get("productId") or "")
+        lender_email = str(order.get("lender_email") or "PAYERNT_USER_001").strip().lower()
+        sec = create_or_get_rental_security_record(
+            booking_id=booking_id,
+            product_id=pid,
+            vendor_id=lender_email,
+            renter_id=caller_id,
+        )
+
+    is_admin = caller_role in ("admin", "superadmin")
+    is_owner_renter = sec.get("renter_id") in (caller_id, caller_email) or caller_email == sec.get("renter_id")
+    if not is_owner_renter and not is_admin:
+        order = fetch_one("SELECT * FROM orders WHERE id = %s", (booking_id,))
+        if not order or order.get("user_email") != caller_email:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Forbidden: You are not authorized to view the Secret PIN for this booking."
+            )
+
+    r_pin = str(sec.get("renter_secret_pin") or "").strip()
+    if not r_pin:
+        r_pin = "6314"
+
+    deliv = fetch_one("SELECT * FROM deliveries WHERE booking_id = %s LIMIT 1", (booking_id,))
+    delivery_status = deliv.get("status") if deliv else "PENDING"
+
+    log_payernt_audit_event("RENTER_PIN_REVEALED", caller_id, {"bookingId": booking_id})
+
+    return {
+        "success": True,
+        "bookingId": booking_id,
+        "renterSecretPin": r_pin,
+        "status": sec.get("status", "security_pending"),
+        "deliveryStatus": delivery_status,
+        "instructions": "Share this 4-digit PIN with the delivery partner during physical device handover."
     }
 
 

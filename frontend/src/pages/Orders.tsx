@@ -24,6 +24,8 @@ export default function Orders() {
   const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(
     null,
   );
+  const [revealedPins, setRevealedPins] = useState<Record<string, { pin: string; instructions?: string }>>({});
+  const [loadingPinOrderId, setLoadingPinOrderId] = useState<string | null>(null);
   const token = storage.get<string | null>(STORAGE_KEYS.token, null);
   const navigate = useNavigate();
 
@@ -36,7 +38,10 @@ export default function Orders() {
     api
       .getOrders(token)
       .then((data) => {
-        setOrders(data);
+        const localOrders = storage.get<Order[]>(STORAGE_KEYS.orders, []);
+        const backendOrderIds = new Set(data.map((o) => o.id));
+        const missingLocal = localOrders.filter((o) => !backendOrderIds.has(o.id));
+        setOrders([...data, ...missingLocal]);
       })
       .catch((err) => {
         console.error("Failed to load orders:", err);
@@ -47,7 +52,54 @@ export default function Orders() {
 
   useEffect(() => {
     loadOrders();
+    const handleUpdate = () => {
+      api.invalidateCache("user_orders");
+      loadOrders();
+    };
+    window.addEventListener("payent_orders_updated", handleUpdate);
+    return () => {
+      window.removeEventListener("payent_orders_updated", handleUpdate);
+    };
   }, [loadOrders]);
+
+  const handleRevealSecretPin = async (orderId: string) => {
+    if (revealedPins[orderId]) {
+      setRevealedPins((prev) => {
+        const next = { ...prev };
+        delete next[orderId];
+        return next;
+      });
+      return;
+    }
+
+    if (!token) {
+      toast.error("Please log in to view your Secret PIN.");
+      return;
+    }
+
+    setLoadingPinOrderId(orderId);
+    try {
+      const res = await api.getRenterSecretPin(token, orderId);
+      if (res && res.renterSecretPin) {
+        setRevealedPins((prev) => ({
+          ...prev,
+          [orderId]: {
+            pin: res.renterSecretPin,
+            instructions: res.instructions,
+          },
+        }));
+        toast.success("Renter Secret PIN revealed.");
+      } else {
+        toast.error("PIN is not available yet for this booking.");
+      }
+    } catch (err: unknown) {
+      console.warn("PIN fetch notice:", err);
+      const e = err as { message?: string };
+      toast.error(e?.message || "Failed to retrieve Renter Secret PIN.");
+    } finally {
+      setLoadingPinOrderId(null);
+    }
+  };
 
   const handleCancelOrder = (orderId: string) => {
     if (!token) return;
@@ -127,18 +179,35 @@ export default function Orders() {
                   <div>
                     <div className="font-semibold text-foreground leading-snug">{o.productTitle || o.product_title || "Gear Rental"}</div>
                     <div className="text-xs text-muted-foreground mt-0.5">Booking #{o.id}</div>
-                    {(() => {
-                      const sec = rentalSecurityService.getSecurityRecord(o.id);
-                      if (sec && sec.renterSecretPin) {
-                        return (
-                          <div className="inline-flex items-center gap-1.5 px-2 py-0.5 mt-1 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-mono font-bold" title="Provide this PIN to the lender during device handover">
-                            <KeyRound className="h-3 w-3" />
-                            <span>Renter PIN: {sec.renterSecretPin}</span>
-                          </div>
-                        );
-                      }
-                      return null;
-                    })()}
+                    {/* Reveal Secret PIN Button / Revealed State */}
+                    <div className="mt-2 flex items-center gap-2 flex-wrap">
+                      {revealedPins[o.id] ? (
+                        <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs">
+                          <KeyRound className="h-3.5 w-3.5 shrink-0" />
+                          <span className="text-[11px] font-medium">Secret PIN:</span>
+                          <span className="font-mono text-xs font-black tracking-widest bg-amber-500/20 px-1.5 py-0.5 rounded text-foreground">
+                            {revealedPins[o.id].pin}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleRevealSecretPin(o.id)}
+                            className="text-[10px] text-muted-foreground hover:text-foreground underline cursor-pointer ml-1"
+                          >
+                            Hide
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleRevealSecretPin(o.id)}
+                          disabled={loadingPinOrderId === o.id || o.status === "cancelled"}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-amber-500/30 hover:bg-amber-500/10 text-amber-700 dark:text-amber-300 text-xs font-semibold transition-colors disabled:opacity-50 cursor-pointer"
+                        >
+                          <KeyRound className="h-3.5 w-3.5 text-amber-500" />
+                          <span>{loadingPinOrderId === o.id ? "Retrieving..." : "Reveal Secret PIN"}</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <div className="text-xs text-muted-foreground">
                     {o.startDate || o.start_date || "Today"} – {o.endDate || o.end_date || "Tomorrow"}

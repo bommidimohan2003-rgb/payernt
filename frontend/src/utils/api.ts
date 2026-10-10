@@ -1887,6 +1887,30 @@ export const api = {
     return await res.json();
   },
 
+  async getRenterSecretPin(
+    token: string,
+    bookingId: string,
+  ): Promise<{
+    success: boolean;
+    bookingId: string;
+    renterSecretPin: string;
+    status: string;
+    deliveryStatus: string;
+    instructions: string;
+  }> {
+    const res = await this.fetchWithAuth(
+      `${API_BASE}/api/bookings/${bookingId}/renter-pin`,
+      {
+        method: "GET",
+      },
+    );
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(parseApiError(data, "Failed to retrieve Secret PIN"));
+    }
+    return await res.json();
+  },
+
   async updateDeliveryStatus(
     token: string,
     deliveryId: string,
@@ -2129,6 +2153,31 @@ export const api = {
     }
     return await res.json();
   },
+
+  async getRenterSecretPin(
+    token: string,
+    bookingId: string,
+  ): Promise<{
+    success: boolean;
+    bookingId: string;
+    renterSecretPin: string;
+    status: string;
+    deliveryStatus: string;
+    instructions?: string;
+  }> {
+    const res = await this.fetchWithAuth(
+      `${API_BASE}/api/bookings/${bookingId}/renter-pin`,
+      {
+        method: "GET",
+      },
+    );
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(parseApiError(data, "Failed to retrieve Renter Secret PIN"));
+    }
+    return await res.json();
+  },
+
 
   // --- Real-time Booking Conversations API ---
   async getBookingConversation(
