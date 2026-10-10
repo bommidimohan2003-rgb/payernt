@@ -1531,42 +1531,60 @@ export const api = {
 
   // Recommendation Engine API Methods
   async getSimilarRecommendations(productId: string): Promise<Product[]> {
-    if (!API_BASE) return [];
-    try {
-      const res = await fetch(
-        `${API_BASE}/api/recommendations/similar/${encodeURIComponent(productId)}`,
-      );
-      if (!res.ok) return [];
-      return await res.json();
-    } catch {
-      return [];
-    }
+    if (!API_BASE || !productId) return [];
+    return getCachedOrFetch<Product[]>(
+      `rec_similar_${productId}`,
+      async () => {
+        try {
+          const res = await fetch(
+            `${API_BASE}/api/recommendations/similar/${encodeURIComponent(productId)}`,
+          );
+          if (!res.ok) return [];
+          return await res.json();
+        } catch {
+          return [];
+        }
+      },
+      { ttlMs: 60000, staleWhileRevalidate: true }
+    );
   },
 
   async getTrendingRecommendations(): Promise<Product[]> {
     if (!API_BASE) return [];
-    try {
-      const res = await fetch(`${API_BASE}/api/recommendations/trending`);
-      if (!res.ok) return [];
-      return await res.json();
-    } catch {
-      return [];
-    }
+    return getCachedOrFetch<Product[]>(
+      "rec_trending",
+      async () => {
+        try {
+          const res = await fetch(`${API_BASE}/api/recommendations/trending`);
+          if (!res.ok) return [];
+          return await res.json();
+        } catch {
+          return [];
+        }
+      },
+      { ttlMs: 60000, staleWhileRevalidate: true }
+    );
   },
 
   async getFrequentlyTogetherRecommendations(
     productId: string,
   ): Promise<Product[]> {
-    if (!API_BASE) return [];
-    try {
-      const res = await fetch(
-        `${API_BASE}/api/recommendations/frequently-together/${encodeURIComponent(productId)}`,
-      );
-      if (!res.ok) return [];
-      return await res.json();
-    } catch {
-      return [];
-    }
+    if (!API_BASE || !productId) return [];
+    return getCachedOrFetch<Product[]>(
+      `rec_freq_together_${productId}`,
+      async () => {
+        try {
+          const res = await fetch(
+            `${API_BASE}/api/recommendations/frequently-together/${encodeURIComponent(productId)}`,
+          );
+          if (!res.ok) return [];
+          return await res.json();
+        } catch {
+          return [];
+        }
+      },
+      { ttlMs: 60000, staleWhileRevalidate: true }
+    );
   },
 
   async getPersonalizedRecommendations(userEmail?: string, sessionId?: string) {

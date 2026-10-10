@@ -9897,12 +9897,23 @@ class EventBatchSchema(BaseModel):
     events: List[EventItemSchema]
 
 
-# Helper: Recommendation Catalog from DB Only
+# Helper: Recommendation Catalog from DB with 30-second TTL in-memory caching
 DEFAULT_CATALOG_PRODUCTS: List[dict] = []
+_RECOMMENDATION_CATALOG_CACHE: List[dict] = []
+_RECOMMENDATION_CATALOG_CACHED_AT: float = 0.0
 
 def get_recommendation_catalog() -> List[dict]:
-    """Retrieve full product list from custom_products DB table."""
-    db_products = get_all_custom_products()
+    """Retrieve full product list from custom_products DB table with 30s TTL cache."""
+    global _RECOMMENDATION_CATALOG_CACHE, _RECOMMENDATION_CATALOG_CACHED_AT
+    now = time.time()
+    if _RECOMMENDATION_CATALOG_CACHE and (now - _RECOMMENDATION_CATALOG_CACHED_AT < 30.0):
+        return _RECOMMENDATION_CATALOG_CACHE
+
+    try:
+        db_products = get_all_custom_products()
+    except Exception:
+        db_products = list(MOCK_CUSTOM_PRODUCTS.values())
+
     catalog_map = {}
     
     for db_p in db_products:
@@ -9928,7 +9939,11 @@ def get_recommendation_catalog() -> List[dict]:
                     "rating": owner_rating
                 }
             }
-    return list(catalog_map.values())
+    result = list(catalog_map.values())
+    if result:
+        _RECOMMENDATION_CATALOG_CACHE = result
+        _RECOMMENDATION_CATALOG_CACHED_AT = now
+    return result or _RECOMMENDATION_CATALOG_CACHE
 
 
 # Phase 1 — Event Tracking API Endpoint

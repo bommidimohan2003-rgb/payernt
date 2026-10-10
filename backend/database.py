@@ -172,6 +172,9 @@ def execute_query(query: str, params: tuple = ()):
         finally:
             conn.close()
     except Exception as e:
+        # Suppress expected schema migration warnings (duplicate column / duplicate key)
+        if hasattr(e, 'args') and len(e.args) > 0 and e.args[0] in (1060, 1061):
+            return
         print(f"Notice: Database execute_query notice: {e}")
 
 def fetch_one(query: str, params: tuple = ()):
@@ -234,22 +237,40 @@ def init_db(force: bool = False):
     # Helper to safely add column if not exists
     def add_column_safely(table: str, column_def: str):
         try:
-            execute_query(f"ALTER TABLE {table} ADD COLUMN {column_def}")
-            print(f"Added column {column_def} to {table} successfully.")
-        except Exception as e:
-            if hasattr(e, 'args') and len(e.args) > 0 and e.args[0] == 1060:
-                pass  # Column already exists
-            else:
-                print(f"Notice: Altering {table} for {column_def} got: {e}")
+            conn = get_db_connection()
+            if not conn:
+                return
+            try:
+                with conn.cursor() as cursor:
+                    cursor.execute(f"ALTER TABLE {table} ADD COLUMN {column_def}")
+                conn.commit()
+            except Exception as e:
+                if hasattr(e, 'args') and len(e.args) > 0 and e.args[0] == 1060:
+                    pass  # Column already exists
+                else:
+                    logger.debug(f"Altering {table} for {column_def} notice: {e}")
+            finally:
+                conn.close()
+        except Exception:
+            pass
 
     # Helper to safely add index if not exists
     def add_index_safely(table: str, index_name: str, column_def: str, unique: bool = False):
         try:
-            uniq_kw = "UNIQUE " if unique else ""
-            execute_query(f"CREATE {uniq_kw}INDEX {index_name} ON {table} ({column_def})")
-            print(f"Added index {index_name} on {table}({column_def}).")
+            conn = get_db_connection()
+            if not conn:
+                return
+            try:
+                uniq_kw = "UNIQUE " if unique else ""
+                with conn.cursor() as cursor:
+                    cursor.execute(f"CREATE {uniq_kw}INDEX {index_name} ON {table} ({column_def})")
+                conn.commit()
+            except Exception:
+                pass  # Index already exists or duplicate
+            finally:
+                conn.close()
         except Exception:
-            pass  # Index already exists or duplicate
+            pass
 
     # Create users table
     execute_query("""
@@ -2742,24 +2763,26 @@ def get_order_co_occurrences(product_id: str, limit: int = 10):
     if not product_id:
         return []
     try:
-        query = """
-            SELECT o2.product_id, COUNT(*) as count
-            FROM orders o1
-            JOIN orders o2 ON o1.user_email = o2.user_email AND o1.product_id != o2.product_id
-            WHERE o1.product_id = %s AND o2.product_id IS NOT NULL
-            GROUP BY o2.product_id
-            ORDER BY count DESC
-            LIMIT %s
-        """
         conn = get_db_connection()
+        if not conn:
+            return []
         try:
+            query = """
+                SELECT o2.product_id, COUNT(*) as count
+                FROM orders o1
+                JOIN orders o2 ON o1.user_email = o2.user_email AND o1.product_id != o2.product_id
+                WHERE o1.product_id = %s AND o2.product_id IS NOT NULL
+                GROUP BY o2.product_id
+                ORDER BY count DESC
+                LIMIT %s
+            """
             with conn.cursor() as cursor:
                 cursor.execute(query, (product_id, limit))
-                return cursor.fetchall()
+                return cursor.fetchall() or []
         finally:
             conn.close()
     except Exception as e:
-        print(f"Warning: Database error in get_order_co_occurrences: {e}")
+        logger.debug(f"Database error in get_order_co_occurrences: {e}")
         return []
 
 def get_precomputed_similarities(product_id: str, limit: int = 10):
@@ -2767,22 +2790,24 @@ def get_precomputed_similarities(product_id: str, limit: int = 10):
     if not product_id:
         return []
     try:
-        query = """
-            SELECT product_id_b as product_id, score
-            FROM item_similarities
-            WHERE product_id_a = %s
-            ORDER BY score DESC
-            LIMIT %s
-        """
         conn = get_db_connection()
+        if not conn:
+            return []
         try:
+            query = """
+                SELECT product_id_b as product_id, score
+                FROM item_similarities
+                WHERE product_id_a = %s
+                ORDER BY score DESC
+                LIMIT %s
+            """
             with conn.cursor() as cursor:
                 cursor.execute(query, (product_id, limit))
-                return cursor.fetchall()
+                return cursor.fetchall() or []
         finally:
             conn.close()
     except Exception as e:
-        print(f"Warning: Database error in get_precomputed_similarities: {e}")
+        logger.debug(f"Database error in get_precomputed_similarities: {e}")
         return []
 
 def save_precomputed_similarities(rows: list):
