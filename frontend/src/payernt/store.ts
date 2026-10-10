@@ -85,24 +85,78 @@ export const INITIAL_WALLET: UserWallet = {
 // Custom React Hook for Payernt Store
 export function usePayerntStore() {
   // paye₹nt Account & Session State
-  const [activeAccount, setActiveAccount] = useState<PayerntAccount | null>(() => {
+  const [activeAccount, setActiveAccount] = useState<PayerntAccount | null>(null);
+
+  const isAuthenticated = !!(
+    activeAccount &&
+    (typeof window !== "undefined" &&
+      (localStorage.getItem("paye₹nt_token") ||
+        localStorage.getItem("payernt_token")))
+  );
+
+  useEffect(() => {
+    // Load stored account on client mount
     try {
       const token =
         localStorage.getItem("paye₹nt_token") ||
         localStorage.getItem("payernt_token");
       const stored = localStorage.getItem(STORAGE_KEY_ACCOUNT);
-      if (stored && token) return JSON.parse(stored);
+      if (stored && token) {
+        setActiveAccount(JSON.parse(stored));
+      }
+      const storedUser = localStorage.getItem(STORAGE_KEY_ACTIVE_USER);
+      if (storedUser) setActiveUserId(storedUser);
+
+      const storedDraft = localStorage.getItem(STORAGE_KEY_DRAFT);
+      if (storedDraft) setDraftProduct(JSON.parse(storedDraft));
+
+      const storedRequests = localStorage.getItem(STORAGE_KEY_REQUESTS);
+      if (storedRequests) {
+        const parsed = JSON.parse(storedRequests);
+        if (Array.isArray(parsed)) {
+          setRentalRequests(parsed.filter((r) => !r.id?.startsWith("req-89")));
+        }
+      }
+
+      const storedEarnings = localStorage.getItem(STORAGE_KEY_EARNINGS);
+      if (storedEarnings) {
+        const parsed = JSON.parse(storedEarnings);
+        if (Array.isArray(parsed)) {
+          setEarningsTransactions(parsed.filter((t) => !t.id?.startsWith("tx-70")));
+        }
+      }
+
+      const storedNotifs = localStorage.getItem(STORAGE_KEY_NOTIFS);
+      if (storedNotifs) {
+        const parsed = JSON.parse(storedNotifs);
+        if (Array.isArray(parsed)) {
+          setNotifications(parsed.filter((n) => n.id !== "notif-1"));
+        }
+      }
+
+      const storedMsgs = localStorage.getItem(STORAGE_KEY_MESSAGES);
+      if (storedMsgs) {
+        const parsed = JSON.parse(storedMsgs);
+        if (Array.isArray(parsed)) {
+          setMessages(parsed);
+          setUnreadMessagesCount(parsed.filter((m) => !m.read && !m.is_read).length);
+        }
+      }
+
+      const storedProf = localStorage.getItem(STORAGE_KEY_PROFILE);
+      if (storedProf) setProfile(JSON.parse(storedProf));
+
+      const storedWallet = localStorage.getItem(STORAGE_KEY_WALLET);
+      if (storedWallet) {
+        const parsed = JSON.parse(storedWallet);
+        if (parsed) {
+          const cleanTx = (parsed.transactions || []).filter((tx: any) => !tx.id?.startsWith("wtx-00"));
+          const cleanBank = (parsed.bankAccounts || []).filter((b: any) => !b.id?.startsWith("bank-00"));
+          setWallet({ ...parsed, transactions: cleanTx, bankAccounts: cleanBank });
+        }
+      }
     } catch {}
-    return null;
-  });
 
-  const isAuthenticated = !!(
-    activeAccount &&
-    (localStorage.getItem("paye₹nt_token") ||
-      localStorage.getItem("payernt_token"))
-  );
-
-  useEffect(() => {
     const handleAuthChange = (e: any) => {
       const detail = e.detail;
       if (detail === null) {
@@ -131,13 +185,7 @@ export function usePayerntStore() {
     };
   }, []);
 
-  const [activeUserId, setActiveUserId] = useState<string>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY_ACTIVE_USER);
-      if (stored) return stored;
-    } catch {}
-    return activeAccount?.accountId || "vendor_active";
-  });
+  const [activeUserId, setActiveUserId] = useState<string>("vendor_active");
 
   const activeUser: DemoUser = activeAccount
     ? {
@@ -168,108 +216,15 @@ export function usePayerntStore() {
     id.startsWith("dummy-") ||
     id === "test-gear-1";
 
-  const [wallet, setWallet] = useState<UserWallet>(() => {
-    try {
-      const walletKey = activeAccount ? `paye₹nt_wallet_${activeAccount.accountId}` : STORAGE_KEY_WALLET;
-      const stored = localStorage.getItem(walletKey);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed) {
-          const cleanTx = (parsed.transactions || []).filter((tx: any) => !tx.id?.startsWith("wtx-00"));
-          const cleanBank = (parsed.bankAccounts || []).filter((b: any) => !b.id?.startsWith("bank-00"));
-          return { ...parsed, transactions: cleanTx, bankAccounts: cleanBank };
-        }
-      }
-    } catch {}
-    return {
-      ...INITIAL_WALLET,
-      userId: activeAccount?.accountId || activeUserId,
-      accountId: activeAccount?.accountId || "PAYERNT_ACCOUNT_DEFAULT",
-    };
-  });
-
-  const [products, setProducts] = useState<PayerntProduct[]>(() => {
-    return [];
-  });
-
-  const [draftProduct, setDraftProduct] = useState<Partial<PayerntProduct> | null>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY_DRAFT);
-      if (stored) return JSON.parse(stored);
-    } catch {}
-    return null;
-  });
-
-  const [rentalRequests, setRentalRequests] = useState<RentalRequest[]>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY_REQUESTS);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
-          return parsed.filter((r) => !r.id?.startsWith("req-89"));
-        }
-      }
-    } catch {}
-    return INITIAL_REQUESTS;
-  });
-
-  const [earningsTransactions, setEarningsTransactions] = useState<EarningTransaction[]>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY_EARNINGS);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
-          return parsed.filter((t) => !t.id?.startsWith("tx-70"));
-        }
-      }
-    } catch {}
-    return INITIAL_EARNINGS;
-  });
-
-  const [notifications, setNotifications] = useState<LenderNotification[]>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY_NOTIFS);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
-          return parsed.filter((n) => n.id !== "notif-1");
-        }
-      }
-    } catch {}
-    return INITIAL_NOTIFICATIONS;
-  });
-
-  const [messages, setMessages] = useState<PayerntMessage[]>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY_MESSAGES);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) return parsed;
-      }
-    } catch {}
-    return [];
-  });
-
-  const [unreadMessagesCount, setUnreadMessagesCount] = useState<number>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY_MESSAGES);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
-          return parsed.filter((m) => !m.read && !m.is_read).length;
-        }
-      }
-    } catch {}
-    return 0;
-  });
-
-  const [profile, setProfile] = useState<LenderProfile>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY_PROFILE);
-      if (stored) return JSON.parse(stored);
-    } catch {}
-    return INITIAL_PROFILE;
-  });
+  const [wallet, setWallet] = useState<UserWallet>(INITIAL_WALLET);
+  const [products, setProducts] = useState<PayerntProduct[]>([]);
+  const [draftProduct, setDraftProduct] = useState<Partial<PayerntProduct> | null>(null);
+  const [rentalRequests, setRentalRequests] = useState<RentalRequest[]>(INITIAL_REQUESTS);
+  const [earningsTransactions, setEarningsTransactions] = useState<EarningTransaction[]>(INITIAL_EARNINGS);
+  const [notifications, setNotifications] = useState<LenderNotification[]>(INITIAL_NOTIFICATIONS);
+  const [messages, setMessages] = useState<PayerntMessage[]>([]);
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState<number>(0);
+  const [profile, setProfile] = useState<LenderProfile>(INITIAL_PROFILE);
 
   // Authoritative Dashboard Synchronization States
   const [isLoadingDashboard, setIsLoadingDashboard] = useState<boolean>(false);

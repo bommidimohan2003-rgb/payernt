@@ -58,26 +58,29 @@ function ensureGlobalPolling(token: string | null) {
 }
 
 export function useUnreadMessages() {
-  const [unreadCount, setUnreadCount] = useState<number>(() => _globalUnreadCount);
-  const token = storage.get<string | null>(STORAGE_KEYS.token, null);
+  const [unreadCount, setUnreadCount] = useState<number>(0);
+  const [token, setToken] = useState<string | null>(null);
 
   const fetchUnread = useCallback(() => {
     return triggerUnreadFetch(token);
   }, [token]);
 
   useEffect(() => {
+    const currentToken = storage.get<string | null>(STORAGE_KEYS.token, null);
+    setToken(currentToken);
+    setUnreadCount(_globalUnreadCount);
     _unreadListeners.add(setUnreadCount);
-    fetchUnread();
-    ensureGlobalPolling(token);
+    triggerUnreadFetch(currentToken);
+    ensureGlobalPolling(currentToken);
 
     const handleCustomUpdate = () => {
       _lastUnreadFetchTime = 0; // force fresh fetch
-      fetchUnread();
+      triggerUnreadFetch(storage.get<string | null>(STORAGE_KEYS.token, null));
     };
 
     const handleFocus = () => {
       if (Date.now() - _lastUnreadFetchTime > 15000) {
-        fetchUnread();
+        triggerUnreadFetch(storage.get<string | null>(STORAGE_KEYS.token, null));
       }
     };
 
@@ -86,11 +89,11 @@ export function useUnreadMessages() {
 
     return () => {
       _unreadListeners.delete(setUnreadCount);
-      ensureGlobalPolling(token);
+      ensureGlobalPolling(currentToken);
       window.removeEventListener("payent:unread-messages-updated", handleCustomUpdate);
       window.removeEventListener("focus", handleFocus);
     };
-  }, [fetchUnread, token]);
+  }, []);
 
   return { unreadCount, refreshUnreadCount: fetchUnread };
 }

@@ -90,10 +90,9 @@ const ACTIVE_USER: User = {
 };
 
 export function useAuth() {
-  const [user, setUser] = useState<User | null>(() => {
-    return storage.get<User | null>(STORAGE_KEYS.currentUser, null);
-  });
-  const [ready, setReady] = useState(true);
+  // Use null initial state so server render and first client render match identically
+  const [user, setUser] = useState<User | null>(null);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     let isMounted = true;

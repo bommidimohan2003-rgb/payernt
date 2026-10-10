@@ -148,12 +148,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 );
 
 function RootShell({ children }: { children: ReactNode }) {
-  const isClientOnly = typeof window !== "undefined" && !!document.getElementById("root");
-
-  if (isClientOnly) {
-    return <>{children}</>;
-  }
-
   return (
     <html lang="en">
       <head>
@@ -226,19 +220,7 @@ function RootContent() {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
-  const [isOffline, setIsOffline] = useState(() => {
-    if (typeof window !== "undefined") {
-      const host = window.location.hostname;
-      if (
-        host === "localhost" ||
-        host === "127.0.0.1" ||
-        host.endsWith(".local")
-      ) {
-        return false;
-      }
-    }
-    return typeof navigator !== "undefined" ? !navigator.onLine : false;
-  });
+  const [isOffline, setIsOffline] = useState(false);
 
   const checkConnectivity = async () => {
     if (typeof window !== "undefined") {

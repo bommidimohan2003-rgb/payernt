@@ -55,11 +55,17 @@ export interface LanguageProviderProps {
 }
 
 export function LanguageProvider({ children, scope = "global" }: LanguageProviderProps) {
-  const [language, setLanguageState] = useState<Language>(() => getInitialLanguage(scope));
+  // Use server-safe initial state to ensure exact server/client hydration parity
+  const [language, setLanguageState] = useState<Language>("en");
   const [isLanguageModalOpen, setIsLanguageModalOpen] = useState(false);
 
-  // Sync state if localStorage changes or other tabs/windows change it
+  // Sync state after mount from localStorage and handle cross-tab changes
   useEffect(() => {
+    const initial = getInitialLanguage(scope);
+    if (initial !== "en") {
+      setLanguageState(initial);
+    }
+
     const key = getStorageKey(scope);
     const handleStorage = (e: StorageEvent) => {
       if (e.key === key || e.key === "payent_lang") {

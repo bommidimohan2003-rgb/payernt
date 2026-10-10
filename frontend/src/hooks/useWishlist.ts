@@ -40,25 +40,28 @@ async function fetchWishlistDeduplicated(token: string): Promise<string[]> {
 }
 
 export function useWishlist() {
-  const token = storage.get<string | null>(STORAGE_KEYS.token, null);
-  const [ids, setIds] = useState<string[]>(() => _globalWishlistIds);
+  const [token, setToken] = useState<string | null>(null);
+  const [ids, setIds] = useState<string[]>([]);
 
   useEffect(() => {
+    const currentToken = storage.get<string | null>(STORAGE_KEYS.token, null);
+    setToken(currentToken);
+    setIds(_globalWishlistIds);
     _wishlistListeners.add(setIds);
 
-    if (!token) {
+    if (!currentToken) {
       setGlobalWishlistIds([]);
       return () => {
         _wishlistListeners.delete(setIds);
       };
     }
 
-    fetchWishlistDeduplicated(token);
+    fetchWishlistDeduplicated(currentToken);
 
     return () => {
       _wishlistListeners.delete(setIds);
     };
-  }, [token]);
+  }, []);
 
   const toggle = useCallback(
     (id: string) => {
