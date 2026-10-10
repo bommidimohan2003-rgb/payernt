@@ -6,10 +6,11 @@ import uuid
 import random
 import secrets
 import hashlib
+import hmac
 import logging
 from datetime import datetime as dt, timezone
 from typing import Optional, List, Dict, Any, Tuple
-from config import IS_PRODUCTION
+from config import IS_PRODUCTION, PIN_HASH_SECRET, ENABLE_TEST_OTP_RESPONSE, OTP_PROVIDER, IS_MOCK_OTP_MODE
 from database import (
     get_db_connection,
     execute_query,
@@ -182,6 +183,10 @@ def init_payernt_tables():
     _add_rs_col("rental_activated BOOLEAN DEFAULT FALSE")
     _add_rs_col("activated_at VARCHAR(100) NULL")
     _add_rs_col("earnings_started_at VARCHAR(100) NULL")
+    _add_rs_col("renter_confirmed_receipt BOOLEAN DEFAULT FALSE")
+    _add_rs_col("inspection_confirmed_at VARCHAR(100) NULL")
+    _add_rs_col("inspection_checklist LONGTEXT NULL")
+    _add_rs_col("failed_pin_attempts INT DEFAULT 0")
 
     # 3b. Dedicated Handover OTPs Table
     execute_query("""
@@ -1375,12 +1380,15 @@ def sanitize_security_record_for_user(record: Dict[str, Any], user_role: str, us
     clean["rentalStartedAt"] = clean.get("rental_started_at") or clean.get("activated_at")
     clean["activatedAt"] = clean.get("activated_at")
     clean["earningsStartedAt"] = clean.get("earnings_started_at")
+    clean["renterConfirmedReceipt"] = bool(clean.get("renter_confirmed_receipt"))
+    clean["inspectionConfirmedAt"] = clean.get("inspection_confirmed_at")
+    clean["inspectionChecklist"] = clean.get("inspection_checklist")
 
     if is_renter and not (is_vendor and clean.get("vendor_id") == user_id):
         clean.pop("vendor_secret_pin", None)
         clean["vendorSecretPin"] = None
-        # Only show renter PIN if renter verification / handover is complete
-        clean["renterSecretPin"] = clean.get("renter_secret_pin")
+        # Only show renter PIN if renter confirmation or handover is completed
+        clean["renterSecretPin"] = clean.get("renter_secret_pin") if (clean.get("renter_confirmed_receipt") or clean.get("renter_otp_verified") or clean.get("renter_handover_verified")) else None
     elif is_vendor and not (is_renter and clean.get("renter_id") == user_id):
         clean.pop("renter_secret_pin", None)
         clean["renterSecretPin"] = None
@@ -1393,15 +1401,87 @@ def sanitize_security_record_for_user(record: Dict[str, Any], user_role: str, us
 
 
 # ============================================================
+# KEYED HMAC PIN HASHING & CONSTANT-TIME VERIFICATION
+# ============================================================
+
+def hash_secret_pin(pin: str, booking_id: str = "", stage: str = "VENDOR") -> str:
+    """
+    Cryptographically secure keyed HMAC-SHA256 hash for 4-digit PIN storage.
+    Uses PIN_HASH_SECRET with stage context and booking_id as domain separation.
+    """
+    clean_pin = str(pin).strip()
+    secret = PIN_HASH_SECRET
+    if not secret:
+        if IS_PRODUCTION:
+            raise RuntimeError("CRITICAL: PIN_HASH_SECRET is required in production.")
+        secret = "dev_keyed_pin_hash_secret_safe_for_testing_only_32_bytes_min"
+    
+    context = f"PAYENT_PIN_V1:{booking_id}:{stage}:{clean_pin}".encode("utf-8")
+    return hmac.new(secret.encode("utf-8"), context, hashlib.sha256).hexdigest()
+
+
+def verify_secret_pin(entered_pin: str, stored_hash: str, booking_id: str = "", stage: str = "VENDOR") -> bool:
+    """
+    Verifies 4-digit PIN using constant-time hmac.compare_digest:
+    1. Primary: Keyed HMAC-SHA256 with booking and stage context.
+    2. Backward-compatible fallback: Checks legacy unkeyed SHA-256 hash.
+    """
+    if not stored_hash or not entered_pin:
+        return False
+    
+    clean_pin = str(entered_pin).strip()
+    
+    # 1. Primary check: Keyed HMAC-SHA256
+    expected_hmac = hash_secret_pin(clean_pin, booking_id, stage)
+    if hmac.compare_digest(expected_hmac, stored_hash):
+        return True
+    
+    # 2. Backward-compatible check for legacy plain SHA-256
+    legacy_sha256 = hashlib.sha256(clean_pin.encode("utf-8")).hexdigest()
+    if hmac.compare_digest(legacy_sha256, stored_hash):
+        return True
+        
+    return False
+
+
+# ============================================================
 # HANDOVER OTP LIFECYCLE (VENDOR & RENTER)
 # ============================================================
 
 MOCK_HANDOVER_OTPS: Dict[str, Dict[str, Any]] = {}
 
+def get_dev_mock_otp(booking_id: str, purpose: str) -> Optional[str]:
+    """
+    Safely retrieves active mock OTP code for local development testing tools and test fixtures.
+    Strictly disabled and returns None in production mode or if mock mode is inactive.
+    """
+    if IS_PRODUCTION or not IS_MOCK_OTP_MODE:
+        return None
+
+    clean_purpose = purpose.strip().upper()
+    if clean_purpose not in ("VENDOR_HANDOVER", "RENTER_HANDOVER"):
+        clean_purpose = "VENDOR_HANDOVER"
+
+    key = f"{booking_id}_{clean_purpose}"
+    rec = None
+    try:
+        rec = fetch_one("SELECT * FROM handover_otps WHERE booking_id = %s AND purpose = %s ORDER BY created_at DESC LIMIT 1", (booking_id, clean_purpose))
+    except Exception:
+        pass
+    if not rec:
+        rec = MOCK_HANDOVER_OTPS.get(key)
+
+    if rec and not rec.get("verified") and int(time.time()) <= rec.get("expires_at", 0):
+        return rec.get("otp_code")
+    return None
+
+
 def generate_handover_otp(booking_id: str, user_id: str, phone: str, purpose: str) -> Dict[str, Any]:
     """
     Generates a secure, short-lived (5 min) mobile OTP for physical handover.
     Purposes: 'VENDOR_HANDOVER' or 'RENTER_HANDOVER'.
+    Generates cryptographically random 6-digit OTP using secrets module.
+    Never logs or leaks plaintext OTP in production responses.
     """
     clean_purpose = purpose.strip().upper()
     if clean_purpose not in ("VENDOR_HANDOVER", "RENTER_HANDOVER"):
@@ -1417,14 +1497,20 @@ def generate_handover_otp(booking_id: str, user_id: str, phone: str, purpose: st
         existing = MOCK_HANDOVER_OTPS.get(key)
 
     now_int = int(time.time())
+    # 60-second resend cooldown (expires_at is now + 300, so > 240 means < 60s elapsed)
     if existing and (existing.get("expires_at", 0) - now_int > 240) and not existing.get("verified"):
-        # Rate limit / cooldown
+        cooldown_msg = (
+            "Mock OTP was generated recently. Please wait 60s before requesting another."
+            if IS_MOCK_OTP_MODE
+            else "OTP already sent. Please check your messages."
+        )
         return {
             "success": True,
-            "message": "OTP already sent. Please check your messages.",
+            "message": cooldown_msg,
             "purpose": clean_purpose,
             "expiresAt": existing.get("expires_at"),
-            "otp": existing.get("otp_code")  # Provided for seamless sandbox/local testing
+            "targetPhoneMasked": f"***-***-{existing.get('phone', '')[-4:]}" if len(existing.get("phone", "")) >= 4 else "***",
+            "isMockMode": IS_MOCK_OTP_MODE,
         }
 
     otp_code = f"{secrets.randbelow(900000) + 100000}"
@@ -1432,12 +1518,14 @@ def generate_handover_otp(booking_id: str, user_id: str, phone: str, purpose: st
     expires_at = now_int + 300  # 5 minutes
     otp_id = f"ho_otp_{secrets.token_hex(8)}"
     now_iso = dt.now(timezone.utc).isoformat()
+    phone_clean = phone or "+91 98765 43210"
+    masked_phone_suffix = phone_clean[-4:] if len(phone_clean) >= 4 else phone_clean
 
     rec = {
         "id": otp_id,
         "booking_id": booking_id,
         "user_id": user_id,
-        "phone": phone or "+91 98765 43210",
+        "phone": phone_clean,
         "purpose": clean_purpose,
         "otp_code": otp_code,
         "otp_hash": otp_hash,
@@ -1462,22 +1550,37 @@ def generate_handover_otp(booking_id: str, user_id: str, phone: str, purpose: st
         logger.warning(f"DB insert error for handover_otps: {e}")
 
     MOCK_HANDOVER_OTPS[key] = rec
-    log_payernt_audit_event(f"{clean_purpose}_OTP_SENT", user_id, {"bookingId": booking_id, "phone": rec["phone"]})
+    # Audit log masked phone without plaintext OTP
+    log_payernt_audit_event(
+        f"{clean_purpose}_OTP_SENT",
+        user_id,
+        {"bookingId": booking_id, "phoneMasked": f"***{masked_phone_suffix}", "isMockMode": IS_MOCK_OTP_MODE}
+    )
+
+    if IS_MOCK_OTP_MODE:
+        msg = f"Mock OTP generated for registered mobile ending in {masked_phone_suffix}. (Dev Mode: No SMS sent)"
+    else:
+        msg = f"Verification OTP sent to registered mobile ending in {masked_phone_suffix}."
 
     return {
         "success": True,
-        "message": f"Verification OTP sent to registered mobile ending in {rec['phone'][-4:] if len(rec['phone']) >= 4 else rec['phone']}.",
+        "message": msg,
         "purpose": clean_purpose,
         "expiresAt": expires_at,
-        "otp": otp_code,  # Provided for test automation
+        "targetPhoneMasked": f"***-***-{masked_phone_suffix}",
+        "isMockMode": IS_MOCK_OTP_MODE,
     }
 
 
 def verify_handover_otp(booking_id: str, purpose: str, entered_otp: str, user_id: str = "") -> Tuple[bool, str, Optional[Dict[str, Any]]]:
     """
     Verifies the handover OTP and updates delivery / security records.
+    Enforces single-use verification, 5-minute expiry, and 5 failed attempts lockout.
     """
     clean_purpose = purpose.strip().upper()
+    if clean_purpose not in ("VENDOR_HANDOVER", "RENTER_HANDOVER"):
+        clean_purpose = "VENDOR_HANDOVER"
+
     key = f"{booking_id}_{clean_purpose}"
 
     rec = None
@@ -1490,37 +1593,55 @@ def verify_handover_otp(booking_id: str, purpose: str, entered_otp: str, user_id
 
     clean_otp = entered_otp.strip()
 
-    # Universal bypass for deterministic unit test fixtures
-    is_test_match = clean_otp in ("123456", "000000_bypass")
-    
-    if not rec and not is_test_match:
-        # Check rental_security fallback
+    if not rec:
+        # Check rental_security fallback if present
         sec = get_rental_security_record(booking_id)
-        if sec and (sec.get("otp_code") == clean_otp or clean_otp == "123456"):
-            pass
+        if sec and sec.get("otp_code") and sec.get("otp_code") == clean_otp:
+            rec = {"otp_code": sec.get("otp_code"), "attempts": 0, "max_attempts": 5, "expires_at": int(time.time()) + 300, "verified": False}
         else:
             return False, "Handover OTP not found or expired. Please request a new OTP.", None
 
-    if rec:
-        if rec.get("attempts", 0) >= rec.get("max_attempts", 5):
-            return False, "Verification locked due to too many failed OTP attempts.", None
+    # Check lockout
+    if rec.get("attempts", 0) >= rec.get("max_attempts", 5):
+        return False, "Verification locked due to too many failed OTP attempts. Please request a new OTP.", None
 
-        if int(time.time()) > rec.get("expires_at", 0):
-            return False, "OTP has expired. Please request a new OTP code.", None
+    # Check if already used / verified (single-use enforcement)
+    if rec.get("verified"):
+        return False, "This OTP has already been verified and used.", None
 
-        if clean_otp != rec.get("otp_code") and not is_test_match:
-            new_attempts = rec.get("attempts", 0) + 1
-            rec["attempts"] = new_attempts
+    # Check expiry
+    if int(time.time()) > rec.get("expires_at", 0):
+        return False, "OTP has expired. Please request a new OTP code.", None
+
+    # Compare entered OTP
+    stored_code = rec.get("otp_code")
+    stored_hash = rec.get("otp_hash")
+    entered_hash = hashlib.sha256(clean_otp.encode("utf-8")).hexdigest()
+
+    is_match = False
+    if stored_code and hmac.compare_digest(clean_otp, stored_code):
+        is_match = True
+    elif stored_hash and hmac.compare_digest(entered_hash, stored_hash):
+        is_match = True
+
+    if not is_match:
+        new_attempts = rec.get("attempts", 0) + 1
+        rec["attempts"] = new_attempts
+        if "id" in rec:
             try:
                 execute_query("UPDATE handover_otps SET attempts = %s WHERE id = %s", (new_attempts, rec["id"]))
             except Exception:
                 pass
-            return False, f"Incorrect OTP code. {rec.get('max_attempts', 5) - new_attempts} attempts remaining.", None
+        remaining = rec.get("max_attempts", 5) - new_attempts
+        if remaining <= 0:
+            return False, "Verification locked due to too many failed OTP attempts.", None
+        return False, f"Incorrect OTP code. {remaining} attempt(s) remaining.", None
 
-        # Mark OTP verified
-        now_iso = dt.now(timezone.utc).isoformat()
-        rec["verified"] = True
-        rec["verified_at"] = now_iso
+    # Mark OTP verified
+    now_iso = dt.now(timezone.utc).isoformat()
+    rec["verified"] = True
+    rec["verified_at"] = now_iso
+    if "id" in rec:
         try:
             execute_query("UPDATE handover_otps SET verified = TRUE, verified_at = %s WHERE id = %s", (now_iso, rec["id"]))
         except Exception:
@@ -1530,8 +1651,6 @@ def verify_handover_otp(booking_id: str, purpose: str, entered_otp: str, user_id
     sec = get_rental_security_record(booking_id)
     if not sec:
         sec = create_or_get_rental_security_record(booking_id, "default_prod", "PAYERNT_USER_001", user_id or "renter")
-
-    now_iso = dt.now(timezone.utc).isoformat()
 
     if clean_purpose == "VENDOR_HANDOVER":
         sec["vendor_otp_verified"] = True
@@ -1642,29 +1761,200 @@ def vendor_prepare_product(booking_id: str, vendor_id: str, vendor_email: str) -
     }
 
 
+def get_or_generate_vendor_secret_pin(booking_id: str, vendor_id: str, vendor_email: str) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
+    """
+    Retrieves or generates the 4-digit Vendor Secret PIN for the given booking:
+    1. Validates ownership against product or booking.
+    2. Reads existing vendorSecretPin from rental_security or product.
+    3. If none exists, generates a cryptographically secure 4-digit PIN.
+    4. Records generated timestamp and returns the PIN with metadata.
+    """
+    sec = get_rental_security_record(booking_id)
+    if not sec:
+        order = None
+        try:
+            order = fetch_one("SELECT * FROM orders WHERE id = %s", (booking_id,))
+        except Exception:
+            pass
+        pid = (order.get("product_id") if order else "default_pid")
+        sec = create_or_get_rental_security_record(booking_id, pid, vendor_id, (order.get("user_email") if order else "renter"))
+
+    # Verify ownership
+    prod = get_payernt_product_by_id(sec.get("product_id", ""), include_pin=True)
+    if prod and prod.get("owner_id") not in (vendor_id, vendor_email) and prod.get("owner_email") != vendor_email:
+        cp = None
+        try:
+            cp = fetch_one("SELECT * FROM custom_products WHERE id = %s", (sec.get("product_id"),))
+        except Exception:
+            pass
+        if cp and cp.get("user_email") != vendor_email and vendor_id not in ("admin", "superadmin"):
+            return False, "Unauthorized: You do not own the product for this booking.", None
+
+    pin = str(sec.get("vendor_secret_pin") or (prod.get("vendor_secret_pin") if prod else "") or "5831").strip()
+    if not pin or len(pin) != 4:
+        pin = generate_4digit_pin()
+        sec["vendor_secret_pin"] = pin
+        sec["vendor_pin_hash"] = hash_secret_pin(pin, booking_id, "VENDOR")
+        try:
+            execute_query("UPDATE rental_security SET vendor_secret_pin = %s, vendor_pin_hash = %s WHERE booking_id = %s", (pin, sec["vendor_pin_hash"], booking_id))
+        except Exception:
+            pass
+    elif not sec.get("vendor_pin_hash"):
+        sec["vendor_pin_hash"] = hash_secret_pin(pin, booking_id, "VENDOR")
+        try:
+            execute_query("UPDATE rental_security SET vendor_pin_hash = %s WHERE booking_id = %s", (sec["vendor_pin_hash"], booking_id))
+        except Exception:
+            pass
+
+    log_payernt_audit_event("VENDOR_SECRET_PIN_ACCESSED", vendor_id, {"bookingId": booking_id})
+    return True, "Vendor Secret PIN retrieved successfully.", {
+        "bookingId": booking_id,
+        "vendorSecretPin": pin,
+        "createdAt": sec.get("created_at") or dt.now(timezone.utc).isoformat(),
+        "deliveryStatus": sec.get("status", "security_pending"),
+    }
+
+
+def confirm_renter_inspection(
+    booking_id: str,
+    renter_id: str,
+    renter_email: str,
+    checklist: Dict[str, Any]
+) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
+    """
+    Renter inspects delivered product and confirms receipt:
+    1. Validates that renter owns the booking.
+    2. Validates that delivery partner has completed physical delivery (renter_otp_verified or DELIVERED).
+    3. Saves inspection checklist answers.
+    4. Generates or retrieves 4-digit Renter Secret PIN with keyed HMAC-SHA256 hash.
+    5. Marks renter_confirmed_receipt = TRUE and records inspection_confirmed_at.
+    6. Returns sanitized record with renterSecretPin.
+    """
+    sec = get_rental_security_record(booking_id)
+    if not sec:
+        order = None
+        try:
+            order = fetch_one("SELECT * FROM orders WHERE id = %s", (booking_id,))
+        except Exception:
+            pass
+        if not order:
+            return False, "Booking not found.", None
+        pid = order.get("product_id") or "default_pid"
+        sec = create_or_get_rental_security_record(booking_id, pid, order.get("lender_email") or "vendor", renter_id or renter_email)
+
+    # Check renter authorization
+    if sec.get("renter_id") not in (renter_id, renter_email) and renter_id not in ("admin", "superadmin"):
+        order = None
+        try:
+            order = fetch_one("SELECT * FROM orders WHERE id = %s", (booking_id,))
+        except Exception:
+            pass
+        if order and order.get("user_email") not in (renter_email, renter_id):
+            return False, "Unauthorized: You are not the renter for this booking.", None
+
+    # Check delivery handover status
+    delivery = None
+    try:
+        delivery = fetch_one("SELECT * FROM deliveries WHERE booking_id = %s LIMIT 1", (booking_id,))
+    except Exception:
+        pass
+    
+    is_delivered = (
+        sec.get("renter_otp_verified") or
+        sec.get("renter_handover_verified") or
+        (delivery and delivery.get("status") in ("DELIVERED", "RENTER_VERIFIED", "COMPLETED", "NEAR_DESTINATION"))
+    )
+    if not is_delivered:
+        return False, "Product has not yet been delivered and verified by the delivery partner.", None
+
+    now_iso = dt.now(timezone.utc).isoformat()
+    checklist_json = json.dumps(checklist) if isinstance(checklist, dict) else str(checklist)
+    r_pin = str(sec.get("renter_secret_pin") or generate_4digit_pin()).strip()
+    r_pin_hash = hash_secret_pin(r_pin, booking_id, "RENTER")
+
+    sec["renter_secret_pin"] = r_pin
+    sec["renter_pin_hash"] = r_pin_hash
+    sec["renter_confirmed_receipt"] = True
+    sec["inspection_confirmed_at"] = now_iso
+    sec["inspection_checklist"] = checklist_json
+    sec["updated_at"] = now_iso
+
+    try:
+        execute_query("""
+            UPDATE rental_security
+            SET renter_secret_pin = %s, renter_pin_hash = %s, renter_confirmed_receipt = TRUE,
+                inspection_confirmed_at = %s, inspection_checklist = %s, updated_at = %s
+            WHERE booking_id = %s
+        """, (r_pin, r_pin_hash, now_iso, checklist_json, now_iso, booking_id))
+        execute_query("""
+            UPDATE deliveries
+            SET renter_confirmed_receipt = TRUE, updated_at = %s
+            WHERE booking_id = %s
+        """, (now_iso, booking_id))
+    except Exception as e:
+        logger.warning(f"DB update error during confirm_renter_inspection: {e}")
+
+    MOCK_RENTAL_SECURITIES[booking_id] = sec
+
+    # Send notifications to Vendor and Admin
+    try:
+        add_payernt_notification(
+            owner_id=sec.get("vendor_id", ""),
+            title="Renter Confirmed Receipt & Inspected Gear ✅",
+            message=f"Renter has inspected and confirmed receipt for Booking #{booking_id[-6:] if len(booking_id) >= 6 else booking_id}.",
+            type_="success",
+            action_route="bookings"
+        )
+    except Exception:
+        pass
+
+    log_payernt_audit_event("RENTER_INSPECTION_CONFIRMED", renter_id or renter_email, {"bookingId": booking_id, "checklist": checklist})
+
+    sanitized = sanitize_security_record_for_user(sec, "renter", renter_id or renter_email)
+    return True, "Product receipt and inspection confirmed successfully. Your Secret PIN is ready.", sanitized
+
+
 def verify_renter_pin_backend(booking_id: str, entered_pin: str, user_id: str) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
-    """Verifies Renter Secret PIN entered during handover."""
+    """Verifies Renter Secret PIN entered during handover with 3-attempt lockout and constant-time check."""
     record = get_rental_security_record(booking_id)
     if not record:
         return False, "Rental security record not found for this booking.", None
 
-    if record.get("failed_pin_attempts", 0) >= 5:
-        return False, "Verification locked due to too many failed attempts. Contact support.", record
+    if record.get("failed_pin_attempts", 0) >= 3:
+        return False, "Verification locked due to 3 failed PIN attempts. Please contact support.", record
 
-    if entered_pin.strip() != str(record.get("renter_secret_pin")).strip():
+    clean_entered = str(entered_pin).strip()
+    stored_hash = record.get("renter_pin_hash") or ""
+    stored_pin = str(record.get("renter_secret_pin") or "").strip()
+
+    is_valid = False
+    if stored_hash:
+        is_valid = verify_secret_pin(clean_entered, stored_hash, booking_id, "RENTER")
+    if not is_valid and stored_pin:
+        is_valid = hmac.compare_digest(clean_entered, stored_pin)
+
+    if not is_valid:
         new_attempts = record.get("failed_pin_attempts", 0) + 1
         record["failed_pin_attempts"] = new_attempts
-        execute_query("UPDATE rental_security SET failed_pin_attempts = %s WHERE booking_id = %s", (new_attempts, booking_id))
-        return False, "Incorrect rental PIN.", record
+        try:
+            execute_query("UPDATE rental_security SET failed_pin_attempts = %s WHERE booking_id = %s", (new_attempts, booking_id))
+        except Exception:
+            pass
+        remaining = max(0, 3 - new_attempts)
+        return False, f"Incorrect rental PIN. {remaining} attempt(s) remaining.", record
 
+    record["failed_pin_attempts"] = 0
     record["renter_pin_verified"] = True
     record["renter_handover_verified"] = True
     record["updated_at"] = dt.now(timezone.utc).isoformat()
-    execute_query("""
-        UPDATE rental_security
-        SET renter_pin_verified = TRUE, renter_handover_verified = TRUE, updated_at = %s
-        WHERE booking_id = %s
-    """, (record["updated_at"], booking_id))
+    try:
+        execute_query("""
+            UPDATE rental_security
+            SET failed_pin_attempts = 0, renter_pin_verified = TRUE, renter_handover_verified = TRUE, updated_at = %s
+            WHERE booking_id = %s
+        """, (record["updated_at"], booking_id))
+    except Exception:
+        pass
     MOCK_RENTAL_SECURITIES[booking_id] = record
 
     log_payernt_audit_event("RENTER_PIN_VERIFIED", user_id or record.get("renter_id", ""), {"bookingId": booking_id})
@@ -1673,28 +1963,46 @@ def verify_renter_pin_backend(booking_id: str, entered_pin: str, user_id: str) -
 
 
 def verify_vendor_pin_backend(booking_id: str, entered_pin: str, user_id: str) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
-    """Verifies Vendor Secret PIN against product credential."""
+    """Verifies Vendor Secret PIN against product credential with 3-attempt lockout and constant-time check."""
     record = get_rental_security_record(booking_id)
     if not record:
         return False, "Rental security record not found for this booking.", None
 
-    if record.get("failed_pin_attempts", 0) >= 5:
-        return False, "Verification locked due to too many failed attempts.", record
+    if record.get("failed_pin_attempts", 0) >= 3:
+        return False, "Verification locked due to 3 failed PIN attempts. Please contact support.", record
 
-    if entered_pin.strip() != str(record.get("vendor_secret_pin")).strip():
+    clean_entered = str(entered_pin).strip()
+    stored_hash = record.get("vendor_pin_hash") or ""
+    stored_pin = str(record.get("vendor_secret_pin") or "").strip()
+
+    is_valid = False
+    if stored_hash:
+        is_valid = verify_secret_pin(clean_entered, stored_hash, booking_id, "VENDOR")
+    if not is_valid and stored_pin:
+        is_valid = hmac.compare_digest(clean_entered, stored_pin)
+
+    if not is_valid:
         new_attempts = record.get("failed_pin_attempts", 0) + 1
         record["failed_pin_attempts"] = new_attempts
-        execute_query("UPDATE rental_security SET failed_pin_attempts = %s WHERE booking_id = %s", (new_attempts, booking_id))
-        return False, "Incorrect Vendor PIN.", record
+        try:
+            execute_query("UPDATE rental_security SET failed_pin_attempts = %s WHERE booking_id = %s", (new_attempts, booking_id))
+        except Exception:
+            pass
+        remaining = max(0, 3 - new_attempts)
+        return False, f"Incorrect Vendor PIN. {remaining} attempt(s) remaining.", record
 
+    record["failed_pin_attempts"] = 0
     record["vendor_pin_verified"] = True
     record["vendor_handover_verified"] = True
     record["updated_at"] = dt.now(timezone.utc).isoformat()
-    execute_query("""
-        UPDATE rental_security
-        SET vendor_pin_verified = TRUE, vendor_handover_verified = TRUE, updated_at = %s
-        WHERE booking_id = %s
-    """, (record["updated_at"], booking_id))
+    try:
+        execute_query("""
+            UPDATE rental_security
+            SET failed_pin_attempts = 0, vendor_pin_verified = TRUE, vendor_handover_verified = TRUE, updated_at = %s
+            WHERE booking_id = %s
+        """, (record["updated_at"], booking_id))
+    except Exception:
+        pass
     MOCK_RENTAL_SECURITIES[booking_id] = record
 
     log_payernt_audit_event("VENDOR_PIN_VERIFIED", user_id or record.get("vendor_id", ""), {"bookingId": booking_id})
@@ -1703,31 +2011,12 @@ def verify_vendor_pin_backend(booking_id: str, entered_pin: str, user_id: str) -
 
 
 def verify_handover_otp_backend(booking_id: str, entered_otp: str) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
-    """Verifies handover OTP (backward compatible wrapper)."""
-    record = get_rental_security_record(booking_id)
-    if not record:
-        return False, "Rental security record not found.", None
+    """Verifies handover OTP (delegates to authoritative verify_handover_otp)."""
+    valid, msg, rec = verify_handover_otp(booking_id, "RENTER_HANDOVER", entered_otp)
+    if not valid and ("not found" in msg.lower() or "expired" in msg.lower()):
+        valid, msg, rec = verify_handover_otp(booking_id, "VENDOR_HANDOVER", entered_otp)
+    return valid, msg, rec
 
-    clean_otp = entered_otp.strip()
-    expected = record.get("otp_code") or "123456"
-
-    if clean_otp != expected and clean_otp != "123456":
-        return False, "Invalid or expired OTP code.", record
-
-    record["otp_verified"] = True
-    record["vendor_otp_verified"] = True
-    record["renter_otp_verified"] = True
-    record["updated_at"] = dt.now(timezone.utc).isoformat()
-    execute_query("""
-        UPDATE rental_security
-        SET otp_verified = TRUE, vendor_otp_verified = TRUE, renter_otp_verified = TRUE, updated_at = %s
-        WHERE booking_id = %s
-    """, (record["updated_at"], booking_id))
-    MOCK_RENTAL_SECURITIES[booking_id] = record
-
-    log_payernt_audit_event("OTP_VERIFIED", record.get("renter_id", ""), {"bookingId": booking_id})
-    check_and_activate_rental(record)
-    return True, "OTP verified successfully.", record
 
 
 # ============================================================

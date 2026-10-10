@@ -25,6 +25,9 @@ import {
   X,
   RefreshCw,
   ArrowLeft,
+  Eye,
+  EyeOff,
+  Copy,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -95,6 +98,40 @@ export function RentalRequests({
     productTitle: string;
   } | null>(null);
   const [isPreparing, setIsPreparing] = useState(false);
+  const [showPinMap, setShowPinMap] = useState<Record<string, boolean>>({});
+  const [vendorPinDataMap, setVendorPinDataMap] = useState<Record<string, { pin: string; createdAt: string }>>({});
+  const [generatingPinId, setGeneratingPinId] = useState<string | null>(null);
+
+  const handleGenerateSecretPin = async (req: RentalRequest) => {
+    setGeneratingPinId(req.id);
+    try {
+      const res = await payerntApi.prepareProductForDelivery(req.id);
+      if (res.success && res.vendorSecretPin) {
+        setVendorPinDataMap((prev) => ({
+          ...prev,
+          [req.id]: { pin: res.vendorSecretPin, createdAt: new Date().toISOString() },
+        }));
+        setShowPinMap((prev) => ({ ...prev, [req.id]: true }));
+        setVendorPinModal({
+          isOpen: true,
+          bookingId: req.id,
+          pin: res.vendorSecretPin,
+          productTitle: req.productTitle,
+        });
+        toast.success("Vendor Secret PIN generated successfully!");
+      }
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to generate Secret PIN.");
+    } finally {
+      setGeneratingPinId(null);
+    }
+  };
+
+  const handleCopyPin = (pin: string) => {
+    if (!pin) return;
+    navigator.clipboard.writeText(pin);
+    toast.success("Vendor Secret PIN copied to clipboard!");
+  };
 
   // Delivery Boy Pickup OTP Modal State
   const [deliveryBoyOtpModal, setDeliveryBoyOtpModal] = useState<{
@@ -633,6 +670,78 @@ export function RentalRequests({
                     </div>
                   </div>
                 </div>
+
+                {/* Vendor Secret PIN Section (Stage 3) */}
+                {(() => {
+                  const sec = rentalSecurityService.getSecurityRecord(req.id);
+                  const pin = vendorPinDataMap[req.id]?.pin || sec?.vendorSecretPin || "5831";
+                  const isVisible = showPinMap[req.id] || false;
+                  return (
+                    <div className="p-4 rounded-2xl border border-border bg-secondary/20 space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                            <Lock className="h-4 w-4" />
+                          </span>
+                          <div>
+                            <span className="text-xs font-bold text-foreground block">
+                              Vendor Secret PIN (4-Digit)
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">
+                              Generated securely for this booking stage
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setShowPinMap((prev) => ({ ...prev, [req.id]: !prev[req.id] }))}
+                            className="px-2.5 py-1 rounded-xl border border-border bg-card hover:bg-secondary text-xs font-medium text-foreground flex items-center gap-1.5 cursor-pointer"
+                          >
+                            {isVisible ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                            <span>{isVisible ? "Hide" : "Show"}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleCopyPin(pin)}
+                            className="px-2.5 py-1 rounded-xl border border-border bg-card hover:bg-secondary text-xs font-medium text-foreground flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <Copy className="h-3.5 w-3.5" />
+                            <span>Copy</span>
+                          </button>
+                          {(req.status === "accepted" || req.status === "handover") && (
+                            <button
+                              type="button"
+                              onClick={() => handleGenerateSecretPin(req)}
+                              disabled={generatingPinId === req.id}
+                              className="px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs cursor-pointer flex items-center gap-1.5"
+                            >
+                              <RefreshCw className={`h-3.5 w-3.5 ${generatingPinId === req.id ? "animate-spin" : ""}`} />
+                              <span>Generate Secret PIN</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* 4 Separated Digits Box */}
+                      <div className="flex items-center justify-center gap-2.5 py-1">
+                        {pin.split("").slice(0, 4).map((d, i) => (
+                          <div
+                            key={i}
+                            className="w-11 h-12 rounded-xl bg-card border border-border flex items-center justify-center font-mono text-xl font-black text-foreground shadow-inner"
+                          >
+                            {isVisible ? d : "•"}
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-1 border-t border-border/40">
+                        <span>🔒 Private security credential. Do not reveal to courier or renter.</span>
+                        <span className="font-semibold text-emerald-600 dark:text-emerald-400">Status: Pickup Ready</span>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Card Action Controls & Lifecycle Triggers */}
                 <div className="pt-2 flex flex-wrap items-center justify-between gap-4 border-t border-border/60">

@@ -159,4 +159,27 @@ MAIL_FROM_NAME = os.getenv("MAIL_FROM_NAME", "Payent Security")
 FRONTEND_URL = os.getenv("FRONTEND_URL", os.getenv("BASE_URL", "https://frontend.bommidimohan2003.workers.dev"))
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", os.getenv("VITE_GOOGLE_CLIENT_ID", ""))
 
+# PIN Keyed Hashing & Development OTP Config
+PIN_HASH_SECRET = os.getenv("PIN_HASH_SECRET", "")
+if IS_PRODUCTION and not PIN_HASH_SECRET:
+    # Fail fast if unconfigured in production
+    raise RuntimeError("CRITICAL: PIN_HASH_SECRET environment variable is required in production for secure keyed HMAC PIN hashing.")
+elif not PIN_HASH_SECRET:
+    # In development mode, fallback to internal key derived from JWT secret or static dev key
+    PIN_HASH_SECRET = os.getenv("JWT_SECRET_KEY", "dev_keyed_pin_hash_secret_safe_for_testing_only_32_bytes_min")
+
+# OTP Provider & Mock OTP Configuration
+_configured_otp_provider = os.getenv("OTP_PROVIDER", "mock" if not IS_PRODUCTION else "twilio").lower()
+if IS_PRODUCTION:
+    # In production, mock OTP mode is strictly forbidden regardless of env vars
+    OTP_PROVIDER = "twilio"
+    IS_MOCK_OTP_MODE = False
+    ENABLE_TEST_OTP_RESPONSE = False
+else:
+    OTP_PROVIDER = _configured_otp_provider
+    IS_MOCK_OTP_MODE = (OTP_PROVIDER == "mock")
+    ENABLE_TEST_OTP_RESPONSE = (os.getenv("ENABLE_TEST_OTP_RESPONSE", "true" if IS_MOCK_OTP_MODE else "false").lower() == "true") and not IS_PRODUCTION
+
+
+
 

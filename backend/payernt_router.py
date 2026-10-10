@@ -1,10 +1,11 @@
 import os
 import re
+import json
 import time
 import logging
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Optional, List, Dict, Any, Union
+from typing import Optional, List, Dict, Any, Union, Tuple
 from fastapi import APIRouter, HTTPException, Depends, Header, status, Query, Request, Response
 from pydantic import BaseModel, Field, EmailStr
 from auth import (
@@ -20,10 +21,13 @@ from config import (
     TWILIO_ACCOUNT_SID,
     TWILIO_AUTH_TOKEN,
     TWILIO_VERIFY_SERVICE_SID,
+    IS_PRODUCTION,
+    IS_MOCK_OTP_MODE,
 )
 from database import fetch_one
 from payernt_database import (
     create_payernt_account,
+    resubmit_payernt_account,
     get_payernt_account_by_email,
     get_payernt_account_by_id,
     update_payernt_account_profile,
@@ -47,7 +51,10 @@ from payernt_database import (
     verify_handover_otp_backend,
     generate_handover_otp,
     verify_handover_otp,
+    get_dev_mock_otp,
     vendor_prepare_product,
+    get_or_generate_vendor_secret_pin,
+    confirm_renter_inspection,
     activate_rental_transactional,
     add_payernt_pending_earnings,
     settle_payernt_earnings,
@@ -1692,6 +1699,144 @@ def vendor_prepare_product_endpoint(
     }
 
 
+@payernt_router.post("/bookings/{booking_id}/generate-secret-pin")
+@payernt_router.get("/bookings/{booking_id}/secret-pin")
+def get_or_generate_vendor_secret_pin_endpoint(
+    booking_id: str,
+    current_vendor: Dict[str, Any] = Depends(get_current_payernt_account),
+):
+    """
+    Retrieves or generates the 4-digit Vendor Secret PIN for the authorized vendor:
+    1. Cryptographically secure 4-digit numeric PIN.
+    2. Linked to the exact booking and pickup stage.
+    3. Returns creation timestamp, delivery status, and PIN.
+    """
+    vendor_id = current_vendor.get("id") or current_vendor.get("email")
+    vendor_email = current_vendor.get("email")
+    valid, msg, data = get_or_generate_vendor_secret_pin(booking_id, vendor_id, vendor_email)
+    if not valid:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
+    return {
+        "success": True,
+        "message": msg,
+        "bookingId": booking_id,
+        "vendorSecretPin": data.get("vendorSecretPin"),
+        "createdAt": data.get("createdAt"),
+        "deliveryStatus": data.get("deliveryStatus"),
+    }
+
+
+class RenterInspectionSchema(BaseModel):
+    checklist: Optional[Dict[str, Any]] = None
+    conditionNotes: Optional[str] = None
+
+
+@rental_router.post("/{booking_id}/confirm-inspection")
+def confirm_renter_inspection_endpoint(
+    booking_id: str,
+    data: Optional[RenterInspectionSchema] = None,
+    authorization: Optional[str] = Header(None),
+):
+    """
+    Stage 8: Renter inspects received product and generates/reveals Renter Secret PIN:
+    1. Validates renter authentication and ownership.
+    2. Confirms delivery partner handover has completed (renter_otp_verified).
+    3. Records inspection checklist and confirmation timestamp.
+    4. Generates/reveals 4-digit Renter Secret PIN exclusively for the renter.
+    """
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required.")
+
+    payload = decode_access_token(authorization.split(" ")[1], expected_type="access")
+    if not payload or "sub" not in payload:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session invalid or expired.")
+
+    renter_email = payload["sub"].strip().lower()
+    renter_id = payload.get("user_id") or renter_email
+    checklist = data.checklist if data and data.checklist else {
+        "received": True,
+        "matchesBooking": True,
+        "accessoriesChecked": True,
+        "conditionChecked": True,
+    }
+
+    valid, msg, sec = confirm_renter_inspection(booking_id, renter_id, renter_email, checklist)
+    if not valid:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
+
+    return {
+        "success": True,
+        "message": msg,
+        "security": sec,
+        "renterSecretPin": sec.get("renterSecretPin"),
+        "inspectionConfirmedAt": sec.get("inspectionConfirmedAt"),
+    }
+
+
+def check_courier_authorization_for_delivery(booking_id: str, authorization: Optional[str]) -> Tuple[bool, int, str, Dict[str, Any]]:
+    """
+    Validates delivery partner authentication & assignment:
+    1. Requires valid Bearer access token.
+    2. Extracts authenticated user ID and role.
+    3. Verifies user is the assigned delivery partner in deliveries / orders, or an admin.
+    Returns (is_authorized, status_code, message, payload).
+    """
+    if not authorization or not authorization.startswith("Bearer "):
+        return False, status.HTTP_401_UNAUTHORIZED, "Authentication required. Bearer token missing.", {}
+
+    token = authorization.split(" ")[1]
+    payload = decode_access_token(token, expected_type="access")
+    if not payload or ("sub" not in payload and "user_id" not in payload):
+        return False, status.HTTP_401_UNAUTHORIZED, "Session invalid or expired.", {}
+
+    user_email = str(payload.get("sub") or "").strip().lower()
+    user_id = str(payload.get("user_id") or user_email).strip()
+    user_role = str(payload.get("role") or "").strip().lower()
+
+    if user_role in ("admin", "superadmin", "system"):
+        return True, 200, "Authorized admin.", payload
+
+    # Lookup delivery assignment
+    delivery = None
+    try:
+        delivery = fetch_one("SELECT * FROM deliveries WHERE booking_id = %s OR id = %s LIMIT 1", (booking_id, booking_id))
+    except Exception:
+        pass
+    if not delivery:
+        from database import MOCK_DELIVERIES
+        delivery = MOCK_DELIVERIES.get(booking_id)
+
+    order = None
+    try:
+        order = fetch_one("SELECT * FROM orders WHERE id = %s LIMIT 1", (booking_id,))
+    except Exception:
+        pass
+    if not order:
+        from database import MOCK_ORDERS
+        order = MOCK_ORDERS.get(booking_id)
+
+    assigned_couriers = set()
+    if delivery:
+        if delivery.get("delivery_boy_id"):
+            assigned_couriers.add(str(delivery.get("delivery_boy_id")).strip().lower())
+        if delivery.get("delivery_boy_name"):
+            assigned_couriers.add(str(delivery.get("delivery_boy_name")).strip().lower())
+    if order:
+        if order.get("delivery_boy_id"):
+            assigned_couriers.add(str(order.get("delivery_boy_id")).strip().lower())
+
+    if assigned_couriers:
+        if user_id.lower() in assigned_couriers or user_email in assigned_couriers:
+            return True, 200, "Authorized courier.", payload
+        return False, status.HTTP_403_FORBIDDEN, "Forbidden: You are not assigned to this delivery task.", payload
+
+    # If open assignment or lender dispatch, permit courier / vendor roles
+    if user_role in ("delivery", "courier", "delivery_boy", "agent", "vendor", "lender"):
+        return True, 200, "Authorized courier role.", payload
+
+    return False, status.HTTP_403_FORBIDDEN, "Forbidden: Only authorized delivery partners can perform this action.", payload
+
+
 class SendHandoverOtpSchema(BaseModel):
     phone: Optional[str] = None
     userId: Optional[str] = None
@@ -1702,10 +1847,18 @@ class VerifyHandoverOtpSchema(BaseModel):
 
 
 @delivery_handover_router.post("/{booking_id}/vendor-otp/send")
-def send_vendor_handover_otp_endpoint(booking_id: str, data: Optional[SendHandoverOtpSchema] = None):
-    """Sends OTP to vendor for pickup verification."""
+def send_vendor_handover_otp_endpoint(
+    booking_id: str,
+    data: Optional[SendHandoverOtpSchema] = None,
+    authorization: Optional[str] = Header(None)
+):
+    """Sends OTP to vendor for pickup verification. Requires authenticated, assigned delivery partner."""
+    auth_ok, err_code, auth_msg, payload = check_courier_authorization_for_delivery(booking_id, authorization)
+    if not auth_ok:
+        raise HTTPException(status_code=err_code, detail=auth_msg)
+
     phone = data.phone if data else ""
-    uid = data.userId if data else ""
+    uid = data.userId if data else (payload.get("user_id") or payload.get("sub"))
     if not phone:
         sec = get_rental_security_record(booking_id)
         if sec:
@@ -1717,9 +1870,17 @@ def send_vendor_handover_otp_endpoint(booking_id: str, data: Optional[SendHandov
 
 
 @delivery_handover_router.post("/{booking_id}/vendor-otp/verify")
-def verify_vendor_handover_otp_endpoint(booking_id: str, data: VerifyHandoverOtpSchema):
-    """Verifies vendor handover OTP (Vendor -> Delivery Boy)."""
-    valid, msg, rec = verify_handover_otp(booking_id, purpose="VENDOR_HANDOVER", entered_otp=data.otp)
+def verify_vendor_handover_otp_endpoint(
+    booking_id: str,
+    data: VerifyHandoverOtpSchema,
+    authorization: Optional[str] = Header(None)
+):
+    """Verifies vendor handover OTP (Vendor -> Delivery Boy). Requires authenticated, assigned delivery partner."""
+    auth_ok, err_code, auth_msg, payload = check_courier_authorization_for_delivery(booking_id, authorization)
+    if not auth_ok:
+        raise HTTPException(status_code=err_code, detail=auth_msg)
+
+    valid, msg, rec = verify_handover_otp(booking_id, purpose="VENDOR_HANDOVER", entered_otp=data.otp, user_id=payload.get("user_id") or payload.get("sub"))
     if not valid:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
     return {
@@ -1731,12 +1892,26 @@ def verify_vendor_handover_otp_endpoint(booking_id: str, data: VerifyHandoverOtp
 
 
 @delivery_handover_router.post("/{booking_id}/renter-otp/send")
-def send_renter_handover_otp_endpoint(booking_id: str, data: Optional[SendHandoverOtpSchema] = None):
-    """Sends OTP to renter for arrival / receipt verification."""
+def send_renter_handover_otp_endpoint(
+    booking_id: str,
+    data: Optional[SendHandoverOtpSchema] = None,
+    authorization: Optional[str] = Header(None)
+):
+    """Sends OTP to renter for arrival / receipt verification. Enforces courier auth and vendor pickup verification first."""
+    auth_ok, err_code, auth_msg, payload = check_courier_authorization_for_delivery(booking_id, authorization)
+    if not auth_ok:
+        raise HTTPException(status_code=err_code, detail=auth_msg)
+
+    sec = get_rental_security_record(booking_id)
+    if not sec or not (sec.get("vendor_otp_verified") or sec.get("vendor_handover_verified")):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot dispatch renter delivery OTP before product pickup is verified with Vendor OTP."
+        )
+
     phone = data.phone if data else ""
-    uid = data.userId if data else ""
+    uid = data.userId if data else (payload.get("user_id") or payload.get("sub"))
     if not phone:
-        sec = get_rental_security_record(booking_id)
         if sec:
             r_user = fetch_one("SELECT phone FROM users WHERE email = %s", (sec.get("renter_id"),))
             if r_user:
@@ -1751,18 +1926,17 @@ def verify_renter_handover_otp_endpoint(
     data: VerifyHandoverOtpSchema,
     authorization: Optional[str] = Header(None)
 ):
-    """Verifies renter handover OTP and reveals private 4-digit Renter PIN."""
-    user_id = ""
-    if authorization and authorization.startswith("Bearer "):
-        payload = decode_access_token(authorization.split(" ")[1], expected_type="access")
-        if payload:
-            user_id = payload.get("user_id", "")
+    """Verifies renter handover OTP and confirms physical delivery. Requires authenticated, assigned delivery partner."""
+    auth_ok, err_code, auth_msg, payload = check_courier_authorization_for_delivery(booking_id, authorization)
+    if not auth_ok:
+        raise HTTPException(status_code=err_code, detail=auth_msg)
 
+    user_id = payload.get("user_id") or payload.get("sub") or ""
     valid, msg, rec = verify_handover_otp(booking_id, purpose="RENTER_HANDOVER", entered_otp=data.otp, user_id=user_id)
     if not valid:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
     
-    r_pin = rec.get("renter_secret_pin") if rec else None
+    r_pin = rec.get("renter_secret_pin") if rec and rec.get("renter_confirmed_receipt") else None
     return {
         "success": True,
         "message": msg,
@@ -1770,6 +1944,39 @@ def verify_renter_handover_otp_endpoint(
         "renterHandoverVerified": True,
         "renterSecretPin": r_pin
     }
+
+
+@delivery_handover_router.get("/dev/mock-otps/{booking_id}/{purpose}")
+@delivery_handover_router.get("/{booking_id}/dev-mock-otp/{purpose}")
+def get_dev_mock_otp_endpoint(
+    booking_id: str,
+    purpose: str,
+    authorization: Optional[str] = Header(None)
+):
+    """
+    Protected developer-only endpoint to inspect active Mock OTP during local development testing.
+    Strictly disabled and returns 404 in production environment.
+    """
+    if IS_PRODUCTION:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dev mock endpoint not available in production.")
+
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Bearer token required for dev mock OTP access.")
+
+    otp_code = get_dev_mock_otp(booking_id, purpose)
+    if not otp_code:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Active mock OTP not found, expired, or already verified.")
+
+    return {
+        "success": True,
+        "bookingId": booking_id,
+        "purpose": purpose.upper(),
+        "mockOtp": otp_code,
+        "label": "MOCK OTP — Development Only",
+        "notice": "Mock OTP generated. No SMS was sent.",
+        "isMockMode": True
+    }
+
 
 
 class PayerntResubmitSchema(BaseModel):

@@ -491,23 +491,33 @@ export default function Bookings() {
                 )}
 
                 {/* Handover timestamps */}
-                <div className="text-[10px] text-muted-foreground space-y-0.5 pt-1 border-t border-border/40 font-mono">
+                <div className="text-[10px] text-muted-foreground space-y-1 pt-1 border-t border-border/40 font-mono">
                   {selectedBooking.pickedUpAt && (
                     <div className="flex justify-between">
-                      <span>Courier Picked Up:</span>
-                      <span>{new Date(selectedBooking.pickedUpAt).toLocaleTimeString()}</span>
+                      <span className="text-muted-foreground">Vendor Pickup Verified:</span>
+                      <span className="font-semibold text-foreground">{new Date(selectedBooking.pickedUpAt).toLocaleString()}</span>
                     </div>
                   )}
                   {selectedBooking.arrivedAtRenterAt && (
                     <div className="flex justify-between">
-                      <span>Arrived at Renter:</span>
-                      <span>{new Date(selectedBooking.arrivedAtRenterAt).toLocaleTimeString()}</span>
+                      <span className="text-muted-foreground">Courier Arrived at Renter:</span>
+                      <span className="font-semibold text-foreground">{new Date(selectedBooking.arrivedAtRenterAt).toLocaleString()}</span>
+                    </div>
+                  )}
+                  {selectedBooking.rentalSecurity?.renterConfirmedReceipt && (
+                    <div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-bold">
+                      <span>Renter Inspection Confirmed:</span>
+                      <span>
+                        {selectedBooking.rentalSecurity.inspectionConfirmedAt
+                          ? new Date(selectedBooking.rentalSecurity.inspectionConfirmedAt).toLocaleString()
+                          : "Verified"}
+                      </span>
                     </div>
                   )}
                   {selectedBooking.rentalSecurity?.activatedAt && (
                     <div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-bold">
-                      <span>Rental Activated & Earnings Started:</span>
-                      <span>{new Date(selectedBooking.rentalSecurity.activatedAt).toLocaleTimeString()}</span>
+                      <span>Rental Active:</span>
+                      <span>{new Date(selectedBooking.rentalSecurity.activatedAt).toLocaleString()}</span>
                     </div>
                   )}
                 </div>

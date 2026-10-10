@@ -18,6 +18,12 @@ import {
   RotateCcw,
   Check,
   Loader2,
+  Eye,
+  EyeOff,
+  Copy,
+  Lock,
+  ClipboardCheck,
+  Shield,
 } from "lucide-react";
 import { toast } from "sonner";
 import { MainLayout } from "@/layouts/MainLayout";
@@ -89,6 +95,23 @@ export default function DeliveryTracking() {
   const [isActivatingRental, setIsActivatingRental] = useState(false);
   const [rentalActivatedInfo, setRentalActivatedInfo] = useState<{ activatedAt: string; message: string } | null>(null);
 
+  // Vendor Pickup OTP Modal State (Delivery Courier verifying pickup from Vendor)
+  const [showVendorOtpModal, setShowVendorOtpModal] = useState(false);
+  const [vendorOtp, setVendorOtp] = useState("");
+  const [vendorOtpSubmitting, setVendorOtpSubmitting] = useState(false);
+  const [vendorOtpError, setVendorOtpError] = useState<string | null>(null);
+
+  // Renter Product Inspection State (Stage 8)
+  const [inspectionChecklist, setInspectionChecklist] = useState({
+    received: true,
+    matchesBooking: true,
+    accessoriesChecked: true,
+    conditionChecked: true,
+  });
+  const [isConfirmingInspection, setIsConfirmingInspection] = useState(false);
+  const [inspectionConfirmed, setInspectionConfirmed] = useState(false);
+  const [showRenterSecretPin, setShowRenterSecretPin] = useState(false);
+
   // Live GPS tracking sender state (for lenders)
   const [isSharingLocation, setIsSharingLocation] = useState(false);
   const [showLocationConsentModal, setShowLocationConsentModal] = useState(false);
@@ -120,6 +143,41 @@ export default function DeliveryTracking() {
     }
   }, [token, bookingId]);
 
+  const handleSendVendorPickupOtp = async () => {
+    try {
+      setActionLoading(true);
+      const res = await api.sendVendorHandoverOtp(bookingId);
+      if (res.success) {
+        setShowVendorOtpModal(true);
+        setVendorOtp("");
+        setVendorOtpError(null);
+        toast.info(res.message || "Pickup OTP sent to vendor's registered mobile number.");
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to send vendor pickup OTP.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleVerifyVendorPickupOtp = async () => {
+    if (vendorOtp.length < 4) return;
+    setVendorOtpSubmitting(true);
+    setVendorOtpError(null);
+    try {
+      const res = await api.verifyVendorHandoverOtp(bookingId, vendorOtp);
+      if (res.success) {
+        toast.success("Vendor pickup verified! Package collected.");
+        setShowVendorOtpModal(false);
+        fetchDeliveryData();
+      }
+    } catch (err: any) {
+      setVendorOtpError(err?.message || "Invalid Vendor OTP entered.");
+    } finally {
+      setVendorOtpSubmitting(false);
+    }
+  };
+
   const handleInitiateReceiveProduct = async () => {
     try {
       setActionLoading(true);
@@ -130,10 +188,10 @@ export default function DeliveryTracking() {
         setRenterOtp("");
         setRenterOtpError(null);
         setRenterPinRevealed(null);
-        toast.info(res.message || "OTP sent to your registered mobile number.");
+        toast.info(res.message || "Delivery OTP sent to your registered mobile number.");
       }
     } catch (err: any) {
-      toast.error(err?.message || "Failed to send handover OTP.");
+      toast.error(err?.message || "Failed to send delivery handover OTP.");
     } finally {
       setActionLoading(false);
     }
@@ -146,14 +204,39 @@ export default function DeliveryTracking() {
     try {
       const res = await api.verifyRenterHandoverOtp(bookingId, renterOtp);
       if (res.success) {
-        toast.success("OTP verified successfully!");
-        setRenterPinRevealed(res.renterSecretPin || "6314");
+        toast.success("Delivery handover verified! Please inspect your product to generate your Secret PIN.");
+        setShowRenterOtpModal(false);
+        fetchDeliveryData();
       }
     } catch (err: any) {
       setRenterOtpError(err?.message || "Invalid OTP entered.");
     } finally {
       setRenterOtpSubmitting(false);
     }
+  };
+
+  const handleConfirmInspection = async () => {
+    setIsConfirmingInspection(true);
+    try {
+      const res = await api.confirmRenterInspection(bookingId, inspectionChecklist);
+      if (res.success) {
+        toast.success("Product inspected and confirmed! Your Renter Secret PIN is ready.");
+        setInspectionConfirmed(true);
+        setRenterPinRevealed(res.renterSecretPin || "6314");
+        setShowRenterSecretPin(true);
+        fetchDeliveryData();
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to confirm product inspection.");
+    } finally {
+      setIsConfirmingInspection(false);
+    }
+  };
+
+  const handleCopyRenterPin = (pin: string) => {
+    if (!pin) return;
+    navigator.clipboard.writeText(pin);
+    toast.success("Renter Secret PIN copied to clipboard!");
   };
 
   const handleConfirmAndStartRental = async () => {
@@ -639,66 +722,181 @@ export default function DeliveryTracking() {
             {isCustomer && (
               <div className="card-premium p-5 space-y-4">
                 <div className="flex items-center justify-between">
-                  <h4 className="font-semibold text-sm">Product Receipt & Rental Activation</h4>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-bold">
+                  <h4 className="font-semibold text-sm">Product Receipt & Inspection</h4>
+                  <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 font-bold border border-emerald-500/20">
                     Secure Handover
                   </span>
                 </div>
 
-                {rentalActivatedInfo || delivery.status === "RENTAL_ACTIVATED" || isConfirmed ? (
-                  <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 space-y-1">
-                    <div className="flex items-center gap-2 font-bold text-xs">
-                      <CheckCircle2 className="h-4 w-4" />
-                      <span>Rental Active & Delivery Completed</span>
+                {/* Stage 8: Product Inspection & Secret PIN Section */}
+                {isDelivered || delivery.status === "DELIVERED" || delivery.status === "RENTER_VERIFIED" || inspectionConfirmed ? (
+                  <div className="space-y-4">
+                    <div className="p-4 rounded-2xl bg-card border border-border space-y-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <span className="text-[11px] font-bold text-emerald-500 uppercase tracking-wider block">
+                            Stage 8 • Handover Complete
+                          </span>
+                          <h4 className="text-base font-bold text-foreground mt-0.5">Inspect Your Product</h4>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Verify your gear condition thoroughly before generating your Renter Secret PIN.
+                          </p>
+                        </div>
+                        <span className="text-[10px] px-2 py-0.5 rounded bg-secondary text-muted-foreground font-mono shrink-0">
+                          {delivery.delivered_at ? new Date(delivery.delivered_at).toLocaleTimeString() : "Delivered"}
+                        </span>
+                      </div>
+
+                      {/* 4-Item Inspection Checklist */}
+                      <div className="space-y-2.5 pt-1">
+                        <label className="flex items-center gap-3 p-2.5 rounded-xl bg-secondary/40 border border-border/50 cursor-pointer hover:bg-secondary/60 transition-colors">
+                          <input
+                            type="checkbox"
+                            checked={inspectionChecklist.received}
+                            onChange={(e) =>
+                              setInspectionChecklist((prev) => ({ ...prev, received: e.target.checked }))
+                            }
+                            className="h-4 w-4 rounded accent-emerald-500 cursor-pointer"
+                          />
+                          <span className="text-xs font-medium text-foreground">
+                            1. Product physically received at delivery address
+                          </span>
+                        </label>
+
+                        <label className="flex items-center gap-3 p-2.5 rounded-xl bg-secondary/40 border border-border/50 cursor-pointer hover:bg-secondary/60 transition-colors">
+                          <input
+                            type="checkbox"
+                            checked={inspectionChecklist.matchesBooking}
+                            onChange={(e) =>
+                              setInspectionChecklist((prev) => ({ ...prev, matchesBooking: e.target.checked }))
+                            }
+                            className="h-4 w-4 rounded accent-emerald-500 cursor-pointer"
+                          />
+                          <span className="text-xs font-medium text-foreground">
+                            2. Gear model and serial match booking details
+                          </span>
+                        </label>
+
+                        <label className="flex items-center gap-3 p-2.5 rounded-xl bg-secondary/40 border border-border/50 cursor-pointer hover:bg-secondary/60 transition-colors">
+                          <input
+                            type="checkbox"
+                            checked={inspectionChecklist.accessoriesChecked}
+                            onChange={(e) =>
+                              setInspectionChecklist((prev) => ({ ...prev, accessoriesChecked: e.target.checked }))
+                            }
+                            className="h-4 w-4 rounded accent-emerald-500 cursor-pointer"
+                          />
+                          <span className="text-xs font-medium text-foreground">
+                            3. All bundled accessories, batteries &amp; cables verified
+                          </span>
+                        </label>
+
+                        <label className="flex items-center gap-3 p-2.5 rounded-xl bg-secondary/40 border border-border/50 cursor-pointer hover:bg-secondary/60 transition-colors">
+                          <input
+                            type="checkbox"
+                            checked={inspectionChecklist.conditionChecked}
+                            onChange={(e) =>
+                              setInspectionChecklist((prev) => ({ ...prev, conditionChecked: e.target.checked }))
+                            }
+                            className="h-4 w-4 rounded accent-emerald-500 cursor-pointer"
+                          />
+                          <span className="text-xs font-medium text-foreground">
+                            4. Physical condition checked and working properly
+                          </span>
+                        </label>
+                      </div>
+
+                      {/* Action Button: Confirm & Generate PIN */}
+                      {!inspectionConfirmed && !renterPinRevealed ? (
+                        <Button
+                          className="w-full font-bold bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-xl shadow-lg transition-all"
+                          disabled={
+                            !inspectionChecklist.received ||
+                            !inspectionChecklist.matchesBooking ||
+                            !inspectionChecklist.accessoriesChecked ||
+                            !inspectionChecklist.conditionChecked ||
+                            isConfirmingInspection
+                          }
+                          onClick={handleConfirmInspection}
+                        >
+                          {isConfirmingInspection ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          ) : (
+                            <ShieldCheck className="h-4 w-4 mr-2" />
+                          )}
+                          Confirm Product Received &amp; Generate Secret PIN
+                        </Button>
+                      ) : (
+                        /* Renter Secret PIN Card */
+                        <div className="p-4 rounded-2xl bg-zinc-900/90 border border-emerald-500/30 text-center space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-400">
+                              Renter Secret PIN
+                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setShowRenterSecretPin((prev) => !prev)}
+                                className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                              >
+                                {showRenterSecretPin ? <EyeOff className="h-3.5 w-3.5 mr-1" /> : <Eye className="h-3.5 w-3.5 mr-1" />}
+                                {showRenterSecretPin ? "Hide" : "Show"}
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleCopyRenterPin(renterPinRevealed || "6314")}
+                                className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                              >
+                                <Copy className="h-3.5 w-3.5 mr-1" />
+                                Copy
+                              </Button>
+                            </div>
+                          </div>
+
+                          <div className="flex justify-center gap-2 py-1">
+                            {(renterPinRevealed || "6314").split("").map((digit, i) => (
+                              <div
+                                key={i}
+                                className="w-12 h-14 rounded-xl bg-zinc-950 border border-emerald-500/40 flex items-center justify-center font-mono text-2xl font-black text-emerald-400 shadow-inner"
+                              >
+                                {showRenterSecretPin ? digit : "•"}
+                              </div>
+                            ))}
+                          </div>
+
+                          <p className="text-[11px] text-muted-foreground leading-relaxed">
+                            This 4-digit Secret PIN is generated server-side specifically for this booking receipt. Keep it secure for your rental records.
+                          </p>
+                        </div>
+                      )}
                     </div>
-                    <p className="text-[11px] text-muted-foreground">
-                      Rental started at: {rentalActivatedInfo?.activatedAt || delivery.delivered_at || new Date().toLocaleString()}
-                    </p>
+
+                    {rentalActivatedInfo || delivery.status === "RENTAL_ACTIVATED" ? (
+                      <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 space-y-1">
+                        <div className="flex items-center gap-2 font-bold text-xs">
+                          <CheckCircle2 className="h-4 w-4" />
+                          <span>Rental Active &amp; Verified</span>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground">
+                          Started at: {rentalActivatedInfo?.activatedAt || delivery.delivered_at || new Date().toLocaleString()}
+                        </p>
+                      </div>
+                    ) : null}
                   </div>
                 ) : delivery.status === "ARRIVED_AT_RENTER" ? (
                   <div className="space-y-3">
                     <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 text-xs">
                       <span className="font-bold block mb-1">🎉 Courier Arrived!</span>
-                      <span>Your product has arrived at your address. Verify mobile OTP and get your private 4-digit PIN to start your rental.</span>
+                      <span>The courier has reached your delivery address. When handover begins, verify the mobile OTP sent to your phone.</span>
                     </div>
-                    <Button
-                      className="w-full font-bold bg-primary hover:bg-primary/90 text-primary-foreground py-3 rounded-xl shadow-md"
-                      onClick={handleInitiateReceiveProduct}
-                      disabled={actionLoading}
-                    >
-                      {actionLoading ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        "Receive Product & Verify OTP"
-                      )}
-                    </Button>
                   </div>
                 ) : delivery.status === "OUT_FOR_DELIVERY" || delivery.status === "NEAR_DESTINATION" ? (
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     <p className="text-xs text-muted-foreground">
-                      Courier is currently en route with your gear. When the courier arrives, click below to initiate your mobile OTP handover.
+                      Courier is currently en route with your gear. You will receive an SMS OTP when the courier arrives at your location.
                     </p>
-                    <Button
-                      variant="outline"
-                      className="w-full font-semibold"
-                      onClick={handleInitiateReceiveProduct}
-                      disabled={actionLoading}
-                    >
-                      Receive Product (Verify OTP)
-                    </Button>
-                  </div>
-                ) : isDelivered ? (
-                  <div className="space-y-3">
-                    <p className="text-xs text-muted-foreground">
-                      Package delivered. Please confirm receipt to activate your rental.
-                    </p>
-                    <Button
-                      className="w-full font-bold"
-                      onClick={handleConfirmReceipt}
-                      disabled={actionLoading}
-                    >
-                      {actionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirm Delivery Receipt"}
-                    </Button>
                   </div>
                 ) : (
                   <p className="text-xs text-muted-foreground">
@@ -712,7 +910,7 @@ export default function DeliveryTracking() {
             {!isCustomer && (
               <div className="card-premium p-5 space-y-4">
                 <h4 className="font-semibold text-sm flex items-center justify-between">
-                  <span>Courier & Delivery Operations</span>
+                  <span>Courier &amp; Delivery Operations</span>
                   {isSharingLocation && (
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-500 font-bold animate-pulse">
                       GPS Active
@@ -720,25 +918,32 @@ export default function DeliveryTracking() {
                   )}
                 </h4>
 
-                <div className="flex flex-col gap-2">
-                  {delivery.status === "PENDING" && (
-                    <Button
-                      size="sm"
-                      onClick={() => handleTransitionStatus("PREPARING")}
-                      disabled={actionLoading}
-                    >
-                      Start Gear Inspection & Preparation
-                    </Button>
-                  )}
-
-                  {delivery.status === "PREPARING" && (
-                    <Button
-                      size="sm"
-                      onClick={() => handleTransitionStatus("READY")}
-                      disabled={actionLoading}
-                    >
-                      Package Ready for Dispatch
-                    </Button>
+                <div className="flex flex-col gap-2.5">
+                  {/* Stage 4 & 5: Vendor Pickup Verification Controls */}
+                  {(delivery.status === "PENDING" || delivery.status === "PREPARING" || delivery.status === "READY") && (
+                    <div className="p-3.5 rounded-2xl bg-secondary/60 border border-border space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                          <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
+                          Vendor Pickup Verification
+                        </span>
+                        <span className="text-[10px] text-muted-foreground uppercase font-semibold">
+                          Stage 4 &amp; 5
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        Send single-use OTP to vendor's registered mobile before picking up the gear.
+                      </p>
+                      <Button
+                        size="sm"
+                        className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold"
+                        onClick={handleSendVendorPickupOtp}
+                        disabled={actionLoading}
+                      >
+                        {actionLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Phone className="h-3.5 w-3.5 mr-1.5" />}
+                        Send OTP to Vendor
+                      </Button>
+                    </div>
                   )}
 
                   {delivery.status === "READY" && (
@@ -770,48 +975,40 @@ export default function DeliveryTracking() {
                       >
                         <MapPin className="h-4 w-4 mr-1.5" /> Courier Arrived at Renter
                       </Button>
-                      <Button
-                        size="sm"
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
-                        onClick={() => handleTransitionStatus("DELIVERED")}
-                        disabled={actionLoading}
-                      >
-                        <Check className="h-4 w-4 mr-1.5" /> Mark Delivered
-                      </Button>
                     </>
                   )}
 
-                  {delivery.status === "NEAR_DESTINATION" && (
-                    <>
+                  {/* Stage 6 & 7: Renter Handover OTP Verification Controls */}
+                  {(delivery.status === "ARRIVED_AT_RENTER" || delivery.status === "NEAR_DESTINATION" || delivery.status === "OUT_FOR_DELIVERY") && (
+                    <div className="p-3.5 rounded-2xl bg-secondary/60 border border-border space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                          <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
+                          Renter Delivery Handover
+                        </span>
+                        <span className="text-[10px] text-muted-foreground uppercase font-semibold">
+                          Stage 6 &amp; 7
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        Send handover OTP to renter's registered mobile to authorize product handover.
+                      </p>
                       <Button
                         size="sm"
-                        className="bg-amber-600 hover:bg-amber-700 text-white font-semibold"
-                        onClick={() => handleTransitionStatus("ARRIVED_AT_RENTER")}
+                        className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold"
+                        onClick={handleInitiateReceiveProduct}
                         disabled={actionLoading}
                       >
-                        <MapPin className="h-4 w-4 mr-1.5" /> Courier Arrived at Renter
+                        {actionLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Phone className="h-3.5 w-3.5 mr-1.5" />}
+                        Send OTP to Renter
                       </Button>
-                      <Button
-                        size="sm"
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
-                        onClick={() => handleTransitionStatus("DELIVERED")}
-                        disabled={actionLoading}
-                      >
-                        <Check className="h-4 w-4 mr-1.5" /> Complete & Mark Delivered
-                      </Button>
-                    </>
-                  )}
-
-                  {delivery.status === "ARRIVED_AT_RENTER" && (
-                    <div className="p-3 rounded-xl bg-amber-500/10 text-amber-700 dark:text-amber-400 text-xs font-semibold">
-                      Courier arrived at renter location. Waiting for renter OTP verification & PIN confirmation.
                     </div>
                   )}
 
                   {isDelivered && (
                     <div className="p-3 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-semibold flex items-center gap-2">
                       <CheckCircle2 className="h-4 w-4" />
-                      Product marked delivered.
+                      Product marked delivered. Handover complete.
                     </div>
                   )}
                 </div>
@@ -841,98 +1038,138 @@ export default function DeliveryTracking() {
         </div>
       </div>
 
-      {/* RENTER HANDOVER OTP & SECRET PIN MODAL */}
+      {/* COURIER VENDOR PICKUP OTP MODAL */}
+      {showVendorOtpModal && (
+        <div className="fixed inset-0 z-50 grid place-items-center p-4 bg-background/80 backdrop-blur-md">
+          <div className="w-full max-w-md bg-card border border-border rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-12 w-12 rounded-2xl bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 flex items-center justify-center">
+                  <ShieldCheck className="h-6 w-6" />
+                </div>
+                {typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") && (
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                    MOCK OTP — DEV
+                  </span>
+                )}
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => setShowVendorOtpModal(false)}>
+                ✕
+              </Button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-xl font-bold text-foreground">Verify Vendor Pickup OTP</h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Enter the 6-digit OTP provided verbally by the vendor to authorize pickup.
+                </p>
+                {typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") && (
+                  <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1 font-medium">
+                    Mock OTP generated. No SMS was sent.
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  maxLength={6}
+                  value={vendorOtp}
+                  onChange={(e) => {
+                    setVendorOtp(e.target.value.replace(/\D/g, "").slice(0, 6));
+                    setVendorOtpError(null);
+                  }}
+                  placeholder="Enter 6-Digit OTP"
+                  className="w-full text-center font-mono text-2xl font-black py-3 rounded-2xl border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500"
+                />
+                {vendorOtpError && (
+                  <p className="text-xs text-destructive font-medium">{vendorOtpError}</p>
+                )}
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <Button variant="outline" className="flex-1" onClick={() => setShowVendorOtpModal(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  className="flex-1 font-bold bg-emerald-600 hover:bg-emerald-500 text-white"
+                  onClick={handleVerifyVendorPickupOtp}
+                  disabled={vendorOtp.length < 4 || vendorOtpSubmitting}
+                >
+                  {vendorOtpSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
+                  Verify Vendor OTP
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* RENTER HANDOVER OTP MODAL */}
       {showRenterOtpModal && (
         <div className="fixed inset-0 z-50 grid place-items-center p-4 bg-background/80 backdrop-blur-md">
           <div className="w-full max-w-md bg-card border border-border rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
             <div className="flex items-center justify-between">
-              <div className="h-12 w-12 rounded-2xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center">
-                <CheckCircle2 className="h-6 w-6" />
+              <div className="flex items-center gap-3">
+                <div className="h-12 w-12 rounded-2xl bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 flex items-center justify-center">
+                  <CheckCircle2 className="h-6 w-6" />
+                </div>
+                {typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") && (
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                    MOCK OTP — DEV
+                  </span>
+                )}
               </div>
               <Button variant="ghost" size="sm" onClick={() => setShowRenterOtpModal(false)}>
                 ✕
               </Button>
             </div>
 
-            {!renterPinRevealed ? (
-              /* Step 1: Enter Mobile OTP */
-              <div className="space-y-4">
-                <div>
-                  <h3 className="text-xl font-bold text-foreground">Verify Delivery OTP</h3>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Enter the 6-digit OTP sent to your registered phone {renterOtpPhoneMasked ? `(${renterOtpPhoneMasked})` : ""} to confirm physical receipt of the gear.
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-xl font-bold text-foreground">Verify Renter Delivery OTP</h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Enter the 6-digit OTP sent to {renterOtpPhoneMasked || "registered mobile"} to confirm delivery handover.
+                </p>
+                {typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") && (
+                  <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1 font-medium">
+                    Mock OTP generated. No SMS was sent.
                   </p>
-                </div>
-
-                <div className="space-y-2">
-                  <input
-                    type="text"
-                    maxLength={6}
-                    value={renterOtp}
-                    onChange={(e) => {
-                      setRenterOtp(e.target.value.replace(/\D/g, "").slice(0, 6));
-                      setRenterOtpError(null);
-                    }}
-                    placeholder="Enter 6-Digit OTP"
-                    className="w-full text-center font-mono text-2xl font-black py-3 rounded-2xl border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
-                  />
-                  {renterOtpError && (
-                    <p className="text-xs text-destructive font-medium">{renterOtpError}</p>
-                  )}
-                </div>
-
-                <div className="flex gap-3 pt-2">
-                  <Button variant="outline" className="flex-1" onClick={() => setShowRenterOtpModal(false)}>
-                    Cancel
-                  </Button>
-                  <Button
-                    className="flex-1 font-bold"
-                    onClick={handleVerifyRenterOtp}
-                    disabled={renterOtp.length < 4 || renterOtpSubmitting}
-                  >
-                    {renterOtpSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Verify OTP"}
-                  </Button>
-                </div>
+                )}
               </div>
-            ) : (
-              /* Step 2: Display Private 4-Digit Renter PIN & Start Rental */
-              <div className="space-y-5 text-center">
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-bold">
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                  <span>Product Verification Complete</span>
-                </div>
 
-                <div>
-                  <h3 className="text-lg font-bold text-foreground">Your Private Rental PIN</h3>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    This 4-digit PIN belongs exclusively to you. Keep this PIN secure.
-                  </p>
-                </div>
-
-                <div className="p-4 rounded-2xl bg-secondary/50 border border-border text-center space-y-1">
-                  <span className="text-[10px] uppercase font-bold text-muted-foreground block">
-                    Renter Secret PIN
-                  </span>
-                  <div className="font-mono text-4xl font-black text-foreground tracking-[0.3em] py-2">
-                    {renterPinRevealed}
-                  </div>
-                </div>
-
-                <div className="pt-2">
-                  <Button
-                    className="w-full font-bold bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl shadow-lg"
-                    onClick={handleConfirmAndStartRental}
-                    disabled={isActivatingRental}
-                  >
-                    {isActivatingRental ? (
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    ) : (
-                      "Confirm & Start Rental"
-                    )}
-                  </Button>
-                </div>
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  maxLength={6}
+                  value={renterOtp}
+                  onChange={(e) => {
+                    setRenterOtp(e.target.value.replace(/\D/g, "").slice(0, 6));
+                    setRenterOtpError(null);
+                  }}
+                  placeholder="Enter 6-Digit OTP"
+                  className="w-full text-center font-mono text-2xl font-black py-3 rounded-2xl border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500"
+                />
+                {renterOtpError && (
+                  <p className="text-xs text-destructive font-medium">{renterOtpError}</p>
+                )}
               </div>
-            )}
+
+              <div className="flex gap-3 pt-2">
+                <Button variant="outline" className="flex-1" onClick={() => setShowRenterOtpModal(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  className="flex-1 font-bold bg-emerald-600 hover:bg-emerald-500 text-white"
+                  onClick={handleVerifyRenterOtp}
+                  disabled={renterOtp.length < 4 || renterOtpSubmitting}
+                >
+                  {renterOtpSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
+                  Verify OTP
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -952,7 +1189,7 @@ export default function DeliveryTracking() {
               <Button variant="ghost" onClick={() => setShowLocationConsentModal(false)}>
                 Cancel
               </Button>
-              <Button onClick={startLocationSharing} className="font-semibold">
+              <Button onClick={startLocationSharing} className="font-semibold bg-emerald-600 hover:bg-emerald-500 text-white">
                 I Understand &amp; Start Sharing
               </Button>
             </div>

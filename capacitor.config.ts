@@ -5,8 +5,7 @@ const config: CapacitorConfig = {
   appName: 'payent',
   webDir: 'dist',
   server: {
-    url: 'http://10.0.2.2:3000',
-    cleartext: true
+    url: 'https://frontend.bommidimohan2003.workers.dev'
   }
 };
 

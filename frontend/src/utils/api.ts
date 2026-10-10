@@ -2025,6 +2025,92 @@ export const api = {
     return await res.json();
   },
 
+  async sendVendorHandoverOtp(
+    bookingId: string,
+  ): Promise<{ success: boolean; message: string; purpose?: string; expiresAt?: number; otp?: string }> {
+    const res = await this.fetchWithAuth(
+      `${API_BASE}/api/deliveries/${bookingId}/vendor-otp/send`,
+      {
+        method: "POST",
+      },
+    );
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(parseApiError(data, "Failed to send vendor OTP"));
+    }
+    return await res.json();
+  },
+
+  async verifyVendorHandoverOtp(
+    bookingId: string,
+    otp: string,
+  ): Promise<{ success: boolean; deliveryStatus: string; vendorHandoverVerified: boolean; message: string }> {
+    const res = await this.fetchWithAuth(
+      `${API_BASE}/api/deliveries/${bookingId}/vendor-otp/verify`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ otp }),
+      },
+    );
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(parseApiError(data, "Failed to verify vendor OTP"));
+    }
+    return await res.json();
+  },
+
+  async getVendorSecretPin(
+    bookingId: string,
+  ): Promise<{ success: boolean; bookingId: string; vendorSecretPin: string; createdAt: string; deliveryStatus: string }> {
+    const res = await this.fetchWithAuth(
+      `${API_BASE}/api/payernt/bookings/${bookingId}/secret-pin`,
+      {
+        method: "GET",
+      },
+    );
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(parseApiError(data, "Failed to fetch Vendor Secret PIN"));
+    }
+    return await res.json();
+  },
+
+  async generateVendorSecretPin(
+    bookingId: string,
+  ): Promise<{ success: boolean; bookingId: string; vendorSecretPin: string; createdAt: string; deliveryStatus: string }> {
+    const res = await this.fetchWithAuth(
+      `${API_BASE}/api/payernt/bookings/${bookingId}/generate-secret-pin`,
+      {
+        method: "POST",
+      },
+    );
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(parseApiError(data, "Failed to generate Vendor Secret PIN"));
+    }
+    return await res.json();
+  },
+
+  async confirmRenterInspection(
+    bookingId: string,
+    checklist?: Record<string, boolean>,
+  ): Promise<{ success: boolean; message: string; renterSecretPin?: string; inspectionConfirmedAt?: string; security?: any }> {
+    const res = await this.fetchWithAuth(
+      `${API_BASE}/api/bookings/${bookingId}/confirm-inspection`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ checklist }),
+      },
+    );
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(parseApiError(data, "Failed to confirm product inspection"));
+    }
+    return await res.json();
+  },
+
   async activateRental(
     bookingId: string,
     renterPin?: string,

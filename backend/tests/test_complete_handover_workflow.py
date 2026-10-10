@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from fastapi.testclient import TestClient
 from main import app, create_access_token
 from database import execute_query, get_db_connection, update_delivery_status
-from payernt_database import create_payernt_account, create_payernt_product
+from payernt_database import create_payernt_account, create_payernt_product, get_dev_mock_otp
 
 client = TestClient(app)
 
@@ -133,7 +133,8 @@ def test_full_handover_and_rental_activation_lifecycle(setup_handover_test_data)
     assert send_v_otp.json()["success"] is True
     
     # Verify OTP
-    verify_v_otp = client.post(f"/api/deliveries/{booking_id}/vendor-otp/verify", json={"otp": "123456"}, headers=vendor_headers)
+    v_otp = get_dev_mock_otp(booking_id, "VENDOR_HANDOVER")
+    verify_v_otp = client.post(f"/api/deliveries/{booking_id}/vendor-otp/verify", json={"otp": v_otp}, headers=vendor_headers)
     assert verify_v_otp.status_code == 200
     assert verify_v_otp.json()["deliveryStatus"] in ("PICKED_UP_FROM_VENDOR", "OUT_FOR_DELIVERY")
     assert verify_v_otp.json()["vendorHandoverVerified"] is True
@@ -153,7 +154,8 @@ def test_full_handover_and_rental_activation_lifecycle(setup_handover_test_data)
     assert send_r_otp.json()["success"] is True
     
     # Renter verifies OTP and gets 4-Digit Renter Secret PIN
-    verify_r_otp = client.post(f"/api/deliveries/{booking_id}/renter-otp/verify", json={"otp": "123456"}, headers=renter_headers)
+    r_otp = get_dev_mock_otp(booking_id, "RENTER_HANDOVER")
+    verify_r_otp = client.post(f"/api/deliveries/{booking_id}/renter-otp/verify", json={"otp": r_otp}, headers=renter_headers)
     assert verify_r_otp.status_code == 200
     r_otp_data = verify_r_otp.json()
     assert r_otp_data["success"] is True
