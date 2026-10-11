@@ -148,11 +148,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 );
 
 function RootShell({ children }: { children: ReactNode }) {
-  // When running in client SPA mode inside #root, avoid nesting <html> inside <div id="root">
-  if (typeof document !== "undefined" && document.getElementById("root")) {
-    return <>{children}</>;
-  }
-
   return (
     <html lang="en" suppressHydrationWarning>
       <head>

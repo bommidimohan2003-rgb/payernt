@@ -10,7 +10,7 @@ import "./styles.css";
 
 const el =
   typeof document !== "undefined" ? document.getElementById("root") : null;
-if (el) {
+if (el && !(window as any).__TSR__) {
   createRoot(el).render(
     <StrictMode>
       <App />

@@ -19,7 +19,10 @@ export const getRouter = () => {
     },
   });
 
-  const isCapacitor = typeof window !== "undefined" && ((window as any).Capacitor || window.location.protocol === "file:" || window.location.hostname === "localhost");
+  const isCapacitor =
+    typeof window !== "undefined" &&
+    (Boolean((window as any).Capacitor?.isNativePlatform?.()) ||
+      window.location.protocol === "file:");
 
   const router = createRouter({
     routeTree,
