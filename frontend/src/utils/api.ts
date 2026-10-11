@@ -54,6 +54,24 @@ function parseApiError(data: unknown, fallback: string): string {
   return fallback;
 }
 
+let _lastSessionExpiredTime = 0;
+export function handleSessionExpiration(loginPath = "/login") {
+  storage.remove(STORAGE_KEYS.token);
+  storage.remove(STORAGE_KEYS.refreshToken);
+  storage.remove(STORAGE_KEYS.currentUser);
+  if (typeof window !== "undefined") {
+    localStorage.removeItem("payent:admin:token");
+    localStorage.removeItem("payent:admin:current_user");
+    const now = Date.now();
+    if (now - _lastSessionExpiredTime > 3000) {
+      _lastSessionExpiredTime = now;
+      window.dispatchEvent(
+        new CustomEvent("payent-session-expired", { detail: { loginPath } }),
+      );
+    }
+  }
+}
+
 interface CacheEntry<T> {
   timestamp: number;
   data: T;
@@ -607,12 +625,7 @@ export const api = {
               if (newToken) {
                 return this.getMe(newToken);
               }
-              storage.remove(STORAGE_KEYS.token);
-              storage.remove(STORAGE_KEYS.refreshToken);
-              storage.remove(STORAGE_KEYS.currentUser);
-              localStorage.removeItem("payent:admin:token");
-              localStorage.removeItem("payent:admin:current_user");
-              window.dispatchEvent(new CustomEvent("payent-session-expired"));
+              handleSessionExpiration();
             }
             const data = await res.json().catch(() => ({}));
             const error = new Error(data.detail || "Failed to fetch user profile.");
@@ -815,14 +828,7 @@ export const api = {
         options.headers = retryHeaders;
         res = await fetch(url, options);
       } else {
-        storage.remove(STORAGE_KEYS.token);
-        storage.remove(STORAGE_KEYS.refreshToken);
-        storage.remove(STORAGE_KEYS.currentUser);
-        if (typeof window !== "undefined") {
-          localStorage.removeItem("payent:admin:token");
-          localStorage.removeItem("payent:admin:current_user");
-          window.dispatchEvent(new CustomEvent("payent-session-expired"));
-        }
+        handleSessionExpiration();
       }
     }
     return res;

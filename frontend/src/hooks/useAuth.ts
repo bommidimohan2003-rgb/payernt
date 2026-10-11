@@ -63,6 +63,7 @@ async function fetchAuthProfile(token: string, cachedUser: User | null): Promise
             errorObj.message.includes("expired")));
       if (is401) {
         storage.remove(STORAGE_KEYS.token);
+        storage.remove(STORAGE_KEYS.refreshToken);
         storage.remove(STORAGE_KEYS.currentUser);
         return null;
       }
@@ -110,7 +111,7 @@ export function useAuth() {
 
       if (token && token !== "payent-active-session-token" && cachedUser) {
         const synced = await fetchAuthProfile(token, cachedUser);
-        if (isMounted && synced) {
+        if (isMounted) {
           setUser(synced);
         }
       }

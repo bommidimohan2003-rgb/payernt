@@ -113,7 +113,11 @@ api.interceptors.response.use(
           window.localStorage.removeItem("payent:currentUser");
           window.localStorage.removeItem("payent:admin:token");
           window.localStorage.removeItem("payent:admin:current_user");
-          window.dispatchEvent(new CustomEvent("payent-session-expired"));
+          const lastExp = (window as any).__lastSessionExpired || 0;
+          if (Date.now() - lastExp > 3000) {
+            (window as any).__lastSessionExpired = Date.now();
+            window.dispatchEvent(new CustomEvent("payent-session-expired"));
+          }
         }
       }
     }

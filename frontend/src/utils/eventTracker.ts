@@ -91,11 +91,15 @@ export async function flushEvents() {
       body: JSON.stringify({ events: eventsToSend }),
     });
     if (!res.ok) {
-      // Re-queue failed events up to a reasonable limit
-      eventQueue = [...eventsToSend, ...eventQueue].slice(0, 50);
+      if (res.status === 404 || res.status === 405) {
+        // Endpoint not present on backend deployment; silently drop events
+        return;
+      }
+      // Re-queue failed events up to a reasonable limit for temporary errors
+      eventQueue = [...eventsToSend, ...eventQueue].slice(0, 30);
     }
-  } catch (err) {
-    eventQueue = [...eventsToSend, ...eventQueue].slice(0, 50);
+  } catch {
+    // Network error / offline, do not crash or throw
   }
 }
 
