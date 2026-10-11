@@ -261,7 +261,8 @@ function RootComponent() {
           currentPath.startsWith("/admin");
 
         if (isProtectedRoute) {
-          const redirectParam = currentPath !== "/" ? `?redirect=${encodeURIComponent(currentPath + window.location.search)}` : "";
+          const cleanPath = currentPath;
+          const redirectParam = cleanPath !== "/" ? `?redirect=${encodeURIComponent(cleanPath)}` : "";
           window.location.href = `${targetLoginBase}${redirectParam}`;
         }
       }

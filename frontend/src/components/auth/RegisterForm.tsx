@@ -93,6 +93,14 @@ function strength(pw: string) {
   return s;
 }
 
+function isValidInternalRedirect(url: string | null | undefined, currentPath: string): url is string {
+  if (!url || typeof url !== "string") return false;
+  if (!url.startsWith("/") || url.startsWith("//") || url.startsWith("/\\")) return false;
+  if (url.startsWith("/login") || url.startsWith("/register")) return false;
+  if (url === currentPath) return false;
+  return true;
+}
+
 export function RegisterForm() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -122,13 +130,14 @@ export function RegisterForm() {
         localStorage.removeItem("pendingProductId");
       }
 
-      if (redirectUrl && redirectUrl.startsWith("/")) {
+      const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
+      if (isValidInternalRedirect(redirectUrl, currentPath)) {
         navigate({ to: redirectUrl as any });
-      } else if (pendingProductId) {
+      } else if (pendingProductId && `/product/${pendingProductId}` !== currentPath) {
         navigate({ to: `/product/${pendingProductId}` as any });
-      } else if (user.role === "admin") {
+      } else if (user.role === "admin" && currentPath !== "/admin/dashboard") {
         navigate({ to: "/admin/dashboard" });
-      } else {
+      } else if (currentPath !== "/categories") {
         navigate({ to: "/categories" });
       }
     }

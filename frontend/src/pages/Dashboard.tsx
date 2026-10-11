@@ -45,9 +45,7 @@ export default function Dashboard() {
   const [revealedPins, setRevealedPins] = useState<Record<string, { pin: string; instructions?: string }>>({});
   const [loadingPinOrderId, setLoadingPinOrderId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (ready && !user) navigate({ to: "/login" });
-  }, [ready, user, navigate]);
+
 
   const fetchDashboardData = useCallback(() => {
     const currentToken = storage.get<string | null>(STORAGE_KEYS.token, null);

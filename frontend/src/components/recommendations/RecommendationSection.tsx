@@ -67,15 +67,6 @@ export function RecommendationSection({
 
   const handleProductClick = (productId: string) => {
     tracker.recommendationClick(productId, type);
-    if (!user) {
-      const redirectTarget = `/product/${productId}`;
-      try {
-        localStorage.setItem("pay₹ent_pending_product_redirect", redirectTarget);
-        localStorage.setItem("pendingProductId", String(productId));
-      } catch (e) {}
-      navigate({ to: "/login", search: { redirect: redirectTarget } as any });
-      return;
-    }
     navigate({ to: "/product/$id", params: { id: productId } });
   };
 

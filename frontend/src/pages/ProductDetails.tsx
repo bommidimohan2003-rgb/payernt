@@ -132,17 +132,7 @@ export default function ProductDetails() {
   const [availabilityMessage, setAvailabilityMessage] = useState<string>("");
   const [isCreatingBooking, setIsCreatingBooking] = useState<boolean>(false);
 
-  // Auth Protection: If unauthenticated, redirect to login while preserving target product
-  useEffect(() => {
-    if (!user) {
-      const redirectTarget = `/product/${id}`;
-      try {
-        localStorage.setItem("pay₹ent_pending_product_redirect", redirectTarget);
-        localStorage.setItem("pendingProductId", String(id));
-      } catch (e) {}
-      navigate({ to: "/login", search: { redirect: redirectTarget } as any });
-    }
-  }, [user, id, navigate]);
+
 
   // Stale-While-Revalidate: load latest product details in background
   useEffect(() => {

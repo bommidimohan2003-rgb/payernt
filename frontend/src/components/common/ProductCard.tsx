@@ -146,16 +146,6 @@ export function ProductCard({
       return;
     }
 
-    if (!user) {
-      const redirectTarget = `/product/${product.id}`;
-      try {
-        localStorage.setItem("pay₹ent_pending_product_redirect", redirectTarget);
-        localStorage.setItem("pendingProductId", String(product.id));
-      } catch (e) {}
-      navigate({ to: "/login", search: { redirect: redirectTarget } as any });
-      return;
-    }
-
     try {
       navigate({ to: "/product/$id", params: { id: String(product.id) } });
     } catch {

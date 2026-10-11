@@ -397,19 +397,6 @@ export function BrowseSwipeDeck({
     if (!activeProduct) return;
     api.cacheProduct(activeProduct);
 
-    if (!user) {
-      const redirectTarget = `/product/${activeProduct.id}`;
-      try {
-        localStorage.setItem("pay₹ent_pending_product_redirect", redirectTarget);
-        localStorage.setItem("pendingProductId", String(activeProduct.id));
-      } catch (e) {}
-      navigate({
-        to: "/login",
-        search: { redirect: redirectTarget } as any,
-      });
-      return;
-    }
-
     navigate({
       to: "/product/$id",
       params: { id: activeProduct.id },
