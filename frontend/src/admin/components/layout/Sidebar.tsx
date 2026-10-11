@@ -22,6 +22,7 @@ import {
   Menu,
   X,
   Radio,
+  KeyRound,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -75,6 +76,7 @@ const menuItems = [
         badgeKey: "support",
       },
       { to: "/admin/activity-logs", icon: Shield, label: "Activity Logs" },
+      { to: "/admin/api-keys", icon: KeyRound, label: "API Keys" },
     ],
   },
   {

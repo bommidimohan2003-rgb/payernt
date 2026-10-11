@@ -1082,10 +1082,124 @@ MOCK_USERS = {
         "last_login_at": dt.now(timezone.utc).isoformat(),
         "status": "active",
         "verified": True
+    },
+    "admin@payent.com": {
+        "email": "admin@payent.com",
+        "firebase_uid": "admin-uid-payent",
+        "phone": "+91 9876543210",
+        "password_hash": _admin_hashed_pwd,
+        "full_name": "Payent Administrator",
+        "role": "admin",
+        "avatar": "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150",
+        "address": "Payent Central Towers, Tech Hub",
+        "city": "Bangalore",
+        "pincode": "560001",
+        "created_at": dt.now(timezone.utc).isoformat(),
+        "last_login_at": dt.now(timezone.utc).isoformat(),
+        "status": "active",
+        "verified": True
+    },
+    "mohan@payent.in": {
+        "email": "mohan@payent.in",
+        "firebase_uid": "admin-uid-mohan-in",
+        "phone": "+91 9876543210",
+        "password_hash": _admin_hashed_pwd,
+        "full_name": "Mohan Bommidi",
+        "role": "admin",
+        "avatar": "https://ui-avatars.com/api/?name=Mohan+Bommidi&background=10b981&color=fff",
+        "address": "123 Innovation Way",
+        "city": "Bangalore",
+        "pincode": "560001",
+        "created_at": dt.now(timezone.utc).isoformat(),
+        "last_login_at": dt.now(timezone.utc).isoformat(),
+        "status": "active",
+        "verified": True
     }
 }
 MOCK_OTPS = {}
-MOCK_ORDERS = {}
+MOCK_ORDERS = {
+    "ord-101": {
+        "id": "ord-101",
+        "product_id": "prod-camera-sony-fx3",
+        "product_title": "Sony FX3 Cinema Line Camera",
+        "product_image": "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800",
+        "user_email": "renter@payent.in",
+        "customer_name": "Aditya Sharma",
+        "owner_name": "Bangalore Cine Rentals",
+        "owner_email": "cine@payent.in",
+        "start_date": "2026-03-25",
+        "end_date": "2026-03-28",
+        "total": 7500,
+        "status": "confirmed",
+        "delivery_status": "READY_FOR_VENDOR",
+        "payment_status": "successful",
+        "razorpay_payment_id": "pay_OqN492X1001",
+        "razorpay_order_id": "order_OqN381X1001",
+        "created_at": "2026-03-20T10:15:00.000Z",
+        "rental_security": {
+            "vendor_pin_verified": True,
+            "renter_pin_verified": False,
+            "otp_verified": True,
+            "rental_started": False,
+            "security_status": "pending_delivery",
+            "activated_at": None,
+        }
+    },
+    "ord-102": {
+        "id": "ord-102",
+        "product_id": "prod-drone-dji-mavic3",
+        "product_title": "DJI Mavic 3 Pro Cine Combo",
+        "product_image": "https://images.unsplash.com/photo-1527977966376-1c8408f9f108?w=800",
+        "user_email": "priya.verma@gmail.com",
+        "customer_name": "Priya Verma",
+        "owner_name": "AeroGear India",
+        "owner_email": "aerogear@payent.in",
+        "start_date": "2026-03-22",
+        "end_date": "2026-03-24",
+        "total": 9200,
+        "status": "active",
+        "delivery_status": "OUT_FOR_DELIVERY",
+        "payment_status": "successful",
+        "razorpay_payment_id": "pay_OqN492X1002",
+        "razorpay_order_id": "order_OqN381X1002",
+        "created_at": "2026-03-19T14:30:00.000Z",
+        "rental_security": {
+            "vendor_pin_verified": True,
+            "renter_pin_verified": True,
+            "otp_verified": True,
+            "rental_started": True,
+            "security_status": "active",
+            "activated_at": "2026-03-22T09:00:00.000Z",
+        }
+    },
+    "ord-103": {
+        "id": "ord-103",
+        "product_id": "prod-macbook-m3-max",
+        "product_title": "Apple MacBook Pro 16\" M3 Max",
+        "product_image": "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800",
+        "user_email": "rahul.k@startup.io",
+        "customer_name": "Rahul Kapoor",
+        "owner_name": "TechLease Studio",
+        "owner_email": "techlease@payent.in",
+        "start_date": "2026-03-10",
+        "end_date": "2026-03-15",
+        "total": 14500,
+        "status": "completed",
+        "delivery_status": "DELIVERED",
+        "payment_status": "successful",
+        "razorpay_payment_id": "pay_OqN492X1003",
+        "razorpay_order_id": "order_OqN381X1003",
+        "created_at": "2026-03-08T11:00:00.000Z",
+        "rental_security": {
+            "vendor_pin_verified": True,
+            "renter_pin_verified": True,
+            "otp_verified": True,
+            "rental_started": True,
+            "security_status": "completed",
+            "activated_at": "2026-03-10T10:00:00.000Z",
+        }
+    }
+}
 MOCK_CARTS = {}
 MOCK_WISHLISTS = {}
 MOCK_NOTIFICATIONS = {}
@@ -2927,7 +3041,36 @@ def get_popular_search_queries(limit: int = 5) -> list:
 # API Key Management Database Operations
 # ----------------------------------------------------------------------
 
-MOCK_API_KEYS = {}
+MOCK_API_KEYS = {
+    "key_live_default_01": {
+        "id": "key_live_default_01",
+        "name": "Production Mobile App",
+        "key_prefix": "payent_live_9b21",
+        "key_hash": hashlib.sha256("payent_live_9b21_secret".encode()).hexdigest(),
+        "user_email": "admin@payent.com",
+        "scopes": "read,write,bookings,payments",
+        "rate_limit": 500,
+        "is_active": True,
+        "expires_at": None,
+        "last_used_at": dt.now(timezone.utc).isoformat(),
+        "created_at": dt.now(timezone.utc).isoformat(),
+        "updated_at": dt.now(timezone.utc).isoformat()
+    },
+    "key_test_sandbox_02": {
+        "id": "key_test_sandbox_02",
+        "name": "Integration Sandbox Key",
+        "key_prefix": "payent_test_4c72",
+        "key_hash": hashlib.sha256("payent_test_4c72_secret".encode()).hexdigest(),
+        "user_email": "mohan@payent.in",
+        "scopes": "read,bookings",
+        "rate_limit": 100,
+        "is_active": True,
+        "expires_at": None,
+        "last_used_at": dt.now(timezone.utc).isoformat(),
+        "created_at": dt.now(timezone.utc).isoformat(),
+        "updated_at": dt.now(timezone.utc).isoformat()
+    }
+}
 
 def get_api_keys_db(page: int = 1, limit: int = 25, search: str = None):
     try:

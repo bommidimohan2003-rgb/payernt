@@ -336,7 +336,7 @@ const getAdminApiBase = () => {
   if (!base && typeof window !== "undefined") {
     const host = window.location.hostname;
     if (host === "10.0.2.2") base = "http://10.0.2.2:8001";
-    else if (host === "localhost" || host === "127.0.0.1") base = "http://127.0.0.1:8001";
+    else if (host === "localhost" || host === "127.0.0.1") base = "";
     else if (host.endsWith(".vercel.app")) base = "";
     else base = window.location.origin;
   }

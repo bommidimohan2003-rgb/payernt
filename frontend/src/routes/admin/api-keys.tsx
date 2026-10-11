@@ -1,9 +1,7 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+import APIKeys from "@/admin/pages/APIKeys";
 
 export const Route = createFileRoute("/admin/api-keys")({
-  beforeLoad: () => {
-    throw redirect({ to: "/admin/dashboard" });
-  },
-  component: () => null,
+  component: APIKeys,
 });
 export default Route;

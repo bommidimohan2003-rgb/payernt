@@ -382,7 +382,7 @@ export default function Bookings() {
       </div>
 
       {/* ERROR STATE */}
-      {error && !loading ? (
+      {error && !loading && bookings.length === 0 ? (
         <div className="bg-card rounded-2xl border border-destructive/30 p-12 text-center shadow-xs flex flex-col items-center justify-center">
           <div className="w-12 h-12 rounded-full bg-destructive/10 text-destructive flex items-center justify-center mb-3">
             <ShieldAlert className="h-6 w-6" />

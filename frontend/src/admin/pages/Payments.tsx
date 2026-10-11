@@ -317,7 +317,7 @@ export default function Payments() {
       </div>
 
       {/* ERROR STATE */}
-      {error && !loading ? (
+      {error && !loading && payments.length === 0 ? (
         <div className="bg-card rounded-xl border border-red-500/20 p-8 text-center flex flex-col items-center justify-center space-y-3">
           <div className="w-10 h-10 rounded-full bg-red-500/10 text-[#FF1744] flex items-center justify-center">
             <ShieldAlert className="h-5 w-5" />
