@@ -838,6 +838,8 @@ export default function Checkout() {
                                 STORAGE_KEYS.token,
                                 null,
                               );
+                              if (isProcessing) return;
+                              setIsProcessing(true);
                               if (token) {
                                 api
                                   .createOrder(token, order)
@@ -853,8 +855,10 @@ export default function Checkout() {
                               storage.set(STORAGE_KEYS.orders, [order, ...localOrders]);
                               window.dispatchEvent(new Event("payent_orders_updated"));
                               setConfirmedOrder(order);
+                              setIsProcessing(false);
                               setOpen(true);
                             }}
+                            disabled={isProcessing}
                             className="bg-primary/5 hover:bg-primary/10 border-primary/20 text-primary"
                           >
                             Simulate UPI App Scan Success

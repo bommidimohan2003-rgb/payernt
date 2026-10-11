@@ -1948,6 +1948,16 @@ def verify_renter_pin_backend(booking_id: str, entered_pin: str, user_id: str) -
     record["renter_pin_verified"] = True
     record["renter_handover_verified"] = True
     record["updated_at"] = dt.now(timezone.utc).isoformat()
+
+    # Opportunistic upgrade: safely migrate legacy SHA-256 hash to keyed HMAC-SHA256
+    expected_renter_hmac = hash_secret_pin(clean_entered, booking_id, "RENTER")
+    if stored_hash and not hmac.compare_digest(stored_hash, expected_renter_hmac):
+        record["renter_pin_hash"] = expected_renter_hmac
+        try:
+            execute_query("UPDATE rental_security SET renter_pin_hash = %s WHERE booking_id = %s", (expected_renter_hmac, booking_id))
+        except Exception:
+            pass
+
     try:
         execute_query("""
             UPDATE rental_security
@@ -1996,6 +2006,15 @@ def verify_vendor_pin_backend(booking_id: str, entered_pin: str, user_id: str) -
     record["vendor_pin_verified"] = True
     record["vendor_handover_verified"] = True
     record["updated_at"] = dt.now(timezone.utc).isoformat()
+
+    # Opportunistic upgrade: safely migrate legacy SHA-256 hash to keyed HMAC-SHA256
+    expected_vendor_hmac = hash_secret_pin(clean_entered, booking_id, "VENDOR")
+    if stored_hash and not hmac.compare_digest(stored_hash, expected_vendor_hmac):
+        record["vendor_pin_hash"] = expected_vendor_hmac
+        try:
+            execute_query("UPDATE rental_security SET vendor_pin_hash = %s WHERE booking_id = %s", (expected_vendor_hmac, booking_id))
+        except Exception:
+            pass
     try:
         execute_query("""
             UPDATE rental_security
