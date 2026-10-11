@@ -2,13 +2,13 @@ import { adminApi, AdminUser } from "./api";
 
 const DEFAULT_ADMIN: AdminUser = {
   id: "admin_payent_current",
-  fullName: "Mohan Bommidi",
-  email: "mohan@payent.in",
-  phone: "+91 9876543210",
+  fullName: "Bommidi Mohan",
+  email: "bommidimohan2003@gmail.com",
+  phone: "+91 8810519885",
   role: "admin",
   status: "active",
   verified: true,
-  avatar: "https://ui-avatars.com/api/?name=Mohan+Bommidi&background=10b981&color=fff",
+  avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
   createdAt: new Date().toISOString(),
 };
 

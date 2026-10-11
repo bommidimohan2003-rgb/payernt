@@ -996,45 +996,6 @@ def init_db(force: bool = False):
                 """, (hashed_pwd, created_at, created_at))
                 print("Seeded admin user bommidimohan2003@gmail.com into users table.")
 
-            # Seed default registered devices if none exist
-            cursor.execute("SELECT COUNT(*) as count FROM devices WHERE account_id = 'bommidimohan2003@gmail.com'")
-            if cursor.fetchone()["count"] == 0:
-                dev1_id = "DEV-LT-829174"
-                sec1_id = "PY-LT-7F42-9186"
-                tok1 = "pYnt_sec_tok_829174_7f42_9186_m3max"
-                tok1_hash = hashlib.sha256(tok1.encode()).hexdigest()
-                now_iso = dt.now(timezone.utc).isoformat()
-                cursor.execute("""
-                    INSERT INTO devices (id, account_id, device_id, device_type, device_name, brand, model, serial_number, security_id, qr_token, qr_token_hash, qr_status, device_status, registered_at, updated_at, notes)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """, ("dev_mbp_16_m3max", "bommidimohan2003@gmail.com", dev1_id, "LAPTOP", "MacBook Pro 16\" M3 Max", "Apple", "MacBookPro18,1", "C02G1234MD6R", sec1_id, tok1, tok1_hash, "ACTIVE", "ACTIVE", now_iso, now_iso, "Tamper sticker positioned over primary chassis mounting screw."))
-
-                cursor.execute("""
-                    INSERT INTO device_security_history (id, device_id, event_type, description, actor_email, ip_address, created_at)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s), (%s, %s, %s, %s, %s, %s, %s)
-                """, (
-                    f"dsh-{uuid.uuid4().hex[:10]}", dev1_id, "DEVICE_REGISTERED", "Device registered under paYent account bommidimohan2003@gmail.com", "bommidimohan2003@gmail.com", "127.0.0.1", now_iso,
-                    f"dsh-{uuid.uuid4().hex[:10]}", dev1_id, "QR_GENERATED", "Cryptographic Security QR generated and activated", "bommidimohan2003@gmail.com", "127.0.0.1", now_iso
-                ))
-
-                dev2_id = "DEV-LT-928170"
-                sec2_id = "PY-LT-3B19-4821"
-                tok2 = "pYnt_sec_tok_928170_3b19_4821_xps15"
-                tok2_hash = hashlib.sha256(tok2.encode()).hexdigest()
-                cursor.execute("""
-                    INSERT INTO devices (id, account_id, device_id, device_type, device_name, brand, model, serial_number, security_id, qr_token, qr_token_hash, qr_status, device_status, registered_at, updated_at, notes)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """, ("dev_dell_xps_15", "bommidimohan2003@gmail.com", dev2_id, "LAPTOP", "Dell XPS 15 9530 (OLED)", "Dell", "XPS 9530", "8F92-K109", sec2_id, tok2, tok2_hash, "ACTIVE", "ACTIVE", now_iso, now_iso, "Anchored across center-rear chassis mounting screws."))
-
-                cursor.execute("""
-                    INSERT INTO device_security_history (id, device_id, event_type, description, actor_email, ip_address, created_at)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s), (%s, %s, %s, %s, %s, %s, %s)
-                """, (
-                    f"dsh-{uuid.uuid4().hex[:10]}", dev2_id, "DEVICE_REGISTERED", "Device registered under paYent account bommidimohan2003@gmail.com", "bommidimohan2003@gmail.com", "127.0.0.1", now_iso,
-                    f"dsh-{uuid.uuid4().hex[:10]}", dev2_id, "QR_GENERATED", "Cryptographic Security QR generated and activated", "bommidimohan2003@gmail.com", "127.0.0.1", now_iso
-                ))
-                print("Seeded registered laptop devices for bommidimohan2003@gmail.com.")
-
         conn.commit()
     finally:
         conn.close()
@@ -1100,84 +1061,8 @@ MOCK_CONVERSATION_MEMBERS = {}
 MOCK_MESSAGES = {}
 MOCK_MESSAGE_ATTACHMENTS = {}
 MOCK_PASSWORD_RESET_TOKENS = {}
-MOCK_DEVICES = {
-    "DEV-LT-829174": {
-        "id": "dev_mbp_16_m3max",
-        "account_id": "bommidimohan2003@gmail.com",
-        "device_id": "DEV-LT-829174",
-        "device_type": "LAPTOP",
-        "device_name": "MacBook Pro 16\" M3 Max",
-        "brand": "Apple",
-        "model": "MacBookPro18,1",
-        "serial_number": "C02G1234MD6R",
-        "security_id": "PY-LT-7F42-9186",
-        "qr_token": "pYnt_sec_tok_829174_7f42_9186_m3max",
-        "qr_token_hash": hashlib.sha256("pYnt_sec_tok_829174_7f42_9186_m3max".encode()).hexdigest(),
-        "qr_status": "ACTIVE",
-        "device_status": "ACTIVE",
-        "registered_at": "2026-03-15T10:30:00.000Z",
-        "updated_at": "2026-03-15T10:30:00.000Z",
-        "last_verified_at": None,
-        "notes": "Tamper sticker positioned over primary chassis mounting screw."
-    },
-    "DEV-LT-928170": {
-        "id": "dev_dell_xps_15",
-        "account_id": "bommidimohan2003@gmail.com",
-        "device_id": "DEV-LT-928170",
-        "device_type": "LAPTOP",
-        "device_name": "Dell XPS 15 9530 (OLED)",
-        "brand": "Dell",
-        "model": "XPS 9530",
-        "serial_number": "8F92-K109",
-        "security_id": "PY-LT-3B19-4821",
-        "qr_token": "pYnt_sec_tok_928170_3b19_4821_xps15",
-        "qr_token_hash": hashlib.sha256("pYnt_sec_tok_928170_3b19_4821_xps15".encode()).hexdigest(),
-        "qr_status": "ACTIVE",
-        "device_status": "ACTIVE",
-        "registered_at": "2026-03-20T14:15:00.000Z",
-        "updated_at": "2026-03-20T14:15:00.000Z",
-        "last_verified_at": None,
-        "notes": "Anchored across center-rear chassis mounting screws."
-    }
-}
-MOCK_DEVICE_SECURITY_HISTORY = [
-    {
-        "id": "dsh_init_1",
-        "device_id": "DEV-LT-829174",
-        "event_type": "DEVICE_REGISTERED",
-        "description": "Device registered under paYent account bommidimohan2003@gmail.com",
-        "actor_email": "bommidimohan2003@gmail.com",
-        "ip_address": "127.0.0.1",
-        "created_at": "2026-03-15T10:30:00.000Z"
-    },
-    {
-        "id": "dsh_init_2",
-        "device_id": "DEV-LT-829174",
-        "event_type": "QR_GENERATED",
-        "description": "Cryptographic Security QR generated and activated",
-        "actor_email": "bommidimohan2003@gmail.com",
-        "ip_address": "127.0.0.1",
-        "created_at": "2026-03-15T10:30:00.000Z"
-    },
-    {
-        "id": "dsh_init_3",
-        "device_id": "DEV-LT-928170",
-        "event_type": "DEVICE_REGISTERED",
-        "description": "Device registered under paYent account bommidimohan2003@gmail.com",
-        "actor_email": "bommidimohan2003@gmail.com",
-        "ip_address": "127.0.0.1",
-        "created_at": "2026-03-20T14:15:00.000Z"
-    },
-    {
-        "id": "dsh_init_4",
-        "device_id": "DEV-LT-928170",
-        "event_type": "QR_GENERATED",
-        "description": "Cryptographic Security QR generated and activated",
-        "actor_email": "bommidimohan2003@gmail.com",
-        "ip_address": "127.0.0.1",
-        "created_at": "2026-03-20T14:15:00.000Z"
-    }
-]
+MOCK_DEVICES = {}
+MOCK_DEVICE_SECURITY_HISTORY = []
 MOCK_DEVICE_TRANSFERS = []
 
 
