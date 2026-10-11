@@ -4,23 +4,11 @@ export const bookingsService = {
   async getBookings(): Promise<AdminBooking[]> {
     try {
       const response = await adminApi.get("/bookings");
-      if (response.data && Array.isArray(response.data) && response.data.length > 0) {
+      if (response.data && Array.isArray(response.data)) {
         if (typeof window !== "undefined") {
           try {
             localStorage.setItem("payent:admin:bookings", JSON.stringify(response.data));
           } catch {}
-        }
-        return response.data;
-      }
-      if (response.data && Array.isArray(response.data)) {
-        if (typeof window !== "undefined") {
-          const cached = localStorage.getItem("payent:admin:bookings");
-          if (cached) {
-            try {
-              const parsed = JSON.parse(cached);
-              if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-            } catch {}
-          }
         }
         return response.data;
       }

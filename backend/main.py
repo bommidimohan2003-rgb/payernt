@@ -8667,8 +8667,7 @@ def admin_bookings_list(current_admin: dict = Depends(check_admin_user)):
                 pass
 
     if not rows:
-        from database import MOCK_ORDERS
-        rows = list(MOCK_ORDERS.values())
+        return []
         
     res = []
     for r in rows:
@@ -8945,20 +8944,7 @@ def admin_payments_list(current_admin: dict = Depends(check_admin_user)):
                 pass
 
     if not rows:
-        from database import MOCK_ORDERS
-        rows = []
-        for o in MOCK_ORDERS.values():
-            rows.append({
-                "booking_id": o["id"],
-                "user_email": o.get("user_email") or o.get("customerId", "customer@payent.in"),
-                "amount": o.get("total") or o.get("amount", 0),
-                "payment_status": o.get("payment_status", "successful"),
-                "razorpay_payment_id": o.get("razorpay_payment_id") or f"pay_{o['id']}",
-                "razorpay_order_id": o.get("razorpay_order_id") or f"order_{o['id']}",
-                "created_at": o.get("created_at") or dt.now(timezone.utc).isoformat(),
-                "refund_status": o.get("refund_status"),
-                "customer_name": o.get("customer_name") or "Aditya Sharma"
-            })
+        return []
         
     res = []
     for r in rows:
