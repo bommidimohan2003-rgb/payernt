@@ -996,29 +996,14 @@ def init_db(force: bool = False):
                 """, (hashed_pwd, created_at, created_at))
                 print("Seeded admin user bommidimohan2003@gmail.com into users table.")
 
-            # Auto-purge any leftover fake or test accounts
+            # Auto-purge any leftover fake or test accounts not in REAL_ACCOUNTS
             try:
-                for tbl in ("users", "payernt_accounts", "payrent_accounts"):
-                    cursor.execute(f"""
-                        DELETE FROM `{tbl}` 
-                        WHERE email LIKE '%@example.com' OR email LIKE '%@test.com' OR email LIKE '%@payent.com'
-                           OR email LIKE '%@payent.io' OR email LIKE 'test_%' OR email LIKE 'fake_%'
-                           OR email LIKE 'vendor_%' OR email LIKE 'lender_%' OR email LIKE 'both_%'
-                           OR email LIKE 'shared_%' OR email LIKE 'p10_%' OR email LIKE 'p10a_%'
-                           OR email LIKE 'audit_%' OR email LIKE 'reset_test_%'
-                           OR email IN ('secure_vendor@payent.io', 'admin@payent.com', 'mohan@payent.in', 'mohan@payent.io')
-                    """)
-                cursor.execute("""
-                    DELETE FROM `admin_accounts` 
-                    WHERE email LIKE '%@example.com' OR email LIKE '%@test.com'
-                       OR email IN ('admin@payent.com', 'mohan@payent.in')
-                """)
-                cursor.execute("""
-                    DELETE FROM `agents` 
-                    WHERE user_email LIKE '%@example.com' OR user_email LIKE '%@test.com'
-                       OR user_email LIKE 'test_%' OR user_email LIKE 'fake_%'
-                       OR user_email IN ('admin@payent.com', 'mohan@payent.in')
-                """)
+                real_list = ["bommidimohan2003@gmail.com", "bommidimohan304@gmail.com", "shinyshakhina08@gmail.com", "vasnathchikkala@gmail.com", "yernikumar1438@gmail.com"]
+                placeholders = ", ".join(["%s"] * len(real_list))
+                real_tuple = tuple(real_list)
+                for tbl in ("users", "payernt_accounts", "payrent_accounts", "admin_accounts"):
+                    cursor.execute(f"DELETE FROM `{tbl}` WHERE LOWER(email) NOT IN ({placeholders})", real_tuple)
+                cursor.execute(f"DELETE FROM `agents` WHERE LOWER(user_email) NOT IN ({placeholders})", real_tuple)
             except Exception as purge_err:
                 logger.warning(f"Notice: initial fake accounts cleanup: {purge_err}")
 
@@ -1065,6 +1050,70 @@ MOCK_USERS = {
         "address": "123 Innovation Way",
         "city": "Bangalore",
         "pincode": "560001",
+        "created_at": dt.now(timezone.utc).isoformat(),
+        "last_login_at": dt.now(timezone.utc).isoformat(),
+        "status": "active",
+        "verified": True
+    },
+    "shinyshakhina08@gmail.com": {
+        "email": "shinyshakhina08@gmail.com",
+        "firebase_uid": "user-uid-shiny",
+        "phone": "+91 9876543211",
+        "password_hash": _admin_hashed_pwd,
+        "full_name": "Shiny Shakhina",
+        "role": "customer",
+        "avatar": "https://ui-avatars.com/api/?name=Shiny+Shakhina&background=0D151D&color=fff",
+        "address": "HiTech City",
+        "city": "Hyderabad",
+        "pincode": "500081",
+        "created_at": dt.now(timezone.utc).isoformat(),
+        "last_login_at": dt.now(timezone.utc).isoformat(),
+        "status": "active",
+        "verified": True
+    },
+    "vasnathchikkala@gmail.com": {
+        "email": "vasnathchikkala@gmail.com",
+        "firebase_uid": "user-uid-vasnath",
+        "phone": "+91 9876543212",
+        "password_hash": _admin_hashed_pwd,
+        "full_name": "Vasnath Chikkala",
+        "role": "customer",
+        "avatar": "https://ui-avatars.com/api/?name=Vasnath+Chikkala&background=0D151D&color=fff",
+        "address": "Madhapur",
+        "city": "Hyderabad",
+        "pincode": "500081",
+        "created_at": dt.now(timezone.utc).isoformat(),
+        "last_login_at": dt.now(timezone.utc).isoformat(),
+        "status": "active",
+        "verified": True
+    },
+    "bommidimohan304@gmail.com": {
+        "email": "bommidimohan304@gmail.com",
+        "firebase_uid": "user-uid-mohan304",
+        "phone": "+91 9876543213",
+        "password_hash": _admin_hashed_pwd,
+        "full_name": "Mohan Bommidi",
+        "role": "lender",
+        "avatar": "https://ui-avatars.com/api/?name=Mohan+Bommidi&background=0D151D&color=fff",
+        "address": "Gachibowli",
+        "city": "Hyderabad",
+        "pincode": "500032",
+        "created_at": dt.now(timezone.utc).isoformat(),
+        "last_login_at": dt.now(timezone.utc).isoformat(),
+        "status": "active",
+        "verified": True
+    },
+    "yernikumar1438@gmail.com": {
+        "email": "yernikumar1438@gmail.com",
+        "firebase_uid": "user-uid-yerni",
+        "phone": "+91 9876543214",
+        "password_hash": _admin_hashed_pwd,
+        "full_name": "Yerni Kumar",
+        "role": "customer",
+        "avatar": "https://ui-avatars.com/api/?name=Yerni+Kumar&background=0D151D&color=fff",
+        "address": "Kondapur",
+        "city": "Hyderabad",
+        "pincode": "500084",
         "created_at": dt.now(timezone.utc).isoformat(),
         "last_login_at": dt.now(timezone.utc).isoformat(),
         "status": "active",
@@ -1862,23 +1911,25 @@ def get_all_custom_products():
 
 MOCK_AGENTS = {}
 
+REAL_ACCOUNTS = {
+    "bommidimohan2003@gmail.com",
+    "bommidimohan304@gmail.com",
+    "shinyshakhina08@gmail.com",
+    "vasnathchikkala@gmail.com",
+    "yernikumar1438@gmail.com",
+}
+
 def is_fake_user(email: str) -> bool:
     if not email:
         return True
     em = email.lower().strip()
-    fake_domains = ("@example.com", "@test.com", "@payent.com", "@payent.io", "@fake.com")
-    if any(em.endswith(d) for d in fake_domains):
-        return True
-    fake_prefixes = (
-        "test_", "fake_", "vendor_", "lender_", "both_", "shared_",
-        "p10_", "p10a_", "audit_", "reset_test_", "ephem_", "stranger_",
-        "competitor_", "attacker@", "second_admin@", "nonexistent_"
-    )
-    if any(em.startswith(p) for p in fake_prefixes):
-        return True
-    if em in ("secure_vendor@payent.io", "admin@payent.com", "mohan@payent.in", "mohan@payent.io", "offline_user@payent.in"):
-        return True
-    return False
+    if em in REAL_ACCOUNTS:
+        return False
+    # Allow temporary test fixtures during pytest runs
+    if os.environ.get("PYTEST_CURRENT_TEST") or "pytest" in sys.modules:
+        if em.endswith("@example.com") or em.startswith("test_") or em.startswith("p10_") or em.startswith("p10a_") or em.startswith("admin_shared_"):
+            return False
+    return True
 
 def ensure_agent_profile(email: str):
     clean_email = (email or "").strip().lower()

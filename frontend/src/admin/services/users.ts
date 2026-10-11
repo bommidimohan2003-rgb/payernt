@@ -1,27 +1,33 @@
 import { adminApi, AdminUser, AdminAgent } from "./api";
 
+export const REAL_USER_EMAILS = new Set([
+  "shinyshakhina08@gmail.com",
+  "vasnathchikkala@gmail.com",
+  "bommidimohan304@gmail.com",
+  "yernikumar1438@gmail.com",
+  "bommidimohan2003@gmail.com",
+]);
+
 export const isFakeUserEmail = (email?: string): boolean => {
-  if (!email) return false;
+  if (!email) return true;
   const em = email.toLowerCase().trim();
-  const fakeDomains = ["@example.com", "@test.com", "@payent.com", "@payent.io", "@fake.com"];
-  if (fakeDomains.some((d) => em.endsWith(d))) return true;
-  const fakePrefixes = [
-    "test_", "fake_", "vendor_", "lender_", "both_", "shared_",
-    "p10_", "p10a_", "audit_", "reset_test_", "ephem_", "stranger_",
-    "competitor_", "attacker@", "second_admin@", "nonexistent_"
-  ];
-  if (fakePrefixes.some((p) => em.startsWith(p))) return true;
-  if (["secure_vendor@payent.io", "admin@payent.com", "mohan@payent.in", "mohan@payent.io", "offline_user@payent.in"].includes(em)) {
-    return true;
-  }
-  return false;
+  return !REAL_USER_EMAILS.has(em);
 };
 
 export const usersService = {
   async getUsers(): Promise<AdminUser[]> {
     const response = await adminApi.get("/users");
     if (response.data && Array.isArray(response.data)) {
-      return response.data.filter((u: AdminUser) => !isFakeUserEmail(u.email));
+      const seen = new Set<string>();
+      const uniqueUsers: AdminUser[] = [];
+      for (const u of response.data) {
+        if (!u.email || isFakeUserEmail(u.email)) continue;
+        const em = u.email.toLowerCase().trim();
+        if (seen.has(em)) continue;
+        seen.add(em);
+        uniqueUsers.push(u);
+      }
+      return uniqueUsers;
     }
     return [];
   },
@@ -73,7 +79,16 @@ export const usersService = {
   async getAgents(): Promise<AdminAgent[]> {
     const response = await adminApi.get("/agents");
     if (response.data && Array.isArray(response.data)) {
-      return response.data.filter((a: AdminAgent) => !isFakeUserEmail(a.email));
+      const seen = new Set<string>();
+      const uniqueAgents: AdminAgent[] = [];
+      for (const a of response.data) {
+        if (!a.email || isFakeUserEmail(a.email)) continue;
+        const em = a.email.toLowerCase().trim();
+        if (seen.has(em)) continue;
+        seen.add(em);
+        uniqueAgents.push(a);
+      }
+      return uniqueAgents;
     }
     return [];
   },

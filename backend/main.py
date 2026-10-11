@@ -6109,7 +6109,7 @@ def admin_users_list(current_admin: dict = Depends(check_admin_user)):
                     raw_aadh = r.get("aadhaar_number") or ""
                     masked_aadh = f"XXXX-XXXX-{raw_aadh[-4:]}" if len(raw_aadh) >= 4 else (raw_aadh if raw_aadh else None)
                     
-                    users_by_id[f"payernt_{em}"] = {
+                    users_by_id[em] = {
                         "id": em,
                         "accountId": r.get("id") or f"PAYERNT_USER_{em}",
                         "fullName": r.get("name") or em.split("@")[0],
@@ -6129,7 +6129,21 @@ def admin_users_list(current_admin: dict = Depends(check_admin_user)):
                         "reviewedAt": r.get("reviewed_at"),
                         "verified": is_approved,
                         "avatar": r.get("avatar") or f"https://ui-avatars.com/api/?name={urllib.parse.quote(r.get('name') or em)}&background=0D151D&color=fff",
-                        "createdAt": str(r.get("created_at") or "")
+                        "createdAt": str(r.get("created_at") or ""),
+                        "payerntAccount": {
+                            "accountId": r.get("id") or f"PAYERNT_USER_{em}",
+                            "name": r.get("name") or em.split("@")[0],
+                            "email": r["email"],
+                            "phone": r.get("phone") or "",
+                            "accountStatus": status_str,
+                            "verificationStatus": status_str,
+                            "isVerified": is_approved,
+                            "aadhaarMasked": masked_aadh,
+                            "address": r.get("address") or "",
+                            "pincode": r.get("pincode") or "",
+                            "avatar": r.get("avatar") or "",
+                            "createdAt": str(r.get("created_at") or "")
+                        }
                     }
 
                 # 2. Payrent (Customer) accounts
@@ -6144,28 +6158,58 @@ def admin_users_list(current_admin: dict = Depends(check_admin_user)):
                         raw_pan = r.get("pan_number") or ""
                         masked_pan = f"XXXXX{raw_pan[-5:]}" if len(raw_pan) == 10 else (raw_pan if raw_pan else None)
                         
-                        users_by_id[f"payrent_{em}"] = {
-                            "id": em,
+                        payrent_sub = {
                             "accountId": f"PAYRENT_USER_{em}",
                             "fullName": r.get("full_name") or em.split("@")[0],
-                            "name": r.get("full_name") or em.split("@")[0],
                             "email": r["email"],
                             "phone": r.get("phone") or "",
+                            "panStatus": "verified" if is_approved else "pending",
+                            "panMasked": masked_pan or "",
+                            "accountStatus": status_str,
+                            "verificationStatus": status_str,
+                            "isVerified": is_approved,
                             "address": r.get("address") or "",
                             "city": r.get("city") or "",
                             "pincode": r.get("pincode") or "",
-                            "panNumber": masked_pan,
-                            "panMasked": masked_pan,
-                            "role": "customer",
-                            "accountType": "Payrent",
-                            "status": status_str,
-                            "rejectionReason": r.get("rejection_reason"),
-                            "reviewedBy": r.get("reviewed_by"),
-                            "reviewedAt": r.get("reviewed_at"),
-                            "verified": is_approved,
-                            "avatar": r.get("avatar") or f"https://ui-avatars.com/api/?name={urllib.parse.quote(r.get('full_name') or em)}&background=0D151D&color=fff",
+                            "avatar": r.get("avatar") or "",
                             "createdAt": str(r.get("created_at") or "")
                         }
+
+                        if em in users_by_id:
+                            users_by_id[em]["payrentAccount"] = payrent_sub
+                            if users_by_id[em]["role"] != "admin":
+                                users_by_id[em]["role"] = "both"
+                                users_by_id[em]["accountType"] = "Both"
+                            if not users_by_id[em].get("panNumber"):
+                                users_by_id[em]["panNumber"] = masked_pan
+                                users_by_id[em]["panMasked"] = masked_pan
+                            if r.get("full_name") and not users_by_id[em].get("fullName"):
+                                users_by_id[em]["fullName"] = r.get("full_name")
+                                users_by_id[em]["name"] = r.get("full_name")
+                        else:
+                            users_by_id[em] = {
+                                "id": em,
+                                "accountId": f"PAYRENT_USER_{em}",
+                                "fullName": r.get("full_name") or em.split("@")[0],
+                                "name": r.get("full_name") or em.split("@")[0],
+                                "email": r["email"],
+                                "phone": r.get("phone") or "",
+                                "address": r.get("address") or "",
+                                "city": r.get("city") or "",
+                                "pincode": r.get("pincode") or "",
+                                "panNumber": masked_pan,
+                                "panMasked": masked_pan,
+                                "role": "customer",
+                                "accountType": "Payrent",
+                                "status": status_str,
+                                "rejectionReason": r.get("rejection_reason"),
+                                "reviewedBy": r.get("reviewed_by"),
+                                "reviewedAt": r.get("reviewed_at"),
+                                "verified": is_approved,
+                                "avatar": r.get("avatar") or f"https://ui-avatars.com/api/?name={urllib.parse.quote(r.get('full_name') or em)}&background=0D151D&color=fff",
+                                "createdAt": str(r.get("created_at") or ""),
+                                "payrentAccount": payrent_sub
+                            }
                 except Exception as pe:
                     logger.warning(f"[admin_users_list] payrent_accounts query error: {pe}")
 
@@ -6178,18 +6222,20 @@ def admin_users_list(current_admin: dict = Depends(check_admin_user)):
                             continue
                         role_str = (r.get("role") or "customer").lower()
                         if role_str in ("admin", "superadmin"):
+                            if em in users_by_id:
+                                users_by_id[em]["role"] = "admin"
+                                users_by_id[em]["accountType"] = "Admin"
                             continue
-                        key = f"payrent_{em}" if "rent" in role_str or "customer" in role_str or "user" in role_str else f"payernt_{em}"
-                        if key not in users_by_id:
+                        if em not in users_by_id:
                             status_str = r.get("status") or "PENDING_REVIEW"
                             is_approved = bool(r.get("verified")) or status_str.upper() in ("APPROVED", "ACTIVE")
                             raw_pan = r.get("pan_number") or ""
                             masked_pan = f"XXXXX{raw_pan[-5:]}" if len(raw_pan) == 10 else (raw_pan if raw_pan else None)
                             raw_aadh = r.get("aadhaar_number") or ""
                             masked_aadh = f"XXXX-XXXX-{raw_aadh[-4:]}" if len(raw_aadh) >= 4 else (raw_aadh if raw_aadh else None)
-                            users_by_id[key] = {
+                            users_by_id[em] = {
                                 "id": em,
-                                "accountId": f"PAYRENT_USER_{em}" if "payrent" in key else f"PAYERNT_USER_{em}",
+                                "accountId": f"USER_{em}",
                                 "fullName": r.get("full_name") or em.split("@")[0],
                                 "name": r.get("full_name") or em.split("@")[0],
                                 "email": r["email"],
@@ -6201,8 +6247,8 @@ def admin_users_list(current_admin: dict = Depends(check_admin_user)):
                                 "panMasked": masked_pan,
                                 "aadhaarNumber": masked_aadh,
                                 "aadhaarMasked": masked_aadh,
-                                "role": "customer" if "payrent" in key else "lender",
-                                "accountType": "Payrent" if "payrent" in key else "Payernt",
+                                "role": "customer" if "rent" in role_str or "customer" in role_str else "lender",
+                                "accountType": "Payrent" if "rent" in role_str or "customer" in role_str else "Payernt",
                                 "status": status_str,
                                 "rejectionReason": r.get("rejection_reason"),
                                 "reviewedBy": r.get("reviewed_by"),
@@ -6220,23 +6266,29 @@ def admin_users_list(current_admin: dict = Depends(check_admin_user)):
                     em = r["email"].lower().strip()
                     if is_fake_user(em):
                         continue
-                    users_by_id[f"admin_{em}"] = {
-                        "id": em,
-                        "accountId": r.get("id") or f"ADMIN_{em}",
-                        "fullName": r.get("full_name") or "Administrator",
-                        "name": r.get("full_name") or "Administrator",
-                        "email": r["email"],
-                        "phone": r.get("phone") or "",
-                        "address": r.get("address") or "",
-                        "city": r.get("city") or "",
-                        "pincode": r.get("pincode") or "",
-                        "role": "admin",
-                        "accountType": "Admin",
-                        "status": r.get("status") or "active",
-                        "verified": bool(r.get("verified", 1)),
-                        "avatar": r.get("avatar") or "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
-                        "createdAt": str(r.get("created_at") or "")
-                    }
+                    if em in users_by_id:
+                        users_by_id[em]["role"] = "admin"
+                        users_by_id[em]["accountType"] = "Admin"
+                        users_by_id[em]["status"] = "active"
+                        users_by_id[em]["verified"] = True
+                    else:
+                        users_by_id[em] = {
+                            "id": em,
+                            "accountId": r.get("id") or f"ADMIN_{em}",
+                            "fullName": r.get("full_name") or "Administrator",
+                            "name": r.get("full_name") or "Administrator",
+                            "email": r["email"],
+                            "phone": r.get("phone") or "",
+                            "address": r.get("address") or "",
+                            "city": r.get("city") or "",
+                            "pincode": r.get("pincode") or "",
+                            "role": "admin",
+                            "accountType": "Admin",
+                            "status": r.get("status") or "active",
+                            "verified": bool(r.get("verified", 1)),
+                            "avatar": r.get("avatar") or "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
+                            "createdAt": str(r.get("created_at") or "")
+                        }
         except Exception as e:
             logger.warning(f"[admin_users_list] error: {e}")
         finally:
@@ -6248,9 +6300,7 @@ def admin_users_list(current_admin: dict = Depends(check_admin_user)):
             if is_fake_user(em):
                 continue
             role_str = (u.get("role") or "customer").lower()
-            key = f"admin_{em}" if role_str in ("admin", "superadmin") else f"payrent_{em}"
-            status_str = u.get("status") or ("active" if role_str in ("admin", "superadmin") else "PENDING_REVIEW")
-            users_by_id[key] = {
+            users_by_id[em] = {
                 "id": em,
                 "accountId": f"USER_{em}",
                 "fullName": u.get("full_name") or u.get("name") or em.split("@")[0],
@@ -6261,8 +6311,8 @@ def admin_users_list(current_admin: dict = Depends(check_admin_user)):
                 "city": u.get("city") or "",
                 "pincode": u.get("pincode") or "",
                 "role": role_str,
-                "accountType": "Admin" if role_str in ("admin", "superadmin") else "Payrent",
-                "status": status_str,
+                "accountType": "Admin" if role_str in ("admin", "superadmin") else ("Payernt" if role_str in ("lender", "vendor") else "Payrent"),
+                "status": u.get("status") or "active",
                 "verified": bool(u.get("verified")),
                 "avatar": u.get("avatar") or f"https://ui-avatars.com/api/?name={urllib.parse.quote(u.get('full_name') or em)}&background=0D151D&color=fff",
                 "createdAt": str(u.get("created_at") or "")
