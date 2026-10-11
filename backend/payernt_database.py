@@ -1227,6 +1227,50 @@ def delete_payernt_product(product_id: str, owner_id: str) -> bool:
 
 
 # ============================================================
+# KEYED HMAC PIN HASHING & CONSTANT-TIME VERIFICATION
+# ============================================================
+
+def hash_secret_pin(pin: str, booking_id: str = "", stage: str = "VENDOR") -> str:
+    """
+    Cryptographically secure keyed HMAC-SHA256 hash for 4-digit PIN storage.
+    Uses PIN_HASH_SECRET with stage context and booking_id as domain separation.
+    """
+    clean_pin = str(pin).strip()
+    secret = PIN_HASH_SECRET
+    if not secret:
+        if IS_PRODUCTION:
+            raise RuntimeError("CRITICAL: PIN_HASH_SECRET is required in production.")
+        secret = "dev_keyed_pin_hash_secret_safe_for_testing_only_32_bytes_min"
+    
+    context = f"PAYENT_PIN_V1:{booking_id}:{stage}:{clean_pin}".encode("utf-8")
+    return hmac.new(secret.encode("utf-8"), context, hashlib.sha256).hexdigest()
+
+
+def verify_secret_pin(entered_pin: str, stored_hash: str, booking_id: str = "", stage: str = "VENDOR") -> bool:
+    """
+    Verifies 4-digit PIN using constant-time hmac.compare_digest:
+    1. Primary: Keyed HMAC-SHA256 with booking and stage context.
+    2. Backward-compatible fallback: Checks legacy unkeyed SHA-256 hash.
+    """
+    if not stored_hash or not entered_pin:
+        return False
+    
+    clean_pin = str(entered_pin).strip()
+    
+    # 1. Primary check: Keyed HMAC-SHA256
+    expected_hmac = hash_secret_pin(clean_pin, booking_id, stage)
+    if hmac.compare_digest(expected_hmac, stored_hash):
+        return True
+    
+    # 2. Backward-compatible check for legacy plain SHA-256
+    legacy_sha256 = hashlib.sha256(clean_pin.encode("utf-8")).hexdigest()
+    if hmac.compare_digest(legacy_sha256, stored_hash):
+        return True
+        
+    return False
+
+
+# ============================================================
 # RENTAL SECURITY & PIN VERIFICATION (CORE LIFECYCLE)
 # ============================================================
 
@@ -1265,9 +1309,9 @@ def create_or_get_rental_security_record(
     record_id = f"RENTAL_SECURITY_{booking_id.replace('ord_', '').replace('ORD_', '')[-4:] if len(booking_id) > 4 else random.randint(1000, 9999)}"
     now_iso = dt.now(timezone.utc).isoformat()
 
-    # Cryptographic hashes
-    v_pin_hash = hashlib.sha256(resolved_vendor_pin.encode("utf-8")).hexdigest()
-    r_pin_hash = hashlib.sha256(renter_pin.encode("utf-8")).hexdigest()
+    # Cryptographic hashes using keyed HMAC-SHA256 bound to booking ID and stage
+    v_pin_hash = hash_secret_pin(resolved_vendor_pin, booking_id, "VENDOR")
+    r_pin_hash = hash_secret_pin(renter_pin, booking_id, "RENTER")
     final_act_pin = f"{resolved_vendor_pin}{renter_pin}"
     final_pin_hash = hashlib.sha256(final_act_pin.encode("utf-8")).hexdigest()
 
@@ -1399,49 +1443,6 @@ def sanitize_security_record_for_user(record: Dict[str, Any], user_role: str, us
 
     return clean
 
-
-# ============================================================
-# KEYED HMAC PIN HASHING & CONSTANT-TIME VERIFICATION
-# ============================================================
-
-def hash_secret_pin(pin: str, booking_id: str = "", stage: str = "VENDOR") -> str:
-    """
-    Cryptographically secure keyed HMAC-SHA256 hash for 4-digit PIN storage.
-    Uses PIN_HASH_SECRET with stage context and booking_id as domain separation.
-    """
-    clean_pin = str(pin).strip()
-    secret = PIN_HASH_SECRET
-    if not secret:
-        if IS_PRODUCTION:
-            raise RuntimeError("CRITICAL: PIN_HASH_SECRET is required in production.")
-        secret = "dev_keyed_pin_hash_secret_safe_for_testing_only_32_bytes_min"
-    
-    context = f"PAYENT_PIN_V1:{booking_id}:{stage}:{clean_pin}".encode("utf-8")
-    return hmac.new(secret.encode("utf-8"), context, hashlib.sha256).hexdigest()
-
-
-def verify_secret_pin(entered_pin: str, stored_hash: str, booking_id: str = "", stage: str = "VENDOR") -> bool:
-    """
-    Verifies 4-digit PIN using constant-time hmac.compare_digest:
-    1. Primary: Keyed HMAC-SHA256 with booking and stage context.
-    2. Backward-compatible fallback: Checks legacy unkeyed SHA-256 hash.
-    """
-    if not stored_hash or not entered_pin:
-        return False
-    
-    clean_pin = str(entered_pin).strip()
-    
-    # 1. Primary check: Keyed HMAC-SHA256
-    expected_hmac = hash_secret_pin(clean_pin, booking_id, stage)
-    if hmac.compare_digest(expected_hmac, stored_hash):
-        return True
-    
-    # 2. Backward-compatible check for legacy plain SHA-256
-    legacy_sha256 = hashlib.sha256(clean_pin.encode("utf-8")).hexdigest()
-    if hmac.compare_digest(legacy_sha256, stored_hash):
-        return True
-        
-    return False
 
 
 # ============================================================

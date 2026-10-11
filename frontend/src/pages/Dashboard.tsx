@@ -36,42 +36,30 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { ids } = useWishlist();
 
-  const [orders, setOrders] = useState<Order[]>(() => {
-    return storage.get<Order[]>(STORAGE_KEYS.orders, []);
-  });
-  const [myListings, setMyListings] = useState<Product[]>(() => {
-    return storage.get<Product[]>(STORAGE_KEYS.customProducts, []);
-  });
-  const [alertsList, setAlertsList] = useState<Notification[]>(() => {
-    return storage.get<Notification[]>(STORAGE_KEYS.notifications, []);
-  });
-  const [publicProducts, setPublicProducts] = useState<Product[]>(() => {
-    return storage.get<Product[]>("public_custom_products", []);
-  });
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [myListings, setMyListings] = useState<Product[]>([]);
+  const [alertsList, setAlertsList] = useState<Notification[]>([]);
+  const [publicProducts, setPublicProducts] = useState<Product[]>([]);
   const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null);
-  const [loadingOrders, setLoadingOrders] = useState(() => {
-    const cached = storage.get<Order[]>(STORAGE_KEYS.orders, []);
-    return cached.length === 0;
-  });
+  const [loadingOrders, setLoadingOrders] = useState(true);
   const [revealedPins, setRevealedPins] = useState<Record<string, { pin: string; instructions?: string }>>({});
   const [loadingPinOrderId, setLoadingPinOrderId] = useState<string | null>(null);
-
-  const token = storage.get<string | null>(STORAGE_KEYS.token, null);
 
   useEffect(() => {
     if (ready && !user) navigate({ to: "/login" });
   }, [ready, user, navigate]);
 
   const fetchDashboardData = useCallback(() => {
-    if (!token) {
+    const currentToken = storage.get<string | null>(STORAGE_KEYS.token, null);
+    if (!currentToken) {
       setLoadingOrders(false);
       return;
     }
 
     Promise.allSettled([
-      api.getOrders(token),
-      api.getCustomProducts(token),
-      api.getNotifications(token),
+      api.getOrders(currentToken),
+      api.getCustomProducts(currentToken),
+      api.getNotifications(currentToken),
       api.getPublicProducts(),
     ]).then(([ordersRes, listingsRes, alertsRes, publicRes]) => {
       if (ordersRes.status === "fulfilled" && Array.isArray(ordersRes.value)) {
@@ -93,9 +81,22 @@ export default function Dashboard() {
     }).finally(() => {
       setLoadingOrders(false);
     });
-  }, [token]);
+  }, []);
 
   useEffect(() => {
+    // Populate cached storage data on client mount for smooth hydration
+    const cachedOrders = storage.get<Order[]>(STORAGE_KEYS.orders, []);
+    if (cachedOrders.length > 0) {
+      setOrders(cachedOrders);
+      setLoadingOrders(false);
+    }
+    const cachedListings = storage.get<Product[]>(STORAGE_KEYS.customProducts, []);
+    if (cachedListings.length > 0) setMyListings(cachedListings);
+    const cachedAlerts = storage.get<Notification[]>(STORAGE_KEYS.notifications, []);
+    if (cachedAlerts.length > 0) setAlertsList(cachedAlerts);
+    const cachedPublic = storage.get<Product[]>("public_custom_products", []);
+    if (cachedPublic.length > 0) setPublicProducts(cachedPublic);
+
     fetchDashboardData();
     const handleOrdersUpdated = () => {
       api.invalidateCache("user_orders");
@@ -117,14 +118,15 @@ export default function Dashboard() {
       return;
     }
 
-    if (!token) {
+    const currentToken = storage.get<string | null>(STORAGE_KEYS.token, null);
+    if (!currentToken) {
       toast.error("Please log in to view your Secret PIN.");
       return;
     }
 
     setLoadingPinOrderId(orderId);
     try {
-      const res = await api.getRenterSecretPin(token, orderId);
+      const res = await api.getRenterSecretPin(currentToken, orderId);
       if (res && res.renterSecretPin) {
         setRevealedPins((prev) => ({
           ...prev,
@@ -147,10 +149,11 @@ export default function Dashboard() {
   };
 
   const handleCancelOrder = (orderId: string) => {
-    if (!token) return;
+    const currentToken = storage.get<string | null>(STORAGE_KEYS.token, null);
+    if (!currentToken) return;
     setCancellingOrderId(orderId);
     api
-      .cancelOrder(token, orderId)
+      .cancelOrder(currentToken, orderId)
       .then(() => {
         setOrders((prev) =>
           prev.map((o) =>

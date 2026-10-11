@@ -165,8 +165,11 @@ if IS_PRODUCTION and not PIN_HASH_SECRET:
     # Fail fast if unconfigured in production
     raise RuntimeError("CRITICAL: PIN_HASH_SECRET environment variable is required in production for secure keyed HMAC PIN hashing.")
 elif not PIN_HASH_SECRET:
-    # In development mode, fallback to internal key derived from JWT secret or static dev key
-    PIN_HASH_SECRET = os.getenv("JWT_SECRET_KEY", "dev_keyed_pin_hash_secret_safe_for_testing_only_32_bytes_min")
+    # In development mode, fallback to a dedicated static dev key (never reuse JWT_SECRET_KEY)
+    PIN_HASH_SECRET = "dev_keyed_pin_hash_secret_safe_for_testing_only_32_bytes_min"
+
+if IS_PRODUCTION and PIN_HASH_SECRET == JWT_SECRET_KEY:
+    raise RuntimeError("FATAL SECURITY: PIN_HASH_SECRET must not be identical to JWT_SECRET_KEY.")
 
 # OTP Provider & Mock OTP Configuration
 _configured_otp_provider = os.getenv("OTP_PROVIDER", "mock" if not IS_PRODUCTION else "twilio").lower()

@@ -13,30 +13,25 @@ import { useNavigate } from "@tanstack/react-router";
 import { getOptimizedImageUrl } from "@/utils/images";
 
 export default function Orders() {
-  const [orders, setOrders] = useState<Order[]>(() => {
-    return storage.get<Order[]>(STORAGE_KEYS.orders, []);
-  });
-  const [loading, setLoading] = useState(() => {
-    const cached = storage.get<Order[]>(STORAGE_KEYS.orders, []);
-    return cached.length === 0;
-  });
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(
     null,
   );
   const [revealedPins, setRevealedPins] = useState<Record<string, { pin: string; instructions?: string }>>({});
   const [loadingPinOrderId, setLoadingPinOrderId] = useState<string | null>(null);
-  const token = storage.get<string | null>(STORAGE_KEYS.token, null);
   const navigate = useNavigate();
 
   const loadOrders = useCallback(() => {
-    if (!token) {
+    const currentToken = storage.get<string | null>(STORAGE_KEYS.token, null);
+    if (!currentToken) {
       setLoading(false);
       return;
     }
     setError(null);
     api
-      .getOrders(token)
+      .getOrders(currentToken)
       .then((data) => {
         const localOrders = storage.get<Order[]>(STORAGE_KEYS.orders, []);
         const backendOrderIds = new Set(data.map((o) => o.id));
@@ -48,9 +43,15 @@ export default function Orders() {
         setError("Failed to fetch your active order history.");
       })
       .finally(() => setLoading(false));
-  }, [token]);
+  }, []);
 
   useEffect(() => {
+    const cachedOrders = storage.get<Order[]>(STORAGE_KEYS.orders, []);
+    if (cachedOrders.length > 0) {
+      setOrders(cachedOrders);
+      setLoading(false);
+    }
+
     loadOrders();
     const handleUpdate = () => {
       api.invalidateCache("user_orders");
@@ -72,14 +73,15 @@ export default function Orders() {
       return;
     }
 
-    if (!token) {
+    const currentToken = storage.get<string | null>(STORAGE_KEYS.token, null);
+    if (!currentToken) {
       toast.error("Please log in to view your Secret PIN.");
       return;
     }
 
     setLoadingPinOrderId(orderId);
     try {
-      const res = await api.getRenterSecretPin(token, orderId);
+      const res = await api.getRenterSecretPin(currentToken, orderId);
       if (res && res.renterSecretPin) {
         setRevealedPins((prev) => ({
           ...prev,
@@ -102,9 +104,10 @@ export default function Orders() {
   };
 
   const handleCancelOrder = (orderId: string) => {
-    if (!token) return;
+    const currentToken = storage.get<string | null>(STORAGE_KEYS.token, null);
+    if (!currentToken) return;
     api
-      .cancelOrder(token, orderId)
+      .cancelOrder(currentToken, orderId)
       .then(() => {
         setOrders((prev) =>
           prev.map((o) =>

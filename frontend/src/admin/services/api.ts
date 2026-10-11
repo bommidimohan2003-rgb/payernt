@@ -227,6 +227,8 @@ export interface AdminBooking {
     activatedAt?: string;
     vendorOtpVerified?: boolean;
     renterOtpVerified?: boolean;
+    renterConfirmedReceipt?: boolean;
+    inspectionConfirmedAt?: string;
   };
   createdAt: string;
 }

@@ -560,16 +560,19 @@ export default function ProductDetails() {
 
   const gallery = useMemo(() => {
     if (!product) return [];
-    let imgs = product.images;
-    if (typeof imgs === "string") {
+    let imgs: string[] = [];
+    const rawImgs = (product as any)?.images;
+    if (Array.isArray(rawImgs)) {
+      imgs = [...rawImgs];
+    } else if (typeof rawImgs === "string") {
       try {
-        const parsed = JSON.parse(imgs);
+        const parsed = JSON.parse(rawImgs);
         if (Array.isArray(parsed)) imgs = parsed;
+        else if (typeof parsed === "string") imgs = [parsed];
       } catch {
-        imgs = [imgs];
+        imgs = [rawImgs];
       }
     }
-    if (!Array.isArray(imgs)) imgs = [];
     imgs = imgs.filter(Boolean);
     const prim = product.image || (product as any).primary_image;
     if (prim && !imgs.includes(prim)) {

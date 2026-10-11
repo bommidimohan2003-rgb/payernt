@@ -104,16 +104,19 @@ export function BrowseSwipeDeck({
   // Extract all images for the active product
   const productImages = useMemo(() => {
     if (!activeProduct) return [];
-    let imgs = activeProduct.images || [];
-    if (typeof imgs === "string") {
+    let imgs: string[] = [];
+    const rawImgs = (activeProduct as any)?.images;
+    if (Array.isArray(rawImgs)) {
+      imgs = [...rawImgs];
+    } else if (typeof rawImgs === "string") {
       try {
-        const parsed = JSON.parse(imgs);
+        const parsed = JSON.parse(rawImgs);
         if (Array.isArray(parsed)) imgs = parsed;
+        else if (typeof parsed === "string") imgs = [parsed];
       } catch {
-        imgs = [imgs];
+        imgs = [rawImgs];
       }
     }
-    if (!Array.isArray(imgs)) imgs = [];
     imgs = imgs.filter(Boolean);
     const prim = getProductPrimaryImage(activeProduct);
     if (prim && !imgs.includes(prim)) {

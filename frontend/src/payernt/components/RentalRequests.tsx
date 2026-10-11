@@ -107,9 +107,10 @@ export function RentalRequests({
     try {
       const res = await payerntApi.prepareProductForDelivery(req.id);
       if (res.success && res.vendorSecretPin) {
+        const pin: string = String(res.vendorSecretPin);
         setVendorPinDataMap((prev) => ({
           ...prev,
-          [req.id]: { pin: res.vendorSecretPin, createdAt: new Date().toISOString() },
+          [req.id]: { pin, createdAt: new Date().toISOString() },
         }));
         setShowPinMap((prev) => ({ ...prev, [req.id]: true }));
         setVendorPinModal({
@@ -507,7 +508,9 @@ export function RentalRequests({
                       </h3>
                       <p className="text-xs text-muted-foreground flex items-center gap-1.5">
                         <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span>Booked on {new Date().toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" })}</span>
+                        <span suppressHydrationWarning>
+                          Booked on {req.requestDate || req.startDate || "Recent"}
+                        </span>
                       </p>
                     </div>
                   </div>

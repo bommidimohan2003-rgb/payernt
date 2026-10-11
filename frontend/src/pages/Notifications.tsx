@@ -8,31 +8,33 @@ import { toast } from "sonner";
 import type { Notification } from "@/types";
 
 export default function Notifications() {
-  const [list, setList] = useState<Notification[]>(() => {
-    return storage.get<Notification[]>(STORAGE_KEYS.notifications, []);
-  });
+  const [list, setList] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
-  const token = storage.get<string | null>(STORAGE_KEYS.token, null);
 
   useEffect(() => {
-    if (!token) {
+    const cached = storage.get<Notification[]>(STORAGE_KEYS.notifications, []);
+    if (cached.length > 0) setList(cached);
+
+    const currentToken = storage.get<string | null>(STORAGE_KEYS.token, null);
+    if (!currentToken) {
       setLoading(false);
       return;
     }
     api
-      .getNotifications(token)
+      .getNotifications(currentToken)
       .then((data) => {
         setList(data);
         storage.set(STORAGE_KEYS.notifications, data);
       })
       .catch((err) => console.error("Failed to load notifications:", err))
       .finally(() => setLoading(false));
-  }, [token]);
+  }, []);
 
   const markAll = () => {
-    if (!token) return;
+    const currentToken = storage.get<string | null>(STORAGE_KEYS.token, null);
+    if (!currentToken) return;
     api
-      .markNotificationsRead(token)
+      .markNotificationsRead(currentToken)
       .then(() => {
         setList((prev) => {
           const updated = prev.map((n) => ({ ...n, read: true }));

@@ -344,6 +344,11 @@ export default function Checkout() {
               createdAt: new Date().toISOString(),
             };
 
+            api.invalidateCache("user_orders");
+            const localOrders = storage.get<Order[]>(STORAGE_KEYS.orders, []);
+            storage.set(STORAGE_KEYS.orders, [confirmed, ...localOrders]);
+            window.dispatchEvent(new Event("payent_orders_updated"));
+
             setConfirmedOrder(confirmed);
             tracker.bookingCompleted(product.id, product.category);
             setOpen(true);
@@ -843,6 +848,11 @@ export default function Checkout() {
                                     ),
                                   );
                               }
+                              api.invalidateCache("user_orders");
+                              const localOrders = storage.get<Order[]>(STORAGE_KEYS.orders, []);
+                              storage.set(STORAGE_KEYS.orders, [order, ...localOrders]);
+                              window.dispatchEvent(new Event("payent_orders_updated"));
+                              setConfirmedOrder(order);
                               setOpen(true);
                             }}
                             className="bg-primary/5 hover:bg-primary/10 border-primary/20 text-primary"
@@ -1020,7 +1030,7 @@ export default function Checkout() {
           open={open}
           onClose={() => {
             setOpen(false);
-            navigate({ to: "/orders" });
+            navigate({ to: "/dashboard" });
           }}
           title="Booking Confirmed"
         >
@@ -1045,10 +1055,10 @@ export default function Checkout() {
               <Button
                 onClick={() => {
                   setOpen(false);
-                  navigate({ to: "/orders" });
+                  navigate({ to: "/dashboard" });
                 }}
               >
-                Go to Orders
+                Go to Dashboard
               </Button>
               <Button
                 variant="ghost"

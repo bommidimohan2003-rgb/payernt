@@ -152,25 +152,24 @@ export default function Messages() {
   const { user, ready } = useAuth();
   const navigate = useNavigate();
 
-  const [conversations, setConversations] = useState<RealtimeConversation[]>(() => {
-    return storage.get<RealtimeConversation[]>(STORAGE_KEYS.messages, []);
-  });
-  const [activeId, setActiveId] = useState<string | null>(() => {
+  const [conversations, setConversations] = useState<RealtimeConversation[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [activeConversation, setActiveConversation] = useState<RealtimeConversation | null>(null);
+  const [messages, setMessages] = useState<RealtimeMessage[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
     const cached = storage.get<RealtimeConversation[]>(STORAGE_KEYS.messages, []);
-    return cached.length > 0 ? cached[0].id : null;
-  });
-  const [activeConversation, setActiveConversation] = useState<RealtimeConversation | null>(() => {
-    const cached = storage.get<RealtimeConversation[]>(STORAGE_KEYS.messages, []);
-    return cached.length > 0 ? cached[0] : null;
-  });
-  const [messages, setMessages] = useState<RealtimeMessage[]>(() => {
-    const cached = storage.get<RealtimeConversation[]>(STORAGE_KEYS.messages, []);
-    return cached.length > 0 && Array.isArray(cached[0]?.messages) ? cached[0].messages : [];
-  });
-  const [loading, setLoading] = useState(() => {
-    const cached = storage.get<RealtimeConversation[]>(STORAGE_KEYS.messages, []);
-    return cached.length === 0;
-  });
+    if (cached.length > 0) {
+      setConversations(cached);
+      setActiveId(cached[0]?.id || null);
+      setActiveConversation(cached[0] || null);
+      if (Array.isArray(cached[0]?.messages)) {
+        setMessages(cached[0].messages);
+      }
+      setLoading(false);
+    }
+  }, []);
   const [threadLoading, setThreadLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [input, setInput] = useState("");

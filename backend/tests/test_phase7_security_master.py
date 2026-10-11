@@ -452,7 +452,7 @@ class TestPhase7SecurityMaster(unittest.TestCase):
     def test_16_cors_and_security_headers(self):
         """Verify strict CORS origin matching and presence of security headers."""
         # Allowed dev/test origin
-        res = client.get("/api/health", headers={"Origin": "http://localhost:3000"})
+        res = client.get("/api/health/live", headers={"Origin": "http://localhost:3000"})
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.headers.get("access-control-allow-origin"), "http://localhost:3000")
         self.assertEqual(res.headers.get("x-frame-options"), "DENY")

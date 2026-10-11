@@ -2093,6 +2093,10 @@ def create_custom_product(email: str, product: dict):
 
     conn = get_db_connection()
     if not conn:
+        if not IS_PRODUCTION:
+            logger.warning("[create_custom_product] Degraded mode: storing in MOCK_CUSTOM_PRODUCTS.")
+            MOCK_CUSTOM_PRODUCTS[product_entry["id"]] = product_entry
+            return product_entry
         logger.error("[create_custom_product] Failed to acquire database connection.")
         raise RuntimeError("Database connection unavailable. Product could not be persisted.")
 
