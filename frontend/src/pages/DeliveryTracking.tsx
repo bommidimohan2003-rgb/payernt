@@ -33,6 +33,7 @@ import { api } from "@/utils/api";
 import { storage, STORAGE_KEYS } from "@/utils/storage";
 import { useAuth } from "@/hooks/useAuth";
 import type { BookingDeliveryResponse, DeliveryStatus, DeliveryLocationUpdate } from "@/types";
+import { SecretPinDisplay } from "@/components/common/SecretPinDisplay";
 
 function formatStatus(status: string): string {
   switch (status) {
@@ -798,7 +799,7 @@ export default function DeliveryTracking() {
                             onChange={(e) =>
                               setInspectionChecklist((prev) => ({ ...prev, conditionChecked: e.target.checked }))
                             }
-                            className="h-4 w-4 rounded accent-emerald-500 cursor-pointer"
+                            className="h-4 w-4 rounded accent-foreground cursor-pointer"
                           />
                           <span className="text-xs font-medium text-foreground">
                             4. Physical condition checked and working properly
@@ -809,7 +810,7 @@ export default function DeliveryTracking() {
                       {/* Action Button: Confirm & Generate PIN */}
                       {!inspectionConfirmed && !renterPinRevealed ? (
                         <Button
-                          className="w-full font-bold bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-xl shadow-lg transition-all"
+                          className="w-full font-bold bg-[#F5F5F5] hover:bg-white text-[#050709] py-3 rounded-2xl shadow-md transition-all cursor-pointer"
                           disabled={
                             !inspectionChecklist.received ||
                             !inspectionChecklist.matchesBooking ||
@@ -827,49 +828,13 @@ export default function DeliveryTracking() {
                           Confirm Product Received &amp; Generate Secret PIN
                         </Button>
                       ) : (
-                        /* Renter Secret PIN Card */
-                        <div className="p-4 rounded-2xl bg-zinc-900/90 border border-emerald-500/30 text-center space-y-3">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-400">
-                              Renter Secret PIN
-                            </span>
-                            <div className="flex items-center gap-1.5">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setShowRenterSecretPin((prev) => !prev)}
-                                className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
-                              >
-                                {showRenterSecretPin ? <EyeOff className="h-3.5 w-3.5 mr-1" /> : <Eye className="h-3.5 w-3.5 mr-1" />}
-                                {showRenterSecretPin ? "Hide" : "Show"}
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleCopyRenterPin(renterPinRevealed || "6314")}
-                                className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
-                              >
-                                <Copy className="h-3.5 w-3.5 mr-1" />
-                                Copy
-                              </Button>
-                            </div>
-                          </div>
-
-                          <div className="flex justify-center gap-2 py-1">
-                            {(renterPinRevealed || "6314").split("").map((digit, i) => (
-                              <div
-                                key={i}
-                                className="w-12 h-14 rounded-xl bg-zinc-950 border border-emerald-500/40 flex items-center justify-center font-mono text-2xl font-black text-emerald-400 shadow-inner"
-                              >
-                                {showRenterSecretPin ? digit : "•"}
-                              </div>
-                            ))}
-                          </div>
-
-                          <p className="text-[11px] text-muted-foreground leading-relaxed">
-                            This 4-digit Secret PIN is generated server-side specifically for this booking receipt. Keep it secure for your rental records.
-                          </p>
-                        </div>
+                        <SecretPinDisplay
+                          pin={renterPinRevealed || "6314"}
+                          type="renter"
+                          title="Renter Secret PIN"
+                          subtitle="This 4-digit Secret PIN is generated server-side specifically for this booking receipt. Keep it secure for your rental records."
+                          isMaskedDefault={false}
+                        />
                       )}
                     </div>
 

@@ -34,6 +34,7 @@ import { toast } from "sonner";
 import { rentalSecurityService } from "@/services/rentalSecurityService";
 import { payerntApi } from "../payerntApiService";
 import type { RentalRequest, RentalRequestStatus } from "../types";
+import { SecretPinDisplay, SecretPinInput } from "@/components/common/SecretPinDisplay";
 
 interface RentalRequestsProps {
   requests: RentalRequest[];
@@ -242,6 +243,12 @@ export function RentalRequests({
   const handleRenterPinKeyDown = (idx: number, e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Backspace" && !enteredRenterPin[idx] && idx > 0) {
       pinInputRefs.current[idx - 1]?.focus();
+    } else if (e.key === "ArrowLeft" && idx > 0) {
+      e.preventDefault();
+      pinInputRefs.current[idx - 1]?.focus();
+    } else if (e.key === "ArrowRight" && idx < 3) {
+      e.preventDefault();
+      pinInputRefs.current[idx + 1]?.focus();
     }
   };
 
@@ -364,26 +371,26 @@ export function RentalRequests({
         <div>
           <button
             onClick={onBack}
-            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border border-border/80 bg-card hover:bg-secondary text-xs font-semibold text-foreground transition-all cursor-pointer shadow-2xs group"
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border border-black/10 dark:border-[#A1A1AA]/25 bg-white dark:bg-[#10151B] hover:bg-neutral-100 dark:hover:bg-white/5 text-xs font-semibold text-neutral-800 dark:text-[#F5F5F5] transition-all cursor-pointer shadow-xs group"
           >
-            <ArrowLeft className="h-3.5 w-3.5 group-hover:-translate-x-0.5 transition-transform" />
+            <ArrowLeft className="h-3.5 w-3.5 group-hover:-translate-x-0.5 transition-transform text-[#A1A1AA]" />
             <span>Back to Home</span>
           </button>
         </div>
       )}
 
-      {/* Header Banner with Concentric Radii */}
-      <div className="p-6 sm:p-8 rounded-3xl border border-border/80 bg-linear-to-br from-card via-card to-secondary/30 relative overflow-hidden shadow-xs">
+      {/* Header Banner */}
+      <div className="p-6 sm:p-8 rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#10151B] relative overflow-hidden shadow-sm">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary border border-primary/20 text-xs font-bold uppercase tracking-wider">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-neutral-100 dark:bg-white/[0.05] text-neutral-800 dark:text-[#A1A1AA] border border-black/5 dark:border-white/10 text-xs font-bold uppercase tracking-wider">
               <Sparkles className="h-3.5 w-3.5" />
               <span>Rental Command Center</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground font-display">
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-neutral-950 dark:text-[#F5F5F5] font-display">
               Bookings & Rental Lifecycles
             </h1>
-            <p className="text-xs sm:text-sm text-muted-foreground max-w-xl">
+            <p className="text-xs sm:text-sm text-neutral-500 dark:text-[#A1A1AA] max-w-xl">
               Manage incoming borrower requests, execute secure device handovers, confirm returns, and approve escrow payout settlements directly into your User Wallet.
             </p>
           </div>
@@ -391,7 +398,7 @@ export function RentalRequests({
           <div className="flex items-center gap-3 shrink-0">
             <button
               onClick={onNavigateToWallet}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-foreground text-background font-bold text-xs shadow-md hover:opacity-95 active:scale-98 transition-all cursor-pointer"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-neutral-900 text-white dark:bg-[#F5F5F5] dark:text-[#050709] dark:hover:bg-white font-bold text-xs shadow-md active:scale-98 transition-all cursor-pointer"
             >
               <span>Go to User Wallet</span>
               <ArrowRight className="h-3.5 w-3.5" />
@@ -400,7 +407,7 @@ export function RentalRequests({
         </div>
 
         {/* Protection Assurance Strip */}
-        <div className="mt-6 pt-4 border-t border-border/60 flex flex-wrap items-center justify-between gap-4 text-xs text-muted-foreground">
+        <div className="mt-6 pt-4 border-t border-black/5 dark:border-white/5 flex flex-wrap items-center justify-between gap-4 text-xs text-neutral-500 dark:text-[#A1A1AA]">
           <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-semibold">
             <ShieldCheck className="h-4 w-4 shrink-0" />
             <span>All rentals backed by ₹50,000 Lender Protection & Verified Escrow</span>
@@ -430,18 +437,18 @@ export function RentalRequests({
               onClick={() => setFilter(tab.id as any)}
               className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer border flex items-center gap-2 active:scale-98 ${
                 isActive
-                  ? "bg-foreground text-background border-foreground shadow-sm"
-                  : "bg-card text-muted-foreground border-border/80 hover:bg-secondary hover:text-foreground"
+                  ? "bg-neutral-900 text-white dark:bg-[#F5F5F5] dark:text-[#050709] border-transparent shadow-sm"
+                  : "bg-white dark:bg-[#10151B] text-neutral-600 dark:text-[#A1A1AA] border-black/10 dark:border-[#A1A1AA]/20 hover:text-black dark:hover:text-[#F5F5F5] hover:bg-neutral-50 dark:hover:bg-white/5"
               }`}
             >
               <span>{tab.label}</span>
               <span
                 className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
                   isActive
-                    ? "bg-background/20 text-background"
+                    ? "bg-white/20 dark:bg-black/20 text-white dark:text-[#050709]"
                     : tab.highlight
                     ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 font-bold"
-                    : "bg-secondary text-muted-foreground"
+                    : "bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-[#A1A1AA]"
                 }`}
               >
                 {tab.count}
@@ -484,30 +491,30 @@ export function RentalRequests({
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 key={req.id}
-                className="rounded-3xl border border-border/80 bg-card p-6 sm:p-7 space-y-6 shadow-xs hover:border-foreground/20 hover:shadow-md transition-all"
+                className="rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#10151B] p-6 sm:p-7 space-y-6 shadow-xs hover:border-black/20 dark:hover:border-[#A1A1AA]/35 transition-all"
               >
                 {/* Card Top Row: Product Identity & Status */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/60 pb-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-black/5 dark:border-white/5 pb-5">
                   <div className="flex items-start sm:items-center gap-4">
                     <img
                       src={req.productImage}
                       alt={req.productTitle}
-                      className="h-16 w-16 sm:h-18 sm:w-18 rounded-2xl object-cover bg-secondary border border-border shrink-0 shadow-xs"
+                      className="h-16 w-16 sm:h-18 sm:w-18 rounded-2xl object-cover bg-neutral-100 dark:bg-[#050709] border border-black/10 dark:border-[#A1A1AA]/20 shrink-0 shadow-xs"
                     />
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
-                        <span className="px-2 py-0.5 rounded-md bg-secondary text-muted-foreground text-[10px] font-extrabold uppercase tracking-wider">
+                        <span className="px-2 py-0.5 rounded-md bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-[#A1A1AA] border border-black/5 dark:border-white/10 text-[10px] font-extrabold uppercase tracking-wider">
                           {req.category}
                         </span>
-                        <span className="text-[11px] font-mono text-muted-foreground">
-                          ID: <strong className="text-foreground">#{req.id}</strong>
+                        <span className="text-[11px] font-mono text-neutral-500 dark:text-[#A1A1AA]">
+                          ID: <strong className="text-neutral-950 dark:text-[#F5F5F5]">#{req.id}</strong>
                         </span>
                       </div>
-                      <h3 className="font-bold text-base sm:text-lg text-foreground font-display line-clamp-1">
+                      <h3 className="font-bold text-base sm:text-lg text-neutral-950 dark:text-[#F5F5F5] font-display line-clamp-1">
                         {req.productTitle}
                       </h3>
-                      <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-                        <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                      <p className="text-xs text-neutral-500 dark:text-[#A1A1AA] flex items-center gap-1.5">
+                        <Calendar className="h-3.5 w-3.5 text-[#A1A1AA]" />
                         <span suppressHydrationWarning>
                           Booked on {req.requestDate || req.startDate || "Recent"}
                         </span>
@@ -517,7 +524,7 @@ export function RentalRequests({
 
                   <div className="flex flex-col sm:items-end justify-between gap-2 shrink-0">
                     <div>{getStatusBadge(req.status)}</div>
-                    <div className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                    <div className="inline-flex items-center gap-1.5 text-[11px] text-neutral-500 dark:text-[#A1A1AA]">
                       <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
                       <span>
                         Escrow: <strong className="text-emerald-600 dark:text-emerald-400 font-semibold">100% Funded & Held</strong>
@@ -528,10 +535,10 @@ export function RentalRequests({
 
                 {/* Card Lifecycle Progress Rail */}
                 {!isDeclined && (
-                  <div className="p-4 rounded-2xl border border-border/60 bg-secondary/30 space-y-3">
-                    <div className="flex items-center justify-between text-xs font-bold text-muted-foreground">
+                  <div className="p-4 sm:p-5 rounded-2xl border border-black/5 dark:border-[#A1A1AA]/15 bg-neutral-50 dark:bg-[#050709]/70 space-y-3">
+                    <div className="flex items-center justify-between text-xs font-bold text-neutral-500 dark:text-[#A1A1AA]">
                       <span className="uppercase tracking-wider text-[10px]">Rental Lifecycle Tracker</span>
-                      <span className="text-foreground font-mono text-[11px]">
+                      <span className="text-neutral-950 dark:text-[#F5F5F5] font-mono text-[11px]">
                         Step {currentStepIdx + 1} of {LIFECYCLE_STEPS.length}
                       </span>
                     </div>
@@ -546,20 +553,20 @@ export function RentalRequests({
                             <div
                               className={`h-2 rounded-full transition-all ${
                                 isDone
-                                  ? "bg-emerald-500"
+                                  ? "bg-neutral-900 dark:bg-[#F5F5F5]"
                                   : isCurrent
-                                  ? "bg-primary animate-pulse"
-                                  : "bg-border"
+                                  ? "bg-neutral-900 dark:bg-[#F5F5F5] animate-pulse"
+                                  : "bg-black/10 dark:bg-white/10"
                               }`}
                             />
                             <div className="hidden sm:block">
                               <p
                                 className={`text-[10px] font-bold truncate ${
                                   isCurrent
-                                    ? "text-foreground font-black"
+                                    ? "text-neutral-950 dark:text-[#F5F5F5] font-black"
                                     : isDone
-                                    ? "text-emerald-600 dark:text-emerald-400"
-                                    : "text-muted-foreground/60"
+                                    ? "text-neutral-800 dark:text-[#F5F5F5]"
+                                    : "text-neutral-400 dark:text-[#A1A1AA]/60"
                                 }`}
                               >
                                 {step.label}
@@ -575,9 +582,9 @@ export function RentalRequests({
                 {/* Card Middle 3-Column Info Matrix */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
                   {/* Column 1: Borrower Profile */}
-                  <div className="p-4 rounded-2xl border border-border bg-card space-y-3 shadow-xs">
+                  <div className="p-4 rounded-2xl border border-black/5 dark:border-[#A1A1AA]/15 bg-neutral-50/50 dark:bg-[#050709]/50 space-y-3 shadow-xs">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                      <span className="text-[10px] font-bold text-neutral-500 dark:text-[#A1A1AA] uppercase tracking-wider">
                         Verified Borrower
                       </span>
                       <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
@@ -589,11 +596,11 @@ export function RentalRequests({
                       <img
                         src={req.renter.avatar}
                         alt={req.renter.name}
-                        className="h-10 w-10 rounded-full object-cover border border-border shadow-xs"
+                        className="h-10 w-10 rounded-full object-cover border border-black/10 dark:border-[#A1A1AA]/20 shadow-xs"
                       />
                       <div>
-                        <p className="font-bold text-foreground text-sm">{req.renter.name}</p>
-                        <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                        <p className="font-bold text-neutral-950 dark:text-[#F5F5F5] text-sm">{req.renter.name}</p>
+                        <p className="text-[11px] text-neutral-500 dark:text-[#A1A1AA] flex items-center gap-1">
                           <span className="text-amber-500 font-bold">★ {req.renter.rating}</span>
                           <span>•</span>
                           <span>{req.renter.completedRentals} past rentals</span>
@@ -601,75 +608,75 @@ export function RentalRequests({
                       </div>
                     </div>
 
-                    <div className="pt-2 border-t border-border/50 text-[11px] text-muted-foreground space-y-1">
+                    <div className="pt-2 border-t border-black/5 dark:border-white/5 text-[11px] text-neutral-500 dark:text-[#A1A1AA] space-y-1">
                       <p className="flex items-center gap-1.5">
-                        <Phone className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                        <span className="text-foreground font-medium">{req.renter.phone}</span>
+                        <Phone className="h-3.5 w-3.5 text-[#A1A1AA] shrink-0" />
+                        <span className="text-neutral-900 dark:text-[#F5F5F5] font-medium">{req.renter.phone}</span>
                       </p>
                       <p className="flex items-center gap-1.5 truncate">
-                        <Mail className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                        <span className="text-foreground font-medium truncate">{req.renter.email}</span>
+                        <Mail className="h-3.5 w-3.5 text-[#A1A1AA] shrink-0" />
+                        <span className="text-neutral-900 dark:text-[#F5F5F5] font-medium truncate">{req.renter.email}</span>
                       </p>
                       <p className="flex items-center gap-1.5">
-                        <MapPin className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                        <MapPin className="h-3.5 w-3.5 text-[#A1A1AA] shrink-0" />
                         <span>{req.renter.city}</span>
                       </p>
                     </div>
                   </div>
 
                   {/* Column 2: Schedule & Duration */}
-                  <div className="p-4 rounded-2xl border border-border bg-card space-y-3 shadow-xs">
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+                  <div className="p-4 rounded-2xl border border-black/5 dark:border-[#A1A1AA]/15 bg-neutral-50/50 dark:bg-[#050709]/50 space-y-3 shadow-xs">
+                    <span className="text-[10px] font-bold text-neutral-500 dark:text-[#A1A1AA] uppercase tracking-wider block">
                       Rental Schedule
                     </span>
 
                     <div className="space-y-1.5">
                       <div className="flex items-baseline gap-2">
-                        <span className="text-2xl font-black text-foreground font-display">{req.totalDays}</span>
-                        <span className="text-xs text-muted-foreground font-semibold">Days Total</span>
+                        <span className="text-2xl font-black text-neutral-950 dark:text-[#F5F5F5] font-display">{req.totalDays}</span>
+                        <span className="text-xs text-neutral-500 dark:text-[#A1A1AA] font-semibold">Days Total</span>
                       </div>
-                      <div className="p-2 rounded-xl bg-secondary/50 border border-border/60 text-[11px] space-y-0.5">
+                      <div className="p-2.5 rounded-xl bg-neutral-100/60 dark:bg-white/[0.03] border border-black/5 dark:border-white/5 text-[11px] space-y-1">
                         <div className="flex justify-between">
-                          <span className="text-muted-foreground">Start:</span>
-                          <span className="font-bold text-foreground">{req.startDate}</span>
+                          <span className="text-neutral-500 dark:text-[#A1A1AA]">Start:</span>
+                          <span className="font-bold text-neutral-950 dark:text-[#F5F5F5]">{req.startDate}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-muted-foreground">Return:</span>
-                          <span className="font-bold text-foreground">{req.endDate}</span>
+                          <span className="text-neutral-500 dark:text-[#A1A1AA]">Return:</span>
+                          <span className="font-bold text-neutral-950 dark:text-[#F5F5F5]">{req.endDate}</span>
                         </div>
                       </div>
                     </div>
 
-                    <div className="pt-1 border-t border-border/50 flex justify-between text-[11px] text-muted-foreground">
+                    <div className="pt-1 border-t border-black/5 dark:border-white/5 flex justify-between text-[11px] text-neutral-500 dark:text-[#A1A1AA]">
                       <span>Daily Base Rate:</span>
-                      <span className="font-semibold text-foreground">₹{req.dailyRate} / day</span>
+                      <span className="font-semibold text-neutral-900 dark:text-[#F5F5F5]">₹{req.dailyRate} / day</span>
                     </div>
                   </div>
 
                   {/* Column 3: Financial Settlement & Escrow */}
-                  <div className="p-4 rounded-2xl border border-border bg-card space-y-3 shadow-xs">
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+                  <div className="p-4 rounded-2xl border border-black/5 dark:border-[#A1A1AA]/15 bg-neutral-50/50 dark:bg-[#050709]/50 space-y-3 shadow-xs">
+                    <span className="text-[10px] font-bold text-neutral-500 dark:text-[#A1A1AA] uppercase tracking-wider block">
                       Financial Summary
                     </span>
 
                     <div className="space-y-1.5">
                       <div className="flex items-baseline justify-between">
-                        <span className="text-xs text-muted-foreground">Total Payout:</span>
-                        <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400 font-display">
+                        <span className="text-xs text-neutral-500 dark:text-[#A1A1AA]">Total Payout:</span>
+                        <span className="text-2xl font-black text-neutral-950 dark:text-[#F5F5F5] font-display">
                           ₹{req.grossRental.toLocaleString("en-IN")}
                         </span>
                       </div>
-                      <div className="flex items-baseline justify-between text-[11px] text-muted-foreground">
+                      <div className="flex items-baseline justify-between text-[11px] text-neutral-500 dark:text-[#A1A1AA]">
                         <span>Escrow Deposit:</span>
-                        <span className="font-semibold text-foreground">
+                        <span className="font-semibold text-neutral-900 dark:text-[#F5F5F5]">
                           ₹{req.securityDeposit.toLocaleString("en-IN")}
                         </span>
                       </div>
                     </div>
 
-                    <div className="pt-2 border-t border-border/50 flex items-center justify-between text-[11px] text-emerald-600 dark:text-emerald-400 font-bold">
-                      <span>Payent Platform Fee:</span>
-                      <span className="px-2 py-0.5 rounded-md bg-emerald-500/10">0% (₹0 Deducted)</span>
+                    <div className="pt-2 border-t border-black/5 dark:border-white/5 flex items-center justify-between text-[11px] font-bold">
+                      <span className="text-neutral-500 dark:text-[#A1A1AA]">Payent Platform Fee:</span>
+                      <span className="px-2 py-0.5 rounded-md bg-neutral-100 dark:bg-white/10 text-neutral-900 dark:text-[#F5F5F5]">0% (₹0 Deducted)</span>
                     </div>
                   </div>
                 </div>
@@ -678,76 +685,28 @@ export function RentalRequests({
                 {(() => {
                   const sec = rentalSecurityService.getSecurityRecord(req.id);
                   const pin = vendorPinDataMap[req.id]?.pin || sec?.vendorSecretPin || "5831";
-                  const isVisible = showPinMap[req.id] || false;
                   return (
-                    <div className="p-4 rounded-2xl border border-border bg-secondary/20 space-y-3">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <span className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                            <Lock className="h-4 w-4" />
-                          </span>
-                          <div>
-                            <span className="text-xs font-bold text-foreground block">
-                              Vendor Secret PIN (4-Digit)
-                            </span>
-                            <span className="text-[10px] text-muted-foreground">
-                              Generated securely for this booking stage
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setShowPinMap((prev) => ({ ...prev, [req.id]: !prev[req.id] }))}
-                            className="px-2.5 py-1 rounded-xl border border-border bg-card hover:bg-secondary text-xs font-medium text-foreground flex items-center gap-1.5 cursor-pointer"
-                          >
-                            {isVisible ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                            <span>{isVisible ? "Hide" : "Show"}</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleCopyPin(pin)}
-                            className="px-2.5 py-1 rounded-xl border border-border bg-card hover:bg-secondary text-xs font-medium text-foreground flex items-center gap-1.5 cursor-pointer"
-                          >
-                            <Copy className="h-3.5 w-3.5" />
-                            <span>Copy</span>
-                          </button>
-                          {(req.status === "accepted" || req.status === "handover") && (
-                            <button
-                              type="button"
-                              onClick={() => handleGenerateSecretPin(req)}
-                              disabled={generatingPinId === req.id}
-                              className="px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs cursor-pointer flex items-center gap-1.5"
-                            >
-                              <RefreshCw className={`h-3.5 w-3.5 ${generatingPinId === req.id ? "animate-spin" : ""}`} />
-                              <span>Generate Secret PIN</span>
-                            </button>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* 4 Separated Digits Box */}
-                      <div className="flex items-center justify-center gap-2.5 py-1">
-                        {pin.split("").slice(0, 4).map((d, i) => (
-                          <div
-                            key={i}
-                            className="w-11 h-12 rounded-xl bg-card border border-border flex items-center justify-center font-mono text-xl font-black text-foreground shadow-inner"
-                          >
-                            {isVisible ? d : "•"}
-                          </div>
-                        ))}
-                      </div>
-
-                      <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-1 border-t border-border/40">
-                        <span>🔒 Private security credential. Do not reveal to courier or renter.</span>
-                        <span className="font-semibold text-emerald-600 dark:text-emerald-400">Status: Pickup Ready</span>
-                      </div>
-                    </div>
+                    <SecretPinDisplay
+                      pin={pin}
+                      type="vendor"
+                      title="Vendor Secret PIN (4-Digit)"
+                      subtitle="Private security credential generated for this booking stage. Keep secure."
+                      isMaskedDefault={!showPinMap[req.id]}
+                      showToggleMask={true}
+                      showCopy={true}
+                      onGenerate={
+                        req.status === "accepted" || req.status === "handover"
+                          ? () => handleGenerateSecretPin(req)
+                          : undefined
+                      }
+                      isGenerating={generatingPinId === req.id}
+                      statusBadge="Status: Pickup Ready"
+                    />
                   );
                 })()}
 
                 {/* Card Action Controls & Lifecycle Triggers */}
-                <div className="pt-2 flex flex-wrap items-center justify-between gap-4 border-t border-border/60">
+                <div className="pt-2 flex flex-wrap items-center justify-between gap-4 border-t border-black/5 dark:border-white/5">
                   {/* 1. When PENDING: Accept / Reject Buttons */}
                   {req.status === "requested" && (
                     <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
@@ -756,7 +715,7 @@ export function RentalRequests({
                           onRequestAction(req.id, "accept");
                           toast.success(`Booking approved for ${req.renter.name}! Prepare equipment for handover.`);
                         }}
-                        className="flex-1 sm:flex-initial px-6 py-3 rounded-2xl bg-foreground text-background font-bold text-xs shadow-md hover:opacity-90 active:scale-98 transition-all cursor-pointer flex items-center justify-center gap-2"
+                        className="flex-1 sm:flex-initial px-6 py-3 rounded-2xl bg-neutral-900 text-white dark:bg-[#F5F5F5] dark:text-[#050709] dark:hover:bg-white font-bold text-xs shadow-md active:scale-98 transition-all cursor-pointer flex items-center justify-center gap-2"
                       >
                         <CheckCircle2 className="h-4 w-4" />
                         <span>Accept & Confirm Booking</span>
@@ -766,7 +725,7 @@ export function RentalRequests({
                           onRequestAction(req.id, "reject");
                           toast.info("Rental request declined.");
                         }}
-                        className="px-4 py-3 rounded-2xl border border-border text-xs font-semibold text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all cursor-pointer"
+                        className="px-4 py-3 rounded-2xl border border-black/10 dark:border-[#A1A1AA]/30 text-xs font-semibold text-neutral-600 dark:text-[#A1A1AA] hover:text-red-500 hover:bg-red-500/10 transition-all cursor-pointer"
                       >
                         Decline
                       </button>
@@ -779,7 +738,7 @@ export function RentalRequests({
                       <button
                         onClick={() => handlePrepareProductForDelivery(req)}
                         disabled={isPreparing}
-                        className="px-5 py-3 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs shadow-md active:scale-98 cursor-pointer flex items-center justify-center gap-2"
+                        className="px-5 py-3 rounded-2xl bg-neutral-900 text-white dark:bg-[#F5F5F5] dark:text-[#050709] dark:hover:bg-white font-bold text-xs shadow-md active:scale-98 cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
                       >
                         <PackageCheck className="h-4 w-4" />
                         <span>{isPreparing ? "Preparing..." : "Prepare Product for Delivery"}</span>
@@ -787,17 +746,17 @@ export function RentalRequests({
 
                       <button
                         onClick={() => handleSendVendorPickupOtp(req.id)}
-                        className="px-5 py-3 rounded-2xl bg-primary text-primary-foreground font-bold text-xs shadow-md hover:opacity-90 active:scale-98 cursor-pointer flex items-center justify-center gap-2"
+                        className="px-5 py-3 rounded-2xl border border-black/10 dark:border-[#A1A1AA]/30 bg-transparent text-neutral-900 dark:text-[#F5F5F5] hover:bg-neutral-100 dark:hover:bg-white/5 font-bold text-xs shadow-sm active:scale-98 cursor-pointer flex items-center justify-center gap-2"
                       >
-                        <Truck className="h-4 w-4" />
+                        <Truck className="h-4 w-4 text-[#A1A1AA]" />
                         <span>Verify Delivery Boy Pickup (OTP)</span>
                       </button>
 
                       <button
                         onClick={() => handleOpenHandoverModal(req)}
-                        className="px-4 py-3 rounded-2xl border border-border bg-card hover:bg-secondary text-foreground text-xs font-semibold cursor-pointer flex items-center justify-center gap-2"
+                        className="px-4 py-3 rounded-2xl border border-black/10 dark:border-[#A1A1AA]/30 bg-transparent text-neutral-900 dark:text-[#F5F5F5] hover:bg-neutral-100 dark:hover:bg-white/5 text-xs font-semibold cursor-pointer flex items-center justify-center gap-2"
                       >
-                        <KeyRound className="h-4 w-4" />
+                        <KeyRound className="h-4 w-4 text-[#A1A1AA]" />
                         <span>Direct Handover PIN</span>
                       </button>
                     </div>
@@ -806,13 +765,13 @@ export function RentalRequests({
                   {/* 2.1 When in HANDOVER state (Waiting for Delivery Boy or in transit) */}
                   {req.status === "handover" && (
                     <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-                      <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 text-xs font-semibold">
-                        <Truck className="h-3.5 w-3.5" />
+                      <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-neutral-100 dark:bg-white/5 text-neutral-800 dark:text-[#F5F5F5] border border-black/5 dark:border-white/10 text-xs font-semibold">
+                        <Truck className="h-3.5 w-3.5 text-[#A1A1AA]" />
                         <span>In Delivery Transit / Handover to Borrower</span>
                       </div>
                       <button
                         onClick={() => handleOpenHandoverModal(req)}
-                        className="px-4 py-2 rounded-xl bg-primary text-primary-foreground font-bold text-xs shadow-sm hover:opacity-90 cursor-pointer"
+                        className="px-5 py-2.5 rounded-xl bg-neutral-900 text-white dark:bg-[#F5F5F5] dark:text-[#050709] dark:hover:bg-white font-bold text-xs shadow-sm cursor-pointer"
                       >
                         Authorize Handover
                       </button>
@@ -827,9 +786,9 @@ export function RentalRequests({
                           onAdvanceLifecycle(req.id, "returned");
                           toast.success("Return marked as received. Ready for post-rental inspection.");
                         }}
-                        className="w-full sm:w-auto px-6 py-3 rounded-2xl border border-border text-foreground hover:bg-secondary font-bold text-xs cursor-pointer flex items-center justify-center gap-2 active:scale-98 shadow-xs"
+                        className="w-full sm:w-auto px-6 py-3 rounded-2xl border border-black/10 dark:border-[#A1A1AA]/30 text-neutral-900 dark:text-[#F5F5F5] hover:bg-neutral-100 dark:hover:bg-white/5 font-bold text-xs cursor-pointer flex items-center justify-center gap-2 active:scale-98 shadow-xs"
                       >
-                        <RotateCcw className="h-4 w-4" />
+                        <RotateCcw className="h-4 w-4 text-[#A1A1AA]" />
                         <span>Receive Return from Borrower (Inspect Condition)</span>
                       </button>
                     </div>
@@ -845,7 +804,7 @@ export function RentalRequests({
                             `Inspection passed! ₹${req.grossRental.toLocaleString("en-IN")} credited to your User Wallet.`
                           );
                         }}
-                        className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow-lg active:scale-98 cursor-pointer flex items-center justify-center gap-2"
+                        className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-neutral-900 text-white dark:bg-[#F5F5F5] dark:text-[#050709] dark:hover:bg-white font-bold text-xs shadow-lg active:scale-98 cursor-pointer flex items-center justify-center gap-2"
                       >
                         <ShieldCheck className="h-4 w-4" />
                         <span>Approve Inspection & Credit Payout (₹{req.grossRental.toLocaleString("en-IN")})</span>
@@ -863,13 +822,13 @@ export function RentalRequests({
 
                   {/* 6. When REJECTED */}
                   {req.status === "rejected" && (
-                    <div className="text-xs text-muted-foreground">
+                    <div className="text-xs text-neutral-500 dark:text-[#A1A1AA]">
                       This rental request was declined.
                     </div>
                   )}
 
                   {/* Right side escrow note */}
-                  <div className="text-[11px] text-muted-foreground ml-auto hidden sm:block">
+                  <div className="text-[11px] text-neutral-400 dark:text-[#A1A1AA] ml-auto hidden sm:block">
                     Zero Fees • Instant Settlement
                   </div>
                 </div>
@@ -901,7 +860,7 @@ export function RentalRequests({
               className="relative w-full max-w-md rounded-3xl border border-border bg-card p-6 sm:p-8 space-y-6 shadow-2xl text-center z-10"
             >
               <div className="flex justify-between items-start">
-                <div className="h-12 w-12 rounded-2xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center shadow-xs">
+                <div className="h-12 w-12 rounded-2xl bg-secondary text-foreground border border-border flex items-center justify-center shadow-xs">
                   <PackageCheck className="h-6 w-6" />
                 </div>
                 <button
@@ -914,7 +873,7 @@ export function RentalRequests({
               </div>
 
               <div className="space-y-1.5 text-left">
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[10px] font-bold uppercase tracking-wider">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-secondary text-foreground border border-border text-[10px] font-bold uppercase tracking-wider">
                   <Lock className="h-3 w-3" />
                   <span>Private Vendor Security PIN</span>
                 </div>
@@ -927,19 +886,15 @@ export function RentalRequests({
               </div>
 
               {/* Secure PIN Display */}
-              <div className="p-5 rounded-2xl border border-amber-500/30 bg-amber-500/5 text-center space-y-2">
-                <span className="text-[11px] uppercase font-bold text-muted-foreground block">
-                  Your Private Vendor Secret PIN
-                </span>
-                <div className="font-mono text-4xl font-black text-foreground tracking-[0.3em] bg-card py-3 px-6 rounded-2xl border border-border inline-block shadow-inner">
-                  {vendorPinModal.pin}
-                </div>
-                <p className="text-[11px] text-muted-foreground mt-2">
-                  🔒 Keep this PIN secure. Do not share with courier or renter.
-                </p>
-              </div>
+              <SecretPinDisplay
+                pin={vendorPinModal.pin}
+                type="vendor"
+                title="Your Private Vendor Secret PIN"
+                subtitle="Keep this PIN secure. Do not share with courier or renter."
+                isMaskedDefault={false}
+              />
 
-              <div className="p-3.5 rounded-xl bg-secondary/40 border border-border/60 text-left text-xs text-muted-foreground space-y-1">
+              <div className="p-3.5 rounded-xl bg-secondary/40 border border-border text-left text-xs text-muted-foreground space-y-1">
                 <span className="font-bold text-foreground block">Next Steps:</span>
                 <p>1. Status updated to <span className="font-semibold text-foreground">Waiting for Delivery Boy</span>.</p>
                 <p>2. Complete mobile OTP verification when the courier arrives for pickup.</p>
@@ -948,7 +903,7 @@ export function RentalRequests({
               <button
                 type="button"
                 onClick={() => setVendorPinModal(null)}
-                className="w-full py-3 px-4 rounded-2xl bg-foreground text-background text-xs font-bold shadow-md hover:opacity-95 transition-all cursor-pointer"
+                className="w-full py-3 px-4 rounded-2xl bg-[#F5F5F5] text-[#050709] text-xs font-bold shadow-md hover:bg-white transition-all cursor-pointer"
               >
                 Acknowledge & Close
               </button>
@@ -979,7 +934,7 @@ export function RentalRequests({
               className="relative w-full max-w-md rounded-3xl border border-border bg-card p-6 sm:p-8 space-y-6 shadow-2xl text-center z-10"
             >
               <div className="flex justify-between items-start">
-                <div className="h-12 w-12 rounded-2xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center shadow-xs">
+                <div className="h-12 w-12 rounded-2xl bg-secondary text-foreground border border-border flex items-center justify-center shadow-xs">
                   <Truck className="h-6 w-6" />
                 </div>
                 <button
@@ -992,7 +947,7 @@ export function RentalRequests({
               </div>
 
               <div className="space-y-1.5 text-left">
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-wider">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-secondary text-foreground border border-border text-[10px] font-bold uppercase tracking-wider">
                   <ShieldCheck className="h-3 w-3" />
                   <span>Pickup Handover Verification</span>
                 </div>
@@ -1014,11 +969,11 @@ export function RentalRequests({
                     setDeliveryBoyOtpModal((prev) => prev ? { ...prev, otp: val, error: null } : null);
                   }}
                   placeholder="Enter 6-Digit OTP"
-                  className="w-full text-center font-mono text-2xl font-black rounded-2xl border border-border bg-background text-foreground py-3 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all shadow-xs"
+                  className="w-full text-center font-mono text-2xl font-black rounded-2xl border border-white/20 bg-[#050709] text-[#F5F5F5] py-3 focus:outline-none focus:ring-2 focus:ring-white/30 focus:border-white transition-all shadow-inner tracking-widest placeholder:text-muted-foreground/40 placeholder:tracking-normal placeholder:font-sans placeholder:text-base placeholder:font-normal"
                 />
 
                 {deliveryBoyOtpModal.error && (
-                  <p className="text-xs text-destructive font-medium flex items-center gap-1.5">
+                  <p className="text-xs text-rose-400 font-medium flex items-center gap-1.5">
                     <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
                     <span>{deliveryBoyOtpModal.error}</span>
                   </p>
@@ -1029,7 +984,7 @@ export function RentalRequests({
                 <button
                   type="button"
                   onClick={() => setDeliveryBoyOtpModal(null)}
-                  className="flex-1 py-3 px-4 rounded-2xl border border-border bg-card hover:bg-secondary text-foreground text-xs font-bold transition-all cursor-pointer"
+                  className="flex-1 py-3 px-4 rounded-2xl border border-border bg-[#10151B] hover:bg-secondary text-[#A1A1AA] hover:text-[#F5F5F5] text-xs font-bold transition-all cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -1037,7 +992,7 @@ export function RentalRequests({
                   type="button"
                   onClick={handleVerifyVendorPickupOtp}
                   disabled={deliveryBoyOtpModal.otp.length < 4 || deliveryBoyOtpModal.isSubmitting}
-                  className="flex-1 py-3 px-4 rounded-2xl bg-foreground text-background text-xs font-bold shadow-md hover:opacity-95 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-98"
+                  className="flex-1 py-3 px-4 rounded-2xl bg-[#F5F5F5] text-[#050709] text-xs font-bold shadow-md hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-98"
                 >
                   {deliveryBoyOtpModal.isSubmitting ? (
                     <>
@@ -1079,7 +1034,7 @@ export function RentalRequests({
               className="relative w-full max-w-md rounded-3xl border border-border bg-card p-6 sm:p-8 space-y-6 shadow-2xl text-center z-10"
             >
               <div className="flex justify-between items-start">
-                <div className="h-12 w-12 rounded-2xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center shadow-xs">
+                <div className="h-12 w-12 rounded-2xl bg-secondary text-foreground border border-border flex items-center justify-center shadow-xs">
                   <KeyRound className="h-6 w-6" />
                 </div>
                 <button
@@ -1092,7 +1047,7 @@ export function RentalRequests({
               </div>
 
               <div className="space-y-1.5 text-left">
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-wider">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-secondary text-foreground border border-border text-[10px] font-bold uppercase tracking-wider">
                   <ShieldCheck className="h-3 w-3" />
                   <span>Handover Security Clearance</span>
                 </div>
@@ -1109,34 +1064,33 @@ export function RentalRequests({
                 const sec = rentalSecurityService.getSecurityRecord(handoverReq.id);
                 const vendorPin = sec?.vendorSecretPin || "5831";
                 return (
-                  <div className="p-3.5 rounded-2xl border border-border/80 bg-secondary/30 text-left flex items-center justify-between">
-                    <div>
-                      <span className="text-[10px] uppercase font-bold text-muted-foreground block">
-                        Your Product Vendor PIN
-                      </span>
-                      <span className="text-xs text-muted-foreground mt-0.5 block">
-                        Attached to your product listing
-                      </span>
-                    </div>
-                    <span className="font-mono text-xl font-black text-foreground tracking-widest bg-card px-3 py-1.5 rounded-xl border border-border">
-                      {vendorPin}
-                    </span>
-                  </div>
+                  <SecretPinDisplay
+                    pin={vendorPin}
+                    type="vendor"
+                    title="Your Product Vendor PIN"
+                    subtitle="Private security credential for this listing. Verify that this matches your records."
+                    isMaskedDefault={false}
+                  />
                 );
               })()}
 
               {/* Step B: Borrower's Renter PIN Input */}
               <div className="space-y-3 text-left">
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-foreground block">
-                    Enter Borrower's 4-Digit Renter PIN *
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-foreground block">
+                      Enter Borrower's 4-Digit Renter PIN *
+                    </label>
+                    <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-2 py-0.5 rounded-full bg-secondary border border-border">
+                      Renter PIN
+                    </span>
+                  </div>
                   <p className="text-[11px] text-muted-foreground">
                     Ask {handoverReq.renter.name} for the 4-digit PIN generated on their booking confirmation screen.
                   </p>
                 </div>
 
-                <div className="flex items-center justify-center gap-3 pt-1">
+                <div className="flex items-center justify-center gap-3 pt-1" role="group" aria-label="Borrower 4-Digit Renter PIN input">
                   {enteredRenterPin.map((digit, idx) => (
                     <input
                       key={idx}
@@ -1145,17 +1099,19 @@ export function RentalRequests({
                       }}
                       type="text"
                       inputMode="numeric"
+                      pattern="[0-9]*"
                       maxLength={1}
+                      aria-label={`Digit ${idx + 1} of borrower PIN`}
                       value={digit}
                       onChange={(e) => handleRenterPinChange(idx, e.target.value)}
                       onKeyDown={(e) => handleRenterPinKeyDown(idx, e)}
-                      className="w-12 h-14 text-center font-mono text-2xl font-black rounded-2xl border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all shadow-xs"
+                      className="w-12 h-14 text-center font-mono text-2xl font-black rounded-2xl border border-white/20 bg-[#050709] text-[#F5F5F5] focus:outline-none focus:ring-2 focus:ring-white/30 focus:border-white transition-all shadow-inner"
                     />
                   ))}
                 </div>
 
                 {pinError && (
-                  <p className="text-xs text-destructive font-medium flex items-center gap-1.5 animate-in fade-in">
+                  <p className="text-xs text-rose-400 font-medium flex items-center gap-1.5 animate-in fade-in">
                     <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
                     <span>{pinError}</span>
                   </p>
@@ -1167,7 +1123,7 @@ export function RentalRequests({
                 <button
                   type="button"
                   onClick={() => setHandoverReq(null)}
-                  className="flex-1 py-3 px-4 rounded-2xl border border-border bg-card hover:bg-secondary text-foreground text-xs font-bold transition-all cursor-pointer"
+                  className="flex-1 py-3 px-4 rounded-2xl border border-border bg-[#10151B] hover:bg-secondary text-[#A1A1AA] hover:text-[#F5F5F5] text-xs font-bold transition-all cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -1175,7 +1131,7 @@ export function RentalRequests({
                   type="button"
                   onClick={handleVerifyAndStartRental}
                   disabled={enteredRenterPin.join("").length !== 4 || isVerifying}
-                  className="flex-1 py-3 px-4 rounded-2xl bg-foreground text-background text-xs font-bold shadow-md hover:opacity-95 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-98"
+                  className="flex-1 py-3 px-4 rounded-2xl bg-[#F5F5F5] text-[#050709] text-xs font-bold shadow-md hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-98"
                 >
                   {isVerifying ? (
                     <>

@@ -99,77 +99,77 @@ html, body {
 }
 
 .dark {
-  /* Dark Mode: Obsidian / Dark Blue-Black Background with Warm Ivory Primary */
-  --background: #05090D;
-  --foreground: #ffffff;
-  --card: #0D151D;
-  --card-foreground: #ffffff;
-  --primary: #F2F0EA;
-  --primary-foreground: #0A0A0A;
-  --secondary: #111B24;
-  --secondary-foreground: #F3F3F3;
-  --muted: #141E27;
-  --muted-foreground: #A8B1BA;
-  --accent: #F2F0EA;
-  --accent-foreground: #0A0A0A;
-  --destructive: #FF1744;
-  --border: rgba(255, 255, 255, 0.10);
-  --input: rgba(255, 255, 255, 0.10);
-  --ring: #F2F0EA;
+  /* Final Color System: Premium Monochrome Dark Interface */
+  --background: #050709;
+  --foreground: #F5F5F5;
+  --card: #10151B;
+  --card-foreground: #F5F5F5;
+  --primary: #F5F5F5;
+  --primary-foreground: #050709;
+  --secondary: #161D26;
+  --secondary-foreground: #F5F5F5;
+  --muted: #12171E;
+  --muted-foreground: #A1A1AA;
+  --accent: #F5F5F5;
+  --accent-foreground: #050709;
+  --destructive: #EF4444;
+  --border: rgba(161, 161, 170, 0.18);
+  --input: rgba(161, 161, 170, 0.18);
+  --ring: #F5F5F5;
 
-  /* Button Tokens - Dark Mode - Refined Warm Cream Hierarchy */
-  --btn-primary-bg: #F2F0EA;
-  --btn-primary-text: #0A0A0A;
-  --btn-primary-hover: #FFFDF7;
-  --btn-primary-pressed: #DDD9D0;
+  /* Button Tokens - Dark Mode - Premium Monochrome */
+  --btn-primary-bg: #F5F5F5;
+  --btn-primary-text: #050709;
+  --btn-primary-hover: #FFFFFF;
+  --btn-primary-pressed: #E4E4E7;
 
-  --btn-secondary-bg: transparent;
-  --btn-secondary-text: #E8E4DA;
-  --btn-secondary-border: rgba(242, 240, 234, 0.35);
-  --btn-secondary-hover: rgba(242, 240, 234, 0.10);
-  --btn-secondary-pressed: rgba(242, 240, 234, 0.16);
+  --btn-secondary-bg: #10151B;
+  --btn-secondary-text: #F5F5F5;
+  --btn-secondary-border: rgba(161, 161, 170, 0.25);
+  --btn-secondary-hover: #161D26;
+  --btn-secondary-pressed: #0B0E13;
 
   --btn-tertiary-bg: transparent;
-  --btn-tertiary-text: #CFC9BD;
-  --btn-tertiary-hover: rgba(242, 240, 234, 0.07);
-  --btn-tertiary-hover-text: #F2F0EA;
-  --btn-tertiary-pressed: rgba(242, 240, 234, 0.12);
+  --btn-tertiary-text: #A1A1AA;
+  --btn-tertiary-hover: rgba(255, 255, 255, 0.06);
+  --btn-tertiary-hover-text: #F5F5F5;
+  --btn-tertiary-pressed: rgba(255, 255, 255, 0.10);
 
   --btn-outline-bg: transparent;
-  --btn-outline-border: #6F6A60;
-  --btn-outline-text: #DDD8CD;
-  --btn-outline-hover: #F0ECE3;
-  --btn-outline-hover-text: #111111;
-  --btn-outline-pressed: #DDD9D0;
+  --btn-outline-border: rgba(161, 161, 170, 0.30);
+  --btn-outline-text: #F5F5F5;
+  --btn-outline-hover: #F5F5F5;
+  --btn-outline-hover-text: #050709;
+  --btn-outline-pressed: #E4E4E7;
 
-  --btn-danger-bg: #FF1744;
+  --btn-danger-bg: #EF4444;
   --btn-danger-text: #FFFFFF;
-  --btn-danger-hover: #D50000;
+  --btn-danger-hover: #DC2626;
 
   /* Semantic Dark Button Color Tokens */
-  --dark-button-primary: #F2F0EA;
-  --dark-button-primary-hover: #FFFDF7;
-  --dark-button-primary-pressed: #DDD9D0;
-  --dark-button-secondary-border: rgba(242, 240, 234, 0.35);
-  --dark-button-secondary-text: #E8E4DA;
-  --dark-button-secondary-hover: rgba(242, 240, 234, 0.10);
-  --dark-button-secondary-pressed: rgba(242, 240, 234, 0.16);
-  --dark-button-tertiary-text: #CFC9BD;
-  --dark-button-tertiary-hover: rgba(242, 240, 234, 0.07);
-  --dark-button-tertiary-hover-text: #F2F0EA;
-  --dark-button-outline-border: #6F6A60;
-  --dark-button-outline-text: #DDD8CD;
-  --dark-button-outline-hover: #F0ECE3;
-  --dark-button-outline-hover-text: #111111;
+  --dark-button-primary: #F5F5F5;
+  --dark-button-primary-hover: #FFFFFF;
+  --dark-button-primary-pressed: #E4E4E7;
+  --dark-button-secondary-border: rgba(161, 161, 170, 0.25);
+  --dark-button-secondary-text: #F5F5F5;
+  --dark-button-secondary-hover: #161D26;
+  --dark-button-secondary-pressed: #0B0E13;
+  --dark-button-tertiary-text: #A1A1AA;
+  --dark-button-tertiary-hover: rgba(255, 255, 255, 0.06);
+  --dark-button-tertiary-hover-text: #F5F5F5;
+  --dark-button-outline-border: rgba(161, 161, 170, 0.30);
+  --dark-button-outline-text: #F5F5F5;
+  --dark-button-outline-hover: #F5F5F5;
+  --dark-button-outline-hover-text: #050709;
 
-  --payent-bg: #05090D;
-  --payent-surface: #0D151D;
-  --payent-surface-elevated: #111B24;
-  --payent-accent: #F2F0EA;
+  --payent-bg: #050709;
+  --payent-surface: #10151B;
+  --payent-surface-elevated: #161D26;
+  --payent-accent: #F5F5F5;
   --payent-accent-hover: #FFFFFF;
-  --payent-border: rgba(255, 255, 255, 0.10);
-  --payent-text-secondary: #A8B1BA;
-  --payent-text-muted: #697681;
+  --payent-border: rgba(161, 161, 170, 0.18);
+  --payent-text-secondary: #A1A1AA;
+  --payent-text-muted: #71717A;
 
   /* Dark Mode Spatial Elevation Tokens */
   --elevation-1-shadow: 0 2px 10px -2px rgba(0, 0, 0, 0.8);
@@ -326,7 +326,7 @@ html, body {
     background: color-mix(in srgb, var(--color-card) 85%, transparent);
     box-shadow:
       var(--elevation-3-shadow),
-      0 0 20px rgba(99, 102, 241, 0.15);
+      0 0 20px rgba(255, 255, 255, 0.05);
     border-color: color-mix(
       in srgb,
       var(--color-primary) 50%,
@@ -404,40 +404,40 @@ html, body {
 
 .dark .btn-gradient,
 :where(.dark) .btn-gradient {
-  background-color: #F2F0EA !important;
+  background-color: #F5F5F5 !important;
   background-image: linear-gradient(
     135deg,
-    #FAF8F3 0%,
-    #F2F0EA 100%
+    #FFFFFF 0%,
+    #F5F5F5 100%
   ) !important;
-  color: #0A0A0A !important;
-  border: 1px solid rgba(242, 240, 234, 0.4) !important;
+  color: #050709 !important;
+  border: 1px solid rgba(255, 255, 255, 0.6) !important;
   box-shadow:
-    0 4px 14px -2px rgba(0, 0, 0, 0.4),
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.9) !important;
+    0 4px 14px -2px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 0 rgba(255, 255, 255, 1) !important;
 }
 
 .dark .btn-gradient:hover,
 :where(.dark) .btn-gradient:hover {
-  background-color: #FFFDF7 !important;
+  background-color: #FFFFFF !important;
   background-image: linear-gradient(
     135deg,
-    #FFFDF7 0%,
-    #FAF8F3 100%
+    #FFFFFF 0%,
+    #FAFAFA 100%
   ) !important;
-  color: #0A0A0A !important;
+  color: #050709 !important;
   box-shadow:
-    0 8px 22px -4px rgba(242, 240, 234, 0.15),
+    0 8px 22px -4px rgba(255, 255, 255, 0.12),
     inset 0 1px 0 0 rgba(255, 255, 255, 1) !important;
 }
 
 .dark .btn-gradient:active,
 :where(.dark) .btn-gradient:active {
-  background-color: #DDD9D0 !important;
+  background-color: #E4E4E7 !important;
   background-image: linear-gradient(
     135deg,
-    #E4E1D9 0%,
-    #DDD9D0 100%
+    #ECECEF 0%,
+    #E4E4E7 100%
   ) !important;
 }
 
