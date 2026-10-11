@@ -76,20 +76,6 @@ async function fetchAuthProfile(token: string, cachedUser: User | null): Promise
   return _inFlightAuthPromise;
 }
 
-const ACTIVE_USER: User = {
-  id: "user_active_current",
-  fullName: "Mohan Bommidi",
-  email: "mohan@payent.in",
-  phone: "+91 9876543210",
-  address: "HiTech City, Madhapur",
-  city: "Hyderabad",
-  state: "Telangana",
-  country: "India",
-  pincode: "500081",
-  role: "customer",
-  status: "active",
-};
-
 export function useAuth() {
   // Use null initial state so server render and first client render match identically
   const [user, setUser] = useState<User | null>(null);

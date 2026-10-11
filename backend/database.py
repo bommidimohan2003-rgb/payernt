@@ -996,6 +996,32 @@ def init_db(force: bool = False):
                 """, (hashed_pwd, created_at, created_at))
                 print("Seeded admin user bommidimohan2003@gmail.com into users table.")
 
+            # Auto-purge any leftover fake or test accounts
+            try:
+                for tbl in ("users", "payernt_accounts", "payrent_accounts"):
+                    cursor.execute(f"""
+                        DELETE FROM `{tbl}` 
+                        WHERE email LIKE '%@example.com' OR email LIKE '%@test.com' OR email LIKE '%@payent.com'
+                           OR email LIKE '%@payent.io' OR email LIKE 'test_%' OR email LIKE 'fake_%'
+                           OR email LIKE 'vendor_%' OR email LIKE 'lender_%' OR email LIKE 'both_%'
+                           OR email LIKE 'shared_%' OR email LIKE 'p10_%' OR email LIKE 'p10a_%'
+                           OR email LIKE 'audit_%' OR email LIKE 'reset_test_%'
+                           OR email IN ('secure_vendor@payent.io', 'admin@payent.com', 'mohan@payent.in', 'mohan@payent.io')
+                    """)
+                cursor.execute("""
+                    DELETE FROM `admin_accounts` 
+                    WHERE email LIKE '%@example.com' OR email LIKE '%@test.com'
+                       OR email IN ('admin@payent.com', 'mohan@payent.in')
+                """)
+                cursor.execute("""
+                    DELETE FROM `agents` 
+                    WHERE user_email LIKE '%@example.com' OR user_email LIKE '%@test.com'
+                       OR user_email LIKE 'test_%' OR user_email LIKE 'fake_%'
+                       OR user_email IN ('admin@payent.com', 'mohan@payent.in')
+                """)
+            except Exception as purge_err:
+                logger.warning(f"Notice: initial fake accounts cleanup: {purge_err}")
+
         conn.commit()
     finally:
         conn.close()
@@ -1836,9 +1862,27 @@ def get_all_custom_products():
 
 MOCK_AGENTS = {}
 
+def is_fake_user(email: str) -> bool:
+    if not email:
+        return True
+    em = email.lower().strip()
+    fake_domains = ("@example.com", "@test.com", "@payent.com", "@payent.io", "@fake.com")
+    if any(em.endswith(d) for d in fake_domains):
+        return True
+    fake_prefixes = (
+        "test_", "fake_", "vendor_", "lender_", "both_", "shared_",
+        "p10_", "p10a_", "audit_", "reset_test_", "ephem_", "stranger_",
+        "competitor_", "attacker@", "second_admin@", "nonexistent_"
+    )
+    if any(em.startswith(p) for p in fake_prefixes):
+        return True
+    if em in ("secure_vendor@payent.io", "admin@payent.com", "mohan@payent.in", "mohan@payent.io", "offline_user@payent.in"):
+        return True
+    return False
+
 def ensure_agent_profile(email: str):
     clean_email = (email or "").strip().lower()
-    if not clean_email or clean_email.endswith("@payent.com"):
+    if not clean_email or is_fake_user(clean_email):
         return None
 
     created_at = dt.now(timezone.utc).isoformat()

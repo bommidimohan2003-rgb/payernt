@@ -898,7 +898,7 @@ def create_product_endpoint(
     try:
         from main import create_notification
         create_notification(
-            email="admin@payent.com",
+            email="bommidimohan2003@gmail.com",
             title="New Listing Submitted for Review ⏳",
             message=f"New gear listing '{product.get('title')}' submitted by {account.get('name', 'Vendor')} is pending review.",
             notif_type="system"

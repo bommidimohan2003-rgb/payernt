@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { Table, Column } from "../components/layout/Table";
 import { Pagination } from "../components/layout/Pagination";
-import { usersService } from "../services/users";
+import { usersService, isFakeUserEmail } from "../services/users";
 import { AdminAgent } from "../services/api";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -85,7 +85,7 @@ export default function Agents() {
   };
 
   const filteredAgents = useMemo(() => {
-    let result = [...agents];
+    let result = agents.filter((a) => !isFakeUserEmail(a.email));
 
     if (search.trim()) {
       const q = search.toLowerCase();

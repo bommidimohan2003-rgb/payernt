@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import { Table, Column } from "../components/layout/Table";
 import { Pagination } from "../components/layout/Pagination";
-import { usersService } from "../services/users";
+import { usersService, isFakeUserEmail } from "../services/users";
 import { AdminUser } from "../services/api";
 import { Loader } from "../components/layout/Loader";
 import { toast } from "sonner";
@@ -234,7 +234,7 @@ export default function Users() {
   };
 
   const filteredUsers = useMemo(() => {
-    let result = [...users];
+    let result = users.filter((u) => !isFakeUserEmail(u.email));
 
     // Platform Tab filter
     if (platformTab === "payernt") {

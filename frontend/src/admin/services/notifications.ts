@@ -141,7 +141,7 @@ export const notificationsService = {
       websiteName: "Payent",
       logoUrl: "/brand/payent-logo-icon.png",
       theme: "dark",
-      contactEmail: "support@payent.com",
+      contactEmail: "support@payent.in",
       contactPhone: "+1 (800) 555-GEAR",
       socialFacebook: "https://facebook.com/payent",
       socialTwitter: "https://twitter.com/payent",

@@ -128,6 +128,7 @@ from database import (
     get_user_category_affinities,
     get_popular_search_queries,
     has_admin_user,
+    is_fake_user,
     MOCK_USERS,
     MOCK_CUSTOM_PRODUCTS,
     MOCK_ORDERS,
@@ -5650,19 +5651,27 @@ def admin_stats(current_admin: dict = Depends(check_admin_user)):
                     logger.warning(f"[admin_stats] query failed: {sql} error: {ex}")
                     return default
 
-            # User accounts across all 3 tables
-            payernt_cnt = int(safe_query("SELECT COUNT(*) as count FROM payernt_accounts", default=0))
-            payrent_cnt = int(safe_query("SELECT COUNT(*) as count FROM payrent_accounts", default=0))
-            admin_cnt = int(safe_query("SELECT COUNT(*) as count FROM admin_accounts", default=0))
-            distinct_users_cnt = int(safe_query("""
+            # User accounts across all 3 tables (excluding fake/test users)
+            _fake_filter = """
+                WHERE email NOT LIKE '%@example.com' AND email NOT LIKE '%@test.com' AND email NOT LIKE '%@payent.com'
+                  AND email NOT LIKE '%@payent.io' AND email NOT LIKE 'test_%' AND email NOT LIKE 'fake_%'
+                  AND email NOT LIKE 'vendor_%' AND email NOT LIKE 'lender_%' AND email NOT LIKE 'both_%'
+                  AND email NOT LIKE 'shared_%' AND email NOT LIKE 'p10_%' AND email NOT LIKE 'p10a_%'
+                  AND email NOT LIKE 'audit_%' AND email NOT LIKE 'reset_test_%'
+                  AND email NOT IN ('secure_vendor@payent.io', 'admin@payent.com', 'mohan@payent.in', 'mohan@payent.io')
+            """
+            payernt_cnt = int(safe_query(f"SELECT COUNT(*) as count FROM payernt_accounts {_fake_filter}", default=0))
+            payrent_cnt = int(safe_query(f"SELECT COUNT(*) as count FROM payrent_accounts {_fake_filter}", default=0))
+            admin_cnt = int(safe_query(f"SELECT COUNT(*) as count FROM admin_accounts {_fake_filter}", default=0))
+            distinct_users_cnt = int(safe_query(f"""
                 SELECT COUNT(DISTINCT email) as count FROM (
-                    SELECT email FROM users
+                    SELECT email FROM users {_fake_filter}
                     UNION
-                    SELECT email FROM payernt_accounts
+                    SELECT email FROM payernt_accounts {_fake_filter}
                     UNION
-                    SELECT email FROM payrent_accounts
+                    SELECT email FROM payrent_accounts {_fake_filter}
                     UNION
-                    SELECT email FROM admin_accounts
+                    SELECT email FROM admin_accounts {_fake_filter}
                 ) as combined_users
             """, default=0))
             
@@ -5670,7 +5679,12 @@ def admin_stats(current_admin: dict = Depends(check_admin_user)):
             stats_result["payrentAccounts"] = payrent_cnt
             stats_result["adminAccounts"] = admin_cnt
             stats_result["totalUsers"] = distinct_users_cnt
-            stats_result["totalAgents"] = int(safe_query("SELECT COUNT(*) as count FROM agents", default=0))
+            stats_result["totalAgents"] = int(safe_query(f"""
+                SELECT COUNT(*) as count FROM agents 
+                WHERE user_email NOT LIKE '%@example.com' AND user_email NOT LIKE '%@test.com'
+                  AND user_email NOT LIKE 'test_%' AND user_email NOT LIKE 'fake_%'
+                  AND user_email NOT IN ('admin@payent.com', 'mohan@payent.in')
+            """, default=0))
             
             # Products across payernt_products and custom_products
             pp_total = int(safe_query("SELECT COUNT(*) as count FROM payernt_products", default=0))
@@ -6088,6 +6102,8 @@ def admin_users_list(current_admin: dict = Depends(check_admin_user)):
                 cursor.execute("SELECT id, email, name, phone, address, pincode, status, aadhaar_number, rejection_reason, reviewed_by, reviewed_at, avatar, created_at FROM payernt_accounts ORDER BY created_at DESC")
                 for r in (cursor.fetchall() or []):
                     em = r["email"].lower().strip()
+                    if is_fake_user(em):
+                        continue
                     status_str = r.get("status") or "PENDING_REVIEW"
                     is_approved = status_str.upper() in ("APPROVED", "ACTIVE")
                     raw_aadh = r.get("aadhaar_number") or ""
@@ -6121,6 +6137,8 @@ def admin_users_list(current_admin: dict = Depends(check_admin_user)):
                     cursor.execute("SELECT email, full_name, phone, address, city, pincode, status, pan_number, rejection_reason, reviewed_by, reviewed_at, avatar, created_at FROM payrent_accounts ORDER BY created_at DESC")
                     for r in (cursor.fetchall() or []):
                         em = r["email"].lower().strip()
+                        if is_fake_user(em):
+                            continue
                         status_str = r.get("status") or "PENDING_REVIEW"
                         is_approved = status_str.upper() in ("APPROVED", "ACTIVE")
                         raw_pan = r.get("pan_number") or ""
@@ -6156,6 +6174,8 @@ def admin_users_list(current_admin: dict = Depends(check_admin_user)):
                     cursor.execute("SELECT email, full_name, phone, address, city, pincode, status, pan_number, aadhaar_number, rejection_reason, reviewed_by, reviewed_at, avatar, created_at, role, account_type, verified FROM users ORDER BY created_at DESC")
                     for r in (cursor.fetchall() or []):
                         em = r["email"].lower().strip()
+                        if is_fake_user(em):
+                            continue
                         role_str = (r.get("role") or "customer").lower()
                         if role_str in ("admin", "superadmin"):
                             continue
@@ -6198,6 +6218,8 @@ def admin_users_list(current_admin: dict = Depends(check_admin_user)):
                 cursor.execute("SELECT id, email, full_name, phone, address, city, pincode, status, verified, avatar, created_at FROM admin_accounts ORDER BY created_at DESC")
                 for r in (cursor.fetchall() or []):
                     em = r["email"].lower().strip()
+                    if is_fake_user(em):
+                        continue
                     users_by_id[f"admin_{em}"] = {
                         "id": em,
                         "accountId": r.get("id") or f"ADMIN_{em}",
@@ -6223,6 +6245,8 @@ def admin_users_list(current_admin: dict = Depends(check_admin_user)):
     # In-memory fallback if DB returned nothing or is offline
     if not users_by_id:
         for em, u in MOCK_USERS.items():
+            if is_fake_user(em):
+                continue
             role_str = (u.get("role") or "customer").lower()
             key = f"admin_{em}" if role_str in ("admin", "superadmin") else f"payrent_{em}"
             status_str = u.get("status") or ("active" if role_str in ("admin", "superadmin") else "PENDING_REVIEW")
@@ -6278,6 +6302,7 @@ def admin_payernt_users_list(current_admin: dict = Depends(check_admin_user)):
                     "createdAt": str(r.get("created_at") or "")
                 }
                 for r in rows
+                if not is_fake_user(r.get("email"))
             ]
     finally:
         conn.close()
@@ -6310,6 +6335,7 @@ def admin_payrent_users_list(current_admin: dict = Depends(check_admin_user)):
                     "createdAt": str(r.get("created_at") or "")
                 }
                 for r in rows
+                if not is_fake_user(r.get("email"))
             ]
     finally:
         conn.close()
@@ -7310,6 +7336,8 @@ def admin_agents_list(current_admin: dict = Depends(check_admin_user)):
             result = []
             for a in agents_rows:
                 email_key = a["user_email"].lower()
+                if is_fake_user(email_key):
+                    continue
                 prod_count = p_counts.get(email_key, 0)
                 order_info = o_stats.get(email_key, {"count": 0, "revenue": 0.0})
                 rating_val = r_stats.get(email_key, 4.8)

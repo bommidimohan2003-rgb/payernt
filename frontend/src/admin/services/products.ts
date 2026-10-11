@@ -56,13 +56,13 @@ const mapToAdminProduct = (p: any): AdminProduct => ({
   createdAt: p.createdAt || new Date().toISOString(),
   updatedAt: p.updatedAt,
   owner: {
-    id: p.ownerId || p.owner?.id || "user_001",
+    id: p.ownerId || p.owner?.id || "bommidimohan2003@gmail.com",
     name: p.owner?.name || p.owner?.fullName || p.verificationDocs?.ownerFullName || "Mohan Bommidi",
     avatar:
       p.owner?.avatar ||
       "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80",
     rating: 5.0,
-    email: p.owner?.email || p.verificationDocs?.ownerEmail || "mohan@payent.io",
+    email: p.owner?.email || p.verificationDocs?.ownerEmail || "bommidimohan2003@gmail.com",
     phone: p.owner?.phone || p.verificationDocs?.ownerPhone || "",
     city: p.location?.city || "",
     pincode: p.location?.pincode || "",

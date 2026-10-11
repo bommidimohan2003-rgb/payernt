@@ -266,7 +266,7 @@ export function Sidebar() {
                   {currentUser?.fullName || currentUser?.email?.split("@")[0] || "Administrator"}
                 </div>
                 <div className="text-[10px] text-muted-foreground font-mono truncate">
-                  {currentUser?.email || "admin@payent"}
+                  {currentUser?.email || "bommidimohan2003@gmail.com"}
                 </div>
               </div>
             </div>

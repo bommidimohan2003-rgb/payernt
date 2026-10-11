@@ -1,10 +1,27 @@
 import { adminApi, AdminUser, AdminAgent } from "./api";
 
+export const isFakeUserEmail = (email?: string): boolean => {
+  if (!email) return false;
+  const em = email.toLowerCase().trim();
+  const fakeDomains = ["@example.com", "@test.com", "@payent.com", "@payent.io", "@fake.com"];
+  if (fakeDomains.some((d) => em.endsWith(d))) return true;
+  const fakePrefixes = [
+    "test_", "fake_", "vendor_", "lender_", "both_", "shared_",
+    "p10_", "p10a_", "audit_", "reset_test_", "ephem_", "stranger_",
+    "competitor_", "attacker@", "second_admin@", "nonexistent_"
+  ];
+  if (fakePrefixes.some((p) => em.startsWith(p))) return true;
+  if (["secure_vendor@payent.io", "admin@payent.com", "mohan@payent.in", "mohan@payent.io", "offline_user@payent.in"].includes(em)) {
+    return true;
+  }
+  return false;
+};
+
 export const usersService = {
   async getUsers(): Promise<AdminUser[]> {
     const response = await adminApi.get("/users");
     if (response.data && Array.isArray(response.data)) {
-      return response.data;
+      return response.data.filter((u: AdminUser) => !isFakeUserEmail(u.email));
     }
     return [];
   },
@@ -56,7 +73,7 @@ export const usersService = {
   async getAgents(): Promise<AdminAgent[]> {
     const response = await adminApi.get("/agents");
     if (response.data && Array.isArray(response.data)) {
-      return response.data;
+      return response.data.filter((a: AdminAgent) => !isFakeUserEmail(a.email));
     }
     return [];
   },

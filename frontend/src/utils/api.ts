@@ -1791,7 +1791,7 @@ export const api = {
       const cached = _productCache.get(productId);
       const newItem: CartItem = {
         id: `offline_cart_${Date.now()}`,
-        user_email: "offline_user@payent.in",
+        user_email: "bommidimohan2003@gmail.com",
         product_id: productId,
         title: cached?.title || "Tech Gear",
         price: cached?.price || 1500,

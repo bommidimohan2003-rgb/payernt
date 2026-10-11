@@ -39,7 +39,7 @@ import {
 } from "../services/notifications";
 import { productsService } from "../services/products";
 import { bookingsService } from "../services/bookings";
-import { usersService } from "../services/users";
+import { usersService, isFakeUserEmail } from "../services/users";
 import { AdminProduct, AdminBooking, AdminUser, AdminSupportTicket } from "../services/api";
 import { authService } from "../services/auth";
 import { toast } from "sonner";
@@ -117,9 +117,7 @@ export default function Dashboard() {
       if (usersData.status === "fulfilled") {
         const unverified = usersData.value.filter(
           (u) =>
-            !u.email?.toLowerCase().endsWith("@example.com") &&
-            !u.email?.toLowerCase().endsWith("@test.com") &&
-            !u.email?.toLowerCase().includes("reset_test_") &&
+            !isFakeUserEmail(u.email) &&
             (String(u.status).toUpperCase() === "PENDING_REVIEW" ||
               String(u.status).toUpperCase() === "PENDING" ||
               String((u as any).verificationStatus).toUpperCase() === "PENDING" ||
