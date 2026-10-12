@@ -157,32 +157,32 @@ export function Sidebar() {
       {/* Main Workspace Navigation Rail */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 flex flex-col bg-[#0B1015] border-r border-[rgba(161,161,170,0.18)] transition-[width] duration-200 ease-out lg:sticky lg:top-0 lg:h-screen shrink-0 select-none",
+          "fixed inset-y-0 left-0 z-40 flex flex-col bg-[var(--admin-sidebar)] border-r border-[var(--admin-border)] transition-[width,background-color] duration-200 ease-out lg:sticky lg:top-0 lg:h-screen shrink-0 select-none",
           collapsed ? "w-[72px]" : "w-[260px]",
           mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         )}
       >
         {/* Workspace Brand Header */}
-        <div className="flex items-center justify-between px-4 h-16 border-b border-[rgba(161,161,170,0.18)] shrink-0">
+        <div className="flex items-center justify-between px-4 h-16 border-b border-[var(--admin-border)] shrink-0">
           <Link
             to="/admin/dashboard"
             onClick={() => setMobileOpen(false)}
             className="flex items-center gap-2.5 overflow-hidden group"
           >
-            <div className="h-7 w-7 rounded-md bg-white/10 border border-white/20 flex items-center justify-center shrink-0">
-              <span className="font-mono font-black text-xs text-[#F5F5F5]">P</span>
+            <div className="h-7 w-7 rounded-md bg-black/5 dark:bg-white/10 border border-[var(--admin-border)] flex items-center justify-center shrink-0">
+              <span className="font-mono font-black text-xs text-[var(--admin-text)]">P</span>
             </div>
             {!collapsed && (
               <div className="flex flex-col min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <span className="font-sans font-extrabold text-sm tracking-tight text-[#F5F5F5]">
+                  <span className="font-sans font-extrabold text-sm tracking-tight text-[var(--admin-text)]">
                     Payent
                   </span>
-                  <span className="text-[9px] font-mono uppercase tracking-widest text-zinc-300 font-bold bg-white/10 border border-white/15 px-1 py-0.2 rounded">
+                  <span className="text-[9px] font-mono uppercase tracking-widest text-[var(--admin-text-secondary)] font-bold bg-black/5 dark:bg-white/10 border border-[var(--admin-border)] px-1 py-0.2 rounded">
                     Admin
                   </span>
                 </div>
-                <span className="text-[10px] text-[#A1A1AA] font-medium truncate">
+                <span className="text-[10px] text-[var(--admin-text-secondary)] font-medium truncate">
                   Admin Portal
                 </span>
               </div>
@@ -192,7 +192,7 @@ export function Sidebar() {
           {/* Desktop Rail Collapse Toggle */}
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="hidden lg:flex p-1.5 rounded-md hover:bg-white/5 text-[#A1A1AA] hover:text-[#F5F5F5] transition-colors"
+            className="hidden lg:flex p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/5 text-[var(--admin-text-secondary)] hover:text-[var(--admin-text)] transition-colors"
             title={collapsed ? "Expand rail" : "Collapse rail"}
           >
             {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
@@ -204,7 +204,7 @@ export function Sidebar() {
           {menuItems.map((group) => (
             <div key={group.group} className="space-y-0.5">
               {!collapsed && (
-                <div className="px-2.5 pb-1 text-[10px] font-bold text-[#A1A1AA]/60 uppercase tracking-widest font-mono">
+                <div className="px-2.5 pb-1 text-[10px] font-bold text-[var(--admin-text-secondary)]/70 uppercase tracking-widest font-mono">
                   {group.group}
                 </div>
               )}
@@ -226,20 +226,20 @@ export function Sidebar() {
                     className={cn(
                       "group relative flex items-center gap-2.5 px-2.5 py-2 rounded-md text-xs font-medium transition-colors",
                       active
-                        ? "bg-white/10 text-[#F5F5F5] font-semibold before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-0.5 before:bg-[#F5F5F5] before:rounded-r"
-                        : "text-[#A1A1AA] hover:text-[#F5F5F5] hover:bg-white/[0.06]",
+                        ? "bg-black/5 dark:bg-white/10 text-[var(--admin-text)] font-semibold before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-0.5 before:bg-[var(--admin-text)] before:rounded-r"
+                        : "text-[var(--admin-text-secondary)] hover:text-[var(--admin-text)] hover:bg-black/5 dark:hover:bg-white/[0.06]",
                       collapsed && "justify-center px-0"
                     )}
                   >
                     <it.icon
                       className={cn(
                         "h-4 w-4 shrink-0 transition-colors",
-                        active ? "text-[#F5F5F5]" : "text-[#A1A1AA] group-hover:text-[#F5F5F5]"
+                        active ? "text-[var(--admin-text)]" : "text-[var(--admin-text-secondary)] group-hover:text-[var(--admin-text)]"
                       )}
                     />
                     {!collapsed && <span className="truncate">{it.label}</span>}
                     {!collapsed && badgeVal > 0 && (
-                      <span className="ml-auto shrink-0 flex items-center justify-center px-1.5 py-0.2 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30 text-[9px] font-mono font-bold">
+                      <span className="ml-auto shrink-0 flex items-center justify-center px-1.5 py-0.2 rounded-full bg-amber-500/15 text-amber-500 dark:text-amber-400 border border-amber-500/30 text-[9px] font-mono font-bold">
                         {badgeVal}
                       </span>
                     )}
@@ -254,17 +254,17 @@ export function Sidebar() {
         </nav>
 
         {/* User Identity & Logout Rail Footer */}
-        <div className="p-3 border-t border-[rgba(161,161,170,0.18)] shrink-0 space-y-2">
+        <div className="p-3 border-t border-[var(--admin-border)] shrink-0 space-y-2">
           {!collapsed && (
-            <div className="px-2 py-1.5 rounded-md bg-[#10151B] border border-[rgba(161,161,170,0.18)] flex items-center gap-2.5">
-              <div className="h-7 w-7 rounded-md bg-white text-black font-bold text-xs flex items-center justify-center shrink-0">
+            <div className="px-2 py-1.5 rounded-md bg-[var(--admin-elevated)] border border-[var(--admin-border)] flex items-center gap-2.5">
+              <div className="h-7 w-7 rounded-md bg-[var(--admin-text)] text-[var(--admin-bg)] font-bold text-xs flex items-center justify-center shrink-0">
                 {currentUser?.fullName?.[0]?.toUpperCase() || currentUser?.email?.[0]?.toUpperCase() || "A"}
               </div>
               <div className="min-w-0 flex-1">
-                <div className="text-xs font-semibold text-[#F5F5F5] truncate">
+                <div className="text-xs font-semibold text-[var(--admin-text)] truncate">
                   {currentUser?.fullName || currentUser?.email?.split("@")[0] || "Administrator"}
                 </div>
-                <div className="text-[10px] text-[#A1A1AA] font-mono truncate">
+                <div className="text-[10px] text-[var(--admin-text-secondary)] font-mono truncate">
                   {currentUser?.email || "admin@payent.in"}
                 </div>
               </div>

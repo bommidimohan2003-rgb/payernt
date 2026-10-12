@@ -58,13 +58,13 @@ export function Topbar() {
   }, []);
 
   return (
-    <header className="sticky top-0 z-30 flex items-center justify-between px-6 md:px-8 h-16 bg-[#050709]/95 border-b border-[rgba(161,161,170,0.18)] backdrop-blur-md">
+    <header className="sticky top-0 z-30 flex items-center justify-between px-6 md:px-8 h-16 bg-[var(--admin-bg)]/95 border-b border-[var(--admin-border)] backdrop-blur-md transition-colors duration-200">
       {/* Left side: Current page title & contextual subtitle */}
       <div className="flex flex-col justify-center min-w-0 pr-4">
-        <h1 className="text-base font-semibold tracking-tight text-[#F5F5F5] truncate">
+        <h1 className="text-base font-semibold tracking-tight text-[var(--admin-text)] truncate">
           {currentMeta.title}
         </h1>
-        <p className="text-[11px] text-[#A1A1AA] truncate hidden sm:block">
+        <p className="text-[11px] text-[var(--admin-text-secondary)] truncate hidden sm:block">
           {currentMeta.subtitle}
         </p>
       </div>
@@ -87,7 +87,7 @@ export function Topbar() {
               Connecting...
             </span>
           ) : (
-            <span className="px-2.5 py-1 text-[11px] font-medium rounded-full bg-white/5 text-[#A1A1AA] border border-white/10 flex items-center gap-1.5">
+            <span className="px-2.5 py-1 text-[11px] font-medium rounded-full bg-black/5 dark:bg-white/5 text-[var(--admin-text-secondary)] border border-[var(--admin-border)] flex items-center gap-1.5">
               <span className="h-1.5 w-1.5 rounded-full bg-zinc-500"></span>
               Online
             </span>
@@ -100,7 +100,7 @@ export function Topbar() {
         {/* Theme Toggle */}
         <button
           onClick={toggle}
-          className="p-2 rounded-lg text-[#A1A1AA] hover:text-[#F5F5F5] hover:bg-white/5 border border-transparent hover:border-white/10 transition-all cursor-pointer"
+          className="p-2 rounded-lg text-[var(--admin-text-secondary)] hover:text-[var(--admin-text)] hover:bg-black/5 dark:hover:bg-white/5 border border-transparent hover:border-[var(--admin-border)] transition-all cursor-pointer"
           title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
           aria-label="Toggle theme"
         >
@@ -115,7 +115,7 @@ export function Topbar() {
         <NotificationDropdown />
 
         {/* Subtle Divider */}
-        <div className="h-5 w-[1px] bg-[rgba(161,161,170,0.18)] shrink-0" />
+        <div className="h-5 w-[1px] bg-[var(--admin-border)] shrink-0" />
 
         {/* Admin Profile */}
         <ProfileDropdown />

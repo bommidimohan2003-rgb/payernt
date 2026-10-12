@@ -334,12 +334,12 @@ export default function Bookings() {
   return (
     <div className="space-y-6">
       {/* HEADER */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-border/50">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-[var(--admin-border)]">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#F5F5F5]">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--admin-text)]">
             Bookings
           </h1>
-          <p className="text-xs text-[#A1A1AA] mt-0.5 font-medium">
+          <p className="text-xs text-[var(--admin-text-secondary)] mt-0.5 font-medium">
             Track and manage all rental bookings.
           </p>
         </div>
@@ -347,15 +347,15 @@ export default function Bookings() {
         <button
           onClick={() => fetchBookings()}
           disabled={loading}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[rgba(161,161,170,0.18)] bg-[#10151B] hover:bg-[#171C23] text-[#F5F5F5] text-xs font-medium transition-colors cursor-pointer self-start sm:self-auto"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card)] hover:bg-[var(--admin-elevated)] text-[var(--admin-text)] text-xs font-medium transition-colors cursor-pointer self-start sm:self-auto"
         >
-          <RefreshCw className={cn("h-3.5 w-3.5 text-[#A1A1AA]", loading && "animate-spin")} />
+          <RefreshCw className={cn("h-3.5 w-3.5 text-[var(--admin-text-secondary)]", loading && "animate-spin")} />
           <span>Refresh</span>
         </button>
       </div>
 
       {/* TABS WITH COUNTERS */}
-      <div className="flex items-center gap-2 border-b border-[rgba(161,161,170,0.18)] pb-2 overflow-x-auto no-scrollbar">
+      <div className="flex items-center gap-2 border-b border-[var(--admin-border)] pb-2 overflow-x-auto no-scrollbar">
         {[
           { id: "all", label: "All", count: tabCounts.all },
           { id: "pending", label: "Pending", count: tabCounts.pending },
@@ -372,15 +372,17 @@ export default function Bookings() {
             className={cn(
               "px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer flex items-center gap-2",
               statusFilter === tab.id
-                ? "bg-white text-black font-semibold shadow-xs"
-                : "text-[#A1A1AA] hover:text-[#F5F5F5] hover:bg-white/5 border border-transparent"
+                ? "bg-[var(--admin-text)] text-[var(--admin-bg)] font-semibold shadow-xs"
+                : "text-[var(--admin-text-secondary)] hover:text-[var(--admin-text)] hover:bg-black/5 dark:hover:bg-white/5 border border-transparent"
             )}
           >
             <span>{tab.label}</span>
             <span
               className={cn(
                 "px-1.5 py-0.2 rounded-full text-[10px] font-mono",
-                statusFilter === tab.id ? "bg-black/15 text-black font-bold" : "bg-white/10 text-[#A1A1AA]"
+                statusFilter === tab.id
+                  ? "bg-black/15 text-black dark:text-black font-bold"
+                  : "bg-black/5 dark:bg-white/10 text-[var(--admin-text-secondary)]"
               )}
             >
               {tab.count}
@@ -390,9 +392,9 @@ export default function Bookings() {
       </div>
 
       {/* FILTERS & SEARCH */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-[#10151B] p-3 rounded-xl border border-[rgba(161,161,170,0.18)]">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-[var(--admin-card)] p-3 rounded-xl border border-[var(--admin-border)]">
         <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#A1A1AA]" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--admin-text-secondary)]" />
           <input
             type="text"
             placeholder="Search by order ID, user or product..."
@@ -401,7 +403,7 @@ export default function Bookings() {
               setSearch(e.target.value);
               setCurrentPage(1);
             }}
-            className="w-full bg-[#050709] text-[#F5F5F5] text-xs rounded-lg pl-9 pr-3 py-2 border border-[rgba(161,161,170,0.18)] focus:outline-none focus:border-white/40 font-medium placeholder:text-[#A1A1AA]"
+            className="w-full bg-[var(--admin-elevated)] text-[var(--admin-text)] text-xs rounded-lg pl-9 pr-3 py-2 border border-[var(--admin-border)] focus:outline-none focus:border-[var(--admin-text)] font-medium placeholder:text-[var(--admin-text-secondary)]"
           />
         </div>
 
@@ -412,7 +414,7 @@ export default function Bookings() {
               setStatusFilter(e.target.value);
               setCurrentPage(1);
             }}
-            className="bg-[#050709] text-[#F5F5F5] text-xs rounded-lg px-2.5 py-2 border border-[rgba(161,161,170,0.18)] focus:outline-none font-medium cursor-pointer"
+            className="bg-[var(--admin-elevated)] text-[var(--admin-text)] text-xs rounded-lg px-2.5 py-2 border border-[var(--admin-border)] focus:outline-none font-medium cursor-pointer"
           >
             <option value="all">All Status</option>
             <option value="pending">Pending</option>
@@ -420,25 +422,20 @@ export default function Bookings() {
             <option value="completed">Completed</option>
             <option value="cancelled">Cancelled</option>
           </select>
-
-          <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] text-xs text-[#A1A1AA] font-mono">
-            <Calendar className="h-3.5 w-3.5 text-white" />
-            <span>Oct 1, 2026 - Oct 31, 2026</span>
-          </div>
         </div>
       </div>
 
       {/* ERROR STATE */}
       {error && !loading && bookings.length === 0 ? (
-        <div className="bg-[#10151B] rounded-2xl border border-red-500/20 p-12 text-center flex flex-col items-center justify-center">
+        <div className="bg-[var(--admin-card)] rounded-2xl border border-red-500/20 p-12 text-center flex flex-col items-center justify-center">
           <div className="w-12 h-12 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center mb-3">
             <ShieldAlert className="h-6 w-6" />
           </div>
-          <h3 className="text-base font-bold text-[#F5F5F5]">Database Sync Failed</h3>
-          <p className="text-xs text-[#A1A1AA] mt-1 max-w-sm">{error}</p>
+          <h3 className="text-base font-bold text-[var(--admin-text)]">Database Sync Failed</h3>
+          <p className="text-xs text-[var(--admin-text-secondary)] mt-1 max-w-sm">{error}</p>
           <button
             onClick={() => fetchBookings()}
-            className="mt-4 px-4 py-2 rounded-xl bg-[#171C23] hover:bg-[#171C23]/80 text-[#F5F5F5] text-xs font-bold transition-all border border-[rgba(161,161,170,0.18)] cursor-pointer"
+            className="mt-4 px-4 py-2 rounded-xl bg-[var(--admin-elevated)] hover:opacity-80 text-[var(--admin-text)] text-xs font-bold transition-all border border-[var(--admin-border)] cursor-pointer"
           >
             Retry Database Fetch
           </button>

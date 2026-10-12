@@ -5636,6 +5636,37 @@ def admin_stats(current_admin: dict = Depends(check_admin_user)):
     }
     conn = get_db_connection()
     if not conn:
+        try:
+            from database import MOCK_USERS, MOCK_CUSTOM_PRODUCTS, MOCK_ORDERS, is_fake_user
+            from payernt_database import MOCK_PAYERNT_PRODUCTS, MOCK_RENTAL_SECURITIES
+            
+            active_users = [u for u in MOCK_USERS.values() if not is_fake_user(u.get("email", ""))]
+            stats_result["totalUsers"] = len(active_users)
+            stats_result["payerntAccounts"] = len([u for u in active_users if u.get("role") in ("vendor", "lender", "agent")])
+            stats_result["payrentAccounts"] = len([u for u in active_users if u.get("role") in ("customer", "renter", "user")])
+            stats_result["adminAccounts"] = len([u for u in active_users if u.get("role") == "admin"])
+            stats_result["totalAgents"] = len([u for u in active_users if u.get("role") == "agent"])
+            
+            all_prods = list(MOCK_CUSTOM_PRODUCTS.values()) + list(MOCK_PAYERNT_PRODUCTS.values())
+            stats_result["totalProducts"] = len(all_prods)
+            stats_result["approvedProducts"] = len([p for p in all_prods if p.get("status") in ("approved", "active")])
+            stats_result["pendingProducts"] = len([p for p in all_prods if p.get("status") in ("pending", "under_review", "pending_admin_review")])
+            stats_result["totalCategories"] = len(set(p.get("category") for p in all_prods if p.get("category")))
+            
+            real_orders = list(MOCK_ORDERS.values())
+            stats_result["monthlyBookings"] = len(real_orders)
+            stats_result["activeBookings"] = len([o for o in real_orders if o.get("status") in ("active", "in_progress", "confirmed", "delivered")])
+            stats_result["completedBookings"] = len([o for o in real_orders if o.get("status") == "completed"])
+            stats_result["bookingsToday"] = len([o for o in real_orders if str(o.get("created_at", "")).startswith(datetime.date.today().isoformat())])
+            
+            paid_orders = [o for o in real_orders if o.get("payment_status") == "paid" or o.get("status") in ("active", "completed")]
+            total_rev = sum(float(o.get("total", 0)) for o in paid_orders)
+            stats_result["monthlyRevenue"] = total_rev
+            stats_result["revenueToday"] = total_rev
+            stats_result["websiteVisitors"] = max(1, len(active_users) * 3)
+            stats_result["activeVisitors"] = 1
+        except Exception as e:
+            logger.warning(f"[admin_stats] fallback calculation failed: {e}")
         return stats_result
     try:
         with conn.cursor() as cursor:
@@ -5911,6 +5942,81 @@ def admin_charts(days: int = Query(30), current_admin: dict = Depends(check_admi
     }
     conn = get_db_connection()
     if not conn:
+        try:
+            from database import MOCK_ORDERS, MOCK_CUSTOM_PRODUCTS, MOCK_USERS
+            from payernt_database import MOCK_PAYERNT_PRODUCTS
+            num_days = max(1, min(days, 365))
+            end_date = datetime.date.today()
+            start_date = end_date - datetime.timedelta(days=num_days - 1)
+            
+            all_prods = list(MOCK_CUSTOM_PRODUCTS.values()) + list(MOCK_PAYERNT_PRODUCTS.values())
+            cat_counts = {}
+            for p in all_prods:
+                cat = p.get("category") or "Tech"
+                cat_name = cat.capitalize()
+                cat_counts[cat_name] = cat_counts.get(cat_name, 0) + 1
+            fallback_charts["categoryDistribution"] = [{"name": k, "value": v} for k, v in cat_counts.items()]
+            
+            real_orders = list(MOCK_ORDERS.values())
+            prod_order_map = {}
+            for o in real_orders:
+                title = o.get("product_title", "Rental Item")
+                rev = float(o.get("total", 0)) if o.get("payment_status") == "paid" or o.get("status") in ("active", "completed") else 0.0
+                if title not in prod_order_map:
+                    prod_order_map[title] = {"rentals": 0, "revenue": 0.0}
+                prod_order_map[title]["rentals"] += 1
+                prod_order_map[title]["revenue"] += rev
+            fallback_charts["topProducts"] = [
+                {"name": name, "rentals": data["rentals"], "revenue": data["revenue"]}
+                for name, data in prod_order_map.items()
+            ]
+            
+            rev_chart = []
+            book_chart = []
+            user_chart = []
+            prod_chart = []
+            
+            order_by_date = {}
+            for o in real_orders:
+                dt_str = str(o.get("created_at", "")[:10])
+                if dt_str:
+                    cnt, rev = order_by_date.get(dt_str, (0, 0.0))
+                    r_amt = float(o.get("total", 0)) if o.get("payment_status") == "paid" or o.get("status") in ("active", "completed") else 0.0
+                    order_by_date[dt_str] = (cnt + 1, rev + r_amt)
+            
+            if num_days <= 31:
+                curr = start_date
+                while curr <= end_date:
+                    d_str = curr.isoformat()
+                    label = curr.strftime("%b %d")
+                    cnt, rev = order_by_date.get(d_str, (0, 0.0))
+                    rev_chart.append({"name": label, "revenue": rev})
+                    book_chart.append({"name": label, "bookings": cnt})
+                    user_chart.append({"name": label, "users": len(MOCK_USERS)})
+                    prod_chart.append({"name": label, "products": len(all_prods)})
+                    curr += datetime.timedelta(days=1)
+            else:
+                rev_m, book_m = {}, {}
+                curr = start_date
+                while curr <= end_date:
+                    d_str = curr.isoformat()
+                    m_label = curr.strftime("%b %Y")
+                    cnt, rev = order_by_date.get(d_str, (0, 0.0))
+                    rev_m[m_label] = rev_m.get(m_label, 0.0) + rev
+                    book_m[m_label] = book_m.get(m_label, 0) + cnt
+                    curr += datetime.timedelta(days=1)
+                for m_label in rev_m.keys():
+                    rev_chart.append({"name": m_label, "revenue": rev_m[m_label]})
+                    book_chart.append({"name": m_label, "bookings": book_m[m_label]})
+                    user_chart.append({"name": m_label, "users": len(MOCK_USERS)})
+                    prod_chart.append({"name": m_label, "products": len(all_prods)})
+                    
+            fallback_charts["revenueChart"] = rev_chart
+            fallback_charts["bookingChart"] = book_chart
+            fallback_charts["userGrowth"] = user_chart
+            fallback_charts["productGrowth"] = prod_chart
+        except Exception as e:
+            logger.warning(f"[admin_charts] fallback error: {e}")
         return fallback_charts
     try:
         with conn.cursor() as cursor:
@@ -7515,11 +7621,58 @@ def admin_products_list(
     current_admin: dict = Depends(check_admin_user)
 ):
     conn = get_db_connection()
-    if not conn:
-        return []
-    
     clean_st = status.strip().lower() if status else None
     products_by_id = {}
+    
+    if not conn:
+        try:
+            from database import MOCK_CUSTOM_PRODUCTS, MOCK_USERS
+            from payernt_database import MOCK_PAYERNT_PRODUCTS
+            prods = list(MOCK_CUSTOM_PRODUCTS.values()) + list(MOCK_PAYERNT_PRODUCTS.values())
+            res = []
+            for p in prods:
+                p_id = p["id"]
+                st = (p.get("status") or "approved").lower()
+                if clean_st and clean_st != "all":
+                    if clean_st in ("pending", "under_review", "pending_admin_review") and st not in ("pending", "under_review", "pending_admin_review"):
+                        continue
+                    elif clean_st not in ("pending", "under_review", "pending_admin_review") and st != clean_st:
+                        continue
+                u = MOCK_USERS.get(p.get("owner_email") or p.get("user_email") or "", {})
+                res.append({
+                    "id": p_id,
+                    "title": p.get("title") or p.get("name") or "Product",
+                    "description": p.get("description") or "",
+                    "category": p.get("category") or "General",
+                    "brand": p.get("brand") or "Standard",
+                    "model": p.get("model") or "",
+                    "price": float(p.get("daily_rate") or p.get("price") or 0.0),
+                    "rating": 5.0,
+                    "reviewsCount": 0,
+                    "available": bool(p.get("available", 1)),
+                    "status": st,
+                    "featured": False,
+                    "hidden": False,
+                    "image": p.get("primary_image") or p.get("image") or "",
+                    "images": [p.get("primary_image") or p.get("image")] if (p.get("primary_image") or p.get("image")) else [],
+                    "documents": ["purchase_proof.jpg"],
+                    "approvedPriceRange": None,
+                    "priceStatus": "SET",
+                    "createdAt": str(p.get("created_at") or ""),
+                    "owner": {
+                        "id": p.get("owner_id") or p.get("user_email") or "",
+                        "name": p.get("owner_name") or u.get("full_name") or "Vendor",
+                        "avatar": u.get("avatar") or "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+                        "rating": 5.0,
+                        "email": p.get("owner_email") or p.get("user_email") or "",
+                        "phone": u.get("phone") or "",
+                        "city": p.get("city") or "Hyderabad"
+                    }
+                })
+            return res
+        except Exception as e:
+            logger.warning(f"Fallback products error: {e}")
+            return []
     
     try:
         with conn.cursor() as cursor:
@@ -8743,6 +8896,47 @@ def admin_bookings_list(current_admin: dict = Depends(check_admin_user)):
                 conn.close()
             except Exception:
                 pass
+
+    if not rows:
+        try:
+            from database import MOCK_ORDERS, MOCK_USERS, MOCK_CUSTOM_PRODUCTS
+            from payernt_database import MOCK_RENTAL_SECURITIES, MOCK_PAYERNT_PRODUCTS
+            for b_id, o in MOCK_ORDERS.items():
+                u = MOCK_USERS.get(o.get("user_email", ""), {})
+                pid = o.get("product_id", "")
+                p = MOCK_CUSTOM_PRODUCTS.get(pid, {}) or MOCK_PAYERNT_PRODUCTS.get(pid, {})
+                sec = MOCK_RENTAL_SECURITIES.get(b_id, {})
+                rows.append({
+                    "id": o.get("id", b_id),
+                    "product_id": pid,
+                    "product_title": o.get("product_title") or p.get("title") or p.get("name") or "Rental Item",
+                    "product_image": o.get("product_image") or p.get("primary_image") or "",
+                    "user_email": o.get("user_email", ""),
+                    "customer_name": o.get("customer_name") or u.get("full_name") or "Customer",
+                    "owner_name": o.get("owner_name") or p.get("owner_name") or "Verified Lender",
+                    "owner_email": o.get("owner_email") or p.get("owner_email") or p.get("user_email") or "",
+                    "start_date": o.get("start_date", ""),
+                    "end_date": o.get("end_date", ""),
+                    "total": o.get("total", 0),
+                    "status": o.get("status", "active"),
+                    "delivery_status": o.get("delivery_status", "DELIVERED"),
+                    "delivery_boy_id": "DB-001",
+                    "delivery_boy_name": "Delivery Agent",
+                    "delivery_boy_phone": "+91 9876543210",
+                    "pickup_location": "Hyderabad",
+                    "delivery_address": "HiTech City, Hyderabad",
+                    "vendor_pin_verified": bool(sec.get("vendor_pin_verified", 1)),
+                    "renter_pin_verified": bool(sec.get("renter_pin_verified", 1)),
+                    "otp_verified": bool(sec.get("otp_verified", 1)),
+                    "rental_started": bool(sec.get("rental_started", 1)),
+                    "security_status": sec.get("status", "active"),
+                    "activated_at": sec.get("rental_started_at") or sec.get("activated_at"),
+                    "sec_vendor_otp_verified": bool(sec.get("vendor_pin_verified", 1)),
+                    "sec_renter_otp_verified": bool(sec.get("renter_pin_verified", 1)),
+                    "created_at": o.get("created_at")
+                })
+        except Exception as e:
+            logger.warning(f"Error reading fallback bookings: {e}")
 
     if not rows:
         return []

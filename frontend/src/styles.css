@@ -26,6 +26,13 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-admin-bg: var(--admin-bg);
+  --color-admin-sidebar: var(--admin-sidebar);
+  --color-admin-card: var(--admin-card);
+  --color-admin-elevated: var(--admin-elevated);
+  --color-admin-text: var(--admin-text);
+  --color-admin-secondary: var(--admin-text-secondary);
+  --color-admin-border: var(--admin-border);
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Outfit", "Inter", sans-serif;
 }
@@ -96,6 +103,15 @@ html, body {
   --payent-border: rgba(0, 0, 0, 0.08);
   --payent-text-secondary: #64748b;
   --payent-text-muted: #94a3b8;
+
+  /* Admin Design System Tokens - Light Theme */
+  --admin-bg: #F5F6F8;
+  --admin-sidebar: #FFFFFF;
+  --admin-card: #FFFFFF;
+  --admin-elevated: #ECEFF3;
+  --admin-text: #17191D;
+  --admin-text-secondary: #626873;
+  --admin-border: rgba(0, 0, 0, 0.10);
 }
 
 .dark {
@@ -171,6 +187,15 @@ html, body {
   --payent-text-secondary: #A1A1AA;
   --payent-text-muted: #71717A;
 
+  /* Admin Design System Tokens - Dark Theme */
+  --admin-bg: #050709;
+  --admin-sidebar: #0B1015;
+  --admin-card: #10151B;
+  --admin-elevated: #171C23;
+  --admin-text: #F5F5F5;
+  --admin-text-secondary: #A1A1AA;
+  --admin-border: rgba(161, 161, 170, 0.18);
+
   /* Dark Mode Spatial Elevation Tokens */
   --elevation-1-shadow: 0 2px 10px -2px rgba(0, 0, 0, 0.8);
   --elevation-2-shadow:
@@ -183,6 +208,39 @@ html, body {
     inset 0 1px 0 0 rgba(255, 255, 255, 0.08),
     inset 0 -1px 0 0 rgba(0, 0, 0, 0.8);
 }
+
+/* Payent Admin Light Mode Mapping: Automatically adapts all admin hex utilities to light design tokens */
+html:not(.dark) .bg-\[\#050709\] {
+  background-color: var(--admin-bg) !important;
+}
+html:not(.dark) .bg-\[\#0B1015\] {
+  background-color: var(--admin-sidebar) !important;
+}
+html:not(.dark) .bg-\[\#10151B\] {
+  background-color: var(--admin-card) !important;
+}
+html:not(.dark) .bg-\[\#171C23\] {
+  background-color: var(--admin-elevated) !important;
+}
+html:not(.dark) .text-\[\#F5F5F5\] {
+  color: var(--admin-text) !important;
+}
+html:not(.dark) .text-\[\#A1A1AA\] {
+  color: var(--admin-text-secondary) !important;
+}
+html:not(.dark) .border-\[rgba\(161\,161\,170\,0\.18\)\] {
+  border-color: var(--admin-border) !important;
+}
+html:not(.dark) .hover\:bg-\[\#171C23\]:hover {
+  background-color: var(--admin-elevated) !important;
+}
+html:not(.dark) .hover\:text-\[\#F5F5F5\]:hover {
+  color: var(--admin-text) !important;
+}
+html:not(.dark) .placeholder\:text-\[\#A1A1AA\]::placeholder {
+  color: var(--admin-text-secondary) !important;
+}
+
 
 @layer base {
   * {
