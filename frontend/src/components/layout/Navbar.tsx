@@ -5,7 +5,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 import { cn } from "@/lib/utils";
 import { LogoIcon } from "@/components/common/LogoIcon";
-import { useOriginReveal } from "@/components/navigation/OriginRevealTransition";
 import { useLanguage } from "@/i18n";
 
 export function Navbar() {
@@ -15,7 +14,6 @@ export function Navbar() {
   const { theme, toggle } = useTheme();
   const { tCommon } = useLanguage();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const { triggerOriginTransition, registerOriginRef } = useOriginReveal();
 
   useEffect(() => {
     setMounted(true);
@@ -27,15 +25,6 @@ export function Navbar() {
 
   const isButton2Home = pathname === "/payant" || pathname === "/payent" || pathname === "/payent/";
   const isHome = pathname === "/" || isButton2Home;
-
-  const handleThemeClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-    triggerOriginTransition("theme", e.currentTarget);
-    toggle();
-  };
-
-  const handleLogoClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    triggerOriginTransition(isButton2Home ? "gateway" : "home", e.currentTarget);
-  };
 
   return (
     <>
@@ -55,8 +44,6 @@ export function Navbar() {
           <div className="flex items-center gap-3">
             <Link
               to={isButton2Home ? "/" : "/payant"}
-              ref={(el) => registerOriginRef("home-logo", el as HTMLElement | null)}
-              onClick={handleLogoClick}
               className="flex items-center gap-3 shrink-0 focus:outline-none group select-none py-1 transition-transform active:scale-96 cursor-pointer"
               id="nav-logo"
               aria-label={isButton2Home ? "Return to Gateway (Choose Experience)" : "Payent Home"}
@@ -71,9 +58,8 @@ export function Navbar() {
             {/* Theme Toggle Button matching Dock Container Icon Style */}
             {mounted && (
               <button
-                ref={(el) => registerOriginRef("theme", el)}
                 type="button"
-                onClick={handleThemeClick}
+                onClick={toggle}
                 aria-label="Toggle Color Theme"
                 title={theme === "dark" ? tCommon.switchToLight : tCommon.switchToDark}
                 className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10 text-neutral-700 hover:text-neutral-950 dark:text-neutral-300 dark:hover:text-white border border-black/5 dark:border-white/10 flex items-center justify-center transition-all cursor-pointer shrink-0 active:scale-96"
@@ -100,8 +86,6 @@ export function Navbar() {
                 )}
                 <Link
                   to={user.role === "admin" || user.role === "superadmin" ? "/admin/dashboard" : "/profile"}
-                  ref={(el) => registerOriginRef("profile", el as HTMLElement | null)}
-                  onClick={(e) => triggerOriginTransition("profile", e.currentTarget)}
                   id="nav-profile-avatar"
                   className="flex items-center gap-2 p-1.5 pl-2 pr-3 sm:pr-4 rounded-xl border border-black/10 dark:border-white/15 bg-white/80 dark:bg-[#0D151D]/80 hover:border-black/20 dark:hover:border-white/30 shadow-xs hover:shadow-sm transition-all active:scale-96"
                 >
@@ -124,8 +108,6 @@ export function Navbar() {
                 <Link
                   to="/login"
                   id="nav-login-btn"
-                  ref={(el) => registerOriginRef("login", el as HTMLElement | null)}
-                  onClick={(e) => triggerOriginTransition("login", e.currentTarget)}
                   className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white rounded-xl hover:bg-black/5 dark:hover:bg-white/10 transition-all cursor-pointer active:scale-96"
                 >
                   {tCommon.login}
@@ -134,8 +116,6 @@ export function Navbar() {
                 <Link
                   to="/register"
                   id="nav-signup-btn"
-                  ref={(el) => registerOriginRef("register", el as HTMLElement | null)}
-                  onClick={(e) => triggerOriginTransition("register", e.currentTarget)}
                   className="inline-flex items-center gap-1.5 px-3.5 sm:px-5 py-2 text-xs sm:text-sm font-bold text-white bg-neutral-950 hover:bg-neutral-800 dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-100 rounded-xl shadow-xs hover:shadow active:scale-96 transition-all cursor-pointer"
                 >
                   <span>{tCommon.signup}</span>

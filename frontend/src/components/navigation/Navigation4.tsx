@@ -17,7 +17,6 @@ import {
   CircleHelp,
 } from "lucide-react";
 import { useCart } from "@/hooks/useCart";
-import { useOriginReveal } from "./OriginRevealTransition";
 import { useLanguage } from "@/i18n";
 
 export interface Navigation4Item {
@@ -50,14 +49,6 @@ function Nav4DockItem({
 }: Navigation4ItemProps) {
   const ref = useRef<HTMLButtonElement>(null);
   const [isHovered, setIsHovered] = useState(false);
-  const { triggerOriginTransition, registerOriginRef } = useOriginReveal();
-
-  useEffect(() => {
-    if (ref.current) {
-      registerOriginRef(item.id, ref.current);
-    }
-    return () => registerOriginRef(item.id, null);
-  }, [item.id, registerOriginRef]);
 
   const mouseDistance = useTransform(mouseX, (val: number) => {
     const rect = ref.current?.getBoundingClientRect() ?? {
@@ -74,10 +65,7 @@ function Nav4DockItem({
   );
   const size = useSpring(targetSize, spring);
 
-  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-    if (ref.current) {
-      triggerOriginTransition(item.id, ref.current);
-    }
+  const handleClick = (_e: React.MouseEvent<HTMLButtonElement>) => {
     item.onClick?.();
   };
 

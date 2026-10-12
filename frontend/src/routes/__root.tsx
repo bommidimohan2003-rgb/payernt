@@ -161,11 +161,6 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
-import {
-  OriginRevealProvider,
-  OriginRevealPageTransition,
-} from "@/components/navigation/OriginRevealTransition";
-
 function RootContent() {
   const [showChatbot, setShowChatbot] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -187,14 +182,7 @@ function RootContent() {
     <>
       <AppPreloader />
       {!hideMainNavigation && <Navigation4 />}
-      {/* Origin-Based Expanding Reveal Page Transition */}
-      {isPayernt ? (
-        <Outlet />
-      ) : (
-        <OriginRevealPageTransition>
-          <Outlet />
-        </OriginRevealPageTransition>
-      )}
+      <Outlet />
 
       {!isGateway && !isPayernt && <CartDrawer />}
       {showChatbot && !isGateway && !isPayernt && <HelpChatbot />}
@@ -310,9 +298,7 @@ function RootComponent() {
       <MotionConfig reducedMotion="user">
         <LanguageProvider>
           <CartProvider>
-            <OriginRevealProvider>
-              <RootContent />
-            </OriginRevealProvider>
+            <RootContent />
           </CartProvider>
         </LanguageProvider>
       </MotionConfig>

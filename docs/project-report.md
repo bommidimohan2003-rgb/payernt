@@ -69,7 +69,7 @@ The app uses two main layouts:
 - `src/layouts/DashboardLayout.tsx` provides the authenticated dashboard shell with the navbar and sidebar.
 - `src/components/auth/AuthLayout.tsx` is used for auth-facing screens.
 
-Page transitions are driven by the **Origin-Based Expanding Reveal Transition** engine (`src/components/navigation/OriginRevealTransition.tsx`). This system dynamically captures the originating element's bounding box (`getBoundingClientRect()`), animates a soft organic SVG expansion with an ambient luminous glass leading edge, progressively unveils destination content with subtle settle physics (`cubic-bezier(0.16, 1, 0.3, 1)`), and cleans up all mask/filter layers upon completion for unhindered scrolling and zero residual DOM artifacts.
+Page transitions are direct standard route transitions without artificial delay or origin-reveal animation overlays. The legacy `OriginRevealTransition` engine has been removed across all pages for instant navigation.
 
 Protected routes are wrapped by `src/components/common/ProtectedRoute.tsx`. The auth state is managed by `useAuth`, wishlist state by `useWishlist`, and theme state by `useTheme`. These hooks read and write browser storage under keys such as `payent:token`, `payent:currentUser`, `payent:wishlist`, `payent:theme`, and the admin-specific `payent:admin:*` values.
 

@@ -8,7 +8,6 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import type { LenderNotification, DemoUser, PayerntAccount } from "../types";
 import { useTheme } from "@/hooks/useTheme";
-import { useOriginReveal } from "@/components/navigation/OriginRevealTransition";
 import { useLanguage } from "@/i18n";
 
 interface PayerntNavbarProps {
@@ -39,7 +38,6 @@ export function PayerntNavbar({
 }: PayerntNavbarProps) {
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const { triggerOriginTransition } = useOriginReveal();
   const { theme, toggle: toggleTheme } = useTheme();
   const { tCommon } = useLanguage();
   const [isNotifOpen, setIsNotifOpen] = useState(false);
@@ -54,11 +52,6 @@ export function PayerntNavbar({
 
   const handleBrandClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
-    try {
-      triggerOriginTransition(isHome ? "gateway" : "home", e.currentTarget);
-    } catch {
-      // Safe fallback if outside provider
-    }
 
     if (isHome) {
       navigate({ to: "/" as any });

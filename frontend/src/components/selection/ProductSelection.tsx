@@ -7,7 +7,6 @@ import {
   AnimatePresence,
 } from "framer-motion";
 import { useNavigate } from "@tanstack/react-router";
-import { useOriginReveal } from "@/components/navigation/OriginRevealTransition";
 import { useTheme } from "@/hooks/useTheme";
 import {
   Coins,
@@ -223,12 +222,10 @@ function CinematicBackground({
 
 export function ProductSelection() {
   const navigate = useNavigate();
-  const { triggerOriginTransition } = useOriginReveal();
   const shouldReduceMotion = useReducedMotion();
 
   // Desktop active hover state
   const [hoveredSide, setHoveredSide] = useState<"payernt" | "payrent" | null>(null);
-  const [isTransitioning, setIsTransitioning] = useState(false);
 
   // Mobile interactive branch state
   const [isMobileOpen, setIsMobileOpen] = useState(false);
@@ -256,34 +253,15 @@ export function ProductSelection() {
   // Smooth architectural easing curve
   const smoothEase: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
-  // Navigation handler with cinematic exit sequence
+  // Navigation handler
   const handleSelect = (
     product: "payernt" | "payrent",
-    e: React.MouseEvent<HTMLButtonElement>
+    _e?: React.MouseEvent<HTMLButtonElement>
   ) => {
-    if (isTransitioning) return;
-    setIsTransitioning(true);
-
-    const rect = e.currentTarget.getBoundingClientRect();
-    const targetPayload = {
-      x: rect.left,
-      y: rect.top,
-      width: rect.width,
-      height: rect.height,
-    };
-
-    triggerOriginTransition(product, targetPayload);
-
     // Left path "paye₹nt" -> Lender experience (/payernt)
     // Right path "pay₹ent" -> Renter experience (/payant)
     const destination = product === "payernt" ? "/payernt" : "/payant";
-
-    setTimeout(
-      () => {
-        navigate({ to: destination as any });
-      },
-      shouldReduceMotion ? 20 : 280
-    );
+    navigate({ to: destination as any });
   };
 
   return (
