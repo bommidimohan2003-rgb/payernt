@@ -264,9 +264,9 @@ export default function Agents() {
       {/* TABS (Panel 4: All Agents, Pending, Verified) */}
       <div className="flex items-center gap-2 border-b border-[rgba(161,161,170,0.18)] pb-2 overflow-x-auto no-scrollbar">
         {[
-          { id: "all", label: "All Agents", count: totalCount || 312 },
-          { id: "pending", label: "Pending", count: pendingCount || 24 },
-          { id: "active", label: "Verified", count: verifiedCount || 288 },
+          { id: "all", label: "All Agents", count: totalCount },
+          { id: "pending", label: "Pending", count: pendingCount },
+          { id: "active", label: "Verified", count: verifiedCount },
         ].map((tab) => (
           <button
             key={tab.id}

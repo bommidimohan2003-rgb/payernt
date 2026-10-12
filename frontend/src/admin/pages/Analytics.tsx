@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import {
   TrendingUp,
   Calendar,
@@ -56,18 +56,28 @@ export default function Analytics() {
     fetchAnalytics();
   }, [fetchAnalytics]);
 
-  const userCount = stats?.totalUsers || 1248;
-  const bookingCount = stats?.monthlyBookings || 641;
-  const revenueCount = stats?.monthlyRevenue ? stats.monthlyRevenue : 48320;
+  const userCount = stats?.totalUsers ?? 0;
+  const bookingCount = stats?.monthlyBookings ?? 0;
+  const revenueCount = stats?.monthlyRevenue ?? 0;
 
-  // Category Distribution Donut Data
-  const categoryData = [
-    { name: "Laptops", value: 180, percentage: "28%" },
-    { name: "Cameras", value: 154, percentage: "24%" },
-    { name: "Bikes", value: 115, percentage: "18%" },
-    { name: "Phones", value: 102, percentage: "16%" },
-    { name: "Others", value: 90, percentage: "14%" },
-  ];
+  // Category Distribution from real database telemetry (charts.categoryDistribution)
+  const categoryData: { name: string; value: number; percentage: string }[] = useMemo(() => {
+    if (charts?.categoryDistribution && charts.categoryDistribution.length > 0) {
+      const totalCat = charts.categoryDistribution.reduce((acc, c) => acc + (c.value || 0), 0) || 1;
+      return charts.categoryDistribution.slice(0, 5).map((c) => ({
+        name: c.name,
+        value: c.value,
+        percentage: `${Math.round(((c.value || 0) / totalCat) * 100)}%`,
+      }));
+    }
+    return [
+      { name: "Laptops", value: 0, percentage: "0%" },
+      { name: "Cameras", value: 0, percentage: "0%" },
+      { name: "Bikes", value: 0, percentage: "0%" },
+      { name: "Phones", value: 0, percentage: "0%" },
+      { name: "Others", value: 0, percentage: "0%" },
+    ];
+  }, [charts?.categoryDistribution]);
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-8">

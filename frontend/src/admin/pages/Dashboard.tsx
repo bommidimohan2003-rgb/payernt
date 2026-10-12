@@ -159,20 +159,20 @@ export default function Dashboard() {
     }
   };
 
-  // Metric derivations
-  const totalUsersDisplay = stats?.totalUsers || 1248;
-  const activeAgentsDisplay = stats?.totalAgents || 312;
-  const totalProductsDisplay = stats?.totalProducts || 856;
-  const totalBookingsDisplay = stats?.monthlyBookings || 641;
-  const revenueTotalDisplay = stats?.monthlyRevenue ? stats.monthlyRevenue : 48320;
+  // Real database metric derivations (no fabricated production numbers)
+  const totalUsersDisplay = stats?.totalUsers ?? 0;
+  const activeAgentsDisplay = stats?.totalAgents ?? 0;
+  const totalProductsDisplay = stats?.totalProducts ?? 0;
+  const totalBookingsDisplay = stats?.monthlyBookings ?? 0;
+  const revenueTotalDisplay = stats?.monthlyRevenue ?? 0;
 
-  // Booking distribution donut data
+  // Real booking distribution donut data
   const bookingDistributionData = [
-    { name: "Active", value: stats?.activeBookings || 106, color: BOOKING_STATUS_COLORS.Active },
-    { name: "Pending", value: 28, color: BOOKING_STATUS_COLORS.Pending },
-    { name: "Ongoing", value: 35, color: BOOKING_STATUS_COLORS.Ongoing },
-    { name: "Completed", value: stats?.completedBookings || 445, color: BOOKING_STATUS_COLORS.Completed },
-    { name: "Cancelled", value: 27, color: BOOKING_STATUS_COLORS.Cancelled },
+    { name: "Active", value: stats?.activeBookings ?? recentBookings.filter((b) => b.status === "active").length, color: BOOKING_STATUS_COLORS.Active },
+    { name: "Pending", value: recentBookings.filter((b) => b.status === "pending").length, color: BOOKING_STATUS_COLORS.Pending },
+    { name: "Ongoing", value: recentBookings.filter((b) => b.status === "confirmed" || b.status === "delivered").length, color: BOOKING_STATUS_COLORS.Ongoing },
+    { name: "Completed", value: stats?.completedBookings ?? recentBookings.filter((b) => b.status === "completed").length, color: BOOKING_STATUS_COLORS.Completed },
+    { name: "Cancelled", value: recentBookings.filter((b) => b.status === "cancelled").length, color: BOOKING_STATUS_COLORS.Cancelled },
   ];
 
   if (loading && !stats) {
@@ -531,7 +531,7 @@ export default function Dashboard() {
             <div className="p-3 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <span className="w-6 h-6 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-xs">
-                  {pendingProductsList.length > 0 ? pendingProductsList.length : 24}
+                  {stats?.pendingProducts ?? pendingProductsList.length}
                 </span>
                 <span className="text-xs font-medium text-[#F5F5F5]">
                   Product Approvals
@@ -549,7 +549,7 @@ export default function Dashboard() {
             <div className="p-3 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <span className="w-6 h-6 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-xs">
-                  8
+                  {pendingUsers.filter((u) => u.accountType === "Payernt").length}
                 </span>
                 <span className="text-xs font-medium text-[#F5F5F5]">
                   Agent Approvals
@@ -567,7 +567,7 @@ export default function Dashboard() {
             <div className="p-3 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <span className="w-6 h-6 rounded-md bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center font-bold text-xs">
-                  3
+                  {stats?.pendingReports ?? 0}
                 </span>
                 <span className="text-xs font-medium text-[#F5F5F5]">
                   Reviews Reported

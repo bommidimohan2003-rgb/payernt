@@ -102,10 +102,10 @@ export default function ProductDetails() {
       setActiveImageIndex(0);
 
       // Populate Price Inputs
-      const existingPrice = prodData.price || prodData.approvedPriceRange?.minPrice || 1000;
+      const existingPrice = prodData.price || prodData.approvedPriceRange?.minPrice || 0;
       const existingUnit = (prodData.approvedPriceRange?.unit as PriceUnitType) || "day";
 
-      setPriceInput(String(existingPrice));
+      setPriceInput(existingPrice > 0 ? String(existingPrice) : "");
       setPriceUnit(existingUnit);
       setIsPriceDirty(false);
     } catch (err) {

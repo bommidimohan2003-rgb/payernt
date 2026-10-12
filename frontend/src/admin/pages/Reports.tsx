@@ -58,6 +58,23 @@ export default function Reports() {
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [disputeSearch, setDisputeSearch] = useState("");
 
+  // Platform telemetry stats and charts
+  const [stats, setStats] = useState<any>(null);
+  const [charts, setCharts] = useState<any>(null);
+
+  const fetchTelemetry = useCallback(async () => {
+    try {
+      const [s, c] = await Promise.all([
+        notificationsService.getDashboardStats().catch(() => null),
+        notificationsService.getDashboardCharts("180").catch(() => null),
+      ]);
+      setStats(s);
+      setCharts(c);
+    } catch {
+      // silently handle
+    }
+  }, []);
+
   const fetchDisputes = useCallback(async () => {
     try {
       setLoadingDisputes(true);
@@ -74,7 +91,8 @@ export default function Reports() {
 
   useEffect(() => {
     fetchDisputes();
-  }, [fetchDisputes]);
+    fetchTelemetry();
+  }, [fetchDisputes, fetchTelemetry]);
 
   const handleResolve = async (id: string) => {
     try {
@@ -356,14 +374,17 @@ export default function Reports() {
     },
   ];
 
-  const monthlyReportData = [
-    { month: "May", value: 32000 },
-    { month: "Jun", value: 41000 },
-    { month: "Jul", value: 38000 },
-    { month: "Aug", value: 52000 },
-    { month: "Sep", value: 46000 },
-    { month: "Oct", value: 48320 },
-  ];
+  const monthlyReportData = useMemo(() => {
+    if (charts?.revenueChart && charts.revenueChart.length > 0) {
+      return charts.revenueChart.slice(-6).map((r: any) => ({
+        month: r.name,
+        value: r.revenue,
+      }));
+    }
+    return [
+      { month: "Current", value: stats?.monthlyRevenue ?? 0 },
+    ];
+  }, [charts?.revenueChart, stats?.monthlyRevenue]);
 
   return (
     <div className="space-y-6">
@@ -435,24 +456,27 @@ export default function Reports() {
             <div className="p-4 rounded-xl bg-[#10151B] border border-[rgba(161,161,170,0.18)] space-y-1">
               <span className="text-xs text-[#A1A1AA] font-medium">Total Revenue</span>
               <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-bold font-mono text-[#F5F5F5]">₹48,320</span>
-                <span className="text-xs font-semibold text-emerald-400 font-mono">+ 18%</span>
+                <span className="text-2xl font-bold font-mono text-[#F5F5F5]">
+                  ₹{(stats?.monthlyRevenue ?? 0).toLocaleString("en-IN")}
+                </span>
               </div>
             </div>
 
             <div className="p-4 rounded-xl bg-[#10151B] border border-[rgba(161,161,170,0.18)] space-y-1">
               <span className="text-xs text-[#A1A1AA] font-medium">Total Bookings</span>
               <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-bold font-mono text-[#F5F5F5]">641</span>
-                <span className="text-xs font-semibold text-emerald-400 font-mono">+ 20%</span>
+                <span className="text-2xl font-bold font-mono text-[#F5F5F5]">
+                  {(stats?.monthlyBookings ?? 0).toLocaleString()}
+                </span>
               </div>
             </div>
 
             <div className="p-4 rounded-xl bg-[#10151B] border border-[rgba(161,161,170,0.18)] space-y-1">
               <span className="text-xs text-[#A1A1AA] font-medium">Total Users</span>
               <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-bold font-mono text-[#F5F5F5]">1,248</span>
-                <span className="text-xs font-semibold text-emerald-400 font-mono">+ 12%</span>
+                <span className="text-2xl font-bold font-mono text-[#F5F5F5]">
+                  {(stats?.totalUsers ?? 0).toLocaleString()}
+                </span>
               </div>
             </div>
           </div>

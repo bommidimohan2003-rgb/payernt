@@ -516,10 +516,10 @@ export default function Users() {
       {/* TABS (Panel 3: All Users, Pending Verification, Verified, Suspended) */}
       <div className="flex items-center gap-2 border-b border-[rgba(161,161,170,0.18)] pb-2 overflow-x-auto no-scrollbar">
         {[
-          { id: "all", label: "All Users", count: totalAllCount || 1248 },
-          { id: "pending", label: "Pending Verification", count: pendingCount || 48 },
-          { id: "active", label: "Verified", count: verifiedCount || 1132 },
-          { id: "suspended", label: "Suspended", count: suspendedCount || 32 },
+          { id: "all", label: "All Users", count: totalAllCount },
+          { id: "pending", label: "Pending Verification", count: pendingCount },
+          { id: "active", label: "Verified", count: verifiedCount },
+          { id: "suspended", label: "Suspended", count: suspendedCount },
         ].map((tab) => (
           <button
             key={tab.id}

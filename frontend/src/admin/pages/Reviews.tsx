@@ -220,7 +220,7 @@ export default function Reviews() {
   const tabCounts = useMemo(() => {
     return {
       all: reviews.length,
-      pending: Math.max(0, Math.floor(reviews.length * 0.05)),
+      pending: reviews.filter((r) => (r as any).status === "pending").length,
       approved: reviews.filter((r) => !r.hidden).length,
       rejected: reviews.filter((r) => r.hidden).length,
     };

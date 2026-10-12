@@ -9979,38 +9979,7 @@ def admin_activity_logs(current_admin: dict = Depends(check_admin_user)):
 class AdminVerify8DigitPinSchema(BaseModel):
     pin: str
 
-ADMIN_PIN_VERIFICATION_HISTORY: List[Dict[str, Any]] = [
-    {
-        "id": "VRF-88421092",
-        "timestamp": "2026-10-12T05:30:00Z",
-        "adminName": "Admin",
-        "maskedPin": "•••• 5678",
-        "outcome": "MATCHED",
-        "productId": "p-1",
-        "productName": "MacBook Pro M2",
-        "productCategory": "Laptops",
-        "productStatus": "Active",
-        "bookingId": "PB2001",
-        "bookingStatus": "Ongoing",
-        "renterName": "Priya S.",
-        "vendorName": "Vasanth C."
-    },
-    {
-        "id": "VRF-77319041",
-        "timestamp": "2026-10-11T14:15:00Z",
-        "adminName": "Admin",
-        "maskedPin": "•••• 3320",
-        "outcome": "MATCHED",
-        "productId": "p-2",
-        "productName": "Canon EOS R50",
-        "productCategory": "Cameras",
-        "productStatus": "Active",
-        "bookingId": "PB2002",
-        "bookingStatus": "Completed",
-        "renterName": "Rahul K.",
-        "vendorName": "Arjun M."
-    }
-]
+ADMIN_PIN_VERIFICATION_HISTORY: List[Dict[str, Any]] = []
 
 @app.post("/api/admin/verify-pin")
 def admin_verify_8digit_pin(
@@ -10072,20 +10041,6 @@ def admin_verify_8digit_pin(
         except Exception:
             pass
 
-    # Seed fallback for testing if no security records exist yet
-    if not found_record and raw_pin in ("12345678", "48219154", "58312046"):
-        found_record = {
-            "id": "RENTAL_SECURITY_MOCK_2001",
-            "booking_id": "PB2001",
-            "product_id": "p-1",
-            "vendor_id": "vendor_vasanth",
-            "renter_id": "renter_priya",
-            "vendor_secret_pin": raw_pin[:4],
-            "renter_secret_pin": raw_pin[4:],
-            "final_activation_pin_hash": pin_hash,
-            "status": "active"
-        }
-
     masked_pin_display = f"•••• {raw_pin[-4:]}"
 
     if not found_record:
@@ -10119,25 +10074,25 @@ def admin_verify_8digit_pin(
             detail="Verification failed. The combined 8-digit PIN does not match any authorized rental context."
         )
 
-    # Resolve product details
-    product_id = found_record.get("product_id", "")
-    booking_id = found_record.get("booking_id", "")
-    vendor_id = found_record.get("vendor_id", "")
-    renter_id = found_record.get("renter_id", "")
+    # Resolve product details from real database records
+    product_id = found_record.get("product_id") or ""
+    booking_id = found_record.get("booking_id") or ""
+    vendor_id = found_record.get("vendor_id") or ""
+    renter_id = found_record.get("renter_id") or ""
 
     product_info = {
-        "id": product_id or "p-1",
-        "name": "MacBook Pro M2",
-        "category": "Laptops",
-        "dailyRate": 1200,
-        "securityDeposit": 5000,
+        "id": product_id,
+        "name": "Listing Details Unavailable",
+        "category": "General",
+        "dailyRate": 0,
+        "securityDeposit": 0,
         "status": "Active",
-        "image": "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=500&auto=format&fit=crop&q=60",
+        "image": "",
         "vendor": {
-            "id": vendor_id or "v-1",
-            "name": "Vasanth C.",
-            "email": "vasanth.c@gmail.com",
-            "phone": "+91 98765 11223"
+            "id": vendor_id,
+            "name": "Vendor",
+            "email": "",
+            "phone": ""
         }
     }
 
@@ -10170,13 +10125,13 @@ def admin_verify_8digit_pin(
         finally:
             conn.close()
 
-    # Resolve booking info
+    # Resolve booking info from real orders
     booking_info = {
-        "id": booking_id or "PB2001",
+        "id": booking_id,
         "status": "Ongoing",
-        "startDate": "Oct 12, 2026",
-        "endDate": "Oct 15, 2026",
-        "amount": 3600
+        "startDate": "—",
+        "endDate": "—",
+        "amount": 0.0
     }
 
     conn = get_db_connection()
@@ -10195,20 +10150,20 @@ def admin_verify_8digit_pin(
                         booking_info["status"] = "Cancelled"
                     else:
                         booking_info["status"] = "Pending"
-                    booking_info["startDate"] = str(o_row.get("start_date") or o_row.get("created_at") or booking_info["startDate"])
-                    booking_info["endDate"] = str(o_row.get("end_date") or booking_info["endDate"])
-                    booking_info["amount"] = float(o_row.get("total") or booking_info["amount"])
+                    booking_info["startDate"] = str(o_row.get("start_date") or o_row.get("created_at") or "—")
+                    booking_info["endDate"] = str(o_row.get("end_date") or "—")
+                    booking_info["amount"] = float(o_row.get("total") or 0.0)
         except Exception as ex:
             logger.warning(f"[admin_verify_8digit_pin] Order fetch error: {ex}")
         finally:
             conn.close()
 
-    # Resolve renter info
+    # Resolve renter info from real registered users
     renter_info = {
-        "id": renter_id or "r-1",
-        "name": "Priya S.",
-        "email": "priya.s@gmail.com",
-        "phone": "+91 98765 43210"
+        "id": renter_id,
+        "name": "Renter",
+        "email": "",
+        "phone": ""
     }
     conn = get_db_connection()
     if conn and renter_id:

@@ -104,9 +104,9 @@ export default function Notifications() {
     return {
       all: notifications.length,
       unread: notifications.filter((n) => !n.read).length,
-      system: notifications.filter((n) => (n.title || "").toLowerCase().includes("system") || (n.title || "").toLowerCase().includes("server")).length || 18,
-      bookings: notifications.filter((n) => (n.title || "").toLowerCase().includes("booking") || (n.title || "").toLowerCase().includes("order")).length || 11,
-      users: notifications.filter((n) => (n.title || "").toLowerCase().includes("user") || (n.title || "").toLowerCase().includes("agent")).length || 8,
+      system: notifications.filter((n) => (n.title || "").toLowerCase().includes("system") || (n.title || "").toLowerCase().includes("server")).length,
+      bookings: notifications.filter((n) => (n.title || "").toLowerCase().includes("booking") || (n.title || "").toLowerCase().includes("order")).length,
+      users: notifications.filter((n) => (n.title || "").toLowerCase().includes("user") || (n.title || "").toLowerCase().includes("agent")).length,
     };
   }, [notifications]);
 

@@ -260,7 +260,7 @@ export default function Payments() {
     return {
       all: payments.length,
       platform: payments.filter((p) => p.status === "successful" || p.status === "captured").length,
-      payouts: Math.max(1, Math.floor(payments.length * 0.3)),
+      payouts: payments.filter((p) => (p as any).type === "payout" || (p as any).type === "payout_to_lender").length,
       refunds: payments.filter((p) => p.status === "refunded").length,
     };
   }, [payments]);
