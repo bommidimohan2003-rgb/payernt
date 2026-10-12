@@ -336,40 +336,57 @@ export default function Products() {
     },
   ];
 
+  const tabCounts = useMemo(() => {
+    return {
+      all: products.length,
+      pending: products.filter((p) => p.status === "pending" || p.status === "under_review").length,
+      approved: products.filter((p) => p.status === "approved" && !p.hidden).length,
+      rejected: products.filter((p) => p.status === "rejected").length,
+    };
+  }, [products]);
+
   return (
     <div className="space-y-6">
       {/* HEADER */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-2 border-b border-border/50">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-border/50">
         <div>
-          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground">
-            Products &amp; Moderation
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#F5F5F5]">
+            Products
           </h1>
-          <p className="text-xs text-muted-foreground mt-0.5 font-medium">
-            Review lender listings, configure approved rental pricing ranges, and manage marketplace catalogue.
+          <p className="text-xs text-[#A1A1AA] mt-0.5 font-medium">
+            Manage all listed equipment and rental products.
           </p>
         </div>
 
-        <button
-          onClick={() => fetchProducts()}
-          disabled={loading}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border/80 bg-secondary/50 hover:bg-secondary text-foreground text-xs font-medium transition-colors cursor-pointer self-start sm:self-auto"
-        >
-          <RefreshCw className={cn("h-3.5 w-3.5 text-muted-foreground", loading && "animate-spin")} />
-          <span>Refresh</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => fetchProducts()}
+            disabled={loading}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[rgba(161,161,170,0.18)] bg-[#10151B] hover:bg-[#171C23] text-[#F5F5F5] text-xs font-medium transition-colors cursor-pointer"
+            title="Refresh database"
+          >
+            <RefreshCw className={cn("h-3.5 w-3.5 text-[#A1A1AA]", loading && "animate-spin")} />
+            <span>Refresh</span>
+          </button>
+          <button
+            onClick={() => {
+              toast.info("Equipment listing creation is initiated from Lender portal or CLI.");
+            }}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-neutral-200 text-black font-semibold text-xs transition-colors cursor-pointer"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            <span>Add Product</span>
+          </button>
+        </div>
       </div>
 
-      {/* TABS: ALL | PENDING | APPROVED | REVISION REQUIRED | REJECTED | PRICE NOT SET | PRICE SET */}
-      <div className="flex items-center gap-1.5 border-b border-border/40 pb-2 overflow-x-auto no-scrollbar">
+      {/* TABS: ALL | PENDING | ACTIVE | REJECTED */}
+      <div className="flex items-center gap-2 border-b border-[rgba(161,161,170,0.18)] pb-2 overflow-x-auto no-scrollbar">
         {[
-          { id: "all", label: "All Listings" },
-          { id: "pending", label: "Pending Review" },
-          { id: "approved", label: "Approved" },
-          { id: "needs_correction", label: "Needs Revision" },
-          { id: "price_not_set", label: "Price Not Set" },
-          { id: "price_set", label: "Price Set" },
-          { id: "rejected", label: "Rejected" },
-          { id: "suspended", label: "Suspended / Hidden" },
+          { id: "all", label: "All Products", count: tabCounts.all },
+          { id: "pending", label: "Pending Approval", count: tabCounts.pending },
+          { id: "approved", label: "Active", count: tabCounts.approved },
+          { id: "rejected", label: "Rejected", count: tabCounts.rejected },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -378,65 +395,89 @@ export default function Products() {
               setCurrentPage(1);
             }}
             className={cn(
-              "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap cursor-pointer",
+              "px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer flex items-center gap-2",
               statusFilter === tab.id
-                ? "bg-secondary text-foreground font-semibold border border-border/70"
-                : "text-muted-foreground hover:text-foreground hover:bg-secondary/40 border border-transparent"
+                ? "bg-white text-black font-semibold shadow-xs"
+                : "text-[#A1A1AA] hover:text-[#F5F5F5] hover:bg-white/5 border border-transparent"
             )}
           >
-            {tab.label}
+            <span>{tab.label}</span>
+            <span
+              className={cn(
+                "px-1.5 py-0.2 rounded-full text-[10px] font-mono",
+                statusFilter === tab.id ? "bg-black/15 text-black font-bold" : "bg-white/10 text-[#A1A1AA]"
+              )}
+            >
+              {tab.count}
+            </span>
           </button>
         ))}
       </div>
 
-      {/* SEARCH & CATEGORY FILTER */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+      {/* SEARCH & FILTERS */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-[#10151B] p-3 rounded-xl border border-[rgba(161,161,170,0.18)]">
         <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#A1A1AA]" />
           <input
             type="text"
-            placeholder="Search gear by title, category, owner..."
+            placeholder="Search products..."
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
               setCurrentPage(1);
             }}
-            className="w-full bg-card text-foreground text-xs rounded-lg pl-9 pr-3 py-2 border border-border/70 focus:outline-none focus:border-foreground/40 font-medium placeholder:text-muted-foreground"
+            className="w-full bg-[#050709] text-[#F5F5F5] text-xs rounded-lg pl-9 pr-3 py-2 border border-[rgba(161,161,170,0.18)] focus:outline-none focus:border-white/40 font-medium placeholder:text-[#A1A1AA]"
           />
         </div>
 
-        {categories.length > 0 && (
+        <div className="flex items-center gap-2">
+          {categories.length > 0 && (
+            <select
+              value={categoryFilter}
+              onChange={(e) => {
+                setCategoryFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="bg-[#050709] text-[#F5F5F5] text-xs rounded-lg px-2.5 py-2 border border-[rgba(161,161,170,0.18)] focus:outline-none font-medium cursor-pointer"
+            >
+              <option value="all">All Categories</option>
+              {categories.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          )}
+
           <select
-            value={categoryFilter}
+            value={statusFilter}
             onChange={(e) => {
-              setCategoryFilter(e.target.value);
+              setStatusFilter(e.target.value);
               setCurrentPage(1);
             }}
-            className="bg-card text-foreground text-xs rounded-lg px-2.5 py-2 border border-border/70 focus:outline-none font-medium cursor-pointer"
+            className="bg-[#050709] text-[#F5F5F5] text-xs rounded-lg px-2.5 py-2 border border-[rgba(161,161,170,0.18)] focus:outline-none font-medium cursor-pointer"
           >
-            <option value="all">All Categories</option>
-            {categories.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
+            <option value="all">All Status</option>
+            <option value="approved">Active</option>
+            <option value="pending">Pending</option>
+            <option value="rejected">Rejected</option>
           </select>
-        )}
+        </div>
       </div>
 
       {/* ERROR STATE */}
       {error && !loading ? (
-        <div className="bg-card rounded-xl border border-red-500/20 p-8 text-center flex flex-col items-center justify-center space-y-3">
-          <div className="w-10 h-10 rounded-full bg-red-500/10 text-[#FF1744] flex items-center justify-center">
+        <div className="bg-[#10151B] rounded-xl border border-red-500/20 p-8 text-center flex flex-col items-center justify-center space-y-3">
+          <div className="w-10 h-10 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center">
             <ShieldAlert className="h-5 w-5" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-foreground">Database Sync Failed</h3>
-            <p className="text-xs text-muted-foreground mt-1 max-w-sm">{error}</p>
+            <h3 className="text-sm font-semibold text-[#F5F5F5]">Database Sync Failed</h3>
+            <p className="text-xs text-[#A1A1AA] mt-1 max-w-sm">{error}</p>
           </div>
           <button
             onClick={() => fetchProducts()}
-            className="px-4 py-2 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground text-xs font-medium transition-colors border border-border/80 cursor-pointer"
+            className="px-4 py-2 rounded-lg bg-[#171C23] hover:bg-[#171C23]/80 text-[#F5F5F5] text-xs font-medium transition-colors border border-[rgba(161,161,170,0.18)] cursor-pointer"
           >
             Retry Database Fetch
           </button>
@@ -451,7 +492,7 @@ export default function Products() {
             sortKey={sortKey}
             sortOrder={sortOrder}
             onSort={handleSort}
-            emptyTitle="No gear listings match criteria"
+            emptyTitle="No equipment listings match criteria"
             emptyDescription="No equipment items found matching your current filter settings."
           />
 

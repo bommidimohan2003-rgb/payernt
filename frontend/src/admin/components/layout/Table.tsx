@@ -74,9 +74,9 @@ export function Table<T>({
                         <span className="shrink-0">
                           {isSorted ? (
                             sortOrder === "asc" ? (
-                              <ArrowUp className="h-3 w-3 text-emerald-500" />
+                              <ArrowUp className="h-3 w-3 text-white" />
                             ) : (
-                              <ArrowDown className="h-3 w-3 text-emerald-500" />
+                              <ArrowDown className="h-3 w-3 text-white" />
                             )
                           ) : (
                             <ArrowUpDown className="h-2.5 w-2.5 opacity-40 group-hover:opacity-100" />

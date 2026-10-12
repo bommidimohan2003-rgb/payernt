@@ -15,14 +15,19 @@ export interface DashboardStats {
   pendingProducts: number;
   approvedProducts: number;
   rejectedProducts: number;
+  suspendedProducts?: number;
   totalCategories: number;
   bookingsToday: number;
   monthlyBookings: number;
+  activeBookings?: number;
+  completedBookings?: number;
   revenueToday: number;
   monthlyRevenue: number;
+  pendingWithdrawals?: number;
   pendingReports: number;
   unreadNotifications: number;
   websiteVisitors: number;
+  activeVisitors?: number;
 }
 
 export interface DashboardCharts {

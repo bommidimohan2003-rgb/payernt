@@ -18,6 +18,7 @@ import {
   Settings,
   X,
   Loader2,
+  KeyRound,
   CornerDownLeft,
 } from "lucide-react";
 import { adminApi, AdminUser, AdminProduct, AdminBooking, AdminPayment } from "../../services/api";
@@ -52,6 +53,7 @@ const PAGES: SearchResultItem[] = [
   { id: "p-notifs", category: "Navigation", title: "Notifications", subtitle: "System alerts & activity events", icon: Bell, route: "/admin/notifications" },
   { id: "p-support", category: "Navigation", title: "Support Desk", subtitle: "Customer inquiries & help tickets", icon: LifeBuoy, route: "/admin/support" },
   { id: "p-logs", category: "Navigation", title: "Activity Logs", subtitle: "Security audit trail & admin logs", icon: Shield, route: "/admin/activity-logs" },
+  { id: "p-pin-verify", category: "Navigation", title: "8-Digit PIN Verification", subtitle: "Verify combined vendor + renter Secret PIN", icon: KeyRound, route: "/admin/pin-verification" },
   { id: "p-profile", category: "Navigation", title: "Admin Profile", subtitle: "Credentials & account security", icon: User, route: "/admin/profile" },
   { id: "p-settings", category: "Navigation", title: "Platform Settings", subtitle: "Configuration, branding & SEO", icon: Settings, route: "/admin/settings" },
 ];

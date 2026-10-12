@@ -45,7 +45,6 @@ import { Route as AdminActivityRouteImport } from './routes/admin/activity'
 import { Route as AdminActivityLogsRouteImport } from './routes/admin/activity-logs'
 import { Route as AdminAgentsRouteImport } from './routes/admin/agents'
 import { Route as AdminAnalyticsRouteImport } from './routes/admin/analytics'
-import { Route as AdminApiKeysRouteImport } from './routes/admin/api-keys'
 import { Route as AdminBookingsRouteImport } from './routes/admin/bookings'
 import { Route as AdminCategoriesRouteImport } from './routes/admin/categories'
 import { Route as AdminDashboardRouteImport } from './routes/admin/dashboard'
@@ -54,6 +53,7 @@ import { Route as AdminLoginRouteImport } from './routes/admin/login'
 import { Route as AdminMessagesRouteImport } from './routes/admin/messages'
 import { Route as AdminNotificationsRouteImport } from './routes/admin/notifications'
 import { Route as AdminPaymentsRouteImport } from './routes/admin/payments'
+import { Route as AdminPinVerificationRouteImport } from './routes/admin/pin-verification'
 import { Route as AdminProductsRouteImport } from './routes/admin/products'
 import { Route as AdminProfileRouteImport } from './routes/admin/profile'
 import { Route as AdminReportsRouteImport } from './routes/admin/reports'
@@ -277,11 +277,6 @@ const AdminAnalyticsRoute = AdminAnalyticsRouteImport.update({
   path: '/analytics',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminApiKeysRoute = AdminApiKeysRouteImport.update({
-  id: '/api-keys',
-  path: '/api-keys',
-  getParentRoute: () => AdminRoute,
-} as any)
 const AdminBookingsRoute = AdminBookingsRouteImport.update({
   id: '/bookings',
   path: '/bookings',
@@ -320,6 +315,11 @@ const AdminNotificationsRoute = AdminNotificationsRouteImport.update({
 const AdminPaymentsRoute = AdminPaymentsRouteImport.update({
   id: '/payments',
   path: '/payments',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminPinVerificationRoute = AdminPinVerificationRouteImport.update({
+  id: '/pin-verification',
+  path: '/pin-verification',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminProductsRoute = AdminProductsRouteImport.update({
@@ -569,7 +569,6 @@ export interface FileRoutesByFullPath {
   '/admin/activity-logs': typeof AdminActivityLogsRoute
   '/admin/agents': typeof AdminAgentsRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
-  '/admin/api-keys': typeof AdminApiKeysRoute
   '/admin/bookings': typeof AdminBookingsRoute
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/dashboard': typeof AdminDashboardRoute
@@ -578,6 +577,7 @@ export interface FileRoutesByFullPath {
   '/admin/messages': typeof AdminMessagesRoute
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/payments': typeof AdminPaymentsRoute
+  '/admin/pin-verification': typeof AdminPinVerificationRoute
   '/admin/products': typeof AdminProductsRouteWithChildren
   '/admin/profile': typeof AdminProfileRoute
   '/admin/reports': typeof AdminReportsRoute
@@ -655,7 +655,6 @@ export interface FileRoutesByTo {
   '/admin/activity-logs': typeof AdminActivityLogsRoute
   '/admin/agents': typeof AdminAgentsRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
-  '/admin/api-keys': typeof AdminApiKeysRoute
   '/admin/bookings': typeof AdminBookingsRoute
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/dashboard': typeof AdminDashboardRoute
@@ -664,6 +663,7 @@ export interface FileRoutesByTo {
   '/admin/messages': typeof AdminMessagesRoute
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/payments': typeof AdminPaymentsRoute
+  '/admin/pin-verification': typeof AdminPinVerificationRoute
   '/admin/products': typeof AdminProductsRouteWithChildren
   '/admin/profile': typeof AdminProfileRoute
   '/admin/reports': typeof AdminReportsRoute
@@ -745,7 +745,6 @@ export interface FileRoutesById {
   '/admin/activity-logs': typeof AdminActivityLogsRoute
   '/admin/agents': typeof AdminAgentsRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
-  '/admin/api-keys': typeof AdminApiKeysRoute
   '/admin/bookings': typeof AdminBookingsRoute
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/dashboard': typeof AdminDashboardRoute
@@ -754,6 +753,7 @@ export interface FileRoutesById {
   '/admin/messages': typeof AdminMessagesRoute
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/payments': typeof AdminPaymentsRoute
+  '/admin/pin-verification': typeof AdminPinVerificationRoute
   '/admin/products': typeof AdminProductsRouteWithChildren
   '/admin/profile': typeof AdminProfileRoute
   '/admin/reports': typeof AdminReportsRoute
@@ -836,7 +836,6 @@ export interface FileRouteTypes {
     | '/admin/activity-logs'
     | '/admin/agents'
     | '/admin/analytics'
-    | '/admin/api-keys'
     | '/admin/bookings'
     | '/admin/categories'
     | '/admin/dashboard'
@@ -845,6 +844,7 @@ export interface FileRouteTypes {
     | '/admin/messages'
     | '/admin/notifications'
     | '/admin/payments'
+    | '/admin/pin-verification'
     | '/admin/products'
     | '/admin/profile'
     | '/admin/reports'
@@ -922,7 +922,6 @@ export interface FileRouteTypes {
     | '/admin/activity-logs'
     | '/admin/agents'
     | '/admin/analytics'
-    | '/admin/api-keys'
     | '/admin/bookings'
     | '/admin/categories'
     | '/admin/dashboard'
@@ -931,6 +930,7 @@ export interface FileRouteTypes {
     | '/admin/messages'
     | '/admin/notifications'
     | '/admin/payments'
+    | '/admin/pin-verification'
     | '/admin/products'
     | '/admin/profile'
     | '/admin/reports'
@@ -1011,7 +1011,6 @@ export interface FileRouteTypes {
     | '/admin/activity-logs'
     | '/admin/agents'
     | '/admin/analytics'
-    | '/admin/api-keys'
     | '/admin/bookings'
     | '/admin/categories'
     | '/admin/dashboard'
@@ -1020,6 +1019,7 @@ export interface FileRouteTypes {
     | '/admin/messages'
     | '/admin/notifications'
     | '/admin/payments'
+    | '/admin/pin-verification'
     | '/admin/products'
     | '/admin/profile'
     | '/admin/reports'
@@ -1356,13 +1356,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAnalyticsRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/admin/api-keys': {
-      id: '/admin/api-keys'
-      path: '/api-keys'
-      fullPath: '/admin/api-keys'
-      preLoaderRoute: typeof AdminApiKeysRouteImport
-      parentRoute: typeof AdminRoute
-    }
     '/admin/bookings': {
       id: '/admin/bookings'
       path: '/bookings'
@@ -1417,6 +1410,13 @@ declare module '@tanstack/react-router' {
       path: '/payments'
       fullPath: '/admin/payments'
       preLoaderRoute: typeof AdminPaymentsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/pin-verification': {
+      id: '/admin/pin-verification'
+      path: '/pin-verification'
+      fullPath: '/admin/pin-verification'
+      preLoaderRoute: typeof AdminPinVerificationRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/products': {
@@ -1746,7 +1746,6 @@ interface AdminRouteChildren {
   AdminActivityLogsRoute: typeof AdminActivityLogsRoute
   AdminAgentsRoute: typeof AdminAgentsRoute
   AdminAnalyticsRoute: typeof AdminAnalyticsRoute
-  AdminApiKeysRoute: typeof AdminApiKeysRoute
   AdminBookingsRoute: typeof AdminBookingsRoute
   AdminCategoriesRoute: typeof AdminCategoriesRoute
   AdminDashboardRoute: typeof AdminDashboardRoute
@@ -1755,6 +1754,7 @@ interface AdminRouteChildren {
   AdminMessagesRoute: typeof AdminMessagesRoute
   AdminNotificationsRoute: typeof AdminNotificationsRoute
   AdminPaymentsRoute: typeof AdminPaymentsRoute
+  AdminPinVerificationRoute: typeof AdminPinVerificationRoute
   AdminProductsRoute: typeof AdminProductsRouteWithChildren
   AdminProfileRoute: typeof AdminProfileRoute
   AdminReportsRoute: typeof AdminReportsRoute
@@ -1772,7 +1772,6 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminActivityLogsRoute: AdminActivityLogsRoute,
   AdminAgentsRoute: AdminAgentsRoute,
   AdminAnalyticsRoute: AdminAnalyticsRoute,
-  AdminApiKeysRoute: AdminApiKeysRoute,
   AdminBookingsRoute: AdminBookingsRoute,
   AdminCategoriesRoute: AdminCategoriesRoute,
   AdminDashboardRoute: AdminDashboardRoute,
@@ -1781,6 +1780,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminMessagesRoute: AdminMessagesRoute,
   AdminNotificationsRoute: AdminNotificationsRoute,
   AdminPaymentsRoute: AdminPaymentsRoute,
+  AdminPinVerificationRoute: AdminPinVerificationRoute,
   AdminProductsRoute: AdminProductsRouteWithChildren,
   AdminProfileRoute: AdminProfileRoute,
   AdminReportsRoute: AdminReportsRoute,

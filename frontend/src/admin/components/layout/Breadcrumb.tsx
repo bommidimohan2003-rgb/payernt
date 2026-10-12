@@ -1,6 +1,12 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import { ChevronRight, Home } from "lucide-react";
 
+const CUSTOM_NAMES: Record<string, string> = {
+  "pin-verification": "8-Digit PIN Verification",
+  "activity-logs": "Activity Logs",
+  "dashboard": "Dashboard",
+};
+
 export function Breadcrumb() {
   const location = useLocation();
   const pathnames = location.pathname.split("/").filter((x) => x);
@@ -13,45 +19,58 @@ export function Breadcrumb() {
     return null;
   }
 
+  // Format breadcrumbs with Section Category for Security & Support if on pin-verification
+  const isPinVerification = pathnames.includes("pin-verification");
+
   return (
-    <nav className="flex items-center gap-2 text-xs font-semibold text-muted-foreground mb-4">
+    <nav className="flex items-center gap-2 text-xs font-medium text-[#A1A1AA] mb-4">
       <Link
         to="/admin/dashboard"
-        className="flex items-center gap-1 hover:text-foreground transition-colors"
+        className="flex items-center gap-1 hover:text-[#F5F5F5] transition-colors"
       >
         <Home className="h-3.5 w-3.5" />
-        <span>Dashboard</span>
+        <span>Admin</span>
       </Link>
 
-      {pathnames.map((value, index) => {
-        if (value === "admin") return null;
+      {isPinVerification ? (
+        <>
+          <ChevronRight className="h-3 w-3 opacity-60 text-[#A1A1AA]" />
+          <span className="text-[#A1A1AA]">Security & Support</span>
+          <ChevronRight className="h-3 w-3 opacity-60 text-[#A1A1AA]" />
+          <span className="text-[#F5F5F5] font-semibold">8-Digit PIN Verification</span>
+        </>
+      ) : (
+        pathnames.map((value, index) => {
+          if (value === "admin") return null;
 
-        const last = index === pathnames.length - 1;
-        const to = `/${pathnames.slice(0, index + 1).join("/")}`;
+          const last = index === pathnames.length - 1;
+          const to = `/${pathnames.slice(0, index + 1).join("/")}`;
 
-        // Capitalize and format value
-        const formattedValue = value
-          .replace("-", " ")
-          .replace(/^[a-z]/, (char) => char.toUpperCase());
+          const formattedValue =
+            CUSTOM_NAMES[value] ||
+            value
+              .replace(/-/g, " ")
+              .replace(/\b\w/g, (char) => char.toUpperCase());
 
-        return (
-          <div key={to} className="flex items-center gap-2">
-            <ChevronRight className="h-3 w-3 opacity-60" />
-            {last ? (
-              <span className="text-foreground font-bold tracking-wide">
-                {formattedValue}
-              </span>
-            ) : (
-              <Link
-                to={to as "/admin"}
-                className="hover:text-foreground transition-colors"
-              >
-                {formattedValue}
-              </Link>
-            )}
-          </div>
-        );
-      })}
+          return (
+            <div key={to} className="flex items-center gap-2">
+              <ChevronRight className="h-3 w-3 opacity-60 text-[#A1A1AA]" />
+              {last ? (
+                <span className="text-[#F5F5F5] font-semibold tracking-wide">
+                  {formattedValue}
+                </span>
+              ) : (
+                <Link
+                  to={to as "/admin"}
+                  className="hover:text-[#F5F5F5] transition-colors"
+                >
+                  {formattedValue}
+                </Link>
+              )}
+            </div>
+          );
+        })
+      )}
     </nav>
   );
 }

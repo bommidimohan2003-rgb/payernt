@@ -321,84 +321,131 @@ export default function Bookings() {
     },
   ];
 
+  const tabCounts = useMemo(() => {
+    return {
+      all: bookings.length,
+      pending: bookings.filter((b) => b.status === "pending").length,
+      active: bookings.filter((b) => b.status === "active" || b.status === "confirmed").length,
+      completed: bookings.filter((b) => b.status === "completed").length,
+      cancelled: bookings.filter((b) => b.status === "cancelled").length,
+    };
+  }, [bookings]);
+
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-6">
       {/* HEADER */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-2 border-b border-border/50">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-border/50">
         <div>
-          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#F5F5F5]">
             Bookings
           </h1>
-          <p className="text-xs text-muted-foreground mt-0.5 font-medium">
-            Rental operations, gear dispatch timelines, schedules, and fulfillment
+          <p className="text-xs text-[#A1A1AA] mt-0.5 font-medium">
+            Track and manage all rental bookings.
           </p>
         </div>
 
         <button
           onClick={() => fetchBookings()}
           disabled={loading}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border/80 bg-secondary/50 hover:bg-secondary text-foreground text-xs font-medium transition-colors cursor-pointer self-start sm:self-auto"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[rgba(161,161,170,0.18)] bg-[#10151B] hover:bg-[#171C23] text-[#F5F5F5] text-xs font-medium transition-colors cursor-pointer self-start sm:self-auto"
         >
-          <RefreshCw className={cn("h-3.5 w-3.5 text-muted-foreground", loading && "animate-spin")} />
+          <RefreshCw className={cn("h-3.5 w-3.5 text-[#A1A1AA]", loading && "animate-spin")} />
           <span>Refresh</span>
         </button>
       </div>
 
+      {/* TABS WITH COUNTERS */}
+      <div className="flex items-center gap-2 border-b border-[rgba(161,161,170,0.18)] pb-2 overflow-x-auto no-scrollbar">
+        {[
+          { id: "all", label: "All", count: tabCounts.all },
+          { id: "pending", label: "Pending", count: tabCounts.pending },
+          { id: "active", label: "Active", count: tabCounts.active },
+          { id: "completed", label: "Completed", count: tabCounts.completed },
+          { id: "cancelled", label: "Cancelled", count: tabCounts.cancelled },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => {
+              setStatusFilter(tab.id);
+              setCurrentPage(1);
+            }}
+            className={cn(
+              "px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer flex items-center gap-2",
+              statusFilter === tab.id
+                ? "bg-white text-black font-semibold shadow-xs"
+                : "text-[#A1A1AA] hover:text-[#F5F5F5] hover:bg-white/5 border border-transparent"
+            )}
+          >
+            <span>{tab.label}</span>
+            <span
+              className={cn(
+                "px-1.5 py-0.2 rounded-full text-[10px] font-mono",
+                statusFilter === tab.id ? "bg-black/15 text-black font-bold" : "bg-white/10 text-[#A1A1AA]"
+              )}
+            >
+              {tab.count}
+            </span>
+          </button>
+        ))}
+      </div>
+
       {/* FILTERS & SEARCH */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-[#10151B] p-3 rounded-xl border border-[rgba(161,161,170,0.18)]">
         <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#A1A1AA]" />
           <input
             type="text"
-            placeholder="Search bookings by ID, customer, product..."
+            placeholder="Search by order ID, user or product..."
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
               setCurrentPage(1);
             }}
-            className="w-full bg-card text-foreground text-xs rounded-lg pl-9 pr-3 py-2 border border-border/70 focus:outline-none focus:border-foreground/40 font-medium placeholder:text-muted-foreground"
+            className="w-full bg-[#050709] text-[#F5F5F5] text-xs rounded-lg pl-9 pr-3 py-2 border border-[rgba(161,161,170,0.18)] focus:outline-none focus:border-white/40 font-medium placeholder:text-[#A1A1AA]"
           />
         </div>
 
-        <div className="flex items-center p-0.5 bg-secondary/60 rounded-lg border border-border/60 text-xs font-medium overflow-x-auto no-scrollbar">
-          {["all", "pending", "confirmed", "active", "completed", "cancelled"].map((st) => (
-            <button
-              key={st}
-              onClick={() => {
-                setStatusFilter(st);
-                setCurrentPage(1);
-              }}
-              className={cn(
-                "px-2.5 py-1 rounded-md capitalize transition-colors cursor-pointer text-xs whitespace-nowrap",
-                statusFilter === st
-                  ? "bg-background text-foreground shadow-2xs font-semibold"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {st}
-            </button>
-          ))}
+        <div className="flex items-center gap-2">
+          <select
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="bg-[#050709] text-[#F5F5F5] text-xs rounded-lg px-2.5 py-2 border border-[rgba(161,161,170,0.18)] focus:outline-none font-medium cursor-pointer"
+          >
+            <option value="all">All Status</option>
+            <option value="pending">Pending</option>
+            <option value="active">Active</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+
+          <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] text-xs text-[#A1A1AA] font-mono">
+            <Calendar className="h-3.5 w-3.5 text-white" />
+            <span>Oct 1, 2026 - Oct 31, 2026</span>
+          </div>
         </div>
       </div>
 
       {/* ERROR STATE */}
       {error && !loading && bookings.length === 0 ? (
-        <div className="bg-card rounded-2xl border border-destructive/30 p-12 text-center shadow-xs flex flex-col items-center justify-center">
-          <div className="w-12 h-12 rounded-full bg-destructive/10 text-destructive flex items-center justify-center mb-3">
+        <div className="bg-[#10151B] rounded-2xl border border-red-500/20 p-12 text-center flex flex-col items-center justify-center">
+          <div className="w-12 h-12 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center mb-3">
             <ShieldAlert className="h-6 w-6" />
           </div>
-          <h3 className="text-base font-bold text-foreground font-display">Database Sync Failed</h3>
-          <p className="text-xs text-muted-foreground mt-1 max-w-sm">{error}</p>
+          <h3 className="text-base font-bold text-[#F5F5F5]">Database Sync Failed</h3>
+          <p className="text-xs text-[#A1A1AA] mt-1 max-w-sm">{error}</p>
           <button
             onClick={() => fetchBookings()}
-            className="mt-4 px-4 py-2 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-bold transition-all shadow-xs cursor-pointer"
+            className="mt-4 px-4 py-2 rounded-xl bg-[#171C23] hover:bg-[#171C23]/80 text-[#F5F5F5] text-xs font-bold transition-all border border-[rgba(161,161,170,0.18)] cursor-pointer"
           >
             Retry Database Fetch
           </button>
         </div>
       ) : (
         /* TABLE */
-        <div className="bg-card rounded-2xl border border-border/80 shadow-xs overflow-hidden">
+        <div className="space-y-4">
           <Table
             columns={columns}
             data={paginatedBookings}
@@ -406,19 +453,21 @@ export default function Bookings() {
             sortKey={sortKey}
             sortOrder={sortOrder}
             onSort={handleSort}
-            emptyMessage="No rental bookings found matching the filters."
+            emptyTitle="No bookings found"
+            emptyDescription="No rental bookings found matching the filters."
           />
 
           {filteredBookings.length > itemsPerPage && (
-            <div className="p-4 border-t border-border/40">
-              <Pagination
-                currentPage={currentPage}
-                totalPages={Math.ceil(filteredBookings.length / itemsPerPage)}
-                onPageChange={setCurrentPage}
-                itemsPerPage={itemsPerPage}
-                totalItems={filteredBookings.length}
-              />
-            </div>
+            <Pagination
+              currentPage={currentPage}
+              totalItems={filteredBookings.length}
+              itemsPerPage={itemsPerPage}
+              onPageChange={setCurrentPage}
+              onItemsPerPageChange={(newSize) => {
+                setItemsPerPage(newSize);
+                setCurrentPage(1);
+              }}
+            />
           )}
         </div>
       )}

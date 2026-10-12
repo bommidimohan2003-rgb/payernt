@@ -140,7 +140,7 @@ function AdminLayout() {
         </div>
       }
     >
-      <div className="min-h-screen bg-background text-foreground flex flex-col antialiased">
+      <div className="dark min-h-screen bg-[#050709] text-[#F5F5F5] flex flex-col antialiased">
         <div className="flex flex-1 relative items-stretch">
           {/* Collapsible Sidebar */}
           <Sidebar />

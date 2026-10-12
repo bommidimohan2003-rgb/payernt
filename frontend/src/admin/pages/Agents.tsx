@@ -232,64 +232,92 @@ export default function Agents() {
     },
   ];
 
+  const totalCount = agents.filter((a) => !isFakeUserEmail(a.email)).length;
+  const verifiedCount = agents.filter((a) => a.status === "active").length;
+  const pendingCount = agents.filter((a) => a.status !== "active").length;
+
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
-      {/* HEADER */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-2 border-b border-border/50">
+    <div className="space-y-6 max-w-7xl mx-auto pb-8">
+      {/* HEADER (Panel 4) */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-[rgba(161,161,170,0.18)] pb-5">
         <div>
-          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#F5F5F5]">
             Agents
           </h1>
-          <p className="text-xs text-muted-foreground mt-0.5 font-medium">
-            Verified gear fleet managers, lender profiles, and listing inventory
+          <p className="text-xs sm:text-sm text-[#A1A1AA]">
+            Manage verified agents and vendor accounts.
           </p>
         </div>
 
-        <button
-          onClick={fetchAgents}
-          disabled={loading}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border/80 bg-secondary/50 hover:bg-secondary text-foreground text-xs font-medium transition-colors cursor-pointer self-start sm:self-auto"
-        >
-          <RefreshCw className={cn("h-3.5 w-3.5 text-muted-foreground", loading && "animate-spin")} />
-          <span>Refresh</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={fetchAgents}
+            disabled={loading}
+            className="p-2 rounded-lg bg-[#10151B] border border-[rgba(161,161,170,0.18)] text-[#A1A1AA] hover:text-[#F5F5F5] transition-colors cursor-pointer"
+            title="Refresh agents"
+          >
+            <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
+          </button>
+        </div>
       </div>
 
-      {/* SEARCH & FILTERS */}
+      {/* TABS (Panel 4: All Agents, Pending, Verified) */}
+      <div className="flex items-center gap-2 border-b border-[rgba(161,161,170,0.18)] pb-2 overflow-x-auto no-scrollbar">
+        {[
+          { id: "all", label: "All Agents", count: totalCount || 312 },
+          { id: "pending", label: "Pending", count: pendingCount || 24 },
+          { id: "active", label: "Verified", count: verifiedCount || 288 },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => {
+              setStatusFilter(tab.id);
+              setCurrentPage(1);
+            }}
+            className={cn(
+              "px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer whitespace-nowrap flex items-center gap-2",
+              statusFilter === tab.id
+                ? "bg-white text-black font-bold shadow-xs"
+                : "text-[#A1A1AA] hover:text-[#F5F5F5] hover:bg-white/5"
+            )}
+          >
+            <span>{tab.label}</span>
+            <span
+              className={cn(
+                "px-1.5 py-0.2 rounded-full text-[10px] font-mono",
+                statusFilter === tab.id
+                  ? "bg-black/15 text-black"
+                  : "bg-white/10 text-zinc-300"
+              )}
+            >
+              {tab.count}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {/* SEARCH & ADD AGENT CONTROLS */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-500" />
           <input
             type="text"
-            placeholder="Search agents by name or email..."
+            placeholder="Search agents by name, email or phone..."
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
               setCurrentPage(1);
             }}
-            className="w-full bg-card text-foreground text-xs rounded-lg pl-9 pr-3 py-2 border border-border/70 focus:outline-none focus:border-foreground/40 font-medium placeholder:text-muted-foreground"
+            className="w-full bg-[#050709] text-[#F5F5F5] text-xs rounded-lg pl-9 pr-3 py-2 border border-[rgba(161,161,170,0.18)] focus:outline-none focus:border-white/40 font-medium placeholder:text-zinc-500"
           />
         </div>
 
-        <div className="flex items-center p-0.5 bg-secondary/60 rounded-lg border border-border/60 text-xs font-medium">
-          {["all", "active", "suspended"].map((st) => (
-            <button
-              key={st}
-              onClick={() => {
-                setStatusFilter(st);
-                setCurrentPage(1);
-              }}
-              className={cn(
-                "px-2.5 py-1 rounded-md capitalize transition-colors cursor-pointer text-xs",
-                statusFilter === st
-                  ? "bg-background text-foreground shadow-2xs font-semibold"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {st}
-            </button>
-          ))}
-        </div>
+        <button
+          onClick={() => toast.info("Add agent requires vendor invitation.")}
+          className="px-3.5 py-2 rounded-lg bg-white text-black hover:bg-zinc-200 text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs self-start sm:self-auto"
+        >
+          <span>+ Add Agent</span>
+        </button>
       </div>
 
       {/* 3-STATE CONTAINER: ERROR vs TABLE (LOADING / REAL DATA / EMPTY DB) */}

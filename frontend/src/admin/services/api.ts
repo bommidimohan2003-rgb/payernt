@@ -283,7 +283,7 @@ export interface AdminSupportTicket {
   id: string;
   subject: string;
   category: string;
-  status: "open" | "pending" | "resolved" | "closed";
+  status: "open" | "pending" | "in_progress" | "resolved" | "closed";
   priority: "low" | "medium" | "high";
   userName: string;
   userEmail: string;

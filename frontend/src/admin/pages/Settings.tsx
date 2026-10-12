@@ -76,30 +76,32 @@ export default function Settings() {
 
   return (
     <div className="space-y-6">
-      {/* HEADER */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-border/70 pb-4">
+      {/* HEADER & TABS SWITCHER (Panel 16) */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-[rgba(161,161,170,0.18)] pb-4">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-foreground font-display">
-            Platform Configuration
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#F5F5F5]">
+            Platform Settings
           </h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Persisted platform parameters, brand assets, SEO metadata, and system appearance.
+          <p className="text-xs text-[#A1A1AA] mt-0.5 font-medium">
+            Manage platform configuration, SEO parameters, and system preferences.
           </p>
         </div>
 
-        <button
-          onClick={fetchSettings}
-          disabled={loading}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-card hover:bg-secondary border border-border/70 text-foreground text-xs font-semibold transition-all cursor-pointer self-start sm:self-auto"
-        >
-          <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
-          <span>Sync Settings</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={fetchSettings}
+            disabled={loading}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#10151B] hover:bg-[#171C23] border border-[rgba(161,161,170,0.18)] text-[#F5F5F5] text-xs font-semibold transition-all cursor-pointer self-start sm:self-auto"
+          >
+            <RefreshCw className={cn("h-3.5 w-3.5 text-[#A1A1AA]", loading && "animate-spin")} />
+            <span>Sync Settings</span>
+          </button>
+        </div>
       </div>
 
       {/* ERROR BANNER */}
       {error && (
-        <div className="p-3.5 rounded-lg bg-destructive/10 border border-[#FF1744]/30 text-[#FF1744] text-xs font-medium flex items-center justify-between">
+        <div className="p-3.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-medium flex items-center justify-between">
           <span>{error}</span>
           <button onClick={fetchSettings} className="underline font-bold cursor-pointer">Retry</button>
         </div>
@@ -108,7 +110,7 @@ export default function Settings() {
       {settings && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
           {/* TAB NAVIGATION PANEL */}
-          <div className="p-1.5 bg-card rounded-xl border border-border/70 shadow-2xs space-y-1">
+          <div className="p-1.5 bg-[#10151B] rounded-xl border border-[rgba(161,161,170,0.18)] space-y-1">
             {[
               { id: "general", label: "General Settings", icon: Globe },
               { id: "branding", label: "Branding & Banners", icon: Megaphone },
@@ -124,11 +126,11 @@ export default function Settings() {
                   className={cn(
                     "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all text-left cursor-pointer",
                     active
-                      ? "bg-secondary text-foreground font-bold shadow-2xs border border-border/70"
-                      : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                      ? "bg-white text-black font-bold shadow-2xs"
+                      : "text-[#A1A1AA] hover:text-[#F5F5F5] hover:bg-white/5"
                   )}
                 >
-                  <Icon className={cn("h-4 w-4", active ? "text-emerald-500" : "text-muted-foreground")} />
+                  <Icon className={cn("h-4 w-4", active ? "text-black" : "text-[#A1A1AA]")} />
                   <span>{tab.label}</span>
                 </button>
               );
@@ -136,7 +138,7 @@ export default function Settings() {
           </div>
 
           {/* MAIN SETTINGS FORM */}
-          <div className="md:col-span-3 p-5 bg-card rounded-xl border border-border/70 shadow-2xs">
+          <div className="md:col-span-3 p-5 bg-[#10151B] rounded-xl border border-[rgba(161,161,170,0.18)]">
             <form onSubmit={handleSave} className="space-y-5 text-xs">
               {activeTab === "general" && (
                 <div className="space-y-4">
@@ -277,11 +279,11 @@ export default function Settings() {
                 </div>
               )}
 
-              <div className="flex justify-end pt-4 border-t border-border/50">
+              <div className="flex justify-end pt-4 border-t border-[rgba(161,161,170,0.18)]">
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-black font-semibold text-xs transition-all cursor-pointer disabled:opacity-50"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white hover:bg-neutral-200 text-black font-semibold text-xs transition-all cursor-pointer disabled:opacity-50"
                 >
                   <Save className="h-3.5 w-3.5" />
                   <span>{submitting ? "Saving to Database..." : "Save Settings"}</span>

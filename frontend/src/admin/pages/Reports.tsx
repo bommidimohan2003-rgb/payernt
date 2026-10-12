@@ -16,7 +16,16 @@ import {
   CreditCard,
   Star,
   IndianRupee,
+  TrendingUp,
 } from "lucide-react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 import { Table, Column } from "../components/layout/Table";
 import { Pagination } from "../components/layout/Pagination";
 import { notificationsService } from "../services/notifications";
@@ -347,55 +356,179 @@ export default function Reports() {
     },
   ];
 
+  const monthlyReportData = [
+    { month: "May", value: 32000 },
+    { month: "Jun", value: 41000 },
+    { month: "Jul", value: 38000 },
+    { month: "Aug", value: 52000 },
+    { month: "Sep", value: 46000 },
+    { month: "Oct", value: 48320 },
+  ];
+
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-6">
       {/* HEADER */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-2 border-b border-border/50">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-border/50">
         <div>
-          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#F5F5F5]">
             Reports
           </h1>
-          <p className="text-xs text-muted-foreground mt-0.5 font-medium">
-            Operational telemetry reports, CSV exports, and marketplace dispute arbitration
+          <p className="text-xs text-[#A1A1AA] mt-0.5 font-medium">
+            Generate and view platform reports.
           </p>
         </div>
 
         {/* TABS SWITCH */}
-        <div className="flex items-center p-0.5 bg-secondary/60 rounded-lg border border-border/60 text-xs font-medium">
-          <button
-            onClick={() => setActiveTab("generator")}
-            className={cn(
-              "px-3 py-1.5 rounded-md transition-colors cursor-pointer flex items-center gap-1.5 text-xs",
-              activeTab === "generator" ? "bg-background text-foreground shadow-2xs font-semibold" : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            <FileSpreadsheet className="h-3.5 w-3.5" />
-            <span>Operational Reports</span>
-          </button>
-          <button
-            onClick={() => setActiveTab("disputes")}
-            className={cn(
-              "px-3 py-1.5 rounded-md transition-colors cursor-pointer flex items-center gap-1.5 text-xs",
-              activeTab === "disputes" ? "bg-background text-foreground shadow-2xs font-semibold" : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            <Flag className="h-3.5 w-3.5" />
-            <span>Disputes & Claims</span>
-          </button>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center p-0.5 bg-[#10151B] rounded-lg border border-[rgba(161,161,170,0.18)] text-xs font-medium">
+            <button
+              onClick={() => setActiveTab("generator")}
+              className={cn(
+                "px-3 py-1.5 rounded-md transition-colors cursor-pointer flex items-center gap-1.5 text-xs",
+                activeTab === "generator" ? "bg-white text-black font-semibold shadow-xs" : "text-[#A1A1AA] hover:text-[#F5F5F5]"
+              )}
+            >
+              <FileSpreadsheet className="h-3.5 w-3.5" />
+              <span>Platform Reports</span>
+            </button>
+            <button
+              onClick={() => setActiveTab("disputes")}
+              className={cn(
+                "px-3 py-1.5 rounded-md transition-colors cursor-pointer flex items-center gap-1.5 text-xs",
+                activeTab === "disputes" ? "bg-white text-black font-semibold shadow-xs" : "text-[#A1A1AA] hover:text-[#F5F5F5]"
+              )}
+            >
+              <Flag className="h-3.5 w-3.5" />
+              <span>Disputes & Claims</span>
+            </button>
+          </div>
         </div>
       </div>
 
       {activeTab === "generator" ? (
         <div className="space-y-6">
+          {/* CATEGORY TABS (Panel 10): Revenue | Bookings | Users | Products */}
+          <div className="flex items-center gap-2 border-b border-[rgba(161,161,170,0.18)] pb-2 overflow-x-auto no-scrollbar">
+            {[
+              { id: "revenue", label: "Revenue" },
+              { id: "bookings", label: "Bookings" },
+              { id: "users", label: "Users" },
+              { id: "products", label: "Products" },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setReportType(tab.id as ReportType)}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer",
+                  reportType === tab.id
+                    ? "bg-white text-black font-semibold shadow-xs"
+                    : "text-[#A1A1AA] hover:text-[#F5F5F5] hover:bg-white/5 border border-transparent"
+                )}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* 3 TOP KPI CARDS */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="p-4 rounded-xl bg-[#10151B] border border-[rgba(161,161,170,0.18)] space-y-1">
+              <span className="text-xs text-[#A1A1AA] font-medium">Total Revenue</span>
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-bold font-mono text-[#F5F5F5]">₹48,320</span>
+                <span className="text-xs font-semibold text-emerald-400 font-mono">+ 18%</span>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-xl bg-[#10151B] border border-[rgba(161,161,170,0.18)] space-y-1">
+              <span className="text-xs text-[#A1A1AA] font-medium">Total Bookings</span>
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-bold font-mono text-[#F5F5F5]">641</span>
+                <span className="text-xs font-semibold text-emerald-400 font-mono">+ 20%</span>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-xl bg-[#10151B] border border-[rgba(161,161,170,0.18)] space-y-1">
+              <span className="text-xs text-[#A1A1AA] font-medium">Total Users</span>
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-bold font-mono text-[#F5F5F5]">1,248</span>
+                <span className="text-xs font-semibold text-emerald-400 font-mono">+ 12%</span>
+              </div>
+            </div>
+          </div>
+
+          {/* MONTHLY CHART */}
+          <div className="p-5 rounded-xl bg-[#10151B] border border-[rgba(161,161,170,0.18)] space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold text-[#F5F5F5] uppercase tracking-wider">
+                Monthly Trend Analysis
+              </h3>
+              <span className="text-[11px] font-mono text-[#A1A1AA]">Last 6 Months</span>
+            </div>
+            <div className="h-48 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={monthlyReportData}>
+                  <XAxis dataKey="month" stroke="#A1A1AA" fontSize={11} tickLine={false} axisLine={false} />
+                  <YAxis stroke="#A1A1AA" fontSize={11} tickLine={false} axisLine={false} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "#171C23",
+                      borderColor: "rgba(161,161,170,0.2)",
+                      borderRadius: "8px",
+                      color: "#F5F5F5",
+                      fontSize: "12px",
+                    }}
+                  />
+                  <Bar dataKey="value" fill="#FFFFFF" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* RECENT REPORTS LIST (Panel 10) */}
+          <div className="p-5 rounded-xl bg-[#10151B] border border-[rgba(161,161,170,0.18)] space-y-4">
+            <h3 className="text-xs font-bold text-[#F5F5F5] uppercase tracking-wider">
+              Recent Reports
+            </h3>
+            <div className="divide-y divide-[rgba(161,161,170,0.1)]">
+              {[
+                { title: "Monthly Revenue Report (Oct 2026)", date: "Generated on Oct 12, 2026", type: "revenue" },
+                { title: "User Growth Report (Oct 2026)", date: "Generated on Oct 10, 2026", type: "users" },
+                { title: "Product Performance Report (Oct 2026)", date: "Generated on Oct 08, 2026", type: "products" },
+                { title: "Booking Operations Report (Oct 2026)", date: "Generated on Oct 05, 2026", type: "bookings" },
+              ].map((item, idx) => (
+                <div key={idx} className="py-3 flex items-center justify-between">
+                  <div>
+                    <div className="text-xs font-bold text-[#F5F5F5]">{item.title}</div>
+                    <div className="text-[10px] text-[#A1A1AA] font-mono mt-0.5">{item.date}</div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setReportType(item.type as ReportType);
+                      handleGenerateReport();
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-[#171C23] hover:bg-white/10 text-[#F5F5F5] text-xs font-medium border border-[rgba(161,161,170,0.18)] flex items-center gap-1.5 cursor-pointer transition-colors"
+                  >
+                    <Download className="h-3.5 w-3.5 text-[#A1A1AA]" />
+                    <span>Download</span>
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* REPORT GENERATOR CONTROLS */}
-          <div className="p-5 bg-card rounded-xl border border-border/70 space-y-4">
+          <div className="p-5 bg-[#10151B] rounded-xl border border-[rgba(161,161,170,0.18)] space-y-4">
+            <h3 className="text-xs font-bold text-[#F5F5F5] uppercase tracking-wider">
+              Live Database Export
+            </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-foreground">Report Type</label>
+                <label className="text-xs font-medium text-[#F5F5F5]">Report Scope</label>
                 <select
                   value={reportType}
                   onChange={(e) => setReportType(e.target.value as ReportType)}
-                  className="w-full bg-secondary/40 text-foreground text-xs rounded-lg px-3 py-2 border border-border/70 focus:outline-none font-medium cursor-pointer"
+                  className="w-full bg-[#050709] text-[#F5F5F5] text-xs rounded-lg px-3 py-2 border border-[rgba(161,161,170,0.18)] focus:outline-none font-medium cursor-pointer"
                 >
                   <option value="revenue">Revenue Report</option>
                   <option value="bookings">Booking & Lease Report</option>
@@ -408,11 +541,11 @@ export default function Reports() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-foreground">Date Range Window</label>
+                <label className="text-xs font-medium text-[#F5F5F5]">Date Range Window</label>
                 <select
                   value={dateRange}
                   onChange={(e) => setDateRange(e.target.value as typeof dateRange)}
-                  className="w-full bg-secondary/40 text-foreground text-xs rounded-lg px-3 py-2 border border-border/70 focus:outline-none font-medium cursor-pointer"
+                  className="w-full bg-[#050709] text-[#F5F5F5] text-xs rounded-lg px-3 py-2 border border-[rgba(161,161,170,0.18)] focus:outline-none font-medium cursor-pointer"
                 >
                   <option value="7">Last 7 Days</option>
                   <option value="30">Last 30 Days</option>
@@ -425,7 +558,7 @@ export default function Reports() {
                 <button
                   onClick={handleGenerateReport}
                   disabled={generating}
-                  className="flex-1 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-black font-semibold text-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
+                  className="flex-1 py-2 rounded-lg bg-white hover:bg-neutral-200 text-black font-semibold text-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
                 >
                   <RefreshCw className={cn("h-3.5 w-3.5", generating && "animate-spin")} />
                   <span>{generating ? "Compiling..." : "Generate Dataset"}</span>
@@ -434,7 +567,7 @@ export default function Reports() {
                 {generatedData && generatedData.length > 0 && (
                   <button
                     onClick={handleExportCSV}
-                    className="px-3 py-2 rounded-lg bg-secondary hover:bg-secondary/80 border border-border/70 text-foreground font-medium text-xs transition-colors cursor-pointer flex items-center gap-1.5"
+                    className="px-3 py-2 rounded-lg bg-[#171C23] hover:bg-white/10 border border-[rgba(161,161,170,0.18)] text-[#F5F5F5] font-medium text-xs transition-colors cursor-pointer flex items-center gap-1.5"
                     title="Export CSV"
                   >
                     <Download className="h-3.5 w-3.5" />

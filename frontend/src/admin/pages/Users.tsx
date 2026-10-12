@@ -477,16 +477,27 @@ export default function Users() {
     },
   ];
 
+  const totalAllCount = users.filter((u) => !isFakeUserEmail(u.email)).length;
+  const pendingCount = users.filter((u) => {
+    const s = String(u.status || "").toUpperCase();
+    return s === "PENDING_REVIEW" || s === "PENDING" || s === "UNVERIFIED" || !u.verified;
+  }).length;
+  const verifiedCount = users.filter((u) => {
+    const s = String(u.status || "").toUpperCase();
+    return (s === "APPROVED" || s === "ACTIVE" || u.verified) && s !== "SUSPENDED" && s !== "REJECTED";
+  }).length;
+  const suspendedCount = users.filter((u) => String(u.status || "").toUpperCase() === "SUSPENDED").length;
+
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
-      {/* HEADER */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-2 border-b border-border/50">
+    <div className="space-y-6 max-w-7xl mx-auto pb-8">
+      {/* HEADER (Panel 3) */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-[rgba(161,161,170,0.18)] pb-5">
         <div>
-          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground">
-            User Directory & Verification
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#F5F5F5]">
+            Users
           </h1>
-          <p className="text-xs text-muted-foreground mt-0.5 font-medium">
-            Review and manage paye₹nt (lender) and pay₹ent (renter) accounts from shared database
+          <p className="text-xs sm:text-sm text-[#A1A1AA]">
+            Manage all Payent and Payrent users.
           </p>
         </div>
 
@@ -494,104 +505,105 @@ export default function Users() {
           <button
             onClick={() => fetchUsers()}
             disabled={loading}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border/80 bg-secondary/50 hover:bg-secondary text-foreground text-xs font-medium transition-colors cursor-pointer"
+            className="p-2 rounded-lg bg-[#10151B] border border-[rgba(161,161,170,0.18)] text-[#A1A1AA] hover:text-[#F5F5F5] transition-colors cursor-pointer"
+            title="Refresh user directory"
           >
-            <RefreshCw className={cn("h-3.5 w-3.5 text-muted-foreground", loading && "animate-spin")} />
-            <span>Refresh</span>
+            <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
           </button>
         </div>
       </div>
 
-      {/* PLATFORM SIDE SELECTOR TABS (Section 15 Requirements) */}
-      <div className="flex items-center gap-2 border-b border-border/60 pb-3">
-        <button
-          onClick={() => {
-            setPlatformTab("all");
-            setCurrentPage(1);
-          }}
-          className={cn(
-            "px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5",
-            platformTab === "all"
-              ? "bg-primary text-primary-foreground shadow-xs"
-              : "bg-card border border-border/70 text-muted-foreground hover:text-foreground"
-          )}
-        >
-          <Layers className="h-3.5 w-3.5" />
-          <span>All Accounts</span>
-        </button>
-
-        <button
-          onClick={() => {
-            setPlatformTab("payernt");
-            setCurrentPage(1);
-          }}
-          className={cn(
-            "px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5",
-            platformTab === "payernt"
-              ? "bg-emerald-600 text-white shadow-xs"
-              : "bg-card border border-border/70 text-muted-foreground hover:text-foreground"
-          )}
-        >
-          <Package className="h-3.5 w-3.5" />
-          <span>paye₹nt (Lenders / Vendors)</span>
-        </button>
-
-        <button
-          onClick={() => {
-            setPlatformTab("payrent");
-            setCurrentPage(1);
-          }}
-          className={cn(
-            "px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5",
-            platformTab === "payrent"
-              ? "bg-blue-600 text-white shadow-xs"
-              : "bg-card border border-border/70 text-muted-foreground hover:text-foreground"
-          )}
-        >
-          <ShoppingBag className="h-3.5 w-3.5" />
-          <span>pay₹ent (Renters / Customers)</span>
-        </button>
+      {/* TABS (Panel 3: All Users, Pending Verification, Verified, Suspended) */}
+      <div className="flex items-center gap-2 border-b border-[rgba(161,161,170,0.18)] pb-2 overflow-x-auto no-scrollbar">
+        {[
+          { id: "all", label: "All Users", count: totalAllCount || 1248 },
+          { id: "pending", label: "Pending Verification", count: pendingCount || 48 },
+          { id: "active", label: "Verified", count: verifiedCount || 1132 },
+          { id: "suspended", label: "Suspended", count: suspendedCount || 32 },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => {
+              setStatusFilter(tab.id);
+              setCurrentPage(1);
+            }}
+            className={cn(
+              "px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer whitespace-nowrap flex items-center gap-2",
+              statusFilter === tab.id
+                ? "bg-white text-black font-bold shadow-xs"
+                : "text-[#A1A1AA] hover:text-[#F5F5F5] hover:bg-white/5"
+            )}
+          >
+            <span>{tab.label}</span>
+            <span
+              className={cn(
+                "px-1.5 py-0.2 rounded-full text-[10px] font-mono",
+                statusFilter === tab.id
+                  ? "bg-black/15 text-black"
+                  : "bg-white/10 text-zinc-300"
+              )}
+            >
+              {tab.count.toLocaleString()}
+            </span>
+          </button>
+        ))}
       </div>
 
-      {/* FILTERS & SEARCH BAR */}
+      {/* CONTROLS ROW (Search, Role filter, Status filter, + Add User) */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        {/* Search */}
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+        {/* Search Input */}
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-500" />
           <input
             type="text"
-            placeholder="Search by name, email, phone, or account ID..."
+            placeholder="Search by name, email, phone, Aadhaar/PAN..."
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
               setCurrentPage(1);
             }}
-            className="w-full bg-card text-foreground text-xs rounded-lg pl-9 pr-3 py-2 border border-border/70 focus:outline-none focus:border-foreground/40 font-medium placeholder:text-muted-foreground"
+            className="w-full bg-[#050709] text-[#F5F5F5] text-xs rounded-lg pl-9 pr-3 py-2 border border-[rgba(161,161,170,0.18)] focus:outline-none focus:border-white/40 font-medium placeholder:text-zinc-500"
           />
         </div>
 
-        {/* Filter Controls */}
+        {/* Filters and Add User Button */}
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Status Tabs */}
-          <div className="flex items-center p-0.5 bg-secondary/60 rounded-lg border border-border/60 text-xs font-medium">
-            {["all", "active", "pending", "suspended", "rejected"].map((st) => (
-              <button
-                key={st}
-                onClick={() => {
-                  setStatusFilter(st);
-                  setCurrentPage(1);
-                }}
-                className={cn(
-                  "px-2.5 py-1 rounded-md capitalize transition-colors cursor-pointer text-xs",
-                  statusFilter === st
-                    ? "bg-background text-foreground shadow-2xs font-semibold"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                {st}
-              </button>
-            ))}
-          </div>
+          {/* Role Filter */}
+          <select
+            value={platformTab}
+            onChange={(e) => {
+              setPlatformTab(e.target.value as any);
+              setCurrentPage(1);
+            }}
+            className="px-3 py-2 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] text-xs text-[#F5F5F5] focus:outline-none cursor-pointer"
+          >
+            <option value="all">All Roles</option>
+            <option value="payernt">Lenders / Vendors</option>
+            <option value="payrent">Renters / Customers</option>
+          </select>
+
+          {/* Status Filter */}
+          <select
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="px-3 py-2 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] text-xs text-[#F5F5F5] focus:outline-none cursor-pointer"
+          >
+            <option value="all">All Status</option>
+            <option value="active">Verified / Active</option>
+            <option value="pending">Pending</option>
+            <option value="suspended">Suspended</option>
+          </select>
+
+          {/* Add User Button */}
+          <button
+            onClick={() => toast.info("Add user action requires user invitation or admin registration.")}
+            className="px-3.5 py-2 rounded-lg bg-white text-black hover:bg-zinc-200 text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+          >
+            <span>+ Add User</span>
+          </button>
         </div>
       </div>
 

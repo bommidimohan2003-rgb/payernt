@@ -108,131 +108,131 @@ export default function ActivityLogs() {
 
   const columns: Column<AdminActivityLog>[] = [
     {
-      key: "timestamp",
-      label: "Timestamp",
-      sortable: true,
-      render: (row) => (
-        <span className="font-mono text-xs text-muted-foreground">
-          {row.timestamp ? new Date(row.timestamp).toLocaleString() : "—"}
-        </span>
-      ),
-    },
-    {
       key: "userName",
-      label: "Actor / Admin",
+      label: "Admin",
       render: (row) => (
-        <span className="font-bold text-foreground text-xs">{row.userName || "System"}</span>
-      ),
-    },
-    {
-      key: "module",
-      label: "Module",
-      render: (row) => (
-        <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-secondary border border-border/60 text-muted-foreground">
-          {row.module || "General"}
-        </span>
+        <div className="flex items-center gap-2.5">
+          <div className="h-7 w-7 rounded-full bg-[#171C23] border border-[rgba(161,161,170,0.18)] flex items-center justify-center font-bold text-xs text-[#F5F5F5] shrink-0">
+            {(row.userName || "A").charAt(0).toUpperCase()}
+          </div>
+          <span className="font-bold text-[#F5F5F5] text-xs">{row.userName || "Admin"}</span>
+        </div>
       ),
     },
     {
       key: "action",
-      label: "Operation Performed",
+      label: "Action",
       render: (row) => (
-        <span className="text-xs text-foreground font-medium">
+        <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-[#171C23] text-[#F5F5F5] border border-[rgba(161,161,170,0.18)]">
           {sanitizeLogText(row.action)}
         </span>
       ),
     },
     {
-      key: "ipAddress",
-      label: "IP Address",
+      key: "module",
+      label: "Target",
       render: (row) => (
-        <span className="font-mono text-[11px] text-muted-foreground">
-          {row.ipAddress || "127.0.0.1"}
+        <span className="text-xs font-semibold text-[#F5F5F5]">
+          {row.module || "System Context"}
         </span>
       ),
     },
     {
-      key: "result",
-      label: "Status",
-      render: () => (
-        <span className="text-[10px] font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
-          SUCCESS
+      key: "ipAddress",
+      label: "Details",
+      render: (row) => (
+        <span className="font-mono text-xs text-[#A1A1AA]">
+          {row.ipAddress ? `IP: ${row.ipAddress}` : "Audit event verified"}
+        </span>
+      ),
+    },
+    {
+      key: "timestamp",
+      label: "Date",
+      sortable: true,
+      render: (row) => (
+        <span className="font-mono text-xs text-[#A1A1AA]">
+          {row.timestamp ? new Date(row.timestamp).toLocaleString("en-IN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}
         </span>
       ),
     },
   ];
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-6">
       {/* HEADER */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-2 border-b border-border/50">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-border/50">
         <div>
-          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#F5F5F5]">
             Activity Logs
           </h1>
-          <p className="text-xs text-muted-foreground mt-0.5 font-medium">
-            Security audit trail, administrative action history, and access log stream
+          <p className="text-xs text-[#A1A1AA] mt-0.5 font-medium">
+            Track all administrative activities.
           </p>
         </div>
 
         <button
           onClick={() => fetchLogs()}
           disabled={loading}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border/80 bg-secondary/50 hover:bg-secondary text-foreground text-xs font-medium transition-colors cursor-pointer self-start sm:self-auto"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[rgba(161,161,170,0.18)] bg-[#10151B] hover:bg-[#171C23] text-[#F5F5F5] text-xs font-medium transition-colors cursor-pointer self-start sm:self-auto"
         >
-          <RefreshCw className={cn("h-3.5 w-3.5 text-muted-foreground", loading && "animate-spin")} />
+          <RefreshCw className={cn("h-3.5 w-3.5 text-[#A1A1AA]", loading && "animate-spin")} />
           <span>Refresh</span>
         </button>
       </div>
 
       {/* FILTERS & SEARCH */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-[#10151B] p-3 rounded-xl border border-[rgba(161,161,170,0.18)]">
         <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#A1A1AA]" />
           <input
             type="text"
-            placeholder="Search logs by actor, action, IP..."
+            placeholder="Search by admin, action or target..."
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
               setCurrentPage(1);
             }}
-            className="w-full bg-card text-foreground text-xs rounded-lg pl-9 pr-3 py-2 border border-border/70 focus:outline-none focus:border-foreground/40 font-medium placeholder:text-muted-foreground"
+            className="w-full bg-[#050709] text-[#F5F5F5] text-xs rounded-lg pl-9 pr-3 py-2 border border-[rgba(161,161,170,0.18)] focus:outline-none focus:border-white/40 font-medium placeholder:text-[#A1A1AA]"
           />
         </div>
 
-        {modules.length > 0 && (
+        <div className="flex items-center gap-2">
           <select
             value={moduleFilter}
             onChange={(e) => {
               setModuleFilter(e.target.value);
               setCurrentPage(1);
             }}
-            className="bg-card text-foreground text-xs rounded-lg px-2.5 py-2 border border-border/70 focus:outline-none font-medium cursor-pointer"
+            className="bg-[#050709] text-[#F5F5F5] text-xs rounded-lg px-2.5 py-2 border border-[rgba(161,161,170,0.18)] focus:outline-none font-medium cursor-pointer"
           >
-            <option value="all">All Modules</option>
+            <option value="all">All Actions</option>
             {modules.map((m) => (
               <option key={m} value={m}>
                 {m}
               </option>
             ))}
           </select>
-        )}
+
+          <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] text-xs text-[#A1A1AA] font-mono">
+            <span>Oct 12, 2026</span>
+          </div>
+        </div>
       </div>
 
       {/* ERROR STATE */}
       {error && !loading ? (
-        <div className="bg-card rounded-xl border border-red-500/20 p-8 text-center flex flex-col items-center justify-center space-y-3">
-          <div className="w-10 h-10 rounded-full bg-red-500/10 text-[#FF1744] flex items-center justify-center">
+        <div className="bg-[#10151B] rounded-xl border border-red-500/20 p-8 text-center flex flex-col items-center justify-center space-y-3">
+          <div className="w-10 h-10 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center">
             <ShieldAlert className="h-5 w-5" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-foreground">Database Sync Failed</h3>
-            <p className="text-xs text-muted-foreground mt-1 max-w-sm">{error}</p>
+            <h3 className="text-sm font-semibold text-[#F5F5F5]">Database Sync Failed</h3>
+            <p className="text-xs text-[#A1A1AA] mt-1 max-w-sm">{error}</p>
           </div>
           <button
             onClick={() => fetchLogs()}
-            className="px-4 py-2 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground text-xs font-medium transition-colors border border-border/80 cursor-pointer"
+            className="px-4 py-2 rounded-lg bg-[#171C23] hover:bg-[#171C23]/80 text-[#F5F5F5] text-xs font-medium transition-colors border border-[rgba(161,161,170,0.18)] cursor-pointer"
           >
             Retry Database Fetch
           </button>

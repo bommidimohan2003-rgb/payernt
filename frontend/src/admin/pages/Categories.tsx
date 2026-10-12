@@ -118,37 +118,52 @@ export default function Categories() {
     }
   };
 
+  const [search, setSearch] = useState("");
+
+  const filteredCategories = categories.filter((c) =>
+    search ? c.name.toLowerCase().includes(search.toLowerCase()) : true
+  );
+
   const columns: Column<AdminCategory>[] = [
     {
       key: "name",
-      label: "Category Name",
+      label: "Category",
       render: (row) => (
         <div className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded-lg bg-secondary flex items-center justify-center text-foreground border border-border/60">
-            <Grid className="h-4 w-4" />
+          <div className="h-8 w-8 rounded-lg bg-[#171C23] flex items-center justify-center text-[#F5F5F5] border border-[rgba(161,161,170,0.18)]">
+            <Package className="h-4 w-4" />
           </div>
           <div>
-            <div className="font-bold text-foreground text-xs">{row.name}</div>
-            <div className="text-[10px] text-muted-foreground font-mono">ID: {row.id}</div>
+            <div className="font-bold text-[#F5F5F5] text-xs">{row.name}</div>
+            <div className="text-[10px] text-[#A1A1AA] font-mono">ID: {row.id}</div>
           </div>
         </div>
       ),
     },
     {
-      key: "count",
-      label: "Indexed Equipment",
+      key: "icon",
+      label: "Icon",
       render: (row) => (
-        <span className="font-mono text-xs font-semibold text-foreground">
-          {row.count || 0} gear listings
+        <span className="px-2 py-0.5 rounded text-[11px] font-mono bg-[#171C23] text-[#A1A1AA] border border-[rgba(161,161,170,0.18)]">
+          {row.icon || "Package"}
+        </span>
+      ),
+    },
+    {
+      key: "count",
+      label: "Products",
+      render: (row) => (
+        <span className="font-mono text-xs font-semibold text-[#F5F5F5]">
+          {row.count || 0}
         </span>
       ),
     },
     {
       key: "enabled",
-      label: "Visibility",
-      render: (row) => (
-        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-          Enabled
+      label: "Status",
+      render: () => (
+        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+          Active
         </span>
       ),
     },
@@ -160,14 +175,14 @@ export default function Categories() {
         <div className="flex items-center justify-end gap-1.5">
           <button
             onClick={() => handleOpenEdit(row)}
-            className="p-1.5 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground transition-all cursor-pointer"
+            className="p-1.5 rounded-lg bg-[#171C23] hover:bg-white/10 text-[#F5F5F5] transition-all cursor-pointer border border-[rgba(161,161,170,0.18)]"
             title="Edit category"
           >
             <Edit2 className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={() => handleDelete(row)}
-            className="p-1.5 rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20 border border-destructive/20 transition-all cursor-pointer"
+            className="p-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 transition-all cursor-pointer"
             title="Delete category"
           >
             <Trash2 className="h-3.5 w-3.5" />
@@ -178,55 +193,71 @@ export default function Categories() {
   ];
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-6">
       {/* HEADER */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-2 border-b border-border/50">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-border/50">
         <div>
-          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#F5F5F5]">
             Categories
           </h1>
-          <p className="text-xs text-muted-foreground mt-0.5 font-medium">
-            Manage marketplace gear taxonomy, product associations, and catalog categories
+          <p className="text-xs text-[#A1A1AA] mt-0.5 font-medium">
+            Manage product categories.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
           <button
+            onClick={fetchCats}
+            disabled={loading}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[rgba(161,161,170,0.18)] bg-[#10151B] hover:bg-[#171C23] text-[#F5F5F5] text-xs font-medium transition-colors cursor-pointer"
+            title="Refresh categories"
+          >
+            <RefreshCw className={cn("h-3.5 w-3.5 text-[#A1A1AA]", loading && "animate-spin")} />
+            <span>Refresh</span>
+          </button>
+          <button
             onClick={() => {
               setName("");
               setCreateModalOpen(true);
             }}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-black font-semibold text-xs transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-neutral-200 text-black font-semibold text-xs transition-colors cursor-pointer"
           >
             <Plus className="h-3.5 w-3.5" />
-            <span>New Category</span>
+            <span>Add Category</span>
           </button>
+        </div>
+      </div>
 
-          <button
-            onClick={fetchCats}
-            disabled={loading}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border/80 bg-secondary/50 hover:bg-secondary text-foreground text-xs font-medium transition-colors cursor-pointer"
-            title="Refresh categories"
-          >
-            <RefreshCw className={cn("h-3.5 w-3.5 text-muted-foreground", loading && "animate-spin")} />
-            <span>Refresh</span>
-          </button>
+      {/* SEARCH BAR */}
+      <div className="flex items-center justify-between gap-3 bg-[#10151B] p-3 rounded-xl border border-[rgba(161,161,170,0.18)]">
+        <div className="relative flex-1 max-w-sm">
+          <Package className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#A1A1AA]" />
+          <input
+            type="text"
+            placeholder="Search categories..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full bg-[#050709] text-[#F5F5F5] text-xs rounded-lg pl-9 pr-3 py-2 border border-[rgba(161,161,170,0.18)] focus:outline-none focus:border-white/40 font-medium placeholder:text-[#A1A1AA]"
+          />
+        </div>
+        <div className="text-xs font-mono text-[#A1A1AA]">
+          {filteredCategories.length} Categories Total
         </div>
       </div>
 
       {/* ERROR STATE */}
       {error && !loading ? (
-        <div className="bg-card rounded-xl border border-red-500/20 p-8 text-center flex flex-col items-center justify-center space-y-3">
-          <div className="w-10 h-10 rounded-full bg-red-500/10 text-[#FF1744] flex items-center justify-center">
+        <div className="bg-[#10151B] rounded-xl border border-red-500/20 p-8 text-center flex flex-col items-center justify-center space-y-3">
+          <div className="w-10 h-10 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center">
             <ShieldAlert className="h-5 w-5" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-foreground">Database Sync Failed</h3>
-            <p className="text-xs text-muted-foreground mt-1 max-w-sm">{error}</p>
+            <h3 className="text-sm font-semibold text-[#F5F5F5]">Database Sync Failed</h3>
+            <p className="text-xs text-[#A1A1AA] mt-1 max-w-sm">{error}</p>
           </div>
           <button
             onClick={fetchCats}
-            className="px-4 py-2 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground text-xs font-medium transition-colors border border-border/80 cursor-pointer"
+            className="px-4 py-2 rounded-lg bg-[#171C23] hover:bg-[#171C23]/80 text-[#F5F5F5] text-xs font-medium transition-colors border border-[rgba(161,161,170,0.18)] cursor-pointer"
           >
             Retry Database Fetch
           </button>
@@ -236,7 +267,7 @@ export default function Categories() {
         <div className="space-y-4">
           <Table
             columns={columns}
-            data={categories}
+            data={filteredCategories}
             loading={loading}
             emptyTitle="No categories found"
             emptyDescription="No categories have been configured in the database."
