@@ -1670,7 +1670,14 @@ export const api = {
 
   async createSupportTicket(
     token: string,
-    ticket: { subject: string; message: string; priority?: string },
+    ticket: {
+      subject: string;
+      message: string;
+      category?: string;
+      priority?: string;
+      bookingId?: string;
+      productReference?: string;
+    },
   ) {
     const res = await this.fetchWithAuth(`${API_BASE}/api/support`, {
       method: "POST",
@@ -1679,8 +1686,19 @@ export const api = {
       },
       body: JSON.stringify(ticket),
     });
-    if (!res.ok) throw new Error("Failed to create support ticket");
+    if (!res.ok) {
+      let errorMsg = "Failed to create support ticket";
+      try {
+        const errJson = await res.json();
+        if (errJson.detail) errorMsg = errJson.detail;
+      } catch {}
+      throw new Error(errorMsg);
+    }
     return await res.json();
+  },
+
+  async replyToConversation(token: string, conversationId: string, message: string) {
+    return this.sendMessage(token, conversationId, message);
   },
 
   async checkAvailabilityBatch(

@@ -7,6 +7,7 @@ const navLinks = [
   { label: "Explore", to: "/browse" },
   { label: "About", to: "/about" },
   { label: "Contact", to: "/contact" },
+  { label: "FAQ & Support", to: "/support" },
 ];
 
 const socials = [

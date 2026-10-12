@@ -20,6 +20,7 @@ import { Route as CategoriesRouteImport } from './routes/categories'
 import { Route as CheckoutRouteImport } from './routes/checkout'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as FaqRouteImport } from './routes/faq'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as LenderPortalRouteImport } from './routes/lender-portal'
 import { Route as LoginRouteImport } from './routes/login'
@@ -38,6 +39,7 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as ReviewsRouteImport } from './routes/reviews'
 import { Route as SelectRouteImport } from './routes/select'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as SupportRouteImport } from './routes/support'
 import { Route as WishlistRouteImport } from './routes/wishlist'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminSplatRouteImport } from './routes/admin/$'
@@ -152,6 +154,11 @@ const DashboardRoute = DashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FaqRoute = FaqRouteImport.update({
+  id: '/faq',
+  path: '/faq',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
   id: '/forgot-password',
   path: '/forgot-password',
@@ -240,6 +247,11 @@ const SelectRoute = SelectRouteImport.update({
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SupportRoute = SupportRouteImport.update({
+  id: '/support',
+  path: '/support',
   getParentRoute: () => rootRouteImport,
 } as any)
 const WishlistRoute = WishlistRouteImport.update({
@@ -545,6 +557,7 @@ export interface FileRoutesByFullPath {
   '/checkout': typeof CheckoutRoute
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRoute
+  '/faq': typeof FaqRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/lender-portal': typeof LenderPortalRoute
   '/login': typeof LoginRoute
@@ -563,6 +576,7 @@ export interface FileRoutesByFullPath {
   '/reviews': typeof ReviewsRoute
   '/select': typeof SelectRoute
   '/settings': typeof SettingsRoute
+  '/support': typeof SupportRoute
   '/wishlist': typeof WishlistRoute
   '/admin/$': typeof AdminSplatRoute
   '/admin/activity': typeof AdminActivityRoute
@@ -633,6 +647,7 @@ export interface FileRoutesByTo {
   '/checkout': typeof CheckoutRoute
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRoute
+  '/faq': typeof FaqRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/lender-portal': typeof LenderPortalRoute
   '/login': typeof LoginRoute
@@ -649,6 +664,7 @@ export interface FileRoutesByTo {
   '/reviews': typeof ReviewsRoute
   '/select': typeof SelectRoute
   '/settings': typeof SettingsRoute
+  '/support': typeof SupportRoute
   '/wishlist': typeof WishlistRoute
   '/admin/$': typeof AdminSplatRoute
   '/admin/activity': typeof AdminActivityRoute
@@ -721,6 +737,7 @@ export interface FileRoutesById {
   '/checkout': typeof CheckoutRoute
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRoute
+  '/faq': typeof FaqRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/lender-portal': typeof LenderPortalRoute
   '/login': typeof LoginRoute
@@ -739,6 +756,7 @@ export interface FileRoutesById {
   '/reviews': typeof ReviewsRoute
   '/select': typeof SelectRoute
   '/settings': typeof SettingsRoute
+  '/support': typeof SupportRoute
   '/wishlist': typeof WishlistRoute
   '/admin/$': typeof AdminSplatRoute
   '/admin/activity': typeof AdminActivityRoute
@@ -812,6 +830,7 @@ export interface FileRouteTypes {
     | '/checkout'
     | '/contact'
     | '/dashboard'
+    | '/faq'
     | '/forgot-password'
     | '/lender-portal'
     | '/login'
@@ -830,6 +849,7 @@ export interface FileRouteTypes {
     | '/reviews'
     | '/select'
     | '/settings'
+    | '/support'
     | '/wishlist'
     | '/admin/$'
     | '/admin/activity'
@@ -900,6 +920,7 @@ export interface FileRouteTypes {
     | '/checkout'
     | '/contact'
     | '/dashboard'
+    | '/faq'
     | '/forgot-password'
     | '/lender-portal'
     | '/login'
@@ -916,6 +937,7 @@ export interface FileRouteTypes {
     | '/reviews'
     | '/select'
     | '/settings'
+    | '/support'
     | '/wishlist'
     | '/admin/$'
     | '/admin/activity'
@@ -987,6 +1009,7 @@ export interface FileRouteTypes {
     | '/checkout'
     | '/contact'
     | '/dashboard'
+    | '/faq'
     | '/forgot-password'
     | '/lender-portal'
     | '/login'
@@ -1005,6 +1028,7 @@ export interface FileRouteTypes {
     | '/reviews'
     | '/select'
     | '/settings'
+    | '/support'
     | '/wishlist'
     | '/admin/$'
     | '/admin/activity'
@@ -1077,6 +1101,7 @@ export interface RootRouteChildren {
   CheckoutRoute: typeof CheckoutRoute
   ContactRoute: typeof ContactRoute
   DashboardRoute: typeof DashboardRoute
+  FaqRoute: typeof FaqRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   LenderPortalRoute: typeof LenderPortalRoute
   LoginRoute: typeof LoginRoute
@@ -1095,6 +1120,7 @@ export interface RootRouteChildren {
   ReviewsRoute: typeof ReviewsRoute
   SelectRoute: typeof SelectRoute
   SettingsRoute: typeof SettingsRoute
+  SupportRoute: typeof SupportRoute
   WishlistRoute: typeof WishlistRoute
   DeliveryIdRoute: typeof DeliveryIdRoute
   ProductIdRoute: typeof ProductIdRoute
@@ -1179,6 +1205,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/faq': {
+      id: '/faq'
+      path: '/faq'
+      fullPath: '/faq'
+      preLoaderRoute: typeof FaqRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/forgot-password': {
@@ -1305,6 +1338,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/support': {
+      id: '/support'
+      path: '/support'
+      fullPath: '/support'
+      preLoaderRoute: typeof SupportRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/wishlist': {
@@ -1890,6 +1930,7 @@ const rootRouteChildren: RootRouteChildren = {
   CheckoutRoute: CheckoutRoute,
   ContactRoute: ContactRoute,
   DashboardRoute: DashboardRoute,
+  FaqRoute: FaqRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
   LenderPortalRoute: LenderPortalRoute,
   LoginRoute: LoginRoute,
@@ -1908,6 +1949,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReviewsRoute: ReviewsRoute,
   SelectRoute: SelectRoute,
   SettingsRoute: SettingsRoute,
+  SupportRoute: SupportRoute,
   WishlistRoute: WishlistRoute,
   DeliveryIdRoute: DeliveryIdRoute,
   ProductIdRoute: ProductIdRoute,

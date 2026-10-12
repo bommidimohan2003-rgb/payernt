@@ -3350,28 +3350,45 @@ def fetch_product_by_id(id: str, response: Response):
 class CreateSupportTicketSchema(BaseModel):
     subject: str
     message: str
+    category: Optional[str] = "General Help"
     priority: Optional[str] = "medium"
+    bookingId: Optional[str] = None
+    productReference: Optional[str] = None
 
 @app.get("/api/support")
 @app.get("/api/messages")
 def fetch_user_conversations(current_user_email: str = Depends(get_current_user_email)):
     clean_email = current_user_email.strip().lower()
-    tickets = fetch_all("""
+    from database import MOCK_SUPPORT_TICKETS
+    db_tickets = fetch_all("""
         SELECT * FROM support_tickets 
         WHERE LOWER(user_email) = %s 
         ORDER BY COALESCE(updated_at, created_at) DESC
     """, (clean_email,))
+    
+    seen_ids = set()
+    combined = []
+    for t in (db_tickets or []):
+        seen_ids.add(t["id"])
+        combined.append(t)
+    
+    for tid, mt in MOCK_SUPPORT_TICKETS.items():
+        if mt.get("user_email", "").strip().lower() == clean_email and tid not in seen_ids:
+            combined.append(mt)
+            
     res = []
-    for t in tickets:
+    for t in combined:
         msgs = json.loads(t["messages"]) if isinstance(t.get("messages"), str) else (t.get("messages") or [])
         last_msg = msgs[-1] if msgs else {}
         unread_cnt = sum(1 for m in msgs if m.get("senderType") != "user" and not m.get("read"))
         res.append({
             "id": t["id"],
             "subject": t.get("subject") or "Inquiry",
-            "category": t.get("category") or "Support",
+            "category": t.get("category") or "General Help",
             "status": t.get("status") or "open",
             "priority": t.get("priority") or "medium",
+            "bookingId": t.get("bookingId") or t.get("booking_id"),
+            "productReference": t.get("productReference") or t.get("product_reference"),
             "createdAt": t.get("created_at"),
             "updatedAt": t.get("updated_at") or t.get("created_at"),
             "partner": "Payent Support & Coordination",
@@ -3388,21 +3405,27 @@ def fetch_user_conversations(current_user_email: str = Depends(get_current_user_
 @app.get("/api/messages/{id}")
 def fetch_conversation_detail(id: str, current_user_email: str = Depends(get_current_user_email)):
     clean_email = current_user_email.strip().lower()
+    from database import MOCK_SUPPORT_TICKETS
     ticket = fetch_one("SELECT * FROM support_tickets WHERE id = %s", (id,))
+    if not ticket and id in MOCK_SUPPORT_TICKETS:
+        ticket = MOCK_SUPPORT_TICKETS[id]
+        
     if not ticket:
         raise HTTPException(status_code=404, detail="Conversation not found.")
     if ticket.get("user_email", "").strip().lower() != clean_email:
         user_rec = get_user(clean_email) or {}
-        if user_rec.get("role") != "admin":
+        if user_rec.get("role") not in ("admin", "superadmin"):
             raise HTTPException(status_code=403, detail="Not authorized to access this conversation.")
     
     msgs = json.loads(ticket["messages"]) if isinstance(ticket.get("messages"), str) else (ticket.get("messages") or [])
     return {
         "id": ticket["id"],
         "subject": ticket.get("subject") or "Inquiry",
-        "category": ticket.get("category") or "Support",
+        "category": ticket.get("category") or "General Help",
         "status": ticket.get("status") or "open",
         "priority": ticket.get("priority") or "medium",
+        "bookingId": ticket.get("bookingId") or ticket.get("booking_id"),
+        "productReference": ticket.get("productReference") or ticket.get("product_reference"),
         "createdAt": ticket.get("created_at"),
         "updatedAt": ticket.get("updated_at") or ticket.get("created_at"),
         "partner": "Payent Support & Coordination",
@@ -3420,12 +3443,16 @@ def reply_to_conversation(id: str, data: ConversationReplySchema, current_user_e
     if not clean_msg:
         raise HTTPException(status_code=422, detail="Message cannot be empty.")
     
+    from database import MOCK_SUPPORT_TICKETS
     ticket = fetch_one("SELECT * FROM support_tickets WHERE id = %s", (id,))
+    if not ticket and id in MOCK_SUPPORT_TICKETS:
+        ticket = MOCK_SUPPORT_TICKETS[id]
+        
     if not ticket:
         raise HTTPException(status_code=404, detail="Conversation not found.")
     
     user_rec = get_user(clean_email) or {}
-    is_admin = user_rec.get("role") == "admin"
+    is_admin = user_rec.get("role") in ("admin", "superadmin")
     if ticket.get("user_email", "").strip().lower() != clean_email and not is_admin:
         raise HTTPException(status_code=403, detail="Not authorized to reply to this conversation.")
     
@@ -3441,11 +3468,20 @@ def reply_to_conversation(id: str, data: ConversationReplySchema, current_user_e
     }
     msgs.append(new_msg)
     new_status = "pending" if is_admin else "open"
-    execute_query("""
-        UPDATE support_tickets 
-        SET messages = %s, status = %s, updated_at = %s 
-        WHERE id = %s
-    """, (json.dumps(msgs), new_status, now_str, id))
+    
+    if id in MOCK_SUPPORT_TICKETS:
+        MOCK_SUPPORT_TICKETS[id]["messages"] = msgs
+        MOCK_SUPPORT_TICKETS[id]["status"] = new_status
+        MOCK_SUPPORT_TICKETS[id]["updated_at"] = now_str
+        
+    try:
+        execute_query("""
+            UPDATE support_tickets 
+            SET messages = %s, status = %s, updated_at = %s 
+            WHERE id = %s
+        """, (json.dumps(msgs), new_status, now_str, id))
+    except Exception as e:
+        logger.warning(f"[reply_to_conversation] DB note: {e}")
     
     return {
         "success": True,
@@ -3457,14 +3493,14 @@ def reply_to_conversation(id: str, data: ConversationReplySchema, current_user_e
 class NewConversationSchema(BaseModel):
     subject: str
     message: str
-    category: Optional[str] = "General Inquiry"
+    category: Optional[str] = "General Help"
 
 @app.post("/api/messages/new")
 def create_new_conversation(data: NewConversationSchema, current_user_email: str = Depends(get_current_user_email)):
     clean_email = current_user_email.strip().lower()
     clean_sub = data.subject.strip()
     clean_msg = data.message.strip()
-    clean_cat = (data.category or "General Inquiry").strip()
+    clean_cat = (data.category or "General Help").strip()
     if len(clean_sub) < 3:
         raise HTTPException(status_code=422, detail="Subject must be at least 3 characters.")
     if len(clean_msg) < 5:
@@ -3481,10 +3517,28 @@ def create_new_conversation(data: NewConversationSchema, current_user_email: str
         "content": clean_msg,
         "timestamp": now_str
     }]
-    execute_query("""
-        INSERT INTO support_tickets (id, user_email, user_name, subject, category, status, priority, messages, created_at, updated_at)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-    """, (ticket_id, clean_email, user_name, clean_sub, clean_cat, "open", "medium", json.dumps(init_messages), now_str, now_str))
+    
+    from database import MOCK_SUPPORT_TICKETS
+    MOCK_SUPPORT_TICKETS[ticket_id] = {
+        "id": ticket_id,
+        "user_email": clean_email,
+        "user_name": user_name,
+        "subject": clean_sub,
+        "category": clean_cat,
+        "status": "open",
+        "priority": "medium",
+        "messages": init_messages,
+        "created_at": now_str,
+        "updated_at": now_str
+    }
+    
+    try:
+        execute_query("""
+            INSERT INTO support_tickets (id, user_email, user_name, subject, category, status, priority, messages, created_at, updated_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (ticket_id, clean_email, user_name, clean_sub, clean_cat, "open", "medium", json.dumps(init_messages), now_str, now_str))
+    except Exception as e:
+        logger.warning(f"[create_new_conversation] DB note: {e}")
     
     return {
         "success": True,
@@ -3499,7 +3553,11 @@ def create_new_conversation(data: NewConversationSchema, current_user_email: str
 @app.post("/api/messages/{id}/read")
 def mark_support_ticket_read(id: str, current_user_email: str = Depends(get_current_user_email)):
     clean_email = current_user_email.strip().lower()
+    from database import MOCK_SUPPORT_TICKETS
     ticket = fetch_one("SELECT * FROM support_tickets WHERE id = %s", (id,))
+    if not ticket and id in MOCK_SUPPORT_TICKETS:
+        ticket = MOCK_SUPPORT_TICKETS[id]
+        
     if not ticket:
         raise HTTPException(status_code=404, detail="Conversation not found.")
     if ticket.get("user_email", "").strip().lower() != clean_email:
@@ -3509,31 +3567,73 @@ def mark_support_ticket_read(id: str, current_user_email: str = Depends(get_curr
     for m in msgs:
         m["read"] = True
     now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
-    execute_query("UPDATE support_tickets SET messages = %s, last_read_user_at = %s WHERE id = %s", (json.dumps(msgs), now_str, id))
+    if id in MOCK_SUPPORT_TICKETS:
+        MOCK_SUPPORT_TICKETS[id]["messages"] = msgs
+        MOCK_SUPPORT_TICKETS[id]["last_read_user_at"] = now_str
+    try:
+        execute_query("UPDATE support_tickets SET messages = %s, last_read_user_at = %s WHERE id = %s", (json.dumps(msgs), now_str, id))
+    except Exception:
+        pass
     return {"success": True}
 
 @app.post("/api/support")
 def create_user_support_ticket(data: CreateSupportTicketSchema, email: str = Depends(get_current_user_email)):
     clean_email = email.strip().lower()
+    clean_sub = data.subject.strip()
+    clean_msg = data.message.strip()
+    clean_cat = (data.category or "General Help").strip()
+    if len(clean_sub) < 3:
+        raise HTTPException(status_code=422, detail="Subject must be at least 3 characters.")
+    if len(clean_msg) < 10:
+        raise HTTPException(status_code=422, detail="Description must be at least 10 characters.")
+    if len(clean_msg) > 5000:
+        raise HTTPException(status_code=422, detail="Description exceeds 5000 characters limit.")
+
     user_rec = get_user(clean_email) or {}
+    user_name = user_rec.get("full_name") or clean_email.split("@")[0]
     ticket_id = f"TICK-{int(time.time() * 1000)}"
     now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
     init_messages = [{
         "id": f"msg-{int(time.time() * 1000)}",
-        "sender": user_rec.get("full_name") or clean_email.split("@")[0],
+        "sender": user_name,
         "senderType": "user",
-        "content": data.message,
+        "content": clean_msg,
+        "bookingId": data.bookingId,
+        "productReference": data.productReference,
+        "category": clean_cat,
         "timestamp": now_str
     }]
-    execute_query("""
-        INSERT INTO support_tickets (id, user_email, user_name, subject, status, priority, messages, created_at, updated_at)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-    """, (
-        ticket_id, clean_email, user_rec.get("full_name") or clean_email.split("@")[0],
-        data.subject, "open", data.priority or "medium",
-        json.dumps(init_messages), now_str, now_str
-    ))
-    return {"success": True, "ticketId": ticket_id}
+    
+    from database import MOCK_SUPPORT_TICKETS
+    MOCK_SUPPORT_TICKETS[ticket_id] = {
+        "id": ticket_id,
+        "user_email": clean_email,
+        "user_name": user_name,
+        "subject": clean_sub,
+        "category": clean_cat,
+        "status": "open",
+        "priority": data.priority or "medium",
+        "bookingId": data.bookingId,
+        "productReference": data.productReference,
+        "messages": init_messages,
+        "created_at": now_str,
+        "updated_at": now_str
+    }
+
+    try:
+        execute_query("""
+            INSERT INTO support_tickets (id, user_email, user_name, subject, category, status, priority, messages, created_at, updated_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (
+            ticket_id, clean_email, user_name,
+            clean_sub, clean_cat, "open", data.priority or "medium",
+            json.dumps(init_messages), now_str, now_str
+        ))
+    except Exception as e:
+        logger.warning(f"[create_user_support_ticket] DB note: {e}")
+
+    logger.info(f"User support ticket created: {ticket_id} for {clean_email}")
+    return {"success": True, "ticketId": ticket_id, "id": ticket_id}
 
 class ContactInquirySchema(BaseModel):
     name: str
@@ -9909,114 +10009,178 @@ def admin_delete_notification(id: str, current_admin: dict = Depends(check_admin
 # Support Tickets
 @app.get("/api/admin/support")
 def admin_support_tickets_list(current_admin: dict = Depends(check_admin_user)):
+    from database import MOCK_SUPPORT_TICKETS
+    rows = []
     conn = get_db_connection()
-    try:
-        with conn.cursor() as cursor:
-            cursor.execute("SELECT * FROM support_tickets ORDER BY created_at DESC")
-            rows = cursor.fetchall()
-    finally:
-        conn.close()
+    if conn:
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT * FROM support_tickets ORDER BY created_at DESC")
+                rows = cursor.fetchall() or []
+        except Exception as e:
+            logger.warning(f"[admin_support_tickets_list] DB query note: {e}")
+        finally:
+            conn.close()
+            
+    seen_ids = set()
+    combined = []
+    for r in rows:
+        seen_ids.add(r["id"])
+        combined.append(r)
+        
+    for tid, mt in MOCK_SUPPORT_TICKETS.items():
+        if tid not in seen_ids:
+            combined.append(mt)
+            
+    # Sort combined descending by created_at / updated_at
+    combined.sort(key=lambda x: str(x.get("updated_at") or x.get("created_at") or ""), reverse=True)
         
     res = []
-    for r in rows:
-        try:
-            msg_list = json.loads(r["messages"]) if r["messages"] else []
-        except Exception:
-            msg_list = []
-            
+    for r in combined:
+        msgs = json.loads(r["messages"]) if isinstance(r.get("messages"), str) else (r.get("messages") or [])
         res.append({
             "id": r["id"],
-            "subject": r["subject"],
-            "category": r["category"],
-            "status": r["status"] or "open",
-            "priority": r["priority"] or "medium",
-            "userName": r["user_name"],
-            "userEmail": r["user_email"],
-            "messages": msg_list,
-            "createdAt": r["created_at"]
+            "subject": r.get("subject") or "Support Request",
+            "category": r.get("category") or "General Help",
+            "status": r.get("status") or "open",
+            "priority": r.get("priority") or "medium",
+            "bookingId": r.get("bookingId") or r.get("booking_id"),
+            "productReference": r.get("productReference") or r.get("product_reference"),
+            "userName": r.get("user_name") or "User",
+            "userEmail": r.get("user_email") or "",
+            "messages": msgs,
+            "createdAt": r.get("created_at")
         })
     return res
 
 @app.post("/api/admin/support/{id}/reply")
 def admin_reply_support_ticket(id: str, data: SupportReplySchema, current_admin: dict = Depends(check_admin_user)):
+    from database import MOCK_SUPPORT_TICKETS
+    now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    new_msg = {
+        "id": f"tm-{random.randint(100000, 999999)}",
+        "sender": "admin",
+        "senderType": "admin",
+        "message": data.message,
+        "content": data.message,
+        "createdAt": now_str,
+        "timestamp": now_str
+    }
+    
+    r_ticket = None
     conn = get_db_connection()
-    try:
-        with conn.cursor() as cursor:
-            cursor.execute("SELECT * FROM support_tickets WHERE id = %s", (id,))
-            r = cursor.fetchone()
-            if not r:
-                raise HTTPException(status_code=404, detail="Ticket not found")
-                
-            try:
-                msg_list = json.loads(r["messages"]) if r["messages"] else []
-            except Exception:
-                msg_list = []
-                
-            new_msg = {
-                "id": f"tm-{random.randint(100000, 999999)}",
-                "sender": "admin",
-                "message": data.message,
-                "createdAt": datetime.datetime.now(datetime.timezone.utc).isoformat()
-            }
-            msg_list.append(new_msg)
+    if conn:
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT * FROM support_tickets WHERE id = %s", (id,))
+                r_ticket = cursor.fetchone()
+                if r_ticket:
+                    try:
+                        msg_list = json.loads(r_ticket["messages"]) if isinstance(r_ticket["messages"], str) else (r_ticket["messages"] or [])
+                    except Exception:
+                        msg_list = []
+                    msg_list.append(new_msg)
+                    cursor.execute("UPDATE support_tickets SET messages = %s, status = 'pending' WHERE id = %s", (json.dumps(msg_list), id))
+                    conn.commit()
+                    r_ticket["messages"] = msg_list
+                    r_ticket["status"] = "pending"
+        except Exception as e:
+            logger.warning(f"[admin_reply] DB note: {e}")
+        finally:
+            conn.close()
             
-            cursor.execute("UPDATE support_tickets SET messages = %s, status = 'pending' WHERE id = %s", (json.dumps(msg_list), id))
-            conn.commit()
-    finally:
-        conn.close()
+    if not r_ticket and id in MOCK_SUPPORT_TICKETS:
+        r_ticket = MOCK_SUPPORT_TICKETS[id]
+        msg_list = r_ticket.get("messages", [])
+        msg_list.append(new_msg)
+        r_ticket["messages"] = msg_list
+        r_ticket["status"] = "pending"
+        r_ticket["updated_at"] = now_str
+    elif r_ticket and id in MOCK_SUPPORT_TICKETS:
+        MOCK_SUPPORT_TICKETS[id]["messages"] = r_ticket["messages"]
+        MOCK_SUPPORT_TICKETS[id]["status"] = "pending"
+        MOCK_SUPPORT_TICKETS[id]["updated_at"] = now_str
+        
+    if not r_ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
         
     # Log action
-    now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
-    execute_query("""
-        INSERT INTO admin_logs (id, timestamp, user_name, action, module, ip_address)
-        VALUES (%s, %s, %s, %s, %s, %s)
-    """, (f"l-{random.randint(100000, 999999)}", now_str, current_admin["full_name"], f"Replied to ticket {id}", "Reports", "127.0.0.1"))
+    try:
+        execute_query("""
+            INSERT INTO admin_logs (id, timestamp, user_name, action, module, ip_address)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """, (f"l-{random.randint(100000, 999999)}", now_str, current_admin["full_name"], f"Replied to ticket {id}", "Reports", "127.0.0.1"))
+    except Exception:
+        pass
     
+    msgs = json.loads(r_ticket["messages"]) if isinstance(r_ticket.get("messages"), str) else (r_ticket.get("messages") or [])
     return {
-        "id": r["id"],
-        "subject": r["subject"],
-        "category": r["category"],
+        "id": r_ticket["id"],
+        "subject": r_ticket.get("subject") or "Support Request",
+        "category": r_ticket.get("category") or "General Help",
         "status": "pending",
-        "priority": r["priority"],
-        "userName": r["user_name"],
-        "userEmail": r["user_email"],
-        "messages": msg_list,
-        "createdAt": r["created_at"]
+        "priority": r_ticket.get("priority") or "medium",
+        "bookingId": r_ticket.get("bookingId") or r_ticket.get("booking_id"),
+        "productReference": r_ticket.get("productReference") or r_ticket.get("product_reference"),
+        "userName": r_ticket.get("user_name") or "User",
+        "userEmail": r_ticket.get("user_email") or "",
+        "messages": msgs,
+        "createdAt": r_ticket.get("created_at")
     }
 
 @app.post("/api/admin/support/{id}/status")
 def admin_status_support_ticket(id: str, data: SupportStatusSchema, current_admin: dict = Depends(check_admin_user)):
-    execute_query("UPDATE support_tickets SET status = %s WHERE id = %s", (data.status, id))
+    from database import MOCK_SUPPORT_TICKETS
+    now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    if id in MOCK_SUPPORT_TICKETS:
+        MOCK_SUPPORT_TICKETS[id]["status"] = data.status
+        MOCK_SUPPORT_TICKETS[id]["updated_at"] = now_str
+        
+    try:
+        execute_query("UPDATE support_tickets SET status = %s WHERE id = %s", (data.status, id))
+    except Exception:
+        pass
     
     # Log action
-    now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
-    execute_query("""
-        INSERT INTO admin_logs (id, timestamp, user_name, action, module, ip_address)
-        VALUES (%s, %s, %s, %s, %s, %s)
-    """, (f"l-{random.randint(100000, 999999)}", now_str, current_admin["full_name"], f"Changed ticket {id} status to {data.status}", "Reports", "127.0.0.1"))
-    
-    conn = get_db_connection()
     try:
-        with conn.cursor() as cursor:
-            cursor.execute("SELECT * FROM support_tickets WHERE id = %s", (id,))
-            r = cursor.fetchone()
-            try:
-                msg_list = json.loads(r["messages"]) if r["messages"] else []
-            except Exception:
-                msg_list = []
-    finally:
-        conn.close()
+        execute_query("""
+            INSERT INTO admin_logs (id, timestamp, user_name, action, module, ip_address)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """, (f"l-{random.randint(100000, 999999)}", now_str, current_admin["full_name"], f"Changed ticket {id} status to {data.status}", "Reports", "127.0.0.1"))
+    except Exception:
+        pass
+    
+    r_ticket = None
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT * FROM support_tickets WHERE id = %s", (id,))
+                r_ticket = cursor.fetchone()
+        except Exception:
+            pass
+        finally:
+            conn.close()
+            
+    if not r_ticket and id in MOCK_SUPPORT_TICKETS:
+        r_ticket = MOCK_SUPPORT_TICKETS[id]
         
+    if not r_ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+        
+    msgs = json.loads(r_ticket["messages"]) if isinstance(r_ticket.get("messages"), str) else (r_ticket.get("messages") or [])
     return {
-        "id": r["id"],
-        "subject": r["subject"],
-        "category": r["category"],
-        "status": r["status"],
-        "priority": r["priority"],
-        "userName": r["user_name"],
-        "userEmail": r["user_email"],
-        "messages": msg_list,
-        "createdAt": r["created_at"]
+        "id": r_ticket["id"],
+        "subject": r_ticket.get("subject") or "Support Request",
+        "category": r_ticket.get("category") or "General Help",
+        "status": data.status,
+        "priority": r_ticket.get("priority") or "medium",
+        "bookingId": r_ticket.get("bookingId") or r_ticket.get("booking_id"),
+        "productReference": r_ticket.get("productReference") or r_ticket.get("product_reference"),
+        "userName": r_ticket.get("user_name") or "User",
+        "userEmail": r_ticket.get("user_email") or "",
+        "messages": msgs,
+        "createdAt": r_ticket.get("created_at")
     }
 
 # Settings

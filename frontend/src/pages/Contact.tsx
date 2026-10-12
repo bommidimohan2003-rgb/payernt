@@ -11,6 +11,7 @@ import {
   AlertCircle,
   Loader2,
   Sparkles,
+  CircleHelp,
 } from "lucide-react";
 import { MainLayout } from "@/layouts/MainLayout";
 import { useAuth } from "@/hooks/useAuth";
@@ -153,16 +154,32 @@ export default function Contact() {
                 Whether you need help selecting cinema lenses, verifying your lender profile, or resolving booking details, our team is directly reachable.
               </p>
 
-              {/* Fast SLA badge */}
-              <div className="mt-6 flex flex-wrap items-center gap-4 text-xs text-neutral-500 dark:text-neutral-400">
+              {/* Verified SLA & Support Hub Link */}
+              <div className="mt-6 flex flex-wrap items-center gap-3 text-xs text-neutral-500 dark:text-neutral-400">
                 <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold border border-emerald-500/20">
                   <Clock className="w-3.5 h-3.5" />
-                  <span>Avg. Response Time &lt; 15 Mins</span>
+                  <span>Support Hours: 9:00 AM – 9:00 PM IST</span>
                 </div>
                 <div className="flex items-center gap-1.5 text-neutral-600 dark:text-neutral-300">
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                  <span>Verified Support Team</span>
+                  <span>Verified Platform Operations</span>
                 </div>
+              </div>
+
+              {/* Direct Link to FAQ & Support Hub */}
+              <div className="mt-5 p-3.5 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 flex items-center justify-between gap-3 max-w-xl">
+                <div className="flex items-center gap-2.5">
+                  <CircleHelp className="w-4 h-4 text-neutral-900 dark:text-white shrink-0" />
+                  <span className="text-xs text-neutral-700 dark:text-neutral-300">
+                    Need instant equipment troubleshooting or want to track an existing ticket?
+                  </span>
+                </div>
+                <Link
+                  to="/support"
+                  className="px-3 py-1.5 rounded-xl bg-neutral-950 dark:bg-white text-white dark:text-neutral-950 text-xs font-bold shrink-0 hover:opacity-90 transition-opacity"
+                >
+                  FAQ &amp; Support Hub
+                </Link>
               </div>
             </div>
 

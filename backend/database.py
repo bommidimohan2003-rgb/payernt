@@ -1964,6 +1964,7 @@ def get_all_custom_products():
     return list(MOCK_CUSTOM_PRODUCTS.values())
 
 MOCK_AGENTS = {}
+MOCK_SUPPORT_TICKETS: Dict[str, dict] = {}
 
 REAL_ACCOUNTS = {
     "bommidimohan2003@gmail.com",

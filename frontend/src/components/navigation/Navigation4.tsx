@@ -13,7 +13,8 @@ import {
   Home,
   Compass,
   ShoppingBag,
-  LayoutDashboard,
+  LayoutGrid,
+  CircleHelp,
 } from "lucide-react";
 import { useCart } from "@/hooks/useCart";
 import { useOriginReveal } from "./OriginRevealTransition";
@@ -183,9 +184,9 @@ export function Navigation4({
     return () => window.removeEventListener("resize", checkDesktop);
   }, []);
 
-  const effectiveBaseItemSize = baseItemSize ?? (isDesktop ? 48 : 42);
-  const effectiveMagnification = magnification ?? (isDesktop ? 62 : 52);
-  const effectiveDistance = distance ?? (isDesktop ? 130 : 110);
+  const effectiveBaseItemSize = baseItemSize ?? (isDesktop ? 44 : 38);
+  const effectiveMagnification = magnification ?? (isDesktop ? 56 : 46);
+  const effectiveDistance = distance ?? (isDesktop ? 115 : 95);
 
   const mouseX = useMotionValue(Infinity);
   const isHovered = useMotionValue(0);
@@ -198,13 +199,16 @@ export function Navigation4({
         pathname.startsWith("/product")
       );
     }
-    if (to === "/cart") {
-      return pathname.startsWith("/cart") || pathname.startsWith("/checkout");
+    if (to === "/orders") {
+      return (
+        pathname.startsWith("/orders") ||
+        pathname.startsWith("/cart") ||
+        pathname.startsWith("/checkout")
+      );
     }
     if (to === "/dashboard") {
       return (
         pathname.startsWith("/dashboard") ||
-        pathname.startsWith("/orders") ||
         pathname.startsWith("/wishlist") ||
         pathname.startsWith("/profile") ||
         pathname.startsWith("/settings") ||
@@ -212,40 +216,56 @@ export function Navigation4({
         pathname.startsWith("/notifications")
       );
     }
+    if (to === "/support") {
+      return pathname.startsWith("/support") || pathname.startsWith("/faq");
+    }
     return pathname === to;
   };
 
-  const { tCommon, tPayrent } = useLanguage();
+  const { tCommon } = useLanguage();
 
+  // Exact 5 Buttons in required order:
+  // 1. Dashboard — Home icon
+  // 2. Explore — Compass icon
+  // 3. Bookings — ShoppingBag icon
+  // 4. More — LayoutGrid icon
+  // 5. FAQ + Support — CircleHelp icon
   const mainItems: Navigation4Item[] = [
     {
-      id: "home",
-      label: tCommon.home,
+      id: "dashboard",
+      label: "Dashboard",
       icon: <Home className="h-4 w-4 sm:h-[18px] sm:w-[18px] md:h-[19px] md:w-[19px] stroke-[1.6]" />,
-      isActive: pathname === "/payant" || pathname === "/payent",
+      isActive: pathname === "/" || pathname === "/payant" || pathname === "/payent" || pathname === "/payent/",
       onClick: () => navigate({ to: "/payant" }),
     },
     {
-      id: "browse",
-      label: tCommon.explore,
+      id: "explore",
+      label: tCommon.explore || "Explore",
       icon: <Compass className="h-4 w-4 sm:h-[18px] sm:w-[18px] md:h-[19px] md:w-[19px] stroke-[1.6]" />,
       isActive: isRouteActive("/browse"),
       onClick: () => navigate({ to: "/browse" }),
     },
     {
-      id: "cart",
-      label: tCommon.cart,
+      id: "bookings",
+      label: "Bookings",
       icon: <ShoppingBag className="h-4 w-4 sm:h-[18px] sm:w-[18px] md:h-[19px] md:w-[19px] stroke-[1.6]" />,
       badge: cartCount > 0 ? cartCount : undefined,
-      isActive: isRouteActive("/cart"),
-      onClick: () => navigate({ to: "/cart" }),
+      isActive: isRouteActive("/orders"),
+      onClick: () => navigate({ to: "/orders" }),
     },
     {
-      id: "dashboard",
-      label: tPayrent.userDashboard,
-      icon: <LayoutDashboard className="h-4 w-4 sm:h-[18px] sm:w-[18px] md:h-[19px] md:w-[19px] stroke-[1.6]" />,
+      id: "more",
+      label: "More",
+      icon: <LayoutGrid className="h-4 w-4 sm:h-[18px] sm:w-[18px] md:h-[19px] md:w-[19px] stroke-[1.6]" />,
       isActive: isRouteActive("/dashboard"),
       onClick: () => navigate({ to: "/dashboard" }),
+    },
+    {
+      id: "support",
+      label: "FAQ + Support",
+      icon: <CircleHelp className="h-4 w-4 sm:h-[18px] sm:w-[18px] md:h-[19px] md:w-[19px] stroke-[1.6]" />,
+      isActive: isRouteActive("/support"),
+      onClick: () => navigate({ to: "/support" }),
     },
   ];
 
@@ -260,7 +280,7 @@ export function Navigation4({
   return (
     <aside
       aria-label="pay₹ent Navigation Dock"
-      className={`fixed bottom-[calc(0.75rem+env(safe-area-inset-bottom,0px))] md:bottom-6 inset-x-0 mx-auto z-50 flex justify-center items-center pointer-events-none select-none px-3 w-full max-w-full ${className}`}
+      className={`fixed bottom-[calc(0.75rem+env(safe-area-inset-bottom,0px))] md:bottom-6 inset-x-0 mx-auto z-50 flex justify-center items-center pointer-events-none select-none px-2 sm:px-4 w-full max-w-full ${className}`}
     >
       <motion.div
         onMouseMove={({ pageX }) => {
@@ -282,10 +302,10 @@ export function Navigation4({
           isHovered.set(0);
           mouseX.set(Infinity);
         }}
-        className="pointer-events-auto py-2 sm:py-2.5 px-6 sm:px-8 md:px-10 rounded-2xl bg-white/92 dark:bg-[#0D151D]/95 backdrop-blur-2xl border-2 border-neutral-300 dark:border-neutral-700 shadow-xl shadow-black/20 dark:shadow-black/80 flex items-center justify-center gap-3 sm:gap-4 md:gap-5 w-auto min-w-[320px] sm:min-w-[400px] md:min-w-[460px] max-w-[calc(100vw-1.5rem)] overflow-visible"
+        className="pointer-events-auto py-1.5 sm:py-2 px-3 sm:px-5 md:px-7 rounded-2xl bg-white/92 dark:bg-[#0D151D]/95 backdrop-blur-2xl border-2 border-neutral-300 dark:border-neutral-700 shadow-xl shadow-black/20 dark:shadow-black/80 flex items-center justify-center gap-1 sm:gap-2.5 md:gap-3.5 w-auto min-w-[290px] sm:min-w-[360px] md:min-w-[420px] max-w-[calc(100vw-1rem)] overflow-visible"
       >
-        {/* The 4 Main Items: Home, Explore, Cart, User Dashboard */}
-        <div className="flex items-center justify-around w-full gap-2.5 sm:gap-4 md:gap-6 shrink-0">
+        {/* The 5 Main Items in exact required order */}
+        <div className="flex items-center justify-between sm:justify-around w-full gap-1.5 sm:gap-2.5 md:gap-4 shrink-0">
           {mainItems.map((item) => (
             <Nav4DockItem
               key={item.id}
