@@ -1,9 +1,12 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { Link, useSearch } from "@tanstack/react-router";
+import { Link, useSearch, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   Search,
   X,
   ChevronDown,
+  ChevronRight,
+  ArrowRight,
+  ArrowLeft,
   CircleHelp,
   PackageCheck,
   CreditCard,
@@ -15,7 +18,6 @@ import {
   CheckCircle2,
   AlertCircle,
   Clock,
-  ArrowRight,
   Send,
   MessageSquare,
   HelpCircle,
@@ -457,15 +459,47 @@ export const FAQ_DATA: FAQItem[] = [
 
 export default function Support() {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const search = useSearch({ strict: false }) as {
+    category?: string;
+    tab?: "faq" | "troubleshoot" | "ticket" | "requests";
+    q?: string;
+  } | undefined;
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
 
-  // Search & Navigation tab
+  // Resolve active category from TanStack search params or URL query/path
+  const activeCategoryId = useMemo(() => {
+    if (search?.category) return search.category;
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const catParam = params.get("category");
+      if (catParam) return catParam;
+      const parts = window.location.pathname.split("/").filter(Boolean);
+      if ((parts[0] === "support" || parts[0] === "faq") && parts[1]) {
+        return parts[1];
+      }
+    }
+    return null;
+  }, [search?.category, pathname]);
+
+  const currentCategory = useMemo(() => {
+    if (!activeCategoryId) return null;
+    return (
+      FAQ_CATEGORIES.find(
+        (c) =>
+          c.id.toLowerCase() === activeCategoryId.toLowerCase() ||
+          c.name.toLowerCase() === activeCategoryId.toLowerCase()
+      ) || null
+    );
+  }, [activeCategoryId]);
+
+  // Search & Navigation inside category
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [subCategoryFilter, setSubCategoryFilter] = useState<"all" | "camera" | "laptop">("all");
   const [activeTab, setActiveTab] = useState<"faq" | "troubleshoot" | "ticket" | "requests">("faq");
 
   // Accordion state
-  const [expandedFaqId, setExpandedFaqId] = useState<string | null>("rp-1");
+  const [expandedFaqId, setExpandedFaqId] = useState<string | null>(null);
 
   // Guided Troubleshooter State
   const [troubleCategory, setTroubleCategory] = useState<string>("Camera");
@@ -493,6 +527,44 @@ export default function Support() {
   const [selectedRequest, setSelectedRequest] = useState<any | null>(null);
   const [replyText, setReplyText] = useState("");
   const [replying, setReplying] = useState(false);
+
+  // Synchronize state when active category changes
+  useEffect(() => {
+    if (currentCategory) {
+      setTicketCategory(currentCategory.name);
+      setSearchQuery("");
+      setSubCategoryFilter("all");
+      setExpandedFaqId(null);
+      setTroubleResolved(null);
+
+      if (currentCategory.id === "rental-product") {
+        setTroubleCategory("Camera");
+        setTroubleIssue("Camera not turning on");
+      } else if (currentCategory.id === "billing-payments") {
+        setTroubleCategory("Billing & Charges");
+        setTroubleIssue("Rental timer pause request");
+      } else if (currentCategory.id === "previous-orders") {
+        setTroubleCategory("Booking & Handover");
+        setTroubleIssue("Secret PIN verification issue");
+      } else if (currentCategory.id === "app-technical") {
+        setTroubleCategory("Account & Login");
+        setTroubleIssue("OTP SMS code not received");
+      } else if (currentCategory.id === "general-help") {
+        setTroubleCategory("Platform Rules");
+        setTroubleIssue("How does gear deposit work?");
+      }
+    }
+  }, [currentCategory]);
+
+  // Read search & tab params from URL if specified
+  useEffect(() => {
+    if (search?.tab && ["faq", "troubleshoot", "ticket", "requests"].includes(search.tab)) {
+      setActiveTab(search.tab);
+    }
+    if (search?.q) {
+      setSearchQuery(search.q);
+    }
+  }, [search?.tab, search?.q]);
 
   // Load user bookings if authenticated
   useEffect(() => {
@@ -538,18 +610,12 @@ export default function Support() {
     }
   }, [activeTab, loadMyTickets]);
 
-  // Filtered FAQ Items
-  const filteredFaqs = useMemo(() => {
-    let result = [...FAQ_DATA];
+  // Filtered FAQ Items for current dedicated category
+  const categoryFaqs = useMemo(() => {
+    if (!currentCategory) return [];
+    let result = FAQ_DATA.filter((item) => item.category === currentCategory.name);
 
-    if (selectedCategory !== "all") {
-      const catObj = FAQ_CATEGORIES.find((c) => c.id === selectedCategory);
-      if (catObj) {
-        result = result.filter((item) => item.category === catObj.name);
-      }
-    }
-
-    if (subCategoryFilter !== "all") {
+    if (currentCategory.id === "rental-product" && subCategoryFilter !== "all") {
       result = result.filter((item) => item.subCategory === subCategoryFilter);
     }
 
@@ -565,7 +631,7 @@ export default function Support() {
     }
 
     return result;
-  }, [selectedCategory, subCategoryFilter, searchQuery]);
+  }, [currentCategory, subCategoryFilter, searchQuery]);
 
   // Open ticket form prefilled from an FAQ or troubleshooter
   const handlePrefillTicket = (categoryName: string, subjectTitle: string) => {
@@ -574,7 +640,6 @@ export default function Support() {
     setTicketSuccessId(null);
     setTicketError(null);
     setActiveTab("ticket");
-    // Scroll smoothly to form
     window.scrollTo({ top: 380, behavior: "smooth" });
   };
 
@@ -611,13 +676,10 @@ export default function Support() {
       setTicketSuccessId(tid);
       toast.success(`Support ticket ${tid} submitted successfully.`);
 
-      // Reset form
       setTicketSubject("");
       setTicketBookingId("");
       setTicketProductRef("");
       setTicketMessage("");
-
-      // Refresh ticket list in background
       loadMyTickets();
     } catch (err: any) {
       setTicketError(err.message || "Failed to create support ticket. Please check your network.");
@@ -648,118 +710,226 @@ export default function Support() {
     }
   };
 
-  return (
-    <MainLayout>
-      <div className="min-h-screen bg-background text-foreground transition-colors duration-200">
-        {/* HERO SECTION */}
-        <section className="relative overflow-hidden pt-12 pb-10 sm:pt-16 sm:pb-14 border-b border-border bg-card/40">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-            <div className="text-center max-w-3xl mx-auto space-y-4">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-black/5 dark:bg-white/5 border border-border text-xs font-semibold text-muted-foreground">
-                <CircleHelp className="w-3.5 h-3.5" />
-                <span>Payent Help &amp; Knowledge Base</span>
-              </div>
+  // Diagnostic types for active category
+  const diagnosticTypes = useMemo(() => {
+    if (!currentCategory) return ["General"];
+    switch (currentCategory.id) {
+      case "rental-product":
+        return ["Camera", "Laptop"];
+      case "billing-payments":
+        return ["Billing & Charges", "Deposits & Refunds"];
+      case "previous-orders":
+        return ["Booking & Handover", "Returns & Logistics"];
+      case "app-technical":
+        return ["Account & Login", "App Performance"];
+      default:
+        return ["Platform Rules", "Security & Coverage"];
+    }
+  }, [currentCategory]);
 
-              <h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-foreground">
+  // =========================================================================
+  // VIEW 1: FAQ + SUPPORT LANDING PAGE (NO CATEGORY SELECTED)
+  // Strictly contains ONLY:
+  // 1. Application Header (Navbar via MainLayout)
+  // 2. FAQ + Support Heading (centered)
+  // 3. Exactly five category options in responsive layout
+  // (NO search bar, NO buttons for Knowledge Base / Troubleshooter / Ticket /
+  // My Requests / Contact, NO FAQ lists, NO extra promo content, NO footer)
+  // =========================================================================
+  if (!currentCategory) {
+    return (
+      <MainLayout hideFooter={true}>
+        <div className="min-h-[calc(100vh-80px)] bg-background text-foreground transition-colors duration-200 flex flex-col justify-center py-12 sm:py-16 lg:py-20">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+            {/* Centered Heading */}
+            <div className="text-center mb-8 sm:mb-12 lg:mb-16">
+              <h1
+                className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-foreground"
+                data-testid="support-heading"
+              >
                 FAQ + Support
               </h1>
+            </div>
 
-              <p className="text-sm sm:text-base text-muted-foreground max-w-xl mx-auto leading-relaxed">
-                Find answers, troubleshoot rental issues, or contact our support team.
-              </p>
+            {/* Exactly Five Category Options in Responsive Layout */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 sm:gap-4 lg:gap-4 xl:gap-5 w-full">
+              {FAQ_CATEGORIES.map((cat, index) => {
+                const Icon = cat.icon;
+                const isFifth = index === 4;
+                return (
+                  <Link
+                    key={cat.id}
+                    to="/support"
+                    search={{ category: cat.id }}
+                    data-testid={`category-card-${cat.id}`}
+                    className={cn(
+                      "group relative rounded-2xl sm:rounded-3xl border border-border/80 bg-card p-4.5 sm:p-5 lg:p-6 text-left transition-all duration-200 cursor-pointer",
+                      "hover:border-foreground/30 hover:shadow-lg dark:hover:shadow-black/60 hover:-translate-y-1 active:scale-[0.98]",
+                      "flex flex-col justify-between",
+                      // Tablet: 5th card positioned neatly across 2 columns
+                      isFifth
+                        ? "sm:col-span-2 sm:max-w-md sm:mx-auto w-full lg:col-span-1 lg:max-w-none lg:mx-0"
+                        : "w-full",
+                      // Responsive consistent minimum heights
+                      "min-h-[100px] sm:min-h-[220px] lg:min-h-[240px]"
+                    )}
+                  >
+                    <div className="flex items-start gap-3.5 sm:flex-col sm:items-start sm:gap-0 h-full justify-between w-full">
+                      <div className="flex items-center gap-3.5 sm:flex-col sm:items-start sm:gap-0 sm:w-full">
+                        {/* Icon Container */}
+                        <div className="p-2.5 sm:p-3 rounded-2xl bg-foreground/5 dark:bg-white/5 border border-border/60 flex items-center justify-center text-foreground shrink-0 group-hover:bg-foreground group-hover:text-background transition-colors duration-200 shadow-sm">
+                          <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
+                        </div>
 
-              {/* Prominent Search Bar */}
-              <div className="pt-3 max-w-2xl mx-auto">
-                <div className="relative flex items-center">
-                  <Search className="absolute left-4 w-5 h-5 text-muted-foreground pointer-events-none" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => {
-                      setSearchQuery(e.target.value);
-                      if (activeTab !== "faq") setActiveTab("faq");
-                    }}
-                    placeholder="Search questions or describe your issue..."
-                    className="w-full pl-12 pr-10 py-3.5 rounded-2xl bg-card border border-border text-sm sm:text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20 transition-all shadow-sm"
-                  />
-                  {searchQuery && (
-                    <button
-                      onClick={() => setSearchQuery("")}
-                      className="absolute right-3.5 p-1 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                      aria-label="Clear search"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
+                        {/* Title & Description */}
+                        <div className="min-w-0 sm:mt-4 sm:w-full">
+                          <h2 className="text-sm sm:text-base font-bold text-foreground group-hover:text-foreground transition-colors line-clamp-2">
+                            {cat.name}
+                          </h2>
+                          <p className="text-xs text-muted-foreground mt-1 sm:mt-1.5 leading-relaxed line-clamp-2 sm:line-clamp-3">
+                            {cat.description}
+                          </p>
+                        </div>
+                      </div>
 
-                {searchQuery && (
-                  <div className="mt-2 text-left text-xs text-muted-foreground flex items-center justify-between px-1">
-                    <span>
-                      Found <strong>{filteredFaqs.length}</strong> matching questions for &ldquo;{searchQuery}&rdquo;
-                    </span>
-                    <button
-                      onClick={() => setSearchQuery("")}
-                      className="underline hover:text-foreground cursor-pointer"
-                    >
-                      Clear search
-                    </button>
-                  </div>
-                )}
+                      {/* Mobile Chevron / Desktop Action Footer */}
+                      <div className="shrink-0 sm:w-full sm:pt-3 sm:mt-3 sm:border-t sm:border-border/40 flex items-center justify-end sm:justify-between text-xs font-semibold text-muted-foreground group-hover:text-foreground">
+                        <span className="hidden sm:inline-block text-[11px] font-medium">Explore Topics</span>
+                        <ArrowRight className="w-4 h-4 sm:w-3.5 sm:h-3.5 shrink-0 group-hover:translate-x-1 transition-transform duration-200" />
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
+
+  // =========================================================================
+  // VIEW 2: DEDICATED CATEGORY PAGE
+  // All FAQ answers, troubleshooting steps, ticket creation, support requests,
+  // and contact actions live inside this dedicated category page!
+  // =========================================================================
+  const CategoryIcon = currentCategory.icon;
+
+  return (
+    <MainLayout>
+      <div className="min-h-screen bg-background text-foreground transition-colors duration-200 pb-20">
+        {/* CATEGORY HERO SECTION */}
+        <section className="relative overflow-hidden pt-8 pb-8 sm:pt-12 sm:pb-10 border-b border-border bg-card/40">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            {/* Back to All Categories & Breadcrumb */}
+            <div className="flex items-center justify-between gap-4 mb-6">
+              <Link
+                to="/support"
+                search={{}}
+                className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl border border-border bg-card hover:bg-muted text-xs font-semibold text-foreground transition-all duration-150 cursor-pointer shadow-sm group"
+              >
+                <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform" />
+                <span>Back to FAQ + Support</span>
+              </Link>
+
+              <div className="text-xs text-muted-foreground font-medium hidden sm:flex items-center gap-1.5">
+                <Link to="/support" search={{}} className="hover:underline">
+                  FAQ + Support
+                </Link>
+                <span>/</span>
+                <span className="text-foreground font-semibold">{currentCategory.name}</span>
               </div>
             </div>
 
-            {/* Top Navigation Tabs */}
-            <div className="mt-8 flex items-center justify-center gap-1.5 sm:gap-2 flex-wrap">
+            {/* Category Header Title & Actions */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+              <div className="flex items-start gap-4">
+                <div className="p-3.5 sm:p-4 rounded-2xl bg-foreground/5 dark:bg-white/5 border border-border flex items-center justify-center text-foreground shrink-0 shadow-sm">
+                  <CategoryIcon className="w-6 h-6 sm:w-7 sm:h-7" />
+                </div>
+                <div className="space-y-1">
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-foreground/5 dark:bg-white/5 border border-border/50 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                    <span>Category Support</span>
+                  </div>
+                  <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight text-foreground">
+                    {currentCategory.name}
+                  </h1>
+                  <p className="text-xs sm:text-sm text-muted-foreground max-w-xl leading-relaxed">
+                    {currentCategory.description}
+                  </p>
+                </div>
+              </div>
+
+              {/* Quick Action Buttons inside Category */}
+              <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                <button
+                  onClick={() => setActiveTab("ticket")}
+                  className="px-3.5 py-2 rounded-xl bg-foreground text-background text-xs font-bold hover:opacity-90 transition-opacity cursor-pointer flex items-center gap-1.5 shadow-sm"
+                >
+                  <PlusCircle className="w-3.5 h-3.5" />
+                  <span>Raise Ticket</span>
+                </button>
+                <Link
+                  to="/contact"
+                  className="px-3.5 py-2 rounded-xl bg-card border border-border text-foreground hover:bg-muted text-xs font-semibold transition-colors flex items-center gap-1.5"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Contact Team</span>
+                </Link>
+              </div>
+            </div>
+
+            {/* Sub-Navigation Tabs inside Category */}
+            <div className="mt-8 flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 no-scrollbar">
               <button
                 onClick={() => setActiveTab("faq")}
                 className={cn(
-                  "px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer flex items-center gap-2",
+                  "px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 shrink-0",
                   activeTab === "faq"
                     ? "bg-foreground text-background shadow-sm"
                     : "bg-card border border-border text-muted-foreground hover:text-foreground hover:border-foreground/30"
                 )}
               >
-                <HelpCircle className="w-4 h-4" />
-                <span>Knowledge Base</span>
+                <HelpCircle className="w-3.5 h-3.5" />
+                <span>Questions & Answers ({categoryFaqs.length})</span>
               </button>
 
               <button
                 onClick={() => setActiveTab("troubleshoot")}
                 className={cn(
-                  "px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer flex items-center gap-2",
+                  "px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 shrink-0",
                   activeTab === "troubleshoot"
                     ? "bg-foreground text-background shadow-sm"
                     : "bg-card border border-border text-muted-foreground hover:text-foreground hover:border-foreground/30"
                 )}
               >
-                <Wrench className="w-4 h-4" />
-                <span>Guided Troubleshooter</span>
+                <Wrench className="w-3.5 h-3.5" />
+                <span>Diagnostic Steps</span>
               </button>
 
               <button
                 onClick={() => setActiveTab("ticket")}
                 className={cn(
-                  "px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer flex items-center gap-2",
+                  "px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 shrink-0",
                   activeTab === "ticket"
                     ? "bg-foreground text-background shadow-sm"
                     : "bg-card border border-border text-muted-foreground hover:text-foreground hover:border-foreground/30"
                 )}
               >
-                <PlusCircle className="w-4 h-4" />
+                <PlusCircle className="w-3.5 h-3.5" />
                 <span>Raise a Ticket</span>
               </button>
 
               <button
                 onClick={() => setActiveTab("requests")}
                 className={cn(
-                  "px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer flex items-center gap-2",
+                  "px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 shrink-0",
                   activeTab === "requests"
                     ? "bg-foreground text-background shadow-sm"
                     : "bg-card border border-border text-muted-foreground hover:text-foreground hover:border-foreground/30"
                 )}
               >
-                <MessageSquare className="w-4 h-4" />
+                <MessageSquare className="w-3.5 h-3.5" />
                 <span>My Support Requests</span>
                 {myTickets.length > 0 && (
                   <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-500/10 text-emerald-500 font-bold">
@@ -767,82 +937,38 @@ export default function Support() {
                   </span>
                 )}
               </button>
-
-              <Link
-                to="/contact"
-                className="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-card border border-border text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-all flex items-center gap-2"
-              >
-                <ExternalLink className="w-3.5 h-3.5" />
-                <span>Contact Page</span>
-              </Link>
             </div>
           </div>
         </section>
 
-        {/* MAIN BODY CONTAINER */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
-          {/* TAB 1: FAQ KNOWLEDGE BASE */}
+        {/* MAIN BODY OF DEDICATED CATEGORY */}
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
+          {/* TAB 1: FAQ ACCORDION LIST */}
           {activeTab === "faq" && (
-            <div className="space-y-8">
-              {/* Category Filter Pills */}
-              <div className="space-y-3">
-                <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                  Browse by Category
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3">
+            <div className="space-y-6">
+              {/* Category Search Input */}
+              <div className="relative flex items-center max-w-xl">
+                <Search className="absolute left-3.5 w-4 h-4 text-muted-foreground pointer-events-none" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={`Search questions in ${currentCategory.name}...`}
+                  className="w-full pl-10 pr-9 py-2.5 rounded-xl bg-card border border-border text-xs sm:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20 transition-all shadow-sm"
+                />
+                {searchQuery && (
                   <button
-                    onClick={() => {
-                      setSelectedCategory("all");
-                      setSubCategoryFilter("all");
-                    }}
-                    className={cn(
-                      "p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between h-24",
-                      selectedCategory === "all"
-                        ? "bg-card border-foreground/40 shadow-sm"
-                        : "bg-card/50 border-border hover:border-foreground/20 text-muted-foreground hover:text-foreground"
-                    )}
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-3 p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer"
                   >
-                    <HelpCircle className="w-5 h-5 text-foreground" />
-                    <div>
-                      <div className="text-xs font-bold text-foreground">All Questions</div>
-                      <div className="text-[10px] text-muted-foreground">{FAQ_DATA.length} topics</div>
-                    </div>
+                    <X className="w-3.5 h-3.5" />
                   </button>
-
-                  {FAQ_CATEGORIES.map((cat) => {
-                    const Icon = cat.icon;
-                    const isSelected = selectedCategory === cat.id;
-                    const count = FAQ_DATA.filter((i) => i.category === cat.name).length;
-                    return (
-                      <button
-                        key={cat.id}
-                        onClick={() => {
-                          setSelectedCategory(cat.id);
-                          setSubCategoryFilter("all");
-                        }}
-                        className={cn(
-                          "p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between h-24",
-                          isSelected
-                            ? "bg-card border-foreground/40 shadow-sm"
-                            : "bg-card/50 border-border hover:border-foreground/20 text-muted-foreground hover:text-foreground"
-                        )}
-                      >
-                        <Icon className="w-5 h-5 text-foreground" />
-                        <div>
-                          <div className="text-xs font-bold text-foreground leading-tight line-clamp-1">
-                            {cat.name}
-                          </div>
-                          <div className="text-[10px] text-muted-foreground">{count} articles</div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
+                )}
               </div>
 
-              {/* Subcategory toggle for Rental & Product Issues (Camera vs Laptop) */}
-              {(selectedCategory === "all" || selectedCategory === "rental-product") && (
-                <div className="flex items-center gap-2 p-1.5 bg-card rounded-xl border border-border w-fit text-xs font-medium">
+              {/* Hardware Subcategory toggle (only for Rental & Product Issues) */}
+              {currentCategory.id === "rental-product" && (
+                <div className="flex items-center gap-2 p-1 bg-card rounded-xl border border-border w-fit text-xs font-medium">
                   <span className="px-2 text-muted-foreground text-[11px]">Hardware Focus:</span>
                   <button
                     onClick={() => setSubCategoryFilter("all")}
@@ -865,7 +991,7 @@ export default function Support() {
                     )}
                   >
                     <Camera className="w-3.5 h-3.5" />
-                    <span>Camera Issues</span>
+                    <span>Camera</span>
                   </button>
                   <button
                     onClick={() => setSubCategoryFilter("laptop")}
@@ -877,32 +1003,29 @@ export default function Support() {
                     )}
                   >
                     <Laptop className="w-3.5 h-3.5" />
-                    <span>Laptop Issues</span>
+                    <span>Laptop</span>
                   </button>
                 </div>
               )}
 
               {/* FAQ Accordion List */}
               <div className="space-y-3">
-                {filteredFaqs.length === 0 ? (
+                {categoryFaqs.length === 0 ? (
                   <div className="p-8 sm:p-12 rounded-3xl bg-card border border-border text-center space-y-3">
                     <AlertCircle className="w-8 h-8 text-muted-foreground mx-auto" />
                     <h3 className="text-base font-bold text-foreground">No matching questions found</h3>
                     <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                      We couldn&rsquo;t find an answer matching &ldquo;{searchQuery}&rdquo;. Try another search term or raise a direct support ticket.
+                      No question matched &ldquo;{searchQuery}&rdquo; under {currentCategory.name}. Try another search term or raise a ticket directly.
                     </p>
                     <div className="pt-2 flex justify-center gap-3">
                       <button
-                        onClick={() => {
-                          setSearchQuery("");
-                          setSelectedCategory("all");
-                        }}
+                        onClick={() => setSearchQuery("")}
                         className="px-4 py-2 rounded-xl bg-muted text-xs font-semibold hover:bg-muted/80 cursor-pointer"
                       >
                         Reset Search
                       </button>
                       <button
-                        onClick={() => handlePrefillTicket("General Help", searchQuery || "Custom Question")}
+                        onClick={() => handlePrefillTicket(currentCategory.name, searchQuery || "Custom Issue")}
                         className="px-4 py-2 rounded-xl bg-foreground text-background text-xs font-bold hover:opacity-90 cursor-pointer"
                       >
                         Raise a Support Ticket
@@ -910,7 +1033,7 @@ export default function Support() {
                     </div>
                   </div>
                 ) : (
-                  filteredFaqs.map((faq) => {
+                  categoryFaqs.map((faq) => {
                     const isExpanded = expandedFaqId === faq.id;
                     return (
                       <div
@@ -967,7 +1090,7 @@ export default function Support() {
                               </div>
                             )}
 
-                            {/* Resolution confirmation / escalation */}
+                            {/* Helpfulness feedback & ticket escalation */}
                             <div className="pt-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs border-t border-border/40">
                               <span className="text-muted-foreground">Was this answer helpful?</span>
                               <div className="flex items-center gap-2">
@@ -995,33 +1118,22 @@ export default function Support() {
                 )}
               </div>
 
-              {/* STILL NEED HELP CTA FOOTER */}
-              <div className="p-6 sm:p-8 rounded-3xl bg-card border border-border flex flex-col md:flex-row items-center justify-between gap-6">
-                <div className="space-y-1 text-center md:text-left">
-                  <h3 className="text-base sm:text-lg font-black text-foreground">
-                    Couldn&rsquo;t find your exact situation?
+              {/* Bottom Escalate Card */}
+              <div className="p-5 sm:p-6 rounded-2xl bg-card border border-border flex flex-col sm:flex-row items-center justify-between gap-4 mt-8">
+                <div className="space-y-0.5 text-center sm:text-left">
+                  <h3 className="text-sm font-bold text-foreground">
+                    Still need assistance with {currentCategory.name}?
                   </h3>
-                  <p className="text-xs sm:text-sm text-muted-foreground max-w-lg">
-                    Our platform support team can pause active timers, arrange courier pickups, verify Secret PIN handovers, and resolve disputes.
+                  <p className="text-xs text-muted-foreground">
+                    Our platform specialists can pause rental timers, arrange replacements, and resolve disputes.
                   </p>
                 </div>
-                <div className="flex items-center gap-3 shrink-0">
-                  <button
-                    onClick={() => {
-                      setActiveTab("ticket");
-                      window.scrollTo({ top: 380, behavior: "smooth" });
-                    }}
-                    className="px-5 py-2.5 rounded-xl bg-foreground text-background text-xs sm:text-sm font-bold hover:opacity-90 transition-opacity cursor-pointer shadow-sm"
-                  >
-                    Raise Support Ticket
-                  </button>
-                  <Link
-                    to="/contact"
-                    className="px-5 py-2.5 rounded-xl bg-muted border border-border text-foreground text-xs sm:text-sm font-semibold hover:bg-muted/80 transition-colors"
-                  >
-                    Contact Team
-                  </Link>
-                </div>
+                <button
+                  onClick={() => setActiveTab("ticket")}
+                  className="px-4 py-2 rounded-xl bg-foreground text-background text-xs font-bold hover:opacity-90 transition-opacity cursor-pointer shrink-0 shadow-sm"
+                >
+                  Raise a Ticket
+                </button>
               </div>
             </div>
           )}
@@ -1031,34 +1143,40 @@ export default function Support() {
             <div className="max-w-3xl mx-auto space-y-6">
               <div className="p-6 sm:p-8 rounded-3xl bg-card border border-border space-y-6">
                 <div className="space-y-1">
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-black/5 dark:bg-white/5 text-[11px] font-bold text-muted-foreground">
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-foreground/5 dark:bg-white/5 text-[11px] font-bold text-muted-foreground">
                     <Wrench className="w-3 h-3" />
-                    <span>Interactive Gear Diagnostic</span>
+                    <span>Safe Troubleshooting Diagnostic</span>
                   </div>
                   <h2 className="text-xl sm:text-2xl font-black text-foreground">
-                    Guided Troubleshooting Flow
+                    Diagnostic Flow for {currentCategory.name}
                   </h2>
                   <p className="text-xs sm:text-sm text-muted-foreground">
-                    Follow safe, standard operating procedures to resolve hardware or booking issues step-by-step.
+                    Follow safe, standard operating procedures to verify hardware condition and rental handovers.
                   </p>
                 </div>
 
-                {/* Step 1: Category selection */}
+                {/* Step 1: Sub-category selection */}
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-foreground">
-                    Step 1: What type of issue are you experiencing?
+                    Step 1: Select issue area
                   </label>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                    {["Camera", "Laptop", "Booking & Handover", "Billing & Deposit"].map((c) => (
+                  <div className="grid grid-cols-2 gap-2.5">
+                    {diagnosticTypes.map((c) => (
                       <button
                         key={c}
                         onClick={() => {
                           setTroubleCategory(c);
                           setTroubleResolved(null);
                           if (c === "Camera") setTroubleIssue("Camera not turning on");
-                          if (c === "Laptop") setTroubleIssue("Laptop running slowly / overheating");
-                          if (c === "Booking & Handover") setTroubleIssue("Secret PIN verification issue");
-                          if (c === "Billing & Deposit") setTroubleIssue("Rental timer pause request");
+                          else if (c === "Laptop") setTroubleIssue("Laptop running slowly / overheating");
+                          else if (c === "Billing & Charges") setTroubleIssue("Rental timer pause request");
+                          else if (c === "Deposits & Refunds") setTroubleIssue("Security deposit refund timeline");
+                          else if (c === "Booking & Handover") setTroubleIssue("Secret PIN verification issue");
+                          else if (c === "Returns & Logistics") setTroubleIssue("Return status not updated");
+                          else if (c === "Account & Login") setTroubleIssue("OTP SMS code not received");
+                          else if (c === "App Performance") setTroubleIssue("App crashes on launch");
+                          else if (c === "Platform Rules") setTroubleIssue("How does gear deposit work?");
+                          else setTroubleIssue("What does Payent Shield insurance cover?");
                         }}
                         className={cn(
                           "p-3 rounded-xl border text-xs font-bold transition-all cursor-pointer text-center",
@@ -1104,20 +1222,61 @@ export default function Support() {
                         <option value="Will not power on">Will not power on</option>
                       </>
                     )}
+                    {troubleCategory === "Billing & Charges" && (
+                      <>
+                        <option value="Rental timer pause request">Rental timer pause request</option>
+                        <option value="Payment debited but status pending">Payment debited but status pending</option>
+                        <option value="Unexpected charge on statement">Unexpected charge on statement</option>
+                        <option value="How to download GST tax invoice">How to download GST tax invoice</option>
+                      </>
+                    )}
+                    {troubleCategory === "Deposits & Refunds" && (
+                      <>
+                        <option value="Security deposit refund timeline">Security deposit refund timeline</option>
+                        <option value="Deposit deduction dispute">Deposit deduction dispute</option>
+                        <option value="Refund for cancelled booking">Refund for cancelled booking</option>
+                      </>
+                    )}
                     {troubleCategory === "Booking & Handover" && (
                       <>
                         <option value="Secret PIN verification issue">Secret PIN verification issue (4-digit code)</option>
                         <option value="Delivery agent pickup delayed">Delivery agent pickup delayed</option>
-                        <option value="Return status not updated">Return status not updated</option>
                         <option value="Condition dispute at handover">Condition dispute at handover</option>
                       </>
                     )}
-                    {troubleCategory === "Billing & Deposit" && (
+                    {troubleCategory === "Returns & Logistics" && (
                       <>
-                        <option value="Rental timer pause request">Rental timer pause request</option>
-                        <option value="Payment succeeded but status pending">Payment debited but status pending</option>
-                        <option value="Security deposit refund timeline">Security deposit refund timeline</option>
-                        <option value="Unexpected charge on statement">Unexpected charge on statement</option>
+                        <option value="Return status not updated">Return status not updated</option>
+                        <option value="Need to extend rental return date">Need to extend rental return date</option>
+                        <option value="Courier packaging return guidelines">Courier packaging return guidelines</option>
+                      </>
+                    )}
+                    {troubleCategory === "Account & Login" && (
+                      <>
+                        <option value="OTP SMS code not received">OTP SMS code not received</option>
+                        <option value="Password reset link not working">Password reset link not working</option>
+                        <option value="Google OAuth sign-in error">Google OAuth sign-in error</option>
+                      </>
+                    )}
+                    {troubleCategory === "App Performance" && (
+                      <>
+                        <option value="App crashes on launch">App crashes on launch</option>
+                        <option value="Unable to upload ID verification photos">Unable to upload ID verification photos</option>
+                        <option value="Map not loading nearby gear">Map not loading nearby gear</option>
+                      </>
+                    )}
+                    {troubleCategory === "Platform Rules" && (
+                      <>
+                        <option value="How does gear deposit work?">How does gear security deposit work?</option>
+                        <option value="Renter verification requirements">Renter verification requirements</option>
+                        <option value="Cancellation and rescheduling policy">Cancellation and rescheduling policy</option>
+                      </>
+                    )}
+                    {troubleCategory === "Security & Coverage" && (
+                      <>
+                        <option value="What does Payent Shield insurance cover?">What does Payent Shield insurance cover?</option>
+                        <option value="Accidental damage vs normal wear & tear">Accidental damage vs normal wear & tear</option>
+                        <option value="Reporting lost or stolen rental equipment">Reporting lost or stolen rental equipment</option>
                       </>
                     )}
                   </select>
@@ -1130,7 +1289,7 @@ export default function Support() {
                     <span>Safe Diagnostic Steps for &ldquo;{troubleIssue}&rdquo;:</span>
                   </div>
 
-                  <div className="text-xs sm:text-sm text-foreground/85 space-y-2">
+                  <div className="text-xs sm:text-sm text-foreground/85 space-y-2 leading-relaxed">
                     {troubleIssue.includes("turning on") && (
                       <>
                         <p>1. Check battery door latch. On modern cinema cameras, the internal switch requires a complete mechanical lock.</p>
@@ -1158,14 +1317,22 @@ export default function Support() {
                         <p>2. Submit a ticket with proof of defect to freeze the billing clock immediately.</p>
                       </>
                     )}
+                    {troubleIssue.includes("OTP") && (
+                      <>
+                        <p>1. Ensure your phone number includes country code (+91) with no spaces.</p>
+                        <p>2. Check your spam / promotional SMS folder if using carrier filtering.</p>
+                        <p>3. Wait 60 seconds before requesting a resend to avoid rate limits.</p>
+                      </>
+                    )}
                     {!troubleIssue.includes("turning on") &&
                       !troubleIssue.includes("blurry") &&
                       !troubleIssue.includes("PIN") &&
-                      !troubleIssue.includes("pause") && (
+                      !troubleIssue.includes("pause") &&
+                      !troubleIssue.includes("OTP") && (
                         <>
-                          <p>1. Verify standard power output and cable seating.</p>
-                          <p>2. Never attempt unauthorized disassembly, firmware flashing, or electrical modifications.</p>
-                          <p>3. If the problem persists, escalate to support below for replacement or billing credit.</p>
+                          <p>1. Verify standard operating guidelines and device status.</p>
+                          <p>2. Never attempt unauthorized disassembly or hardware modifications.</p>
+                          <p>3. If problem persists, escalate to support below for coordinate resolution.</p>
                         </>
                       )}
                   </div>
@@ -1186,12 +1353,12 @@ export default function Support() {
                           : "bg-muted hover:bg-muted/80 text-foreground"
                       )}
                     >
-                      Yes, it&rsquo;s working!
+                      Yes, resolved!
                     </button>
                     <button
                       onClick={() => {
                         setTroubleResolved(false);
-                        handlePrefillTicket(troubleCategory, troubleIssue);
+                        handlePrefillTicket(currentCategory.name, troubleIssue);
                       }}
                       className={cn(
                         "px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer",
@@ -1200,7 +1367,7 @@ export default function Support() {
                           : "bg-muted hover:bg-muted/80 text-foreground"
                       )}
                     >
-                      No, I still need help
+                      No, still need help
                     </button>
                   </div>
                 </div>
@@ -1208,7 +1375,7 @@ export default function Support() {
                 {troubleResolved === true && (
                   <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-xs font-semibold flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4" />
-                    <span>Great! You&rsquo;re all set. Feel free to return to the Knowledge Base if you need anything else.</span>
+                    <span>Great! You&rsquo;re all set. Return to Questions &amp; Answers if you need anything else.</span>
                   </div>
                 )}
               </div>
@@ -1221,10 +1388,10 @@ export default function Support() {
               <div className="p-6 sm:p-8 rounded-3xl bg-card border border-border space-y-6">
                 <div>
                   <h2 className="text-xl sm:text-2xl font-black text-foreground">
-                    Raise a Support Ticket
+                    Raise a Ticket for {currentCategory.name}
                   </h2>
                   <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-                    Submit your request directly to our platform operations team. Authenticated tickets receive prioritized review.
+                    Submit your request directly to our platform coordinators. Authenticated tickets receive prioritized review.
                   </p>
                 </div>
 
@@ -1235,9 +1402,7 @@ export default function Support() {
                       <h3 className="text-base font-bold text-foreground">
                         Support Ticket Created Successfully!
                       </h3>
-                      <p className="text-xs text-muted-foreground">
-                        Your reference ID is:
-                      </p>
+                      <p className="text-xs text-muted-foreground">Your reference ID is:</p>
                       <div className="font-mono text-sm font-black text-emerald-500 bg-emerald-500/10 py-1.5 px-3 rounded-lg inline-block">
                         #{ticketSuccessId}
                       </div>
@@ -1328,7 +1493,7 @@ export default function Support() {
                         maxLength={200}
                         value={ticketSubject}
                         onChange={(e) => setTicketSubject(e.target.value)}
-                        placeholder="Brief summary of the issue (e.g. Battery drain on Sony FX3)"
+                        placeholder="Brief summary of the issue..."
                         className="w-full px-3.5 py-2.5 rounded-xl bg-card border border-border text-xs sm:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
                       />
                     </div>
@@ -1417,7 +1582,7 @@ export default function Support() {
                       <button
                         type="submit"
                         disabled={ticketSubmitting}
-                        className="px-6 py-2.5 rounded-xl bg-foreground text-background text-xs sm:text-sm font-bold hover:opacity-90 transition-opacity cursor-pointer flex items-center gap-2 disabled:opacity-50"
+                        className="px-6 py-2.5 rounded-xl bg-foreground text-background text-xs sm:text-sm font-bold hover:opacity-90 transition-opacity cursor-pointer flex items-center gap-2 disabled:opacity-50 shadow-sm"
                       >
                         {ticketSubmitting ? (
                           <>
@@ -1475,7 +1640,7 @@ export default function Support() {
                   </div>
                   <Link
                     to="/login"
-                    className="px-5 py-2.5 rounded-xl bg-foreground text-background text-xs font-bold inline-block hover:opacity-90"
+                    className="px-5 py-2.5 rounded-xl bg-foreground text-background text-xs font-bold inline-block hover:opacity-90 shadow-sm"
                   >
                     Log In to Payent
                   </Link>
@@ -1509,7 +1674,7 @@ export default function Support() {
                   </div>
                   <button
                     onClick={() => setActiveTab("ticket")}
-                    className="px-5 py-2.5 rounded-xl bg-foreground text-background text-xs font-bold hover:opacity-90 cursor-pointer"
+                    className="px-5 py-2.5 rounded-xl bg-foreground text-background text-xs font-bold hover:opacity-90 cursor-pointer shadow-sm"
                   >
                     Raise Support Ticket
                   </button>
@@ -1581,7 +1746,6 @@ export default function Support() {
                           </div>
                         </div>
 
-                        {/* Expanded conversation history & reply box */}
                         {isSelected && (
                           <div className="px-4 sm:px-5 pb-5 pt-2 border-t border-border/50 space-y-4">
                             <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
@@ -1614,7 +1778,6 @@ export default function Support() {
                               })}
                             </div>
 
-                            {/* Reply Input Form */}
                             <form
                               onSubmit={(e) => {
                                 e.preventDefault();
@@ -1648,6 +1811,27 @@ export default function Support() {
               )}
             </div>
           )}
+
+          {/* SWITCH CATEGORY FOOTER ROW */}
+          <div className="mt-14 pt-8 border-t border-border">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <span className="text-xs font-semibold text-muted-foreground">
+                Switch to another support topic:
+              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                {FAQ_CATEGORIES.filter((c) => c.id !== currentCategory.id).map((c) => (
+                  <Link
+                    key={c.id}
+                    to="/support"
+                    search={{ category: c.id }}
+                    className="px-3 py-1.5 rounded-xl bg-card border border-border text-xs font-medium text-foreground hover:bg-muted hover:border-foreground/30 transition-colors flex items-center gap-1.5 shadow-sm"
+                  >
+                    <span>{c.name}</span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </MainLayout>
