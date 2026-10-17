@@ -23,6 +23,7 @@ export interface DashboardStats {
   completedBookings?: number;
   revenueToday: number;
   monthlyRevenue: number;
+  pendingUsers?: number;
   pendingWithdrawals?: number;
   pendingReports: number;
   unreadNotifications: number;

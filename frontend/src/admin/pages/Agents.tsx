@@ -98,7 +98,16 @@ export default function Agents() {
     }
 
     if (statusFilter !== "all") {
-      result = result.filter((a) => a.status === statusFilter);
+      result = result.filter((a) => {
+        const s = String(a.status || "").toLowerCase();
+        if (statusFilter === "pending") {
+          return s === "pending" || s === "pending_review" || s === "unverified" || (s !== "active" && s !== "approved" && s !== "suspended");
+        }
+        if (statusFilter === "active") {
+          return s === "active" || s === "approved";
+        }
+        return s === statusFilter.toLowerCase();
+      });
     }
 
     result.sort((a, b) => {
@@ -233,8 +242,16 @@ export default function Agents() {
   ];
 
   const totalCount = agents.filter((a) => !isFakeUserEmail(a.email)).length;
-  const verifiedCount = agents.filter((a) => a.status === "active").length;
-  const pendingCount = agents.filter((a) => a.status !== "active").length;
+  const verifiedCount = agents.filter((a) => {
+    if (isFakeUserEmail(a.email)) return false;
+    const s = String(a.status || "").toLowerCase();
+    return s === "active" || s === "approved";
+  }).length;
+  const pendingCount = agents.filter((a) => {
+    if (isFakeUserEmail(a.email)) return false;
+    const s = String(a.status || "").toLowerCase();
+    return s === "pending" || s === "pending_review" || s === "unverified" || (s !== "active" && s !== "approved" && s !== "suspended");
+  }).length;
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-8">

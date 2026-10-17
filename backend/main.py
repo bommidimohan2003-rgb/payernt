@@ -5712,6 +5712,7 @@ def admin_update_password(data: PasswordUpdateSchema, current_admin: dict = Depe
 def admin_stats(current_admin: dict = Depends(check_admin_user)):
     stats_result = {
         "totalUsers": 0,
+        "pendingUsers": 0,
         "payerntAccounts": 0,
         "payrentAccounts": 0,
         "adminAccounts": 0,
@@ -5738,10 +5739,13 @@ def admin_stats(current_admin: dict = Depends(check_admin_user)):
     if not conn:
         try:
             from database import MOCK_USERS, MOCK_CUSTOM_PRODUCTS, MOCK_ORDERS, is_fake_user
-            from payernt_database import MOCK_PAYERNT_PRODUCTS, MOCK_RENTAL_SECURITIES
+            from payernt_database import MOCK_PAYERNT_ACCOUNTS, MOCK_PAYERNT_PRODUCTS, MOCK_RENTAL_SECURITIES
             
             active_users = [u for u in MOCK_USERS.values() if not is_fake_user(u.get("email", ""))]
             stats_result["totalUsers"] = len(active_users)
+            pending_payernt = [p for p in MOCK_PAYERNT_ACCOUNTS.values() if not is_fake_user(p.get("email", "")) and (str(p.get("status", "")).upper() in ("PENDING", "PENDING_REVIEW", "UNVERIFIED") or not p.get("verified"))]
+            pending_users_cnt = len([u for u in active_users if u.get("role") != "admin" and (str(u.get("status", "")).upper() in ("PENDING", "PENDING_REVIEW", "UNVERIFIED") or not u.get("verified"))]) + len(pending_payernt)
+            stats_result["pendingUsers"] = pending_users_cnt
             stats_result["payerntAccounts"] = len([u for u in active_users if u.get("role") in ("vendor", "lender", "agent")])
             stats_result["payrentAccounts"] = len([u for u in active_users if u.get("role") in ("customer", "renter", "user")])
             stats_result["adminAccounts"] = len([u for u in active_users if u.get("role") == "admin"])
@@ -5810,6 +5814,15 @@ def admin_stats(current_admin: dict = Depends(check_admin_user)):
             stats_result["payrentAccounts"] = payrent_cnt
             stats_result["adminAccounts"] = admin_cnt
             stats_result["totalUsers"] = distinct_users_cnt
+            stats_result["pendingUsers"] = int(safe_query(f"""
+                SELECT COUNT(DISTINCT email) as count FROM (
+                    SELECT email FROM users {_fake_filter} AND (UPPER(status) IN ('PENDING', 'PENDING_REVIEW', 'UNVERIFIED') OR verified = 0) AND role NOT IN ('admin', 'superadmin')
+                    UNION
+                    SELECT email FROM payernt_accounts {_fake_filter} AND UPPER(status) IN ('PENDING', 'PENDING_REVIEW', 'UNVERIFIED')
+                    UNION
+                    SELECT email FROM payrent_accounts {_fake_filter} AND (UPPER(status) IN ('PENDING', 'PENDING_REVIEW', 'UNVERIFIED') OR verified = 0)
+                ) as pending_tbl
+            """, default=0))
             stats_result["totalAgents"] = int(safe_query(f"""
                 SELECT COUNT(*) as count FROM agents 
                 WHERE user_email NOT LIKE '%@example.com' AND user_email NOT LIKE '%@test.com'
@@ -6506,6 +6519,10 @@ def admin_users_list(current_admin: dict = Depends(check_admin_user)):
             if is_fake_user(em):
                 continue
             role_str = (u.get("role") or "customer").lower()
+            status_val = u.get("status") or "active"
+            is_verified = bool(u.get("verified")) or str(status_val).upper() in ("APPROVED", "ACTIVE")
+            raw_pan = u.get("panMasked") or u.get("pan_number") or u.get("panNumber")
+            raw_aadh = u.get("aadhaarMasked") or u.get("aadhaar_number") or u.get("aadhaarNumber")
             users_by_id[em] = {
                 "id": em,
                 "accountId": f"USER_{em}",
@@ -6516,13 +6533,74 @@ def admin_users_list(current_admin: dict = Depends(check_admin_user)):
                 "address": u.get("address") or "",
                 "city": u.get("city") or "",
                 "pincode": u.get("pincode") or "",
+                "panNumber": raw_pan,
+                "panMasked": raw_pan,
+                "aadhaarNumber": raw_aadh,
+                "aadhaarMasked": raw_aadh,
                 "role": role_str,
                 "accountType": "Admin" if role_str in ("admin", "superadmin") else ("Payernt" if role_str in ("lender", "vendor") else "Payrent"),
-                "status": u.get("status") or "active",
-                "verified": bool(u.get("verified")),
+                "status": status_val,
+                "rejectionReason": u.get("rejection_reason"),
+                "reviewedBy": u.get("reviewed_by"),
+                "reviewedAt": u.get("reviewed_at"),
+                "verified": is_verified,
                 "avatar": u.get("avatar") or f"https://ui-avatars.com/api/?name={urllib.parse.quote(u.get('full_name') or em)}&background=0D151D&color=fff",
                 "createdAt": str(u.get("created_at") or "")
             }
+
+        try:
+            from payernt_database import MOCK_PAYERNT_ACCOUNTS
+            for em, p in MOCK_PAYERNT_ACCOUNTS.items():
+                if is_fake_user(em):
+                    continue
+                status_str = p.get("status") or "PENDING_REVIEW"
+                is_approved = status_str.upper() in ("APPROVED", "ACTIVE") or bool(p.get("verified"))
+                raw_aadh = p.get("aadhaar_number") or ""
+                p_sub = {
+                    "accountId": p.get("id") or f"PAYERNT_USER_{em}",
+                    "name": p.get("name") or em.split("@")[0],
+                    "email": p.get("email") or em,
+                    "phone": p.get("phone") or "",
+                    "accountStatus": status_str,
+                    "verificationStatus": status_str,
+                    "isVerified": is_approved,
+                    "aadhaarMasked": raw_aadh,
+                    "address": p.get("address") or "",
+                    "pincode": p.get("pincode") or "",
+                    "avatar": p.get("avatar") or "",
+                    "createdAt": str(p.get("created_at") or "")
+                }
+                if em in users_by_id:
+                    users_by_id[em]["payerntAccount"] = p_sub
+                    if users_by_id[em]["role"] != "admin":
+                        users_by_id[em]["role"] = "both"
+                        users_by_id[em]["accountType"] = "Both"
+                else:
+                    users_by_id[em] = {
+                        "id": em,
+                        "accountId": p.get("id") or f"PAYERNT_USER_{em}",
+                        "fullName": p.get("name") or em.split("@")[0],
+                        "name": p.get("name") or em.split("@")[0],
+                        "email": p.get("email") or em,
+                        "phone": p.get("phone") or "",
+                        "address": p.get("address") or "",
+                        "city": "",
+                        "pincode": p.get("pincode") or "",
+                        "aadhaarNumber": raw_aadh,
+                        "aadhaarMasked": raw_aadh,
+                        "role": "lender",
+                        "accountType": "Payernt",
+                        "status": status_str,
+                        "rejectionReason": p.get("rejection_reason"),
+                        "reviewedBy": p.get("reviewed_by"),
+                        "reviewedAt": p.get("reviewed_at"),
+                        "verified": is_approved,
+                        "avatar": p.get("avatar") or f"https://ui-avatars.com/api/?name={urllib.parse.quote(p.get('name') or em)}&background=0D151D&color=fff",
+                        "createdAt": str(p.get("created_at") or ""),
+                        "payerntAccount": p_sub
+                    }
+        except Exception as pe:
+            logger.warning(f"Error checking MOCK_PAYERNT_ACCOUNTS in fallback: {pe}")
 
     return list(users_by_id.values())
 
@@ -6532,7 +6610,29 @@ def admin_users_list(current_admin: dict = Depends(check_admin_user)):
 def admin_payernt_users_list(current_admin: dict = Depends(check_admin_user)):
     conn = get_db_connection()
     if not conn:
-        return []
+        try:
+            from payernt_database import MOCK_PAYERNT_ACCOUNTS, MOCK_PAYERNT_PRODUCTS
+            results = []
+            for em, p in MOCK_PAYERNT_ACCOUNTS.items():
+                if is_fake_user(em):
+                    continue
+                prod_count = len([prod for prod in MOCK_PAYERNT_PRODUCTS.values() if prod.get("owner_email", "").lower() == em.lower()])
+                results.append({
+                    "id": p.get("id") or f"PAYERNT_USER_{em}",
+                    "email": p.get("email") or em,
+                    "fullName": p.get("name") or em.split("@")[0],
+                    "phone": p.get("phone") or "",
+                    "address": p.get("address"),
+                    "pincode": p.get("pincode"),
+                    "status": p.get("status") or "active",
+                    "productCount": prod_count,
+                    "walletBalance": 0.0,
+                    "avatar": p.get("avatar") or "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+                    "createdAt": str(p.get("created_at") or "")
+                })
+            return results
+        except Exception:
+            return []
     try:
         with conn.cursor() as cursor:
             cursor.execute("""
@@ -6567,7 +6667,30 @@ def admin_payernt_users_list(current_admin: dict = Depends(check_admin_user)):
 def admin_payrent_users_list(current_admin: dict = Depends(check_admin_user)):
     conn = get_db_connection()
     if not conn:
-        return []
+        try:
+            from database import MOCK_USERS, MOCK_ORDERS
+            results = []
+            for em, u in MOCK_USERS.items():
+                if is_fake_user(em):
+                    continue
+                if u.get("role") in ("admin", "superadmin"):
+                    continue
+                orders_cnt = len([o for o in MOCK_ORDERS.values() if o.get("user_email", "").lower() == em.lower()])
+                results.append({
+                    "id": em,
+                    "email": em,
+                    "fullName": u.get("full_name") or em.split("@")[0],
+                    "phone": u.get("phone") or "",
+                    "address": u.get("address"),
+                    "pincode": u.get("pincode"),
+                    "status": u.get("status") or "active",
+                    "bookingCount": orders_cnt,
+                    "avatar": u.get("avatar") or "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
+                    "createdAt": str(u.get("created_at") or "")
+                })
+            return results
+        except Exception:
+            return []
     try:
         with conn.cursor() as cursor:
             cursor.execute("""

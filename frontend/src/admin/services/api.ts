@@ -27,6 +27,8 @@ export interface AdminUser {
   upiId?: string;
   aadhaarMasked?: string;
   aadhaarNumber?: string;
+  panNumber?: string;
+  rejectionReason?: string;
   accountType?: string;
   createdAt: string;
   payerntAccount?: {

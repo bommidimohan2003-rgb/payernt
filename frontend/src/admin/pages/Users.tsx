@@ -32,6 +32,17 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { adminWS } from "../services/websocket";
 
+export const isPendingUser = (u?: AdminUser | null): boolean => {
+  if (!u || u.role === "admin") return false;
+  const s = String(u.status || "").toUpperCase();
+  return (
+    s === "PENDING" ||
+    s === "PENDING_REVIEW" ||
+    s === "UNVERIFIED" ||
+    (!u.verified && s !== "ACTIVE" && s !== "APPROVED" && s !== "SUSPENDED" && s !== "REJECTED")
+  );
+};
+
 export default function Users() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,9 +51,31 @@ export default function Users() {
   // Platform Type Tab
   const [platformTab, setPlatformTab] = useState<"all" | "payernt" | "payrent">("all");
 
-  // Search & Filters
+  // Search & Filters (support ?status=pending or ?tab=pending from URL)
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState(() => {
+    if (typeof window !== "undefined") {
+      const sp = new URLSearchParams(window.location.search);
+      const val = sp.get("status") || sp.get("tab");
+      if (val) return val.toLowerCase();
+    }
+    return "all";
+  });
+
+  const handleStatusFilterChange = (newStatus: string) => {
+    setStatusFilter(newStatus);
+    setCurrentPage(1);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      if (newStatus === "all") {
+        url.searchParams.delete("status");
+        url.searchParams.delete("tab");
+      } else {
+        url.searchParams.set("status", newStatus);
+      }
+      window.history.replaceState(null, "", url.toString());
+    }
+  };
 
   // Sorting
   const [sortKey, setSortKey] = useState("createdAt");
@@ -276,10 +309,10 @@ export default function Users() {
       result = result.filter((u) => {
         const s = String(u.status || "").toUpperCase();
         if (statusFilter === "pending") {
-          return s === "PENDING_REVIEW" || s === "PENDING" || s === "UNVERIFIED" || !u.verified;
+          return isPendingUser(u);
         }
         if (statusFilter === "active") {
-          return s === "APPROVED" || s === "ACTIVE" || (u.verified && s !== "SUSPENDED" && s !== "REJECTED");
+          return (s === "APPROVED" || s === "ACTIVE" || u.verified) && s !== "SUSPENDED" && s !== "REJECTED" && !isPendingUser(u);
         }
         if (statusFilter === "rejected") {
           return s === "REJECTED" || s === "DECLINED";
@@ -408,7 +441,7 @@ export default function Users() {
       align: "right",
       render: (row) => {
         const rawStatus = String(row.status || "").toUpperCase();
-        const isPending = rawStatus === "PENDING" || rawStatus === "PENDING_REVIEW" || rawStatus === "UNVERIFIED";
+        const isPending = isPendingUser(row);
         const isSuspended = rawStatus === "SUSPENDED";
         const isPayernt = row.accountType?.toLowerCase().includes("payernt") || row.role === "lender" || row.role === "vendor";
         const typeLabel = isPayernt ? "Payernt" : "Payrent";
@@ -478,15 +511,13 @@ export default function Users() {
   ];
 
   const totalAllCount = users.filter((u) => !isFakeUserEmail(u.email)).length;
-  const pendingCount = users.filter((u) => {
-    const s = String(u.status || "").toUpperCase();
-    return s === "PENDING_REVIEW" || s === "PENDING" || s === "UNVERIFIED" || !u.verified;
-  }).length;
+  const pendingCount = users.filter((u) => !isFakeUserEmail(u.email) && isPendingUser(u)).length;
   const verifiedCount = users.filter((u) => {
+    if (isFakeUserEmail(u.email)) return false;
     const s = String(u.status || "").toUpperCase();
-    return (s === "APPROVED" || s === "ACTIVE" || u.verified) && s !== "SUSPENDED" && s !== "REJECTED";
+    return (s === "APPROVED" || s === "ACTIVE" || u.verified) && s !== "SUSPENDED" && s !== "REJECTED" && !isPendingUser(u);
   }).length;
-  const suspendedCount = users.filter((u) => String(u.status || "").toUpperCase() === "SUSPENDED").length;
+  const suspendedCount = users.filter((u) => !isFakeUserEmail(u.email) && String(u.status || "").toUpperCase() === "SUSPENDED").length;
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-8">
@@ -497,7 +528,7 @@ export default function Users() {
             Users
           </h1>
           <p className="text-xs sm:text-sm text-[#A1A1AA]">
-            Manage all Payent and Payrent users.
+            Manage all Payent and Payrent users and review account approvals.
           </p>
         </div>
 
@@ -513,20 +544,17 @@ export default function Users() {
         </div>
       </div>
 
-      {/* TABS (Panel 3: All Users, Pending Verification, Verified, Suspended) */}
+      {/* TABS (Panel 3: All Users, Account Approvals, Verified, Suspended) */}
       <div className="flex items-center gap-2 border-b border-[rgba(161,161,170,0.18)] pb-2 overflow-x-auto no-scrollbar">
         {[
           { id: "all", label: "All Users", count: totalAllCount },
-          { id: "pending", label: "Pending Verification", count: pendingCount },
+          { id: "pending", label: "Account Approvals", count: pendingCount, isApproval: true },
           { id: "active", label: "Verified", count: verifiedCount },
           { id: "suspended", label: "Suspended", count: suspendedCount },
         ].map((tab) => (
           <button
             key={tab.id}
-            onClick={() => {
-              setStatusFilter(tab.id);
-              setCurrentPage(1);
-            }}
+            onClick={() => handleStatusFilterChange(tab.id)}
             className={cn(
               "px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer whitespace-nowrap flex items-center gap-2",
               statusFilter === tab.id
@@ -534,11 +562,16 @@ export default function Users() {
                 : "text-[#A1A1AA] hover:text-[#F5F5F5] hover:bg-white/5"
             )}
           >
+            {tab.isApproval && pendingCount > 0 && (
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+            )}
             <span>{tab.label}</span>
             <span
               className={cn(
                 "px-1.5 py-0.2 rounded-full text-[10px] font-mono",
-                statusFilter === tab.id
+                tab.isApproval && pendingCount > 0
+                  ? "bg-amber-500/20 text-amber-500 font-bold border border-amber-500/30"
+                  : statusFilter === tab.id
                   ? "bg-black/15 text-black"
                   : "bg-white/10 text-zinc-300"
               )}
@@ -585,15 +618,12 @@ export default function Users() {
           {/* Status Filter */}
           <select
             value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
-              setCurrentPage(1);
-            }}
+            onChange={(e) => handleStatusFilterChange(e.target.value)}
             className="px-3 py-2 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] text-xs text-[#F5F5F5] focus:outline-none cursor-pointer"
           >
             <option value="all">All Status</option>
+            <option value="pending">Account Approvals (Pending)</option>
             <option value="active">Verified / Active</option>
-            <option value="pending">Pending</option>
             <option value="suspended">Suspended</option>
           </select>
 
@@ -961,9 +991,27 @@ export default function Users() {
                         <div className="pt-2 border-t border-border/40 flex justify-between items-center font-mono">
                           <span>Verification State:</span>
                           <span className={cn("font-bold uppercase", selectedUser.verified ? "text-emerald-500" : "text-amber-500")}>
-                            {selectedUser.verified ? "VERIFIED" : "PENDING"}
+                            {selectedUser.verified ? "VERIFIED" : "PENDING REVIEW"}
                           </span>
                         </div>
+                        {selectedUser.panNumber && (
+                          <div className="flex justify-between items-center font-mono">
+                            <span className="text-muted-foreground">PAN Number:</span>
+                            <span className="font-bold text-foreground">{selectedUser.panNumber}</span>
+                          </div>
+                        )}
+                        {(selectedUser.aadhaarNumber || selectedUser.aadhaarMasked) && (
+                          <div className="flex justify-between items-center font-mono">
+                            <span className="text-muted-foreground">Aadhaar:</span>
+                            <span className="font-bold text-foreground">{selectedUser.aadhaarNumber || selectedUser.aadhaarMasked}</span>
+                          </div>
+                        )}
+                        {selectedUser.rejectionReason && (
+                          <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs">
+                            <span className="font-bold block mb-1">Prior Rejection Reason:</span>
+                            <span>{selectedUser.rejectionReason}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -973,7 +1021,7 @@ export default function Users() {
 
             {/* Drawer Footer Actions */}
             <div className="p-5 border-t border-border/60 bg-secondary/20 flex items-center justify-between gap-2">
-              {selectedUser.status === "pending" ? (
+              {isPendingUser(selectedUser) ? (
                 <>
                   <button
                     onClick={() => handleApprove(selectedUser.accountId || selectedUser.id || selectedUser.email, selectedUser.accountType)}

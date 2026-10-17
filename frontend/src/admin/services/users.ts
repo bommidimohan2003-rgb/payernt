@@ -11,7 +11,12 @@ export const REAL_USER_EMAILS = new Set([
 export const isFakeUserEmail = (email?: string): boolean => {
   if (!email) return true;
   const em = email.toLowerCase().trim();
-  return !REAL_USER_EMAILS.has(em);
+  if (REAL_USER_EMAILS.has(em)) return false;
+  const testDomains = ["@example.com", "@test.com", "@fake.com", "@mock.com", "@mailinator.com"];
+  if (testDomains.some((d) => em.endsWith(d))) return true;
+  const testPrefixes = ["fake_", "test_", "audit_", "ephem_", "reset_test_"];
+  if (testPrefixes.some((p) => em.startsWith(p))) return true;
+  return false;
 };
 
 export const usersService = {

@@ -39,7 +39,7 @@ const menuItems = [
   {
     group: "Management",
     items: [
-      { to: "/admin/users", icon: Users, label: "Users" },
+      { to: "/admin/users", icon: Users, label: "Users", badgeKey: "users" },
       { to: "/admin/agents", icon: UserCheck, label: "Agents" },
       { to: "/admin/products", icon: Package, label: "Products" },
       { to: "/admin/categories", icon: Grid, label: "Categories" },
@@ -95,6 +95,7 @@ export function Sidebar() {
     reports: 0,
     notifications: 0,
     support: 0,
+    users: 0,
   });
   const navigate = useNavigate();
   const currentUser = authService.getCurrentUser();
@@ -106,6 +107,7 @@ export function Sidebar() {
         reports: stats.pendingReports || 0,
         notifications: stats.unreadNotifications || 0,
         support: 0,
+        users: stats.pendingUsers || 0,
       });
     } catch {
       // Ignore badge errors silently

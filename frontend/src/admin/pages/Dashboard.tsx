@@ -101,12 +101,16 @@ export default function Dashboard() {
       }
       if (usersData.status === "fulfilled") {
         setPendingUsers(
-          usersData.value.filter(
-            (u) =>
-              u.status === "pending" ||
-              u.status === "PENDING_REVIEW" ||
-              !u.verified
-          )
+          usersData.value.filter((u) => {
+            if (u.role === "admin") return false;
+            const s = String(u.status || "").toUpperCase();
+            return (
+              s === "PENDING" ||
+              s === "PENDING_REVIEW" ||
+              s === "UNVERIFIED" ||
+              (!u.verified && s !== "ACTIVE" && s !== "APPROVED" && s !== "SUSPENDED" && s !== "REJECTED")
+            );
+          })
         );
       }
     } catch (err: any) {
@@ -524,19 +528,20 @@ export default function Dashboard() {
           </div>
 
           <div className="space-y-3">
-            {/* User Verifications */}
+            {/* Account Approvals */}
             <div className="p-3 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <span className="w-6 h-6 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-500 dark:text-amber-400 flex items-center justify-center font-bold text-xs">
-                  {pendingUsers.length}
+                  {stats?.pendingUsers ?? pendingUsers.length}
                 </span>
                 <span className="text-xs font-medium text-[var(--admin-text)]">
-                  User Verifications
+                  Account Approvals
                 </span>
               </div>
               <Link
                 to="/admin/users"
-                className="px-2.5 py-1 rounded-md bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 text-[var(--admin-text)] text-[11px] font-semibold transition-colors"
+                search={{ status: "pending" } as any}
+                className="px-2.5 py-1 rounded-md bg-amber-500/15 hover:bg-amber-500/25 text-amber-600 dark:text-amber-400 text-[11px] font-semibold transition-colors"
               >
                 Review
               </Link>
@@ -564,7 +569,7 @@ export default function Dashboard() {
             <div className="p-3 rounded-lg bg-[var(--admin-elevated)] border border-[var(--admin-border)] flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <span className="w-6 h-6 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-500 dark:text-amber-400 flex items-center justify-center font-bold text-xs">
-                  {pendingUsers.filter((u) => u.accountType === "Payernt" || u.role === "agent").length}
+                  {pendingUsers.filter((u) => u.accountType?.toLowerCase().includes("payernt") || u.role === "agent" || u.role === "lender" || u.role === "vendor").length}
                 </span>
                 <span className="text-xs font-medium text-[var(--admin-text)]">
                   Agent Approvals
