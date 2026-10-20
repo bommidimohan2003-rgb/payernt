@@ -22,6 +22,7 @@ import uuid
 import time
 import secrets
 import random
+import json
 from typing import Optional, List, Set, Dict, Tuple, Any
 from datetime import datetime as dt, timezone, timedelta
 from config import MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DB, MYSQL_SSL, TIDB_SSL_CA, IS_PRODUCTION
@@ -478,11 +479,41 @@ def init_db(force: bool = False):
     add_column_safely("orders", "payment_status VARCHAR(50) DEFAULT 'unpaid'")
     add_column_safely("orders", "refund_id VARCHAR(255)")
     add_column_safely("orders", "refund_status VARCHAR(50)")
+    add_column_safely("orders", "time_slot VARCHAR(50) DEFAULT 'full_day'")
+    add_column_safely("orders", "duration_type VARCHAR(50) DEFAULT 'full_day'")
+    add_column_safely("orders", "start_time VARCHAR(20) NULL")
+    add_column_safely("orders", "end_time VARCHAR(20) NULL")
+    add_column_safely("orders", "start_datetime VARCHAR(100) NULL")
+    add_column_safely("orders", "end_datetime VARCHAR(100) NULL")
+    add_column_safely("orders", "cancellation_id VARCHAR(255) NULL")
     add_index_safely("orders", "idx_orders_user_email", "user_email")
     add_index_safely("orders", "idx_orders_status", "status")
     add_index_safely("orders", "idx_orders_created_at", "created_at")
     add_index_safely("orders", "idx_orders_product_status", "product_id, status")
     add_index_safely("orders", "idx_orders_user_created", "user_email, created_at")
+
+    # Create booking_cancellations table
+    execute_query("""
+        CREATE TABLE IF NOT EXISTS booking_cancellations (
+            id VARCHAR(255) PRIMARY KEY,
+            booking_id VARCHAR(255) NOT NULL,
+            product_id VARCHAR(255) NOT NULL,
+            lender_id VARCHAR(255) NOT NULL,
+            renter_id VARCHAR(255) NOT NULL,
+            initiated_by VARCHAR(50) DEFAULT 'LENDER',
+            reason_code VARCHAR(100) NOT NULL,
+            feedback TEXT NULL,
+            previous_status VARCHAR(50) NOT NULL,
+            new_status VARCHAR(50) DEFAULT 'cancelled',
+            created_at VARCHAR(100) NOT NULL,
+            policy_outcome VARCHAR(100) DEFAULT 'released',
+            notification_sent BOOLEAN DEFAULT TRUE
+        )
+    """)
+    add_index_safely("booking_cancellations", "idx_bc_booking", "booking_id")
+    add_index_safely("booking_cancellations", "idx_bc_product", "product_id")
+    add_index_safely("booking_cancellations", "idx_bc_lender", "lender_id")
+    add_index_safely("booking_cancellations", "idx_bc_renter", "renter_id")
 
     # Create cart_items table
     execute_query("""
@@ -501,6 +532,12 @@ def init_db(force: bool = False):
             INDEX idx_cart_product (product_id)
         )
     """)
+    add_column_safely("cart_items", "time_slot VARCHAR(50) DEFAULT 'full_day'")
+    add_column_safely("cart_items", "duration_type VARCHAR(50) DEFAULT 'full_day'")
+    add_column_safely("cart_items", "start_time VARCHAR(20) NULL")
+    add_column_safely("cart_items", "end_time VARCHAR(20) NULL")
+    add_column_safely("cart_items", "start_datetime VARCHAR(100) NULL")
+    add_column_safely("cart_items", "end_datetime VARCHAR(100) NULL")
     add_index_safely("cart_items", "uq_cart_user_product", "user_email, product_id", unique=True)
 
     # Create custom_products table
@@ -546,6 +583,13 @@ def init_db(force: bool = False):
     add_column_safely("custom_products", "price_history LONGTEXT NULL")
     add_column_safely("custom_products", "video_url LONGTEXT NULL")
     add_column_safely("custom_products", "revision_notes LONGTEXT NULL")
+    add_column_safely("custom_products", "allow_half_day BOOLEAN DEFAULT TRUE")
+    add_column_safely("custom_products", "morning_slot_enabled BOOLEAN DEFAULT TRUE")
+    add_column_safely("custom_products", "afternoon_slot_enabled BOOLEAN DEFAULT TRUE")
+    add_column_safely("custom_products", "full_day_slot_enabled BOOLEAN DEFAULT TRUE")
+    add_column_safely("custom_products", "half_day_rate INT NULL")
+    add_column_safely("custom_products", "buffer_minutes INT DEFAULT 60")
+    add_column_safely("custom_products", "blocked_dates LONGTEXT NULL")
     add_index_safely("custom_products", "idx_custom_products_user_email", "user_email")
     add_index_safely("custom_products", "idx_cp_status_hidden_created", "status, hidden, created_at")
     add_index_safely("custom_products", "idx_cp_category", "category")
@@ -1153,6 +1197,7 @@ MOCK_ORDERS = {
         "owner_email": "vasnathchikkala@gmail.com"
     }
 }
+MOCK_BOOKING_CANCELLATIONS: Dict[str, Dict[str, Any]] = {}
 MOCK_CARTS = {}
 MOCK_WISHLISTS = {}
 MOCK_NOTIFICATIONS = {}
@@ -1836,10 +1881,33 @@ def create_order(email: str, order: dict):
     status = order.get("status") or "active"
     total = float(order.get("total", 0))
 
+    time_slot = order.get("time_slot") or order.get("timeSlot") or "full_day"
+    duration_type = order.get("duration_type") or order.get("durationType") or "full_day"
+    start_time = order.get("start_time") or order.get("startTime")
+    end_time = order.get("end_time") or order.get("endTime")
+    slot_info = DEFAULT_TIME_SLOTS.get(str(time_slot).lower())
+    if not start_time and slot_info:
+        start_time = slot_info["start_time"]
+    if not end_time and slot_info:
+        end_time = slot_info["end_time"]
+        
+    start_dt, end_dt = normalize_slot_interval(start, time_slot, start_time, end_time)
+    start_datetime = order.get("start_datetime") or order.get("startDatetime") or start_dt.isoformat()
+    end_datetime = order.get("end_datetime") or order.get("endDatetime") or end_dt.isoformat()
+
     if pid and start and end and status not in ("cancelled", "rejected", "failed"):
-        conflicts = check_products_booking_conflicts([pid], start, end, exclude_order_id=order.get("id"))
-        if pid in conflicts:
-            raise ValueError(f"Double booking conflict: Product '{pid}' is already booked for {start} to {end}.")
+        # 1. Authoritative slot & interval conflict check with turnaround buffer
+        has_slot_conf, conf_reason = check_product_interval_conflicts(
+            pid, start_dt, end_dt, buffer_minutes=60, exclude_order_id=order.get("id")
+        )
+        if has_slot_conf:
+            raise ValueError(f"Double booking conflict: Product '{pid}' is already booked ({conf_reason}).")
+
+        # 2. Date-level check for multi-day bookings
+        if duration_type == "multi_day" or (start != end and time_slot == "full_day"):
+            conflicts = check_products_booking_conflicts([pid], start, end, exclude_order_id=order.get("id"))
+            if pid in conflicts:
+                raise ValueError(f"Double booking conflict: Product '{pid}' is already booked for {start} to {end}.")
 
     normalized = {
         "id": order["id"],
@@ -1855,6 +1923,12 @@ def create_order(email: str, order: dict):
         "start_date": start,
         "endDate": end,
         "end_date": end,
+        "time_slot": time_slot,
+        "duration_type": duration_type,
+        "start_time": start_time,
+        "end_time": end_time,
+        "start_datetime": start_datetime,
+        "end_datetime": end_datetime,
         "total": total,
         "status": status,
         "createdAt": created,
@@ -1863,8 +1937,8 @@ def create_order(email: str, order: dict):
     MOCK_ORDERS[order["id"]] = normalized
 
     execute_query("""
-        INSERT INTO orders (id, user_email, product_id, product_title, product_image, start_date, end_date, total, status, created_at)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        INSERT INTO orders (id, user_email, product_id, product_title, product_image, start_date, end_date, total, status, created_at, time_slot, duration_type, start_time, end_time, start_datetime, end_datetime)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """, (
         order["id"],
         clean_email,
@@ -1875,7 +1949,13 @@ def create_order(email: str, order: dict):
         end,
         total,
         status,
-        created
+        created,
+        time_slot,
+        duration_type,
+        start_time,
+        end_time,
+        start_datetime,
+        end_datetime
     ))
 
     # Create matching payment transaction
@@ -1904,7 +1984,142 @@ def cancel_order(order_id: str):
     for key, o in list(MOCK_ORDERS.items()):
         if key == order_id or o.get("id") == order_id or o.get("productId") == order_id or o.get("product_id") == order_id:
             MOCK_ORDERS[key]["status"] = "cancelled"
-    execute_query("UPDATE orders SET status = 'cancelled' WHERE id = %s OR product_id = %s", (order_id, order_id))
+    execute_query("UPDATE orders SET status = 'cancelled' WHERE id = %s", (order_id,))
+    try:
+        execute_query("UPDATE rental_security SET status = 'cancelled' WHERE booking_id = %s", (order_id,))
+    except Exception:
+        pass
+
+def record_booking_cancellation(
+    booking_id: str,
+    product_id: str,
+    lender_id: str,
+    renter_id: str,
+    reason_code: str,
+    feedback: Optional[str] = None,
+    previous_status: str = "pending",
+    new_status: str = "cancelled",
+    initiated_by: str = "LENDER",
+    policy_outcome: str = "released",
+    notification_sent: bool = True
+) -> Dict[str, Any]:
+    """
+    Atomically records a cancellation event in booking_cancellations,
+    updates orders.status = 'cancelled' and orders.cancellation_id,
+    and updates rental_security.status = 'cancelled'.
+    """
+    clean_feedback = (feedback or "").strip() if feedback else None
+    canc_id = f"canc_{int(time.time() * 1000)}_{secrets.token_hex(4)}"
+    now_iso = dt.now(timezone.utc).isoformat()
+    
+    canc_record = {
+        "id": canc_id,
+        "booking_id": booking_id,
+        "bookingId": booking_id,
+        "product_id": product_id,
+        "productId": product_id,
+        "lender_id": lender_id,
+        "lenderId": lender_id,
+        "renter_id": renter_id,
+        "renterId": renter_id,
+        "initiated_by": initiated_by,
+        "initiatedBy": initiated_by,
+        "reason_code": reason_code,
+        "reasonCode": reason_code,
+        "feedback": clean_feedback,
+        "previous_status": previous_status,
+        "previousStatus": previous_status,
+        "new_status": new_status,
+        "newStatus": new_status,
+        "created_at": now_iso,
+        "createdAt": now_iso,
+        "policy_outcome": policy_outcome,
+        "notification_sent": notification_sent
+    }
+    
+    # In-memory storage for test/degraded mode
+    MOCK_BOOKING_CANCELLATIONS[canc_id] = canc_record
+    MOCK_BOOKING_CANCELLATIONS[f"booking:{booking_id}"] = canc_record
+    
+    # Update mock orders
+    for key, o in list(MOCK_ORDERS.items()):
+        if key == booking_id or o.get("id") == booking_id:
+            MOCK_ORDERS[key]["status"] = new_status
+            MOCK_ORDERS[key]["cancellation_id"] = canc_id
+            MOCK_ORDERS[key]["cancellation_reason"] = reason_code
+            MOCK_ORDERS[key]["cancellation_feedback"] = clean_feedback
+            MOCK_ORDERS[key]["cancelled_at"] = now_iso
+            MOCK_ORDERS[key]["cancelled_by"] = initiated_by
+            
+    # Database execution
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    INSERT INTO booking_cancellations 
+                    (id, booking_id, product_id, lender_id, renter_id, initiated_by, reason_code, feedback, previous_status, new_status, created_at, policy_outcome, notification_sent)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    canc_id, booking_id, product_id, lender_id, renter_id, initiated_by,
+                    reason_code, clean_feedback, previous_status, new_status, now_iso, policy_outcome, notification_sent
+                ))
+                cursor.execute("""
+                    UPDATE orders 
+                    SET status = %s, cancellation_id = %s 
+                    WHERE id = %s
+                """, (new_status, canc_id, booking_id))
+                try:
+                    cursor.execute("""
+                        UPDATE rental_security 
+                        SET status = %s, updated_at = %s 
+                        WHERE booking_id = %s
+                    """, (new_status, now_iso, booking_id))
+                except Exception:
+                    pass
+            conn.commit()
+        except Exception as e:
+            logger.warning(f"Database error writing booking_cancellation: {e}")
+            if conn:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+        finally:
+            conn.close()
+            
+    return canc_record
+
+def get_booking_cancellation(booking_id: str) -> Optional[Dict[str, Any]]:
+    """Retrieves the cancellation record for a given booking ID."""
+    if not booking_id:
+        return None
+    b_id = str(booking_id).strip()
+    
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT * FROM booking_cancellations 
+                    WHERE booking_id = %s 
+                    ORDER BY created_at DESC LIMIT 1
+                """, (b_id,))
+                row = cursor.fetchone()
+                if row:
+                    return row
+        except Exception as e:
+            logger.warning(f"Database error reading booking_cancellation: {e}")
+        finally:
+            conn.close()
+            
+    # Check in-memory fallback
+    if f"booking:{b_id}" in MOCK_BOOKING_CANCELLATIONS:
+        return MOCK_BOOKING_CANCELLATIONS[f"booking:{b_id}"]
+    for c in MOCK_BOOKING_CANCELLATIONS.values():
+        if c.get("booking_id") == b_id:
+            return c
+    return None
 
 # Custom Products CRUD
 def get_custom_products(email: str):
@@ -3728,6 +3943,326 @@ def parse_date_safely(date_str) -> Optional[datetime.date]:
         except Exception:
             continue
     return None
+
+DEFAULT_TIME_SLOTS = {
+    "morning": {
+        "id": "morning",
+        "name": "Half Day — Morning",
+        "label": "Morning — 8:00 AM to 12:00 PM",
+        "start_time": "08:00",
+        "end_time": "12:00",
+        "duration_hours": 4,
+        "type": "half_day"
+    },
+    "afternoon": {
+        "id": "afternoon",
+        "name": "Half Day — Afternoon",
+        "label": "Afternoon — 1:00 PM to 5:00 PM",
+        "start_time": "13:00",
+        "end_time": "17:00",
+        "duration_hours": 4,
+        "type": "half_day"
+    },
+    "full_day": {
+        "id": "full_day",
+        "name": "Full Day",
+        "label": "Full Day — 8:00 AM to 5:00 PM",
+        "start_time": "08:00",
+        "end_time": "17:00",
+        "duration_hours": 9,
+        "type": "full_day"
+    }
+}
+DEFAULT_BUFFER_MINUTES = 60
+
+def parse_datetime_safely(dt_val: Any) -> Optional[datetime.datetime]:
+    """Parses date, datetime, or ISO string safely into UTC datetime."""
+    if not dt_val:
+        return None
+    if isinstance(dt_val, datetime.datetime):
+        if dt_val.tzinfo is None:
+            return dt_val.replace(tzinfo=timezone.utc)
+        return dt_val.astimezone(timezone.utc)
+    if isinstance(dt_val, datetime.date):
+        return datetime.datetime.combine(dt_val, datetime.time.min, tzinfo=timezone.utc)
+    
+    val_str = str(dt_val).strip()
+    try:
+        dt_parsed = datetime.datetime.fromisoformat(val_str.replace("Z", "+00:00"))
+        if dt_parsed.tzinfo is None:
+            dt_parsed = dt_parsed.replace(tzinfo=timezone.utc)
+        return dt_parsed.astimezone(timezone.utc)
+    except Exception:
+        pass
+        
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d", "%d-%m-%Y", "%Y/%m/%d"):
+        try:
+            dt_parsed = dt.strptime(val_str, fmt)
+            return dt_parsed.replace(tzinfo=timezone.utc)
+        except Exception:
+            continue
+    return None
+
+def normalize_slot_interval(
+    date_str: str,
+    time_slot: str = "full_day",
+    start_time: Optional[str] = None,
+    end_time: Optional[str] = None
+) -> Tuple[datetime.datetime, datetime.datetime]:
+    """Calculates UTC start and end datetimes for a date and slot or custom time."""
+    d = parse_date_safely(date_str)
+    if not d:
+        d = dt.now(timezone.utc).date()
+        
+    slot_info = DEFAULT_TIME_SLOTS.get(str(time_slot).lower())
+    s_time_str = start_time or (slot_info["start_time"] if slot_info else "08:00")
+    e_time_str = end_time or (slot_info["end_time"] if slot_info else "17:00")
+    
+    sh, sm = [int(x) for x in s_time_str.split(":")[:2]]
+    eh, em = [int(x) for x in e_time_str.split(":")[:2]]
+    
+    start_dt = datetime.datetime(d.year, d.month, d.day, sh, sm, 0, tzinfo=timezone.utc)
+    end_dt = datetime.datetime(d.year, d.month, d.day, eh, em, 0, tzinfo=timezone.utc)
+    return start_dt, end_dt
+
+def _extract_order_interval(order: dict) -> Tuple[Optional[datetime.datetime], Optional[datetime.datetime]]:
+    """Extracts UTC start and end datetimes from an order record."""
+    s_dt = parse_datetime_safely(order.get("start_datetime"))
+    e_dt = parse_datetime_safely(order.get("end_datetime"))
+    if s_dt and e_dt:
+        return s_dt, e_dt
+        
+    s_date_str = str(order.get("start_date") or order.get("startDate") or "")
+    e_date_str = str(order.get("end_date") or order.get("endDate") or "")
+    if not s_date_str or not e_date_str:
+        return None, None
+        
+    t_slot = str(order.get("time_slot") or "").lower()
+    s_time = order.get("start_time")
+    e_time = order.get("end_time")
+    
+    if s_date_str == e_date_str and t_slot in DEFAULT_TIME_SLOTS:
+        return normalize_slot_interval(s_date_str, t_slot, s_time, e_time)
+        
+    s_d = parse_date_safely(s_date_str)
+    e_d = parse_date_safely(e_date_str)
+    if not s_d or not e_d:
+        return None, None
+        
+    sh, sm = [int(x) for x in (s_time or "08:00").split(":")[:2]]
+    eh, em = [int(x) for x in (e_time or "17:00").split(":")[:2]]
+    
+    start_dt = datetime.datetime(s_d.year, s_d.month, s_d.day, sh, sm, 0, tzinfo=timezone.utc)
+    end_dt = datetime.datetime(e_d.year, e_d.month, e_d.day, eh, em, 0, tzinfo=timezone.utc)
+    return start_dt, end_dt
+
+def check_product_interval_conflicts(
+    product_id: str,
+    req_start_dt: datetime.datetime,
+    req_end_dt: datetime.datetime,
+    buffer_minutes: int = 60,
+    exclude_order_id: Optional[str] = None
+) -> Tuple[bool, Optional[str]]:
+    """
+    Determines whether a requested rental interval conflicts with existing reservations
+    or lender blocked dates for product_id.
+    
+    Interval Overlap Formula with turnaround buffer:
+    Conflict occurs if:
+        req_start < (existing_end + buffer) AND (req_end + buffer) > existing_start
+    """
+    if not product_id or not req_start_dt or not req_end_dt:
+        return False, None
+        
+    buf_delta = datetime.timedelta(minutes=max(0, buffer_minutes))
+    
+    # 1. Check Product Blocked Dates / Personal Use Time
+    product = None
+    try:
+        from payernt_database import get_payernt_product_by_id
+        product = get_payernt_product_by_id(product_id)
+    except Exception:
+        pass
+    if not product:
+        product = fetch_one("SELECT * FROM custom_products WHERE id = %s", (product_id,))
+    if not product:
+        product = MOCK_CUSTOM_PRODUCTS.get(product_id)
+            
+    if product:
+        blocked_raw = product.get("blocked_dates")
+        if blocked_raw:
+            try:
+                blocked_list = json.loads(blocked_raw) if isinstance(blocked_raw, str) else blocked_raw
+                if isinstance(blocked_list, list):
+                    for b in blocked_list:
+                        if isinstance(b, str):
+                            b_d = parse_date_safely(b)
+                            if b_d:
+                                b_start = datetime.datetime.combine(b_d, datetime.time(0, 0), tzinfo=timezone.utc)
+                                b_end = datetime.datetime.combine(b_d, datetime.time(23, 59, 59), tzinfo=timezone.utc)
+                            else:
+                                b_start = parse_datetime_safely(b)
+                                b_end = b_start + datetime.timedelta(days=1) if b_start else None
+                            reason = "Lender personal use / maintenance"
+                        elif isinstance(b, dict):
+                            b_start = parse_datetime_safely(b.get("start") or b.get("startDate"))
+                            b_end = parse_datetime_safely(b.get("end") or b.get("endDate"))
+                            reason = b.get("reason", "Lender personal use / maintenance")
+                        else:
+                            continue
+
+                        if b_start and b_end:
+                            if req_start_dt < (b_end + buf_delta) and (req_end_dt + buf_delta) > b_start:
+                                return True, f"Conflict with lender unavailable period ({reason})"
+            except Exception as e:
+                logger.warning(f"Error parsing product blocked_dates: {e}")
+
+    # 2. Check Database Orders
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cursor:
+                params = [product_id]
+                exclude_clause = ""
+                if exclude_order_id:
+                    exclude_clause = " AND id != %s"
+                    params.append(exclude_order_id)
+                query = f"""
+                    SELECT id, start_date, end_date, start_time, end_time, start_datetime, end_datetime, time_slot, status
+                    FROM orders
+                    WHERE status NOT IN ('cancelled', 'refunded', 'rejected')
+                      AND product_id = %s{exclude_clause}
+                """
+                cursor.execute(query, tuple(params))
+                rows = cursor.fetchall()
+                for row in rows:
+                    ord_start, ord_end = _extract_order_interval(row)
+                    if ord_start and ord_end:
+                        if req_start_dt < (ord_end + buf_delta) and (req_end_dt + buf_delta) > ord_start:
+                            slot_name = row.get("time_slot") or "rental"
+                            return True, f"Conflict with existing {slot_name} booking #{row.get('id')}"
+        except Exception as e:
+            logger.warning(f"Error checking order interval conflicts in database: {e}")
+        finally:
+            conn.close()
+
+    # 3. Check in-memory MOCK_ORDERS
+    for order in MOCK_ORDERS.values():
+        if exclude_order_id and order.get("id") == exclude_order_id:
+            continue
+        pid = str(order.get("product_id") or order.get("productId") or "")
+        if pid == product_id:
+            status = str(order.get("status") or "active").lower()
+            if status not in ('cancelled', 'refunded', 'rejected'):
+                ord_start, ord_end = _extract_order_interval(order)
+                if ord_start and ord_end:
+                    if req_start_dt < (ord_end + buf_delta) and (req_end_dt + buf_delta) > ord_start:
+                        slot_name = order.get("time_slot") or "rental"
+                        return True, f"Conflict with existing {slot_name} booking #{order.get('id')}"
+
+    return False, None
+
+def get_product_slots_for_date(product_id: str, date_str: str) -> Dict[str, Any]:
+    """
+    Returns slot availability (morning, afternoon, full_day) for a given date,
+    evaluating buffer, slot enablement, existing reservations, and pricing.
+    """
+    product = None
+    try:
+        from payernt_database import get_payernt_product_by_id
+        product = get_payernt_product_by_id(product_id)
+    except Exception:
+        pass
+    if not product:
+        product = fetch_one("SELECT * FROM custom_products WHERE id = %s", (product_id,))
+    if not product:
+        product = MOCK_CUSTOM_PRODUCTS.get(product_id)
+            
+    daily_rate = 2499
+    half_day_rate = None
+    buffer_min = DEFAULT_BUFFER_MINUTES
+    allow_half_day = True
+    morning_enabled = True
+    afternoon_enabled = True
+    full_day_enabled = True
+    
+    if product:
+        daily_rate = int(float(product.get("daily_rate") or product.get("price") or 2499))
+        half_day_rate = product.get("half_day_rate")
+        buffer_min = int(product.get("buffer_minutes") or DEFAULT_BUFFER_MINUTES)
+        allow_half_day = bool(product.get("allow_half_day", True))
+        morning_enabled = bool(product.get("morning_slot_enabled", True)) and allow_half_day
+        afternoon_enabled = bool(product.get("afternoon_slot_enabled", True)) and allow_half_day
+        full_day_enabled = bool(product.get("full_day_slot_enabled", True))
+        
+    if not half_day_rate:
+        half_day_rate = int(round(daily_rate * 0.6))
+    else:
+        half_day_rate = int(half_day_rate)
+        
+    d = parse_date_safely(date_str)
+    if not d:
+        d = dt.now(timezone.utc).date()
+    today_dt = dt.now(timezone.utc).date()
+    is_past = d < today_dt
+    
+    slots_out = []
+    
+    slot_configs = [
+        ("morning", "Half Day — Morning", "08:00", "12:00", "Morning — 8:00 AM to 12:00 PM", morning_enabled, half_day_rate),
+        ("afternoon", "Half Day — Afternoon", "13:00", "17:00", "Afternoon — 1:00 PM to 5:00 PM", afternoon_enabled, half_day_rate),
+        ("full_day", "Full Day", "08:00", "17:00", "Full Day — 8:00 AM to 5:00 PM", full_day_enabled, daily_rate),
+    ]
+    
+    for s_id, s_name, s_time, e_time, s_label, enabled, rate in slot_configs:
+        start_dt, end_dt = normalize_slot_interval(date_str, s_id, s_time, e_time)
+        
+        if is_past:
+            status = "not_available"
+            status_label = "Past Date"
+        elif not enabled:
+            status = "not_available"
+            status_label = "Not Offered by Lender"
+        elif product and not product.get("available", True):
+            status = "not_available"
+            status_label = "Listing Paused"
+        else:
+            has_conflict, reason = check_product_interval_conflicts(
+                product_id, start_dt, end_dt, buffer_minutes=buffer_min
+            )
+            if has_conflict:
+                status = "booked"
+                status_label = "Booked"
+            else:
+                status = "available"
+                status_label = "Available"
+                
+        slots_out.append({
+            "id": s_id,
+            "name": s_name,
+            "label": s_label,
+            "startTime": s_time,
+            "endTime": e_time,
+            "startDatetime": start_dt.isoformat(),
+            "endDatetime": end_dt.isoformat(),
+            "status": status,
+            "statusLabel": status_label,
+            "rate": rate,
+            "rateFormatted": f"₹{rate:,}",
+            "enabled": enabled
+        })
+        
+    return {
+        "success": True,
+        "productId": product_id,
+        "date": date_str,
+        "bufferMinutes": buffer_min,
+        "pricing": {
+            "dailyRate": daily_rate,
+            "halfDayRate": half_day_rate
+        },
+        "slots": slots_out
+    }
 
 def check_products_booking_conflicts(product_ids: List[str], start_date_str: str, end_date_str: str, exclude_order_id: Optional[str] = None) -> Set[str]:
     """

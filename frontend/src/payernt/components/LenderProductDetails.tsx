@@ -18,12 +18,19 @@ import {
   Layers,
   Sparkles,
   Video,
+  Plus,
+  X,
+  AlertTriangle,
+  Sliders,
+  Check,
+  CalendarOff,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { usePayernt } from "../context";
 import { getOptimizedImageUrl } from "@/utils/images";
 import type { PayerntProduct } from "../types";
+import payerntApi from "../payerntApiService";
 
 export function LenderProductDetails({ productId: propId }: { productId?: string }) {
   const navigate = useNavigate();
@@ -36,8 +43,33 @@ export function LenderProductDetails({ productId: propId }: { productId?: string
   const [newPrice, setNewPrice] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
 
+  // Time-Slot & Availability Settings
+  const [allowHalfDay, setAllowHalfDay] = useState(true);
+  const [morningSlotEnabled, setMorningSlotEnabled] = useState(true);
+  const [afternoonSlotEnabled, setAfternoonSlotEnabled] = useState(true);
+  const [fullDaySlotEnabled, setFullDaySlotEnabled] = useState(true);
+  const [halfDayRate, setHalfDayRate] = useState<string>("");
+  const [bufferMinutes, setBufferMinutes] = useState(60);
+  const [blockedDates, setBlockedDates] = useState<string[]>([]);
+  const [newBlockedDate, setNewBlockedDate] = useState("");
+  const [isSavingConfig, setIsSavingConfig] = useState(false);
+
   useEffect(() => {
     if (!productId) return;
+    payerntApi.getProductAvailabilityConfig(productId).then((res) => {
+      if (res.success && res.config) {
+        setAllowHalfDay(res.config.allowHalfDay ?? true);
+        setMorningSlotEnabled(res.config.morningSlotEnabled ?? true);
+        setAfternoonSlotEnabled(res.config.afternoonSlotEnabled ?? true);
+        setFullDaySlotEnabled(res.config.fullDaySlotEnabled ?? true);
+        setHalfDayRate(res.config.halfDayRate ? String(res.config.halfDayRate) : "");
+        setBufferMinutes(res.config.bufferMinutes || 60);
+        setBlockedDates(res.config.blockedDates || []);
+      }
+    });
+  }, [productId]);
+
+  useEffect(() => {
     const found = userProducts.find(
       (p) => String(p.id) === String(productId) || String(p.title).toLowerCase().replace(/\s+/g, "-") === productId
     );
@@ -95,9 +127,53 @@ export function LenderProductDetails({ productId: propId }: { productId?: string
   };
 
   const handleDelete = () => {
-    deleteProduct(product.id);
-    toast.success("Listing removed successfully.");
-    navigate({ to: "/payernt/products" });
+    try {
+      deleteProduct(product.id);
+      toast.success("Listing deleted successfully.");
+      navigate({ to: "/payernt/products" });
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete listing.");
+    }
+  };
+
+
+  const handleSaveAvailabilityConfig = async () => {
+    if (!productId) return;
+    setIsSavingConfig(true);
+    try {
+      const res = await payerntApi.updateProductAvailabilityConfig(productId, {
+        allowHalfDay,
+        morningSlotEnabled,
+        afternoonSlotEnabled,
+        fullDaySlotEnabled,
+        halfDayRate: halfDayRate ? Number(halfDayRate) : undefined,
+        bufferMinutes,
+        blockedDates,
+      });
+      if (res.success) {
+        toast.success("Rental availability and time-slot rules saved!");
+      } else {
+        toast.error(res.error || "Failed to update availability settings.");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Error saving availability config.");
+    } finally {
+      setIsSavingConfig(false);
+    }
+  };
+
+  const handleAddBlockedDate = () => {
+    if (!newBlockedDate) return;
+    if (blockedDates.includes(newBlockedDate)) {
+      toast.error("This date is already blocked.");
+      return;
+    }
+    setBlockedDates([...blockedDates, newBlockedDate].sort());
+    setNewBlockedDate("");
+  };
+
+  const handleRemoveBlockedDate = (d: string) => {
+    setBlockedDates(blockedDates.filter((item) => item !== d));
   };
 
   return (
@@ -333,6 +409,178 @@ export function LenderProductDetails({ productId: propId }: { productId?: string
                     : String(product.location || product.city || "Available locally")}
                 </span>
               </div>
+            </div>
+          </div>
+
+          {/* Rental Slots & Availability Settings Card */}
+          <div className="p-5 rounded-2xl border border-border bg-card space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <Clock className="w-4 h-4 text-primary" />
+                <span>Time Slots & Availability</span>
+              </h3>
+              <span className="text-[10px] text-muted-foreground font-semibold">
+                Flexible Rentals
+              </span>
+            </div>
+
+            {/* Slot Toggles */}
+            <div className="space-y-3 pt-1">
+              <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-foreground">
+                <input
+                  type="checkbox"
+                  checked={allowHalfDay}
+                  onChange={(e) => setAllowHalfDay(e.target.checked)}
+                  className="rounded border-border text-primary focus:ring-primary h-4 w-4 cursor-pointer"
+                />
+                <span>Enable Half-Day Rental Slots</span>
+              </label>
+
+              {allowHalfDay && (
+                <div className="ml-6 space-y-2.5 p-3 rounded-xl bg-secondary/40 border border-border/60">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs text-foreground">
+                    <input
+                      type="checkbox"
+                      checked={morningSlotEnabled}
+                      onChange={(e) => setMorningSlotEnabled(e.target.checked)}
+                      className="rounded border-border text-primary focus:ring-primary h-3.5 w-3.5 cursor-pointer"
+                    />
+                    <span className="font-semibold">Morning Slot</span>
+                    <span className="text-[10px] text-muted-foreground">(8:00 AM – 12:00 PM)</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 cursor-pointer text-xs text-foreground">
+                    <input
+                      type="checkbox"
+                      checked={afternoonSlotEnabled}
+                      onChange={(e) => setAfternoonSlotEnabled(e.target.checked)}
+                      className="rounded border-border text-primary focus:ring-primary h-3.5 w-3.5 cursor-pointer"
+                    />
+                    <span className="font-semibold">Afternoon Slot</span>
+                    <span className="text-[10px] text-muted-foreground">(1:00 PM – 5:00 PM)</span>
+                  </label>
+
+                  <div className="pt-2 border-t border-border/40 space-y-1">
+                    <label className="text-[10px] font-bold text-muted-foreground block">
+                      Custom Half-Day Rate (Leave empty for default 60% of daily rate)
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground">
+                        ₹
+                      </span>
+                      <input
+                        type="number"
+                        placeholder={String(Math.round(Number(product.pricePerDay || product.fairMarketPrice || 0) * 0.6))}
+                        value={halfDayRate}
+                        onChange={(e) => setHalfDayRate(e.target.value)}
+                        className="w-full pl-6 pr-3 py-1.5 rounded-lg border border-border bg-background text-xs font-bold text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-foreground">
+                <input
+                  type="checkbox"
+                  checked={fullDaySlotEnabled}
+                  onChange={(e) => setFullDaySlotEnabled(e.target.checked)}
+                  className="rounded border-border text-primary focus:ring-primary h-4 w-4 cursor-pointer"
+                />
+                <span>Enable Full-Day Rentals</span>
+                <span className="text-[10px] text-muted-foreground font-normal">(8:00 AM – 5:00 PM)</span>
+              </label>
+            </div>
+
+            {/* Turnaround Buffer */}
+            <div className="pt-3 border-t border-border/70 space-y-1.5">
+              <label className="text-xs font-bold text-muted-foreground block">
+                Turnaround / Return Buffer
+              </label>
+              <select
+                value={bufferMinutes}
+                onChange={(e) => setBufferMinutes(Number(e.target.value))}
+                className="w-full px-3 py-2 rounded-xl border border-border bg-background text-xs font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
+              >
+                <option value={30}>30 Minutes</option>
+                <option value={60}>60 Minutes (Standard / Recommended)</option>
+                <option value={90}>90 Minutes</option>
+                <option value={120}>120 Minutes (Extended Check)</option>
+              </select>
+              <p className="text-[10px] text-muted-foreground">
+                Applied between reservations to inspect condition and prevent back-to-back conflicts.
+              </p>
+            </div>
+
+            {/* Block Personal-Use Dates */}
+            <div className="pt-3 border-t border-border/70 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-muted-foreground block">
+                  Block Dates for Personal Use
+                </label>
+                <span className="text-[10px] text-muted-foreground font-mono">
+                  {blockedDates.length} Blocked
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  min={new Date().toISOString().split("T")[0]}
+                  value={newBlockedDate}
+                  onChange={(e) => setNewBlockedDate(e.target.value)}
+                  className="flex-1 px-3 py-1.5 rounded-xl border border-border bg-background text-xs font-semibold text-foreground focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddBlockedDate}
+                  disabled={!newBlockedDate}
+                  className="px-3 py-1.5 rounded-xl bg-secondary text-secondary-foreground text-xs font-bold hover:bg-secondary/80 disabled:opacity-40 transition-all cursor-pointer inline-flex items-center gap-1"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Block
+                </button>
+              </div>
+
+              {blockedDates.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {blockedDates.map((d) => (
+                    <span
+                      key={d}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 text-[11px] font-mono font-medium"
+                    >
+                      <CalendarOff className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                      <span>{d}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveBlockedDate(d)}
+                        className="ml-1 hover:text-destructive cursor-pointer"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Save Config Button */}
+            <div className="pt-2">
+              <button
+                type="button"
+                disabled={isSavingConfig}
+                onClick={handleSaveAvailabilityConfig}
+                className="w-full py-2.5 rounded-xl bg-foreground text-background text-xs font-extrabold hover:opacity-90 shadow-sm active:scale-98 transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
+              >
+                {isSavingConfig ? (
+                  <span>Saving Configuration...</span>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4" />
+                    <span>Save Availability Settings</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
 

@@ -208,6 +208,17 @@ export interface AdminBooking {
   ownerName: string;
   startDate: string;
   endDate: string;
+  timeSlot?: string;
+  durationType?: string;
+  startTime?: string;
+  endTime?: string;
+  startDatetime?: string;
+  endDatetime?: string;
+  cancellationReason?: string;
+  cancellationFeedback?: string;
+  cancellationTimestamp?: string;
+  cancellationPreviousStatus?: string;
+  cancellationInitiatedBy?: string;
   amount: number;
   status: "pending" | "confirmed" | "active" | "completed" | "cancelled" | string;
   paymentStatus?: "paid" | "pending" | "refunded" | "failed" | "successful" | "captured" | string;

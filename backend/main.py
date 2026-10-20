@@ -2890,6 +2890,21 @@ def check_single_product_availability(
         "reason": info.get("reason")
     }
 
+@app.get("/api/products/{id}/slots")
+def get_product_slots_endpoint(
+    id: str,
+    date: Optional[str] = Query(None)
+):
+    """
+    Returns time-slot availability (morning, afternoon, full-day) for a given date,
+    evaluating lender configuration, existing reservations, buffer rules, and duration rates.
+    """
+    from database import get_product_slots_for_date
+    if not date:
+        date = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
+    result = get_product_slots_for_date(id, date)
+    return result
+
 # ============================================================
 # Cart Endpoints
 # ============================================================
@@ -9102,13 +9117,19 @@ def admin_bookings_list(current_admin: dict = Depends(check_admin_user)):
                            sec.status as security_status,
                            sec.activated_at,
                            sec.vendor_otp_verified as sec_vendor_otp_verified,
-                           sec.renter_otp_verified as sec_renter_otp_verified
+                           sec.renter_otp_verified as sec_renter_otp_verified,
+                           bc.reason_code as cancellation_reason_code,
+                           bc.feedback as cancellation_feedback,
+                           bc.created_at as cancellation_timestamp,
+                           bc.previous_status as cancellation_previous_status,
+                           bc.initiated_by as cancellation_initiated_by
                     FROM orders o
                     LEFT JOIN users u ON o.user_email = u.email
                     LEFT JOIN custom_products p ON o.product_id = p.id
                     LEFT JOIN payernt_products pp ON o.product_id = pp.id
                     LEFT JOIN deliveries d ON o.id = d.booking_id
                     LEFT JOIN rental_security sec ON o.id = sec.booking_id
+                    LEFT JOIN booking_cancellations bc ON (o.cancellation_id = bc.id OR o.id = bc.booking_id)
                     ORDER BY o.created_at DESC
                 """)
                 rows = cursor.fetchall() or []
@@ -9122,13 +9143,14 @@ def admin_bookings_list(current_admin: dict = Depends(check_admin_user)):
 
     if not rows:
         try:
-            from database import MOCK_ORDERS, MOCK_USERS, MOCK_CUSTOM_PRODUCTS
+            from database import MOCK_ORDERS, MOCK_USERS, MOCK_CUSTOM_PRODUCTS, MOCK_BOOKING_CANCELLATIONS
             from payernt_database import MOCK_RENTAL_SECURITIES, MOCK_PAYERNT_PRODUCTS
             for b_id, o in MOCK_ORDERS.items():
                 u = MOCK_USERS.get(o.get("user_email", ""), {})
                 pid = o.get("product_id", "")
                 p = MOCK_CUSTOM_PRODUCTS.get(pid, {}) or MOCK_PAYERNT_PRODUCTS.get(pid, {})
                 sec = MOCK_RENTAL_SECURITIES.get(b_id, {})
+                canc = MOCK_BOOKING_CANCELLATIONS.get(o.get("cancellation_id")) or MOCK_BOOKING_CANCELLATIONS.get(f"booking:{b_id}") or {}
                 rows.append({
                     "id": o.get("id", b_id),
                     "product_id": pid,
@@ -9156,6 +9178,17 @@ def admin_bookings_list(current_admin: dict = Depends(check_admin_user)):
                     "activated_at": sec.get("rental_started_at") or sec.get("activated_at"),
                     "sec_vendor_otp_verified": bool(sec.get("vendor_pin_verified", 1)),
                     "sec_renter_otp_verified": bool(sec.get("renter_pin_verified", 1)),
+                    "time_slot": o.get("time_slot") or "full_day",
+                    "duration_type": o.get("duration_type") or "full_day",
+                    "start_time": o.get("start_time") or "08:00",
+                    "end_time": o.get("end_time") or "17:00",
+                    "start_datetime": o.get("start_datetime"),
+                    "end_datetime": o.get("end_datetime"),
+                    "cancellation_reason_code": canc.get("reason_code") or o.get("cancellation_reason"),
+                    "cancellation_feedback": canc.get("feedback") or o.get("cancellation_feedback"),
+                    "cancellation_timestamp": canc.get("created_at") or o.get("cancelled_at"),
+                    "cancellation_previous_status": canc.get("previous_status"),
+                    "cancellation_initiated_by": canc.get("initiated_by") or o.get("cancelled_by"),
                     "created_at": o.get("created_at")
                 })
         except Exception as e:
@@ -9177,6 +9210,17 @@ def admin_bookings_list(current_admin: dict = Depends(check_admin_user)):
             "ownerName": r.get("owner_name") or r.get("ownerName") or "Verified Lender",
             "startDate": r.get("start_date") or r.get("startDate", ""),
             "endDate": r.get("end_date") or r.get("endDate", ""),
+            "timeSlot": r.get("time_slot") or r.get("timeSlot") or "full_day",
+            "durationType": r.get("duration_type") or r.get("durationType") or "full_day",
+            "startTime": r.get("start_time") or r.get("startTime") or "08:00",
+            "endTime": r.get("end_time") or r.get("endTime") or "17:00",
+            "startDatetime": r.get("start_datetime") or r.get("startDatetime"),
+            "endDatetime": r.get("end_datetime") or r.get("endDatetime"),
+            "cancellationReason": r.get("cancellation_reason_code") or r.get("cancellation_reason"),
+            "cancellationFeedback": r.get("cancellation_feedback"),
+            "cancellationTimestamp": r.get("cancellation_timestamp") or r.get("cancelled_at"),
+            "cancellationPreviousStatus": r.get("cancellation_previous_status"),
+            "cancellationInitiatedBy": r.get("cancellation_initiated_by") or r.get("cancelled_by"),
             "amount": r.get("total") or r.get("amount", 0),
             "status": r.get("status") or "pending",
             "deliveryStatus": r.get("delivery_status") or r.get("deliveryStatus") or "WAITING_FOR_ADMIN",

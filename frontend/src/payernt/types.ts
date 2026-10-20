@@ -19,7 +19,8 @@ export type RentalRequestStatus =
   | "return_initiated"
   | "returned"
   | "completed"
-  | "rejected";
+  | "rejected"
+  | "cancelled";
 
 export interface DemoUser {
   id: string;
@@ -179,6 +180,13 @@ export interface PayerntProduct {
   status?: string;
   verificationNotes?: string;
   availabilityStatus: ProductAvailability;
+  allowHalfDay?: boolean;
+  morningSlotEnabled?: boolean;
+  afternoonSlotEnabled?: boolean;
+  fullDaySlotEnabled?: boolean;
+  halfDayRate?: number;
+  bufferMinutes?: number;
+  blockedDates?: string[];
   totalRentalsCount: number;
   totalEarningsGenerated: number;
   approvedPriceRange?: {
@@ -240,6 +248,23 @@ export interface RentalRequest {
   };
   startDate: string;
   endDate: string;
+  timeSlot?: "morning" | "afternoon" | "full_day" | string;
+  durationType?: "half_day" | "full_day" | "custom" | string;
+  startTime?: string;
+  endTime?: string;
+  startDatetime?: string;
+  endDatetime?: string;
+  cancellation?: {
+    id?: string;
+    reasonCode?: string;
+    reason_code?: string;
+    feedback?: string;
+    initiated_by?: string;
+    initiatedBy?: string;
+    createdAt?: string;
+    created_at?: string;
+    previous_status?: string;
+  };
   totalDays: number;
   dailyRate: number;
   grossRental: number;

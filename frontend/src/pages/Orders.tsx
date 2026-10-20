@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { toast } from "sonner";
-import { Package, Truck, MessageSquare, KeyRound } from "lucide-react";
+import { Package, Truck, MessageSquare, KeyRound, AlertTriangle, Clock } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/common/Button";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
@@ -215,8 +215,16 @@ export default function Orders() {
                       )}
                     </div>
                   </div>
-                  <div className="text-xs text-neutral-500 dark:text-[#A1A1AA]">
-                    {o.startDate || o.start_date || "Today"} – {o.endDate || o.end_date || "Tomorrow"}
+                  <div className="text-xs text-neutral-500 dark:text-[#A1A1AA] space-y-1">
+                    <div>
+                      {o.startDate || o.start_date || "Today"} {o.endDate && o.endDate !== o.startDate ? `– ${o.endDate}` : ""}
+                    </div>
+                    {((o as any).timeSlot || (o as any).time_slot) && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-primary/10 text-primary uppercase">
+                        <Clock className="h-2.5 w-2.5" />
+                        {((o as any).timeSlot || (o as any).time_slot).replace(/_/g, " ")}
+                      </span>
+                    )}
                   </div>
                   <div className="font-black text-sm font-mono text-neutral-950 dark:text-[#F5F5F5]">
                     ₹{o.total}
@@ -235,6 +243,11 @@ export default function Orders() {
                     >
                       {o.status}
                     </span>
+                    {o.status === "cancelled" && ((o as any).cancellationReason || (o as any).cancellation_reason) && (
+                      <span className="text-[10px] text-red-500 dark:text-red-400 font-medium leading-tight">
+                        Reason: {String((o as any).cancellationReason || (o as any).cancellation_reason).replace(/_/g, " ")}
+                      </span>
+                    )}
                     {(o.status === "active" || o.status === "pending") && (
                       <button
                         onClick={() => setCancellingOrderId(o.id)}

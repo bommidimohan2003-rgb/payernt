@@ -767,6 +767,128 @@ export const payerntApi = {
     }
   },
 
+  async cancelBooking(
+    bookingId: string,
+    reasonCode: string,
+    feedback?: string
+  ): Promise<{
+    success: boolean;
+    message?: string;
+    booking?: any;
+    cancellation?: any;
+    error?: string;
+  }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/payernt/bookings/${bookingId}/cancel`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          reasonCode,
+          feedback: feedback?.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return {
+          success: true,
+          message: data.message || "Booking cancelled successfully.",
+          booking: data.booking,
+          cancellation: data.cancellation,
+        };
+      }
+      return {
+        success: false,
+        error: data.detail || data.message || "Failed to cancel booking.",
+      };
+    } catch (e: any) {
+      return {
+        success: false,
+        error: e?.message || "Network error while cancelling booking.",
+      };
+    }
+  },
+
+  async getProductAvailabilityConfig(productId: string): Promise<{
+    success: boolean;
+    config?: {
+      productId: string;
+      allowHalfDay: boolean;
+      morningSlotEnabled: boolean;
+      afternoonSlotEnabled: boolean;
+      fullDaySlotEnabled: boolean;
+      halfDayRate: number;
+      dailyRate: number;
+      bufferMinutes: number;
+      blockedDates: string[];
+    };
+    error?: string;
+  }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/payernt/products/${productId}/availability-config`, {
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return {
+          success: true,
+          config: data,
+        };
+      }
+      return {
+        success: false,
+        error: data.detail || data.message || "Failed to load availability config.",
+      };
+    } catch (e: any) {
+      return {
+        success: false,
+        error: e?.message || "Network error loading availability config.",
+      };
+    }
+  },
+
+  async updateProductAvailabilityConfig(
+    productId: string,
+    config: {
+      allowHalfDay?: boolean;
+      morningSlotEnabled?: boolean;
+      afternoonSlotEnabled?: boolean;
+      fullDaySlotEnabled?: boolean;
+      halfDayRate?: number;
+      bufferMinutes?: number;
+      blockedDates?: string[];
+    }
+  ): Promise<{
+    success: boolean;
+    config?: any;
+    message?: string;
+    error?: string;
+  }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/payernt/products/${productId}/availability-config`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(config),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return {
+          success: true,
+          config: data.config,
+          message: data.message || "Availability configuration updated.",
+        };
+      }
+      return {
+        success: false,
+        error: data.detail || data.message || "Failed to update availability config.",
+      };
+    } catch (e: any) {
+      return {
+        success: false,
+        error: e?.message || "Network error updating availability config.",
+      };
+    }
+  },
+
   async getEarningsSummary(): Promise<{
     success: boolean;
     total?: number;

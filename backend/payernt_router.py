@@ -24,7 +24,22 @@ from config import (
     IS_PRODUCTION,
     IS_MOCK_OTP_MODE,
 )
-from database import fetch_one
+from database import (
+    fetch_one,
+    fetch_all,
+    execute_query,
+    get_db_connection,
+    get_order_by_id,
+    record_booking_cancellation,
+    create_notification,
+    check_product_interval_conflicts,
+    normalize_slot_interval,
+    parse_datetime_safely,
+    parse_date_safely,
+    DEFAULT_BUFFER_MINUTES,
+    MOCK_ORDERS,
+    MOCK_BOOKING_CANCELLATIONS,
+)
 from payernt_database import (
     create_payernt_account,
     resubmit_payernt_account,
@@ -443,6 +458,39 @@ class CreateBookingSchema(BaseModel):
     startDate: str
     endDate: str
     vendorSecretPin: Optional[str] = None
+    timeSlot: Optional[str] = None
+    durationType: Optional[str] = None
+    startTime: Optional[str] = None
+    endTime: Optional[str] = None
+    total: Optional[float] = None
+
+
+class LenderCancelBookingSchema(BaseModel):
+    reasonCode: str = Field(..., min_length=1)
+    feedback: Optional[str] = None
+
+
+class ProductAvailabilityConfigSchema(BaseModel):
+    allowHalfDay: Optional[bool] = None
+    morningSlotEnabled: Optional[bool] = None
+    afternoonSlotEnabled: Optional[bool] = None
+    fullDaySlotEnabled: Optional[bool] = None
+    halfDayRate: Optional[float] = None
+    bufferMinutes: Optional[int] = None
+    blockedDates: Optional[List[str]] = None
+
+
+VALID_CANCELLATION_REASONS = {
+    "PERSONAL_USE": "I need the product for personal use.",
+    "NO_LONGER_AVAILABLE": "Product is no longer available.",
+    "DAMAGED_OR_TECHNICAL_ISSUE": "Product has a technical issue or is damaged.",
+    "CANNOT_COMPLETE_HANDOVER": "I cannot complete the handover at the scheduled time.",
+    "RENTER_REQUESTED": "The renter requested cancellation.",
+    "SCHEDULING_CONFLICT": "Scheduling conflict.",
+    "OTHER": "Other."
+}
+
+REASON_LABEL_TO_CODE = {v.lower().strip("."): k for k, v in VALID_CANCELLATION_REASONS.items()}
 
 
 class VerifyPinSchema(BaseModel):
@@ -1435,6 +1483,325 @@ def get_vendor_bookings_endpoint(
     }
 
 
+def process_lender_booking_cancellation(
+    booking_id: str,
+    data: LenderCancelBookingSchema,
+    vendor_id: str
+) -> Dict[str, Any]:
+    """
+    Core atomic handler for lender-initiated booking cancellation.
+    Validates reason, feedback, permissions, and eligibility, then updates booking and releases slot.
+    """
+    raw_code = (data.reasonCode or "").strip()
+    norm_key = raw_code.upper().replace(" ", "_").strip(".")
+    
+    code = None
+    if norm_key in VALID_CANCELLATION_REASONS:
+        code = norm_key
+    else:
+        cleaned_label = raw_code.lower().strip(".")
+        if cleaned_label in REASON_LABEL_TO_CODE:
+            code = REASON_LABEL_TO_CODE[cleaned_label]
+        elif "personal" in cleaned_label:
+            code = "PERSONAL_USE"
+        elif "no longer" in cleaned_label or "unavailable" in cleaned_label:
+            code = "NO_LONGER_AVAILABLE"
+        elif "damage" in cleaned_label or "technical" in cleaned_label:
+            code = "DAMAGED_OR_TECHNICAL_ISSUE"
+        elif "handover" in cleaned_label or "scheduled" in cleaned_label:
+            code = "CANNOT_COMPLETE_HANDOVER"
+        elif "renter" in cleaned_label:
+            code = "RENTER_REQUESTED"
+        elif "conflict" in cleaned_label or "schedule" in cleaned_label:
+            code = "SCHEDULING_CONFLICT"
+        elif "other" in cleaned_label:
+            code = "OTHER"
+            
+    if not code:
+        valid_opts = list(VALID_CANCELLATION_REASONS.keys())
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid cancellation reason '{raw_code}'. Valid reasons are: {valid_opts}"
+        )
+        
+    clean_fb = (data.feedback or "").strip() if data.feedback else None
+    if code == "OTHER":
+        if not clean_fb or len(clean_fb) < 5:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="A written explanation is required when selecting 'Other' (minimum 5 characters)."
+            )
+        if len(clean_fb) > 500:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cancellation feedback cannot exceed 500 characters."
+            )
+    else:
+        if clean_fb and len(clean_fb) > 500:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cancellation feedback cannot exceed 500 characters."
+            )
+            
+    order = get_order_by_id(booking_id)
+    sec = get_rental_security_record(booking_id)
+    
+    if not order and not sec:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Booking '{booking_id}' not found."
+        )
+        
+    prod_id = (order.get("product_id") or order.get("productId") if order else None) or (sec.get("product_id") if sec else "")
+    product = get_payernt_product_by_id(prod_id) if prod_id else None
+    
+    actual_vendor_id = (
+        (sec.get("vendor_id") if sec else None)
+        or (product.get("owner_id") if product else None)
+        or (order.get("owner_id") if order else None)
+    )
+    if actual_vendor_id and actual_vendor_id != vendor_id and vendor_id not in ("admin", "superadmin"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Unauthorized: You are not the lender associated with this booking."
+        )
+        
+    current_status = (order.get("status") if order else None) or (sec.get("status") if sec else "pending")
+    current_status = str(current_status).strip().lower()
+    
+    if current_status == "cancelled":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This booking has already been cancelled."
+        )
+        
+    if current_status in ("completed", "returned"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Completed bookings cannot be cancelled through the normal lender cancellation flow."
+        )
+        
+    if current_status in ("active", "in_progress", "ongoing"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot cancel booking after physical handover has occurred."
+        )
+        
+    if sec:
+        if (sec.get("vendor_handover_verified") or 
+            sec.get("renter_handover_verified") or 
+            sec.get("rental_started") or 
+            sec.get("rental_activated")):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot cancel booking after physical handover or pickup has been verified."
+            )
+            
+    if order and order.get("delivery_status") in ("PICKED_UP_FROM_VENDOR", "OUT_FOR_DELIVERY", "DELIVERED", "COMPLETED"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot cancel booking after courier pickup has occurred."
+        )
+        
+    renter_id = (order.get("user_email") if order else None) or (sec.get("renter_id") if sec else "renter")
+    prod_title = (order.get("product_title") if order else None) or (product.get("title") if product else "Tech Gear")
+    
+    canc_record = record_booking_cancellation(
+        booking_id=booking_id,
+        product_id=prod_id,
+        lender_id=vendor_id,
+        renter_id=renter_id,
+        reason_code=code,
+        feedback=clean_fb,
+        previous_status=current_status,
+        new_status="cancelled",
+        initiated_by="LENDER",
+        policy_outcome="released",
+        notification_sent=True,
+    )
+    
+    human_reason = VALID_CANCELLATION_REASONS.get(code, code)
+    try:
+        if renter_id and "@" in renter_id:
+            create_notification(
+                email=renter_id,
+                n={
+                    "id": f"notif_{int(time.time()*1000)}",
+                    "title": "Booking Cancelled by Lender",
+                    "message": f"Your booking for '{prod_title}' (Booking ID: {booking_id}) was cancelled by the lender. Reason: {human_reason}.",
+                    "type": "warning",
+                    "booking_id": booking_id,
+                    "read": False,
+                    "created_at": datetime.now(timezone.utc).isoformat()
+                }
+            )
+        add_payernt_notification(
+            owner_id=renter_id,
+            title="Booking Cancelled by Lender",
+            message=f"Your booking for '{prod_title}' (Booking ID: {booking_id}) was cancelled by the lender. Reason: {human_reason}.",
+            type_="booking_cancelled",
+            action_route="orders",
+        )
+    except Exception as notif_err:
+        logger.warning(f"Could not dispatch cancellation notification to renter {renter_id}: {notif_err}")
+        
+    updated_order = get_order_by_id(booking_id) or order or {}
+    
+    return {
+        "success": True,
+        "message": "Booking cancelled successfully. Reservation interval released.",
+        "bookingId": booking_id,
+        "status": "cancelled",
+        "booking": updated_order,
+        "cancellation": canc_record
+    }
+
+
+@payernt_router.post("/bookings/{booking_id}/cancel")
+def payernt_cancel_booking_endpoint(
+    booking_id: str,
+    data: LenderCancelBookingSchema,
+    account: Dict[str, Any] = Depends(get_current_payernt_account),
+):
+    """
+    Lender-initiated booking cancellation endpoint.
+    Safely cancels an eligible booking, records reason and feedback,
+    releases the reservation interval, and notifies the renter.
+    """
+    return process_lender_booking_cancellation(booking_id, data, account["id"])
+
+
+@payernt_router.get("/products/{product_id}/availability-config")
+def get_product_availability_config_endpoint(
+    product_id: str,
+    account: Dict[str, Any] = Depends(get_current_payernt_account),
+):
+    product = get_payernt_product_by_id(product_id)
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found.")
+        
+    blocked = product.get("blocked_dates") or []
+    if isinstance(blocked, str):
+        try:
+            blocked = json.loads(blocked)
+        except Exception:
+            blocked = []
+            
+    daily = float(product.get("daily_rate") or product.get("price") or 2499)
+    half_day = product.get("half_day_rate")
+    if not half_day:
+        half_day = round(daily * 0.6)
+    else:
+        half_day = float(half_day)
+        
+    return {
+        "success": True,
+        "productId": product_id,
+        "allowHalfDay": bool(product.get("allow_half_day", True)),
+        "morningSlotEnabled": bool(product.get("morning_slot_enabled", True)),
+        "afternoonSlotEnabled": bool(product.get("afternoon_slot_enabled", True)),
+        "fullDaySlotEnabled": bool(product.get("full_day_slot_enabled", True)),
+        "halfDayRate": half_day,
+        "dailyRate": daily,
+        "bufferMinutes": int(product.get("buffer_minutes") or 60),
+        "blockedDates": blocked,
+    }
+
+
+@payernt_router.post("/products/{product_id}/availability-config")
+def update_product_availability_config_endpoint(
+    product_id: str,
+    data: ProductAvailabilityConfigSchema,
+    account: Dict[str, Any] = Depends(get_current_payernt_account),
+):
+    product = get_payernt_product_by_id(product_id)
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found.")
+        
+    if product.get("owner_id") != account["id"] and account.get("role") not in ("admin", "superadmin"):
+        raise HTTPException(status_code=403, detail="Unauthorized: You do not own this listing.")
+        
+    if data.blockedDates is not None:
+        for b_date_str in data.blockedDates:
+            d = parse_date_safely(b_date_str)
+            if not d:
+                continue
+            day_start = datetime.combine(d, datetime.min.time()).replace(tzinfo=timezone.utc)
+            day_end = datetime.combine(d, datetime.max.time()).replace(tzinfo=timezone.utc)
+            has_conflict, reason = check_product_interval_conflicts(
+                product_id, day_start, day_end, buffer_minutes=0
+            )
+            if has_conflict:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"Cannot block date {b_date_str}: {reason}. Please resolve existing bookings first."
+                )
+
+    update_fields = {}
+    if data.allowHalfDay is not None:
+        update_fields["allow_half_day"] = data.allowHalfDay
+    if data.morningSlotEnabled is not None:
+        update_fields["morning_slot_enabled"] = data.morningSlotEnabled
+    if data.afternoonSlotEnabled is not None:
+        update_fields["afternoon_slot_enabled"] = data.afternoonSlotEnabled
+    if data.fullDaySlotEnabled is not None:
+        update_fields["full_day_slot_enabled"] = data.fullDaySlotEnabled
+    if data.halfDayRate is not None:
+        update_fields["half_day_rate"] = data.halfDayRate
+    if data.bufferMinutes is not None:
+        update_fields["buffer_minutes"] = data.bufferMinutes
+    if data.blockedDates is not None:
+        update_fields["blocked_dates"] = json.dumps(data.blockedDates)
+
+    if update_fields:
+        conn = get_db_connection()
+        if conn:
+            try:
+                set_clauses = [f"{k} = %s" for k in update_fields.keys()]
+                vals = list(update_fields.values())
+                vals.append(product_id)
+                with conn.cursor() as cur:
+                    cur.execute(f"UPDATE payernt_products SET {', '.join(set_clauses)} WHERE id = %s", tuple(vals))
+                    try:
+                        cur.execute(f"UPDATE custom_products SET {', '.join(set_clauses)} WHERE id = %s", tuple(vals))
+                    except Exception:
+                        pass
+                conn.commit()
+            except Exception as e:
+                logger.warning(f"Error updating product availability in DB: {e}")
+            finally:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+                    
+        from payernt_database import MOCK_PAYERNT_PRODUCTS
+        if product_id in MOCK_PAYERNT_PRODUCTS:
+            for k, v in update_fields.items():
+                if k == "blocked_dates" and isinstance(v, str):
+                    try:
+                        MOCK_PAYERNT_PRODUCTS[product_id][k] = json.loads(v)
+                    except Exception:
+                        MOCK_PAYERNT_PRODUCTS[product_id][k] = v
+                else:
+                    MOCK_PAYERNT_PRODUCTS[product_id][k] = v
+
+    return {
+        "success": True,
+        "message": "Availability configuration updated successfully.",
+        "config": {
+            "productId": product_id,
+            "allowHalfDay": data.allowHalfDay if data.allowHalfDay is not None else product.get("allow_half_day", True),
+            "morningSlotEnabled": data.morningSlotEnabled if data.morningSlotEnabled is not None else product.get("morning_slot_enabled", True),
+            "afternoonSlotEnabled": data.afternoonSlotEnabled if data.afternoonSlotEnabled is not None else product.get("afternoon_slot_enabled", True),
+            "fullDaySlotEnabled": data.fullDaySlotEnabled if data.fullDaySlotEnabled is not None else product.get("full_day_slot_enabled", True),
+            "halfDayRate": data.halfDayRate if data.halfDayRate is not None else product.get("half_day_rate"),
+            "bufferMinutes": data.bufferMinutes if data.bufferMinutes is not None else product.get("buffer_minutes", 60),
+            "blockedDates": data.blockedDates if data.blockedDates is not None else product.get("blocked_dates", []),
+        }
+    }
+
+
 @payernt_router.get("/earnings/summary")
 def get_vendor_earnings_summary_endpoint(
     account: Dict[str, Any] = Depends(get_current_payernt_account),
@@ -1508,6 +1875,45 @@ def create_booking_with_security(
         prod_img = product.get("primary_image") or prod_img
         daily_rate = int(product.get("daily_rate", 2499))
 
+    # Normalize slot interval & check availability
+    norm_slot = (data.timeSlot or "full_day").lower()
+    norm_dur = data.durationType or ("half_day" if norm_slot in ("morning", "afternoon") else "full_day")
+    if data.startDate == data.endDate or not data.endDate:
+        s_dt, e_dt = normalize_slot_interval(data.startDate, norm_slot, data.startTime, data.endTime)
+    else:
+        s_d = parse_date_safely(data.startDate) or datetime.now(timezone.utc).date()
+        e_d = parse_date_safely(data.endDate) or s_d
+        s_time_str = data.startTime or "08:00"
+        e_time_str = data.endTime or "17:00"
+        sh, sm = [int(x) for x in s_time_str.split(":")[:2]]
+        eh, em = [int(x) for x in e_time_str.split(":")[:2]]
+        s_dt = datetime(s_d.year, s_d.month, s_d.day, sh, sm, 0, tzinfo=timezone.utc)
+        e_dt = datetime(e_d.year, e_d.month, e_d.day, eh, em, 0, tzinfo=timezone.utc)
+    buffer_min = product.get("buffer_minutes") if product else DEFAULT_BUFFER_MINUTES
+    if buffer_min is None:
+        buffer_min = DEFAULT_BUFFER_MINUTES
+    has_conflict, conflict_reason = check_product_interval_conflicts(
+        data.productId,
+        s_dt,
+        e_dt,
+        buffer_minutes=buffer_min,
+    )
+    if has_conflict:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Selected slot is not available: {conflict_reason}",
+        )
+
+    # Calculate price based on duration
+    if norm_dur == "half_day":
+        half_rate = product.get("half_day_rate") if product else None
+        if not half_rate:
+            half_rate = round(daily_rate * 0.6)
+        booking_total = float(data.total) if data.total else float(half_rate)
+    else:
+        d_count = max(1, (e_dt.date() - s_dt.date()).days + 1)
+        booking_total = float(data.total) if data.total else float(daily_rate * d_count)
+
     # Generate unique booking ID
     booking_id = f"ord_{int(time.time() * 1000)}"
 
@@ -1530,9 +1936,15 @@ def create_booking_with_security(
             "productImage": prod_img,
             "startDate": data.startDate,
             "endDate": data.endDate,
-            "total": daily_rate * 3,
+            "timeSlot": norm_slot,
+            "durationType": norm_dur,
+            "startTime": s_dt.strftime("%H:%M"),
+            "endTime": e_dt.strftime("%H:%M"),
+            "startDatetime": s_dt.isoformat(),
+            "endDatetime": e_dt.isoformat(),
+            "total": booking_total,
             "status": "pending",
-            "createdAt": dt.now(timezone.utc).isoformat(),
+            "createdAt": datetime.now(timezone.utc).isoformat(),
         }
         create_order(renter_email, normalized_order)
     except Exception as e:
@@ -1551,13 +1963,45 @@ def create_booking_with_security(
             "productImage": prod_img,
             "startDate": data.startDate,
             "endDate": data.endDate,
-            "total": daily_rate * 3,
+            "timeSlot": norm_slot,
+            "durationType": norm_dur,
+            "startTime": s_dt.strftime("%H:%M"),
+            "endTime": e_dt.strftime("%H:%M"),
+            "startDatetime": s_dt.isoformat(),
+            "endDatetime": e_dt.isoformat(),
+            "total": booking_total,
             "status": "pending",
             "renterId": renter_id,
             "vendorId": vendor_id,
         },
         "security": sanitized_sec,
     }
+
+
+@rental_router.post("/{booking_id}/cancel")
+def rental_cancel_booking_endpoint(
+    booking_id: str,
+    data: LenderCancelBookingSchema,
+    authorization: Optional[str] = Header(None),
+):
+    """
+    Shared cancellation endpoint for rental bookings.
+    Verifies authenticated caller is the lender of the booking.
+    """
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required to cancel booking."
+        )
+    token = authorization.split(" ")[1]
+    payload = decode_access_token(token, expected_type="access")
+    if not payload or "sub" not in payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session expired or invalid token."
+        )
+    user_id = payload.get("user_id") or payload.get("id") or payload.get("sub")
+    return process_lender_booking_cancellation(booking_id, data, user_id)
 
 
 @rental_router.get("/{booking_id}/renter-pin")

@@ -86,6 +86,7 @@ MOCK_PAYERNT_WALLETS: Dict[str, Dict[str, Any]] = {}
 MOCK_PAYERNT_TRANSACTIONS: Dict[str, List[Dict[str, Any]]] = {}
 MOCK_PAYERNT_BANK_ACCOUNTS: Dict[str, List[Dict[str, Any]]] = {}
 MOCK_PAYERNT_NOTIFICATIONS: Dict[str, List[Dict[str, Any]]] = {}
+MOCK_BOOKING_CANCELLATIONS: Dict[str, Dict[str, Any]] = {}
 
 MOCK_PAYERNT_MESSAGES: List[Dict[str, Any]] = []
 MOCK_PAYERNT_AUDIT_LOGS: List[Dict[str, Any]] = []
@@ -178,6 +179,13 @@ def init_payernt_tables():
     _add_pp_col("price_history LONGTEXT NULL")
     _add_pp_col("video_url LONGTEXT NULL")
     _add_pp_col("revision_notes LONGTEXT NULL")
+    _add_pp_col("allow_half_day BOOLEAN DEFAULT TRUE")
+    _add_pp_col("morning_slot_enabled BOOLEAN DEFAULT TRUE")
+    _add_pp_col("afternoon_slot_enabled BOOLEAN DEFAULT TRUE")
+    _add_pp_col("full_day_slot_enabled BOOLEAN DEFAULT TRUE")
+    _add_pp_col("half_day_rate INT NULL")
+    _add_pp_col("buffer_minutes INT DEFAULT 60")
+    _add_pp_col("blocked_dates LONGTEXT NULL")
 
     # 3. Rental Security Table (Links Vendor PIN + Renter PIN in ONE canonical record)
     execute_query("""
@@ -3446,9 +3454,20 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50) -> List[Dict[st
                 o.user_email as renter_email,
                 o.start_date,
                 o.end_date,
+                o.time_slot,
+                o.duration_type,
+                o.start_time,
+                o.end_time,
+                o.start_datetime,
+                o.end_datetime,
+                o.cancellation_id,
                 o.total,
                 o.status as order_status,
                 o.created_at as order_created_at,
+                bc.reason_code as cancellation_reason,
+                bc.feedback as cancellation_feedback,
+                bc.created_at as cancelled_at,
+                bc.initiated_by as cancelled_by,
                 pp.title as product_title,
                 pp.primary_image as product_image,
                 pp.category as product_category,
@@ -3459,6 +3478,7 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50) -> List[Dict[st
                 d.picked_up_at
             FROM rental_security sec
             LEFT JOIN orders o ON sec.booking_id = o.id
+            LEFT JOIN booking_cancellations bc ON sec.booking_id = bc.booking_id
             LEFT JOIN payernt_products pp ON sec.product_id = pp.id
             LEFT JOIN deliveries d ON sec.booking_id = d.booking_id
             WHERE sec.vendor_id = %s OR pp.owner_id = %s
@@ -3475,6 +3495,15 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50) -> List[Dict[st
                 renter_email = r.get("renter_email") or ""
                 r_name = renter_email.split("@")[0].capitalize() if renter_email else "Customer"
                 del_status = r.get("delivery_status") or "WAITING_FOR_ADMIN"
+                canc_info = None
+                if r.get("cancellation_reason") or r.get("order_status") == "cancelled":
+                    canc_info = {
+                        "reasonCode": r.get("cancellation_reason") or "LENDER_CANCELLED",
+                        "reason": r.get("cancellation_reason") or "Booking cancelled",
+                        "feedback": r.get("cancellation_feedback"),
+                        "cancelledAt": r.get("cancelled_at") or r.get("order_created_at"),
+                        "cancelledBy": r.get("cancelled_by") or "LENDER"
+                    }
                 bookings.append({
                     "id": b_id,
                     "bookingId": b_id,
@@ -3487,6 +3516,13 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50) -> List[Dict[st
                     "renterEmail": renter_email,
                     "startDate": r.get("start_date") or "",
                     "endDate": r.get("end_date") or "",
+                    "timeSlot": r.get("time_slot") or "full_day",
+                    "durationType": r.get("duration_type") or "full_day",
+                    "startTime": r.get("start_time") or "08:00",
+                    "endTime": r.get("end_time") or "17:00",
+                    "startDatetime": r.get("start_datetime"),
+                    "endDatetime": r.get("end_datetime"),
+                    "cancellation": canc_info,
                     "amount": float(r.get("total") or r.get("daily_rate") or 0.0),
                     "total": float(r.get("total") or r.get("daily_rate") or 0.0),
                     "status": r.get("order_status") or r.get("security_status") or "pending",

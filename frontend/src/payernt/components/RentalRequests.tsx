@@ -103,6 +103,107 @@ export function RentalRequests({
   const [vendorPinDataMap, setVendorPinDataMap] = useState<Record<string, { pin: string; createdAt: string }>>({});
   const [generatingPinId, setGeneratingPinId] = useState<string | null>(null);
 
+  // Lender Cancellation Modal State
+  const [cancellationModal, setCancellationModal] = useState<{
+    isOpen: boolean;
+    booking: RentalRequest | null;
+    reasonCode: string;
+    feedback: string;
+    submitting: boolean;
+    error: string | null;
+  }>({
+    isOpen: false,
+    booking: null,
+    reasonCode: "PERSONAL_USE",
+    feedback: "",
+    submitting: false,
+    error: null,
+  });
+
+  const CANCELLATION_REASONS = [
+    { code: "PERSONAL_USE", label: "I need the product for personal use." },
+    { code: "NO_LONGER_AVAILABLE", label: "Product is no longer available." },
+    { code: "DAMAGED_OR_TECHNICAL_ISSUE", label: "Product has a technical issue or is damaged." },
+    { code: "CANNOT_COMPLETE_HANDOVER", label: "I cannot complete the handover at the scheduled time." },
+    { code: "RENTER_REQUESTED", label: "The renter requested cancellation." },
+    { code: "SCHEDULING_CONFLICT", label: "Scheduling conflict." },
+    { code: "OTHER", label: "Other." },
+  ];
+
+  const handleOpenCancellationModal = (booking: RentalRequest) => {
+    setCancellationModal({
+      isOpen: true,
+      booking,
+      reasonCode: "PERSONAL_USE",
+      feedback: "",
+      submitting: false,
+      error: null,
+    });
+  };
+
+  const handleConfirmCancellation = async () => {
+    if (!cancellationModal.booking) return;
+    const { booking, reasonCode, feedback } = cancellationModal;
+    const cleanFeedback = feedback.trim();
+
+    if (reasonCode === "OTHER") {
+      if (!cleanFeedback || cleanFeedback.length < 5) {
+        setCancellationModal((prev) => ({
+          ...prev,
+          error: "Written explanation is required when selecting 'Other' (minimum 5 characters).",
+        }));
+        return;
+      }
+      if (cleanFeedback.length > 500) {
+        setCancellationModal((prev) => ({
+          ...prev,
+          error: "Explanation cannot exceed 500 characters.",
+        }));
+        return;
+      }
+    } else if (cleanFeedback.length > 500) {
+      setCancellationModal((prev) => ({
+        ...prev,
+        error: "Feedback cannot exceed 500 characters.",
+      }));
+      return;
+    }
+
+    setCancellationModal((prev) => ({ ...prev, submitting: true, error: null }));
+    try {
+      const res = await payerntApi.cancelBooking(
+        booking.id,
+        reasonCode,
+        cleanFeedback || undefined
+      );
+
+      if (res.success) {
+        toast.success("Booking cancelled successfully. Reservation interval released.");
+        onAdvanceLifecycle(booking.id, "cancelled" as any);
+        setCancellationModal({
+          isOpen: false,
+          booking: null,
+          reasonCode: "PERSONAL_USE",
+          feedback: "",
+          submitting: false,
+          error: null,
+        });
+      } else {
+        setCancellationModal((prev) => ({
+          ...prev,
+          submitting: false,
+          error: res.error || "Failed to cancel booking.",
+        }));
+      }
+    } catch (err: any) {
+      setCancellationModal((prev) => ({
+        ...prev,
+        submitting: false,
+        error: err?.message || "Error occurred during cancellation.",
+      }));
+    }
+  };
+
   const handleGenerateSecretPin = async (req: RentalRequest) => {
     setGeneratingPinId(req.id);
     try {
@@ -644,6 +745,20 @@ export function RentalRequests({
                           <span className="text-neutral-500 dark:text-[#A1A1AA]">Return:</span>
                           <span className="font-bold text-neutral-950 dark:text-[#F5F5F5]">{req.endDate}</span>
                         </div>
+                        {req.timeSlot && (
+                          <div className="flex justify-between pt-1 border-t border-black/5 dark:border-white/5">
+                            <span className="text-neutral-500 dark:text-[#A1A1AA]">Slot:</span>
+                            <span className="font-bold text-neutral-950 dark:text-[#F5F5F5] capitalize">
+                              {req.timeSlot === "morning"
+                                ? "Morning (8:00 AM – 12:00 PM)"
+                                : req.timeSlot === "afternoon"
+                                ? "Afternoon (1:00 PM – 5:00 PM)"
+                                : req.timeSlot === "full_day"
+                                ? "Full Day (8:00 AM – 5:00 PM)"
+                                : req.timeSlot}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -826,6 +941,38 @@ export function RentalRequests({
                       This rental request was declined.
                     </div>
                   )}
+
+                  {/* 7. When CANCELLED */}
+                  {req.status === "cancelled" && (
+                    <div className="w-full p-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-700 dark:text-red-300 text-xs space-y-1">
+                      <div className="flex items-center gap-2 font-bold">
+                        <AlertTriangle className="h-4 w-4 shrink-0 text-red-500" />
+                        <span>Booking Cancelled</span>
+                      </div>
+                      {req.cancellation?.reasonCode && (
+                        <p className="text-[11px] text-red-600/90 dark:text-red-400/90">
+                          Reason: {req.cancellation.reasonCode.replace(/_/g, " ")}
+                        </p>
+                      )}
+                      {req.cancellation?.feedback && (
+                        <p className="text-[11px] italic text-muted-foreground">
+                          "{req.cancellation.feedback}"
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Lender Cancellation Button - Only shown when allowed under status & policy */}
+                  {(req.status === "requested" || req.status === "accepted" || req.status === "handover") && (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenCancellationModal(req)}
+                        className="px-4 py-2.5 rounded-2xl border border-red-500/30 text-xs font-bold text-red-600 dark:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer flex items-center gap-1.5"
+                      >
+                        <XCircle className="h-4 w-4" />
+                        <span>Cancel Booking</span>
+                      </button>
+                    )}
 
                   {/* Right side escrow note */}
                   <div className="text-[11px] text-neutral-400 dark:text-[#A1A1AA] ml-auto hidden sm:block">
@@ -1142,6 +1289,178 @@ export function RentalRequests({
                     <>
                       <CheckCircle2 className="h-4 w-4" />
                       <span>Verify & Start Rental</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ========================================================= */}
+      {/* LENDER-INITIATED CANCELLATION MODAL                      */}
+      {/* ========================================================= */}
+      <AnimatePresence>
+        {cancellationModal.isOpen && cancellationModal.booking && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-xs select-none">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => {
+                if (!cancellationModal.submitting) {
+                  setCancellationModal((prev) => ({ ...prev, isOpen: false }));
+                }
+              }}
+              className="absolute inset-0"
+            />
+
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 15 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 15 }}
+              className="relative w-full max-w-lg rounded-3xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#10151B] p-6 shadow-2xl space-y-5 z-10"
+            >
+              <div className="flex items-center justify-between pb-3 border-b border-black/5 dark:border-white/10">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-red-500/10 text-red-500">
+                    <AlertTriangle className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-base text-neutral-950 dark:text-[#F5F5F5]">
+                      Cancel Booking
+                    </h3>
+                    <p className="text-xs text-neutral-500 dark:text-[#A1A1AA]">
+                      Booking #{cancellationModal.booking.id} • {cancellationModal.booking.productTitle}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!cancellationModal.submitting) {
+                      setCancellationModal((prev) => ({ ...prev, isOpen: false }));
+                    }
+                  }}
+                  className="p-1.5 rounded-full hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Form Content */}
+              <div className="space-y-4">
+                {/* Reason Selection */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-neutral-800 dark:text-[#F5F5F5] block">
+                    Cancellation Reason <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={cancellationModal.reasonCode}
+                    onChange={(e) =>
+                      setCancellationModal((prev) => ({
+                        ...prev,
+                        reasonCode: e.target.value,
+                        error: null,
+                      }))
+                    }
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-black/10 dark:border-white/15 bg-neutral-50 dark:bg-[#050709] text-xs font-semibold text-neutral-950 dark:text-[#F5F5F5] focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-all cursor-pointer"
+                  >
+                    {CANCELLATION_REASONS.map((r) => (
+                      <option key={r.code} value={r.code}>
+                        {r.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Additional Feedback */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-neutral-800 dark:text-[#F5F5F5]">
+                      Additional Feedback {cancellationModal.reasonCode === "OTHER" ? (
+                        <span className="text-red-500">* (Required)</span>
+                      ) : (
+                        <span className="text-neutral-400 font-normal">(Optional)</span>
+                      )}
+                    </label>
+                    <span className="text-[10px] text-neutral-400 font-mono">
+                      {cancellationModal.feedback.length}/500
+                    </span>
+                  </div>
+                  <textarea
+                    rows={3}
+                    maxLength={500}
+                    placeholder={
+                      cancellationModal.reasonCode === "OTHER"
+                        ? "Please explain why you need to cancel this booking (minimum 5 characters)..."
+                        : "Provide any additional context for the renter (optional)..."
+                    }
+                    value={cancellationModal.feedback}
+                    onChange={(e) =>
+                      setCancellationModal((prev) => ({
+                        ...prev,
+                        feedback: e.target.value,
+                        error: null,
+                      }))
+                    }
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-black/10 dark:border-white/15 bg-neutral-50 dark:bg-[#050709] text-xs text-neutral-950 dark:text-[#F5F5F5] focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-all placeholder:text-neutral-400"
+                  />
+                </div>
+
+                {/* Error Banner */}
+                {cancellationModal.error && (
+                  <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs font-semibold flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                    <span>{cancellationModal.error}</span>
+                  </div>
+                )}
+
+                {/* Impact Notice */}
+                <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 text-xs space-y-1">
+                  <p className="font-bold flex items-center gap-1.5">
+                    <Info className="h-4 w-4 shrink-0" />
+                    <span>Renter Impact Notice</span>
+                  </p>
+                  <p className="text-[11px] leading-relaxed text-amber-900/80 dark:text-amber-200/80">
+                    You are about to cancel this booking. The renter may be affected by this change. Please confirm that you want to continue.
+                  </p>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  disabled={cancellationModal.submitting}
+                  onClick={() =>
+                    setCancellationModal((prev) => ({ ...prev, isOpen: false }))
+                  }
+                  className="flex-1 py-3 px-4 rounded-xl border border-black/10 dark:border-white/15 text-xs font-bold text-neutral-700 dark:text-[#A1A1AA] hover:bg-neutral-100 dark:hover:bg-white/5 transition-all cursor-pointer"
+                >
+                  Keep Booking
+                </button>
+                <button
+                  type="button"
+                  disabled={
+                    cancellationModal.submitting ||
+                    (cancellationModal.reasonCode === "OTHER" &&
+                      cancellationModal.feedback.trim().length < 5)
+                  }
+                  onClick={handleConfirmCancellation}
+                  className="flex-1 py-3 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {cancellationModal.submitting ? (
+                    <>
+                      <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                      <span>Cancelling...</span>
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="h-4 w-4" />
+                      <span>Confirm Cancellation</span>
                     </>
                   )}
                 </button>

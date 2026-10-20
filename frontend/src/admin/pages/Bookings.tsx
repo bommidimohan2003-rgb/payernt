@@ -13,6 +13,7 @@ import {
   X,
   Clock,
   ShieldAlert,
+  AlertTriangle,
 } from "lucide-react";
 import { Table, Column } from "../components/layout/Table";
 import { Pagination } from "../components/layout/Pagination";
@@ -212,6 +213,24 @@ export default function Bookings() {
       label: "Lender",
       render: (row) => (
         <span className="text-xs text-muted-foreground truncate">{row.ownerName || "Verified Lender"}</span>
+      ),
+    },
+    {
+      key: "schedule" as any,
+      label: "Schedule",
+      render: (row) => (
+        <div className="text-xs">
+          <div className="font-semibold text-foreground">
+            {row.startDate} {row.endDate && row.endDate !== row.startDate ? `➔ ${row.endDate}` : ""}
+          </div>
+          {row.timeSlot ? (
+            <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-primary/10 text-primary uppercase">
+              {row.timeSlot.replace(/_/g, " ")} {row.startTime && row.endTime ? `(${row.startTime}–${row.endTime})` : ""}
+            </span>
+          ) : (
+            <span className="text-[10px] text-muted-foreground">Full Day</span>
+          )}
+        </div>
       ),
     },
     {
@@ -496,8 +515,56 @@ export default function Bookings() {
                   <p className="text-[11px] text-muted-foreground mt-0.5">
                     Rental Dates: {selectedBooking.startDate || "Start"} ➔ {selectedBooking.endDate || "End"}
                   </p>
+                  {selectedBooking.timeSlot && (
+                    <div className="mt-1">
+                      <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-primary/10 text-primary uppercase">
+                        Slot: {selectedBooking.timeSlot.replace(/_/g, " ")}{" "}
+                        {selectedBooking.startTime && selectedBooking.endTime ? `(${selectedBooking.startTime} – ${selectedBooking.endTime})` : ""}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
+
+              {/* Cancellation Audit Record (Admin Inspection) */}
+              {(selectedBooking.status === "cancelled" || selectedBooking.cancellationReason) && (
+                <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-xs space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-destructive flex items-center gap-1.5 uppercase text-[10px] tracking-wider">
+                      <AlertTriangle className="h-3.5 w-3.5" />
+                      Cancellation Audit Record
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-destructive/20 text-destructive uppercase">
+                      Initiated by {selectedBooking.cancellationInitiatedBy || "LENDER"}
+                    </span>
+                  </div>
+
+                  <div className="space-y-1.5 pt-1.5 border-t border-destructive/20">
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground text-[11px]">Reason:</span>
+                      <span className="font-bold text-foreground text-[11px]">
+                        {selectedBooking.cancellationReason?.replace(/_/g, " ") || "Personal / Schedule Conflict"}
+                      </span>
+                    </div>
+
+                    {selectedBooking.cancellationFeedback && (
+                      <div className="space-y-1 pt-1">
+                        <span className="text-muted-foreground text-[10px] block font-semibold">Written Feedback:</span>
+                        <p className="p-2.5 rounded-lg bg-background/60 border border-border/40 text-[11px] text-foreground italic">
+                          "{selectedBooking.cancellationFeedback}"
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="flex justify-between text-[10px] text-muted-foreground pt-1 border-t border-destructive/10 font-mono">
+                      <span>Previous Status: {selectedBooking.cancellationPreviousStatus || "active/pending"}</span>
+                      {selectedBooking.cancellationTimestamp && (
+                        <span>Cancelled: {new Date(selectedBooking.cancellationTimestamp).toLocaleString()}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="p-3 rounded-xl bg-secondary/40 border border-border/60 space-y-1">

@@ -150,6 +150,8 @@ The project has a mixed integration state. Some customer-facing features are bac
 | **Admin Support & Reports**     | `GET /api/admin/support`, `/api/admin/reports` & dispute resolution          | Real   |
 | **Admin Activity Logs**         | `GET /api/admin/activity-logs` with audit trail in `admin_logs`              | Real   |
 | **Secure Device Identity & QR** | `GET/POST /api/devices/*`, `POST /api/devices/{id}/verify-password`, `GET /api/verify/device/{token}`, `GET/POST /api/device-transfers/*`, `GET /api/admin/devices` backed by MySQL `devices`, `device_security_history`, `device_transfers` | Real   |
+| **Lender Booking Cancellation** | `POST /api/payernt/bookings/{id}/cancel`, `POST /api/bookings/{id}/cancel` with reason code, feedback validation, handover verification safeguards & counterparty notifications | Real   |
+| **Flexible Time-Slot Booking**  | Half-day (Morning 08:00–12:00, Afternoon 13:00–17:00), Full-Day, Turnaround Buffer & Interval Overlap Math, `GET /api/products/{id}/slots`, `GET/POST /api/payernt/products/{id}/availability-config` | Real   |
 
 ## Technical Debt
 
@@ -210,6 +212,8 @@ The main technical debt areas are clear:
 - [RESOLVED Complete 4-Actor Handover, Secret PINs, Mobile OTP, Rental & Earnings Activation Engine] (1) 4-Actor Physical Handover Lifecycle: Architected end-to-end integration across Renter (Payrent), Vendor (Payernt), Delivery Agent / Courier, and Admin; (2) Admin Dispatch & Notification Pipeline: Admin monitors bookings (`GET /api/admin/bookings`), initiates dispatch (`POST /api/admin/bookings/{id}/process`), notifies vendor with real persistent database notifications (`POST /api/admin/bookings/{id}/notify-vendor`), and assigns delivery couriers (`POST /api/admin/bookings/{id}/assign-delivery`); (3) Vendor Preparation & Private 4-Digit Vendor PIN: Vendor prepares product upon receipt of notification (`POST /api/paye₹nt/bookings/{id}/prepare`), generating a cryptographically secure 4-digit Vendor Secret PIN (stored securely as SHA-256 hash in `rental_security`) with UI masked reveal; (4) Delivery Boy Pickup & Purpose-Specific Vendor OTP (`VENDOR_HANDOVER`): Mobile OTP is generated (`POST /api/deliveries/{id}/vendor-otp/send`) and verified (`POST /api/deliveries/{id}/vendor-otp/verify`) when courier reaches vendor, atomically updating delivery status to `PICKED_UP_FROM_VENDOR` -> `OUT_FOR_DELIVERY`; (5) Delivery Boy Arrival & Purpose-Specific Renter OTP (`RENTER_HANDOVER`): Mobile OTP is generated (`POST /api/deliveries/{id}/renter-otp/send`) and verified (`POST /api/deliveries/{id}/renter-otp/verify`) upon reaching renter, generating and revealing the private 4-digit Renter Secret PIN exclusively to the authenticated renter; (6) Transactional Rental Activation & Deterministic 8-Digit Secret: Combines `Vendor PIN + Renter PIN` on the server into deterministic 8-digit activation secret (`POST /api/bookings/{id}/activate-rental`), atomically transitioning orders to `active`, deliveries to `COMPLETED`, setting authoritative server timestamps (`rentalStartedAt`, `earningsStartedAt`), and initiating vendor pending earnings; (7) Strictly Idempotent Wallet Credit Engine: Guaranteed single pending earnings credit in `payernt_wallet_transactions` even under duplicate activation attempts; (8) 100% Test & Build Verification: Authored and executed `backend/tests/test_complete_handover_workflow.py` (100% pass rate) and validated zero-error Vite 8 / TanStack Start production build.
 - [RESOLVED Secure Device Identity / My Security QR System for Registered Laptops] (1) Architecture & Location: Implemented inside Settings → Security & Device Identity (`My Security QR`, `My Devices`, `Security History`, `Ownership Transfer`) with real backend MySQL persistence (`devices`, `device_security_history`, `device_transfers`); (2) Strict Password-Only Verification: Completely excluded OTP, SMS, email OTP, biometric, and PIN auth; verification executes strictly against the account password server-side with rate limiting (5 attempts), zero client-side password retention, and temporary QR token reveal; (3) Cryptographic Device & QR Identity: Generated non-sequential, unique device IDs (`DEV-LT-XXXXXX`), security IDs (`PY-LT-XXXX-XXXX`), and cryptographically secure QR tokens (`pYnt_sec_...`); (4) Public Verification Route (`/verify/device/:token`): Publicly verifiable endpoint without authentication requirement, presenting verified status (`ACTIVE`, `REPORTED_LOST`, `REPORTED_STOLEN`, `INVALID`) while strictly omitting all private owner info (no email, phone, Aadhaar, PAN, address, password, or bank info); (5) Printable Tamper-Evident Sticker & Laptop Screw Alignment Guide: Built responsive sticker layout (`paYent SECURE DEVICE`, `PROTECTED DEVICE`, `TAMPER EVIDENT — DO NOT REMOVE`) and interactive laptop bottom chassis guide illustrating sticker anchoring around/over laptop chassis screws without blocking ventilation/ports; (6) Device Lifecycle Management: Added user-authenticated Report Lost, Report Stolen, Restore Device, Password-protected QR Regeneration (invalidating old tokens and recording audit logs), and Multi-step Ownership Transfer; (7) Automated Tests & Build: Authored unit test suite `backend/tests/test_secure_device_identity.py` (100% pass) and validated zero-error Vite 8 / TanStack Start build.
 - [RESOLVED Admin Account Approvals Visibility & Multi-Store Persistence] (1) Root-Cause Identification: Identified 5-email whitelist (`REAL_ACCOUNTS` in backend, `REAL_USER_EMAILS` in frontend) and startup cleanup query in `init_db` deleting non-whitelisted users, dropping legitimate pending registrations; (2) Database & Backend Aggregation: Replaced hardcoded email whitelist with pattern matching excluding only automated test fixtures (`%@example.com`, `test_%`, `fake_%`), aggregated `MOCK_USERS` and `MOCK_PAYERNT_ACCOUNTS` in fallback mode, and calculated `pendingUsers` in dashboard stats; (3) Admin Portal Visibility: Enhanced Admin Dashboard "Pending Approvals" with direct link to `?status=pending`, added Amber badge counter on Sidebar Users rail, updated `Users.tsx` status filter to handle all pending review variations, added animated indicator to "Account Approvals" tab, and wired Approve/Reject buttons directly in the user detail drawer; (4) Verification: Passed all 7 approval flow pytest cases (`test_account_review_approval_flow.py`) and verified clean zero-error frontend production build.
+- [RESOLVED Lender-Initiated Booking Cancellation & Flexible Rental Date & Time-Slot Booking System] (1) Lender Cancellation & Feedback: Implemented lender-initiated cancellation on eligible bookings (`requested`, `accepted`, `handover` prior to physical verification), requiring 1 of 7 standardized reason codes, conditionally mandatory written feedback for `OTHER` (5-500 chars), with irreversible modal confirmation, state transition (`orders.status = 'cancelled'`, `rental_security.status = 'cancelled'`), in-app renter notification, interval release, and admin audit visibility (`booking_cancellations` table); (2) Handover Safeguards: Server strictly rejects cancellation once physical handover is verified (`vendor_handover_verified`, `renter_handover_verified`, `rental_started`, or courier in `PICKED_UP_FROM_VENDOR`, `OUT_FOR_DELIVERY`, `DELIVERED`, `COMPLETED`); (3) Flexible Time-Slots & Interval Math: Built half-day slots (Morning: 08:00–12:00, Afternoon: 13:00–17:00), Full-Day (08:00–17:00), and Multi-Day support with configurable turnaround buffer (default 60 mins), half-open interval overlap math `new_start < (existing_end + buffer) AND (new_end + buffer) > existing_start`, and transparent rate calculation; (4) Lender Availability Configuration: Lenders can configure allowed slots, turnaround buffer, custom half-day rate, and blocked personal-use dates via `GET/POST /api/payernt/products/{id}/availability-config`; (5) Public Slots Availability: Renter storefront queries `GET /api/products/{id}/slots?date=...` displaying live slot status badges (`Available`, `Booked`, `Not Available`); (6) 100% Verification: 16/16 comprehensive pytest cases passed in `test_cancellation_and_time_slots.py`, regression tests passed 5/5, and frontend production build completed with 0 errors.
+
 
 
 
@@ -984,4 +988,80 @@ Sampling conducted with 15 iterations per endpoint against remote TiDB Cloud dat
   6. Payernt Products API immediately reflects `approved` status.
 - Pytest suite `tests/test_listing_confirmation_security.py` and `tests/test_admin_product_review_pricing.py` passed **8/8 tests (100% OK)**.
 - Frontend build `npm run build` completed cleanly with **0 errors**.
+
+---
+
+## 17. Lender-Initiated Booking Cancellation & Flexible Time-Slot Booking System
+
+### 1. Architectural Overview & Requirements Addressed
+This release implements two major capabilities on top of Payent's existing architecture while strictly preserving Secret PIN verification, OTP flows, delivery courier tracking, and Admin operations:
+1. **Lender-Initiated Booking Cancellation & Feedback System**:
+   - Gives verified gear lenders the ability to safely cancel bookings that have not entered physical execution (`requested`, `accepted`, `handover` prior to handover verification).
+   - Rejects cancellation requests once handover is verified (`vendor_handover_verified`, `renter_handover_verified`, `rental_started`, or courier tracking in `PICKED_UP_FROM_VENDOR`, `OUT_FOR_DELIVERY`, `DELIVERED`, `COMPLETED`), protecting renters against in-flight abandonment.
+   - Requires mandatory selection of one of 7 standardized reason codes (`EQUIPMENT_UNAVAILABLE_DAMAGE`, `EQUIPMENT_UNAVAILABLE_MAINTENANCE`, `SCHEDULING_CONFLICT_PERSONAL`, `UNABLE_TO_FULFILL_TIME_SLOT`, `SECURITY_OR_VERIFICATION_CONCERN`, `LOCATION_OR_LOGISTICS_ISSUE`, `OTHER`).
+   - Requires written feedback (5–500 characters, trimmed) when `OTHER` is selected.
+   - Provides full audit trail in `booking_cancellations` table, counterparty notification alerts to renters, and admin visibility without leaking confidential lender credentials.
+2. **Flexible Rental Date & Time-Slot Booking System**:
+   - Supports Half Day — Morning (08:00–12:00), Half Day — Afternoon (13:00–17:00), Full Day (08:00–17:00), and Multi-Day rentals.
+   - Half-open interval conflict detection with configurable turnaround buffer (default 60 minutes): `new_start < (existing_end + buffer) AND (new_end + buffer) > existing_start`.
+   - Allows non-overlapping same-day rentals (e.g. 08:00–12:00 + 60m buffer ends at 13:00, permitting a 13:00–17:00 booking on the same day).
+   - Dynamic transparent pricing: Custom half-day rate (or 60% default) vs full-day rate.
+   - Lender availability management: Lenders can toggle allowed slot types, set custom turnaround buffer, set half-day rate, and block personal-use date ranges with conflict detection.
+   - Renter slot exploration: `GET /api/products/{id}/slots?date=YYYY-MM-DD` returns real-time slot availability badges (`Available`, `Booked`, `Not Available`).
+
+### 2. Database Schema Enhancements
+- **New Table `booking_cancellations`**:
+  - `id`: VARCHAR(64) PRIMARY KEY
+  - `booking_id`: VARCHAR(64) UNIQUE (linked to `orders.id` / `rental_security.booking_id`)
+  - `product_id`: VARCHAR(64)
+  - `initiated_by`: VARCHAR(32) (`"lender"` / `"renter"` / `"admin"`)
+  - `initiator_user_id`: VARCHAR(64)
+  - `reason_code`: VARCHAR(64)
+  - `feedback`: TEXT
+  - `previous_status`: VARCHAR(32)
+  - `created_at`: TIMESTAMP
+- **Extended Columns across `orders`, `cart_items`, `custom_products`, and `payernt_products`**:
+  - `time_slot`: VARCHAR(32) DEFAULT `'full_day'` (`'morning'`, `'afternoon'`, `'full_day'`, `'multi_day'`)
+  - `duration_type`: VARCHAR(32) DEFAULT `'full_day'` (`'half_day'`, `'full_day'`, `'multi_day'`)
+  - `start_time`: VARCHAR(16) (e.g. `'08:00'`)
+  - `end_time`: VARCHAR(16) (e.g. `'12:00'`)
+  - `start_datetime`: DATETIME
+  - `end_datetime`: DATETIME
+  - `cancellation_id`: VARCHAR(64)
+  - `allow_half_day`: BOOLEAN DEFAULT TRUE
+  - `morning_slot_enabled`: BOOLEAN DEFAULT TRUE
+  - `afternoon_slot_enabled`: BOOLEAN DEFAULT TRUE
+  - `full_day_slot_enabled`: BOOLEAN DEFAULT TRUE
+  - `half_day_rate`: DECIMAL(10, 2)
+  - `buffer_minutes`: INT DEFAULT 60
+  - `blocked_dates`: JSON (list of strings or dict intervals)
+
+### 3. API Endpoints
+- `POST /api/payernt/bookings/{id}/cancel` & `POST /api/bookings/{id}/cancel`: Lender-authenticated booking cancellation with handover verification check, reason validation, feedback capture, and renter notification.
+- `GET /api/products/{id}/slots?date=YYYY-MM-DD`: Public endpoint returning slot availability breakdown, times, prices, and status (`available`, `booked`, `not_available`).
+- `GET /api/payernt/products/{id}/availability-config`: Fetch lender's configuration for half-day toggles, slot availability, turnaround buffer, half-day rate, and blocked dates.
+- `POST /api/payernt/products/{id}/availability-config`: Update lender's product availability settings with validation.
+- `GET /api/admin/bookings`: Enhanced to include time slot metadata, duration type, and cancellation audit record.
+
+### 4. Verification & Automated Test Suite
+- Master test suite `backend/tests/test_cancellation_and_time_slots.py` passed **16/16 tests (100% OK in 2.58s)**:
+  1. `test_01_lender_cancel_eligible_booking_success`: Successfully cancels requested booking and records cancellation record.
+  2. `test_02_lender_cannot_cancel_other_lenders_booking`: Rejects cancellation attempt by non-owner lender (403 Forbidden).
+  3. `test_03_renter_cannot_use_lender_cancel_endpoint`: Rejects cancellation by renter token (403 Forbidden).
+  4. `test_04_cancellation_requires_valid_reason_code`: Rejects invalid reason codes (422 Unprocessable Entity).
+  5. `test_05_cancellation_other_requires_written_feedback`: Rejects `OTHER` reason when feedback is missing or under 5 characters (422 Unprocessable Entity).
+  6. `test_06_cannot_cancel_completed_booking`: Rejects cancellation for completed/active rentals (400 Bad Request).
+  7. `test_07_cannot_cancel_after_handover_verified`: Rejects cancellation once vendor handover is verified (400 Bad Request).
+  8. `test_08_cancellation_idempotency`: Repeated cancellation call returns already-cancelled state cleanly (200 OK).
+  9. `test_09_morning_and_afternoon_same_day_non_conflicting`: Confirms morning (08:00–12:00) and afternoon (13:00–17:00) with 60-min turnaround buffer do not conflict.
+  10. `test_10_morning_vs_morning_overlap_conflict`: Confirms two morning bookings on the same date conflict (409 Conflict).
+  11. `test_11_full_day_conflicts_with_half_day_slots`: Confirms full-day booking conflicts with both morning and afternoon slots on that date.
+  12. `test_12_multiday_booking_conflicts_with_all_intersecting_slots`: Confirms multi-day booking blocks all slots across its date span.
+  13. `test_13_cancelled_booking_releases_interval`: Cancelling a booking immediately frees the time slot for new bookings.
+  14. `test_14_product_slots_endpoint_returns_pricing_and_availability`: Validates `/api/products/{id}/slots` returns rates and live slot statuses.
+  15. `test_15_lender_availability_config_api`: Validates fetching and updating lender availability configuration.
+  16. `test_16_blocked_date_prevents_renter_booking`: Validates that lender-blocked dates reject rental bookings (409 Conflict).
+- Regression suite `backend/tests/test_listing_confirmation_security.py` passed **5/5 tests (100% OK)**.
+- Frontend build `npm run build` in `frontend/` passed with **0 errors**.
+
 
