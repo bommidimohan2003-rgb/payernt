@@ -215,6 +215,33 @@ export default function Dashboard() {
   return (
     <DashboardLayout>
       <div className="space-y-8 max-w-6xl">
+        {/* ADMIN OPERATIONS CALLOUT */}
+        {(user?.role === "admin" || (user as any)?.role === "superadmin" || (typeof window !== "undefined" && Boolean(localStorage.getItem("payent:admin:current_user")))) && (
+          <div className="rounded-2xl border border-blue-500/30 bg-blue-950/20 dark:bg-blue-950/40 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-blue-500/20 text-blue-500 flex items-center justify-center shrink-0 border border-blue-500/30">
+                <ShieldCheck className="w-5 h-5 text-blue-400" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-neutral-900 dark:text-white flex items-center gap-2">
+                  <span>Payent Operations Command Center</span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30">ADMIN ACCESS</span>
+                </h3>
+                <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                  Switch to the upgraded Midnight Sapphire administrative dashboard for platform telemetry, analytics, and queues.
+                </p>
+              </div>
+            </div>
+            <Link
+              to="/admin/dashboard"
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all shadow-md active:scale-95 shrink-0"
+            >
+              <span>Open Admin Dashboard</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+        )}
+
         {/* 1. WELCOME & COMMAND HEADER */}
         <div className="rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#10151B] p-6 sm:p-8 shadow-sm">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">

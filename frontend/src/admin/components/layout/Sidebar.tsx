@@ -171,8 +171,8 @@ export function Sidebar() {
             onClick={() => setMobileOpen(false)}
             className="flex items-center gap-2.5 overflow-hidden group"
           >
-            <div className="h-7 w-7 rounded-md bg-black/5 dark:bg-white/10 border border-[var(--admin-border)] flex items-center justify-center shrink-0">
-              <span className="font-mono font-black text-xs text-[var(--admin-text)]">P</span>
+            <div className="h-7 w-7 rounded-md bg-blue-500/10 border border-blue-500/30 flex items-center justify-center shrink-0">
+              <span className="font-mono font-black text-xs text-blue-500 dark:text-blue-400">P</span>
             </div>
             {!collapsed && (
               <div className="flex flex-col min-w-0">
@@ -228,15 +228,15 @@ export function Sidebar() {
                     className={cn(
                       "group relative flex items-center gap-2.5 px-2.5 py-2 rounded-md text-xs font-medium transition-colors",
                       active
-                        ? "bg-black/5 dark:bg-white/10 text-[var(--admin-text)] font-semibold before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-0.5 before:bg-[var(--admin-text)] before:rounded-r"
-                        : "text-[var(--admin-text-secondary)] hover:text-[var(--admin-text)] hover:bg-black/5 dark:hover:bg-white/[0.06]",
+                        ? "bg-blue-500/10 text-blue-500 dark:text-blue-400 font-semibold before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-0.5 before:bg-blue-500 before:rounded-r"
+                        : "text-[var(--admin-text-secondary)] hover:text-[var(--admin-text)] hover:bg-black/5 dark:hover:bg-white/[0.04]",
                       collapsed && "justify-center px-0"
                     )}
                   >
                     <it.icon
                       className={cn(
                         "h-4 w-4 shrink-0 transition-colors",
-                        active ? "text-[var(--admin-text)]" : "text-[var(--admin-text-secondary)] group-hover:text-[var(--admin-text)]"
+                        active ? "text-blue-500 dark:text-blue-400" : "text-[var(--admin-text-secondary)] group-hover:text-[var(--admin-text)]"
                       )}
                     />
                     {!collapsed && <span className="truncate">{it.label}</span>}

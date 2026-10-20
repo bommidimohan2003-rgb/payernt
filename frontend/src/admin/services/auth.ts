@@ -32,6 +32,7 @@ export const authService = {
       };
 
       if (typeof window !== "undefined") {
+        localStorage.removeItem("payent:admin:logged_out");
         localStorage.setItem("payent:admin:token", response.data.token);
         localStorage.setItem(
           "payent:admin:current_user",
@@ -68,6 +69,7 @@ export const authService = {
     if (typeof window !== "undefined") {
       localStorage.removeItem("payent:admin:token");
       localStorage.removeItem("payent:admin:current_user");
+      localStorage.setItem("payent:admin:logged_out", "true");
       window.dispatchEvent(new Event("payent:admin:profile-updated"));
       window.location.href = "/login";
     }
@@ -162,6 +164,23 @@ export const authService = {
           return adminPayload;
         }
       } catch {}
+    }
+
+    // 4. In local development / preview, fallback to DEFAULT_ADMIN if not explicitly logged out
+    if (
+      typeof window !== "undefined" &&
+      (import.meta.env.DEV ||
+        window.location.hostname === "localhost" ||
+        window.location.hostname === "127.0.0.1")
+    ) {
+      const isLoggedOut = localStorage.getItem("payent:admin:logged_out");
+      if (!isLoggedOut) {
+        localStorage.setItem("payent:admin:current_user", JSON.stringify(DEFAULT_ADMIN));
+        if (!localStorage.getItem("payent:admin:token")) {
+          localStorage.setItem("payent:admin:token", "dev_admin_session_token");
+        }
+        return DEFAULT_ADMIN;
+      }
     }
 
     return null;
