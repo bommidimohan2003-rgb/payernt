@@ -14,7 +14,7 @@ export function Footer() {
           <a href="#" className="hover:text-foreground transition-colors">
             Privacy Policy
           </a>
-          <span className="text-muted-foreground/60 select-none">v1.0.0</span>
+          <span className="text-muted-foreground/60 select-none">v2.0 Enterprise</span>
         </div>
       </div>
     </footer>

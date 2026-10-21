@@ -30,10 +30,16 @@
   --color-admin-sidebar: var(--admin-sidebar);
   --color-admin-card: var(--admin-card);
   --color-admin-elevated: var(--admin-elevated);
+  --color-admin-secondary-surface: var(--admin-secondary-surface);
   --color-admin-text: var(--admin-text);
   --color-admin-secondary: var(--admin-text-secondary);
+  --color-admin-muted: var(--admin-text-muted);
   --color-admin-border: var(--admin-border);
   --color-admin-accent: var(--admin-accent);
+  --color-admin-accent-hover: var(--admin-accent-hover);
+  --color-admin-success: var(--admin-success);
+  --color-admin-warning: var(--admin-warning);
+  --color-admin-error: var(--admin-error);
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Outfit", "Inter", sans-serif;
 }
@@ -105,15 +111,21 @@ html, body {
   --payent-text-secondary: #64748b;
   --payent-text-muted: #94a3b8;
 
-  /* Admin Design System Tokens - Light Theme */
-  --admin-bg: #F8FAFC;
-  --admin-sidebar: #FFFFFF;
-  --admin-card: #FFFFFF;
-  --admin-elevated: #F1F5F9;
-  --admin-text: #0F172A;
-  --admin-text-secondary: #64748B;
-  --admin-border: #E2E8F0;
-  --admin-accent: #3B82F6;
+  /* Admin Design System Tokens - Midnight Sapphire v2 */
+  --admin-bg: #070B14;
+  --admin-sidebar: #0B101D;
+  --admin-elevated: #0D1524;
+  --admin-card: #111C2F;
+  --admin-secondary-surface: #162238;
+  --admin-text: #F4F7FC;
+  --admin-text-secondary: #9AAAC2;
+  --admin-text-muted: #71819B;
+  --admin-border: #24334A;
+  --admin-accent: #4F8CFF;
+  --admin-accent-hover: #76A7FF;
+  --admin-success: #35D39A;
+  --admin-warning: #FFBE55;
+  --admin-error: #FF647C;
 }
 
 .dark {
@@ -189,15 +201,21 @@ html, body {
   --payent-text-secondary: #A1A1AA;
   --payent-text-muted: #71717A;
 
-  /* Admin Design System Tokens - Dark Theme (Midnight Sapphire) */
+  /* Admin Design System Tokens - Dark Theme (Midnight Sapphire v2) */
   --admin-bg: #070B14;
   --admin-sidebar: #0B101D;
-  --admin-card: #111827;
-  --admin-elevated: #1E293B;
-  --admin-text: #F8FAFC;
-  --admin-text-secondary: #94A3B8;
-  --admin-border: #273244;
-  --admin-accent: #3B82F6;
+  --admin-elevated: #0D1524;
+  --admin-card: #111C2F;
+  --admin-secondary-surface: #162238;
+  --admin-text: #F4F7FC;
+  --admin-text-secondary: #9AAAC2;
+  --admin-text-muted: #71819B;
+  --admin-border: #24334A;
+  --admin-accent: #4F8CFF;
+  --admin-accent-hover: #76A7FF;
+  --admin-success: #35D39A;
+  --admin-warning: #FFBE55;
+  --admin-error: #FF647C;
 
   /* Dark Mode Spatial Elevation Tokens */
   --elevation-1-shadow: 0 2px 10px -2px rgba(0, 0, 0, 0.8);
