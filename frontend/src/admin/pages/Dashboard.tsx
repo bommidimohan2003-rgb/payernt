@@ -69,6 +69,7 @@ import {
   adminApi,
 } from "../services/api";
 import { adminWS, ConnectionStatus } from "../services/websocket";
+import { useTheme } from "@/hooks/useTheme";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -77,7 +78,6 @@ const DASHBOARD_V14 = {
   bg: "#F3F2F5",
   card: "#FFFFFF",
   secondaryBg: "#F8F7F9",
-  elevated: "#F8F7F9",
   text: "#242424",
   textSecondary: "#77757D",
   muted: "#9E9DA4",
@@ -109,6 +109,8 @@ type DateRange = "7D" | "30D" | "90D";
 
 export function Dashboard() {
   const shouldReduceMotion = useReducedMotion();
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
 
   // ----------------------------------------------------------------------
   // State Management
@@ -474,14 +476,14 @@ export function Dashboard() {
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-[#FF7655]" />
-            <span className="text-[11px] font-mono uppercase tracking-widest text-[#77757D] font-bold">
+            <span className="text-[11px] font-mono uppercase tracking-widest text-[#77757D] dark:text-[#9AAAC2] font-bold">
               Payent Platform Governance
             </span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-[#242424]">
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-[#242424] dark:text-[#F8FAFC]">
             Dashboard Overview
           </h1>
-          <p className="text-xs sm:text-sm text-[#77757D] max-w-2xl font-normal">
+          <p className="text-xs sm:text-sm text-[#77757D] dark:text-[#9AAAC2] max-w-2xl font-normal">
             Platform performance, operational queue, and actions requiring administrative attention.
           </p>
         </div>
@@ -489,7 +491,7 @@ export function Dashboard() {
         {/* Global Controls: Telemetry, Date Range & Refresh */}
         <div className="flex flex-wrap items-center gap-2.5">
           {/* Live Telemetry Status Badge */}
-          <div className="flex items-center px-3 py-1.5 rounded-xl bg-white border border-[#E6E4E9] text-xs font-semibold text-[#242424] shadow-xs">
+          <div className="flex items-center px-3 py-1.5 rounded-xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] text-xs font-semibold text-[#242424] dark:text-[#F8FAFC] shadow-xs">
             <span
               className={cn(
                 "h-2 w-2 rounded-full mr-2",
@@ -506,7 +508,7 @@ export function Dashboard() {
           </div>
 
           {/* Date Range Selector Pills with Smooth Spring Motion */}
-          <div className="bg-[#F8F7F9] p-1 rounded-xl border border-[#E6E4E9] flex items-center gap-1 shadow-xs">
+          <div className="bg-[#F8F7F9] dark:bg-[#162238] p-1 rounded-xl border border-[#E6E4E9] dark:border-[#273244] flex items-center gap-1 shadow-xs">
             {(["7D", "30D", "90D"] as DateRange[]).map((range) => (
               <button
                 key={range}
@@ -514,14 +516,14 @@ export function Dashboard() {
                 className={cn(
                   "relative px-3 py-1 text-xs font-semibold rounded-lg transition-colors cursor-pointer",
                   dateRange === range
-                    ? "text-white"
-                    : "text-[#77757D] hover:text-[#242424]"
+                    ? "text-white dark:text-[#070B14]"
+                    : "text-[#77757D] dark:text-[#9AAAC2] hover:text-[#242424] dark:hover:text-[#F8FAFC]"
                 )}
               >
                 {dateRange === range && (
                   <motion.span
                     layoutId="activeDatePill"
-                    className="absolute inset-0 rounded-lg bg-[#242424] shadow-xs"
+                    className="absolute inset-0 rounded-lg bg-[#242424] dark:bg-white shadow-xs"
                     transition={{ type: "spring", stiffness: 420, damping: 32 }}
                   />
                 )}
@@ -531,8 +533,8 @@ export function Dashboard() {
           </div>
 
           {/* Sync Timestamp & Manual Refresh */}
-          <div className="flex items-center gap-1 text-[11px] font-mono text-[#77757D] px-2.5 py-1.5 rounded-xl bg-white border border-[#E6E4E9] shadow-xs">
-            <Clock className="h-3.5 w-3.5 text-[#77757D]" />
+          <div className="flex items-center gap-1 text-[11px] font-mono text-[#77757D] dark:text-[#9AAAC2] px-2.5 py-1.5 rounded-xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] shadow-xs">
+            <Clock className="h-3.5 w-3.5 text-[#77757D] dark:text-[#9AAAC2]" />
             <span>Synced {lastSyncTime || "Realtime"}</span>
           </div>
 
@@ -540,7 +542,7 @@ export function Dashboard() {
             whileTap={{ scale: 0.94 }}
             onClick={() => fetchDashboardData(days, true)}
             disabled={isRefreshing}
-            className="p-2 rounded-xl bg-white hover:bg-[#F8F7F9] text-[#77757D] hover:text-[#242424] border border-[#E6E4E9] shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+            className="p-2 rounded-xl bg-white dark:bg-[#111827] hover:bg-[#F8F7F9] dark:hover:bg-[#162238] text-[#77757D] dark:text-[#9AAAC2] hover:text-[#242424] dark:hover:text-[#F8FAFC] border border-[#E6E4E9] dark:border-[#273244] shadow-xs transition-colors cursor-pointer disabled:opacity-50"
             title="Refresh dashboard telemetry"
           >
             <RefreshCw
@@ -594,102 +596,102 @@ export function Dashboard() {
           </div>
         </motion.div>
 
-        {/* KPI CARD 2: ACTIVE RENTALS (CLEAN WHITE CARD) */}
+        {/* KPI CARD 2: ACTIVE RENTALS (ADAPTIVE LIGHT/DARK CARD) */}
         <motion.div
           whileHover={{ y: -3 }}
           transition={{ duration: 0.15 }}
-          className="rounded-2xl bg-white border border-[#E6E4E9] p-5 sm:p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between"
+          className="rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] p-5 sm:p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between"
         >
           <div className="flex items-start justify-between">
             <div className="space-y-1">
-              <span className="text-xs font-bold uppercase tracking-wider text-[#77757D]">
+              <span className="text-xs font-bold uppercase tracking-wider text-[#77757D] dark:text-[#9AAAC2]">
                 Active Rentals
               </span>
-              <div className="text-3xl sm:text-4xl font-black text-[#242424] tracking-tight mt-1">
+              <div className="text-3xl sm:text-4xl font-black text-[#242424] dark:text-[#F8FAFC] tracking-tight mt-1">
                 {activeRentalsVal.toLocaleString()}
               </div>
             </div>
-            <div className="p-2.5 rounded-xl bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0] shadow-xs">
+            <div className="p-2.5 rounded-xl bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0] dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20 shadow-xs">
               <Package className="h-5 w-5" />
             </div>
           </div>
 
-          <div className="pt-4 mt-2 border-t border-[#E6E4E9] flex items-center justify-between text-xs">
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0] font-semibold text-[11px]">
+          <div className="pt-4 mt-2 border-t border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between text-xs">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0] dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20 font-semibold text-[11px]">
               <span className="h-1.5 w-1.5 rounded-full bg-[#10B981]" />
               In circulation
             </span>
             <Link
               to="/admin/bookings"
-              className="text-[#77757D] hover:text-[#242424] font-semibold inline-flex items-center gap-1"
+              className="text-[#77757D] hover:text-[#242424] dark:text-[#9AAAC2] dark:hover:text-[#F8FAFC] font-semibold inline-flex items-center gap-1"
             >
               Roster ↗
             </Link>
           </div>
         </motion.div>
 
-        {/* KPI CARD 3: PENDING APPROVALS (CLEAN WHITE CARD WITH WARM AMBER ACCENTS) */}
+        {/* KPI CARD 3: PENDING APPROVALS (ADAPTIVE LIGHT/DARK CARD WITH WARM AMBER ACCENTS) */}
         <motion.div
           whileHover={{ y: -3 }}
           transition={{ duration: 0.15 }}
-          className="rounded-2xl bg-white border border-[#E6E4E9] p-5 sm:p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between"
+          className="rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] p-5 sm:p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between"
         >
           <div className="flex items-start justify-between">
             <div className="space-y-1">
-              <span className="text-xs font-bold uppercase tracking-wider text-[#77757D]">
+              <span className="text-xs font-bold uppercase tracking-wider text-[#77757D] dark:text-[#9AAAC2]">
                 Pending Approvals
               </span>
-              <div className="text-3xl sm:text-4xl font-black text-[#242424] tracking-tight mt-1">
+              <div className="text-3xl sm:text-4xl font-black text-[#242424] dark:text-[#F8FAFC] tracking-tight mt-1">
                 {pendingApprovalsVal.toLocaleString()}
               </div>
             </div>
-            <div className="p-2.5 rounded-xl bg-[#FFFBEB] text-[#D97706] border border-[#FDE68A] shadow-xs">
+            <div className="p-2.5 rounded-xl bg-[#FFFBEB] text-[#D97706] border border-[#FDE68A] dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20 shadow-xs">
               <Clock className="h-5 w-5" />
             </div>
           </div>
 
-          <div className="pt-4 mt-2 border-t border-[#E6E4E9] flex items-center justify-between text-xs">
-            <span className="text-[#77757D] font-medium text-[11px]">
-              <span className="font-bold text-[#D97706]">{stats?.pendingUsers || pendingUsersList.length}</span> KYC ·{" "}
-              <span className="font-bold text-[#D97706]">{stats?.pendingProducts || pendingProductsList.length}</span> Gear
+          <div className="pt-4 mt-2 border-t border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between text-xs">
+            <span className="text-[#77757D] dark:text-[#9AAAC2] font-medium text-[11px]">
+              <span className="font-bold text-[#D97706] dark:text-amber-400">{stats?.pendingUsers || pendingUsersList.length}</span> KYC ·{" "}
+              <span className="font-bold text-[#D97706] dark:text-amber-400">{stats?.pendingProducts || pendingProductsList.length}</span> Gear
             </span>
             <a
               href="#operational-queue"
-              className="text-[#D97706] hover:text-[#B45309] font-bold inline-flex items-center gap-1"
+              className="text-[#D97706] hover:text-[#B45309] dark:text-amber-400 dark:hover:text-amber-300 font-bold inline-flex items-center gap-1"
             >
               Review ↗
             </a>
           </div>
         </motion.div>
 
-        {/* KPI CARD 4: OPEN ISSUES (CLEAN WHITE CARD WITH MUTED RED ACCENTS) */}
+        {/* KPI CARD 4: OPEN ISSUES (ADAPTIVE LIGHT/DARK CARD WITH MUTED RED ACCENTS) */}
         <motion.div
           whileHover={{ y: -3 }}
           transition={{ duration: 0.15 }}
-          className="rounded-2xl bg-white border border-[#E6E4E9] p-5 sm:p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between"
+          className="rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] p-5 sm:p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between"
         >
           <div className="flex items-start justify-between">
             <div className="space-y-1">
-              <span className="text-xs font-bold uppercase tracking-wider text-[#77757D]">
+              <span className="text-xs font-bold uppercase tracking-wider text-[#77757D] dark:text-[#9AAAC2]">
                 Open Issues
               </span>
-              <div className="text-3xl sm:text-4xl font-black text-[#242424] tracking-tight mt-1">
+              <div className="text-3xl sm:text-4xl font-black text-[#242424] dark:text-[#F8FAFC] tracking-tight mt-1">
                 {openIssuesVal.toLocaleString()}
               </div>
             </div>
-            <div className="p-2.5 rounded-xl bg-[#FEF2F2] text-[#DC2626] border border-[#FECACA] shadow-xs">
+            <div className="p-2.5 rounded-xl bg-[#FEF2F2] text-[#DC2626] border border-[#FECACA] dark:bg-red-500/10 dark:text-red-400 dark:border-red-500/20 shadow-xs">
               <AlertTriangle className="h-5 w-5" />
             </div>
           </div>
 
-          <div className="pt-4 mt-2 border-t border-[#E6E4E9] flex items-center justify-between text-xs">
-            <span className="text-[#77757D] font-medium text-[11px]">
-              <span className="font-bold text-[#DC2626]">{openReportsCount}</span> Reports ·{" "}
-              <span className="font-bold text-[#DC2626]">{openSupportTicketsCount}</span> Support
+          <div className="pt-4 mt-2 border-t border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between text-xs">
+            <span className="text-[#77757D] dark:text-[#9AAAC2] font-medium text-[11px]">
+              <span className="font-bold text-[#DC2626] dark:text-red-400">{openReportsCount}</span> Reports ·{" "}
+              <span className="font-bold text-[#DC2626] dark:text-red-400">{openSupportTicketsCount}</span> Support
             </span>
             <Link
               to="/admin/reports"
-              className="text-[#DC2626] hover:text-[#B91C1C] font-bold inline-flex items-center gap-1"
+              className="text-[#DC2626] hover:text-[#B91C1C] dark:text-red-400 dark:hover:text-red-300 font-bold inline-flex items-center gap-1"
             >
               Action ↗
             </Link>
@@ -698,16 +700,16 @@ export function Dashboard() {
       </motion.div>
 
       {/* ------------------------------------------------------------------ */}
-      {/* 3. ANALYTICS TABS & CHARTS (WHITE PANEL WITH DARK CHARCOAL ACTIVE TAB) */}
+      {/* 3. ANALYTICS TABS & CHARTS (ADAPTIVE LIGHT/DARK PANEL) */}
       {/* ------------------------------------------------------------------ */}
       <motion.div
         variants={itemVariants}
-        className="rounded-2xl bg-white border border-[#E6E4E9] p-5 sm:p-6 shadow-xs space-y-6"
+        className="rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] p-5 sm:p-6 shadow-xs space-y-6"
       >
         {/* Navigation Tabs Bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#E6E4E9] pb-4">
-          {/* Rounded Tabs Container matching Dashboard V14 */}
-          <div className="bg-[#F8F7F9] p-1.5 rounded-2xl border border-[#E6E4E9] inline-flex flex-wrap items-center gap-1">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#E6E4E9] dark:border-[#273244] pb-4">
+          {/* Rounded Tabs Container */}
+          <div className="bg-[#F8F7F9] dark:bg-[#162238] p-1.5 rounded-2xl border border-[#E6E4E9] dark:border-[#273244] inline-flex flex-wrap items-center gap-1">
             {(["Bookings", "Products", "Users", "Delivery", "Finance"] as AnalyticsTab[]).map(
               (tab) => {
                 const isActive = activeTab === tab;
@@ -718,14 +720,14 @@ export function Dashboard() {
                     className={cn(
                       "relative px-4 py-1.5 text-xs font-semibold rounded-xl transition-all cursor-pointer",
                       isActive
-                        ? "text-white"
-                        : "text-[#77757D] hover:text-[#242424]"
+                        ? "text-white dark:text-[#070B14]"
+                        : "text-[#77757D] dark:text-[#9AAAC2] hover:text-[#242424] dark:hover:text-[#F8FAFC]"
                     )}
                   >
                     {isActive && (
                       <motion.span
                         layoutId="activeAnalyticsTab"
-                        className="absolute inset-0 rounded-xl bg-[#242424] shadow-xs"
+                        className="absolute inset-0 rounded-xl bg-[#242424] dark:bg-white shadow-xs"
                         transition={{ type: "spring", stiffness: 420, damping: 32 }}
                       />
                     )}
@@ -736,8 +738,8 @@ export function Dashboard() {
             )}
           </div>
 
-          <div className="text-xs font-medium text-[#77757D] hidden sm:block">
-            Active Window: <span className="font-bold text-[#242424]">Last {days} Days</span>
+          <div className="text-xs font-medium text-[#77757D] dark:text-[#9AAAC2] hidden sm:block">
+            Active Window: <span className="font-bold text-[#242424] dark:text-[#F8FAFC]">Last {days} Days</span>
           </div>
         </div>
 
@@ -747,14 +749,14 @@ export function Dashboard() {
           <div className="lg:col-span-2 space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-bold text-[#242424]">
+                <h3 className="text-sm font-bold text-[#242424] dark:text-[#F8FAFC]">
                   {activeTab === "Bookings" && "Booking Performance"}
                   {activeTab === "Products" && "Catalog Equipment Growth"}
                   {activeTab === "Users" && "User Acquisition Velocity"}
                   {activeTab === "Delivery" && "Delivery SLA Fulfillment"}
                   {activeTab === "Finance" && "Gross Merchandise Value (GMV)"}
                 </h3>
-                <p className="text-xs text-[#77757D]">
+                <p className="text-xs text-[#77757D] dark:text-[#9AAAC2]">
                   {activeTab === "Bookings" && "Daily reservation rate across the marketplace"}
                   {activeTab === "Products" && "Total gear listings registered across all categories"}
                   {activeTab === "Users" && "New customer, lender, and delivery agent registrations"}
@@ -764,14 +766,14 @@ export function Dashboard() {
               </div>
 
               <div className="text-right">
-                <div className="text-sm font-black text-[#242424]">
+                <div className="text-sm font-black text-[#242424] dark:text-[#F8FAFC]">
                   {activeTab === "Bookings" && `${totalBookingsVal} Total`}
                   {activeTab === "Products" && `${products.length} Listings`}
                   {activeTab === "Users" && `${users.length} Accounts`}
                   {activeTab === "Delivery" && "98.4% On-Time"}
                   {activeTab === "Finance" && `₹${(stats?.totalRevenue || 0).toLocaleString()}`}
                 </div>
-                <span className="text-[10px] text-[#77757D] font-mono">Last {days} days</span>
+                <span className="text-[10px] text-[#77757D] dark:text-[#9AAAC2] font-mono">Last {days} days</span>
               </div>
             </div>
 
@@ -798,30 +800,34 @@ export function Dashboard() {
                             <stop offset="95%" stopColor="#FF7655" stopOpacity={0} />
                           </linearGradient>
                         </defs>
-                        <CartesianGrid stroke="#F0EFF2" strokeDasharray="3 3" vertical={false} />
+                        <CartesianGrid
+                          stroke={isDark ? "#273244" : "#F0EFF2"}
+                          strokeDasharray="3 3"
+                          vertical={false}
+                        />
                         <XAxis
                           dataKey="date"
-                          stroke="#77757D"
+                          stroke={isDark ? "#9AAAC2" : "#77757D"}
                           fontSize={11}
                           tickLine={false}
-                          axisLine={{ stroke: "#E6E4E9" }}
+                          axisLine={{ stroke: isDark ? "#273244" : "#E6E4E9" }}
                         />
                         <YAxis
-                          stroke="#77757D"
+                          stroke={isDark ? "#9AAAC2" : "#77757D"}
                           fontSize={11}
                           tickLine={false}
                           axisLine={false}
                         />
                         <Tooltip
                           contentStyle={{
-                            backgroundColor: "#FFFFFF",
-                            borderColor: "#E6E4E9",
+                            backgroundColor: isDark ? "#111827" : "#FFFFFF",
+                            borderColor: isDark ? "#273244" : "#E6E4E9",
                             borderRadius: 12,
-                            boxShadow: "0 4px 20px rgba(0,0,0,0.06)",
-                            color: "#242424",
+                            boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
+                            color: isDark ? "#F8FAFC" : "#242424",
                             fontSize: 12,
                           }}
-                          labelStyle={{ color: "#77757D", fontWeight: 600 }}
+                          labelStyle={{ color: isDark ? "#9AAAC2" : "#77757D", fontWeight: 600 }}
                         />
                         <Area
                           type="monotone"
@@ -835,7 +841,7 @@ export function Dashboard() {
                       </AreaChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center bg-[#F8F7F9] rounded-xl border border-dashed border-[#E6E4E9] text-xs text-[#77757D]">
+                    <div className="w-full h-full flex flex-col items-center justify-center bg-[#F8F7F9] dark:bg-[#162238]/60 rounded-xl border border-dashed border-[#E6E4E9] dark:border-[#273244] text-xs text-[#77757D] dark:text-[#9AAAC2]">
                       <BarChart3 className="h-6 w-6 mb-2 text-[#9E9DA4]" />
                       <span>No {activeTab.toLowerCase()} trend telemetry in selected period.</span>
                     </div>
@@ -846,12 +852,12 @@ export function Dashboard() {
           </div>
 
           {/* Secondary Distribution Panel: Donut Chart (1 Col) */}
-          <div className="bg-[#F8F7F9] rounded-xl border border-[#E6E4E9] p-4 flex flex-col justify-between">
-            <div className="flex items-center justify-between pb-2 border-b border-[#E6E4E9]">
-              <span className="text-xs font-bold text-[#242424]">
+          <div className="bg-[#F8F7F9] dark:bg-[#162238] rounded-xl border border-[#E6E4E9] dark:border-[#273244] p-4 flex flex-col justify-between">
+            <div className="flex items-center justify-between pb-2 border-b border-[#E6E4E9] dark:border-[#273244]">
+              <span className="text-xs font-bold text-[#242424] dark:text-[#F8FAFC]">
                 Booking Status Distribution
               </span>
-              <span className="text-[10px] font-mono text-[#77757D]">Realtime</span>
+              <span className="text-[10px] font-mono text-[#77757D] dark:text-[#9AAAC2]">Realtime</span>
             </div>
 
             <div className="relative h-[160px] flex items-center justify-center my-2">
@@ -866,24 +872,29 @@ export function Dashboard() {
                     isAnimationActive={!shouldReduceMotion}
                   >
                     {bookingDistributionData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} stroke="#FFFFFF" strokeWidth={2} />
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={entry.color}
+                        stroke={isDark ? "#162238" : "#FFFFFF"}
+                        strokeWidth={2}
+                      />
                     ))}
                   </Pie>
                 </PieChart>
               </ResponsiveContainer>
 
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-xl font-black text-[#242424]">
+                <span className="text-xl font-black text-[#242424] dark:text-[#F8FAFC]">
                   {totalDistributedOrders}
                 </span>
-                <span className="text-[9px] uppercase tracking-wider font-bold text-[#77757D]">
+                <span className="text-[9px] uppercase tracking-wider font-bold text-[#77757D] dark:text-[#9AAAC2]">
                   Orders
                 </span>
               </div>
             </div>
 
             {/* Distribution Legend */}
-            <div className="grid grid-cols-2 gap-2 text-[11px] pt-2 border-t border-[#E6E4E9]">
+            <div className="grid grid-cols-2 gap-2 text-[11px] pt-2 border-t border-[#E6E4E9] dark:border-[#273244]">
               {bookingDistributionData.map((item) => (
                 <div key={item.name} className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5 truncate">
@@ -891,9 +902,9 @@ export function Dashboard() {
                       className="h-2 w-2 rounded-full shrink-0"
                       style={{ backgroundColor: item.color }}
                     />
-                    <span className="text-[#77757D] truncate">{item.name}</span>
+                    <span className="text-[#77757D] dark:text-[#9AAAC2] truncate">{item.name}</span>
                   </div>
-                  <span className="font-mono font-bold text-[#242424] ml-1">
+                  <span className="font-mono font-bold text-[#242424] dark:text-[#F8FAFC] ml-1">
                     {item.value}
                   </span>
                 </div>
@@ -911,15 +922,15 @@ export function Dashboard() {
         className="grid grid-cols-1 md:grid-cols-3 gap-5"
       >
         {/* Top Rented Gear */}
-        <div className="rounded-2xl bg-white border border-[#E6E4E9] p-5 shadow-xs space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-[#E6E4E9]">
+        <div className="rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] p-5 shadow-xs space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-[#E6E4E9] dark:border-[#273244]">
             <div className="flex items-center gap-2">
               <Award className="h-4 w-4 text-[#FF7655]" />
-              <h3 className="text-xs font-bold uppercase tracking-wider text-[#242424]">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#242424] dark:text-[#F8FAFC]">
                 Top Rented Gear
               </h3>
             </div>
-            <span className="text-[10px] text-[#77757D] font-mono">By Volume</span>
+            <span className="text-[10px] text-[#77757D] dark:text-[#9AAAC2] font-mono">By Volume</span>
           </div>
 
           <div className="space-y-2.5">
@@ -927,28 +938,28 @@ export function Dashboard() {
               topRentedGear.map((p) => (
                 <div
                   key={p.id}
-                  className="flex items-center justify-between p-2 rounded-xl hover:bg-[#F8F7F9] transition-colors duration-150"
+                  className="flex items-center justify-between p-2 rounded-xl hover:bg-[#F8F7F9] dark:hover:bg-[#162238]/60 transition-colors duration-150"
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="h-8 w-8 rounded-lg bg-[#F8F7F9] border border-[#E6E4E9] flex items-center justify-center shrink-0">
-                      <Package className="h-4 w-4 text-[#77757D]" />
+                    <div className="h-8 w-8 rounded-lg bg-[#F8F7F9] dark:bg-[#162238] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-center shrink-0">
+                      <Package className="h-4 w-4 text-[#77757D] dark:text-[#9AAAC2]" />
                     </div>
                     <div className="min-w-0">
-                      <div className="text-xs font-semibold text-[#242424] truncate">
+                      <div className="text-xs font-semibold text-[#242424] dark:text-[#F8FAFC] truncate">
                         {p.title}
                       </div>
-                      <div className="text-[10px] text-[#77757D] truncate">
+                      <div className="text-[10px] text-[#77757D] dark:text-[#9AAAC2] truncate">
                         {p.category || "Gear"}
                       </div>
                     </div>
                   </div>
-                  <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-lg bg-[#F8F7F9] text-[#242424] border border-[#E6E4E9]">
+                  <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-lg bg-[#F8F7F9] dark:bg-[#162238] text-[#242424] dark:text-[#F8FAFC] border border-[#E6E4E9] dark:border-[#273244]">
                     {p.rentalCount || 0} rentals
                   </span>
                 </div>
               ))
             ) : (
-              <div className="py-8 text-center text-xs text-[#77757D]">
+              <div className="py-8 text-center text-xs text-[#77757D] dark:text-[#9AAAC2]">
                 No equipment rental records available.
               </div>
             )}
@@ -956,11 +967,11 @@ export function Dashboard() {
         </div>
 
         {/* Category Velocity */}
-        <div className="rounded-2xl bg-white border border-[#E6E4E9] p-5 shadow-xs space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-[#E6E4E9]">
+        <div className="rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] p-5 shadow-xs space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-[#E6E4E9] dark:border-[#273244]">
             <div className="flex items-center gap-2">
               <Layers className="h-4 w-4 text-[#FF7655]" />
-              <h3 className="text-xs font-bold uppercase tracking-wider text-[#242424]">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#242424] dark:text-[#F8FAFC]">
                 Category Velocity
               </h3>
             </div>
@@ -974,14 +985,14 @@ export function Dashboard() {
               categoryVelocity.map((cat) => (
                 <div key={cat.name} className="space-y-1">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-[#242424] font-medium truncate max-w-[150px]">
+                    <span className="text-[#242424] dark:text-[#F8FAFC] font-medium truncate max-w-[150px]">
                       {cat.name}
                     </span>
-                    <span className="text-[11px] font-mono font-bold text-[#77757D]">
+                    <span className="text-[11px] font-mono font-bold text-[#77757D] dark:text-[#9AAAC2]">
                       {cat.count} listings ({cat.percent}%)
                     </span>
                   </div>
-                  <div className="w-full h-1.5 rounded-full bg-[#F8F7F9] overflow-hidden border border-[#E6E4E9]">
+                  <div className="w-full h-1.5 rounded-full bg-[#F8F7F9] dark:bg-[#162238] overflow-hidden border border-[#E6E4E9] dark:border-[#273244]">
                     <div
                       className="h-full rounded-full bg-gradient-to-r from-[#F9856A] to-[#FF7655]"
                       style={{ width: `${Math.min(cat.percent, 100)}%` }}
@@ -990,7 +1001,7 @@ export function Dashboard() {
                 </div>
               ))
             ) : (
-              <div className="py-8 text-center text-xs text-[#77757D]">
+              <div className="py-8 text-center text-xs text-[#77757D] dark:text-[#9AAAC2]">
                 No category distribution telemetry.
               </div>
             )}
@@ -998,31 +1009,31 @@ export function Dashboard() {
         </div>
 
         {/* Platform Compliance & Health */}
-        <div className="rounded-2xl bg-white border border-[#E6E4E9] p-5 shadow-xs space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-[#E6E4E9]">
+        <div className="rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] p-5 shadow-xs space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-[#E6E4E9] dark:border-[#273244]">
             <div className="flex items-center gap-2">
               <ShieldCheck className="h-4 w-4 text-[#10B981]" />
-              <h3 className="text-xs font-bold uppercase tracking-wider text-[#242424]">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#242424] dark:text-[#F8FAFC]">
                 Platform Compliance
               </h3>
             </div>
-            <span className="px-2 py-0.5 rounded-full bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0] text-[10px] font-mono font-bold">
+            <span className="px-2 py-0.5 rounded-full bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0] dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20 text-[10px] font-mono font-bold">
               100% PASS
             </span>
           </div>
 
           <div className="space-y-2 text-xs">
-            <div className="p-2.5 rounded-xl bg-[#F8F7F9] border border-[#E6E4E9] flex items-center justify-between">
-              <span className="text-[#242424] font-medium">PIN Handshake Verification</span>
-              <span className="text-[#059669] font-bold">Enforced</span>
+            <div className="p-2.5 rounded-xl bg-[#F8F7F9] dark:bg-[#162238] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between">
+              <span className="text-[#242424] dark:text-[#F8FAFC] font-medium">PIN Handshake Verification</span>
+              <span className="text-[#059669] dark:text-emerald-400 font-bold">Enforced</span>
             </div>
-            <div className="p-2.5 rounded-xl bg-[#F8F7F9] border border-[#E6E4E9] flex items-center justify-between">
-              <span className="text-[#242424] font-medium">Razorpay Escrow Vault</span>
-              <span className="text-[#059669] font-bold">Secured</span>
+            <div className="p-2.5 rounded-xl bg-[#F8F7F9] dark:bg-[#162238] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between">
+              <span className="text-[#242424] dark:text-[#F8FAFC] font-medium">Razorpay Escrow Vault</span>
+              <span className="text-[#059669] dark:text-emerald-400 font-bold">Secured</span>
             </div>
-            <div className="p-2.5 rounded-xl bg-[#F8F7F9] border border-[#E6E4E9] flex items-center justify-between">
-              <span className="text-[#242424] font-medium">Platform Uptime SLA</span>
-              <span className="text-[#242424] font-mono font-bold">99.98%</span>
+            <div className="p-2.5 rounded-xl bg-[#F8F7F9] dark:bg-[#162238] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between">
+              <span className="text-[#242424] dark:text-[#F8FAFC] font-medium">Platform Uptime SLA</span>
+              <span className="text-[#242424] dark:text-[#F8FAFC] font-mono font-bold">99.98%</span>
             </div>
           </div>
         </div>
@@ -1034,25 +1045,25 @@ export function Dashboard() {
       <div id="operational-queue" className="space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <h2 className="text-base font-bold text-[#242424]">
+            <h2 className="text-base font-bold text-[#242424] dark:text-[#F8FAFC]">
               Needs Attention
             </h2>
             <span className="px-2 py-0.5 rounded-full bg-[#FF7655]/10 text-[#FF7655] border border-[#FF7655]/20 text-[11px] font-mono font-bold">
               {pendingApprovalsVal + openIssuesVal} Items
             </span>
           </div>
-          <span className="text-xs text-[#77757D]">
+          <span className="text-xs text-[#77757D] dark:text-[#9AAAC2]">
             Requires immediate administrative review
           </span>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           {/* PENDING APPROVALS LIST */}
-          <div className="rounded-2xl bg-white border border-[#E6E4E9] p-5 shadow-xs space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-[#E6E4E9]">
+          <div className="rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] p-5 shadow-xs space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-[#E6E4E9] dark:border-[#273244]">
               <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-[#D97706]" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-[#242424]">
+                <Clock className="h-4 w-4 text-[#D97706] dark:text-amber-400" />
+                <h3 className="text-xs font-bold uppercase tracking-wider text-[#242424] dark:text-[#F8FAFC]">
                   Pending Approvals
                 </h3>
               </div>
@@ -1068,18 +1079,18 @@ export function Dashboard() {
                   {pendingProductsList.slice(0, 3).map((prod) => (
                     <div
                       key={prod.id}
-                      className="p-3 rounded-xl bg-[#F8F7F9] border border-[#E6E4E9] flex items-center justify-between gap-3 hover:border-[#D6D4D9] transition-all"
+                      className="p-3 rounded-xl bg-[#F8F7F9] dark:bg-[#162238] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between gap-3 hover:border-[#D6D4D9] dark:hover:border-[#3B82F6]/40 transition-all"
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] font-mono uppercase px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 font-bold">
+                          <span className="text-[10px] font-mono uppercase px-1.5 py-0.2 rounded bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 font-bold">
                             Gear Listing
                           </span>
-                          <span className="text-xs font-bold text-[#242424] truncate">
+                          <span className="text-xs font-bold text-[#242424] dark:text-[#F8FAFC] truncate">
                             {prod.title}
                           </span>
                         </div>
-                        <div className="text-[11px] text-[#77757D] truncate mt-0.5">
+                        <div className="text-[11px] text-[#77757D] dark:text-[#9AAAC2] truncate mt-0.5">
                           ₹{prod.dailyRate || 0}/day · Listed by {prod.ownerName || "Vendor"}
                         </div>
                       </div>
@@ -1088,14 +1099,14 @@ export function Dashboard() {
                         <button
                           onClick={() => handleApproveProduct(prod.id, prod.title)}
                           disabled={approvingId === prod.id}
-                          className="px-2.5 py-1 text-xs font-bold rounded-lg bg-[#242424] text-white hover:bg-black transition-all cursor-pointer shadow-xs disabled:opacity-50"
+                          className="px-2.5 py-1 text-xs font-bold rounded-lg bg-[#242424] text-white hover:bg-black dark:bg-[#3B82F6] dark:hover:bg-[#2563EB] transition-all cursor-pointer shadow-xs disabled:opacity-50"
                         >
                           {approvingId === prod.id ? "Approving..." : "Approve"}
                         </button>
                         <button
                           onClick={() => handleRejectProduct(prod.id, prod.title)}
                           disabled={rejectingId === prod.id}
-                          className="p-1 rounded-lg hover:bg-red-50 text-red-500 transition-colors cursor-pointer"
+                          className="p-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/20 text-red-500 transition-colors cursor-pointer"
                           title="Reject listing"
                         >
                           <X className="h-4 w-4" />
@@ -1108,18 +1119,18 @@ export function Dashboard() {
                   {pendingUsersList.slice(0, 2).map((u) => (
                     <div
                       key={u.id}
-                      className="p-3 rounded-xl bg-[#F8F7F9] border border-[#E6E4E9] flex items-center justify-between gap-3 hover:border-[#D6D4D9] transition-all"
+                      className="p-3 rounded-xl bg-[#F8F7F9] dark:bg-[#162238] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between gap-3 hover:border-[#D6D4D9] dark:hover:border-[#3B82F6]/40 transition-all"
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] font-mono uppercase px-1.5 py-0.2 rounded bg-blue-100 text-blue-800 font-bold">
+                          <span className="text-[10px] font-mono uppercase px-1.5 py-0.2 rounded bg-blue-100 dark:bg-blue-500/20 text-blue-800 dark:text-blue-300 font-bold">
                             KYC User
                           </span>
-                          <span className="text-xs font-bold text-[#242424] truncate">
+                          <span className="text-xs font-bold text-[#242424] dark:text-[#F8FAFC] truncate">
                             {u.fullName || u.email}
                           </span>
                         </div>
-                        <div className="text-[11px] text-[#77757D] truncate mt-0.5">
+                        <div className="text-[11px] text-[#77757D] dark:text-[#9AAAC2] truncate mt-0.5">
                           Role: {u.role} · {u.email}
                         </div>
                       </div>
@@ -1128,7 +1139,7 @@ export function Dashboard() {
                         <button
                           onClick={() => handleApproveUser(u.id, u.fullName || u.email)}
                           disabled={approvingUserId === u.id}
-                          className="px-2.5 py-1 text-xs font-bold rounded-lg bg-[#242424] text-white hover:bg-black transition-all cursor-pointer shadow-xs disabled:opacity-50"
+                          className="px-2.5 py-1 text-xs font-bold rounded-lg bg-[#242424] text-white hover:bg-black dark:bg-[#3B82F6] dark:hover:bg-[#2563EB] transition-all cursor-pointer shadow-xs disabled:opacity-50"
                         >
                           {approvingUserId === u.id ? "Approving..." : "Approve"}
                         </button>
@@ -1137,7 +1148,7 @@ export function Dashboard() {
                   ))}
                 </>
               ) : (
-                <div className="py-10 text-center bg-[#F8F7F9] rounded-xl border border-dashed border-[#E6E4E9] text-xs text-[#77757D]">
+                <div className="py-10 text-center bg-[#F8F7F9] dark:bg-[#162238]/50 rounded-xl border border-dashed border-[#E6E4E9] dark:border-[#273244] text-xs text-[#77757D] dark:text-[#9AAAC2]">
                   <CheckCircle2 className="h-6 w-6 text-[#10B981] mx-auto mb-2" />
                   <span>All submissions verified. Zero queue backlog.</span>
                 </div>
@@ -1146,11 +1157,11 @@ export function Dashboard() {
           </div>
 
           {/* ISSUES & EXCEPTIONS LIST */}
-          <div className="rounded-2xl bg-white border border-[#E6E4E9] p-5 shadow-xs space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-[#E6E4E9]">
+          <div className="rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] p-5 shadow-xs space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-[#E6E4E9] dark:border-[#273244]">
               <div className="flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 text-[#DC2626]" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-[#242424]">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-[#242424] dark:text-[#F8FAFC]">
                   Issues & Exceptions
                 </h3>
               </div>
@@ -1164,7 +1175,7 @@ export function Dashboard() {
                 issuesList.map((issue) => (
                   <div
                     key={issue.id}
-                    className="p-3 rounded-xl bg-[#F8F7F9] border border-[#E6E4E9] flex items-center justify-between gap-3 hover:border-[#D6D4D9] transition-all"
+                    className="p-3 rounded-xl bg-[#F8F7F9] dark:bg-[#162238] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between gap-3 hover:border-[#D6D4D9] dark:hover:border-[#3B82F6]/40 transition-all"
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
@@ -1172,31 +1183,31 @@ export function Dashboard() {
                           className={cn(
                             "text-[9px] font-mono uppercase px-1.5 py-0.2 rounded font-bold",
                             issue.severity === "CRITICAL"
-                              ? "bg-red-100 text-red-800"
-                              : "bg-amber-100 text-amber-800"
+                              ? "bg-red-100 dark:bg-red-500/20 text-red-800 dark:text-red-300"
+                              : "bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300"
                           )}
                         >
                           {issue.severity}
                         </span>
-                        <span className="text-xs font-bold text-[#242424] truncate">
+                        <span className="text-xs font-bold text-[#242424] dark:text-[#F8FAFC] truncate">
                           {issue.title}
                         </span>
                       </div>
-                      <div className="text-[11px] text-[#77757D] truncate mt-0.5">
+                      <div className="text-[11px] text-[#77757D] dark:text-[#9AAAC2] truncate mt-0.5">
                         Logged by {issue.author} · {issue.date}
                       </div>
                     </div>
 
                     <Link
                       to={issue.type === "report" ? "/admin/reports" : "/admin/support"}
-                      className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-white border border-[#E6E4E9] text-[#242424] hover:bg-[#F8F7F9] transition-colors shrink-0 shadow-2xs"
+                      className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] text-[#242424] dark:text-[#F8FAFC] hover:bg-[#F8F7F9] dark:hover:bg-[#162238] transition-colors shrink-0 shadow-2xs"
                     >
                       Resolve
                     </Link>
                   </div>
                 ))
               ) : (
-                <div className="py-10 text-center bg-[#F8F7F9] rounded-xl border border-dashed border-[#E6E4E9] text-xs text-[#77757D]">
+                <div className="py-10 text-center bg-[#F8F7F9] dark:bg-[#162238]/50 rounded-xl border border-dashed border-[#E6E4E9] dark:border-[#273244] text-xs text-[#77757D] dark:text-[#9AAAC2]">
                   <CheckCircle2 className="h-6 w-6 text-[#10B981] mx-auto mb-2" />
                   <span>Zero open disputes or reported issues. Platform operational.</span>
                 </div>
@@ -1211,11 +1222,11 @@ export function Dashboard() {
       {/* ------------------------------------------------------------------ */}
       <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* UPCOMING BOOKINGS */}
-        <div className="rounded-2xl bg-white border border-[#E6E4E9] p-5 shadow-xs space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-[#E6E4E9]">
+        <div className="rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] p-5 shadow-xs space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-[#E6E4E9] dark:border-[#273244]">
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4 text-[#FF7655]" />
-              <h3 className="text-xs font-bold uppercase tracking-wider text-[#242424]">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#242424] dark:text-[#F8FAFC]">
                 Upcoming Bookings
               </h3>
             </div>
@@ -1229,13 +1240,13 @@ export function Dashboard() {
               upcomingBookingsList.map((bk) => (
                 <div
                   key={bk.id}
-                  className="p-3 rounded-xl bg-[#F8F7F9] border border-[#E6E4E9] flex items-center justify-between gap-3 hover:border-[#D6D4D9] transition-all"
+                  className="p-3 rounded-xl bg-[#F8F7F9] dark:bg-[#162238] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between gap-3 hover:border-[#D6D4D9] dark:hover:border-[#3B82F6]/40 transition-all"
                 >
                   <div className="min-w-0">
-                    <div className="text-xs font-bold text-[#242424] truncate">
+                    <div className="text-xs font-bold text-[#242424] dark:text-[#F8FAFC] truncate">
                       {bk.productTitle || `Booking #${bk.id.slice(0, 8)}`}
                     </div>
-                    <div className="text-[11px] text-[#77757D] truncate mt-0.5">
+                    <div className="text-[11px] text-[#77757D] dark:text-[#9AAAC2] truncate mt-0.5">
                       Renter: {bk.renterName || "Customer"} · ₹{bk.totalAmount || 0}
                     </div>
                   </div>
@@ -1244,10 +1255,10 @@ export function Dashboard() {
                     className={cn(
                       "px-2 py-0.5 text-[10px] font-mono font-bold rounded-full capitalize",
                       bk.status === "active"
-                        ? "bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0]"
+                        ? "bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0] dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20"
                         : bk.status === "confirmed"
-                        ? "bg-blue-100 text-blue-800 border border-blue-200"
-                        : "bg-amber-100 text-amber-800 border border-amber-200"
+                        ? "bg-blue-100 dark:bg-blue-500/20 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-500/30"
+                        : "bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30"
                     )}
                   >
                     {bk.status}
@@ -1255,7 +1266,7 @@ export function Dashboard() {
                 </div>
               ))
             ) : (
-              <div className="py-8 text-center text-xs text-[#77757D]">
+              <div className="py-8 text-center text-xs text-[#77757D] dark:text-[#9AAAC2]">
                 No scheduled reservations currently active.
               </div>
             )}
@@ -1263,15 +1274,15 @@ export function Dashboard() {
         </div>
 
         {/* OVERDUE ACTIONS */}
-        <div className="rounded-2xl bg-white border border-[#E6E4E9] p-5 shadow-xs space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-[#E6E4E9]">
+        <div className="rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] p-5 shadow-xs space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-[#E6E4E9] dark:border-[#273244]">
             <div className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-[#D97706]" />
-              <h3 className="text-xs font-bold uppercase tracking-wider text-[#242424]">
+              <AlertTriangle className="h-4 w-4 text-[#D97706] dark:text-amber-400" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#242424] dark:text-[#F8FAFC]">
                 Action Required Tasks
               </h3>
             </div>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#F8F7F9] text-[#77757D] border border-[#E6E4E9]">
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#F8F7F9] dark:bg-[#162238] text-[#77757D] dark:text-[#9AAAC2] border border-[#E6E4E9] dark:border-[#273244]">
               {overdueActions.length} Tasks
             </span>
           </div>
@@ -1281,13 +1292,13 @@ export function Dashboard() {
               overdueActions.map((task) => (
                 <div
                   key={task.id}
-                  className="p-3 rounded-xl bg-[#F8F7F9] border border-[#E6E4E9] flex items-center justify-between gap-3 hover:border-[#D6D4D9] transition-all"
+                  className="p-3 rounded-xl bg-[#F8F7F9] dark:bg-[#162238] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between gap-3 hover:border-[#D6D4D9] dark:hover:border-[#3B82F6]/40 transition-all"
                 >
                   <div className="min-w-0">
-                    <div className="text-xs font-bold text-[#242424] truncate">
+                    <div className="text-xs font-bold text-[#242424] dark:text-[#F8FAFC] truncate">
                       {task.title}
                     </div>
-                    <div className="text-[11px] text-[#77757D] truncate mt-0.5">
+                    <div className="text-[11px] text-[#77757D] dark:text-[#9AAAC2] truncate mt-0.5">
                       {task.category}
                     </div>
                   </div>
@@ -1296,8 +1307,8 @@ export function Dashboard() {
                     className={cn(
                       "px-2 py-0.5 text-[10px] font-mono font-bold rounded-full shrink-0",
                       task.urgent
-                        ? "bg-red-100 text-red-700 border border-red-200"
-                        : "bg-amber-100 text-amber-700 border border-amber-200"
+                        ? "bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-500/30"
+                        : "bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30"
                     )}
                   >
                     {task.duration}
@@ -1305,7 +1316,7 @@ export function Dashboard() {
                 </div>
               ))
             ) : (
-              <div className="py-8 text-center text-xs text-[#77757D]">
+              <div className="py-8 text-center text-xs text-[#77757D] dark:text-[#9AAAC2]">
                 All operational items are current. Zero overdue tasks.
               </div>
             )}
@@ -1318,11 +1329,11 @@ export function Dashboard() {
       {/* ------------------------------------------------------------------ */}
       <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* RECENT ACTIVITY TRAIL (2 COLS) */}
-        <div className="lg:col-span-2 rounded-2xl bg-white border border-[#E6E4E9] p-5 shadow-xs space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-[#E6E4E9]">
+        <div className="lg:col-span-2 rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] p-5 shadow-xs space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-[#E6E4E9] dark:border-[#273244]">
             <div className="flex items-center gap-2">
               <Activity className="h-4 w-4 text-[#FF7655]" />
-              <h3 className="text-xs font-bold uppercase tracking-wider text-[#242424]">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#242424] dark:text-[#F8FAFC]">
                 Recent Activity Trail
               </h3>
             </div>
@@ -1336,21 +1347,21 @@ export function Dashboard() {
               recentActivity.slice(0, 5).map((act) => (
                 <div
                   key={act.id}
-                  className="p-3 rounded-xl bg-[#F8F7F9] border border-[#E6E4E9] flex items-center justify-between gap-3 text-xs"
+                  className="p-3 rounded-xl bg-[#F8F7F9] dark:bg-[#162238] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between gap-3 text-xs"
                 >
                   <div className="min-w-0">
-                    <span className="font-semibold text-[#242424]">{act.action}</span>
-                    <div className="text-[11px] text-[#77757D] truncate mt-0.5">
+                    <span className="font-semibold text-[#242424] dark:text-[#F8FAFC]">{act.action}</span>
+                    <div className="text-[11px] text-[#77757D] dark:text-[#9AAAC2] truncate mt-0.5">
                       Target: {act.target || "Platform"} · By {act.user || "System"}
                     </div>
                   </div>
-                  <span className="text-[10px] font-mono text-[#77757D] shrink-0">
+                  <span className="text-[10px] font-mono text-[#77757D] dark:text-[#9AAAC2] shrink-0">
                     {act.timestamp ? new Date(act.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "Just now"}
                   </span>
                 </div>
               ))
             ) : (
-              <div className="py-8 text-center text-xs text-[#77757D]">
+              <div className="py-8 text-center text-xs text-[#77757D] dark:text-[#9AAAC2]">
                 No recent activity records recorded in audit log.
               </div>
             )}
@@ -1358,40 +1369,40 @@ export function Dashboard() {
         </div>
 
         {/* PLATFORM HEALTH (1 COL) */}
-        <div className="rounded-2xl bg-white border border-[#E6E4E9] p-5 shadow-xs space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-[#E6E4E9]">
+        <div className="rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] p-5 shadow-xs space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-[#E6E4E9] dark:border-[#273244]">
             <div className="flex items-center gap-2">
               <Database className="h-4 w-4 text-[#10B981]" />
-              <h3 className="text-xs font-bold uppercase tracking-wider text-[#242424]">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#242424] dark:text-[#F8FAFC]">
                 Platform Health
               </h3>
             </div>
-            <span className="px-2 py-0.5 rounded-full bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0] text-[10px] font-mono font-bold">
+            <span className="px-2 py-0.5 rounded-full bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0] dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20 text-[10px] font-mono font-bold">
               Operational
             </span>
           </div>
 
           <div className="space-y-3">
-            <div className="p-3 rounded-xl bg-[#F8F7F9] border border-[#E6E4E9] flex items-center justify-between">
+            <div className="p-3 rounded-xl bg-[#F8F7F9] dark:bg-[#162238] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between">
               <div>
-                <div className="text-xs font-bold text-[#242424]">FastAPI Backend</div>
-                <div className="text-[10px] font-mono text-[#77757D]">/api/health/ready</div>
+                <div className="text-xs font-bold text-[#242424] dark:text-[#F8FAFC]">FastAPI Backend</div>
+                <div className="text-[10px] font-mono text-[#77757D] dark:text-[#9AAAC2]">/api/health/ready</div>
               </div>
               <span className="h-2 w-2 rounded-full bg-[#10B981] animate-pulse" />
             </div>
 
-            <div className="p-3 rounded-xl bg-[#F8F7F9] border border-[#E6E4E9] flex items-center justify-between">
+            <div className="p-3 rounded-xl bg-[#F8F7F9] dark:bg-[#162238] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between">
               <div>
-                <div className="text-xs font-bold text-[#242424]">Database Datastore</div>
-                <div className="text-[10px] font-mono text-[#77757D]">TiDB cloud MySQL SSL</div>
+                <div className="text-xs font-bold text-[#242424] dark:text-[#F8FAFC]">Database Datastore</div>
+                <div className="text-[10px] font-mono text-[#77757D] dark:text-[#9AAAC2]">TiDB cloud MySQL SSL</div>
               </div>
               <span className="h-2 w-2 rounded-full bg-[#10B981]" />
             </div>
 
-            <div className="p-3 rounded-xl bg-[#F8F7F9] border border-[#E6E4E9] flex items-center justify-between">
+            <div className="p-3 rounded-xl bg-[#F8F7F9] dark:bg-[#162238] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between">
               <div>
-                <div className="text-xs font-bold text-[#242424]">Live WebSocket Stream</div>
-                <div className="text-[10px] font-mono text-[#77757D]">/api/admin/ws</div>
+                <div className="text-xs font-bold text-[#242424] dark:text-[#F8FAFC]">Live WebSocket Stream</div>
+                <div className="text-[10px] font-mono text-[#77757D] dark:text-[#9AAAC2]">/api/admin/ws</div>
               </div>
               <span
                 className={cn(
@@ -1402,9 +1413,9 @@ export function Dashboard() {
             </div>
           </div>
 
-          <div className="pt-2 border-t border-[#E6E4E9] flex items-center justify-between text-[11px] text-[#77757D]">
+          <div className="pt-2 border-t border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between text-[11px] text-[#77757D] dark:text-[#9AAAC2]">
             <span>Data Freshness</span>
-            <span className="font-mono font-semibold text-[#242424]">Realtime sync</span>
+            <span className="font-mono font-semibold text-[#242424] dark:text-[#F8FAFC]">Realtime sync</span>
           </div>
         </div>
       </motion.div>

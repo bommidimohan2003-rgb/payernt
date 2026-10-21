@@ -158,13 +158,13 @@ export function Sidebar() {
       {/* Main Workspace Navigation Rail */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 flex flex-col bg-white border-r border-[#E6E4E9] transition-[width,background-color] duration-200 ease-out lg:sticky lg:top-0 lg:h-screen shrink-0 select-none shadow-[2px_0_12px_rgba(0,0,0,0.02)]",
+          "fixed inset-y-0 left-0 z-40 flex flex-col bg-white dark:bg-[#0D1524] border-r border-[#E6E4E9] dark:border-[#273244] transition-[width,background-color] duration-200 ease-out lg:sticky lg:top-0 lg:h-screen shrink-0 select-none shadow-[2px_0_12px_rgba(0,0,0,0.02)]",
           collapsed ? "w-[72px]" : "w-[260px]",
           mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         )}
       >
         {/* Workspace Brand Header */}
-        <div className="flex items-center justify-between px-3.5 h-16 border-b border-[#E6E4E9] shrink-0">
+        <div className="flex items-center justify-between px-3.5 h-16 border-b border-[#E6E4E9] dark:border-[#273244] shrink-0">
           <Link
             to="/admin/dashboard"
             onClick={() => setMobileOpen(false)}
@@ -176,14 +176,14 @@ export function Sidebar() {
             {!collapsed && (
               <div className="flex flex-col min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <span className="font-sans font-extrabold text-sm tracking-tight text-[#242424]">
+                  <span className="font-sans font-extrabold text-sm tracking-tight text-[#242424] dark:text-[#F8FAFC]">
                     Payent
                   </span>
                   <span className="text-[9px] font-mono uppercase tracking-widest text-[#FF7655] font-bold bg-[#FF7655]/10 border border-[#FF7655]/25 px-1.5 py-0.2 rounded">
                     Admin
                   </span>
                 </div>
-                <span className="text-[10px] text-[#77757D] font-medium truncate">
+                <span className="text-[10px] text-[#77757D] dark:text-[#9AAAC2] font-medium truncate">
                   Enterprise Ops
                 </span>
               </div>
@@ -193,7 +193,7 @@ export function Sidebar() {
           {/* Desktop Rail Collapse Toggle */}
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="hidden lg:flex p-1.5 rounded-lg hover:bg-[#F8F7F9] text-[#77757D] hover:text-[#242424] transition-colors cursor-pointer"
+            className="hidden lg:flex p-1.5 rounded-lg hover:bg-[#F8F7F9] dark:hover:bg-[#162238] text-[#77757D] dark:text-[#9AAAC2] hover:text-[#242424] dark:hover:text-[#F8FAFC] transition-colors cursor-pointer"
             title={collapsed ? "Expand rail" : "Collapse rail"}
           >
             {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
@@ -205,7 +205,7 @@ export function Sidebar() {
           {menuItems.map((group) => (
             <div key={group.group} className="space-y-0.5">
               {!collapsed && (
-                <div className="px-2.5 pb-1 text-[9px] font-bold text-[#77757D] uppercase tracking-widest font-mono">
+                <div className="px-2.5 pb-1 text-[9px] font-bold text-[#77757D] dark:text-[#9AAAC2] uppercase tracking-widest font-mono">
                   {group.group}
                 </div>
               )}
@@ -226,15 +226,15 @@ export function Sidebar() {
                     className={cn(
                       "group relative flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-all duration-150",
                       active
-                        ? "bg-[#242424] text-white font-semibold shadow-xs"
-                        : "text-[#77757D] hover:text-[#242424] hover:bg-[#F8F7F9]",
+                        ? "bg-[#242424] text-white dark:bg-[#162238] dark:text-[#F8FAFC] dark:border dark:border-[#3B82F6]/40 font-semibold shadow-xs"
+                        : "text-[#77757D] hover:text-[#242424] hover:bg-[#F8F7F9] dark:text-[#9AAAC2] dark:hover:text-[#F8FAFC] dark:hover:bg-[#162238]/60",
                       collapsed && "justify-center px-0 h-10 w-10 mx-auto"
                     )}
                   >
                     <it.icon
                       className={cn(
                         "h-4 w-4 shrink-0 transition-colors",
-                        active ? "text-white" : "text-[#77757D] group-hover:text-[#242424]"
+                        active ? "text-white dark:text-[#F8FAFC]" : "text-[#77757D] group-hover:text-[#242424] dark:text-[#9AAAC2] dark:group-hover:text-[#F8FAFC]"
                       )}
                     />
                     {!collapsed && <span className="truncate">{it.label}</span>}
@@ -247,12 +247,12 @@ export function Sidebar() {
                       </span>
                     )}
                     {collapsed && badgeVal > 0 && (
-                      <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-[#FF7655] ring-2 ring-white" />
+                      <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-[#FF7655] ring-2 ring-white dark:ring-[#0D1524]" />
                     )}
 
                     {/* Collapsed Tooltip */}
                     {collapsed && (
-                      <div className="pointer-events-none absolute left-full ml-3 px-2.5 py-1 rounded-lg bg-[#242424] text-white text-xs font-semibold whitespace-nowrap shadow-xl border border-black/10 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-150 z-50 flex items-center gap-2">
+                      <div className="pointer-events-none absolute left-full ml-3 px-2.5 py-1 rounded-lg bg-[#242424] text-white dark:bg-[#162238] dark:text-[#F8FAFC] text-xs font-semibold whitespace-nowrap shadow-xl border border-black/10 dark:border-[#273244] opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-150 z-50 flex items-center gap-2">
                         <span>{it.label}</span>
                         {badgeVal > 0 && (
                           <span className="px-1.5 py-0.2 rounded-full bg-[#FF7655] text-white text-[10px] font-mono">
@@ -269,17 +269,17 @@ export function Sidebar() {
         </nav>
 
         {/* User Identity & Logout Rail Footer */}
-        <div className="p-3 border-t border-[#E6E4E9] shrink-0 space-y-2">
+        <div className="p-3 border-t border-[#E6E4E9] dark:border-[#273244] shrink-0 space-y-2">
           {!collapsed && (
-            <div className="px-2.5 py-2 rounded-xl bg-[#F8F7F9] border border-[#E6E4E9] flex items-center gap-2.5">
-              <div className="h-7 w-7 rounded-lg bg-[#242424] text-white font-bold text-xs flex items-center justify-center shrink-0">
+            <div className="px-2.5 py-2 rounded-xl bg-[#F8F7F9] dark:bg-[#162238] border border-[#E6E4E9] dark:border-[#273244] flex items-center gap-2.5">
+              <div className="h-7 w-7 rounded-lg bg-[#242424] text-white dark:bg-[#3B82F6] font-bold text-xs flex items-center justify-center shrink-0">
                 {currentUser?.fullName?.[0]?.toUpperCase() || currentUser?.email?.[0]?.toUpperCase() || "A"}
               </div>
               <div className="min-w-0 flex-1">
-                <div className="text-xs font-semibold text-[#242424] truncate">
+                <div className="text-xs font-semibold text-[#242424] dark:text-[#F8FAFC] truncate">
                   {currentUser?.fullName || currentUser?.email?.split("@")[0] || "Administrator"}
                 </div>
-                <div className="text-[10px] text-[#77757D] font-mono truncate">
+                <div className="text-[10px] text-[#77757D] dark:text-[#9AAAC2] font-mono truncate">
                   {currentUser?.email || "admin@payent.in"}
                 </div>
               </div>
@@ -290,7 +290,7 @@ export function Sidebar() {
             onClick={handleLogout}
             title="Sign out of Admin Session"
             className={cn(
-              "w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-rose-500 hover:bg-rose-50 transition-colors cursor-pointer",
+              "w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition-colors cursor-pointer",
               collapsed && "justify-center px-0"
             )}
           >

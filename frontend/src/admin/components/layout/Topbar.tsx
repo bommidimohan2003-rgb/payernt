@@ -58,13 +58,13 @@ export function Topbar() {
   }, []);
 
   return (
-    <header className="sticky top-0 z-30 flex items-center justify-between px-6 md:px-8 h-16 bg-white/95 border-b border-[#E6E4E9] backdrop-blur-md transition-colors duration-200">
+    <header className="sticky top-0 z-30 flex items-center justify-between px-6 md:px-8 h-16 bg-white/95 dark:bg-[#0D1524]/95 border-b border-[#E6E4E9] dark:border-[#273244] backdrop-blur-md transition-colors duration-200">
       {/* Left side: Current page title & contextual subtitle */}
       <div className="flex flex-col justify-center min-w-0 pr-4">
-        <h1 className="text-base font-bold tracking-tight text-[#242424] truncate">
+        <h1 className="text-base font-bold tracking-tight text-[#242424] dark:text-[#F8FAFC] truncate">
           {currentMeta.title}
         </h1>
-        <p className="text-[11px] text-[#77757D] truncate hidden sm:block">
+        <p className="text-[11px] text-[#77757D] dark:text-[#9AAAC2] truncate hidden sm:block">
           {currentMeta.subtitle}
         </p>
       </div>
@@ -74,7 +74,7 @@ export function Topbar() {
         {/* Live Stream Telemetry Indicator (Desktop) */}
         <div className="hidden lg:flex items-center">
           {wsStatus === "LIVE" ? (
-            <span className="px-2.5 py-1 text-[11px] font-medium rounded-full bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0] flex items-center gap-1.5 shadow-2xs">
+            <span className="px-2.5 py-1 text-[11px] font-medium rounded-full bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0] dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20 flex items-center gap-1.5 shadow-2xs">
               <span className="relative flex h-1.5 w-1.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#10B981] opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#10B981]"></span>
@@ -82,12 +82,12 @@ export function Topbar() {
               Live Telemetry
             </span>
           ) : wsStatus === "CONNECTING" ? (
-            <span className="px-2.5 py-1 text-[11px] font-medium rounded-full bg-[#FFFBEB] text-[#D97706] border border-[#FDE68A] flex items-center gap-1.5">
+            <span className="px-2.5 py-1 text-[11px] font-medium rounded-full bg-[#FFFBEB] text-[#D97706] border border-[#FDE68A] dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20 flex items-center gap-1.5">
               <span className="h-1.5 w-1.5 rounded-full bg-[#F59E0B] animate-pulse"></span>
               Connecting...
             </span>
           ) : (
-            <span className="px-2.5 py-1 text-[11px] font-medium rounded-full bg-[#F8F7F9] text-[#77757D] border border-[#E6E4E9] flex items-center gap-1.5">
+            <span className="px-2.5 py-1 text-[11px] font-medium rounded-full bg-[#F8F7F9] dark:bg-[#162238] text-[#77757D] dark:text-[#9AAAC2] border border-[#E6E4E9] dark:border-[#273244] flex items-center gap-1.5">
               <span className="h-1.5 w-1.5 rounded-full bg-[#77757D]"></span>
               Online
             </span>
@@ -100,7 +100,7 @@ export function Topbar() {
         {/* Theme Toggle */}
         <button
           onClick={toggle}
-          className="p-2 rounded-lg text-[#77757D] hover:text-[#242424] hover:bg-[#F8F7F9] border border-transparent hover:border-[#E6E4E9] transition-all cursor-pointer"
+          className="p-2 rounded-lg text-[#77757D] dark:text-[#9AAAC2] hover:text-[#242424] dark:hover:text-[#F8FAFC] hover:bg-[#F8F7F9] dark:hover:bg-[#162238] border border-transparent hover:border-[#E6E4E9] dark:hover:border-[#273244] transition-all cursor-pointer"
           title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
           aria-label="Toggle theme"
         >
@@ -115,7 +115,7 @@ export function Topbar() {
         <NotificationDropdown />
 
         {/* Subtle Divider */}
-        <div className="h-5 w-[1px] bg-[#E6E4E9] shrink-0" />
+        <div className="h-5 w-[1px] bg-[#E6E4E9] dark:bg-[#273244] shrink-0" />
 
         {/* Admin Profile */}
         <ProfileDropdown />
