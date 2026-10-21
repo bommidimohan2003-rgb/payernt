@@ -25,6 +25,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { getOptimizedImageUrl, getResponsiveImageSrcSet } from "@/utils/images";
 import { api } from "@/utils/api";
+import { isFakeOrDeletedProduct } from "@/utils/productFilters";
 
 const KNOWN_BRANDS = [
   "Sony",
@@ -84,7 +85,11 @@ export function BrowseSwipeDeck({
   className,
   onResetFilters,
 }: BrowseSwipeDeckProps) {
-  const [queue, setQueue] = useState<Product[]>(() => products);
+  const cleanProducts = useMemo(
+    () => (products || []).filter((p) => !isFakeOrDeletedProduct(p)),
+    [products],
+  );
+  const [queue, setQueue] = useState<Product[]>(() => cleanProducts);
   const [, setCycleIndex] = useState<number>(0);
 
   const { has, toggle } = useWishlist();
@@ -93,13 +98,17 @@ export function BrowseSwipeDeck({
 
   // Reset queue when products array changes (due to filter or search)
   useEffect(() => {
-    setQueue(products);
+    setQueue(cleanProducts);
     setCycleIndex(0);
-  }, [products]);
+  }, [cleanProducts]);
 
-  const activeProduct = queue[0] || null;
-  const nextProduct = queue[1] || null;
-  const thirdProduct = queue[2] || null;
+  const validQueue = useMemo(
+    () => queue.filter((p) => !isFakeOrDeletedProduct(p)),
+    [queue],
+  );
+  const activeProduct = validQueue[0] || null;
+  const nextProduct = validQueue[1] || null;
+  const thirdProduct = validQueue[2] || null;
 
   // Extract all images for the active product
   const productImages = useMemo(() => {
@@ -215,8 +224,9 @@ export function BrowseSwipeDeck({
         ease: [0.32, 0.72, 0, 1],
       }).then(() => {
         setQueue((prevQueue) => {
-          if (prevQueue.length <= 1) return prevQueue;
-          const [first, ...rest] = prevQueue;
+          const clean = prevQueue.filter((item) => !isFakeOrDeletedProduct(item));
+          if (clean.length <= 1) return clean;
+          const [first, ...rest] = clean;
           return [...rest, first];
         });
         x.set(0);
@@ -788,7 +798,7 @@ export function BrowseSwipeDeck({
       {/* Bottom Queue Indicators & Reset Action */}
       <div className="mt-4 flex items-center justify-center gap-2">
         <div className="flex items-center gap-1.5">
-          {queue.slice(0, Math.min(queue.length, 6)).map((p, idx) => (
+          {validQueue.slice(0, Math.min(validQueue.length, 6)).map((p, idx) => (
             <button
               key={p.id}
               type="button"
@@ -812,9 +822,9 @@ export function BrowseSwipeDeck({
               )}
             />
           ))}
-          {queue.length > 6 && (
+          {validQueue.length > 6 && (
             <span className="text-[10px] font-mono text-neutral-400">
-              +{queue.length - 6}
+              +{validQueue.length - 6}
             </span>
           )}
         </div>

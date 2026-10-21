@@ -8,6 +8,7 @@ import { useWishlist } from "@/hooks/useWishlist";
 import { storage, STORAGE_KEYS } from "@/utils/storage";
 import { api } from "@/utils/api";
 import type { Product } from "@/types";
+import { isFakeOrDeletedProduct } from "@/utils/productFilters";
 
 export default function Wishlist() {
   const { ids } = useWishlist();
@@ -20,13 +21,13 @@ export default function Wishlist() {
       .getPublicProducts()
       .then((serverProducts) => {
         if (Array.isArray(serverProducts)) {
-          setAllProductsList(serverProducts);
+          setAllProductsList(serverProducts.filter((p) => !isFakeOrDeletedProduct(p)));
         }
       })
       .catch((err) => console.warn("Failed to load wishlist products:", err));
   }, []);
 
-  const items = allProductsList.filter((p) => ids.includes(p.id));
+  const items = allProductsList.filter((p) => ids.includes(p.id) && !isFakeOrDeletedProduct(p));
 
   return (
     <MainLayout>

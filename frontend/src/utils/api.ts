@@ -1,4 +1,5 @@
 import { storage, STORAGE_KEYS, resetPayentCache } from "./storage";
+import { isFakeOrDeletedProduct } from "./productFilters";
 import type {
   Order,
   Product,
@@ -220,13 +221,16 @@ export const api = {
     if (!id) return null;
     const key = String(id);
     const inMem = _productCache.get(key);
-    if (inMem) return normalizeProductData(inMem);
+    if (inMem) {
+      if (isFakeOrDeletedProduct(inMem)) return null;
+      return normalizeProductData(inMem);
+    }
     const fromStorage = storage.get<Product[]>("payent_server_products", []);
     if (Array.isArray(fromStorage)) {
       const found = fromStorage.find(
         (p) => String(p?.id).toLowerCase() === key.toLowerCase() || String(p?.id) === key
       );
-      if (found) {
+      if (found && !isFakeOrDeletedProduct(found)) {
         const norm = normalizeProductData(found);
         _productCache.set(key, norm);
         return norm;
@@ -1142,13 +1146,15 @@ export const api = {
           }
         }
         if (Array.isArray(items)) {
-          const normalizedItems = items.map((p) => {
-            const norm = normalizeProductData(p);
-            if (norm && norm.id) {
-              _productCache.set(String(norm.id), norm);
-            }
-            return norm;
-          });
+          const normalizedItems = items
+            .filter((p) => !isFakeOrDeletedProduct(p))
+            .map((p) => {
+              const norm = normalizeProductData(p);
+              if (norm && norm.id) {
+                _productCache.set(String(norm.id), norm);
+              }
+              return norm;
+            });
           storage.set("payent_server_products", normalizedItems);
           return normalizedItems;
         }

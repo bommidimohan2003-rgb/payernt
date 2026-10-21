@@ -30,6 +30,7 @@ import { formatOwnerAddress } from "@/utils/formatters";
 import { CSSTiltCard } from "./CSSTiltCard";
 import { getOptimizedImageUrl, getResponsiveImageSrcSet } from "@/utils/images";
 import { ProductMessageModal } from "@/components/browse/ProductMessageModal";
+import { isFakeOrDeletedProduct } from "@/utils/productFilters";
 
 export interface ProductCardProps {
   product: Product;
@@ -50,6 +51,10 @@ export function ProductCard({
   selectedEndDate,
   isNearby = false,
 }: ProductCardProps) {
+  if (!product || isFakeOrDeletedProduct(product)) {
+    return null;
+  }
+
   const { has, toggle } = useWishlist();
   const liked = has(product.id);
   const { user } = useAuth();

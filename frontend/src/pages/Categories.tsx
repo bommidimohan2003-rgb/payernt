@@ -38,6 +38,7 @@ import { useSearch, useNavigate, Link } from "@tanstack/react-router";
 import { tracker } from "@/utils/eventTracker";
 import { storage } from "@/utils/storage";
 import { api } from "@/utils/api";
+import { isFakeOrDeletedProduct } from "@/utils/productFilters";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserLocation } from "@/hooks/useUserLocation";
 import { useWishlist } from "@/hooks/useWishlist";
@@ -183,7 +184,7 @@ export default function Categories() {
   const [availableOnlyFilter, setAvailableOnlyFilter] = useState<boolean>(false);
 
   const [allProductsList, setAllProductsList] = useState<Product[]>(() => {
-    return storage.get<Product[]>("payent_server_products", []);
+    return storage.get<Product[]>("payent_server_products", []).filter((p) => !isFakeOrDeletedProduct(p));
   });
   const [isLoadingProducts, setIsLoadingProducts] = useState<boolean>(() => {
     const cached = storage.get<Product[]>("payent_server_products", []);
@@ -304,9 +305,10 @@ export default function Categories() {
       .getPublicProducts()
       .then((serverProducts) => {
         if (Array.isArray(serverProducts)) {
-          setAllProductsList(serverProducts);
-          storage.set("payent_server_products", serverProducts);
-          if (serverProducts.length === 0) {
+          const cleanList = serverProducts.filter((p) => !isFakeOrDeletedProduct(p));
+          setAllProductsList(cleanList);
+          storage.set("payent_server_products", cleanList);
+          if (cleanList.length === 0) {
             try {
               localStorage.removeItem("payernt_products_v2");
               localStorage.removeItem("paye₹nt_products");
@@ -473,6 +475,9 @@ export default function Categories() {
     const currentUserName = (user?.fullName || "").toLowerCase().trim();
 
     list = list.filter((p: any) => {
+      // 0. Exclude any fake or deleted product (e.g. Sony FX3)
+      if (isFakeOrDeletedProduct(p)) return false;
+
       // 1. Check Admin approval
       const isApproved =
         p.status === "approved" ||

@@ -3290,6 +3290,19 @@ def fetch_public_listings(
 
         if not listings:
             return []
+
+        # Strictly exclude fake or deleted products (specifically Sony FX3)
+        listings = [
+            p for p in listings
+            if not any(
+                k in str(p.get("title", "") or p.get("name", "") or p.get("model", "") or p.get("id", "") or "").lower()
+                for k in ["fx3", "cinema line", "prod-1790474939846-841", "prod-1790474367552-646", "p-custom-1791012883229", "sony-fx3"]
+            )
+        ]
+
+        if not listings:
+            return []
+
         pids = [str(p["id"]) for p in listings if p.get("id")]
         today_str = dt.now(timezone.utc).strftime("%Y-%m-%d")
         booked_set = set(check_products_booking_conflicts(pids, today_str, today_str)) if pids else set()
@@ -3299,6 +3312,8 @@ def fetch_public_listings(
 @app.get("/api/products/custom/{id}")
 @app.get("/api/products/{id}")
 def fetch_product_by_id(id: str, response: Response):
+    if any(k in id.lower() for k in ["fx3", "cinema line", "prod-1790474939846-841", "prod-1790474367552-646", "p-custom-1791012883229", "sony-fx3"]):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found.")
     response.headers["Cache-Control"] = "public, max-age=30, stale-while-revalidate=120"
     def _load_prod():
         product = fetch_one_product(id)

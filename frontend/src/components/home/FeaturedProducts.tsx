@@ -16,6 +16,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import type { Product } from "@/types";
 import { getOptimizedImageUrl, getResponsiveImageSrcSet } from "@/utils/images";
+import { isFakeOrDeletedProduct } from "@/utils/productFilters";
 
 interface DisplayProduct {
   id: string;
@@ -37,7 +38,7 @@ export function FeaturedProducts() {
     const cached = storage.get<Product[]>("payent_server_products", []);
     const seen = new Set<string>();
     const unique = cached.filter((p) => {
-      if (!p || !p.id || !p.title || seen.has(p.id)) return false;
+      if (!p || !p.id || !p.title || seen.has(p.id) || isFakeOrDeletedProduct(p)) return false;
       seen.add(p.id);
       return p.status === "approved" || !p.status;
     });
@@ -78,7 +79,7 @@ export function FeaturedProducts() {
       // Deduplicate by ID and only accept real approved items (no fake hardcoded items)
       const seen = new Set<string>();
       const uniqueReal = realListings.filter((p) => {
-        if (!p || !p.id || !p.title || seen.has(p.id)) return false;
+        if (!p || !p.id || !p.title || seen.has(p.id) || isFakeOrDeletedProduct(p)) return false;
         seen.add(p.id);
         return p.status === "approved" || !p.status;
       });

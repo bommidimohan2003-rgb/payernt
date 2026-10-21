@@ -16,6 +16,7 @@ import type {
   PayerntMessage,
 } from "./types";
 import { payerntApi } from "./payerntApiService";
+import { isFakeOrDeletedProduct } from "@/utils/productFilters";
 
 
 export const STORAGE_KEY_PRODUCTS = "paye₹nt_products";
@@ -209,12 +210,19 @@ export function usePayerntStore() {
         role: "Guest",
       };
 
-  const isMockItem = (id?: string) =>
-    !id ||
-    id.startsWith("mock-") ||
-    id.startsWith("fake-") ||
-    id.startsWith("dummy-") ||
-    id === "test-gear-1";
+  const isMockItem = (item?: any) => {
+    if (!item) return true;
+    if (typeof item === "string") {
+      return (
+        item.startsWith("mock-") ||
+        item.startsWith("fake-") ||
+        item.startsWith("dummy-") ||
+        item === "test-gear-1" ||
+        isFakeOrDeletedProduct({ id: item })
+      );
+    }
+    return isFakeOrDeletedProduct(item);
+  };
 
   const [wallet, setWallet] = useState<UserWallet>(INITIAL_WALLET);
   const [products, setProducts] = useState<PayerntProduct[]>([]);

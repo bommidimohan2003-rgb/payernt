@@ -1,3 +1,5 @@
+import { isFakeOrDeletedProduct } from "./productFilters";
+
 const USER_SPECIFIC_KEYS = new Set([
   "payent:wishlist",
   "payent:cart",
@@ -6,7 +8,7 @@ const USER_SPECIFIC_KEYS = new Set([
   "payent:orders",
 ]);
 
-export const PAYENT_CACHE_VERSION = "v8_clean_products";
+export const PAYENT_CACHE_VERSION = "v10_purge_fx3_final";
 
 export function resetPayentCache(): void {
   if (typeof window === "undefined") return;
@@ -82,7 +84,18 @@ export const storage = {
     try {
       const namespaced = getNamespacedKey(key);
       const raw = window.localStorage.getItem(namespaced);
-      return raw ? (JSON.parse(raw) as T) : fallback;
+      let parsed = raw ? (JSON.parse(raw) as T) : fallback;
+      if (
+        Array.isArray(parsed) &&
+        (key.includes("product") || key.includes("catalog"))
+      ) {
+        const cleaned = parsed.filter((item: any) => !isFakeOrDeletedProduct(item));
+        if (cleaned.length !== parsed.length) {
+          window.localStorage.setItem(namespaced, JSON.stringify(cleaned));
+          return cleaned as unknown as T;
+        }
+      }
+      return parsed;
     } catch {
       return fallback;
     }

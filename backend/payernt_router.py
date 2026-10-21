@@ -1162,6 +1162,13 @@ def get_vendor_product_endpoint(
 def get_public_payernt_catalog_endpoint():
     """Public catalog endpoint for renters to discover active products without PIN exposure."""
     products = get_all_active_payernt_products()
+    products = [
+        p for p in products
+        if not any(
+            k in str(p.get("title", "") or p.get("name", "") or p.get("model", "") or p.get("id", "") or "").lower()
+            for k in ["fx3", "cinema line", "prod-1790474939846-841", "prod-1790474367552-646", "p-custom-1791012883229", "sony-fx3"]
+        )
+    ]
     sanitized = [_sanitize_payernt_product(p, include_pin=False) for p in products]
     return {"success": True, "products": sanitized}
 
@@ -1169,6 +1176,8 @@ def get_public_payernt_catalog_endpoint():
 @payernt_router.get("/catalog/{product_id}")
 def get_public_payernt_product_detail_endpoint(product_id: str):
     """Public product detail endpoint for renters without PIN exposure."""
+    if any(k in product_id.lower() for k in ["fx3", "cinema line", "prod-1790474939846-841", "prod-1790474367552-646", "p-custom-1791012883229", "sony-fx3"]):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found.")
     product = get_payernt_product_by_id(product_id, include_pin=False)
     if not product:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found.")
