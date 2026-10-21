@@ -5,7 +5,7 @@ export default function Login() {
   return (
     <AuthLayout
       mode="login"
-      title="Welcome, Payrent"
+      title="Welcome to Payent"
       subtitle="Find what you need and rent it with ease."
       role="payrent"
     >

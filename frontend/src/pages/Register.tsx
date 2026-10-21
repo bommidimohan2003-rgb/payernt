@@ -5,7 +5,7 @@ export default function Register() {
   return (
     <AuthLayout
       mode="register"
-      title="Welcome, Payrent"
+      title="Welcome to Payent"
       subtitle="Find what you need and rent it with ease."
       role="payrent"
     >
