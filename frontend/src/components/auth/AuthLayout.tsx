@@ -1,21 +1,7 @@
-import { useState, useEffect } from "react";
 import { Link, useLocation } from "@tanstack/react-router";
 import { MainLayout } from "@/layouts/MainLayout";
-import {
-  CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
-  Camera,
-  Laptop,
-  Bike,
-  Plane,
-} from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { CheckCircle2, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
-import sonyA7FrontImg from "@/assets/images/sony_a7_front.webp";
-import macbookFrontImg from "@/assets/images/macbook_front.webp";
-import droneFrontImg from "@/assets/images/drone_front.webp";
-import reClassic350Img from "@/assets/images/re_classic350.webp";
 
 interface AuthLayoutProps {
   children: React.ReactNode;
@@ -24,139 +10,28 @@ interface AuthLayoutProps {
   subtitle: string;
 }
 
-// Clear high-visibility background images array (Cameras, Laptops, Bikes, Drones)
-const BACKGROUND_GEAR_PHOTOS = [
-  {
-    id: "camera",
-    category: "Camera",
-    title: "Sony Cinema & Mirrorless Cameras",
-    image: sonyA7FrontImg,
-    icon: Camera,
-  },
-  {
-    id: "laptop",
-    category: "Laptop",
-    title: "High-Performance Workstations & MacBooks",
-    image: macbookFrontImg,
-    icon: Laptop,
-  },
-  {
-    id: "bike",
-    category: "Bike & Ride",
-    title: "Royal Enfield & Sport Motorcycles",
-    image: reClassic350Img,
-    icon: Bike,
-  },
-  {
-    id: "drone",
-    category: "Drone",
-    title: "5.1K Aerial Drones & Quadcopters",
-    image: droneFrontImg,
-    icon: Plane,
-  },
-];
-
 export function AuthLayout({
   children,
   mode,
   title,
   subtitle,
 }: AuthLayoutProps) {
-  const [activeIdx, setActiveIdx] = useState(0);
   const location = useLocation();
-
-  // Auto-play clear background slider every 3.5 seconds
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setActiveIdx((prev) => (prev + 1) % BACKGROUND_GEAR_PHOTOS.length);
-    }, 3500);
-    return () => clearInterval(timer);
-  }, []);
-
-  const nextPhoto = () =>
-    setActiveIdx((prev) => (prev + 1) % BACKGROUND_GEAR_PHOTOS.length);
-  const prevPhoto = () =>
-    setActiveIdx((prev) =>
-      prev > 0 ? prev - 1 : BACKGROUND_GEAR_PHOTOS.length - 1,
-    );
-
-  const currentGear = BACKGROUND_GEAR_PHOTOS[activeIdx];
-  const IconComp = currentGear.icon;
 
   return (
     <MainLayout>
-      <section className="relative min-h-[calc(100vh-70px)] flex items-center p-4 md:p-8 pb-24 md:pb-8 overflow-y-auto bg-black">
-        {/* CRYSTAL CLEAR HIGH-VISIBILITY FULL PAGE BACKGROUND IMAGE SLIDER */}
-        <div className="absolute inset-0 w-full h-full z-0 overflow-hidden bg-black">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={currentGear.id}
-              initial={{ opacity: 0, scale: 1.04 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.98 }}
-              transition={{ duration: 0.7, ease: "easeInOut" }}
-              className="absolute inset-0 w-full h-full flex items-center justify-center"
-            >
-              <img
-                src={currentGear.image}
-                alt={currentGear.title}
-                decoding="async"
-                width={800}
-                height={600}
-                className="w-full h-full object-cover object-center filter saturate-125 contrast-105"
-              />
-            </motion.div>
-          </AnimatePresence>
-
-          {/* Light subtle scrim for text readability with darker emphasis on right for form contrast */}
-          <div className="absolute inset-0 bg-gradient-to-r from-black/30 via-black/40 to-black/75" />
+      <section className="relative min-h-[calc(100vh-70px)] flex items-center justify-center p-4 sm:p-6 md:p-8 pb-24 md:pb-12 overflow-y-auto bg-gradient-to-b from-background via-muted/30 to-background">
+        {/* Subtle decorative ambient glow for clean modern aesthetic without background photos */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
+          <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[650px] h-[360px] bg-primary/10 dark:bg-primary/15 rounded-full blur-[120px] opacity-60" />
+          <div className="absolute bottom-1/4 left-1/3 -translate-x-1/2 w-[400px] h-[300px] bg-accent/10 dark:bg-accent/15 rounded-full blur-[100px] opacity-40" />
         </div>
 
-        {/* LEFT CORNER FLOATING BADGE & CONTROLS */}
-        <div className="absolute bottom-6 left-6 z-20 hidden md:flex items-center gap-3 bg-black/60 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-white/20 text-white shadow-2xl">
-          <div className="p-2 rounded-xl bg-primary text-primary-foreground">
-            <IconComp className="h-4 w-4" />
-          </div>
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-wider text-primary">
-              Featured Gear • {currentGear.category}
-            </p>
-            <p className="text-xs font-bold text-white">{currentGear.title}</p>
-          </div>
-
-          <div className="flex items-center gap-1.5 ml-4 pl-4 border-l border-white/20">
-            {BACKGROUND_GEAR_PHOTOS.map((_, idx) => (
-              <button
-                key={idx}
-                onClick={() => setActiveIdx(idx)}
-                className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
-                  activeIdx === idx
-                    ? "w-5 bg-primary"
-                    : "w-2 bg-white/40 hover:bg-white/80"
-                }`}
-                aria-label={`View photo ${idx + 1}`}
-              />
-            ))}
-            <button
-              onClick={prevPhoto}
-              className="p-1 rounded-full hover:bg-white/20 transition-all cursor-pointer ml-1"
-            >
-              <ChevronLeft className="h-3.5 w-3.5" />
-            </button>
-            <button
-              onClick={nextPhoto}
-              className="p-1 rounded-full hover:bg-white/20 transition-all cursor-pointer"
-            >
-              <ChevronRight className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        </div>
-
-        {/* RIGHT SIDE ALIGNED FORM CONTAINER */}
-        <div className="relative z-10 w-full max-w-7xl mx-auto flex justify-center md:justify-end">
+        {/* CENTERED AUTHENTICATION CARD */}
+        <div className="relative z-10 w-full max-w-7xl mx-auto flex justify-center items-center">
           <div
             className={cn(
-              "w-full card-premium p-5 sm:p-6 shadow-2xl border-white/25 bg-background/95 dark:bg-slate-900/95 backdrop-blur-2xl rounded-3xl space-y-4 transition-all duration-300",
+              "w-full card-premium p-6 sm:p-8 shadow-2xl border border-border/80 bg-card/95 dark:bg-slate-900/90 backdrop-blur-2xl rounded-3xl space-y-5 transition-all duration-300",
               mode === "register" ? "max-w-xl lg:max-w-2xl" : "max-w-md",
             )}
           >
@@ -187,17 +62,21 @@ export function AuthLayout({
             )}
 
             {/* Title & Subtitle */}
-            <div>
+            <div className="space-y-1 text-center sm:text-left">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 text-primary text-[11px] font-bold tracking-wide uppercase mb-1">
+                <ShieldCheck className="h-3.5 w-3.5" />
+                Payent Authentication
+              </div>
               <h1 className="text-2xl sm:text-3xl font-black text-foreground tracking-tight font-display">
                 {title}
               </h1>
-              <p className="mt-1 text-xs sm:text-sm text-muted-foreground font-normal leading-relaxed">
+              <p className="text-xs sm:text-sm text-muted-foreground font-normal leading-relaxed">
                 {subtitle}
               </p>
             </div>
 
             {/* Form Children */}
-            <div className="space-y-4">{children}</div>
+            <div className="space-y-4 pt-1">{children}</div>
 
             {/* Security Footnote */}
             <div className="pt-4 border-t border-border/60 flex items-center justify-between text-[11px] text-muted-foreground font-medium">
