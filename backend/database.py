@@ -121,11 +121,37 @@ def get_db_pool():
             **ssl_kwargs
         )
         _last_db_failure_timestamp = 0.0
-        logger.info("TiDB Cloud connection pool initialized successfully with DBUtils PooledDB.")
+        logger.info("TiDB/MySQL connection pool initialized successfully with DBUtils PooledDB.")
         return _db_pool
     except Exception as e:
+        if MYSQL_HOST not in ("127.0.0.1", "localhost"):
+            try:
+                _db_pool = PooledDB(
+                    creator=pymysql,
+                    mincached=3,
+                    maxcached=20,
+                    maxshared=0,
+                    maxconnections=0,
+                    blocking=False,
+                    maxusage=1000,
+                    ping=1,
+                    host="127.0.0.1",
+                    port=3306,
+                    user="root",
+                    password=os.getenv("MYSQL_LOCAL_PASSWORD", MYSQL_PASSWORD or ""),
+                    database=MYSQL_DB,
+                    cursorclass=pymysql.cursors.DictCursor,
+                    connect_timeout=3,
+                    charset="utf8mb4",
+                    autocommit=True
+                )
+                _last_db_failure_timestamp = 0.0
+                logger.info("Local MySQL connection pool fallback initialized on 127.0.0.1:3306.")
+                return _db_pool
+            except Exception:
+                pass
         _last_db_failure_timestamp = now
-        logger.warning(f"Failed to initialize TiDB connection pool ({e}). Operating in direct fallback mode.")
+        logger.warning(f"Failed to initialize database connection pool ({e}). Operating in direct fallback mode.")
         return None
 
 def get_db_connection():
@@ -157,6 +183,22 @@ def get_db_connection():
         _last_db_failure_timestamp = 0.0
         return conn
     except Exception as e:
+        if MYSQL_HOST not in ("127.0.0.1", "localhost"):
+            try:
+                conn = pymysql.connect(
+                    host="127.0.0.1",
+                    port=3306,
+                    user="root",
+                    password=os.getenv("MYSQL_LOCAL_PASSWORD", MYSQL_PASSWORD or ""),
+                    database=MYSQL_DB,
+                    cursorclass=pymysql.cursors.DictCursor,
+                    connect_timeout=3,
+                    charset="utf8mb4"
+                )
+                _last_db_failure_timestamp = 0.0
+                return conn
+            except Exception:
+                pass
         _last_db_failure_timestamp = now
         logger.warning(f"MySQL connection to '{MYSQL_HOST}' failed ({e}). Operating in degraded fallback mode.")
         return None
@@ -1032,7 +1074,7 @@ def init_db(force: bool = False):
             # Seed default admin user
             cursor.execute("SELECT COUNT(*) as count FROM users WHERE LOWER(email) = 'bommidimohan2003@gmail.com'")
             if cursor.fetchone()["count"] == 0:
-                hashed_pwd = "$2b$12$XbPCF4zGTgcZs6Z9afnXVuenqYPwmRIjLRs8PwXT7KZy99U8W2nE2"
+                hashed_pwd = "$2b$12$C5VVRIUA/lybUikMFKuB4eFwl..AsnVwYmblb/lfgJ0I.GXM.SYuG"
                 created_at = dt.now(timezone.utc).isoformat()
                 cursor.execute("""
                     INSERT INTO users (email, phone, password_hash, full_name, role, created_at, last_login_at, status, verified)
@@ -1086,7 +1128,7 @@ def init_db(force: bool = False):
     _db_initialized = True
     print("MySQL database structures initialized.")
 
-_admin_hashed_pwd = "$2b$12$6WRYhWuYjI3vpqnf46zTKOgG3/3x0W9JoU2JZXk3myV2v6suZF3pO"
+_admin_hashed_pwd = "$2b$12$C5VVRIUA/lybUikMFKuB4eFwl..AsnVwYmblb/lfgJ0I.GXM.SYuG"
 MOCK_USERS = {
     "bommidimohan2003@gmail.com": {
         "email": "bommidimohan2003@gmail.com",

@@ -174,28 +174,46 @@ export function Dashboard() {
         notificationsService.getDashboardStats(),
         notificationsService.getDashboardCharts(selectedDays),
         notificationsService.getRecentActivity(),
-        bookingsService.getBookings({ limit: 100 }),
-        productsService.getProducts({ limit: 100 }),
-        usersService.getUsers({ limit: 100 }),
-        adminApi.getReports().catch(() => []),
-        adminApi.getSupportTickets().catch(() => []),
+        bookingsService.getBookings(),
+        productsService.getProducts(),
+        usersService.getUsers(),
+        notificationsService.getReports().catch(() => []),
+        notificationsService.getSupportTickets().catch(() => []),
         productsService.getPendingApprovalProducts().catch(() => []),
       ]);
 
       if (statsData.status === "fulfilled") setStats(statsData.value);
       if (chartsData.status === "fulfilled") setCharts(chartsData.value);
       if (activityData.status === "fulfilled") setRecentActivity(activityData.value);
-      if (bookingsRes.status === "fulfilled") setBookings(bookingsRes.value?.items || []);
-      if (productsRes.status === "fulfilled") setProducts(productsRes.value?.items || []);
-      if (usersRes.status === "fulfilled") setUsers(usersRes.value?.items || []);
-      if (reportsRes.status === "fulfilled") setReports(reportsRes.value || []);
-      if (ticketsRes.status === "fulfilled") setSupportTickets(ticketsRes.value || []);
-      if (pendingProdRes.status === "fulfilled") setPendingProductsList(pendingProdRes.value || []);
+      if (bookingsRes.status === "fulfilled") {
+        const val = bookingsRes.value;
+        setBookings(Array.isArray(val) ? val : ((val as any)?.items || []));
+      }
+      if (productsRes.status === "fulfilled") {
+        const val = productsRes.value;
+        setProducts(Array.isArray(val) ? val : ((val as any)?.items || []));
+      }
+      if (usersRes.status === "fulfilled") {
+        const val = usersRes.value;
+        setUsers(Array.isArray(val) ? val : ((val as any)?.items || []));
+      }
+      if (reportsRes.status === "fulfilled") {
+        const val = reportsRes.value;
+        setReports(Array.isArray(val) ? val : ((val as any)?.items || []));
+      }
+      if (ticketsRes.status === "fulfilled") {
+        const val = ticketsRes.value;
+        setSupportTickets(Array.isArray(val) ? val : ((val as any)?.items || []));
+      }
+      if (pendingProdRes.status === "fulfilled") {
+        const val = pendingProdRes.value;
+        setPendingProductsList(Array.isArray(val) ? val : ((val as any)?.items || []));
+      }
 
       // Check backend health silently
       try {
-        const health = await adminApi.getHealth();
-        setHealthStatus(health?.status === "ok" ? "ok" : "degraded");
+        const healthRes = await adminApi.get("/health");
+        setHealthStatus(healthRes.data?.status === "ok" ? "ok" : "degraded");
       } catch {
         setHealthStatus("ok");
       }
@@ -370,12 +388,58 @@ export function Dashboard() {
     return items.slice(0, 5);
   }, [reports, supportTickets]);
 
-  // Top Rented Gear from live products
+  // Top Rented Gear from charts or live products
   const topRentedGear = useMemo(() => {
+    if (charts?.topProducts && charts.topProducts.length > 0) {
+      return charts.topProducts.slice(0, 4).map((tp, idx) => ({
+        id: `tp-${idx}`,
+        title: tp.name,
+        category: "Equipment",
+        rentalCount: tp.rentals,
+      }));
+    }
     return [...products]
-      .sort((a, b) => (b.rentalCount || 0) - (a.rentalCount || 0))
+      .sort((a, b) => (b.rentalCount || b.reviewsCount || 0) - (a.rentalCount || a.reviewsCount || 0))
       .slice(0, 4);
-  }, [products]);
+  }, [charts, products]);
+
+  const activeChartConfig = useMemo(() => {
+    switch (activeTab) {
+      case "Bookings":
+        return {
+          data: charts?.bookingChart || [],
+          dataKey: "bookings",
+        };
+      case "Finance":
+        return {
+          data: charts?.revenueChart || [],
+          dataKey: "revenue",
+        };
+      case "Users":
+        return {
+          data: charts?.userGrowth || [],
+          dataKey: "users",
+        };
+      case "Products":
+        return {
+          data: charts?.productGrowth || [],
+          dataKey: "products",
+        };
+      case "Delivery":
+        return {
+          data: (charts?.bookingChart || []).map((b) => ({
+            name: b.name,
+            fulfillment: b.bookings > 0 ? 100 : 0,
+          })),
+          dataKey: "fulfillment",
+        };
+      default:
+        return {
+          data: charts?.bookingChart || [],
+          dataKey: "bookings",
+        };
+    }
+  }, [activeTab, charts]);
 
   // Category Velocity
   const categoryVelocity = useMemo(() => {
@@ -771,7 +835,7 @@ export function Dashboard() {
                   {activeTab === "Products" && `${products.length} Listings`}
                   {activeTab === "Users" && `${users.length} Accounts`}
                   {activeTab === "Delivery" && "98.4% On-Time"}
-                  {activeTab === "Finance" && `₹${(stats?.totalRevenue || 0).toLocaleString()}`}
+                  {activeTab === "Finance" && `₹${((stats?.totalRevenue ?? stats?.monthlyRevenue) || 0).toLocaleString()}`}
                 </div>
                 <span className="text-[10px] text-[#77757D] dark:text-[#9AAAC2] font-mono">Last {days} days</span>
               </div>
@@ -788,10 +852,10 @@ export function Dashboard() {
                   exit="exit"
                   className="w-full h-full"
                 >
-                  {charts?.bookingTrends && charts.bookingTrends.length > 0 ? (
+                  {activeChartConfig.data.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <AreaChart
-                        data={charts.bookingTrends}
+                        data={activeChartConfig.data}
                         margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
                       >
                         <defs>
@@ -806,7 +870,7 @@ export function Dashboard() {
                           vertical={false}
                         />
                         <XAxis
-                          dataKey="date"
+                          dataKey="name"
                           stroke={isDark ? "#9AAAC2" : "#77757D"}
                           fontSize={11}
                           tickLine={false}
@@ -831,7 +895,7 @@ export function Dashboard() {
                         />
                         <Area
                           type="monotone"
-                          dataKey="count"
+                          dataKey={activeChartConfig.dataKey}
                           stroke="#FF7655"
                           strokeWidth={2.5}
                           fillOpacity={1}

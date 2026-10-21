@@ -94,6 +94,10 @@ export const productsService = {
     return [];
   },
 
+  async getPendingApprovalProducts(): Promise<AdminProduct[]> {
+    return this.getProducts("pending");
+  },
+
   async getProductById(id: string): Promise<AdminProduct> {
     try {
       const response = await adminApi.get(`/products/${encodeURIComponent(id)}`);

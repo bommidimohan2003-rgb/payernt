@@ -446,6 +446,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 @app.get("/")
 @app.get("/api/health")
+@app.get("/api/admin/health")
 @app.get("/health")
 @app.get("/healthz")
 def health_check(response: Response):
@@ -5739,11 +5740,13 @@ def admin_stats(current_admin: dict = Depends(check_admin_user)):
         "suspendedProducts": 0,
         "totalCategories": 0,
         "bookingsToday": 0,
+        "todayBookings": 0,
         "monthlyBookings": 0,
         "activeBookings": 0,
         "completedBookings": 0,
         "revenueToday": 0.0,
         "monthlyRevenue": 0.0,
+        "totalRevenue": 0.0,
         "pendingWithdrawals": 0,
         "pendingReports": 0,
         "unreadNotifications": 0,
@@ -5777,10 +5780,12 @@ def admin_stats(current_admin: dict = Depends(check_admin_user)):
             stats_result["activeBookings"] = len([o for o in real_orders if o.get("status") in ("active", "in_progress", "confirmed", "delivered")])
             stats_result["completedBookings"] = len([o for o in real_orders if o.get("status") == "completed"])
             stats_result["bookingsToday"] = len([o for o in real_orders if str(o.get("created_at", "")).startswith(datetime.date.today().isoformat())])
+            stats_result["todayBookings"] = stats_result["bookingsToday"]
             
             paid_orders = [o for o in real_orders if o.get("payment_status") == "paid" or o.get("status") in ("active", "completed")]
             total_rev = sum(float(o.get("total", 0)) for o in paid_orders)
             stats_result["monthlyRevenue"] = total_rev
+            stats_result["totalRevenue"] = total_rev
             stats_result["revenueToday"] = total_rev
             stats_result["websiteVisitors"] = max(1, len(active_users) * 3)
             stats_result["activeVisitors"] = 1
@@ -5791,7 +5796,10 @@ def admin_stats(current_admin: dict = Depends(check_admin_user)):
         with conn.cursor() as cursor:
             def safe_query(sql, params=None, default=0):
                 try:
-                    cursor.execute(sql, params or ())
+                    if params is not None:
+                        cursor.execute(sql, params)
+                    else:
+                        cursor.execute(sql)
                     row = cursor.fetchone()
                     if row:
                         val = next(iter(row.values()))
@@ -5866,16 +5874,28 @@ def admin_stats(current_admin: dict = Depends(check_admin_user)):
             cp_suspended = int(safe_query("SELECT COUNT(*) as count FROM custom_products WHERE LOWER(status) = 'suspended'", default=0))
             stats_result["suspendedProducts"] = max(pp_suspended, cp_suspended)
             
-            stats_result["totalCategories"] = int(safe_query("SELECT COUNT(*) as count FROM categories", default=0))
+            cats_cnt = int(safe_query("SELECT COUNT(*) as count FROM categories", default=0))
+            if cats_cnt == 0:
+                cats_cnt = int(safe_query("""
+                    SELECT COUNT(DISTINCT category) as count 
+                    FROM (
+                        SELECT category FROM custom_products WHERE category IS NOT NULL AND category != ''
+                        UNION 
+                        SELECT category FROM payernt_products WHERE category IS NOT NULL AND category != ''
+                    ) as cats
+                """, default=0))
+            stats_result["totalCategories"] = cats_cnt
             
             # Orders / Bookings
             stats_result["monthlyBookings"] = int(safe_query("SELECT COUNT(*) as count FROM orders", default=0))
             stats_result["activeBookings"] = int(safe_query("SELECT COUNT(*) as count FROM orders WHERE status IN ('active', 'in_progress', 'confirmed', 'delivered')", default=0))
             stats_result["completedBookings"] = int(safe_query("SELECT COUNT(*) as count FROM orders WHERE status = 'completed'", default=0))
             stats_result["monthlyRevenue"] = float(safe_query("SELECT IFNULL(SUM(total), 0) as total FROM orders", default=0.0))
+            stats_result["totalRevenue"] = stats_result["monthlyRevenue"]
             
             today_prefix = datetime.date.today().isoformat()
             stats_result["bookingsToday"] = int(safe_query("SELECT COUNT(*) as count FROM orders WHERE created_at LIKE %s OR created_at >= CURDATE()", (f"{today_prefix}%",), default=0))
+            stats_result["todayBookings"] = stats_result["bookingsToday"]
             stats_result["revenueToday"] = float(safe_query("SELECT IFNULL(SUM(total), 0) as total FROM orders WHERE created_at LIKE %s OR created_at >= CURDATE()", (f"{today_prefix}%",), default=0.0))
             
             # Withdrawals & Reports
@@ -6176,7 +6196,11 @@ def admin_charts(days: int = Query(30), current_admin: dict = Depends(check_admi
                 # Category distribution share
                 cursor.execute("""
                     SELECT category as name, COUNT(*) as value
-                    FROM custom_products
+                    FROM (
+                        SELECT category FROM custom_products WHERE category IS NOT NULL AND category != ''
+                        UNION ALL
+                        SELECT category FROM payernt_products WHERE category IS NOT NULL AND category != ''
+                    ) as all_prods
                     GROUP BY category
                 """)
                 cat_rows = cursor.fetchall() or []
@@ -6436,7 +6460,7 @@ def admin_users_list(current_admin: dict = Depends(check_admin_user)):
         try:
             with conn.cursor() as cursor:
                 # 1. Payernt (Vendor) accounts
-                cursor.execute("SELECT id, email, name, phone, address, pincode, status, aadhaar_number, rejection_reason, reviewed_by, reviewed_at, avatar, created_at FROM payernt_accounts ORDER BY created_at DESC")
+                cursor.execute("SELECT id, email, name, phone, address, pincode, status, aadhaar_number, avatar, created_at FROM payernt_accounts ORDER BY created_at DESC")
                 for r in (cursor.fetchall() or []):
                     em = r["email"].lower().strip()
                     if is_fake_user(em):
@@ -6485,7 +6509,7 @@ def admin_users_list(current_admin: dict = Depends(check_admin_user)):
 
                 # 2. Payrent (Customer) accounts
                 try:
-                    cursor.execute("SELECT email, full_name, phone, address, city, pincode, status, pan_number, rejection_reason, reviewed_by, reviewed_at, avatar, created_at FROM payrent_accounts ORDER BY created_at DESC")
+                    cursor.execute("SELECT email, full_name, phone, address, city, pincode, status, pan_number, avatar, created_at FROM payrent_accounts ORDER BY created_at DESC")
                     for r in (cursor.fetchall() or []):
                         em = r["email"].lower().strip()
                         if is_fake_user(em):
@@ -6552,7 +6576,7 @@ def admin_users_list(current_admin: dict = Depends(check_admin_user)):
 
                 # 3. Users table (for any registered users not in payrent_accounts/payernt_accounts)
                 try:
-                    cursor.execute("SELECT email, full_name, phone, address, city, pincode, status, pan_number, aadhaar_number, rejection_reason, reviewed_by, reviewed_at, avatar, created_at, role, account_type, verified FROM users ORDER BY created_at DESC")
+                    cursor.execute("SELECT email, full_name, phone, address, city, pincode, status, pan_number, aadhaar_number, avatar, created_at, role, account_type, verified FROM users ORDER BY created_at DESC")
                     for r in (cursor.fetchall() or []):
                         em = r["email"].lower().strip()
                         if is_fake_user(em):
@@ -9205,22 +9229,15 @@ def admin_bookings_list(current_admin: dict = Depends(check_admin_user)):
                            COALESCE(p.owner_name, pp.owner_name) as owner_name, 
                            COALESCE(p.user_email, pp.owner_email) as owner_email,
                            d.status as delivery_status,
-                           d.delivery_boy_id,
-                           d.delivery_boy_name,
-                           d.delivery_boy_phone,
-                           d.pickup_location,
+                           d.pickup_address as pickup_location,
                            d.delivery_address,
-                           d.picked_up_at,
-                           d.arrived_at_renter_at,
-                           d.completed_at as delivered_at,
+                           d.delivered_at,
                            sec.vendor_pin_verified,
                            sec.renter_pin_verified,
                            sec.otp_verified,
                            sec.rental_started,
                            sec.status as security_status,
-                           sec.activated_at,
-                           sec.vendor_otp_verified as sec_vendor_otp_verified,
-                           sec.renter_otp_verified as sec_renter_otp_verified,
+                           sec.created_at as activated_at,
                            bc.reason_code as cancellation_reason_code,
                            bc.feedback as cancellation_feedback,
                            bc.created_at as cancellation_timestamp,
@@ -9232,7 +9249,7 @@ def admin_bookings_list(current_admin: dict = Depends(check_admin_user)):
                     LEFT JOIN payernt_products pp ON o.product_id = pp.id
                     LEFT JOIN deliveries d ON o.id = d.booking_id
                     LEFT JOIN rental_security sec ON o.id = sec.booking_id
-                    LEFT JOIN booking_cancellations bc ON (o.cancellation_id = bc.id OR o.id = bc.booking_id)
+                    LEFT JOIN booking_cancellations bc ON o.id = bc.booking_id
                     ORDER BY o.created_at DESC
                 """)
                 rows = cursor.fetchall() or []
@@ -9569,14 +9586,39 @@ def admin_payments_list(current_admin: dict = Depends(check_admin_user)):
         try:
             with conn.cursor() as cursor:
                 cursor.execute("""
-                    SELECT o.id AS booking_id, o.user_email, o.total AS amount, o.payment_status, o.razorpay_payment_id,
-                           o.razorpay_order_id, o.created_at, o.refund_status,
-                           u.full_name AS customer_name
-                    FROM orders o
-                    LEFT JOIN users u ON o.user_email = u.email
-                    ORDER BY o.created_at DESC
+                    SELECT p.id, p.booking_id, p.customer_id, 
+                           COALESCE(p.customer_name, u.full_name, 'Customer') as customer_name, 
+                           p.amount, p.status, p.method, p.invoice_url, p.created_at
+                    FROM payments p
+                    LEFT JOIN users u ON p.customer_id = u.email
+                    ORDER BY p.created_at DESC
                 """)
                 rows = cursor.fetchall() or []
+                if not rows:
+                    cursor.execute("""
+                        SELECT o.id AS booking_id, o.user_email, o.total AS amount, o.payment_status, o.razorpay_payment_id,
+                               o.razorpay_order_id, o.created_at, o.refund_status,
+                               u.full_name AS customer_name
+                        FROM orders o
+                        LEFT JOIN users u ON o.user_email = u.email
+                        ORDER BY o.created_at DESC
+                    """)
+                    fallback_orders = cursor.fetchall() or []
+                    for r in fallback_orders:
+                        st = r.get("payment_status") or "successful"
+                        if r.get("refund_status") == "refunded":
+                            st = "refunded"
+                        rows.append({
+                            "id": r.get("razorpay_payment_id") or f"pay-{r['booking_id']}",
+                            "booking_id": r["booking_id"],
+                            "customer_id": r["user_email"],
+                            "customer_name": r.get("customer_name") or (r["user_email"].split("@")[0] if r.get("user_email") else "Customer"),
+                            "amount": r["amount"],
+                            "status": st,
+                            "method": "Razorpay (UPI / Card)",
+                            "invoice_url": "#",
+                            "created_at": r["created_at"]
+                        })
         except Exception as e:
             logger.warning(f"Error fetching admin payments from DB: {e}")
         finally:
@@ -9590,19 +9632,16 @@ def admin_payments_list(current_admin: dict = Depends(check_admin_user)):
         
     res = []
     for r in rows:
-        st = r.get("payment_status") or "successful"
-        if r.get("refund_status") == "refunded":
-            st = "refunded"
         res.append({
-            "id": r.get("razorpay_payment_id") or f"pay-{r['booking_id']}",
-            "bookingId": r["booking_id"],
-            "customerId": r["user_email"],
-            "customerName": r.get("customer_name") or (r["user_email"].split("@")[0] if r.get("user_email") else "Customer"),
-            "amount": r["amount"],
-            "status": st,
-            "method": "Razorpay (UPI / Card)",
-            "invoiceUrl": "#",
-            "createdAt": r["created_at"]
+            "id": r.get("id"),
+            "bookingId": r.get("booking_id") or "",
+            "customerId": r.get("customer_id") or "",
+            "customerName": r.get("customer_name") or "Customer",
+            "amount": float(r.get("amount") or 0),
+            "status": r.get("status") or "successful",
+            "method": r.get("method") or "UPI / Card",
+            "invoiceUrl": r.get("invoice_url") or "#",
+            "createdAt": r.get("created_at") or ""
         })
     return res
 

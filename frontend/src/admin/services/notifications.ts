@@ -18,11 +18,13 @@ export interface DashboardStats {
   suspendedProducts?: number;
   totalCategories: number;
   bookingsToday: number;
+  todayBookings?: number;
   monthlyBookings: number;
   activeBookings?: number;
   completedBookings?: number;
   revenueToday: number;
   monthlyRevenue: number;
+  totalRevenue?: number;
   pendingUsers?: number;
   pendingWithdrawals?: number;
   pendingReports: number;
@@ -233,6 +235,10 @@ export const notificationsService = {
       return response.data;
     }
     return [];
+  },
+
+  async getRecentActivity(): Promise<DashboardActivity[]> {
+    return this.getDashboardActivities();
   },
 
   async getDashboardFunnel(period = 30): Promise<DashboardFunnel> {
