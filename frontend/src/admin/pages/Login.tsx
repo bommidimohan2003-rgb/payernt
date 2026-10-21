@@ -286,6 +286,36 @@ export default function Login() {
                   </>
                 )}
               </button>
+
+              {/* Quick Demo Sign-in Option */}
+              <div className="pt-2 border-t border-border/40">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const defaultUser = {
+                      id: "admin_payent_current",
+                      fullName: "Bommidi Mohan",
+                      email: "bommidimohan2003@gmail.com",
+                      phone: "+91 8810519885",
+                      role: "admin",
+                      status: "active",
+                      verified: true,
+                      avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+                      createdAt: new Date().toISOString(),
+                    };
+                    localStorage.removeItem("payent:admin:logged_out");
+                    localStorage.setItem("payent:admin:token", "dev_admin_session_token");
+                    localStorage.setItem("payent:admin:current_user", JSON.stringify(defaultUser));
+                    window.dispatchEvent(new Event("payent:admin:profile-updated"));
+                    toast.success("Signed in as Administrator (Bommidi Mohan)");
+                    navigate({ to: "/admin/dashboard" });
+                  }}
+                  className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 text-blue-500 dark:text-blue-400 text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-98"
+                >
+                  <ShieldCheck className="h-4 w-4" />
+                  <span>Sign In as Administrator (Bommidi Mohan)</span>
+                </button>
+              </div>
             </form>
           )}
 

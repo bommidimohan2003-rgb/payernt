@@ -105,7 +105,6 @@ export default function Profile() {
 
   const handleLogout = async () => {
     await authService.logout();
-    navigate({ to: "/" });
   };
 
   if (loading && !profile) {

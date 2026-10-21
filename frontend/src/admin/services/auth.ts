@@ -62,16 +62,14 @@ export const authService = {
 
   async logout(): Promise<void> {
     try {
-      await adminApi.post("/auth/logout");
-    } catch (err) {
-      console.warn("Logout endpoint notice:", err);
-    }
+      await adminApi.post("/auth/logout").catch(() => {});
+    } catch {}
     if (typeof window !== "undefined") {
       localStorage.removeItem("payent:admin:token");
       localStorage.removeItem("payent:admin:current_user");
       localStorage.setItem("payent:admin:logged_out", "true");
       window.dispatchEvent(new Event("payent:admin:profile-updated"));
-      window.location.href = "/login";
+      window.location.replace("/admin/login");
     }
   },
 

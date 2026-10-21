@@ -77,21 +77,35 @@ function AdminPageTransitionOutlet() {
 
 function AdminLayout() {
   const navigate = useNavigate();
+  const currentPath = useRouterState({ select: (s) => s.location.pathname });
+  const isLoginPage = currentPath === "/admin/login" || currentPath === "/admin/login/";
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!isLoginPage);
   const [isDenied, setIsDenied] = useState(false);
 
   useEffect(() => {
-    import("@/admin/services/auth").then(({ authService }) => {
+    let isMounted = true;
+
+    const checkAuth = async () => {
+      const { authService } = await import("@/admin/services/auth");
       const loggedIn = authService.isAuthenticated();
       const currentUser = authService.getCurrentUser();
+
+      if (!isMounted) return;
+
+      if (isLoginPage) {
+        if (loggedIn) {
+          navigate({ to: "/admin/dashboard" });
+        }
+        setLoading(false);
+        return;
+      }
 
       if (!loggedIn) {
         setIsAuthenticated(false);
         setLoading(false);
         navigate({
-          to: "/login",
-          search: { redirect: "/admin/dashboard" } as any,
+          to: "/admin/login",
         });
         return;
       }
@@ -106,8 +120,23 @@ function AdminLayout() {
       }
 
       setLoading(false);
-    });
-  }, [navigate]);
+    };
+
+    checkAuth();
+
+    const handleProfileUpdate = () => {
+      checkAuth();
+    };
+    window.addEventListener("payent:admin:profile-updated", handleProfileUpdate);
+    return () => {
+      isMounted = false;
+      window.removeEventListener("payent:admin:profile-updated", handleProfileUpdate);
+    };
+  }, [navigate, isLoginPage]);
+
+  if (isLoginPage) {
+    return <Outlet />;
+  }
 
   if (loading) {
     return (

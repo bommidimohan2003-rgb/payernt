@@ -122,7 +122,6 @@ export function Sidebar() {
 
   const handleLogout = async () => {
     await authService.logout();
-    navigate({ to: "/" });
   };
 
   const getBadgeValue = (key?: string) => {

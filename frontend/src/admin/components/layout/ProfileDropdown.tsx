@@ -31,9 +31,8 @@ export function ProfileDropdown() {
 
   const handleLogout = async () => {
     try {
-      await authService.logout();
       setIsOpen(false);
-      navigate({ to: "/" });
+      await authService.logout();
     } catch (err) {
       console.error("Logout failed:", err);
     }
