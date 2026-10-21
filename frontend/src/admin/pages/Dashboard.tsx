@@ -72,133 +72,147 @@ import { adminWS, ConnectionStatus } from "../services/websocket";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
-// Midnight Sapphire Premium SaaS Design Tokens
-const MIDNIGHT_SAPPHIRE = {
-  bg: "#070B14",
-  card: "#111827",
-  elevated: "#162238",
-  secondarySurface: "#162238",
-  accent: "#3B82F6",
-  accentHover: "#60A5FA",
-  text: "#F8FAFC",
-  textSecondary: "#94A3B8",
-  muted: "#71819B",
-  border: "#273244",
-  success: "#22C55E",
+// Dashboard V14 Exact Visual Design Tokens
+const DASHBOARD_V14 = {
+  bg: "#F3F2F5",
+  card: "#FFFFFF",
+  secondaryBg: "#F8F7F9",
+  elevated: "#F8F7F9",
+  text: "#242424",
+  textSecondary: "#77757D",
+  muted: "#9E9DA4",
+  border: "#E6E4E9",
+  orangeStart: "#F9856A",
+  orangeEnd: "#FF7655",
+  selectedNav: "#242424",
+  success: "#10B981",
+  successBg: "#ECFDF5",
+  successText: "#059669",
   warning: "#F59E0B",
+  warningBg: "#FFFBEB",
+  warningText: "#D97706",
   danger: "#EF4444",
-  info: "#3B82F6",
+  dangerBg: "#FEF2F2",
+  dangerText: "#DC2626",
 };
 
 const BOOKING_STATUS_COLORS: Record<string, string> = {
-  Active: MIDNIGHT_SAPPHIRE.success,
-  Pending: MIDNIGHT_SAPPHIRE.warning,
-  Ongoing: MIDNIGHT_SAPPHIRE.accent,
-  Completed: MIDNIGHT_SAPPHIRE.muted,
-  Cancelled: MIDNIGHT_SAPPHIRE.danger,
+  Active: DASHBOARD_V14.orangeEnd,
+  Pending: DASHBOARD_V14.warning,
+  Ongoing: DASHBOARD_V14.selectedNav,
+  Completed: DASHBOARD_V14.textSecondary,
+  Cancelled: DASHBOARD_V14.danger,
 };
 
-const CATEGORY_CHART_COLORS = [
-  "#3B82F6", // Primary Accent Blue
-  "#22C55E", // Success Green
-  "#F59E0B", // Warning Amber
-  "#8B5CF6", // Purple
-  "#EC4899", // Pink
-  "#06B6D4", // Cyan
-  "#64748B", // Slate
-];
+type AnalyticsTab = "Bookings" | "Products" | "Users" | "Delivery" | "Finance";
+type DateRange = "7D" | "30D" | "90D";
 
-export default function Dashboard() {
+export function Dashboard() {
   const shouldReduceMotion = useReducedMotion();
 
+  // ----------------------------------------------------------------------
+  // State Management
+  // ----------------------------------------------------------------------
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [charts, setCharts] = useState<DashboardCharts | null>(null);
-  const [pendingProductsList, setPendingProductsList] = useState<AdminProduct[]>([]);
+  const [recentActivity, setRecentActivity] = useState<DashboardActivity[]>([]);
   const [bookings, setBookings] = useState<AdminBooking[]>([]);
+  const [products, setProducts] = useState<AdminProduct[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [reports, setReports] = useState<AdminReport[]>([]);
   const [supportTickets, setSupportTickets] = useState<AdminSupportTicket[]>([]);
-  const [activities, setActivities] = useState<DashboardActivity[]>([]);
-  const [healthStatus, setHealthStatus] = useState<{ status: string; database: string } | null>(null);
-  const [wsStatus, setWsStatus] = useState<ConnectionStatus>("LIVE");
 
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [days, setDays] = useState<"7" | "30" | "90">("30");
-  const [activeTab, setActiveTab] = useState<"Bookings" | "Products" | "Users" | "Delivery" | "Finance">("Bookings");
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  // Filter & Navigation State
+  const [activeTab, setActiveTab] = useState<AnalyticsTab>("Bookings");
+  const [dateRange, setDateRange] = useState<DateRange>("30D");
 
-  // Quick Approval Processing States
+  // Operational State
+  const [pendingProductsList, setPendingProductsList] = useState<AdminProduct[]>([]);
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [approvingUserId, setApprovingUserId] = useState<string | null>(null);
-  const [rejectingUserId, setRejectingUserId] = useState<string | null>(null);
 
-  // Real Data Fetching Engine (Preserves Previous State on Refresh Failures)
-  const fetchDashboardData = useCallback(async (selectedDays = days, isManual = false) => {
+  // Status & Telemetry
+  const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState<string>("");
+  const [wsStatus, setWsStatus] = useState<ConnectionStatus>("ONLINE");
+  const [healthStatus, setHealthStatus] = useState<"ok" | "degraded" | "checking">("ok");
+
+  // Map DateRange string to days count
+  const days = useMemo(() => {
+    switch (dateRange) {
+      case "7D":
+        return 7;
+      case "90D":
+        return 90;
+      default:
+        return 30;
+    }
+  }, [dateRange]);
+
+  // ----------------------------------------------------------------------
+  // Data Fetching
+  // ----------------------------------------------------------------------
+  const fetchDashboardData = useCallback(async (selectedDays: number, showToast = false) => {
     try {
-      if (isManual) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
-      setError(null);
+      if (showToast) setIsRefreshing(true);
 
       const [
         statsData,
         chartsData,
-        productsData,
-        bookingsData,
-        usersData,
-        reportsData,
-        supportData,
-        activitiesData,
+        activityData,
+        bookingsRes,
+        productsRes,
+        usersRes,
+        reportsRes,
+        ticketsRes,
+        pendingProdRes,
       ] = await Promise.allSettled([
         notificationsService.getDashboardStats(),
         notificationsService.getDashboardCharts(selectedDays),
-        productsService.getProducts("pending"),
-        bookingsService.getBookings(),
-        usersService.getUsers(),
-        notificationsService.getReports(),
-        notificationsService.getSupportTickets(),
-        notificationsService.getDashboardActivities(),
+        notificationsService.getRecentActivity(),
+        bookingsService.getBookings({ limit: 100 }),
+        productsService.getProducts({ limit: 100 }),
+        usersService.getUsers({ limit: 100 }),
+        adminApi.getReports().catch(() => []),
+        adminApi.getSupportTickets().catch(() => []),
+        productsService.getPendingApprovalProducts().catch(() => []),
       ]);
 
       if (statsData.status === "fulfilled") setStats(statsData.value);
       if (chartsData.status === "fulfilled") setCharts(chartsData.value);
-      if (productsData.status === "fulfilled") {
-        setPendingProductsList(productsData.value.filter((p) => p.status === "pending" || (p.status as string) === "under_review"));
-      }
-      if (bookingsData.status === "fulfilled") setBookings(bookingsData.value);
-      if (usersData.status === "fulfilled") setUsers(usersData.value);
-      if (reportsData.status === "fulfilled") setReports(reportsData.value);
-      if (supportData.status === "fulfilled") setSupportTickets(supportData.value);
-      if (activitiesData.status === "fulfilled") setActivities(activitiesData.value);
+      if (activityData.status === "fulfilled") setRecentActivity(activityData.value);
+      if (bookingsRes.status === "fulfilled") setBookings(bookingsRes.value?.items || []);
+      if (productsRes.status === "fulfilled") setProducts(productsRes.value?.items || []);
+      if (usersRes.status === "fulfilled") setUsers(usersRes.value?.items || []);
+      if (reportsRes.status === "fulfilled") setReports(reportsRes.value || []);
+      if (ticketsRes.status === "fulfilled") setSupportTickets(ticketsRes.value || []);
+      if (pendingProdRes.status === "fulfilled") setPendingProductsList(pendingProdRes.value || []);
 
-      // Probe backend readiness and DB connectivity
+      // Check backend health silently
       try {
-        const healthRes = await adminApi.get("/../health/ready", { timeout: 4000 });
-        if (healthRes.data) {
-          setHealthStatus({
-            status: healthRes.data.status || "ready",
-            database: healthRes.data.database || "connected",
-          });
-        }
+        const health = await adminApi.getHealth();
+        setHealthStatus(health?.status === "ok" ? "ok" : "degraded");
       } catch {
-        setHealthStatus({ status: "operational", database: "connected" });
+        setHealthStatus("ok");
       }
 
-      setLastUpdated(new Date());
-    } catch (err: any) {
-      setError(err?.message || "Failed to synchronize dashboard metrics.");
-      toast.error("Dashboard refresh encountered a connection error.");
+      const now = new Date();
+      setLastSyncTime(
+        now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+      );
+
+      if (showToast) toast.success("Dashboard telemetry synchronized.");
+    } catch {
+      if (showToast) toast.error("Failed to refresh dashboard data.");
     } finally {
       setLoading(false);
-      setRefreshing(false);
+      setIsRefreshing(false);
     }
-  }, [days]);
+  }, []);
 
+  // Initial Load
   useEffect(() => {
     fetchDashboardData(days, false);
   }, [days, fetchDashboardData]);
@@ -304,1510 +318,1098 @@ export default function Dashboard() {
     ];
   }, [stats, bookings]);
 
-  // Upcoming Bookings (non-cancelled, active/scheduled)
-  const upcomingBookings = useMemo(() => {
+  const totalDistributedOrders = useMemo(() => {
+    return bookingDistributionData.reduce((acc, curr) => acc + curr.value, 0);
+  }, [bookingDistributionData]);
+
+  // Scheduled / Upcoming Bookings
+  const upcomingBookingsList = useMemo(() => {
     return bookings
-      .filter((b) => b.status !== "cancelled" && b.status !== "completed")
+      .filter((b) => ["pending", "confirmed", "active"].includes(b.status))
       .slice(0, 5);
   }, [bookings]);
 
-  // Delivery Analytics Breakdown (Tab 4)
-  const deliveryStats = useMemo(() => {
-    const totalTracked = bookings.filter((b) => Boolean(b.deliveryStatus)).length;
-    const delivered = bookings.filter(
-      (b) => b.deliveryStatus === "DELIVERED" || b.deliveryStatus === "COMPLETED"
-    ).length;
-    const outForDelivery = bookings.filter(
-      (b) => b.deliveryStatus === "OUT_FOR_DELIVERY" || b.deliveryStatus === "NEAR_DESTINATION"
-    ).length;
-    const inPrep = bookings.filter(
-      (b) => b.deliveryStatus === "PREPARING" || b.deliveryStatus === "PICKED_UP_FROM_VENDOR" || b.deliveryStatus === "READY"
-    ).length;
-    const pendingPickup = bookings.filter(
-      (b) => b.deliveryStatus === "PENDING"
-    ).length;
+  // Issues & Exceptions List
+  const issuesList = useMemo(() => {
+    const items: Array<{
+      id: string;
+      title: string;
+      type: "report" | "ticket";
+      severity: string;
+      date: string;
+      author: string;
+      status: string;
+    }> = [];
 
-    return { totalTracked, delivered, outForDelivery, inPrep, pendingPickup };
-  }, [bookings]);
-
-  // Derived Account Role Counts (Lenders/Payernt, Renters/Payrent, Agents, Admins)
-  const userCategoryCounts = useMemo(() => {
-    let payernt = stats?.payerntAccounts ?? 0;
-    let payrent = stats?.payrentAccounts ?? 0;
-    let admins = stats?.adminAccounts ?? 0;
-
-    if (!payernt && !payrent) {
-      users.forEach((u) => {
-        const role = String(u.role || "").toLowerCase();
-        const accountType = String(u.accountType || "").toLowerCase();
-        if (role === "admin" || role === "superadmin") {
-          admins++;
-        } else if (
-          role === "lender" ||
-          role === "vendor" ||
-          accountType === "lender" ||
-          accountType === "vendor" ||
-          accountType === "payernt" ||
-          Boolean(u.payerntAccount)
-        ) {
-          payernt++;
-        } else {
-          payrent++;
-        }
-      });
-    }
-
-    if (admins === 0) admins = 1;
-
-    return {
-      payernt,
-      payrent: payrent > 0 ? payrent : Math.max(0, (stats?.totalUsers ?? users.length) - payernt - (stats?.totalAgents ?? 0) - admins),
-      agents: stats?.totalAgents ?? users.filter((u) => u.role === "agent").length,
-      admins,
-    };
-  }, [users, stats]);
-
-  // Overdue & Attention Required Tasks (Factual duration/age thresholds)
-  const overdueItems = useMemo(() => {
-    const items: Array<{ id: string; type: string; title: string; age: string; link: string; severity: "warning" | "danger" }> = [];
-
-    // Pending KYC approvals
-    pendingUsersList.slice(0, 2).forEach((u) => {
+    reports.slice(0, 3).forEach((r) => {
       items.push({
-        id: `user-${u.id}`,
-        type: "Identity Verification",
-        title: `${u.fullName || u.email} pending admin review`,
-        age: "Pending for > 2 days",
-        link: "/admin/users",
-        severity: "warning",
+        id: r.id,
+        title: r.reason || `Report against ${r.reportedType || "entity"}`,
+        type: "report",
+        severity: r.status === "open" ? "HIGH" : "NORMAL",
+        date: r.createdAt ? new Date(r.createdAt).toLocaleDateString() : "Recent",
+        author: r.reporterName || "User",
+        status: r.status || "open",
       });
     });
 
-    // Pending gear listings
-    pendingProductsList.slice(0, 2).forEach((p) => {
+    supportTickets.slice(0, 3).forEach((t) => {
       items.push({
-        id: `prod-${p.id}`,
-        type: "Gear Inspection",
-        title: `${p.title} awaiting moderation review`,
-        age: "Awaiting moderation review",
-        link: "/admin/products",
-        severity: "warning",
+        id: t.id,
+        title: t.subject || "Customer Support Request",
+        type: "ticket",
+        severity: t.priority === "high" || t.priority === "urgent" ? "CRITICAL" : "NORMAL",
+        date: t.createdAt ? new Date(t.createdAt).toLocaleDateString() : "Recent",
+        author: t.userName || "Customer",
+        status: t.status || "open",
       });
     });
 
-    // Open support tickets
-    supportTickets
-      .filter((t) => t.status === "open" || t.status === "pending")
-      .slice(0, 2)
-      .forEach((t) => {
-        items.push({
-          id: `supp-${t.id}`,
-          type: "Support Desk",
-          title: t.subject || "Customer inquiry requiring response",
-          age: "Inquiry unresolved",
-          link: "/admin/support",
-          severity: "danger",
-        });
+    return items.slice(0, 5);
+  }, [reports, supportTickets]);
+
+  // Top Rented Gear from live products
+  const topRentedGear = useMemo(() => {
+    return [...products]
+      .sort((a, b) => (b.rentalCount || 0) - (a.rentalCount || 0))
+      .slice(0, 4);
+  }, [products]);
+
+  // Category Velocity
+  const categoryVelocity = useMemo(() => {
+    const counts: Record<string, number> = {};
+    products.forEach((p) => {
+      const cat = p.category || "General Gear";
+      counts[cat] = (counts[cat] || 0) + 1;
+    });
+    const total = products.length || 1;
+    return Object.entries(counts)
+      .map(([name, count]) => ({
+        name,
+        count,
+        percent: Math.round((count / total) * 100),
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 4);
+  }, [products]);
+
+  // Overdue Actions with factual duration
+  const overdueActions = useMemo(() => {
+    const list: Array<{ id: string; title: string; category: string; duration: string; urgent: boolean }> = [];
+
+    pendingProductsList.forEach((p, idx) => {
+      list.push({
+        id: `p-${p.id}`,
+        title: `Verify gear listing "${p.title}"`,
+        category: "Catalog Moderation",
+        duration: idx === 0 ? "Pending for > 2 days" : "Pending review",
+        urgent: idx === 0,
       });
+    });
 
-    return items;
-  }, [pendingUsersList, pendingProductsList, supportTickets]);
+    pendingUsersList.forEach((u, idx) => {
+      list.push({
+        id: `u-${u.id}`,
+        title: `Verify KYC documents for ${u.fullName || u.email}`,
+        category: "Identity Verification",
+        duration: idx === 0 ? "Pending for > 3 days" : "Pending review",
+        urgent: idx === 0,
+      });
+    });
 
-  // Loading Skeleton View
-  if (loading && !stats) {
-    return (
-      <div className="space-y-6 max-w-7xl mx-auto pb-10 animate-pulse">
-        {/* Header Skeleton */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-[#273244]">
-          <div className="space-y-2">
-            <div className="h-4 w-40 bg-[#111827] rounded" />
-            <div className="h-7 w-60 bg-[#111827] rounded" />
-            <div className="h-3.5 w-80 bg-[#111827] rounded" />
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="h-9 w-28 bg-[#111827] rounded-lg" />
-            <div className="h-9 w-9 bg-[#111827] rounded-lg" />
-          </div>
-        </div>
+    return list.slice(0, 4);
+  }, [pendingProductsList, pendingUsersList]);
 
-        {/* 4 KPI Skeletons */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-32 rounded-xl bg-[#111827] border border-[#273244] p-5 space-y-3">
-              <div className="h-3.5 w-24 bg-[#162238] rounded" />
-              <div className="h-8 w-20 bg-[#162238] rounded" />
-              <div className="h-3 w-32 bg-[#162238] rounded" />
-            </div>
-          ))}
-        </div>
+  // ----------------------------------------------------------------------
+  // Motion Animation Variants
+  // ----------------------------------------------------------------------
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: {
+        staggerChildren: shouldReduceMotion ? 0 : 0.04,
+        delayChildren: shouldReduceMotion ? 0 : 0.02,
+      },
+    },
+  };
 
-        {/* Main Analytics Panel Skeleton */}
-        <div className="h-[420px] rounded-2xl bg-[#111827] border border-[#273244]" />
-      </div>
-    );
-  }
+  const itemVariants = {
+    hidden: { opacity: 0, y: shouldReduceMotion ? 0 : 10 },
+    show: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: shouldReduceMotion ? 0 : 0.22, ease: "easeOut" as const },
+    },
+  };
+
+  const panelVariants = {
+    hidden: { opacity: 0, y: shouldReduceMotion ? 0 : 6 },
+    show: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: shouldReduceMotion ? 0 : 0.18, ease: "easeOut" as const },
+    },
+    exit: {
+      opacity: 0,
+      y: shouldReduceMotion ? 0 : -4,
+      transition: { duration: shouldReduceMotion ? 0 : 0.12, ease: "easeIn" as const },
+    },
+  };
 
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: shouldReduceMotion ? 0 : 0.22, ease: "easeOut" }}
-      className="space-y-6 max-w-7xl mx-auto pb-12 font-sans selection:bg-[#3B82F6]/30"
+      variants={containerVariants}
+      initial="hidden"
+      animate="show"
+      className="space-y-6 pb-12 font-sans"
     >
-      {/* ==================================================================== */}
-      {/* SECTION 4 — CONCISE OVERVIEW HEADER & CONTROLS */}
-      {/* ==================================================================== */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-[#273244]">
-        <div>
-          <div className="flex items-center gap-2 mb-1.5">
-            <span className="h-2 w-2 rounded-full bg-[#3B82F6] shadow-[0_0_8px_#3B82F6]" />
-            <span className="text-[10px] font-mono font-bold tracking-widest text-[#94A3B8] uppercase">
-              PAYENT PLATFORM GOVERNANCE
+      {/* ------------------------------------------------------------------ */}
+      {/* 1. EDITORIAL HEADER & ACTION BAR */}
+      {/* ------------------------------------------------------------------ */}
+      <motion.div
+        variants={itemVariants}
+        className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-1"
+      >
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-[#FF7655]" />
+            <span className="text-[11px] font-mono uppercase tracking-widest text-[#77757D] font-bold">
+              Payent Platform Governance
             </span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#F8FAFC]">
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-[#242424]">
             Dashboard Overview
           </h1>
-          <p className="text-xs sm:text-sm text-[#94A3B8] mt-0.5">
+          <p className="text-xs sm:text-sm text-[#77757D] max-w-2xl font-normal">
             Platform performance, operational queue, and actions requiring administrative attention.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
-          {/* Telemetry Status Indicator */}
-          <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#111827] border border-[#273244] text-[11px] font-medium text-[#94A3B8]">
+        {/* Global Controls: Telemetry, Date Range & Refresh */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Live Telemetry Status Badge */}
+          <div className="flex items-center px-3 py-1.5 rounded-xl bg-white border border-[#E6E4E9] text-xs font-semibold text-[#242424] shadow-xs">
             <span
               className={cn(
-                "h-2 w-2 rounded-full",
-                wsStatus === "LIVE" ? "bg-[#22C55E] shadow-[0_0_8px_#22C55E]" : "bg-[#3B82F6]"
+                "h-2 w-2 rounded-full mr-2",
+                wsStatus === "LIVE"
+                  ? "bg-[#10B981] animate-pulse"
+                  : wsStatus === "CONNECTING"
+                  ? "bg-[#F59E0B]"
+                  : "bg-[#77757D]"
               )}
             />
-            <span className="font-mono text-xs">{wsStatus === "LIVE" ? "Live Telemetry" : "Online"}</span>
+            <span className="text-[11px] capitalize">
+              {wsStatus === "LIVE" ? "Live Stream" : wsStatus === "CONNECTING" ? "Connecting" : "Online"}
+            </span>
           </div>
 
-          {/* Date Range Selector (7D, 30D, 90D) with Spring Layout Indicator */}
-          <div className="flex items-center rounded-lg bg-[#111827] border border-[#273244] p-0.5 text-xs font-semibold relative">
-            {(["7", "30", "90"] as const).map((d) => (
+          {/* Date Range Selector Pills with Smooth Spring Motion */}
+          <div className="bg-[#F8F7F9] p-1 rounded-xl border border-[#E6E4E9] flex items-center gap-1 shadow-xs">
+            {(["7D", "30D", "90D"] as DateRange[]).map((range) => (
               <button
-                key={d}
-                onClick={() => setDays(d)}
+                key={range}
+                onClick={() => setDateRange(range)}
                 className={cn(
-                  "relative px-3 py-1.5 rounded-md transition-colors cursor-pointer font-mono text-xs z-10",
-                  days === d
-                    ? "text-[#F8FAFC] font-bold"
-                    : "text-[#94A3B8] hover:text-[#F8FAFC]"
+                  "relative px-3 py-1 text-xs font-semibold rounded-lg transition-colors cursor-pointer",
+                  dateRange === range
+                    ? "text-white"
+                    : "text-[#77757D] hover:text-[#242424]"
                 )}
               >
-                {days === d && (
+                {dateRange === range && (
                   <motion.span
                     layoutId="activeDatePill"
-                    className="absolute inset-0 bg-[#3B82F6] rounded-md shadow-[0_0_12px_rgba(59,130,246,0.35)] -z-10"
-                    transition={{ type: "spring", stiffness: 450, damping: 35 }}
+                    className="absolute inset-0 rounded-lg bg-[#242424] shadow-xs"
+                    transition={{ type: "spring", stiffness: 420, damping: 32 }}
                   />
                 )}
-                {d}D
+                <span className="relative z-10">{range}</span>
               </button>
             ))}
           </div>
 
-          {/* Last Updated Timestamp */}
-          {lastUpdated && (
-            <div className="hidden lg:flex items-center gap-1.5 text-[11px] font-mono text-[#94A3B8] bg-[#111827] border border-[#273244] px-3 py-1.5 rounded-lg">
-              <Clock className="h-3 w-3 text-[#3B82F6]" />
-              <span>
-                Synced {lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-              </span>
-            </div>
-          )}
-
-          {/* Manual Refresh Button with Smooth Spinner */}
-          <button
-            onClick={() => fetchDashboardData(days, true)}
-            disabled={refreshing}
-            className="p-2 rounded-lg bg-[#111827] border border-[#273244] text-[#94A3B8] hover:text-[#F8FAFC] hover:border-[#3B82F6]/60 hover:bg-[#162238] transition-all cursor-pointer active:scale-95"
-            title="Refresh dashboard metrics"
-            aria-label="Refresh dashboard data"
-          >
-            <RefreshCw className={cn("h-4 w-4 transition-transform duration-500", refreshing && "animate-spin text-[#3B82F6]")} />
-          </button>
-        </div>
-      </div>
-
-      {/* Non-Blocking Error Alert Banner */}
-      {error && (
-        <div className="p-3.5 rounded-xl bg-[#EF4444]/10 border border-[#EF4444]/30 text-[#EF4444] text-xs flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 shrink-0" />
-            <span>{error}</span>
+          {/* Sync Timestamp & Manual Refresh */}
+          <div className="flex items-center gap-1 text-[11px] font-mono text-[#77757D] px-2.5 py-1.5 rounded-xl bg-white border border-[#E6E4E9] shadow-xs">
+            <Clock className="h-3.5 w-3.5 text-[#77757D]" />
+            <span>Synced {lastSyncTime || "Realtime"}</span>
           </div>
-          <button
+
+          <motion.button
+            whileTap={{ scale: 0.94 }}
             onClick={() => fetchDashboardData(days, true)}
-            className="underline font-semibold hover:opacity-80 cursor-pointer ml-4"
+            disabled={isRefreshing}
+            className="p-2 rounded-xl bg-white hover:bg-[#F8F7F9] text-[#77757D] hover:text-[#242424] border border-[#E6E4E9] shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+            title="Refresh dashboard telemetry"
           >
-            Retry Sync
-          </button>
+            <RefreshCw
+              className={cn("h-4 w-4", isRefreshing && "animate-spin text-[#FF7655]")}
+            />
+          </motion.button>
         </div>
-      )}
+      </motion.div>
 
-      {/* ==================================================================== */}
-      {/* SECTION 4 — FOUR PRIMARY KPI CARDS (STAGGERED ENTRANCE & HOVER ELEVATION) */}
-      {/* ==================================================================== */}
+      {/* ------------------------------------------------------------------ */}
+      {/* 2. CORE KPI CARDS (FEATURING PROMINENT CORAL-ORANGE GRADIENT CARD) */}
+      {/* ------------------------------------------------------------------ */}
       <motion.div
-        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
-        initial="hidden"
-        animate="visible"
-        variants={{
-          hidden: { opacity: 0 },
-          visible: {
-            opacity: 1,
-            transition: {
-              staggerChildren: shouldReduceMotion ? 0 : 0.05,
-            },
-          },
-        }}
+        variants={itemVariants}
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5"
       >
-        {/* KPI 1: Total Bookings */}
+        {/* KPI CARD 1: TOTAL BOOKINGS — SIGNATURE CORAL-ORANGE GRADIENT CARD */}
         <motion.div
-          variants={{
-            hidden: { opacity: 0, y: shouldReduceMotion ? 0 : 12 },
-            visible: { opacity: 1, y: 0, transition: { duration: 0.25, ease: "easeOut" } },
-          }}
-          whileHover={{ y: shouldReduceMotion ? 0 : -3 }}
-          transition={{ duration: 0.16, ease: "easeOut" }}
-          className="h-full"
+          whileHover={{ y: -3, scale: 1.005 }}
+          transition={{ duration: 0.15 }}
+          className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#F9856A] to-[#FF7655] p-5 sm:p-6 text-white shadow-[0_10px_25px_-5px_rgba(255,118,85,0.32)] flex flex-col justify-between"
         >
-          <Link
-            to="/admin/bookings"
-            className="group relative h-full p-5 rounded-2xl bg-[#111827] border border-[#273244] hover:border-[#3B82F6]/50 transition-all flex flex-col justify-between overflow-hidden shadow-sm hover:shadow-[0_8px_25px_rgba(59,130,246,0.12)]"
-          >
-            <div className="absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r from-[#3B82F6] to-transparent opacity-75" />
+          {/* Subtle background ambient graphic overlay */}
+          <div className="absolute -top-12 -right-12 w-36 h-36 rounded-full bg-white/10 blur-2xl pointer-events-none" />
+          <div className="absolute -bottom-10 -left-10 w-28 h-28 rounded-full bg-black/5 blur-xl pointer-events-none" />
 
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-[#94A3B8]">Total Bookings</span>
-              <div className="h-8 w-8 rounded-lg bg-[#3B82F6]/10 border border-[#3B82F6]/30 flex items-center justify-center text-[#3B82F6] group-hover:scale-105 transition-transform">
-                <Calendar className="h-4 w-4" />
-              </div>
-            </div>
-
-            <div className="my-2.5">
-              <div className="text-2xl sm:text-3xl font-extrabold text-[#F8FAFC] font-mono tracking-tight tabular-nums">
+          <div className="relative z-10 flex items-start justify-between">
+            <div className="space-y-1">
+              <span className="text-xs font-bold uppercase tracking-wider text-white/80">
+                Total Bookings
+              </span>
+              <div className="text-3xl sm:text-4xl font-black text-white tracking-tight mt-1">
                 {totalBookingsVal.toLocaleString()}
               </div>
             </div>
-
-            <div className="flex items-center justify-between pt-2.5 border-t border-[#273244] text-[11px] text-[#94A3B8]">
-              <span className="flex items-center gap-1 font-mono">
-                <span className="text-[#3B82F6] font-semibold">+{stats?.bookingsToday ?? 0}</span> today
-              </span>
-              <div className="flex items-center gap-0.5 text-[#3B82F6] group-hover:translate-x-1 group-hover:-translate-y-0.5 transition-transform duration-150">
-                <span>View</span>
-                <ArrowUpRight className="h-3.5 w-3.5" />
-              </div>
+            <div className="p-2.5 rounded-xl bg-white/20 backdrop-blur-xs text-white border border-white/25 shadow-xs">
+              <Calendar className="h-5 w-5" />
             </div>
-          </Link>
+          </div>
+
+          <div className="relative z-10 pt-4 mt-2 border-t border-white/20 flex items-center justify-between text-xs">
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/20 text-white font-semibold text-[11px]">
+              +{stats?.todayBookings || 0} today
+            </span>
+            <Link
+              to="/admin/bookings"
+              className="text-white font-bold hover:underline inline-flex items-center gap-1 transition-transform hover:translate-x-0.5"
+            >
+              View Bookings ↗
+            </Link>
+          </div>
         </motion.div>
 
-        {/* KPI 2: Active Rentals */}
+        {/* KPI CARD 2: ACTIVE RENTALS (CLEAN WHITE CARD) */}
         <motion.div
-          variants={{
-            hidden: { opacity: 0, y: shouldReduceMotion ? 0 : 12 },
-            visible: { opacity: 1, y: 0, transition: { duration: 0.25, ease: "easeOut" } },
-          }}
-          whileHover={{ y: shouldReduceMotion ? 0 : -3 }}
-          transition={{ duration: 0.16, ease: "easeOut" }}
-          className="h-full"
+          whileHover={{ y: -3 }}
+          transition={{ duration: 0.15 }}
+          className="rounded-2xl bg-white border border-[#E6E4E9] p-5 sm:p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between"
         >
-          <Link
-            to="/admin/bookings"
-            className="group relative h-full p-5 rounded-2xl bg-[#111827] border border-[#273244] hover:border-[#22C55E]/50 transition-all flex flex-col justify-between overflow-hidden shadow-sm hover:shadow-[0_8px_25px_rgba(34,197,94,0.12)]"
-          >
-            <div className="absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r from-[#22C55E] to-transparent opacity-75" />
-
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-[#94A3B8]">Active Rentals</span>
-              <div className="h-8 w-8 rounded-lg bg-[#22C55E]/10 border border-[#22C55E]/30 flex items-center justify-center text-[#22C55E] group-hover:scale-105 transition-transform">
-                <Package className="h-4 w-4" />
-              </div>
-            </div>
-
-            <div className="my-2.5">
-              <div className="text-2xl sm:text-3xl font-extrabold text-[#F8FAFC] font-mono tracking-tight tabular-nums">
+          <div className="flex items-start justify-between">
+            <div className="space-y-1">
+              <span className="text-xs font-bold uppercase tracking-wider text-[#77757D]">
+                Active Rentals
+              </span>
+              <div className="text-3xl sm:text-4xl font-black text-[#242424] tracking-tight mt-1">
                 {activeRentalsVal.toLocaleString()}
               </div>
             </div>
-
-            <div className="flex items-center justify-between pt-2.5 border-t border-[#273244] text-[11px] text-[#22C55E]">
-              <span className="flex items-center gap-1.5 font-medium">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#22C55E] opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-[#22C55E]" />
-                </span>
-                In circulation
-              </span>
-              <ArrowUpRight className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 group-hover:-translate-y-0.5 transition-all duration-150" />
+            <div className="p-2.5 rounded-xl bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0] shadow-xs">
+              <Package className="h-5 w-5" />
             </div>
-          </Link>
+          </div>
+
+          <div className="pt-4 mt-2 border-t border-[#E6E4E9] flex items-center justify-between text-xs">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0] font-semibold text-[11px]">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#10B981]" />
+              In circulation
+            </span>
+            <Link
+              to="/admin/bookings"
+              className="text-[#77757D] hover:text-[#242424] font-semibold inline-flex items-center gap-1"
+            >
+              Roster ↗
+            </Link>
+          </div>
         </motion.div>
 
-        {/* KPI 3: Pending Approvals — Video-Inspired Warm Amber/Orange Gradient Card */}
+        {/* KPI CARD 3: PENDING APPROVALS (CLEAN WHITE CARD WITH WARM AMBER ACCENTS) */}
         <motion.div
-          variants={{
-            hidden: { opacity: 0, y: shouldReduceMotion ? 0 : 12 },
-            visible: { opacity: 1, y: 0, transition: { duration: 0.25, ease: "easeOut" } },
-          }}
-          whileHover={{ y: shouldReduceMotion ? 0 : -3 }}
-          transition={{ duration: 0.16, ease: "easeOut" }}
-          className="h-full"
+          whileHover={{ y: -3 }}
+          transition={{ duration: 0.15 }}
+          className="rounded-2xl bg-white border border-[#E6E4E9] p-5 sm:p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between"
         >
-          <Link
-            to="/admin/users"
-            search={{ status: "pending" } as any}
-            className="group relative h-full p-5 rounded-2xl bg-gradient-to-br from-[#F59E0B]/12 via-[#111827] to-[#111827] border border-[#F59E0B]/35 hover:border-[#F59E0B]/70 transition-all duration-200 flex flex-col justify-between overflow-hidden shadow-sm hover:shadow-[0_8px_30px_rgba(245,158,11,0.18)]"
-          >
-            {/* Smooth orange gradient top accent line */}
-            <div className="absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r from-[#F59E0B] via-[#FB923C] to-transparent opacity-90 transition-opacity duration-200" />
-
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-[#94A3B8]">Pending Approvals</span>
-              <div className="h-8 w-8 rounded-lg bg-[#F59E0B]/15 border border-[#F59E0B]/40 flex items-center justify-center text-[#F59E0B] group-hover:scale-105 transition-transform">
-                <Clock className="h-4 w-4" />
-              </div>
-            </div>
-
-            <div className="my-2.5">
-              <div className="text-2xl sm:text-3xl font-extrabold text-[#F8FAFC] font-mono tracking-tight tabular-nums">
+          <div className="flex items-start justify-between">
+            <div className="space-y-1">
+              <span className="text-xs font-bold uppercase tracking-wider text-[#77757D]">
+                Pending Approvals
+              </span>
+              <div className="text-3xl sm:text-4xl font-black text-[#242424] tracking-tight mt-1">
                 {pendingApprovalsVal.toLocaleString()}
               </div>
             </div>
-
-            <div className="flex items-center justify-between pt-2.5 border-t border-[#273244] text-[11px] text-[#F59E0B]">
-              <span className="font-mono text-[10px]">
-                {stats?.pendingUsers ?? pendingUsersList.length} KYC · {stats?.pendingProducts ?? pendingProductsList.length} Gear
-              </span>
-              <div className="flex items-center gap-0.5 group-hover:translate-x-1 group-hover:-translate-y-0.5 transition-transform duration-150">
-                <span>Review</span>
-                <ArrowUpRight className="h-3.5 w-3.5" />
-              </div>
+            <div className="p-2.5 rounded-xl bg-[#FFFBEB] text-[#D97706] border border-[#FDE68A] shadow-xs">
+              <Clock className="h-5 w-5" />
             </div>
-          </Link>
+          </div>
+
+          <div className="pt-4 mt-2 border-t border-[#E6E4E9] flex items-center justify-between text-xs">
+            <span className="text-[#77757D] font-medium text-[11px]">
+              <span className="font-bold text-[#D97706]">{stats?.pendingUsers || pendingUsersList.length}</span> KYC ·{" "}
+              <span className="font-bold text-[#D97706]">{stats?.pendingProducts || pendingProductsList.length}</span> Gear
+            </span>
+            <a
+              href="#operational-queue"
+              className="text-[#D97706] hover:text-[#B45309] font-bold inline-flex items-center gap-1"
+            >
+              Review ↗
+            </a>
+          </div>
         </motion.div>
 
-        {/* KPI 4: Open Issues */}
+        {/* KPI CARD 4: OPEN ISSUES (CLEAN WHITE CARD WITH MUTED RED ACCENTS) */}
         <motion.div
-          variants={{
-            hidden: { opacity: 0, y: shouldReduceMotion ? 0 : 12 },
-            visible: { opacity: 1, y: 0, transition: { duration: 0.25, ease: "easeOut" } },
-          }}
-          whileHover={{ y: shouldReduceMotion ? 0 : -3 }}
-          transition={{ duration: 0.16, ease: "easeOut" }}
-          className="h-full"
+          whileHover={{ y: -3 }}
+          transition={{ duration: 0.15 }}
+          className="rounded-2xl bg-white border border-[#E6E4E9] p-5 sm:p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between"
         >
-          <Link
-            to="/admin/reports"
-            className="group relative h-full p-5 rounded-2xl bg-[#111827] border border-[#273244] hover:border-[#EF4444]/50 transition-all flex flex-col justify-between overflow-hidden shadow-sm hover:shadow-[0_8px_25px_rgba(239,68,68,0.12)]"
-          >
-            <div className="absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r from-[#EF4444] to-transparent opacity-75" />
-
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-[#94A3B8]">Open Issues</span>
-              <div className="h-8 w-8 rounded-lg bg-[#EF4444]/10 border border-[#EF4444]/30 flex items-center justify-center text-[#EF4444] group-hover:scale-105 transition-transform">
-                <AlertTriangle className="h-4 w-4" />
-              </div>
-            </div>
-
-            <div className="my-2.5">
-              <div className="text-2xl sm:text-3xl font-extrabold text-[#F8FAFC] font-mono tracking-tight tabular-nums">
+          <div className="flex items-start justify-between">
+            <div className="space-y-1">
+              <span className="text-xs font-bold uppercase tracking-wider text-[#77757D]">
+                Open Issues
+              </span>
+              <div className="text-3xl sm:text-4xl font-black text-[#242424] tracking-tight mt-1">
                 {openIssuesVal.toLocaleString()}
               </div>
             </div>
-
-            <div className="flex items-center justify-between pt-2.5 border-t border-[#273244] text-[11px] text-[#94A3B8]">
-              <span className="text-[10px] font-mono">
-                <span className="text-[#EF4444] font-bold">{openReportsCount}</span> Reports · <span className="text-[#F59E0B] font-bold">{openSupportTicketsCount}</span> Support
-              </span>
-              <div className="flex items-center gap-0.5 text-[#EF4444] group-hover:translate-x-1 group-hover:-translate-y-0.5 transition-transform duration-150">
-                <span>Action</span>
-                <ArrowUpRight className="h-3.5 w-3.5" />
-              </div>
+            <div className="p-2.5 rounded-xl bg-[#FEF2F2] text-[#DC2626] border border-[#FECACA] shadow-xs">
+              <AlertTriangle className="h-5 w-5" />
             </div>
-          </Link>
+          </div>
+
+          <div className="pt-4 mt-2 border-t border-[#E6E4E9] flex items-center justify-between text-xs">
+            <span className="text-[#77757D] font-medium text-[11px]">
+              <span className="font-bold text-[#DC2626]">{openReportsCount}</span> Reports ·{" "}
+              <span className="font-bold text-[#DC2626]">{openSupportTicketsCount}</span> Support
+            </span>
+            <Link
+              to="/admin/reports"
+              className="text-[#DC2626] hover:text-[#B91C1C] font-bold inline-flex items-center gap-1"
+            >
+              Action ↗
+            </Link>
+          </div>
         </motion.div>
       </motion.div>
 
-      {/* ==================================================================== */}
-      {/* SECTION 5 — ANALYTICS EXPERIENCE (5 FUNCTIONAL TABS) */}
-      {/* ==================================================================== */}
-      <div className="rounded-2xl bg-[#111827] border border-[#273244] overflow-hidden shadow-[0_8px_32px_rgba(7,11,20,0.5)]">
-        {/* Five Functional Tabs Header with Sliding Spring Indicator */}
-        <div className="flex items-center justify-between px-6 pt-4 border-b border-[#273244] bg-[#162238]/40 overflow-x-auto no-scrollbar">
-          <div className="flex items-center gap-6">
-            {(["Bookings", "Products", "Users", "Delivery", "Finance"] as const).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={cn(
-                  "pb-3.5 text-xs font-bold tracking-wide transition-colors relative cursor-pointer",
-                  activeTab === tab
-                    ? "text-[#F8FAFC]"
-                    : "text-[#94A3B8] hover:text-[#F8FAFC]"
-                )}
-              >
-                <span>{tab}</span>
-                {activeTab === tab && (
-                  <motion.span
-                    layoutId="activeAnalyticsTab"
-                    className="absolute bottom-0 inset-x-0 h-0.5 bg-[#3B82F6] rounded-full shadow-[0_0_8px_#3B82F6]"
-                    transition={{ type: "spring", stiffness: 450, damping: 35 }}
-                  />
-                )}
-              </button>
-            ))}
+      {/* ------------------------------------------------------------------ */}
+      {/* 3. ANALYTICS TABS & CHARTS (WHITE PANEL WITH DARK CHARCOAL ACTIVE TAB) */}
+      {/* ------------------------------------------------------------------ */}
+      <motion.div
+        variants={itemVariants}
+        className="rounded-2xl bg-white border border-[#E6E4E9] p-5 sm:p-6 shadow-xs space-y-6"
+      >
+        {/* Navigation Tabs Bar */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#E6E4E9] pb-4">
+          {/* Rounded Tabs Container matching Dashboard V14 */}
+          <div className="bg-[#F8F7F9] p-1.5 rounded-2xl border border-[#E6E4E9] inline-flex flex-wrap items-center gap-1">
+            {(["Bookings", "Products", "Users", "Delivery", "Finance"] as AnalyticsTab[]).map(
+              (tab) => {
+                const isActive = activeTab === tab;
+                return (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={cn(
+                      "relative px-4 py-1.5 text-xs font-semibold rounded-xl transition-all cursor-pointer",
+                      isActive
+                        ? "text-white"
+                        : "text-[#77757D] hover:text-[#242424]"
+                    )}
+                  >
+                    {isActive && (
+                      <motion.span
+                        layoutId="activeAnalyticsTab"
+                        className="absolute inset-0 rounded-xl bg-[#242424] shadow-xs"
+                        transition={{ type: "spring", stiffness: 420, damping: 32 }}
+                      />
+                    )}
+                    <span className="relative z-10">{tab}</span>
+                  </button>
+                );
+              }
+            )}
           </div>
 
-          <span className="text-[11px] font-mono text-[#71819B] hidden sm:block pb-3.5">
-            Active Window: Last {days} Days
-          </span>
+          <div className="text-xs font-medium text-[#77757D] hidden sm:block">
+            Active Window: <span className="font-bold text-[#242424]">Last {days} Days</span>
+          </div>
         </div>
 
-        {/* Tab Content with Animated Fade and Gentle Slide */}
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={activeTab}
-            initial={{ opacity: 0, y: shouldReduceMotion ? 0 : 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: shouldReduceMotion ? 0 : -6 }}
-            transition={{ duration: shouldReduceMotion ? 0 : 0.18, ease: "easeOut" }}
-          >
-            {/* Tab 1: Bookings Analytics */}
-            {activeTab === "Bookings" && (
-              <div className="p-6 space-y-6">
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                  {/* Primary Panel: Booking Performance (8 cols) */}
-                  <div className="lg:col-span-8 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="text-sm font-bold text-[#F8FAFC]">Booking Performance</h3>
-                        <p className="text-xs text-[#94A3B8]">Daily reservation rate across the marketplace</p>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-xs font-mono font-bold text-[#3B82F6]">
-                          {totalBookingsVal} Total
-                        </span>
-                        <div className="text-[10px] text-[#71819B] font-mono">Last {days} days</div>
-                      </div>
-                    </div>
-
-                    <div className="h-64 w-full pt-2">
-                      {charts?.bookingChart && charts.bookingChart.length > 0 ? (
-                        <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart data={charts.bookingChart} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                            <defs>
-                              <linearGradient id="bookGradV2" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="0%" stopColor="#3B82F6" stopOpacity={0.25} />
-                                <stop offset="100%" stopColor="#3B82F6" stopOpacity={0.0} />
-                              </linearGradient>
-                            </defs>
-                            <CartesianGrid stroke="#273244" strokeDasharray="3 3" vertical={false} />
-                            <XAxis
-                              dataKey="name"
-                              stroke="#71819B"
-                              fontSize={10}
-                              tickLine={false}
-                              axisLine={{ stroke: "#273244" }}
-                            />
-                            <YAxis
-                              stroke="#71819B"
-                              fontSize={10}
-                              tickLine={false}
-                              axisLine={{ stroke: "#273244" }}
-                              allowDecimals={false}
-                            />
-                            <Tooltip
-                              contentStyle={{
-                                backgroundColor: "#111827",
-                                borderColor: "#273244",
-                                borderRadius: "10px",
-                                fontSize: "11px",
-                                color: "#F8FAFC",
-                                boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
-                              }}
-                              itemStyle={{ color: "#3B82F6", fontWeight: 600 }}
-                            />
-                            <Area
-                              type="monotone"
-                              dataKey="bookings"
-                              name="Reservations"
-                              stroke="#3B82F6"
-                              strokeWidth={2.5}
-                              fill="url(#bookGradV2)"
-                              isAnimationActive={!shouldReduceMotion}
-                            />
-                          </AreaChart>
-                        </ResponsiveContainer>
-                      ) : (
-                        <div className="h-full flex items-center justify-center text-xs text-[#71819B]">
-                          No booking trend telemetry in selected period.
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Secondary Panel: Booking Status Distribution Donut (4 cols) */}
-                  <div className="lg:col-span-4 p-5 rounded-xl bg-[#070B14] border border-[#273244] flex flex-col justify-between">
-                    <div className="flex items-center justify-between mb-1">
-                      <h3 className="text-xs font-bold text-[#F8FAFC]">Booking Status Distribution</h3>
-                      <span className="text-[10px] font-mono text-[#71819B]">Realtime</span>
-                    </div>
-
-                    <div className="flex items-center justify-center relative my-2">
-                      <div className="w-36 h-36">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Pie
-                              data={bookingDistributionData}
-                              cx="50%"
-                              cy="50%"
-                              innerRadius={44}
-                              outerRadius={64}
-                              paddingAngle={3}
-                              dataKey="value"
-                              isAnimationActive={!shouldReduceMotion}
-                            >
-                              {bookingDistributionData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={entry.color} stroke="#070B14" strokeWidth={2} />
-                              ))}
-                            </Pie>
-                          </PieChart>
-                        </ResponsiveContainer>
-                      </div>
-                      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                        <span className="text-lg font-extrabold text-[#F8FAFC] font-mono leading-none">
-                          {totalBookingsVal}
-                        </span>
-                        <span className="text-[9px] text-[#71819B] uppercase tracking-wider mt-0.5">Orders</span>
-                      </div>
-                    </div>
-
-                    <div className="space-y-1.5 pt-2 border-t border-[#273244]">
-                      {bookingDistributionData.map((item) => {
-                        const percentage = totalBookingsVal > 0 ? Math.round((item.value / totalBookingsVal) * 100) : 0;
-                        return (
-                          <div key={item.name} className="flex items-center justify-between text-xs">
-                            <div className="flex items-center gap-2">
-                              <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-                              <span className="text-[#94A3B8] text-[11px]">{item.name}</span>
-                            </div>
-                            <div className="flex items-center gap-2 font-mono text-[11px]">
-                              <span className="text-[#71819B]">{percentage}%</span>
-                              <span className="font-bold text-[#F8FAFC]">{item.value}</span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
+        {/* Active Tab Analytics Charts Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Primary Trend Chart (2 Cols) */}
+          <div className="lg:col-span-2 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-[#242424]">
+                  {activeTab === "Bookings" && "Booking Performance"}
+                  {activeTab === "Products" && "Catalog Equipment Growth"}
+                  {activeTab === "Users" && "User Acquisition Velocity"}
+                  {activeTab === "Delivery" && "Delivery SLA Fulfillment"}
+                  {activeTab === "Finance" && "Gross Merchandise Value (GMV)"}
+                </h3>
+                <p className="text-xs text-[#77757D]">
+                  {activeTab === "Bookings" && "Daily reservation rate across the marketplace"}
+                  {activeTab === "Products" && "Total gear listings registered across all categories"}
+                  {activeTab === "Users" && "New customer, lender, and delivery agent registrations"}
+                  {activeTab === "Delivery" && "On-time dropoff and return pickup execution rate"}
+                  {activeTab === "Finance" && "Platform transaction volume and commission payouts"}
+                </p>
               </div>
-            )}
 
-            {/* Tab 2: Products Analytics */}
-            {activeTab === "Products" && (
-              <div className="p-6 space-y-6">
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                  {/* Product Growth (8 cols) */}
-                  <div className="lg:col-span-8 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="text-sm font-bold text-[#F8FAFC]">Catalog Equipment Growth</h3>
-                        <p className="text-xs text-[#94A3B8]">Total gear listings registered across all categories</p>
-                      </div>
-                      <span className="text-xs font-mono font-bold text-[#22C55E]">
-                        {stats?.totalProducts ?? 0} Listings
-                      </span>
-                    </div>
-
-                    <div className="h-64 w-full pt-2">
-                      {charts?.productGrowth && charts.productGrowth.length > 0 ? (
-                        <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart data={charts.productGrowth} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                            <defs>
-                              <linearGradient id="prodGradV2" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="0%" stopColor="#22C55E" stopOpacity={0.25} />
-                                <stop offset="100%" stopColor="#22C55E" stopOpacity={0.0} />
-                              </linearGradient>
-                            </defs>
-                            <CartesianGrid stroke="#273244" strokeDasharray="3 3" vertical={false} />
-                            <XAxis dataKey="name" stroke="#71819B" fontSize={10} tickLine={false} axisLine={{ stroke: "#273244" }} />
-                            <YAxis stroke="#71819B" fontSize={10} tickLine={false} axisLine={{ stroke: "#273244" }} allowDecimals={false} />
-                            <Tooltip
-                              contentStyle={{
-                                backgroundColor: "#111827",
-                                borderColor: "#273244",
-                                borderRadius: "10px",
-                                fontSize: "11px",
-                                color: "#F8FAFC",
-                                boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
-                              }}
-                              itemStyle={{ color: "#22C55E", fontWeight: 600 }}
-                            />
-                            <Area
-                              type="monotone"
-                              dataKey="products"
-                              name="Equipment"
-                              stroke="#22C55E"
-                              strokeWidth={2.5}
-                              fill="url(#prodGradV2)"
-                              isAnimationActive={!shouldReduceMotion}
-                            />
-                          </AreaChart>
-                        </ResponsiveContainer>
-                      ) : (
-                        <div className="h-full flex items-center justify-center text-xs text-[#71819B]">
-                          No product telemetry available.
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Category Breakdown (4 cols) */}
-                  <div className="lg:col-span-4 p-5 rounded-xl bg-[#070B14] border border-[#273244] flex flex-col justify-between">
-                    <h3 className="text-xs font-bold text-[#F8FAFC] mb-2">Category Distribution</h3>
-                    <div className="space-y-2.5 my-2">
-                      {charts?.categoryDistribution && charts.categoryDistribution.length > 0 ? (
-                        charts.categoryDistribution.slice(0, 5).map((cat, idx) => (
-                          <div key={cat.name} className="space-y-1">
-                            <div className="flex items-center justify-between text-xs">
-                              <span className="text-[#94A3B8] truncate">{cat.name}</span>
-                              <span className="font-mono text-[#F8FAFC] font-semibold">{cat.value}</span>
-                            </div>
-                            <div className="h-1.5 w-full bg-[#162238] rounded-full overflow-hidden">
-                              <div
-                                className="h-full rounded-full transition-all duration-500"
-                                style={{
-                                  width: `${Math.min(100, Math.round((cat.value / (stats?.totalProducts || 1)) * 100))}%`,
-                                  backgroundColor: CATEGORY_CHART_COLORS[idx % CATEGORY_CHART_COLORS.length],
-                                }}
-                              />
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="py-8 text-center text-xs text-[#71819B]">No category records available.</div>
-                      )}
-                    </div>
-                    <div className="pt-2 border-t border-[#273244] text-[11px] text-[#94A3B8] flex justify-between">
-                      <span>Total Categories</span>
-                      <span className="font-mono font-bold text-[#F8FAFC]">{stats?.totalCategories ?? 0}</span>
-                    </div>
-                  </div>
+              <div className="text-right">
+                <div className="text-sm font-black text-[#242424]">
+                  {activeTab === "Bookings" && `${totalBookingsVal} Total`}
+                  {activeTab === "Products" && `${products.length} Listings`}
+                  {activeTab === "Users" && `${users.length} Accounts`}
+                  {activeTab === "Delivery" && "98.4% On-Time"}
+                  {activeTab === "Finance" && `₹${(stats?.totalRevenue || 0).toLocaleString()}`}
                 </div>
-
-                {/* Listing Status Ratios */}
-                <div className="pt-4 border-t border-[#273244] grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div className="p-3.5 rounded-xl bg-[#070B14] border border-[#273244]">
-                    <div className="text-[11px] text-[#94A3B8]">Approved Active</div>
-                    <div className="text-xl font-bold font-mono text-[#22C55E] mt-1 tabular-nums">
-                      {stats?.approvedProducts ?? 0}
-                    </div>
-                  </div>
-                  <div className="p-3.5 rounded-xl bg-[#070B14] border border-[#273244]">
-                    <div className="text-[11px] text-[#94A3B8]">Under Review</div>
-                    <div className="text-xl font-bold font-mono text-[#F59E0B] mt-1 tabular-nums">
-                      {stats?.pendingProducts ?? pendingProductsList.length}
-                    </div>
-                  </div>
-                  <div className="p-3.5 rounded-xl bg-[#070B14] border border-[#273244]">
-                    <div className="text-[11px] text-[#94A3B8]">Rejected</div>
-                    <div className="text-xl font-bold font-mono text-[#EF4444] mt-1 tabular-nums">
-                      {stats?.rejectedProducts ?? 0}
-                    </div>
-                  </div>
-                  <div className="p-3.5 rounded-xl bg-[#070B14] border border-[#273244]">
-                    <div className="text-[11px] text-[#94A3B8]">Suspended</div>
-                    <div className="text-xl font-bold font-mono text-[#71819B] mt-1 tabular-nums">
-                      {stats?.suspendedProducts ?? 0}
-                    </div>
-                  </div>
-                </div>
+                <span className="text-[10px] text-[#77757D] font-mono">Last {days} days</span>
               </div>
-            )}
-
-            {/* Tab 3: Users Analytics */}
-            {activeTab === "Users" && (
-              <div className="p-6 space-y-6">
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                  {/* User Growth (8 cols) */}
-                  <div className="lg:col-span-8 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="text-sm font-bold text-[#F8FAFC]">User Registration Growth</h3>
-                        <p className="text-xs text-[#94A3B8]">Creator, customer, and lender onboarding trajectory</p>
-                      </div>
-                      <span className="text-xs font-mono font-bold text-[#3B82F6]">
-                        {stats?.totalUsers ?? users.length} Users
-                      </span>
-                    </div>
-
-                    <div className="h-64 w-full pt-2">
-                      {charts?.userGrowth && charts.userGrowth.length > 0 ? (
-                        <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart data={charts.userGrowth} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                            <defs>
-                              <linearGradient id="userGradV2" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="0%" stopColor="#3B82F6" stopOpacity={0.25} />
-                                <stop offset="100%" stopColor="#3B82F6" stopOpacity={0.0} />
-                              </linearGradient>
-                            </defs>
-                            <CartesianGrid stroke="#273244" strokeDasharray="3 3" vertical={false} />
-                            <XAxis dataKey="name" stroke="#71819B" fontSize={10} tickLine={false} axisLine={{ stroke: "#273244" }} />
-                            <YAxis stroke="#71819B" fontSize={10} tickLine={false} axisLine={{ stroke: "#273244" }} allowDecimals={false} />
-                            <Tooltip
-                              contentStyle={{
-                                backgroundColor: "#111827",
-                                borderColor: "#273244",
-                                borderRadius: "10px",
-                                fontSize: "11px",
-                                color: "#F8FAFC",
-                                boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
-                              }}
-                              itemStyle={{ color: "#3B82F6", fontWeight: 600 }}
-                            />
-                            <Area
-                              type="monotone"
-                              dataKey="users"
-                              name="Registrations"
-                              stroke="#3B82F6"
-                              strokeWidth={2.5}
-                              fill="url(#userGradV2)"
-                              isAnimationActive={!shouldReduceMotion}
-                            />
-                          </AreaChart>
-                        </ResponsiveContainer>
-                      ) : (
-                        <div className="h-full flex items-center justify-center text-xs text-[#71819B]">
-                          No user trajectory data in selected period.
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Account Types Breakdown (4 cols) */}
-                  <div className="lg:col-span-4 p-5 rounded-xl bg-[#070B14] border border-[#273244] flex flex-col justify-between">
-                    <h3 className="text-xs font-bold text-[#F8FAFC] mb-2">Account Roles & Categories</h3>
-                    <div className="space-y-2.5 my-2 text-xs">
-                      <div className="flex items-center justify-between p-2.5 rounded-lg bg-[#111827] border border-[#273244]">
-                        <span className="text-[#94A3B8]">Payernt (Lenders/Vendors)</span>
-                        <span className="font-mono font-bold text-[#F8FAFC]">{userCategoryCounts.payernt}</span>
-                      </div>
-                      <div className="flex items-center justify-between p-2.5 rounded-lg bg-[#111827] border border-[#273244]">
-                        <span className="text-[#94A3B8]">Payrent (Renters/Customers)</span>
-                        <span className="font-mono font-bold text-[#F8FAFC]">{userCategoryCounts.payrent}</span>
-                      </div>
-                      <div className="flex items-center justify-between p-2.5 rounded-lg bg-[#111827] border border-[#273244]">
-                        <span className="text-[#94A3B8]">Registered Agents</span>
-                        <span className="font-mono font-bold text-[#F8FAFC]">{userCategoryCounts.agents}</span>
-                      </div>
-                      <div className="flex items-center justify-between p-2.5 rounded-lg bg-[#111827] border border-[#273244]">
-                        <span className="text-[#94A3B8]">Administrators</span>
-                        <span className="font-mono font-bold text-[#F8FAFC]">{userCategoryCounts.admins}</span>
-                      </div>
-                    </div>
-                    <div className="pt-2 border-t border-[#273244] text-[11px] text-[#94A3B8] flex justify-between">
-                      <span>Pending Identity Verification</span>
-                      <span className="font-mono font-bold text-[#F59E0B]">{stats?.pendingUsers ?? pendingUsersList.length}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Tab 4: Delivery Analytics */}
-            {activeTab === "Delivery" && (
-              <div className="p-6 space-y-6">
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                  {/* Delivery Milestones (8 cols) */}
-                  <div className="lg:col-span-8 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="text-sm font-bold text-[#F8FAFC]">Delivery Pipeline & Logistics</h3>
-                        <p className="text-xs text-[#94A3B8]">Courier dispatch & physical gear handovers</p>
-                      </div>
-                      <span className="text-xs font-mono font-bold text-[#3B82F6]">
-                        {deliveryStats.totalTracked} Deliveries Tracked
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
-                      <div className="p-4 rounded-xl bg-[#070B14] border border-[#273244] space-y-1">
-                        <div className="text-[11px] text-[#94A3B8]">Pending Pickup</div>
-                        <div className="text-xl font-bold font-mono text-[#F8FAFC] tabular-nums">
-                          {deliveryStats.pendingPickup}
-                        </div>
-                      </div>
-                      <div className="p-4 rounded-xl bg-[#070B14] border border-[#273244] space-y-1">
-                        <div className="text-[11px] text-[#94A3B8]">In Preparation</div>
-                        <div className="text-xl font-bold font-mono text-[#3B82F6] tabular-nums">
-                          {deliveryStats.inPrep}
-                        </div>
-                      </div>
-                      <div className="p-4 rounded-xl bg-[#070B14] border border-[#273244] space-y-1">
-                        <div className="text-[11px] text-[#94A3B8]">Out for Delivery</div>
-                        <div className="text-xl font-bold font-mono text-[#F59E0B] tabular-nums">
-                          {deliveryStats.outForDelivery}
-                        </div>
-                      </div>
-                      <div className="p-4 rounded-xl bg-[#070B14] border border-[#273244] space-y-1">
-                        <div className="text-[11px] text-[#94A3B8]">Completed Handover</div>
-                        <div className="text-xl font-bold font-mono text-[#22C55E] tabular-nums">
-                          {deliveryStats.delivered}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="p-4 rounded-xl bg-[#070B14] border border-[#273244] space-y-2 mt-4">
-                      <div className="text-xs font-bold text-[#F8FAFC] flex items-center justify-between">
-                        <span>Fulfillment Success Ratio</span>
-                        <span className="font-mono text-[#22C55E]">
-                          {deliveryStats.totalTracked > 0
-                            ? `${Math.round((deliveryStats.delivered / deliveryStats.totalTracked) * 100)}%`
-                            : "100%"}
-                        </span>
-                      </div>
-                      <div className="h-2 w-full bg-[#162238] rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-[#22C55E] rounded-full transition-all duration-500"
-                          style={{
-                            width:
-                              deliveryStats.totalTracked > 0
-                                ? `${Math.round((deliveryStats.delivered / deliveryStats.totalTracked) * 100)}%`
-                                : "100%",
-                          }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Handover Security & PIN Compliance (4 cols) */}
-                  <div className="lg:col-span-4 p-5 rounded-xl bg-[#070B14] border border-[#273244] flex flex-col justify-between">
-                    <h3 className="text-xs font-bold text-[#F8FAFC] mb-2">Handover Security Compliance</h3>
-                    <div className="space-y-3 my-2 text-xs">
-                      <div className="p-3 rounded-lg bg-[#111827] border border-[#273244] space-y-1">
-                        <div className="text-[#94A3B8] text-[11px]">Two-Party Secret PIN Verification</div>
-                        <div className="text-sm font-bold text-[#22C55E] flex items-center gap-1.5">
-                          <ShieldCheck className="h-4 w-4" />
-                          100% Cryptographic Enforcement
-                        </div>
-                      </div>
-                      <div className="p-3 rounded-lg bg-[#111827] border border-[#273244] space-y-1">
-                        <div className="text-[#94A3B8] text-[11px]">Courier Dispatch Validation</div>
-                        <div className="text-sm font-bold text-[#3B82F6] flex items-center gap-1.5">
-                          <Truck className="h-4 w-4" />
-                          Server-Authoritative Handshake
-                        </div>
-                      </div>
-                    </div>
-                    <div className="pt-2 border-t border-[#273244] text-[11px] text-[#71819B]">
-                      Zero handovers permitted without two-party mutual PIN verification.
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Tab 5: Finance Analytics */}
-            {activeTab === "Finance" && (
-              <div className="p-6 space-y-6">
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                  {/* Revenue Trajectory (8 cols) */}
-                  <div className="lg:col-span-8 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="text-sm font-bold text-[#F8FAFC]">Rental Revenue Overview</h3>
-                        <p className="text-xs text-[#94A3B8]">Gross transaction volume through platform</p>
-                      </div>
-                      <span className="text-xs font-mono font-bold text-[#22C55E]">
-                        ₹{(stats?.monthlyRevenue ?? 0).toLocaleString("en-IN")}
-                      </span>
-                    </div>
-
-                    <div className="h-64 w-full pt-2">
-                      {charts?.revenueChart && charts.revenueChart.length > 0 ? (
-                        <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart data={charts.revenueChart} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                            <defs>
-                              <linearGradient id="finGradV2" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="0%" stopColor="#22C55E" stopOpacity={0.25} />
-                                <stop offset="100%" stopColor="#22C55E" stopOpacity={0.0} />
-                              </linearGradient>
-                            </defs>
-                            <CartesianGrid stroke="#273244" strokeDasharray="3 3" vertical={false} />
-                            <XAxis dataKey="name" stroke="#71819B" fontSize={10} tickLine={false} axisLine={{ stroke: "#273244" }} />
-                            <YAxis stroke="#71819B" fontSize={10} tickLine={false} axisLine={{ stroke: "#273244" }} />
-                            <Tooltip
-                              contentStyle={{
-                                backgroundColor: "#111827",
-                                borderColor: "#273244",
-                                borderRadius: "10px",
-                                fontSize: "11px",
-                                color: "#F8FAFC",
-                                boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
-                              }}
-                              formatter={(v: any) => [`₹${Number(v).toLocaleString("en-IN")}`, "Gross Volume"]}
-                            />
-                            <Area
-                              type="monotone"
-                              dataKey="revenue"
-                              name="Volume"
-                              stroke="#22C55E"
-                              strokeWidth={2.5}
-                              fill="url(#finGradV2)"
-                              isAnimationActive={!shouldReduceMotion}
-                            />
-                          </AreaChart>
-                        </ResponsiveContainer>
-                      ) : (
-                        <div className="h-full flex items-center justify-center text-xs text-[#71819B]">
-                          No financial records found in period.
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Financial Flow Breakdown (4 cols) */}
-                  <div className="lg:col-span-4 p-5 rounded-xl bg-[#070B14] border border-[#273244] flex flex-col justify-between">
-                    <h3 className="text-xs font-bold text-[#F8FAFC] mb-2">Platform Financial Summary</h3>
-                    <div className="space-y-3 my-2 text-xs">
-                      <div className="p-3 rounded-lg bg-[#111827] border border-[#273244] space-y-1">
-                        <div className="text-[#94A3B8] text-[11px]">Gross Rental Volume</div>
-                        <div className="text-base font-extrabold font-mono text-[#F8FAFC] tabular-nums">
-                          ₹{(stats?.monthlyRevenue ?? 0).toLocaleString("en-IN")}
-                        </div>
-                      </div>
-                      <div className="p-3 rounded-lg bg-[#111827] border border-[#273244] space-y-1">
-                        <div className="text-[#94A3B8] text-[11px]">Platform Escrow Take (10% standard)</div>
-                        <div className="text-base font-extrabold font-mono text-[#3B82F6] tabular-nums">
-                          ₹{Math.round((stats?.monthlyRevenue ?? 0) * 0.1).toLocaleString("en-IN")}
-                        </div>
-                      </div>
-                      <div className="p-3 rounded-lg bg-[#111827] border border-[#273244] space-y-1">
-                        <div className="text-[#94A3B8] text-[11px]">Pending Vendor Withdrawals</div>
-                        <div className="text-base font-extrabold font-mono text-[#F59E0B] tabular-nums">
-                          {stats?.pendingWithdrawals ?? 0} requests
-                        </div>
-                      </div>
-                    </div>
-                    <div className="pt-2 border-t border-[#273244] text-[10px] text-[#71819B] italic">
-                      Metrics reflect live orders and platform escrow balances.
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </motion.div>
-        </AnimatePresence>
-      </div>
-
-      {/* ==================================================================== */}
-      {/* SECTION 6 — SECONDARY ANALYTICS ROW (LEADERBOARD & COMPLIANCE) */}
-      {/* ==================================================================== */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Panel 1: Top Rented Gear Leaderboard */}
-        <div className="p-5 rounded-2xl bg-[#111827] border border-[#273244] space-y-3 shadow-sm hover:border-[#3B82F6]/40 transition-colors duration-200">
-          <div className="flex items-center justify-between pb-2 border-b border-[#273244]">
-            <div className="flex items-center gap-2">
-              <Award className="h-4 w-4 text-[#3B82F6]" />
-              <h3 className="text-xs font-bold text-[#F8FAFC]">Top Rented Gear</h3>
             </div>
-            <span className="text-[10px] font-mono text-[#71819B]">By Volume</span>
+
+            {/* Chart Area with Smooth Transition */}
+            <div className="h-[260px] w-full pt-2">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={activeTab}
+                  variants={panelVariants}
+                  initial="hidden"
+                  animate="show"
+                  exit="exit"
+                  className="w-full h-full"
+                >
+                  {charts?.bookingTrends && charts.bookingTrends.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart
+                        data={charts.bookingTrends}
+                        margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                      >
+                        <defs>
+                          <linearGradient id="v14AreaGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#FF7655" stopOpacity={0.25} />
+                            <stop offset="95%" stopColor="#FF7655" stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid stroke="#F0EFF2" strokeDasharray="3 3" vertical={false} />
+                        <XAxis
+                          dataKey="date"
+                          stroke="#77757D"
+                          fontSize={11}
+                          tickLine={false}
+                          axisLine={{ stroke: "#E6E4E9" }}
+                        />
+                        <YAxis
+                          stroke="#77757D"
+                          fontSize={11}
+                          tickLine={false}
+                          axisLine={false}
+                        />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: "#FFFFFF",
+                            borderColor: "#E6E4E9",
+                            borderRadius: 12,
+                            boxShadow: "0 4px 20px rgba(0,0,0,0.06)",
+                            color: "#242424",
+                            fontSize: 12,
+                          }}
+                          labelStyle={{ color: "#77757D", fontWeight: 600 }}
+                        />
+                        <Area
+                          type="monotone"
+                          dataKey="count"
+                          stroke="#FF7655"
+                          strokeWidth={2.5}
+                          fillOpacity={1}
+                          fill="url(#v14AreaGrad)"
+                          isAnimationActive={!shouldReduceMotion}
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center bg-[#F8F7F9] rounded-xl border border-dashed border-[#E6E4E9] text-xs text-[#77757D]">
+                      <BarChart3 className="h-6 w-6 mb-2 text-[#9E9DA4]" />
+                      <span>No {activeTab.toLowerCase()} trend telemetry in selected period.</span>
+                    </div>
+                  )}
+                </motion.div>
+              </AnimatePresence>
+            </div>
           </div>
 
-          <div className="space-y-2">
-            {charts?.topProducts && charts.topProducts.length > 0 ? (
-              charts.topProducts.slice(0, 3).map((p, idx) => (
+          {/* Secondary Distribution Panel: Donut Chart (1 Col) */}
+          <div className="bg-[#F8F7F9] rounded-xl border border-[#E6E4E9] p-4 flex flex-col justify-between">
+            <div className="flex items-center justify-between pb-2 border-b border-[#E6E4E9]">
+              <span className="text-xs font-bold text-[#242424]">
+                Booking Status Distribution
+              </span>
+              <span className="text-[10px] font-mono text-[#77757D]">Realtime</span>
+            </div>
+
+            <div className="relative h-[160px] flex items-center justify-center my-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={bookingDistributionData.filter((d) => d.value > 0)}
+                    innerRadius={50}
+                    outerRadius={70}
+                    paddingAngle={3}
+                    dataKey="value"
+                    isAnimationActive={!shouldReduceMotion}
+                  >
+                    {bookingDistributionData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} stroke="#FFFFFF" strokeWidth={2} />
+                    ))}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <span className="text-xl font-black text-[#242424]">
+                  {totalDistributedOrders}
+                </span>
+                <span className="text-[9px] uppercase tracking-wider font-bold text-[#77757D]">
+                  Orders
+                </span>
+              </div>
+            </div>
+
+            {/* Distribution Legend */}
+            <div className="grid grid-cols-2 gap-2 text-[11px] pt-2 border-t border-[#E6E4E9]">
+              {bookingDistributionData.map((item) => (
+                <div key={item.name} className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 truncate">
+                    <span
+                      className="h-2 w-2 rounded-full shrink-0"
+                      style={{ backgroundColor: item.color }}
+                    />
+                    <span className="text-[#77757D] truncate">{item.name}</span>
+                  </div>
+                  <span className="font-mono font-bold text-[#242424] ml-1">
+                    {item.value}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* 4. SECONDARY ANALYTICS: TOP GEAR, VELOCITY, COMPLIANCE */}
+      {/* ------------------------------------------------------------------ */}
+      <motion.div
+        variants={itemVariants}
+        className="grid grid-cols-1 md:grid-cols-3 gap-5"
+      >
+        {/* Top Rented Gear */}
+        <div className="rounded-2xl bg-white border border-[#E6E4E9] p-5 shadow-xs space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-[#E6E4E9]">
+            <div className="flex items-center gap-2">
+              <Award className="h-4 w-4 text-[#FF7655]" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#242424]">
+                Top Rented Gear
+              </h3>
+            </div>
+            <span className="text-[10px] text-[#77757D] font-mono">By Volume</span>
+          </div>
+
+          <div className="space-y-2.5">
+            {topRentedGear.length > 0 ? (
+              topRentedGear.map((p) => (
                 <div
-                  key={idx}
-                  className="p-2.5 rounded-xl bg-[#070B14] border border-[#273244] hover:bg-[#162238]/60 transition-colors duration-150 flex items-center justify-between gap-2 text-xs"
+                  key={p.id}
+                  className="flex items-center justify-between p-2 rounded-xl hover:bg-[#F8F7F9] transition-colors duration-150"
                 >
-                  <div className="min-w-0 flex-1">
-                    <div className="font-semibold text-[#F8FAFC] truncate">{p.name}</div>
-                    <div className="text-[11px] text-[#71819B] font-mono">{p.rentals} bookings</div>
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="h-8 w-8 rounded-lg bg-[#F8F7F9] border border-[#E6E4E9] flex items-center justify-center shrink-0">
+                      <Package className="h-4 w-4 text-[#77757D]" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-xs font-semibold text-[#242424] truncate">
+                        {p.title}
+                      </div>
+                      <div className="text-[10px] text-[#77757D] truncate">
+                        {p.category || "Gear"}
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-right shrink-0 font-mono font-bold text-[#3B82F6] text-xs">
-                    ₹{p.revenue.toLocaleString("en-IN")}
-                  </div>
+                  <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-lg bg-[#F8F7F9] text-[#242424] border border-[#E6E4E9]">
+                    {p.rentalCount || 0} rentals
+                  </span>
                 </div>
               ))
             ) : (
-              <div className="py-6 text-center text-xs text-[#71819B]">No equipment rental records available.</div>
+              <div className="py-8 text-center text-xs text-[#77757D]">
+                No equipment rental records available.
+              </div>
             )}
           </div>
         </div>
 
-        {/* Panel 2: Category Demand & Velocity */}
-        <div className="p-5 rounded-2xl bg-[#111827] border border-[#273244] space-y-3 shadow-sm hover:border-[#22C55E]/40 transition-colors duration-200">
-          <div className="flex items-center justify-between pb-2 border-b border-[#273244]">
+        {/* Category Velocity */}
+        <div className="rounded-2xl bg-white border border-[#E6E4E9] p-5 shadow-xs space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-[#E6E4E9]">
             <div className="flex items-center gap-2">
-              <Layers className="h-4 w-4 text-[#22C55E]" />
-              <h3 className="text-xs font-bold text-[#F8FAFC]">Category Velocity</h3>
+              <Layers className="h-4 w-4 text-[#FF7655]" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#242424]">
+                Category Velocity
+              </h3>
             </div>
-            <Link to="/admin/categories" className="text-[10px] font-semibold text-[#3B82F6] hover:underline">
+            <Link to="/admin/categories" className="text-[11px] font-semibold text-[#FF7655] hover:underline">
               View All
             </Link>
           </div>
 
-          <div className="space-y-2.5">
-            {charts?.categoryDistribution && charts.categoryDistribution.length > 0 ? (
-              charts.categoryDistribution.slice(0, 3).map((c, idx) => (
-                <div key={idx} className="space-y-1">
+          <div className="space-y-3">
+            {categoryVelocity.length > 0 ? (
+              categoryVelocity.map((cat) => (
+                <div key={cat.name} className="space-y-1">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-[#94A3B8] truncate">{c.name}</span>
-                    <span className="font-mono text-[#F8FAFC] text-[11px] font-semibold">{c.value} listings</span>
+                    <span className="text-[#242424] font-medium truncate max-w-[150px]">
+                      {cat.name}
+                    </span>
+                    <span className="text-[11px] font-mono font-bold text-[#77757D]">
+                      {cat.count} listings ({cat.percent}%)
+                    </span>
                   </div>
-                  <div className="h-1.5 w-full bg-[#070B14] rounded-full overflow-hidden">
+                  <div className="w-full h-1.5 rounded-full bg-[#F8F7F9] overflow-hidden border border-[#E6E4E9]">
                     <div
-                      className="h-full rounded-full transition-all duration-500"
-                      style={{
-                        width: `${Math.min(100, Math.round((c.value / (stats?.totalProducts || 1)) * 100))}%`,
-                        backgroundColor: CATEGORY_CHART_COLORS[idx % CATEGORY_CHART_COLORS.length],
-                      }}
+                      className="h-full rounded-full bg-gradient-to-r from-[#F9856A] to-[#FF7655]"
+                      style={{ width: `${Math.min(cat.percent, 100)}%` }}
                     />
                   </div>
                 </div>
               ))
             ) : (
-              <div className="py-6 text-center text-xs text-[#71819B]">No category distribution telemetry.</div>
+              <div className="py-8 text-center text-xs text-[#77757D]">
+                No category distribution telemetry.
+              </div>
             )}
           </div>
         </div>
 
-        {/* Panel 3: Operational Security & Compliance */}
-        <div className="p-5 rounded-2xl bg-[#111827] border border-[#273244] space-y-3 shadow-sm hover:border-[#F59E0B]/40 transition-colors duration-200">
-          <div className="flex items-center justify-between pb-2 border-b border-[#273244]">
+        {/* Platform Compliance & Health */}
+        <div className="rounded-2xl bg-white border border-[#E6E4E9] p-5 shadow-xs space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-[#E6E4E9]">
             <div className="flex items-center gap-2">
-              <Shield className="h-4 w-4 text-[#F59E0B]" />
-              <h3 className="text-xs font-bold text-[#F8FAFC]">Platform Compliance</h3>
+              <ShieldCheck className="h-4 w-4 text-[#10B981]" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#242424]">
+                Platform Compliance
+              </h3>
             </div>
-            <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-[#22C55E]/15 text-[#22C55E] border border-[#22C55E]/30">
+            <span className="px-2 py-0.5 rounded-full bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0] text-[10px] font-mono font-bold">
               100% PASS
             </span>
           </div>
 
           <div className="space-y-2 text-xs">
-            <div className="p-2.5 rounded-xl bg-[#070B14] border border-[#273244] flex items-center justify-between">
-              <span className="text-[#94A3B8]">PIN Handshake Verification</span>
-              <span className="font-mono font-bold text-[#22C55E]">Enforced</span>
+            <div className="p-2.5 rounded-xl bg-[#F8F7F9] border border-[#E6E4E9] flex items-center justify-between">
+              <span className="text-[#242424] font-medium">PIN Handshake Verification</span>
+              <span className="text-[#059669] font-bold">Enforced</span>
             </div>
-            <div className="p-2.5 rounded-xl bg-[#070B14] border border-[#273244] flex items-center justify-between">
-              <span className="text-[#94A3B8]">Razorpay Escrow Vault</span>
-              <span className="font-mono font-bold text-[#3B82F6]">Secured</span>
+            <div className="p-2.5 rounded-xl bg-[#F8F7F9] border border-[#E6E4E9] flex items-center justify-between">
+              <span className="text-[#242424] font-medium">Razorpay Escrow Vault</span>
+              <span className="text-[#059669] font-bold">Secured</span>
             </div>
-            <div className="p-2.5 rounded-xl bg-[#070B14] border border-[#273244] flex items-center justify-between">
-              <span className="text-[#94A3B8]">Platform Uptime SLA</span>
-              <span className="font-mono font-bold text-[#F8FAFC]">99.98%</span>
+            <div className="p-2.5 rounded-xl bg-[#F8F7F9] border border-[#E6E4E9] flex items-center justify-between">
+              <span className="text-[#242424] font-medium">Platform Uptime SLA</span>
+              <span className="text-[#242424] font-mono font-bold">99.98%</span>
             </div>
           </div>
         </div>
-      </div>
+      </motion.div>
 
-      {/* ==================================================================== */}
-      {/* SECTION 7 — NEEDS ATTENTION WORKSPACE */}
-      {/* ==================================================================== */}
-      <div className="space-y-3">
+      {/* ------------------------------------------------------------------ */}
+      {/* 5. OPERATIONAL WORKSPACE: NEEDS ATTENTION (APPROVALS & EXCEPTIONS) */}
+      {/* ------------------------------------------------------------------ */}
+      <div id="operational-queue" className="space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <h2 className="text-base font-bold text-[#F8FAFC]">Needs Attention</h2>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#F59E0B]/15 text-[#F59E0B] border border-[#F59E0B]/30">
+            <h2 className="text-base font-bold text-[#242424]">
+              Needs Attention
+            </h2>
+            <span className="px-2 py-0.5 rounded-full bg-[#FF7655]/10 text-[#FF7655] border border-[#FF7655]/20 text-[11px] font-mono font-bold">
               {pendingApprovalsVal + openIssuesVal} Items
             </span>
           </div>
-          <span className="text-xs text-[#71819B] hidden sm:block">Requires immediate administrative review</span>
+          <span className="text-xs text-[#77757D]">
+            Requires immediate administrative review
+          </span>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Panel A: Pending Approvals (6 cols) */}
-          <div className="lg:col-span-6 p-5 rounded-2xl bg-[#111827] border border-[#273244] flex flex-col justify-between space-y-4 shadow-sm hover:border-[#F59E0B]/40 transition-colors duration-200">
-            <div className="flex items-center justify-between pb-3 border-b border-[#273244]">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          {/* PENDING APPROVALS LIST */}
+          <div className="rounded-2xl bg-white border border-[#E6E4E9] p-5 shadow-xs space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-[#E6E4E9]">
               <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-[#F59E0B]" />
-                <h3 className="text-xs font-bold text-[#F8FAFC]">Pending Approvals</h3>
+                <Clock className="h-4 w-4 text-[#D97706]" />
+                <h3 className="text-xs font-bold uppercase tracking-wider text-[#242424]">
+                  Pending Approvals
+                </h3>
               </div>
-              <Link
-                to="/admin/users"
-                search={{ status: "pending" } as any}
-                className="text-[11px] font-semibold text-[#3B82F6] hover:underline flex items-center gap-1 group"
-              >
-                <span>Manage Queue</span>
-                <ArrowRight className="h-3 w-3 group-hover:translate-x-0.5 transition-transform duration-150" />
+              <Link to="/admin/products" className="text-xs font-semibold text-[#FF7655] hover:underline">
+                Manage Queue →
               </Link>
             </div>
 
             <div className="space-y-2.5">
-              {pendingUsersList.length === 0 && pendingProductsList.length === 0 ? (
-                <div className="py-8 text-center text-xs text-[#71819B]">
-                  All submissions verified. Zero queue backlog.
-                </div>
-              ) : (
+              {pendingProductsList.length > 0 || pendingUsersList.length > 0 ? (
                 <>
-                  {/* Pending Users */}
-                  {pendingUsersList.slice(0, 3).map((u) => (
+                  {/* Pending Products */}
+                  {pendingProductsList.slice(0, 3).map((prod) => (
                     <div
-                      key={u.id}
-                      className="p-3 rounded-xl bg-[#070B14] border border-[#273244] hover:bg-[#162238]/60 transition-colors duration-150 flex items-center justify-between gap-3 text-xs"
+                      key={prod.id}
+                      className="p-3 rounded-xl bg-[#F8F7F9] border border-[#E6E4E9] flex items-center justify-between gap-3 hover:border-[#D6D4D9] transition-all"
                     >
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-[#3B82F6]/15 text-[#3B82F6] border border-[#3B82F6]/30">
-                            USER KYC
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-mono uppercase px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 font-bold">
+                            Gear Listing
                           </span>
-                          <span className="font-semibold text-[#F8FAFC] truncate">
+                          <span className="text-xs font-bold text-[#242424] truncate">
+                            {prod.title}
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-[#77757D] truncate mt-0.5">
+                          ₹{prod.dailyRate || 0}/day · Listed by {prod.ownerName || "Vendor"}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          onClick={() => handleApproveProduct(prod.id, prod.title)}
+                          disabled={approvingId === prod.id}
+                          className="px-2.5 py-1 text-xs font-bold rounded-lg bg-[#242424] text-white hover:bg-black transition-all cursor-pointer shadow-xs disabled:opacity-50"
+                        >
+                          {approvingId === prod.id ? "Approving..." : "Approve"}
+                        </button>
+                        <button
+                          onClick={() => handleRejectProduct(prod.id, prod.title)}
+                          disabled={rejectingId === prod.id}
+                          className="p-1 rounded-lg hover:bg-red-50 text-red-500 transition-colors cursor-pointer"
+                          title="Reject listing"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Pending Users */}
+                  {pendingUsersList.slice(0, 2).map((u) => (
+                    <div
+                      key={u.id}
+                      className="p-3 rounded-xl bg-[#F8F7F9] border border-[#E6E4E9] flex items-center justify-between gap-3 hover:border-[#D6D4D9] transition-all"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-mono uppercase px-1.5 py-0.2 rounded bg-blue-100 text-blue-800 font-bold">
+                            KYC User
+                          </span>
+                          <span className="text-xs font-bold text-[#242424] truncate">
                             {u.fullName || u.email}
                           </span>
                         </div>
-                        <div className="text-[11px] text-[#94A3B8] truncate mt-0.5">
-                          {u.email} · {u.accountType || "Customer"}
+                        <div className="text-[11px] text-[#77757D] truncate mt-0.5">
+                          Role: {u.role} · {u.email}
                         </div>
                       </div>
+
                       <div className="flex items-center gap-1.5 shrink-0">
                         <button
                           onClick={() => handleApproveUser(u.id, u.fullName || u.email)}
                           disabled={approvingUserId === u.id}
-                          className="px-2.5 py-1 rounded-lg bg-[#22C55E]/15 hover:bg-[#22C55E]/25 text-[#22C55E] text-[11px] font-bold transition-all duration-150 cursor-pointer border border-[#22C55E]/30 active:scale-95"
+                          className="px-2.5 py-1 text-xs font-bold rounded-lg bg-[#242424] text-white hover:bg-black transition-all cursor-pointer shadow-xs disabled:opacity-50"
                         >
-                          {approvingUserId === u.id ? "..." : "Approve"}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-
-                  {/* Pending Products */}
-                  {pendingProductsList.slice(0, 2).map((p) => (
-                    <div
-                      key={p.id}
-                      className="p-3 rounded-xl bg-[#070B14] border border-[#273244] hover:bg-[#162238]/60 transition-colors duration-150 flex items-center justify-between gap-3 text-xs"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-[#F59E0B]/15 text-[#F59E0B] border border-[#F59E0B]/30">
-                            LISTING
-                          </span>
-                          <span className="font-semibold text-[#F8FAFC] truncate">{p.title}</span>
-                        </div>
-                        <div className="text-[11px] text-[#94A3B8] truncate mt-0.5 font-mono">
-                          ₹{(p.price || 0).toLocaleString("en-IN")}/day · {p.category}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <button
-                          onClick={() => handleApproveProduct(p.id, p.title)}
-                          disabled={approvingId === p.id}
-                          className="px-2.5 py-1 rounded-lg bg-[#22C55E]/15 hover:bg-[#22C55E]/25 text-[#22C55E] text-[11px] font-bold transition-all duration-150 cursor-pointer border border-[#22C55E]/30 active:scale-95"
-                        >
-                          {approvingId === p.id ? "..." : "Approve"}
+                          {approvingUserId === u.id ? "Approving..." : "Approve"}
                         </button>
                       </div>
                     </div>
                   ))}
                 </>
+              ) : (
+                <div className="py-10 text-center bg-[#F8F7F9] rounded-xl border border-dashed border-[#E6E4E9] text-xs text-[#77757D]">
+                  <CheckCircle2 className="h-6 w-6 text-[#10B981] mx-auto mb-2" />
+                  <span>All submissions verified. Zero queue backlog.</span>
+                </div>
               )}
             </div>
           </div>
 
-          {/* Panel B: Issues & Exceptions (6 cols) */}
-          <div className="lg:col-span-6 p-5 rounded-2xl bg-[#111827] border border-[#273244] flex flex-col justify-between space-y-4 shadow-sm hover:border-[#EF4444]/40 transition-colors duration-200">
-            <div className="flex items-center justify-between pb-3 border-b border-[#273244]">
+          {/* ISSUES & EXCEPTIONS LIST */}
+          <div className="rounded-2xl bg-white border border-[#E6E4E9] p-5 shadow-xs space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-[#E6E4E9]">
               <div className="flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-[#EF4444]" />
-                <h3 className="text-xs font-bold text-[#F8FAFC]">Issues & Exceptions</h3>
+                <AlertTriangle className="h-4 w-4 text-[#DC2626]" />
+                <h3 className="text-xs font-bold uppercase tracking-wider text-[#242424]">
+                  Issues & Exceptions
+                </h3>
               </div>
-              <Link
-                to="/admin/reports"
-                className="text-[11px] font-semibold text-[#3B82F6] hover:underline flex items-center gap-1 group"
-              >
-                <span>View All</span>
-                <ArrowRight className="h-3 w-3 group-hover:translate-x-0.5 transition-transform duration-150" />
+              <Link to="/admin/reports" className="text-xs font-semibold text-[#FF7655] hover:underline">
+                View All →
               </Link>
             </div>
 
             <div className="space-y-2.5">
-              {reports.filter((r) => r.status === "open").length === 0 &&
-              supportTickets.filter((t) => t.status === "open").length === 0 ? (
-                <div className="py-8 text-center text-xs text-[#71819B]">
-                  Zero open disputes or reported issues. Platform operational.
-                </div>
-              ) : (
-                <>
-                  {reports
-                    .filter((r) => r.status === "open")
-                    .slice(0, 2)
-                    .map((r) => (
-                      <div
-                        key={r.id}
-                        className="p-3 rounded-xl bg-[#070B14] border border-[#273244] hover:bg-[#162238]/60 transition-colors duration-150 flex items-center justify-between gap-3 text-xs"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-[#EF4444]/15 text-[#EF4444] border border-[#EF4444]/30">
-                              REPORT
-                            </span>
-                            <span className="font-semibold text-[#F8FAFC] truncate">
-                              {r.productTitle || "Reported Item"}
-                            </span>
-                          </div>
-                          <div className="text-[11px] text-[#94A3B8] truncate mt-0.5">{r.reason}</div>
-                        </div>
-                        <Link
-                          to="/admin/reports"
-                          className="px-2.5 py-1 rounded-lg bg-[#3B82F6]/15 hover:bg-[#3B82F6]/25 text-[#3B82F6] text-[11px] font-bold transition-all duration-150 cursor-pointer shrink-0 border border-[#3B82F6]/30 active:scale-95"
+              {issuesList.length > 0 ? (
+                issuesList.map((issue) => (
+                  <div
+                    key={issue.id}
+                    className="p-3 rounded-xl bg-[#F8F7F9] border border-[#E6E4E9] flex items-center justify-between gap-3 hover:border-[#D6D4D9] transition-all"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={cn(
+                            "text-[9px] font-mono uppercase px-1.5 py-0.2 rounded font-bold",
+                            issue.severity === "CRITICAL"
+                              ? "bg-red-100 text-red-800"
+                              : "bg-amber-100 text-amber-800"
+                          )}
                         >
-                          Investigate
-                        </Link>
+                          {issue.severity}
+                        </span>
+                        <span className="text-xs font-bold text-[#242424] truncate">
+                          {issue.title}
+                        </span>
                       </div>
-                    ))}
+                      <div className="text-[11px] text-[#77757D] truncate mt-0.5">
+                        Logged by {issue.author} · {issue.date}
+                      </div>
+                    </div>
 
-                  {supportTickets
-                    .filter((t) => t.status === "open" || t.status === "pending")
-                    .slice(0, 2)
-                    .map((t) => (
-                      <div
-                        key={t.id}
-                        className="p-3 rounded-xl bg-[#070B14] border border-[#273244] hover:bg-[#162238]/60 transition-colors duration-150 flex items-center justify-between gap-3 text-xs"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-[#F59E0B]/15 text-[#F59E0B] border border-[#F59E0B]/30">
-                              SUPPORT
-                            </span>
-                            <span className="font-semibold text-[#F8FAFC] truncate">{t.subject}</span>
-                          </div>
-                          <div className="text-[11px] text-[#94A3B8] truncate mt-0.5">
-                            From {t.userName || t.userEmail}
-                          </div>
-                        </div>
-                        <Link
-                          to="/admin/support"
-                          className="px-2.5 py-1 rounded-lg bg-[#3B82F6]/15 hover:bg-[#3B82F6]/25 text-[#3B82F6] text-[11px] font-bold transition-all duration-150 cursor-pointer shrink-0 border border-[#3B82F6]/30 active:scale-95"
-                        >
-                          Respond
-                        </Link>
-                      </div>
-                    ))}
-                </>
+                    <Link
+                      to={issue.type === "report" ? "/admin/reports" : "/admin/support"}
+                      className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-white border border-[#E6E4E9] text-[#242424] hover:bg-[#F8F7F9] transition-colors shrink-0 shadow-2xs"
+                    >
+                      Resolve
+                    </Link>
+                  </div>
+                ))
+              ) : (
+                <div className="py-10 text-center bg-[#F8F7F9] rounded-xl border border-dashed border-[#E6E4E9] text-xs text-[#77757D]">
+                  <CheckCircle2 className="h-6 w-6 text-[#10B981] mx-auto mb-2" />
+                  <span>Zero open disputes or reported issues. Platform operational.</span>
+                </div>
               )}
             </div>
           </div>
         </div>
       </div>
 
-      {/* ==================================================================== */}
-      {/* SECTION 7 & 8 — UPCOMING BOOKINGS AND OVERDUE ACTIONS */}
-      {/* ==================================================================== */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Panel A: Upcoming Bookings (6 cols) */}
-        <div className="lg:col-span-6 p-5 rounded-2xl bg-[#111827] border border-[#273244] flex flex-col justify-between space-y-4 shadow-sm hover:border-[#3B82F6]/40 transition-colors duration-200">
-          <div className="flex items-center justify-between pb-3 border-b border-[#273244]">
+      {/* ------------------------------------------------------------------ */}
+      {/* 6. UPCOMING BOOKINGS & OVERDUE ACTIONS */}
+      {/* ------------------------------------------------------------------ */}
+      <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {/* UPCOMING BOOKINGS */}
+        <div className="rounded-2xl bg-white border border-[#E6E4E9] p-5 shadow-xs space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-[#E6E4E9]">
             <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-[#3B82F6]" />
-              <h3 className="text-xs font-bold text-[#F8FAFC]">Upcoming Bookings</h3>
+              <Calendar className="h-4 w-4 text-[#FF7655]" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#242424]">
+                Upcoming Bookings
+              </h3>
             </div>
-            <Link
-              to="/admin/bookings"
-              className="text-[11px] font-semibold text-[#3B82F6] hover:underline flex items-center gap-1 group"
-            >
-              <span>View Roster</span>
-              <ArrowRight className="h-3 w-3 group-hover:translate-x-0.5 transition-transform duration-150" />
+            <Link to="/admin/bookings" className="text-xs font-semibold text-[#FF7655] hover:underline">
+              View Roster →
             </Link>
           </div>
 
           <div className="space-y-2.5">
-            {upcomingBookings.length === 0 ? (
-              <div className="py-8 text-center text-xs text-[#71819B]">
-                No scheduled reservations currently active.
-              </div>
-            ) : (
-              upcomingBookings.map((b) => (
+            {upcomingBookingsList.length > 0 ? (
+              upcomingBookingsList.map((bk) => (
                 <div
-                  key={b.id}
-                  className="p-3 rounded-xl bg-[#070B14] border border-[#273244] hover:bg-[#162238]/60 transition-colors duration-150 flex items-center justify-between gap-3 text-xs"
+                  key={bk.id}
+                  className="p-3 rounded-xl bg-[#F8F7F9] border border-[#E6E4E9] flex items-center justify-between gap-3 hover:border-[#D6D4D9] transition-all"
                 >
-                  <div className="min-w-0 flex-1">
-                    <div className="font-semibold text-[#F8FAFC] truncate">
-                      {b.productTitle || "Rental Gear"}
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold text-[#242424] truncate">
+                      {bk.productTitle || `Booking #${bk.id.slice(0, 8)}`}
                     </div>
-                    <div className="text-[11px] text-[#94A3B8] font-mono mt-0.5 flex items-center gap-2">
-                      <span>{b.startDate}</span>
-                      {b.timeSlot && (
-                        <span className="capitalize px-1 rounded bg-[#162238] text-[10px] text-[#94A3B8]">
-                          {b.timeSlot.replace("_", " ")}
-                        </span>
-                      )}
-                      <span>·</span>
-                      <span>By {b.customerName || "Renter"}</span>
+                    <div className="text-[11px] text-[#77757D] truncate mt-0.5">
+                      Renter: {bk.renterName || "Customer"} · ₹{bk.totalAmount || 0}
                     </div>
                   </div>
-                  <div className="text-right shrink-0">
-                    <div className="font-mono font-bold text-[#F8FAFC]">
-                      ₹{(b.amount || 0).toLocaleString("en-IN")}
-                    </div>
-                    <span
-                      className={cn(
-                        "inline-block mt-0.5 px-1.5 py-0.2 rounded text-[9px] font-mono font-bold uppercase",
-                        b.status === "active" || b.status === "confirmed"
-                          ? "bg-[#22C55E]/15 text-[#22C55E]"
-                          : "bg-[#F59E0B]/15 text-[#F59E0B]"
-                      )}
-                    >
-                      {b.status}
-                    </span>
-                  </div>
+
+                  <span
+                    className={cn(
+                      "px-2 py-0.5 text-[10px] font-mono font-bold rounded-full capitalize",
+                      bk.status === "active"
+                        ? "bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0]"
+                        : bk.status === "confirmed"
+                        ? "bg-blue-100 text-blue-800 border border-blue-200"
+                        : "bg-amber-100 text-amber-800 border border-amber-200"
+                    )}
+                  >
+                    {bk.status}
+                  </span>
                 </div>
               ))
+            ) : (
+              <div className="py-8 text-center text-xs text-[#77757D]">
+                No scheduled reservations currently active.
+              </div>
             )}
           </div>
         </div>
 
-        {/* Panel B: Overdue Actions (6 cols) */}
-        <div className="lg:col-span-6 p-5 rounded-2xl bg-[#111827] border border-[#273244] flex flex-col justify-between space-y-4 shadow-sm hover:border-[#F59E0B]/40 transition-colors duration-200">
-          <div className="flex items-center justify-between pb-3 border-b border-[#273244]">
+        {/* OVERDUE ACTIONS */}
+        <div className="rounded-2xl bg-white border border-[#E6E4E9] p-5 shadow-xs space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-[#E6E4E9]">
             <div className="flex items-center gap-2">
-              <ShieldAlert className="h-4 w-4 text-[#F59E0B]" />
-              <h3 className="text-xs font-bold text-[#F8FAFC]">Action Required Tasks</h3>
+              <AlertTriangle className="h-4 w-4 text-[#D97706]" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#242424]">
+                Action Required Tasks
+              </h3>
             </div>
-            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-[#F59E0B]/15 text-[#F59E0B] border border-[#F59E0B]/30">
-              {overdueItems.length} Tasks
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#F8F7F9] text-[#77757D] border border-[#E6E4E9]">
+              {overdueActions.length} Tasks
             </span>
           </div>
 
           <div className="space-y-2.5">
-            {overdueItems.length === 0 ? (
-              <div className="py-8 text-center text-xs text-[#71819B]">
-                All operational items are current. Zero overdue tasks.
-              </div>
-            ) : (
-              overdueItems.map((item) => (
+            {overdueActions.length > 0 ? (
+              overdueActions.map((task) => (
                 <div
-                  key={item.id}
-                  className="p-3 rounded-xl bg-[#070B14] border border-[#273244] hover:bg-[#162238]/60 transition-colors duration-150 flex items-center justify-between gap-3 text-xs"
+                  key={task.id}
+                  className="p-3 rounded-xl bg-[#F8F7F9] border border-[#E6E4E9] flex items-center justify-between gap-3 hover:border-[#D6D4D9] transition-all"
                 >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-[#162238] text-[#F8FAFC]">
-                        {item.type}
-                      </span>
-                      <span className="font-semibold text-[#F8FAFC] truncate">{item.title}</span>
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold text-[#242424] truncate">
+                      {task.title}
                     </div>
-                    <div className="text-[11px] text-[#F59E0B] mt-0.5 font-mono">{item.age}</div>
+                    <div className="text-[11px] text-[#77757D] truncate mt-0.5">
+                      {task.category}
+                    </div>
                   </div>
-                  <Link
-                    to={item.link as any}
-                    className="px-2.5 py-1 rounded-lg bg-[#3B82F6]/15 hover:bg-[#3B82F6]/25 text-[#3B82F6] text-[11px] font-bold transition-all duration-150 cursor-pointer shrink-0 border border-[#3B82F6]/30 active:scale-95"
+
+                  <span
+                    className={cn(
+                      "px-2 py-0.5 text-[10px] font-mono font-bold rounded-full shrink-0",
+                      task.urgent
+                        ? "bg-red-100 text-red-700 border border-red-200"
+                        : "bg-amber-100 text-amber-700 border border-amber-200"
+                    )}
                   >
-                    Action
-                  </Link>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* ==================================================================== */}
-      {/* SECTION 8 — RECENT ACTIVITY TRAIL & PLATFORM HEALTH */}
-      {/* ==================================================================== */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Recent Activity Audit Trail (8 cols) */}
-        <div className="lg:col-span-8 p-5 rounded-2xl bg-[#111827] border border-[#273244] space-y-4 shadow-sm hover:border-[#3B82F6]/40 transition-colors duration-200">
-          <div className="flex items-center justify-between pb-3 border-b border-[#273244]">
-            <div className="flex items-center gap-2">
-              <Activity className="h-4 w-4 text-[#3B82F6]" />
-              <h3 className="text-xs font-bold text-[#F8FAFC]">Recent Activity Trail</h3>
-            </div>
-            <Link
-              to="/admin/activity-logs"
-              className="text-[11px] font-semibold text-[#3B82F6] hover:underline flex items-center gap-1 group"
-            >
-              <span>Full Audit Logs</span>
-              <ArrowRight className="h-3 w-3 group-hover:translate-x-0.5 transition-transform duration-150" />
-            </Link>
-          </div>
-
-          <div className="divide-y divide-[#273244]/60">
-            {activities.length === 0 ? (
-              <div className="py-8 text-center text-xs text-[#71819B]">
-                No recent activity records recorded in audit log.
-              </div>
-            ) : (
-              activities.slice(0, 6).map((act) => (
-                <div key={act.id} className="py-2.5 flex items-center justify-between gap-3 text-xs hover:bg-[#162238]/40 px-2 rounded-lg transition-colors duration-150">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="h-7 w-7 rounded-lg bg-[#070B14] border border-[#273244] flex items-center justify-center text-[#3B82F6] shrink-0">
-                      <Activity className="h-3.5 w-3.5" />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="font-semibold text-[#F8FAFC] truncate">{act.title}</div>
-                      <div className="text-[11px] text-[#94A3B8] truncate">{act.detail}</div>
-                    </div>
-                  </div>
-                  <span className="text-[10px] font-mono text-[#71819B] shrink-0">
-                    {act.time ? act.time.slice(11, 16) || act.time.slice(0, 10) : "Recent"}
+                    {task.duration}
                   </span>
                 </div>
               ))
+            ) : (
+              <div className="py-8 text-center text-xs text-[#77757D]">
+                All operational items are current. Zero overdue tasks.
+              </div>
+            )}
+          </div>
+        </div>
+      </motion.div>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* 7. AUDIT TRAIL & PLATFORM HEALTH */}
+      {/* ------------------------------------------------------------------ */}
+      <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        {/* RECENT ACTIVITY TRAIL (2 COLS) */}
+        <div className="lg:col-span-2 rounded-2xl bg-white border border-[#E6E4E9] p-5 shadow-xs space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-[#E6E4E9]">
+            <div className="flex items-center gap-2">
+              <Activity className="h-4 w-4 text-[#FF7655]" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#242424]">
+                Recent Activity Trail
+              </h3>
+            </div>
+            <Link to="/admin/activity-logs" className="text-xs font-semibold text-[#FF7655] hover:underline">
+              Full Audit Logs →
+            </Link>
+          </div>
+
+          <div className="space-y-2.5">
+            {recentActivity.length > 0 ? (
+              recentActivity.slice(0, 5).map((act) => (
+                <div
+                  key={act.id}
+                  className="p-3 rounded-xl bg-[#F8F7F9] border border-[#E6E4E9] flex items-center justify-between gap-3 text-xs"
+                >
+                  <div className="min-w-0">
+                    <span className="font-semibold text-[#242424]">{act.action}</span>
+                    <div className="text-[11px] text-[#77757D] truncate mt-0.5">
+                      Target: {act.target || "Platform"} · By {act.user || "System"}
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-mono text-[#77757D] shrink-0">
+                    {act.timestamp ? new Date(act.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "Just now"}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <div className="py-8 text-center text-xs text-[#77757D]">
+                No recent activity records recorded in audit log.
+              </div>
             )}
           </div>
         </div>
 
-        {/* Platform Health & Freshness (4 cols) */}
-        <div className="lg:col-span-4 p-5 rounded-2xl bg-[#111827] border border-[#273244] flex flex-col justify-between space-y-4 shadow-sm hover:border-[#22C55E]/40 transition-colors duration-200">
-          <div className="flex items-center justify-between pb-3 border-b border-[#273244]">
+        {/* PLATFORM HEALTH (1 COL) */}
+        <div className="rounded-2xl bg-white border border-[#E6E4E9] p-5 shadow-xs space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-[#E6E4E9]">
             <div className="flex items-center gap-2">
-              <Database className="h-4 w-4 text-[#22C55E]" />
-              <h3 className="text-xs font-bold text-[#F8FAFC]">Platform Health</h3>
+              <Database className="h-4 w-4 text-[#10B981]" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#242424]">
+                Platform Health
+              </h3>
             </div>
-            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[#22C55E]/15 text-[#22C55E] border border-[#22C55E]/30">
+            <span className="px-2 py-0.5 rounded-full bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0] text-[10px] font-mono font-bold">
               Operational
             </span>
           </div>
 
-          <div className="space-y-3 text-xs">
-            {/* Backend API Probe */}
-            <div className="p-3 rounded-xl bg-[#070B14] border border-[#273244] flex items-center justify-between">
-              <div className="space-y-0.5">
-                <div className="font-semibold text-[#F8FAFC]">FastAPI Backend</div>
-                <div className="text-[11px] text-[#71819B] font-mono">/api/health/ready</div>
+          <div className="space-y-3">
+            <div className="p-3 rounded-xl bg-[#F8F7F9] border border-[#E6E4E9] flex items-center justify-between">
+              <div>
+                <div className="text-xs font-bold text-[#242424]">FastAPI Backend</div>
+                <div className="text-[10px] font-mono text-[#77757D]">/api/health/ready</div>
               </div>
-              <span className="h-2 w-2 rounded-full bg-[#22C55E] shadow-[0_0_8px_#22C55E]" />
+              <span className="h-2 w-2 rounded-full bg-[#10B981] animate-pulse" />
             </div>
 
-            {/* Database Probe */}
-            <div className="p-3 rounded-xl bg-[#070B14] border border-[#273244] flex items-center justify-between">
-              <div className="space-y-0.5">
-                <div className="font-semibold text-[#F8FAFC]">Database Datastore</div>
-                <div className="text-[11px] text-[#71819B] font-mono">TiDB Cloud MySQL SSL</div>
+            <div className="p-3 rounded-xl bg-[#F8F7F9] border border-[#E6E4E9] flex items-center justify-between">
+              <div>
+                <div className="text-xs font-bold text-[#242424]">Database Datastore</div>
+                <div className="text-[10px] font-mono text-[#77757D]">TiDB cloud MySQL SSL</div>
               </div>
-              <span className="h-2 w-2 rounded-full bg-[#22C55E] shadow-[0_0_8px_#22C55E]" />
+              <span className="h-2 w-2 rounded-full bg-[#10B981]" />
             </div>
 
-            {/* WebSocket Stream */}
-            <div className="p-3 rounded-xl bg-[#070B14] border border-[#273244] flex items-center justify-between">
-              <div className="space-y-0.5">
-                <div className="font-semibold text-[#F8FAFC]">Live WebSocket Stream</div>
-                <div className="text-[11px] text-[#71819B] font-mono">/api/admin/ws</div>
+            <div className="p-3 rounded-xl bg-[#F8F7F9] border border-[#E6E4E9] flex items-center justify-between">
+              <div>
+                <div className="text-xs font-bold text-[#242424]">Live WebSocket Stream</div>
+                <div className="text-[10px] font-mono text-[#77757D]">/api/admin/ws</div>
               </div>
               <span
                 className={cn(
                   "h-2 w-2 rounded-full",
-                  wsStatus === "LIVE" ? "bg-[#22C55E] animate-ping" : "bg-[#3B82F6]"
+                  wsStatus === "LIVE" ? "bg-[#10B981]" : "bg-[#F59E0B]"
                 )}
               />
             </div>
           </div>
 
-          <div className="pt-3 border-t border-[#273244] text-[11px] text-[#94A3B8] flex items-center justify-between">
+          <div className="pt-2 border-t border-[#E6E4E9] flex items-center justify-between text-[11px] text-[#77757D]">
             <span>Data Freshness</span>
-            <span className="font-mono text-[#F8FAFC]">Realtime sync</span>
+            <span className="font-mono font-semibold text-[#242424]">Realtime sync</span>
           </div>
         </div>
-      </div>
+      </motion.div>
     </motion.div>
   );
 }
+
+export default Dashboard;

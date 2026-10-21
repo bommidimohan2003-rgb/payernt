@@ -169,7 +169,7 @@ function AdminLayout() {
         </div>
       }
     >
-      <div className="dark min-h-screen bg-[var(--admin-bg)] text-[var(--admin-text)] flex flex-col antialiased transition-colors duration-200">
+      <div className="min-h-screen bg-[var(--admin-bg)] text-[var(--admin-text)] flex flex-col antialiased transition-colors duration-200">
         <div className="flex flex-1 relative items-stretch">
           {/* Collapsible Sidebar */}
           <Sidebar />

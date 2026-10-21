@@ -40,6 +40,8 @@
   --color-admin-success: var(--admin-success);
   --color-admin-warning: var(--admin-warning);
   --color-admin-error: var(--admin-error);
+  --color-admin-orange-start: var(--admin-orange-start);
+  --color-admin-orange-end: var(--admin-orange-end);
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Outfit", "Inter", sans-serif;
 }
@@ -111,19 +113,21 @@ html, body {
   --payent-text-secondary: #64748b;
   --payent-text-muted: #94a3b8;
 
-  /* Admin Design System Tokens - Midnight Sapphire Premium SaaS */
-  --admin-bg: #070B14;
-  --admin-sidebar: #0D1524;
-  --admin-elevated: #162238;
-  --admin-card: #111827;
-  --admin-secondary-surface: #162238;
-  --admin-text: #F8FAFC;
-  --admin-text-secondary: #9AAAC2;
-  --admin-text-muted: #71819B;
-  --admin-border: #273244;
-  --admin-accent: #3B82F6;
-  --admin-accent-hover: #60A5FA;
-  --admin-success: #22C55E;
+  /* Admin Design System Tokens - Dashboard V14 Exact Visual Style (Light Theme) */
+  --admin-bg: #F3F2F5;
+  --admin-sidebar: #FFFFFF;
+  --admin-elevated: #F8F7F9;
+  --admin-card: #FFFFFF;
+  --admin-secondary-surface: #F8F7F9;
+  --admin-text: #242424;
+  --admin-text-secondary: #77757D;
+  --admin-text-muted: #9E9DA4;
+  --admin-border: #E6E4E9;
+  --admin-accent: #242424;
+  --admin-accent-hover: #161616;
+  --admin-orange-start: #F9856A;
+  --admin-orange-end: #FF7655;
+  --admin-success: #10B981;
   --admin-warning: #F59E0B;
   --admin-error: #EF4444;
 }
