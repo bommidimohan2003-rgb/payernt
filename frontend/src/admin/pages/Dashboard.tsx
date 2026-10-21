@@ -117,7 +117,7 @@ export default function Dashboard() {
   const [supportTickets, setSupportTickets] = useState<AdminSupportTicket[]>([]);
   const [activities, setActivities] = useState<DashboardActivity[]>([]);
   const [healthStatus, setHealthStatus] = useState<{ status: string; database: string } | null>(null);
-  const [wsStatus, setWsStatus] = useState<ConnectionStatus>("ONLINE");
+  const [wsStatus, setWsStatus] = useState<ConnectionStatus>("LIVE");
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -326,6 +326,43 @@ export default function Dashboard() {
 
     return { totalTracked, delivered, outForDelivery, inPrep, pendingPickup };
   }, [bookings]);
+
+  // Derived Account Role Counts (Lenders/Payernt, Renters/Payrent, Agents, Admins)
+  const userCategoryCounts = useMemo(() => {
+    let payernt = stats?.payerntAccounts ?? 0;
+    let payrent = stats?.payrentAccounts ?? 0;
+    let admins = stats?.adminAccounts ?? 0;
+
+    if (!payernt && !payrent) {
+      users.forEach((u) => {
+        const role = String(u.role || "").toLowerCase();
+        const accountType = String(u.accountType || "").toLowerCase();
+        if (role === "admin" || role === "superadmin") {
+          admins++;
+        } else if (
+          role === "lender" ||
+          role === "vendor" ||
+          accountType === "lender" ||
+          accountType === "vendor" ||
+          accountType === "payernt" ||
+          Boolean(u.payerntAccount)
+        ) {
+          payernt++;
+        } else {
+          payrent++;
+        }
+      });
+    }
+
+    if (admins === 0) admins = 1;
+
+    return {
+      payernt,
+      payrent: payrent > 0 ? payrent : Math.max(0, (stats?.totalUsers ?? users.length) - payernt - (stats?.totalAgents ?? 0) - admins),
+      agents: stats?.totalAgents ?? users.filter((u) => u.role === "agent").length,
+      admins,
+    };
+  }, [users, stats]);
 
   // Overdue & Attention Required Tasks (Factual duration/age thresholds)
   const overdueItems = useMemo(() => {
@@ -960,19 +997,19 @@ export default function Dashboard() {
                 <div className="space-y-2.5 my-2 text-xs">
                   <div className="flex items-center justify-between p-2.5 rounded-lg bg-[#111827] border border-[#273244]">
                     <span className="text-[#94A3B8]">Payernt (Lenders/Vendors)</span>
-                    <span className="font-mono font-bold text-[#F8FAFC]">{stats?.payerntAccounts ?? 0}</span>
+                    <span className="font-mono font-bold text-[#F8FAFC]">{userCategoryCounts.payernt}</span>
                   </div>
                   <div className="flex items-center justify-between p-2.5 rounded-lg bg-[#111827] border border-[#273244]">
                     <span className="text-[#94A3B8]">Payrent (Renters/Customers)</span>
-                    <span className="font-mono font-bold text-[#F8FAFC]">{stats?.payrentAccounts ?? 0}</span>
+                    <span className="font-mono font-bold text-[#F8FAFC]">{userCategoryCounts.payrent}</span>
                   </div>
                   <div className="flex items-center justify-between p-2.5 rounded-lg bg-[#111827] border border-[#273244]">
                     <span className="text-[#94A3B8]">Registered Agents</span>
-                    <span className="font-mono font-bold text-[#F8FAFC]">{stats?.totalAgents ?? 0}</span>
+                    <span className="font-mono font-bold text-[#F8FAFC]">{userCategoryCounts.agents}</span>
                   </div>
                   <div className="flex items-center justify-between p-2.5 rounded-lg bg-[#111827] border border-[#273244]">
                     <span className="text-[#94A3B8]">Administrators</span>
-                    <span className="font-mono font-bold text-[#F8FAFC]">{stats?.adminAccounts ?? 1}</span>
+                    <span className="font-mono font-bold text-[#F8FAFC]">{userCategoryCounts.admins}</span>
                   </div>
                 </div>
                 <div className="pt-2 border-t border-[#273244] text-[11px] text-[#94A3B8] flex justify-between">

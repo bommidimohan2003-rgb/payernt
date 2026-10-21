@@ -29,6 +29,9 @@ export interface DashboardStats {
   unreadNotifications: number;
   websiteVisitors: number;
   activeVisitors?: number;
+  payerntAccounts?: number;
+  payrentAccounts?: number;
+  adminAccounts?: number;
 }
 
 export interface DashboardCharts {
