@@ -38,6 +38,7 @@ export default defineConfig({
         target: process.env.VITE_API_URL || "http://127.0.0.1:8001",
         changeOrigin: true,
         secure: false,
+        ws: true,
       },
     },
     headers: {

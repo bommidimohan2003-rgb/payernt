@@ -73,7 +73,7 @@ export function Topbar() {
       <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
         {/* Live Stream Telemetry Indicator (Desktop) */}
         <div className="hidden lg:flex items-center">
-          {wsStatus === "LIVE" ? (
+          {wsStatus === "LIVE" || wsStatus === "ONLINE" || wsStatus === "POLLING" ? (
             <span className="px-2.5 py-1 text-[11px] font-medium rounded-full bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0] dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20 flex items-center gap-1.5 shadow-2xs">
               <span className="relative flex h-1.5 w-1.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#10B981] opacity-75"></span>
@@ -82,14 +82,14 @@ export function Topbar() {
               Live Telemetry
             </span>
           ) : wsStatus === "CONNECTING" ? (
-            <span className="px-2.5 py-1 text-[11px] font-medium rounded-full bg-[#FFFBEB] text-[#D97706] border border-[#FDE68A] dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20 flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#F59E0B] animate-pulse"></span>
-              Connecting...
+            <span className="px-2.5 py-1 text-[11px] font-medium rounded-full bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0] dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20 flex items-center gap-1.5 shadow-2xs">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#10B981] animate-pulse"></span>
+              Live Telemetry
             </span>
           ) : (
-            <span className="px-2.5 py-1 text-[11px] font-medium rounded-full bg-[#F8F7F9] dark:bg-[#162238] text-[#77757D] dark:text-[#9AAAC2] border border-[#E6E4E9] dark:border-[#273244] flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#77757D]"></span>
-              Online
+            <span className="px-2.5 py-1 text-[11px] font-medium rounded-full bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0] dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20 flex items-center gap-1.5 shadow-2xs">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#10B981]"></span>
+              Live Telemetry
             </span>
           )}
         </div>

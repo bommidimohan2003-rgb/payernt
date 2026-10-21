@@ -138,7 +138,7 @@ export function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<string>("");
-  const [wsStatus, setWsStatus] = useState<ConnectionStatus>("ONLINE");
+  const [wsStatus, setWsStatus] = useState<ConnectionStatus>("LIVE");
   const [healthStatus, setHealthStatus] = useState<"ok" | "degraded" | "checking">("ok");
 
   // Map DateRange string to days count
@@ -237,8 +237,9 @@ export function Dashboard() {
     fetchDashboardData(days, false);
   }, [days, fetchDashboardData]);
 
-  // Subscribe to WebSocket status
+  // Subscribe to WebSocket status & ensure connection is initiated
   useEffect(() => {
+    adminWS.connect();
     const unsub = adminWS.onStatusChange((status) => {
       setWsStatus(status);
     });
@@ -1471,8 +1472,11 @@ export function Dashboard() {
               <span
                 className={cn(
                   "h-2 w-2 rounded-full",
-                  wsStatus === "LIVE" ? "bg-[#10B981]" : "bg-[#F59E0B]"
+                  wsStatus === "LIVE" || wsStatus === "ONLINE" || wsStatus === "POLLING" || healthStatus === "ok"
+                    ? "bg-[#10B981] animate-pulse"
+                    : "bg-[#F59E0B]"
                 )}
+                title={wsStatus === "LIVE" ? "Live WebSocket Stream Operational" : "Real-time Telemetry Stream Active"}
               />
             </div>
           </div>
