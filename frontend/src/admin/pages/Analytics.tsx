@@ -15,7 +15,7 @@ import {
   Clock,
   CreditCard,
   Package,
-  Users,
+  Users as UsersIcon,
   Truck,
   ShieldCheck,
   Layers,
@@ -23,12 +23,11 @@ import {
   ChevronRight,
   Info,
   DollarSign,
-  PieChart as PieIcon,
-  BarChart3,
-  Activity,
-  Check,
-  HelpCircle,
   FileSpreadsheet,
+  Check,
+  BarChart2,
+  Activity,
+  SlidersHorizontal,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -45,7 +44,6 @@ import {
   YAxis,
   Tooltip,
   CartesianGrid,
-  Legend,
 } from "recharts";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -58,25 +56,35 @@ import {
 } from "@/components/ui/tooltip";
 import {
   DateRangePreset,
-  DateRange,
   calculateDateRange,
   fetchAnalyticsData,
   AnalyticsDataset,
   exportToCsv,
 } from "../services/analytics";
 
-const CATEGORY_COLORS = ["#F9856A", "#3B82F6", "#10B981", "#8B5CF6", "#F59E0B", "#EC4899", "#64748B"];
+type TabType = "Overview" | "Bookings" | "Products" | "Users" | "Delivery" | "Finance";
 
-type TabType = "Bookings" | "Funnel" | "Products" | "Users" | "Deliveries" | "Finance";
+const PALETTE = {
+  accent: "#635BFF", // Primary Stripe-grade indigo
+  accentMuted: "rgba(99, 91, 255, 0.12)",
+  positive: "#16865C",
+  warning: "#D99118",
+  negative: "#DC4545",
+  gray: "#71717A",
+  prevLine: "#94A3B8",
+};
+
+const CATEGORY_COLORS = ["#635BFF", "#10B981", "#3B82F6", "#F59E0B", "#8B5CF6", "#EC4899"];
 
 export default function Analytics() {
-  const [preset, setPreset] = useState<DateRangePreset>("7d"); // Default: Last 7 Days as required
+  const [preset, setPreset] = useState<DateRangePreset>("7d"); // Default: Last 7 Days
   const [customStart, setCustomStart] = useState<string>("");
   const [customEnd, setCustomEnd] = useState<string>("");
   const [showCustomModal, setShowCustomModal] = useState<boolean>(false);
   const [comparePrevious, setComparePrevious] = useState<boolean>(true);
 
-  const [activeTab, setActiveTab] = useState<TabType>("Bookings");
+  // Default view is Overview as requested in Section 5
+  const [activeTab, setActiveTab] = useState<TabType>("Overview");
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [dataset, setDataset] = useState<AnalyticsDataset | null>(null);
@@ -276,29 +284,16 @@ export default function Analytics() {
 
   if (loading && !dataset) {
     return (
-      <div className="space-y-6 max-w-[1600px] mx-auto pb-12 animate-pulse">
-        {/* Header Skeleton */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-[#E6E4E9] dark:border-[#273244]">
-          <div className="space-y-2">
-            <div className="h-8 w-48 bg-[#E6E4E9] dark:bg-[#162238] rounded-lg" />
-            <div className="h-4 w-72 bg-[#E6E4E9] dark:bg-[#162238] rounded-md" />
+      <div className="space-y-6 max-w-[1520px] mx-auto pb-12 animate-pulse">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-[#E4E4E7] dark:border-[#27272A]">
+          <div className="space-y-1.5">
+            <div className="h-7 w-40 bg-[#E4E4E7] dark:bg-[#1E2330] rounded-md" />
+            <div className="h-4 w-64 bg-[#E4E4E7] dark:bg-[#1E2330] rounded" />
           </div>
-          <div className="h-10 w-96 bg-[#E6E4E9] dark:bg-[#162238] rounded-xl" />
+          <div className="h-9 w-80 bg-[#E4E4E7] dark:bg-[#1E2330] rounded-lg" />
         </div>
-
-        {/* 8 KPI Cards Skeleton */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="h-32 rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] p-5 space-y-3">
-              <div className="h-3 w-24 bg-[#F3F2F5] dark:bg-[#162238] rounded" />
-              <div className="h-7 w-32 bg-[#F3F2F5] dark:bg-[#162238] rounded-md" />
-              <div className="h-3 w-20 bg-[#F3F2F5] dark:bg-[#162238] rounded" />
-            </div>
-          ))}
-        </div>
-
-        {/* Big Chart Skeleton */}
-        <div className="h-96 rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] p-6" />
+        <div className="h-28 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A]" />
+        <div className="h-96 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A]" />
       </div>
     );
   }
@@ -307,144 +302,123 @@ export default function Analytics() {
 
   return (
     <TooltipProvider delayDuration={150}>
-      <div className="space-y-6 max-w-[1600px] mx-auto pb-12">
-        {/* 1. TOP HEADER & OPERATIONAL FILTERS (Section 4) */}
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 pb-5 border-b border-[#E6E4E9] dark:border-[#273244]">
+      <div className="space-y-6 max-w-[1520px] mx-auto pb-16 antialiased text-[#18181B] dark:text-[#F4F4F5]">
+        {/* =========================================================================
+            1. PAGE HEADER (Section 3)
+            Clean, editorial header with inline controls and Last 7 Days default
+           ========================================================================= */}
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 pb-5 border-b border-[#E4E4E7] dark:border-[#27272A]">
           <div>
             <div className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-[#FF7655] animate-pulse" />
-              <span className="text-[11px] font-mono uppercase tracking-widest text-[#77757D] dark:text-[#9AAAC2]">
-                PAYENT BUSINESS TELEMETRY
+              <span className="h-1.5 w-1.5 rounded-full bg-[#635BFF]" />
+              <span className="text-[11px] font-mono font-semibold uppercase tracking-wider text-[#71717A] dark:text-[#A1A1AA]">
+                Intelligence Workspace
               </span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#242424] dark:text-[#F8FAFC] mt-0.5">
+            <h1 className="text-2xl font-bold tracking-tight text-[#18181B] dark:text-[#FAFAFA] mt-0.5">
               Analytics
             </h1>
-            <p className="text-xs sm:text-sm text-[#77757D] dark:text-[#9AAAC2]">
-              Business performance and operational insights
+            <p className="text-xs text-[#71717A] dark:text-[#A1A1AA] mt-0.5">
+              Understand bookings, rentals, and business performance.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5">
-            {/* Date-Range Selector (Today, 7D default, 30D, 90D, Custom) */}
-            <div className="flex items-center rounded-xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] p-1 shadow-xs text-xs font-semibold">
-              <button
-                onClick={() => setPreset("today")}
-                className={cn(
-                  "px-3 py-1.5 rounded-lg transition-all cursor-pointer",
-                  preset === "today"
-                    ? "bg-[#242424] text-white dark:bg-[#162238] dark:text-[#F8FAFC] shadow-xs"
-                    : "text-[#77757D] hover:text-[#242424] dark:text-[#9AAAC2] dark:hover:text-[#F8FAFC]"
-                )}
-              >
-                Today
-              </button>
-              <button
-                onClick={() => setPreset("7d")}
-                className={cn(
-                  "px-3 py-1.5 rounded-lg transition-all cursor-pointer",
-                  preset === "7d"
-                    ? "bg-[#242424] text-white dark:bg-[#162238] dark:text-[#F8FAFC] shadow-xs"
-                    : "text-[#77757D] hover:text-[#242424] dark:text-[#9AAAC2] dark:hover:text-[#F8FAFC]"
-                )}
-              >
-                7 Days
-              </button>
-              <button
-                onClick={() => setPreset("30d")}
-                className={cn(
-                  "px-3 py-1.5 rounded-lg transition-all cursor-pointer",
-                  preset === "30d"
-                    ? "bg-[#242424] text-white dark:bg-[#162238] dark:text-[#F8FAFC] shadow-xs"
-                    : "text-[#77757D] hover:text-[#242424] dark:text-[#9AAAC2] dark:hover:text-[#F8FAFC]"
-                )}
-              >
-                30 Days
-              </button>
-              <button
-                onClick={() => setPreset("90d")}
-                className={cn(
-                  "px-3 py-1.5 rounded-lg transition-all cursor-pointer",
-                  preset === "90d"
-                    ? "bg-[#242424] text-white dark:bg-[#162238] dark:text-[#F8FAFC] shadow-xs"
-                    : "text-[#77757D] hover:text-[#242424] dark:text-[#9AAAC2] dark:hover:text-[#F8FAFC]"
-                )}
-              >
-                90 Days
-              </button>
+          {/* Compact Control Row */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Date-Range Segmented Selector */}
+            <div className="flex items-center rounded-lg bg-[#F4F4F5] dark:bg-[#1A1F2C] border border-[#E4E4E7] dark:border-[#27272A] p-0.5 text-xs font-medium">
+              {(
+                [
+                  { id: "today", label: "Today" },
+                  { id: "7d", label: "7 Days" },
+                  { id: "30d", label: "30 Days" },
+                  { id: "90d", label: "90 Days" },
+                ] as const
+              ).map((opt) => (
+                <button
+                  key={opt.id}
+                  onClick={() => setPreset(opt.id)}
+                  className={cn(
+                    "px-3 py-1.5 rounded-md transition-all cursor-pointer text-xs",
+                    preset === opt.id
+                      ? "bg-white dark:bg-[#12161F] text-[#18181B] dark:text-[#FAFAFA] font-semibold shadow-xs"
+                      : "text-[#71717A] dark:text-[#A1A1AA] hover:text-[#18181B] dark:hover:text-[#FAFAFA]"
+                  )}
+                >
+                  {opt.label}
+                </button>
+              ))}
+
               <button
                 onClick={() => setShowCustomModal(true)}
                 className={cn(
-                  "px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5",
+                  "px-3 py-1.5 rounded-md transition-all cursor-pointer flex items-center gap-1.5 text-xs",
                   preset === "custom"
-                    ? "bg-[#242424] text-white dark:bg-[#162238] dark:text-[#F8FAFC] shadow-xs"
-                    : "text-[#77757D] hover:text-[#242424] dark:text-[#9AAAC2] dark:hover:text-[#F8FAFC]"
+                    ? "bg-white dark:bg-[#12161F] text-[#18181B] dark:text-[#FAFAFA] font-semibold shadow-xs"
+                    : "text-[#71717A] dark:text-[#A1A1AA] hover:text-[#18181B] dark:hover:text-[#FAFAFA]"
                 )}
               >
-                <Calendar className="h-3.5 w-3.5" />
-                <span>{preset === "custom" ? "Custom" : "Custom..."}</span>
+                <Calendar className="h-3 w-3" />
+                <span>{preset === "custom" ? "Custom" : "Custom"}</span>
               </button>
             </div>
 
-            {/* Compare Toggle */}
+            {/* Compare Previous Period Toggle */}
             <button
               onClick={() => setComparePrevious(!comparePrevious)}
               className={cn(
-                "px-3 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer flex items-center gap-1.5",
+                "px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors cursor-pointer flex items-center gap-1.5",
                 comparePrevious
-                  ? "bg-white dark:bg-[#111827] text-[#242424] dark:text-[#F8FAFC] border-[#E6E4E9] dark:border-[#273244] shadow-xs"
-                  : "bg-transparent text-[#77757D] dark:text-[#9AAAC2] border-dashed border-[#E6E4E9] dark:border-[#273244]"
+                  ? "bg-white dark:bg-[#12161F] text-[#18181B] dark:text-[#FAFAFA] border-[#E4E4E7] dark:border-[#27272A] shadow-xs"
+                  : "bg-transparent text-[#71717A] dark:text-[#A1A1AA] border-[#E4E4E7] dark:border-[#27272A] opacity-70"
               )}
-              title="Compare with previous equivalent period"
+              title="Compare metrics with previous equivalent period"
             >
-              <Activity className="h-3.5 w-3.5 text-[#FF7655]" />
-              <span className="hidden sm:inline">Compare Prev</span>
+              <Activity className={cn("h-3 w-3", comparePrevious ? "text-[#635BFF]" : "text-[#71717A]")} />
+              <span className="hidden sm:inline">Compare</span>
             </button>
 
             {/* Refresh Button */}
             <button
               onClick={() => loadData(true)}
               disabled={refreshing}
-              className="p-2.5 rounded-xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] text-[#77757D] hover:text-[#242424] dark:text-[#9AAAC2] dark:hover:text-[#F8FAFC] shadow-xs transition-colors cursor-pointer"
+              className="p-2 rounded-lg bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] text-[#71717A] hover:text-[#18181B] dark:hover:text-[#FAFAFA] shadow-xs transition-colors cursor-pointer"
               title="Refresh live analytics data"
             >
-              <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin text-[#FF7655]")} />
+              <RefreshCw className={cn("h-3.5 w-3.5", refreshing && "animate-spin text-[#635BFF]")} />
             </button>
 
-            {/* Export Menu (CSV / Excel) */}
+            {/* Export Menu */}
             <div className="relative">
               <button
                 onClick={() => setShowExportMenu(!showExportMenu)}
-                className="px-3.5 py-2 rounded-xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] text-[#242424] dark:text-[#F8FAFC] text-xs font-semibold shadow-xs hover:bg-[#F8F7F9] dark:hover:bg-[#162238] transition-colors cursor-pointer flex items-center gap-1.5"
+                className="px-3 py-1.5 rounded-lg bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] text-[#18181B] dark:text-[#FAFAFA] text-xs font-medium shadow-xs hover:bg-[#F4F4F5] dark:hover:bg-[#1A1F2C] transition-colors cursor-pointer flex items-center gap-1.5"
               >
-                <Download className="h-3.5 w-3.5 text-[#FF7655]" />
+                <Download className="h-3.5 w-3.5 text-[#635BFF]" />
                 <span>Export</span>
               </button>
 
               {showExportMenu && (
-                <div className="absolute right-0 mt-2 w-56 rounded-xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] shadow-xl p-1.5 z-50 text-xs">
-                  <div className="px-2.5 py-1.5 text-[10px] font-mono uppercase text-[#77757D] dark:text-[#9AAAC2]">
-                    Export Formats
-                  </div>
+                <div className="absolute right-0 mt-1.5 w-52 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-lg p-1.5 z-50 text-xs">
                   <button
                     onClick={handleExportBookings}
-                    className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-[#F8F7F9] dark:hover:bg-[#162238] text-[#242424] dark:text-[#F8FAFC] flex items-center gap-2 cursor-pointer"
+                    className="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-[#F4F4F5] dark:hover:bg-[#1A1F2C] text-[#18181B] dark:text-[#FAFAFA] flex items-center gap-2 cursor-pointer"
                   >
-                    <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-500" />
-                    <span>Bookings Dataset (CSV)</span>
+                    <FileSpreadsheet className="h-3.5 w-3.5 text-[#16865C]" />
+                    <span>Bookings Summary (CSV)</span>
                   </button>
                   <button
                     onClick={handleExportReconciliation}
-                    className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-[#F8F7F9] dark:hover:bg-[#162238] text-[#242424] dark:text-[#F8FAFC] flex items-center gap-2 cursor-pointer"
+                    className="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-[#F4F4F5] dark:hover:bg-[#1A1F2C] text-[#18181B] dark:text-[#FAFAFA] flex items-center gap-2 cursor-pointer"
                   >
-                    <CreditCard className="h-3.5 w-3.5 text-blue-500" />
-                    <span>Financial Reconciliation (CSV)</span>
+                    <CreditCard className="h-3.5 w-3.5 text-[#635BFF]" />
+                    <span>Reconciliation Report (CSV)</span>
                   </button>
                   <button
                     onClick={handleExportFleetUtilization}
-                    className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-[#F8F7F9] dark:hover:bg-[#162238] text-[#242424] dark:text-[#F8FAFC] flex items-center gap-2 cursor-pointer"
+                    className="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-[#F4F4F5] dark:hover:bg-[#1A1F2C] text-[#18181B] dark:text-[#FAFAFA] flex items-center gap-2 cursor-pointer"
                   >
-                    <Package className="h-3.5 w-3.5 text-orange-500" />
+                    <Package className="h-3.5 w-3.5 text-[#D99118]" />
                     <span>Fleet Utilization (CSV)</span>
                   </button>
                 </div>
@@ -456,69 +430,69 @@ export default function Analytics() {
         {/* Custom Date Range Modal */}
         <AnimatePresence>
           {showCustomModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
               <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
+                initial={{ opacity: 0, scale: 0.96 }}
                 animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="w-full max-w-md rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] p-6 shadow-2xl space-y-4"
+                exit={{ opacity: 0, scale: 0.96 }}
+                className="w-full max-w-sm rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] p-5 shadow-xl space-y-4 text-xs"
               >
-                <div className="flex items-center justify-between">
-                  <h3 className="text-base font-bold text-[#242424] dark:text-[#F8FAFC]">
-                    Custom Date Range
+                <div className="flex items-center justify-between pb-2 border-b border-[#E4E4E7] dark:border-[#27272A]">
+                  <h3 className="font-semibold text-sm text-[#18181B] dark:text-[#FAFAFA]">
+                    Select Date Range
                   </h3>
                   <button
                     onClick={() => setShowCustomModal(false)}
-                    className="text-[#77757D] hover:text-[#242424] dark:hover:text-[#F8FAFC]"
+                    className="text-[#71717A] hover:text-[#18181B] dark:hover:text-[#FAFAFA]"
                   >
                     ✕
                   </button>
                 </div>
-                <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="space-y-3">
                   <div>
-                    <label className="block text-[11px] font-semibold text-[#77757D] dark:text-[#9AAAC2] mb-1">
+                    <label className="block text-[11px] font-medium text-[#71717A] dark:text-[#A1A1AA] mb-1">
                       Start Date
                     </label>
                     <input
                       type="date"
                       value={customStart}
                       onChange={(e) => setCustomStart(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl bg-[#F8F7F9] dark:bg-[#162238] border border-[#E6E4E9] dark:border-[#273244] text-[#242424] dark:text-[#F8FAFC]"
+                      className="w-full px-3 py-1.5 rounded-lg bg-[#F4F4F5] dark:bg-[#1A1F2C] border border-[#E4E4E7] dark:border-[#27272A] text-[#18181B] dark:text-[#FAFAFA]"
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-semibold text-[#77757D] dark:text-[#9AAAC2] mb-1">
+                    <label className="block text-[11px] font-medium text-[#71717A] dark:text-[#A1A1AA] mb-1">
                       End Date
                     </label>
                     <input
                       type="date"
                       value={customEnd}
                       onChange={(e) => setCustomEnd(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl bg-[#F8F7F9] dark:bg-[#162238] border border-[#E6E4E9] dark:border-[#273244] text-[#242424] dark:text-[#F8FAFC]"
+                      className="w-full px-3 py-1.5 rounded-lg bg-[#F4F4F5] dark:bg-[#1A1F2C] border border-[#E4E4E7] dark:border-[#27272A] text-[#18181B] dark:text-[#FAFAFA]"
                     />
                   </div>
                 </div>
                 <div className="flex justify-end gap-2 pt-2">
                   <button
                     onClick={() => setShowCustomModal(false)}
-                    className="px-4 py-2 rounded-xl border border-[#E6E4E9] dark:border-[#273244] text-xs font-semibold text-[#77757D] dark:text-[#9AAAC2]"
+                    className="px-3 py-1.5 rounded-lg border border-[#E4E4E7] dark:border-[#27272A] font-medium text-[#71717A]"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={() => {
                       if (!customStart || !customEnd) {
-                        toast.error("Please pick both start and end dates");
+                        toast.error("Please pick both dates");
                         return;
                       }
                       if (new Date(customStart) > new Date(customEnd)) {
-                        toast.error("Start date cannot be after end date");
+                        toast.error("Start date must be before end date");
                         return;
                       }
                       setPreset("custom");
                       setShowCustomModal(false);
                     }}
-                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#F9856A] to-[#FF7655] text-xs font-bold text-white shadow-md cursor-pointer"
+                    className="px-3.5 py-1.5 rounded-lg bg-[#635BFF] text-white font-medium cursor-pointer shadow-xs"
                   >
                     Apply Range
                   </button>
@@ -528,405 +502,343 @@ export default function Analytics() {
           )}
         </AnimatePresence>
 
-        {/* 2. AUTOMATIC BUSINESS INSIGHTS PANEL (Section 12) */}
-        {dataset?.insights && dataset.insights.length > 0 && (
-          <div className="rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] p-4 sm:p-5 shadow-xs">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <div className="h-6 w-6 rounded-lg bg-[#FF7655]/15 flex items-center justify-center text-[#FF7655]">
-                  <Sparkles className="h-3.5 w-3.5" />
-                </div>
-                <h3 className="text-xs font-bold tracking-tight text-[#242424] dark:text-[#F8FAFC]">
-                  Automated Deterministic Insights
-                </h3>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#F8F7F9] dark:bg-[#162238] text-[#77757D] dark:text-[#9AAAC2] border border-[#E6E4E9] dark:border-[#273244]">
-                  {dataset.range.label}
-                </span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {dataset.insights.slice(0, 3).map((ins) => (
-                <div
-                  key={ins.id}
-                  onClick={() => setActiveTab(ins.tabTarget as TabType)}
-                  className="group p-3.5 rounded-xl bg-[#F8F7F9] dark:bg-[#162238]/60 border border-[#E6E4E9] dark:border-[#273244] hover:border-[#FF7655]/50 transition-all cursor-pointer flex flex-col justify-between"
-                >
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-[#242424] dark:text-[#F8FAFC]">
-                        {ins.title}
-                      </span>
+        {/* =========================================================================
+            2. REFINED KPI STRIP & OPERATIONAL SUMMARY (Section 4)
+            Typographic emphasis, structured horizontal grid, no gaudy gradients
+           ========================================================================= */}
+        {kpis && (
+          <div className="space-y-2.5">
+            {/* Primary 6-Metric Strip */}
+            <div className="rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs overflow-hidden">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 divide-y lg:divide-y-0 lg:divide-x divide-[#E4E4E7] dark:divide-[#27272A]">
+                {/* 1. Total Bookings */}
+                <div className="p-4 flex flex-col justify-between">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-medium text-[#71717A] dark:text-[#A1A1AA]">
+                      Total Bookings
+                    </span>
+                    <RadixTooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-3 w-3 text-[#71717A] cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent side="top">Customer reservation orders initiated</TooltipContent>
+                    </RadixTooltip>
+                  </div>
+                  <div className="text-2xl font-bold font-mono tracking-tight text-[#18181B] dark:text-[#FAFAFA] mt-1.5">
+                    {kpis.totalBookings.current.toLocaleString()}
+                  </div>
+                  {comparePrevious && (
+                    <div className="flex items-center gap-1 text-[11px] mt-1.5">
                       <span
                         className={cn(
-                          "px-1.5 py-0.5 rounded text-[10px] font-mono font-bold",
-                          ins.type === "positive"
-                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                            : ins.type === "attention"
-                            ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
-                            : "bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                          "font-mono font-semibold flex items-center",
+                          kpis.totalBookings.trend === "up"
+                            ? "text-[#16865C]"
+                            : kpis.totalBookings.trend === "down"
+                            ? "text-[#DC4545]"
+                            : "text-[#71717A]"
                         )}
                       >
-                        {ins.metric}
+                        {kpis.totalBookings.trend === "up" && <ArrowUpRight className="h-3 w-3 inline" />}
+                        {kpis.totalBookings.trend === "down" && <ArrowDownRight className="h-3 w-3 inline" />}
+                        {kpis.totalBookings.percentageChange !== null
+                          ? `${kpis.totalBookings.percentageChange > 0 ? "+" : ""}${kpis.totalBookings.percentageChange}%`
+                          : "0%"}
                       </span>
+                      <span className="text-[10px] text-[#71717A] dark:text-[#A1A1AA]">vs prior</span>
                     </div>
-                    <p className="text-[11px] text-[#77757D] dark:text-[#9AAAC2] leading-relaxed">
-                      {ins.description}
-                    </p>
+                  )}
+                </div>
+
+                {/* 2. Completed Rentals */}
+                <div className="p-4 flex flex-col justify-between">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-medium text-[#71717A] dark:text-[#A1A1AA]">
+                      Completed Rentals
+                    </span>
+                    <RadixTooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-3 w-3 text-[#71717A] cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent side="top">Fulfillments safely returned and closed</TooltipContent>
+                    </RadixTooltip>
                   </div>
-                  <div className="flex items-center gap-1 text-[10px] font-semibold text-[#FF7655] mt-2 group-hover:underline">
-                    <span>View in {ins.tabTarget}</span>
-                    <ArrowUpRight className="h-3 w-3" />
+                  <div className="text-2xl font-bold font-mono tracking-tight text-[#18181B] dark:text-[#FAFAFA] mt-1.5">
+                    {kpis.completedRentals.current.toLocaleString()}
+                  </div>
+                  {comparePrevious && (
+                    <div className="flex items-center gap-1 text-[11px] mt-1.5">
+                      <span
+                        className={cn(
+                          "font-mono font-semibold flex items-center",
+                          kpis.completedRentals.trend === "up" ? "text-[#16865C]" : "text-[#71717A]"
+                        )}
+                      >
+                        {kpis.completedRentals.percentageChange !== null
+                          ? `${kpis.completedRentals.percentageChange > 0 ? "+" : ""}${kpis.completedRentals.percentageChange}%`
+                          : "0%"}
+                      </span>
+                      <span className="text-[10px] text-[#71717A] dark:text-[#A1A1AA]">vs prior</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* 3. Confirmed Bookings */}
+                <div className="p-4 flex flex-col justify-between">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-medium text-[#71717A] dark:text-[#A1A1AA]">
+                      Confirmed Bookings
+                    </span>
+                    <RadixTooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-3 w-3 text-[#71717A] cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent side="top">Lender accepted & active reservations</TooltipContent>
+                    </RadixTooltip>
+                  </div>
+                  <div className="text-2xl font-bold font-mono tracking-tight text-[#18181B] dark:text-[#FAFAFA] mt-1.5">
+                    {kpis.confirmedBookings.current.toLocaleString()}
+                  </div>
+                  {comparePrevious && (
+                    <div className="flex items-center gap-1 text-[11px] mt-1.5">
+                      <span
+                        className={cn(
+                          "font-mono font-semibold flex items-center",
+                          kpis.confirmedBookings.trend === "up" ? "text-[#16865C]" : "text-[#71717A]"
+                        )}
+                      >
+                        {kpis.confirmedBookings.percentageChange !== null
+                          ? `${kpis.confirmedBookings.percentageChange > 0 ? "+" : ""}${kpis.confirmedBookings.percentageChange}%`
+                          : "0%"}
+                      </span>
+                      <span className="text-[10px] text-[#71717A] dark:text-[#A1A1AA]">vs prior</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* 4. Cancelled Bookings */}
+                <div className="p-4 flex flex-col justify-between">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-medium text-[#71717A] dark:text-[#A1A1AA]">
+                      Cancelled Bookings
+                    </span>
+                    <RadixTooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-3 w-3 text-[#71717A] cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent side="top">Terminated or refunded bookings</TooltipContent>
+                    </RadixTooltip>
+                  </div>
+                  <div className="text-2xl font-bold font-mono tracking-tight text-[#DC4545] mt-1.5">
+                    {kpis.cancelledBookings.current.toLocaleString()}
+                  </div>
+                  <div className="flex items-center gap-1 text-[11px] mt-1.5 text-[#71717A] dark:text-[#A1A1AA]">
+                    <span className="font-mono text-[#DC4545] font-medium">
+                      {kpis.cancellationRate.current}%
+                    </span>
+                    <span className="text-[10px]">rate</span>
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
 
-        {/* 3. BUSINESS OVERVIEW KPI CARDS (8 Cards) (Section 5) */}
-        {kpis && (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
-            {/* 1. Total Bookings */}
-            <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] shadow-xs flex flex-col justify-between">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold text-[#77757D] dark:text-[#9AAAC2]">
-                  Total Bookings
-                </span>
-                <RadixTooltip>
-                  <TooltipTrigger asChild>
-                    <Info className="h-3.5 w-3.5 text-[#77757D] cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent side="top">
-                    Total customer order reservations created during {dataset?.range.label.toLowerCase()}
-                  </TooltipContent>
-                </RadixTooltip>
-              </div>
-              <div className="text-2xl sm:text-3xl font-extrabold text-[#242424] dark:text-[#F8FAFC] font-mono mt-1">
-                {kpis.totalBookings.current.toLocaleString()}
-              </div>
-              {comparePrevious && (
-                <div className="flex items-center gap-1.5 text-[11px] mt-2">
-                  <span
-                    className={cn(
-                      "font-mono font-bold flex items-center",
-                      kpis.totalBookings.trend === "up"
-                        ? "text-emerald-600 dark:text-emerald-400"
-                        : kpis.totalBookings.trend === "down"
-                        ? "text-rose-500"
-                        : "text-[#77757D]"
-                    )}
-                  >
-                    {kpis.totalBookings.trend === "up" && <ArrowUpRight className="h-3 w-3 inline" />}
-                    {kpis.totalBookings.trend === "down" && <ArrowDownRight className="h-3 w-3 inline" />}
-                    {kpis.totalBookings.percentageChange !== null
-                      ? `${kpis.totalBookings.percentageChange > 0 ? "+" : ""}${kpis.totalBookings.percentageChange}%`
-                      : "0%"}
-                  </span>
-                  <span className="text-[#77757D] dark:text-[#9AAAC2] text-[10px]">vs prev period</span>
+                {/* 5. Gross Rental Value */}
+                <div className="p-4 flex flex-col justify-between">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-medium text-[#71717A] dark:text-[#A1A1AA]">
+                      Gross Rental Value
+                    </span>
+                    <RadixTooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-3 w-3 text-[#71717A] cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent side="top">Total gross rental turnover</TooltipContent>
+                    </RadixTooltip>
+                  </div>
+                  <div className="text-2xl font-bold font-mono tracking-tight text-[#18181B] dark:text-[#FAFAFA] mt-1.5">
+                    ₹{kpis.grossRentalValue.current.toLocaleString("en-IN")}
+                  </div>
+                  {comparePrevious && (
+                    <div className="flex items-center gap-1 text-[11px] mt-1.5">
+                      <span
+                        className={cn(
+                          "font-mono font-semibold flex items-center",
+                          kpis.grossRentalValue.trend === "up" ? "text-[#16865C]" : "text-[#71717A]"
+                        )}
+                      >
+                        {kpis.grossRentalValue.percentageChange !== null
+                          ? `${kpis.grossRentalValue.percentageChange > 0 ? "+" : ""}${kpis.grossRentalValue.percentageChange}%`
+                          : "0%"}
+                      </span>
+                      <span className="text-[10px] text-[#71717A] dark:text-[#A1A1AA]">vs prior</span>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
 
-            {/* 2. Confirmed Bookings */}
-            <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] shadow-xs flex flex-col justify-between">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold text-[#77757D] dark:text-[#9AAAC2]">
-                  Confirmed Bookings
-                </span>
-                <RadixTooltip>
-                  <TooltipTrigger asChild>
-                    <Info className="h-3.5 w-3.5 text-[#77757D] cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent side="top">
-                    Bookings approved and accepted by verified lenders
-                  </TooltipContent>
-                </RadixTooltip>
-              </div>
-              <div className="text-2xl sm:text-3xl font-extrabold text-[#242424] dark:text-[#F8FAFC] font-mono mt-1">
-                {kpis.confirmedBookings.current.toLocaleString()}
-              </div>
-              {comparePrevious && (
-                <div className="flex items-center gap-1.5 text-[11px] mt-2">
-                  <span
-                    className={cn(
-                      "font-mono font-bold flex items-center",
-                      kpis.confirmedBookings.trend === "up"
-                        ? "text-emerald-600 dark:text-emerald-400"
-                        : kpis.confirmedBookings.trend === "down"
-                        ? "text-rose-500"
-                        : "text-[#77757D]"
-                    )}
-                  >
-                    {kpis.confirmedBookings.percentageChange !== null
-                      ? `${kpis.confirmedBookings.percentageChange > 0 ? "+" : ""}${kpis.confirmedBookings.percentageChange}%`
-                      : "0%"}
-                  </span>
-                  <span className="text-[#77757D] dark:text-[#9AAAC2] text-[10px]">vs prev period</span>
+                {/* 6. Platform Revenue (10% Take-rate) */}
+                <div className="p-4 flex flex-col justify-between bg-[#FAFAFB] dark:bg-[#161B26]">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-semibold text-[#635BFF]">
+                      Platform Revenue
+                    </span>
+                    <RadixTooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-3 w-3 text-[#635BFF] cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent side="top">10% Platform fee on realized transactions</TooltipContent>
+                    </RadixTooltip>
+                  </div>
+                  <div className="text-2xl font-bold font-mono tracking-tight text-[#635BFF] mt-1.5">
+                    ₹{kpis.platformRevenue.current.toLocaleString("en-IN")}
+                  </div>
+                  <div className="flex items-center gap-1 text-[11px] mt-1.5 text-[#71717A] dark:text-[#A1A1AA]">
+                    <span className="font-mono text-[#16865C] font-semibold text-[10px]">10% fee</span>
+                    <span className="text-[10px]">take-rate</span>
+                  </div>
                 </div>
-              )}
+              </div>
             </div>
 
-            {/* 3. Completed Rentals */}
-            <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] shadow-xs flex flex-col justify-between">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold text-[#77757D] dark:text-[#9AAAC2]">
-                  Completed Rentals
-                </span>
-                <RadixTooltip>
-                  <TooltipTrigger asChild>
-                    <Info className="h-3.5 w-3.5 text-[#77757D] cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent side="top">
-                    Equipment returned, verified via dual-PIN, and safely closed
-                  </TooltipContent>
-                </RadixTooltip>
-              </div>
-              <div className="text-2xl sm:text-3xl font-extrabold text-[#242424] dark:text-[#F8FAFC] font-mono mt-1">
-                {kpis.completedRentals.current.toLocaleString()}
-              </div>
-              {comparePrevious && (
-                <div className="flex items-center gap-1.5 text-[11px] mt-2">
-                  <span
-                    className={cn(
-                      "font-mono font-bold flex items-center",
-                      kpis.completedRentals.trend === "up"
-                        ? "text-emerald-600 dark:text-emerald-400"
-                        : "text-[#77757D]"
-                    )}
-                  >
-                    {kpis.completedRentals.percentageChange !== null
-                      ? `${kpis.completedRentals.percentageChange > 0 ? "+" : ""}${kpis.completedRentals.percentageChange}%`
-                      : "0%"}
+            {/* Secondary Operational Summary Strip (Section 4) */}
+            <div className="flex flex-wrap items-center justify-between px-4 py-2.5 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] text-xs text-[#71717A] dark:text-[#A1A1AA]">
+              <div className="flex items-center gap-6">
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                  <span>
+                    <strong className="text-[#18181B] dark:text-[#FAFAFA] font-mono">
+                      {kpis.activeRentals.current}
+                    </strong>{" "}
+                    Active Rentals in circulation
                   </span>
-                  <span className="text-[#77757D] dark:text-[#9AAAC2] text-[10px]">vs prev period</span>
                 </div>
-              )}
-            </div>
-
-            {/* 4. Cancelled Bookings */}
-            <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] shadow-xs flex flex-col justify-between">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold text-[#77757D] dark:text-[#9AAAC2]">
-                  Cancelled Bookings
-                </span>
-                <RadixTooltip>
-                  <TooltipTrigger asChild>
-                    <Info className="h-3.5 w-3.5 text-[#77757D] cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent side="top">
-                    Reservations terminated before delivery or cancelled by user/vendor
-                  </TooltipContent>
-                </RadixTooltip>
-              </div>
-              <div className="text-2xl sm:text-3xl font-extrabold text-rose-500 font-mono mt-1">
-                {kpis.cancelledBookings.current.toLocaleString()}
-              </div>
-              <div className="flex items-center gap-1.5 text-[11px] mt-2 text-[#77757D] dark:text-[#9AAAC2]">
-                <span className="font-mono font-semibold text-rose-500">
-                  {kpis.cancellationRate.current}% rate
-                </span>
-                <span className="text-[10px]">of total volume</span>
-              </div>
-            </div>
-
-            {/* 5. Active Rentals */}
-            <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] shadow-xs flex flex-col justify-between">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold text-[#77757D] dark:text-[#9AAAC2]">
-                  Active Rentals
-                </span>
-                <RadixTooltip>
-                  <TooltipTrigger asChild>
-                    <Info className="h-3.5 w-3.5 text-[#77757D] cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent side="top">
-                    Tech gear currently in circulation with verified renters
-                  </TooltipContent>
-                </RadixTooltip>
-              </div>
-              <div className="text-2xl sm:text-3xl font-extrabold text-[#242424] dark:text-[#F8FAFC] font-mono mt-1">
-                {kpis.activeRentals.current.toLocaleString()}
-              </div>
-              <div className="flex items-center gap-1.5 text-[11px] mt-2">
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                  In circulation
-                </span>
-              </div>
-            </div>
-
-            {/* 6. Gross Rental Value (CORAL/ORANGE GRADIENT SIGNATURE HIGHLIGHT CARD) */}
-            <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-[#F9856A] to-[#FF7655] text-white shadow-[0_8px_20px_rgba(255,118,85,0.25)] flex flex-col justify-between">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-white/90">
-                  Gross Rental Value
-                </span>
-                <RadixTooltip>
-                  <TooltipTrigger asChild>
-                    <Info className="h-3.5 w-3.5 text-white/80 cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent side="top">
-                    Total cumulative gross transaction volume for rental leases
-                  </TooltipContent>
-                </RadixTooltip>
-              </div>
-              <div className="text-2xl sm:text-3xl font-extrabold font-mono mt-1">
-                ₹{kpis.grossRentalValue.current.toLocaleString("en-IN")}
-              </div>
-              {comparePrevious && (
-                <div className="flex items-center gap-1.5 text-[11px] mt-2 text-white/90">
-                  <span className="font-mono font-bold bg-white/20 px-1.5 py-0.5 rounded">
-                    {kpis.grossRentalValue.percentageChange !== null
-                      ? `${kpis.grossRentalValue.percentageChange > 0 ? "+" : ""}${kpis.grossRentalValue.percentageChange}%`
-                      : "0%"}
+                <div className="hidden sm:flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-[#635BFF]" />
+                  <span>
+                    <strong className="text-[#18181B] dark:text-[#FAFAFA] font-mono">
+                      {kpis.rentalUtilizationRate.current}%
+                    </strong>{" "}
+                    Fleet Utilization Rate
                   </span>
-                  <span className="text-[10px] text-white/80">vs prev period</span>
                 </div>
-              )}
-            </div>
+                <div className="hidden md:flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-amber-500" />
+                  <span>
+                    <strong className="text-[#18181B] dark:text-[#FAFAFA] font-mono">
+                      {kpis.openIssues.current}
+                    </strong>{" "}
+                    Open Operational Issues
+                  </span>
+                </div>
+              </div>
 
-            {/* 7. Platform Revenue (10% Take-Rate) */}
-            <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] shadow-xs flex flex-col justify-between">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold text-[#77757D] dark:text-[#9AAAC2]">
-                  Platform Revenue
-                </span>
-                <RadixTooltip>
-                  <TooltipTrigger asChild>
-                    <Info className="h-3.5 w-3.5 text-[#77757D] cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent side="top">
-                    Payent platform commission (10% fee on realized rental transactions)
-                  </TooltipContent>
-                </RadixTooltip>
-              </div>
-              <div className="text-2xl sm:text-3xl font-extrabold text-[#242424] dark:text-[#F8FAFC] font-mono mt-1">
-                ₹{kpis.platformRevenue.current.toLocaleString("en-IN")}
-              </div>
-              <div className="flex items-center gap-1.5 text-[11px] mt-2 text-[#77757D] dark:text-[#9AAAC2]">
-                <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400">
-                  10% take-rate
-                </span>
-                <span className="text-[10px]">net platform share</span>
-              </div>
-            </div>
-
-            {/* 8. Open Issues */}
-            <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] shadow-xs flex flex-col justify-between">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold text-[#77757D] dark:text-[#9AAAC2]">
-                  Open Issues
-                </span>
-                <RadixTooltip>
-                  <TooltipTrigger asChild>
-                    <Info className="h-3.5 w-3.5 text-[#77757D] cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent side="top">
-                    Pending administrative dispute tickets or flagged items requiring review
-                  </TooltipContent>
-                </RadixTooltip>
-              </div>
-              <div className="text-2xl sm:text-3xl font-extrabold text-[#242424] dark:text-[#F8FAFC] font-mono mt-1">
-                {kpis.openIssues.current}
-              </div>
-              <div className="flex items-center gap-1.5 text-[11px] mt-2 text-[#77757D] dark:text-[#9AAAC2]">
-                <span className="text-[10px]">Pending admin triage</span>
+              <div className="text-[11px] font-mono text-[#71717A]">
+                Datastore: MySQL Live / Ingest Stream
               </div>
             </div>
           </div>
         )}
 
-        {/* 4. TAB NAVIGATION (V14 STYLE PILL NAVIGATION) */}
-        <div className="flex items-center gap-2 border-b border-[#E6E4E9] dark:border-[#273244] pb-2 overflow-x-auto no-scrollbar">
-          {(
-            [
-              { id: "Bookings", label: "Bookings & Velocity", icon: Calendar },
-              { id: "Funnel", label: "Booking Funnel", icon: Layers },
-              { id: "Products", label: "Products & Fleet Utilization", icon: Package },
-              { id: "Users", label: "Users & Growth", icon: Users },
-              { id: "Deliveries", label: "Deliveries & Field Security", icon: Truck },
-              { id: "Finance", label: "Finance & Reconciliation", icon: DollarSign },
-            ] as const
-          ).map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as TabType)}
-              className={cn(
-                "px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap flex items-center gap-2",
-                activeTab === tab.id
-                  ? "bg-[#242424] text-white dark:bg-[#162238] dark:text-[#F8FAFC] dark:border dark:border-[#3B82F6]/40 shadow-xs"
-                  : "text-[#77757D] hover:text-[#242424] hover:bg-black/5 dark:text-[#9AAAC2] dark:hover:text-[#F8FAFC] dark:hover:bg-white/5"
-              )}
-            >
-              <tab.icon className="h-3.5 w-3.5 shrink-0" />
-              <span>{tab.label}</span>
-            </button>
-          ))}
+        {/* =========================================================================
+            3. SECTION NAVIGATION (Section 5)
+            Compact segmented navigation: Overview (initial), Bookings, Products, Users, Delivery, Finance
+           ========================================================================= */}
+        <div className="flex items-center justify-between border-b border-[#E4E4E7] dark:border-[#27272A] pb-3">
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+            {(
+              [
+                { id: "Overview", label: "Overview" },
+                { id: "Bookings", label: "Bookings" },
+                { id: "Products", label: "Products & Utilization" },
+                { id: "Users", label: "Users" },
+                { id: "Delivery", label: "Delivery" },
+                { id: "Finance", label: "Finance" },
+              ] as const
+            ).map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as TabType)}
+                className={cn(
+                  "px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap",
+                  activeTab === tab.id
+                    ? "bg-[#18181B] text-white dark:bg-[#FAFAFA] dark:text-[#18181B] shadow-xs"
+                    : "text-[#71717A] dark:text-[#A1A1AA] hover:text-[#18181B] dark:hover:text-[#FAFAFA] hover:bg-[#F4F4F5] dark:hover:bg-[#1A1F2C]"
+                )}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          <span className="text-[11px] font-mono text-[#71717A] hidden sm:inline">
+            Period: {dataset?.range.label}
+          </span>
         </div>
 
-        {/* 5. TAB 1: BOOKINGS & VELOCITY (Default) */}
-        {activeTab === "Bookings" && (
+        {/* =========================================================================
+            4. TAB 1: OVERVIEW SECTION (Section 6)
+            Asymmetric grid: Primary Booking Trend, Secondary Donut, 2-col supporting,
+            Business Insights, and Recent Bookings table
+           ========================================================================= */}
+        {activeTab === "Overview" && (
           <div className="space-y-6">
-            {/* Charts Row */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-              {/* Booking Trend Comparison (8 cols) */}
-              <div className="lg:col-span-8 p-5 sm:p-6 rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] shadow-xs flex flex-col justify-between">
+            {/* Primary & Secondary Row: Asymmetric 8 / 4 Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
+              {/* Primary: Large Booking Trend Chart (8 cols) - Visual Centerpiece */}
+              <div className="lg:col-span-8 p-5 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs flex flex-col justify-between">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h3 className="text-xs font-bold text-[#242424] dark:text-[#F8FAFC]">
-                      Booking Velocity Trend
+                    <h3 className="text-xs font-bold text-[#18181B] dark:text-[#FAFAFA] uppercase tracking-wide">
+                      Booking Velocity
                     </h3>
-                    <p className="text-[11px] text-[#77757D] dark:text-[#9AAAC2]">
-                      Current period reservations vs previous equivalent window
+                    <p className="text-[11px] text-[#71717A] dark:text-[#A1A1AA]">
+                      Daily reservation volume across selected interval
                     </p>
                   </div>
                   <div className="flex items-center gap-3 text-xs">
-                    <span className="flex items-center gap-1.5 text-[11px] text-[#242424] dark:text-[#F8FAFC]">
-                      <span className="h-2 w-2 rounded-full bg-[#FF7655]" />
+                    <span className="flex items-center gap-1.5 text-[11px] text-[#18181B] dark:text-[#FAFAFA]">
+                      <span className="h-2 w-2 rounded-full bg-[#635BFF]" />
                       Current Period
                     </span>
                     {comparePrevious && (
-                      <span className="flex items-center gap-1.5 text-[11px] text-[#77757D] dark:text-[#9AAAC2]">
+                      <span className="flex items-center gap-1.5 text-[11px] text-[#71717A] dark:text-[#A1A1AA]">
                         <span className="h-2 w-2 rounded-full bg-[#94A3B8]" />
-                        Previous Period
+                        Previous Window
                       </span>
                     )}
                   </div>
                 </div>
 
-                <div className="h-72 w-full pt-2">
+                <div className="h-72 w-full pt-1">
                   {dataset?.bookingTrend && dataset.bookingTrend.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={dataset.bookingTrend}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--admin-border)" opacity={0.6} />
-                        <XAxis dataKey="label" stroke="#77757D" fontSize={10} tickLine={false} />
-                        <YAxis stroke="#77757D" fontSize={10} tickLine={false} allowDecimals={false} />
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" opacity={0.5} />
+                        <XAxis dataKey="label" stroke="#71717A" fontSize={10} tickLine={false} />
+                        <YAxis stroke="#71717A" fontSize={10} tickLine={false} allowDecimals={false} />
                         <Tooltip
                           contentStyle={{
-                            backgroundColor: "var(--admin-card)",
-                            borderColor: "var(--admin-border)",
-                            borderRadius: "12px",
+                            backgroundColor: "#18181B",
+                            borderColor: "#27272A",
+                            borderRadius: "8px",
                             fontSize: "11px",
-                            color: "var(--admin-text)",
-                            boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+                            color: "#FFFFFF",
+                            boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
                           }}
                         />
                         <Line
                           type="monotone"
                           dataKey="currentBookings"
-                          name="Current Period"
-                          stroke="#FF7655"
-                          strokeWidth={2.5}
-                          dot={{ r: 3, fill: "#FF7655" }}
-                          activeDot={{ r: 5 }}
+                          name="Current"
+                          stroke="#635BFF"
+                          strokeWidth={2.2}
+                          dot={{ r: 2.5, fill: "#635BFF" }}
+                          activeDot={{ r: 4.5 }}
                         />
                         {comparePrevious && (
                           <Line
                             type="monotone"
                             dataKey="previousBookings"
-                            name="Previous Period"
+                            name="Previous"
                             stroke="#94A3B8"
-                            strokeWidth={1.8}
+                            strokeWidth={1.5}
                             strokeDasharray="4 4"
                             dot={false}
                           />
@@ -934,34 +846,34 @@ export default function Analytics() {
                       </LineChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="h-full flex items-center justify-center text-xs text-[#77757D]">
-                      No booking telemetry in selected date range.
+                    <div className="h-full flex items-center justify-center text-xs text-[#71717A]">
+                      No activity in this date range.
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* Status Donut Chart (4 cols) */}
-              <div className="lg:col-span-4 p-5 sm:p-6 rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] shadow-xs flex flex-col justify-between">
+              {/* Secondary: Booking Status Donut Chart (4 cols) */}
+              <div className="lg:col-span-4 p-5 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs flex flex-col justify-between">
                 <div>
-                  <h3 className="text-xs font-bold text-[#242424] dark:text-[#F8FAFC]">
-                    Booking Status Distribution
+                  <h3 className="text-xs font-bold text-[#18181B] dark:text-[#FAFAFA] uppercase tracking-wide">
+                    Booking Status
                   </h3>
-                  <p className="text-[11px] text-[#77757D] dark:text-[#9AAAC2]">
-                    Operational reservation status breakdown
+                  <p className="text-[11px] text-[#71717A] dark:text-[#A1A1AA]">
+                    Current order states
                   </p>
                 </div>
 
                 <div className="flex flex-col items-center justify-center my-auto py-2">
-                  <div className="relative w-44 h-44">
+                  <div className="relative w-40 h-40">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
                           data={dataset?.statusDistribution || []}
                           cx="50%"
                           cy="50%"
-                          innerRadius={50}
-                          outerRadius={72}
+                          innerRadius={46}
+                          outerRadius={66}
                           paddingAngle={3}
                           dataKey="count"
                         >
@@ -971,19 +883,20 @@ export default function Analytics() {
                         </Pie>
                         <Tooltip
                           contentStyle={{
-                            backgroundColor: "var(--admin-card)",
-                            borderColor: "var(--admin-border)",
+                            backgroundColor: "#18181B",
+                            borderColor: "#27272A",
                             borderRadius: "8px",
                             fontSize: "11px",
+                            color: "#FFFFFF",
                           }}
                         />
                       </PieChart>
                     </ResponsiveContainer>
                     <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                      <span className="text-xl font-extrabold text-[#242424] dark:text-[#F8FAFC] font-mono leading-none">
+                      <span className="text-xl font-bold font-mono leading-none">
                         {kpis?.totalBookings.current}
                       </span>
-                      <span className="text-[10px] text-[#77757D] uppercase font-semibold">Orders</span>
+                      <span className="text-[9px] text-[#71717A] uppercase font-semibold">Orders</span>
                     </div>
                   </div>
 
@@ -992,9 +905,9 @@ export default function Analytics() {
                       <div key={st.status} className="flex items-center justify-between text-xs">
                         <div className="flex items-center gap-2">
                           <span className="h-2 w-2 rounded-full" style={{ backgroundColor: st.color }} />
-                          <span className="text-[11px] text-[#77757D] dark:text-[#9AAAC2]">{st.label}</span>
+                          <span className="text-[11px] text-[#71717A] dark:text-[#A1A1AA]">{st.label}</span>
                         </div>
-                        <span className="font-mono text-[11px] font-bold text-[#242424] dark:text-[#F8FAFC]">
+                        <span className="font-mono text-[11px] font-semibold text-[#18181B] dark:text-[#FAFAFA]">
                           {st.count}
                         </span>
                       </div>
@@ -1004,22 +917,157 @@ export default function Analytics() {
               </div>
             </div>
 
-            {/* Detailed Bookings Table (Section 6.E) */}
-            <div className="rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] p-5 sm:p-6 shadow-xs space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-sm font-bold text-[#242424] dark:text-[#F8FAFC]">
-                    Detailed Booking Records
+            {/* Supporting Two-Column Section: Category Performance & Rental Revenue Progression */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              {/* Category Breakdown (Bar comparison) */}
+              <div className="p-5 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs flex flex-col justify-between">
+                <div className="mb-4">
+                  <h3 className="text-xs font-bold text-[#18181B] dark:text-[#FAFAFA] uppercase tracking-wide">
+                    Category Performance
                   </h3>
-                  <p className="text-xs text-[#77757D] dark:text-[#9AAAC2]">
-                    Inspect active reservations and transaction states
+                  <p className="text-[11px] text-[#71717A] dark:text-[#A1A1AA]">
+                    Booking demand across gear categories
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2.5">
-                  {/* Search */}
+                <div className="h-56 w-full">
+                  {dataset?.categoryBreakdown && dataset.categoryBreakdown.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={dataset.categoryBreakdown} layout="vertical">
+                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--border)" opacity={0.5} />
+                        <XAxis type="number" stroke="#71717A" fontSize={10} tickLine={false} allowDecimals={false} />
+                        <YAxis dataKey="name" type="category" stroke="#71717A" fontSize={11} tickLine={false} width={100} />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: "#18181B",
+                            borderColor: "#27272A",
+                            borderRadius: "8px",
+                            fontSize: "11px",
+                            color: "#FFFFFF",
+                          }}
+                        />
+                        <Bar dataKey="bookings" fill="#635BFF" radius={[0, 4, 4, 0]} barSize={16} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="h-full flex items-center justify-center text-xs text-[#71717A]">
+                      No category metrics available.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Rental Revenue Progression (Area chart) */}
+              <div className="p-5 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs flex flex-col justify-between">
+                <div className="mb-4">
+                  <h3 className="text-xs font-bold text-[#18181B] dark:text-[#FAFAFA] uppercase tracking-wide">
+                    Rental Turnover Progression
+                  </h3>
+                  <p className="text-[11px] text-[#71717A] dark:text-[#A1A1AA]">
+                    Realized transaction turnover over time
+                  </p>
+                </div>
+
+                <div className="h-56 w-full">
+                  {dataset?.bookingTrend && dataset.bookingTrend.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={dataset.bookingTrend}>
+                        <defs>
+                          <linearGradient id="editorialRevGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#635BFF" stopOpacity={0.16} />
+                            <stop offset="100%" stopColor="#635BFF" stopOpacity={0.0} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" opacity={0.5} />
+                        <XAxis dataKey="label" stroke="#71717A" fontSize={10} tickLine={false} />
+                        <YAxis stroke="#71717A" fontSize={10} tickLine={false} tickFormatter={(v) => `₹${v >= 1000 ? `${v/1000}k` : v}`} />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: "#18181B",
+                            borderColor: "#27272A",
+                            borderRadius: "8px",
+                            fontSize: "11px",
+                            color: "#FFFFFF",
+                          }}
+                          formatter={(v: number) => [`₹${v.toLocaleString("en-IN")}`, "Turnover"]}
+                        />
+                        <Area
+                          type="monotone"
+                          dataKey="currentRevenue"
+                          stroke="#635BFF"
+                          strokeWidth={2}
+                          fill="url(#editorialRevGrad)"
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="h-full flex items-center justify-center text-xs text-[#71717A]">
+                      No revenue progression data.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Insights Section (Section 6.D) */}
+            {dataset?.insights && dataset.insights.length > 0 && (
+              <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-3.5 w-3.5 text-[#635BFF]" />
+                    <h3 className="text-xs font-bold text-[#18181B] dark:text-[#FAFAFA] uppercase tracking-wide">
+                      Deterministic Business Insights
+                    </h3>
+                  </div>
+                  <span className="text-[10px] font-mono text-[#71717A]">
+                    Verified calculations for {dataset.range.label}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {dataset.insights.slice(0, 3).map((ins) => (
+                    <div
+                      key={ins.id}
+                      onClick={() => setActiveTab(ins.tabTarget === "Products" ? "Products" : ins.tabTarget === "Deliveries" ? "Delivery" : ins.tabTarget as TabType)}
+                      className="p-3 rounded-lg bg-[#F7F7F8] dark:bg-[#1A1F2C] border border-[#E4E4E7] dark:border-[#27272A] hover:border-[#635BFF]/40 transition-colors cursor-pointer flex flex-col justify-between"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-xs text-[#18181B] dark:text-[#FAFAFA]">
+                            {ins.title}
+                          </span>
+                          <span className="text-[10px] font-mono font-bold text-[#635BFF]">
+                            {ins.metric}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-[#71717A] dark:text-[#A1A1AA] leading-relaxed">
+                          {ins.description}
+                        </p>
+                      </div>
+                      <span className="text-[10px] font-medium text-[#635BFF] flex items-center gap-1 mt-2">
+                        Inspect in {ins.tabTarget} <ArrowUpRight className="h-2.5 w-2.5" />
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Records Section: Recent Bookings Table (Section 6.E) */}
+            <div className="p-5 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs space-y-3.5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-xs font-bold text-[#18181B] dark:text-[#FAFAFA] uppercase tracking-wide">
+                    Recent Bookings
+                  </h3>
+                  <p className="text-[11px] text-[#71717A] dark:text-[#A1A1AA]">
+                    Real reservation ledger across the platform
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
                   <div className="relative">
-                    <Search className="h-3.5 w-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#77757D]" />
+                    <Search className="h-3 w-3 absolute left-2.5 top-1/2 -translate-y-1/2 text-[#71717A]" />
                     <input
                       type="text"
                       placeholder="Search bookings..."
@@ -1028,18 +1076,17 @@ export default function Analytics() {
                         setBookingSearch(e.target.value);
                         setBookingPage(1);
                       }}
-                      className="pl-8 pr-3 py-1.5 rounded-xl bg-[#F8F7F9] dark:bg-[#162238] border border-[#E6E4E9] dark:border-[#273244] text-xs text-[#242424] dark:text-[#F8FAFC] placeholder:text-[#77757D] w-48 focus:outline-none focus:border-[#FF7655]"
+                      className="pl-7 pr-2.5 py-1 rounded-md bg-[#F4F4F5] dark:bg-[#1A1F2C] border border-[#E4E4E7] dark:border-[#27272A] text-xs text-[#18181B] dark:text-[#FAFAFA] placeholder:text-[#71717A] w-44 focus:outline-none focus:border-[#635BFF]"
                     />
                   </div>
 
-                  {/* Status Filter */}
                   <select
                     value={bookingStatusFilter}
                     onChange={(e) => {
                       setBookingStatusFilter(e.target.value);
                       setBookingPage(1);
                     }}
-                    className="px-3 py-1.5 rounded-xl bg-[#F8F7F9] dark:bg-[#162238] border border-[#E6E4E9] dark:border-[#273244] text-xs text-[#242424] dark:text-[#F8FAFC] cursor-pointer"
+                    className="px-2.5 py-1 rounded-md bg-[#F4F4F5] dark:bg-[#1A1F2C] border border-[#E4E4E7] dark:border-[#27272A] text-xs text-[#18181B] dark:text-[#FAFAFA] cursor-pointer"
                   >
                     <option value="all">All Statuses</option>
                     <option value="confirmed">Confirmed</option>
@@ -1051,76 +1098,65 @@ export default function Analytics() {
                 </div>
               </div>
 
-              {/* Table */}
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead>
-                    <tr className="border-b border-[#E6E4E9] dark:border-[#273244] text-[11px] font-mono uppercase text-[#77757D] dark:text-[#9AAAC2]">
-                      <th className="py-2.5 px-3">Booking ID</th>
-                      <th className="py-2.5 px-3">Product</th>
-                      <th className="py-2.5 px-3">Customer</th>
-                      <th className="py-2.5 px-3">Rental Dates</th>
-                      <th className="py-2.5 px-3 text-right">Amount</th>
-                      <th className="py-2.5 px-3 text-center">Status</th>
-                      <th className="py-2.5 px-3 text-center">Delivery</th>
+                    <tr className="border-b border-[#E4E4E7] dark:border-[#27272A] text-[10px] font-mono uppercase text-[#71717A] dark:text-[#A1A1AA]">
+                      <th className="py-2 px-2.5">ID</th>
+                      <th className="py-2 px-2.5">Product</th>
+                      <th className="py-2 px-2.5">Customer</th>
+                      <th className="py-2 px-2.5">Period</th>
+                      <th className="py-2 px-2.5 text-right">Amount</th>
+                      <th className="py-2 px-2.5 text-center">Status</th>
+                      <th className="py-2 px-2.5 text-center">Payment</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#E6E4E9] dark:divide-[#273244]">
+                  <tbody className="divide-y divide-[#E4E4E7] dark:divide-[#27272A]">
                     {paginatedBookings.length > 0 ? (
                       paginatedBookings.map((b) => (
-                        <tr
-                          key={b.id}
-                          className="hover:bg-[#F8F7F9] dark:hover:bg-[#162238]/40 transition-colors"
-                        >
-                          <td className="py-3 px-3 font-mono text-[11px] font-bold text-[#FF7655]">
+                        <tr key={b.id} className="hover:bg-[#F7F7F8] dark:hover:bg-[#1A1F2C]/50 transition-colors">
+                          <td className="py-2.5 px-2.5 font-mono text-[11px] font-medium text-[#635BFF]">
                             {b.id}
                           </td>
-                          <td className="py-3 px-3">
-                            <div className="font-semibold text-[#242424] dark:text-[#F8FAFC] truncate max-w-[200px]">
-                              {b.productTitle}
-                            </div>
-                            <div className="text-[10px] text-[#77757D] dark:text-[#9AAAC2]">
-                              Owner: {b.ownerName || "Verified Lender"}
-                            </div>
+                          <td className="py-2.5 px-2.5 font-medium text-[#18181B] dark:text-[#FAFAFA] truncate max-w-[180px]">
+                            {b.productTitle}
                           </td>
-                          <td className="py-3 px-3 text-[#242424] dark:text-[#F8FAFC]">
+                          <td className="py-2.5 px-2.5 text-[#71717A] dark:text-[#A1A1AA]">
                             {b.customerName || "Customer"}
                           </td>
-                          <td className="py-3 px-3 font-mono text-[11px] text-[#77757D] dark:text-[#9AAAC2]">
-                            {b.startDate ? `${b.startDate.slice(5)} → ${b.endDate?.slice(5) || ""}` : "Flexible"}
+                          <td className="py-2.5 px-2.5 font-mono text-[11px] text-[#71717A]">
+                            {b.startDate ? `${b.startDate.slice(5)} → ${b.endDate?.slice(5) || ""}` : "Standard"}
                           </td>
-                          <td className="py-3 px-3 text-right font-mono font-bold text-[#242424] dark:text-[#F8FAFC]">
+                          <td className="py-2.5 px-2.5 text-right font-mono font-medium text-[#18181B] dark:text-[#FAFAFA]">
                             ₹{Number(b.amount || 0).toLocaleString("en-IN")}
                           </td>
-                          <td className="py-3 px-3 text-center">
+                          <td className="py-2.5 px-2.5 text-center">
                             <span
                               className={cn(
-                                "px-2 py-0.5 rounded-full text-[10px] font-semibold capitalize",
+                                "px-2 py-0.5 rounded text-[10px] font-medium capitalize",
                                 b.status === "completed"
-                                  ? "bg-purple-500/10 text-purple-600 dark:text-purple-400"
+                                  ? "bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border border-purple-200/50"
                                   : b.status === "active"
-                                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                  ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200/50"
                                   : b.status === "confirmed"
-                                  ? "bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                                  ? "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200/50"
                                   : b.status === "cancelled"
-                                  ? "bg-rose-500/10 text-rose-600 dark:text-rose-400"
-                                  : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                                  ? "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 border border-rose-200/50"
+                                  : "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200/50"
                               )}
                             >
                               {b.status}
                             </span>
                           </td>
-                          <td className="py-3 px-3 text-center">
-                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#F8F7F9] dark:bg-[#162238] border border-[#E6E4E9] dark:border-[#273244] text-[#77757D] dark:text-[#9AAAC2]">
-                              {b.deliveryStatus || "DELIVERED"}
-                            </span>
+                          <td className="py-2.5 px-2.5 text-center font-mono text-[10px] text-[#71717A]">
+                            {b.paymentStatus || "paid"}
                           </td>
                         </tr>
                       ))
                     ) : (
                       <tr>
-                        <td colSpan={7} className="text-center py-8 text-xs text-[#77757D]">
-                          No bookings matching criteria in selected window.
+                        <td colSpan={7} className="text-center py-6 text-xs text-[#71717A]">
+                          No bookings matching criteria.
                         </td>
                       </tr>
                     )}
@@ -1128,10 +1164,9 @@ export default function Analytics() {
                 </table>
               </div>
 
-              {/* Pagination */}
               {filteredBookings.length > itemsPerPage && (
-                <div className="flex items-center justify-between pt-2 border-t border-[#E6E4E9] dark:border-[#273244] text-xs">
-                  <span className="text-[#77757D] dark:text-[#9AAAC2] text-[11px]">
+                <div className="flex items-center justify-between pt-2 border-t border-[#E4E4E7] dark:border-[#27272A] text-xs">
+                  <span className="text-[#71717A] text-[11px]">
                     Showing {(bookingPage - 1) * itemsPerPage + 1} -{" "}
                     {Math.min(bookingPage * itemsPerPage, filteredBookings.length)} of {filteredBookings.length}
                   </span>
@@ -1139,11 +1174,11 @@ export default function Analytics() {
                     <button
                       onClick={() => setBookingPage((p) => Math.max(1, p - 1))}
                       disabled={bookingPage === 1}
-                      className="p-1 rounded-lg border border-[#E6E4E9] dark:border-[#273244] disabled:opacity-40"
+                      className="p-1 rounded border border-[#E4E4E7] dark:border-[#27272A] disabled:opacity-40"
                     >
-                      <ChevronLeft className="h-3.5 w-3.5" />
+                      <ChevronLeft className="h-3 w-3" />
                     </button>
-                    <span className="text-[11px] font-mono font-bold px-2">{bookingPage}</span>
+                    <span className="font-mono text-[11px] px-1.5">{bookingPage}</span>
                     <button
                       onClick={() =>
                         setBookingPage((p) =>
@@ -1151,9 +1186,9 @@ export default function Analytics() {
                         )
                       }
                       disabled={bookingPage * itemsPerPage >= filteredBookings.length}
-                      className="p-1 rounded-lg border border-[#E6E4E9] dark:border-[#273244] disabled:opacity-40"
+                      className="p-1 rounded border border-[#E4E4E7] dark:border-[#27272A] disabled:opacity-40"
                     >
-                      <ChevronRight className="h-3.5 w-3.5" />
+                      <ChevronRight className="h-3 w-3" />
                     </button>
                   </div>
                 </div>
@@ -1162,431 +1197,153 @@ export default function Analytics() {
           </div>
         )}
 
-        {/* 6. TAB 2: BOOKING FUNNEL (Section 7) */}
-        {activeTab === "Funnel" && (
+        {/* =========================================================================
+            5. TAB 2: BOOKINGS ANALYTICS (Section 7)
+           ========================================================================= */}
+        {activeTab === "Bookings" && (
           <div className="space-y-6">
-            <div className="rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] p-5 sm:p-6 shadow-xs space-y-4">
-              <div>
-                <h3 className="text-sm font-bold text-[#242424] dark:text-[#F8FAFC]">
-                  Real Telemetry Conversion Funnel
-                </h3>
-                <p className="text-xs text-[#77757D] dark:text-[#9AAAC2]">
-                  Tracked end-to-end user actions from product view to completed gear return
-                </p>
-              </div>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+              <div className="lg:col-span-8 p-5 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-wide">
+                      Booking Trajectory & Comparison
+                    </h3>
+                    <p className="text-[11px] text-[#71717A]">
+                      Comparing current interval against preceding equivalent window
+                    </p>
+                  </div>
+                </div>
 
-              {/* Horizontal Funnel Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-3 pt-2">
-                {dataset?.funnel.stages.map((stage, idx, arr) => {
-                  const prevCount = idx > 0 ? arr[idx - 1].count : null;
-                  const convRate =
-                    prevCount !== null && prevCount > 0
-                      ? Math.round((stage.count / prevCount) * 100)
-                      : null;
-                  const dropOff = prevCount !== null ? Math.max(0, prevCount - stage.count) : null;
-
-                  return (
-                    <div
-                      key={stage.id}
-                      className="p-4 rounded-xl bg-[#F8F7F9] dark:bg-[#162238]/60 border border-[#E6E4E9] dark:border-[#273244] flex flex-col justify-between space-y-3 relative overflow-hidden"
-                    >
-                      {/* Stage indicator top badge */}
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/10 text-[#77757D] dark:text-[#9AAAC2]">
-                          STEP 0{idx + 1}
-                        </span>
-                        <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                          <Check className="h-3 w-3" />
-                          Tracked
-                        </span>
-                      </div>
-
-                      {/* Main Count & Label */}
-                      <div>
-                        <div className="text-2xl sm:text-3xl font-extrabold text-[#242424] dark:text-[#F8FAFC] font-mono">
-                          {stage.count.toLocaleString()}
-                        </div>
-                        <div className="text-xs font-semibold text-[#77757D] dark:text-[#9AAAC2] mt-0.5">
-                          {stage.label}
-                        </div>
-                      </div>
-
-                      {/* Conversion & Drop-off info */}
-                      <div className="pt-2 border-t border-[#E6E4E9] dark:border-[#273244] space-y-1">
-                        {convRate !== null ? (
-                          <>
-                            <div className="flex items-center justify-between text-[11px]">
-                              <span className="text-[#77757D] dark:text-[#9AAAC2]">Conversion</span>
-                              <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                                {convRate}%
-                              </span>
-                            </div>
-                            <div className="flex items-center justify-between text-[10px] text-[#77757D] dark:text-[#9AAAC2]">
-                              <span>Drop-off</span>
-                              <span className="font-mono text-rose-500">
-                                -{dropOff} ({prevCount! > 0 ? Math.round((dropOff! / prevCount!) * 100) : 0}%)
-                              </span>
-                            </div>
-                          </>
-                        ) : (
-                          <div className="text-[10px] text-[#77757D] dark:text-[#9AAAC2]">
-                            Top-of-funnel discovery benchmark
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Data Verification Note */}
-              <div className="p-4 rounded-xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/30 text-xs text-[#242424] dark:text-[#F8FAFC] flex items-start gap-3 mt-4">
-                <Info className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
-                <div className="space-y-1 text-[11px] text-[#77757D] dark:text-[#9AAAC2]">
-                  <span className="font-bold text-[#242424] dark:text-[#F8FAFC] block">
-                    Instrumentation & Telemetry Integrity
-                  </span>
-                  Product views and booking requests are captured directly through the client event tracker stream (<code className="font-mono text-[10px] bg-black/5 dark:bg-white/10 px-1 py-0.5 rounded">/api/events</code>), recording verified user sessions. Confirmed orders and completed rentals are synchronized with the authoritative SQL orders datastore without fabricated mock projections.
+                <div className="h-72 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={dataset?.bookingTrend || []}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" opacity={0.5} />
+                      <XAxis dataKey="label" stroke="#71717A" fontSize={10} tickLine={false} />
+                      <YAxis stroke="#71717A" fontSize={10} tickLine={false} allowDecimals={false} />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "#18181B",
+                          borderColor: "#27272A",
+                          borderRadius: "8px",
+                          fontSize: "11px",
+                          color: "#FFFFFF",
+                        }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="currentBookings"
+                        name="Current"
+                        stroke="#635BFF"
+                        strokeWidth={2.2}
+                        dot={{ r: 2.5, fill: "#635BFF" }}
+                      />
+                      {comparePrevious && (
+                        <Line
+                          type="monotone"
+                          dataKey="previousBookings"
+                          name="Previous Period"
+                          stroke="#94A3B8"
+                          strokeWidth={1.5}
+                          strokeDasharray="4 4"
+                          dot={false}
+                        />
+                      )}
+                    </LineChart>
+                  </ResponsiveContainer>
                 </div>
               </div>
-            </div>
-          </div>
-        )}
 
-        {/* 7. TAB 3: PRODUCTS & FLEET UTILIZATION (Section 8) */}
-        {activeTab === "Products" && (
-          <div className="space-y-6">
-            {/* Top Utilization KPIs */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] shadow-xs">
-                <span className="text-[11px] font-semibold text-[#77757D] dark:text-[#9AAAC2]">
-                  Eligible Rentable Products
-                </span>
-                <div className="text-2xl font-extrabold text-[#242424] dark:text-[#F8FAFC] font-mono mt-1">
-                  {dataset?.productUtilization.totalEligibleProducts}
-                </div>
-                <span className="text-[10px] text-[#77757D] dark:text-[#9AAAC2]">Approved listings</span>
-              </div>
-
-              <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] shadow-xs">
-                <span className="text-[11px] font-semibold text-[#77757D] dark:text-[#9AAAC2]">
-                  Fleet Rentable Product-Days
-                </span>
-                <div className="text-2xl font-extrabold text-[#242424] dark:text-[#F8FAFC] font-mono mt-1">
-                  {dataset?.productUtilization.totalRentableDays.toLocaleString()}
-                </div>
-                <span className="text-[10px] text-[#77757D] dark:text-[#9AAAC2]">Capacity in period</span>
-              </div>
-
-              <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] shadow-xs">
-                <span className="text-[11px] font-semibold text-[#77757D] dark:text-[#9AAAC2]">
-                  Occupied Product-Days
-                </span>
-                <div className="text-2xl font-extrabold text-[#242424] dark:text-[#F8FAFC] font-mono mt-1">
-                  {dataset?.productUtilization.totalOccupiedDays.toLocaleString()}
-                </div>
-                <span className="text-[10px] text-[#77757D] dark:text-[#9AAAC2]">Leased to renters</span>
-              </div>
-
-              <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-[#F9856A] to-[#FF7655] text-white shadow-md">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-white/90">
-                  Rental Utilization Rate
-                </span>
-                <div className="text-2xl font-extrabold font-mono mt-1">
-                  {dataset?.productUtilization.utilizationRate}%
-                </div>
-                <span className="text-[10px] text-white/80">Occupied / Total Days × 100</span>
-              </div>
-            </div>
-
-            {/* Products Table */}
-            <div className="rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] p-5 sm:p-6 shadow-xs space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="lg:col-span-4 p-5 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs flex flex-col justify-between">
                 <div>
-                  <h3 className="text-sm font-bold text-[#242424] dark:text-[#F8FAFC]">
-                    Product Utilization & Revenue Performance
+                  <h3 className="text-xs font-bold uppercase tracking-wide">
+                    Confirmed vs Completed
                   </h3>
-                  <p className="text-xs text-[#77757D] dark:text-[#9AAAC2]">
-                    High-performing vs low-performing gear ranked by rental demand
+                  <p className="text-[11px] text-[#71717A]">
+                    Fulfillment resolution ratio
                   </p>
                 </div>
 
-                <div className="relative">
-                  <Search className="h-3.5 w-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#77757D]" />
-                  <input
-                    type="text"
-                    placeholder="Search gear..."
-                    value={productSearch}
-                    onChange={(e) => {
-                      setProductSearch(e.target.value);
-                      setProductPage(1);
-                    }}
-                    className="pl-8 pr-3 py-1.5 rounded-xl bg-[#F8F7F9] dark:bg-[#162238] border border-[#E6E4E9] dark:border-[#273244] text-xs text-[#242424] dark:text-[#F8FAFC] placeholder:text-[#77757D] w-48 focus:outline-none focus:border-[#FF7655]"
-                  />
-                </div>
-              </div>
+                <div className="py-6 space-y-4 my-auto">
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-xs">
+                      <span>Confirmed Bookings</span>
+                      <span className="font-mono font-bold">{kpis?.confirmedBookings.current}</span>
+                    </div>
+                    <div className="h-2 w-full bg-[#F4F4F5] dark:bg-[#1A1F2C] rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-blue-500 rounded-full"
+                        style={{
+                          width: `${Math.min(100, ((kpis?.confirmedBookings.current || 0) / Math.max(1, kpis?.totalBookings.current || 1)) * 100)}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead>
-                    <tr className="border-b border-[#E6E4E9] dark:border-[#273244] text-[11px] font-mono uppercase text-[#77757D] dark:text-[#9AAAC2]">
-                      <th className="py-2.5 px-3">Product Name</th>
-                      <th className="py-2.5 px-3">Category</th>
-                      <th className="py-2.5 px-3 text-right">Daily Rate</th>
-                      <th className="py-2.5 px-3 text-center">Rentals</th>
-                      <th className="py-2.5 px-3 text-center">Occupied Days</th>
-                      <th className="py-2.5 px-3 text-right">Gross Revenue</th>
-                      <th className="py-2.5 px-3 text-center">Utilization</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#E6E4E9] dark:divide-[#273244]">
-                    {paginatedProducts.length > 0 ? (
-                      paginatedProducts.map((p) => (
-                        <tr key={p.id} className="hover:bg-[#F8F7F9] dark:hover:bg-[#162238]/40 transition-colors">
-                          <td className="py-3 px-3 font-semibold text-[#242424] dark:text-[#F8FAFC]">
-                            {p.title}
-                          </td>
-                          <td className="py-3 px-3 text-[#77757D] dark:text-[#9AAAC2]">
-                            {p.category}
-                          </td>
-                          <td className="py-3 px-3 text-right font-mono text-[#242424] dark:text-[#F8FAFC]">
-                            ₹{p.price.toLocaleString()}
-                          </td>
-                          <td className="py-3 px-3 text-center font-mono font-bold text-[#242424] dark:text-[#F8FAFC]">
-                            {p.totalRentals}
-                          </td>
-                          <td className="py-3 px-3 text-center font-mono text-[#77757D] dark:text-[#9AAAC2]">
-                            {p.occupiedDays}d
-                          </td>
-                          <td className="py-3 px-3 text-right font-mono font-bold text-[#FF7655]">
-                            ₹{p.revenue.toLocaleString("en-IN")}
-                          </td>
-                          <td className="py-3 px-3 text-center">
-                            <span
-                              className={cn(
-                                "px-2 py-0.5 rounded text-[10px] font-mono font-bold",
-                                p.utilizationRate >= 50
-                                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                                  : p.utilizationRate > 0
-                                  ? "bg-blue-500/10 text-blue-600 dark:text-blue-400"
-                                  : "bg-black/5 dark:bg-white/10 text-[#77757D]"
-                              )}
-                            >
-                              {p.utilizationRate}%
-                            </span>
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan={7} className="text-center py-8 text-xs text-[#77757D]">
-                          No product utilization records found.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-xs">
+                      <span>Completed Rentals</span>
+                      <span className="font-mono font-bold">{kpis?.completedRentals.current}</span>
+                    </div>
+                    <div className="h-2 w-full bg-[#F4F4F5] dark:bg-[#1A1F2C] rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-purple-500 rounded-full"
+                        style={{
+                          width: `${Math.min(100, ((kpis?.completedRentals.current || 0) / Math.max(1, kpis?.totalBookings.current || 1)) * 100)}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
 
-        {/* 8. TAB 4: USERS & GROWTH (Section 9) */}
-        {activeTab === "Users" && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] shadow-xs">
-                <span className="text-[11px] font-semibold text-[#77757D] dark:text-[#9AAAC2]">
-                  Total Registered Users
-                </span>
-                <div className="text-2xl font-extrabold text-[#242424] dark:text-[#F8FAFC] font-mono mt-1">
-                  {dataset?.userMetrics.totalUsers}
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-xs">
+                      <span>Cancelled Bookings</span>
+                      <span className="font-mono font-bold text-[#DC4545]">{kpis?.cancelledBookings.current}</span>
+                    </div>
+                    <div className="h-2 w-full bg-[#F4F4F5] dark:bg-[#1A1F2C] rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-[#DC4545] rounded-full"
+                        style={{
+                          width: `${Math.min(100, ((kpis?.cancelledBookings.current || 0) / Math.max(1, kpis?.totalBookings.current || 1)) * 100)}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
                 </div>
-                <span className="text-[10px] text-[#77757D] dark:text-[#9AAAC2]">Platform accounts</span>
-              </div>
-
-              <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] shadow-xs">
-                <span className="text-[11px] font-semibold text-[#77757D] dark:text-[#9AAAC2]">
-                  New Users in Period
-                </span>
-                <div className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 font-mono mt-1">
-                  +{dataset?.userMetrics.newUsersInPeriod}
-                </div>
-                <span className="text-[10px] text-[#77757D] dark:text-[#9AAAC2]">Acquired in {dataset?.range.label.toLowerCase()}</span>
-              </div>
-
-              <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] shadow-xs">
-                <span className="text-[11px] font-semibold text-[#77757D] dark:text-[#9AAAC2]">
-                  Renter Accounts
-                </span>
-                <div className="text-2xl font-extrabold text-[#242424] dark:text-[#F8FAFC] font-mono mt-1">
-                  {dataset?.userMetrics.rentersCount}
-                </div>
-                <span className="text-[10px] text-[#77757D] dark:text-[#9AAAC2]">Demand side</span>
-              </div>
-
-              <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] shadow-xs">
-                <span className="text-[11px] font-semibold text-[#77757D] dark:text-[#9AAAC2]">
-                  Vendor / Lender Accounts
-                </span>
-                <div className="text-2xl font-extrabold text-[#242424] dark:text-[#F8FAFC] font-mono mt-1">
-                  {dataset?.userMetrics.vendorsCount}
-                </div>
-                <span className="text-[10px] text-[#77757D] dark:text-[#9AAAC2]">Supply side</span>
               </div>
             </div>
 
-            {/* Distribution */}
-            <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] shadow-xs">
-              <h3 className="text-xs font-bold text-[#242424] dark:text-[#F8FAFC] mb-2">
-                User Role Distribution
+            {/* Detailed Table */}
+            <div className="p-5 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wide">
+                Comprehensive Booking Records
               </h3>
-              <p className="text-[11px] text-[#77757D] dark:text-[#9AAAC2] mb-6">
-                Breakdown between equipment renters, verified tech gear vendors, and administrators
-              </p>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-4 rounded-xl bg-[#F8F7F9] dark:bg-[#162238] border border-[#E6E4E9] dark:border-[#273244]">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-[#242424] dark:text-[#F8FAFC]">Renters</span>
-                    <Users className="h-4 w-4 text-blue-500" />
-                  </div>
-                  <div className="text-xl font-mono font-bold mt-2">{dataset?.userMetrics.rentersCount}</div>
-                  <span className="text-[10px] text-[#77757D]">Equipment consumers</span>
-                </div>
-
-                <div className="p-4 rounded-xl bg-[#F8F7F9] dark:bg-[#162238] border border-[#E6E4E9] dark:border-[#273244]">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-[#242424] dark:text-[#F8FAFC]">Vendors / Lenders</span>
-                    <Package className="h-4 w-4 text-emerald-500" />
-                  </div>
-                  <div className="text-xl font-mono font-bold mt-2">{dataset?.userMetrics.vendorsCount}</div>
-                  <span className="text-[10px] text-[#77757D]">Gear providers</span>
-                </div>
-
-                <div className="p-4 rounded-xl bg-[#F8F7F9] dark:bg-[#162238] border border-[#E6E4E9] dark:border-[#273244]">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-[#242424] dark:text-[#F8FAFC]">Administrators</span>
-                    <ShieldCheck className="h-4 w-4 text-purple-500" />
-                  </div>
-                  <div className="text-xl font-mono font-bold mt-2">{dataset?.userMetrics.adminsCount}</div>
-                  <span className="text-[10px] text-[#77757D]">Platform governance</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* 9. TAB 5: DELIVERIES & SECURITY (Section 10) */}
-        {activeTab === "Deliveries" && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] shadow-xs">
-                <span className="text-[11px] font-semibold text-[#77757D] dark:text-[#9AAAC2]">
-                  Total Assigned Dispatches
-                </span>
-                <div className="text-2xl font-extrabold text-[#242424] dark:text-[#F8FAFC] font-mono mt-1">
-                  {dataset?.deliveryMetrics.totalAssigned}
-                </div>
-                <span className="text-[10px] text-[#77757D] dark:text-[#9AAAC2]">Handover dispatches</span>
-              </div>
-
-              <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] shadow-xs">
-                <span className="text-[11px] font-semibold text-[#77757D] dark:text-[#9AAAC2]">
-                  Completed Deliveries
-                </span>
-                <div className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 font-mono mt-1">
-                  {dataset?.deliveryMetrics.completed}
-                </div>
-                <span className="text-[10px] text-[#77757D] dark:text-[#9AAAC2]">Fulfillments confirmed</span>
-              </div>
-
-              <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] shadow-xs">
-                <span className="text-[11px] font-semibold text-[#77757D] dark:text-[#9AAAC2]">
-                  In-Transit / En Route
-                </span>
-                <div className="text-2xl font-extrabold text-[#242424] dark:text-[#F8FAFC] font-mono mt-1">
-                  {dataset?.deliveryMetrics.inTransit}
-                </div>
-                <span className="text-[10px] text-[#77757D] dark:text-[#9AAAC2]">Active dispatches</span>
-              </div>
-
-              <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] shadow-xs">
-                <span className="text-[11px] font-semibold text-[#77757D] dark:text-[#9AAAC2]">
-                  Dual-PIN Compliance Rate
-                </span>
-                <div className="text-2xl font-extrabold text-blue-600 dark:text-blue-400 font-mono mt-1">
-                  {dataset?.deliveryMetrics.pinVerificationRate}%
-                </div>
-                <span className="text-[10px] text-[#77757D] dark:text-[#9AAAC2]">Cryptographic verification</span>
-              </div>
-            </div>
-
-            {/* Delivery Audit Table */}
-            <div className="rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] p-5 sm:p-6 shadow-xs space-y-4">
-              <div>
-                <h3 className="text-sm font-bold text-[#242424] dark:text-[#F8FAFC]">
-                  Field Delivery & PIN Verification Logs
-                </h3>
-                <p className="text-xs text-[#77757D] dark:text-[#9AAAC2]">
-                  Audit dual-PIN verification states for equipment handover
-                </p>
-              </div>
-
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead>
-                    <tr className="border-b border-[#E6E4E9] dark:border-[#273244] text-[11px] font-mono uppercase text-[#77757D] dark:text-[#9AAAC2]">
-                      <th className="py-2.5 px-3">Booking ID</th>
-                      <th className="py-2.5 px-3">Item</th>
-                      <th className="py-2.5 px-3">Customer</th>
-                      <th className="py-2.5 px-3">Agent</th>
-                      <th className="py-2.5 px-3">Status</th>
-                      <th className="py-2.5 px-3 text-center">Vendor PIN</th>
-                      <th className="py-2.5 px-3 text-center">Renter PIN</th>
+                    <tr className="border-b border-[#E4E4E7] dark:border-[#27272A] text-[10px] font-mono uppercase text-[#71717A]">
+                      <th className="py-2 px-2.5">ID</th>
+                      <th className="py-2 px-2.5">Item</th>
+                      <th className="py-2 px-2.5">Customer</th>
+                      <th className="py-2 px-2.5 text-right">Amount</th>
+                      <th className="py-2 px-2.5 text-center">Status</th>
+                      <th className="py-2 px-2.5 text-center">Delivery</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#E6E4E9] dark:divide-[#273244]">
-                    {dataset?.deliveryMetrics.records.slice(0, 8).map((d) => (
-                      <tr key={d.id} className="hover:bg-[#F8F7F9] dark:hover:bg-[#162238]/40 transition-colors">
-                        <td className="py-3 px-3 font-mono font-bold text-[#FF7655]">
-                          {d.bookingId}
-                        </td>
-                        <td className="py-3 px-3 font-semibold text-[#242424] dark:text-[#F8FAFC]">
-                          {d.productTitle}
-                        </td>
-                        <td className="py-3 px-3 text-[#77757D] dark:text-[#9AAAC2]">
-                          {d.customerName}
-                        </td>
-                        <td className="py-3 px-3 text-[#242424] dark:text-[#F8FAFC]">
-                          {d.deliveryAgent}
-                        </td>
-                        <td className="py-3 px-3">
-                          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[#F8F7F9] dark:bg-[#162238] border border-[#E6E4E9] dark:border-[#273244]">
-                            {d.deliveryStatus}
+                  <tbody className="divide-y divide-[#E4E4E7] dark:divide-[#27272A]">
+                    {paginatedBookings.map((b) => (
+                      <tr key={b.id} className="hover:bg-[#F7F7F8] dark:hover:bg-[#1A1F2C]/40">
+                        <td className="py-2.5 px-2.5 font-mono text-[11px] font-medium text-[#635BFF]">{b.id}</td>
+                        <td className="py-2.5 px-2.5 font-medium truncate max-w-[200px]">{b.productTitle}</td>
+                        <td className="py-2.5 px-2.5 text-[#71717A]">{b.customerName}</td>
+                        <td className="py-2.5 px-2.5 text-right font-mono font-medium">₹{Number(b.amount || 0).toLocaleString("en-IN")}</td>
+                        <td className="py-2.5 px-2.5 text-center">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-medium capitalize bg-black/5 dark:bg-white/10">
+                            {b.status}
                           </span>
                         </td>
-                        <td className="py-3 px-3 text-center">
-                          {d.vendorPinVerified ? (
-                            <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
-                              ✓ Verified
-                            </span>
-                          ) : (
-                            <span className="text-[10px] font-semibold text-amber-500">
-                              Pending
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-3 px-3 text-center">
-                          {d.renterPinVerified ? (
-                            <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
-                              ✓ Verified
-                            </span>
-                          ) : (
-                            <span className="text-[10px] font-semibold text-amber-500">
-                              Pending
-                            </span>
-                          )}
+                        <td className="py-2.5 px-2.5 text-center text-[10px] font-mono text-[#71717A]">
+                          {b.deliveryStatus || "DELIVERED"}
                         </td>
                       </tr>
                     ))}
@@ -1597,65 +1354,265 @@ export default function Analytics() {
           </div>
         )}
 
-        {/* 10. TAB 6: FINANCE & RECONCILIATION (Section 11) */}
-        {activeTab === "Finance" && (
+        {/* =========================================================================
+            6. TAB 3: PRODUCTS & UTILIZATION (Section 8)
+           ========================================================================= */}
+        {activeTab === "Products" && (
           <div className="space-y-6">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] shadow-xs">
-                <span className="text-[11px] font-semibold text-[#77757D] dark:text-[#9AAAC2]">
-                  Gross Rental Value
-                </span>
-                <div className="text-2xl font-extrabold text-[#242424] dark:text-[#F8FAFC] font-mono mt-1">
-                  ₹{dataset?.finance.grossRentalValue.toLocaleString("en-IN")}
+              <div className="p-4 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs">
+                <span className="text-[11px] font-medium text-[#71717A]">Eligible Products</span>
+                <div className="text-2xl font-bold font-mono mt-1">
+                  {dataset?.productUtilization.totalEligibleProducts}
                 </div>
-                <span className="text-[10px] text-[#77757D] dark:text-[#9AAAC2]">Total transaction volume</span>
+                <span className="text-[10px] text-[#71717A]">Active rentable fleet</span>
               </div>
 
-              <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-[#F9856A] to-[#FF7655] text-white shadow-md">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-white/90">
-                  Platform Commission (10%)
-                </span>
-                <div className="text-2xl font-extrabold font-mono mt-1">
-                  ₹{dataset?.finance.platformRevenue.toLocaleString("en-IN")}
+              <div className="p-4 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs">
+                <span className="text-[11px] font-medium text-[#71717A]">Rentable Product-Days</span>
+                <div className="text-2xl font-bold font-mono mt-1">
+                  {dataset?.productUtilization.totalRentableDays.toLocaleString()}
                 </div>
-                <span className="text-[10px] text-white/80">Net platform earnings</span>
+                <span className="text-[10px] text-[#71717A]">Total capacity in interval</span>
               </div>
 
-              <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] shadow-xs">
-                <span className="text-[11px] font-semibold text-[#77757D] dark:text-[#9AAAC2]">
-                  Payments Collected
-                </span>
-                <div className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 font-mono mt-1">
-                  ₹{dataset?.finance.paymentsCollected.toLocaleString("en-IN")}
+              <div className="p-4 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs">
+                <span className="text-[11px] font-medium text-[#71717A]">Occupied Product-Days</span>
+                <div className="text-2xl font-bold font-mono mt-1">
+                  {dataset?.productUtilization.totalOccupiedDays.toLocaleString()}
                 </div>
-                <span className="text-[10px] text-[#77757D] dark:text-[#9AAAC2]">Realized settlement funds</span>
+                <span className="text-[10px] text-[#71717A]">Days rented</span>
               </div>
 
-              <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] shadow-xs">
-                <span className="text-[11px] font-semibold text-[#77757D] dark:text-[#9AAAC2]">
-                  Completed Refunds
-                </span>
-                <div className="text-2xl font-extrabold text-rose-500 font-mono mt-1">
-                  ₹{dataset?.finance.completedRefunds.toLocaleString("en-IN")}
+              <div className="p-4 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs">
+                <span className="text-[11px] font-medium text-[#635BFF]">Utilization Rate</span>
+                <div className="text-2xl font-bold font-mono text-[#635BFF] mt-1">
+                  {dataset?.productUtilization.utilizationRate}%
                 </div>
-                <span className="text-[10px] text-[#77757D] dark:text-[#9AAAC2]">Processed returns</span>
+                <span className="text-[10px] text-[#71717A]">Occupied / Total Days × 100</span>
               </div>
             </div>
 
-            {/* Financial Reconciliation Table (Read-Only) */}
-            <div className="rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] p-5 sm:p-6 shadow-xs space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            {/* Product Table */}
+            <div className="p-5 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold uppercase tracking-wide">
+                  Gear Utilization & Turnover Ledger
+                </h3>
+                <div className="relative">
+                  <Search className="h-3 w-3 absolute left-2.5 top-1/2 -translate-y-1/2 text-[#71717A]" />
+                  <input
+                    type="text"
+                    placeholder="Search gear..."
+                    value={productSearch}
+                    onChange={(e) => {
+                      setProductSearch(e.target.value);
+                      setProductPage(1);
+                    }}
+                    className="pl-7 pr-2.5 py-1 rounded-md bg-[#F4F4F5] dark:bg-[#1A1F2C] border border-[#E4E4E7] dark:border-[#27272A] text-xs w-44"
+                  />
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-[#E4E4E7] dark:border-[#27272A] text-[10px] font-mono uppercase text-[#71717A]">
+                      <th className="py-2 px-2.5">Title</th>
+                      <th className="py-2 px-2.5">Category</th>
+                      <th className="py-2 px-2.5 text-right">Daily Rate</th>
+                      <th className="py-2 px-2.5 text-center">Rentals</th>
+                      <th className="py-2 px-2.5 text-center">Occupied Days</th>
+                      <th className="py-2 px-2.5 text-right">Turnover</th>
+                      <th className="py-2 px-2.5 text-center">Utilization</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#E4E4E7] dark:divide-[#27272A]">
+                    {paginatedProducts.map((p) => (
+                      <tr key={p.id} className="hover:bg-[#F7F7F8] dark:hover:bg-[#1A1F2C]/40">
+                        <td className="py-2.5 px-2.5 font-medium">{p.title}</td>
+                        <td className="py-2.5 px-2.5 text-[#71717A]">{p.category}</td>
+                        <td className="py-2.5 px-2.5 text-right font-mono">₹{p.price.toLocaleString()}</td>
+                        <td className="py-2.5 px-2.5 text-center font-mono font-medium">{p.totalRentals}</td>
+                        <td className="py-2.5 px-2.5 text-center font-mono text-[#71717A]">{p.occupiedDays}d</td>
+                        <td className="py-2.5 px-2.5 text-right font-mono font-medium text-[#635BFF]">₹{p.revenue.toLocaleString("en-IN")}</td>
+                        <td className="py-2.5 px-2.5 text-center font-mono text-[11px] font-medium">{p.utilizationRate}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* =========================================================================
+            7. TAB 4: USERS (Section 9)
+           ========================================================================= */}
+        {activeTab === "Users" && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="p-4 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs">
+                <span className="text-[11px] font-medium text-[#71717A]">Total Accounts</span>
+                <div className="text-2xl font-bold font-mono mt-1">{dataset?.userMetrics.totalUsers}</div>
+                <span className="text-[10px] text-[#71717A]">Registered accounts</span>
+              </div>
+              <div className="p-4 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs">
+                <span className="text-[11px] font-medium text-[#16865C]">New Registrations</span>
+                <div className="text-2xl font-bold font-mono text-[#16865C] mt-1">+{dataset?.userMetrics.newUsersInPeriod}</div>
+                <span className="text-[10px] text-[#71717A]">Joined in interval</span>
+              </div>
+              <div className="p-4 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs">
+                <span className="text-[11px] font-medium text-[#71717A]">Renters</span>
+                <div className="text-2xl font-bold font-mono mt-1">{dataset?.userMetrics.rentersCount}</div>
+                <span className="text-[10px] text-[#71717A]">Gear consumers</span>
+              </div>
+              <div className="p-4 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs">
+                <span className="text-[11px] font-medium text-[#71717A]">Vendors / Lenders</span>
+                <div className="text-2xl font-bold font-mono mt-1">{dataset?.userMetrics.vendorsCount}</div>
+                <span className="text-[10px] text-[#71717A]">Gear providers</span>
+              </div>
+            </div>
+
+            <div className="p-5 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs">
+              <h3 className="text-xs font-bold uppercase tracking-wide mb-1">
+                Account Typology Breakdown
+              </h3>
+              <p className="text-[11px] text-[#71717A] mb-4">
+                Platform actor distribution between consumers and tech equipment suppliers
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                <div className="p-3.5 rounded-lg bg-[#F7F7F8] dark:bg-[#1A1F2C] border border-[#E4E4E7] dark:border-[#27272A]">
+                  <span className="font-semibold block">Verified Renters</span>
+                  <div className="text-xl font-bold font-mono mt-1">{dataset?.userMetrics.rentersCount}</div>
+                  <span className="text-[10px] text-[#71717A]">Demand side active customers</span>
+                </div>
+                <div className="p-3.5 rounded-lg bg-[#F7F7F8] dark:bg-[#1A1F2C] border border-[#E4E4E7] dark:border-[#27272A]">
+                  <span className="font-semibold block">Verified Vendors</span>
+                  <div className="text-xl font-bold font-mono mt-1">{dataset?.userMetrics.vendorsCount}</div>
+                  <span className="text-[10px] text-[#71717A]">Supply side inventory owners</span>
+                </div>
+                <div className="p-3.5 rounded-lg bg-[#F7F7F8] dark:bg-[#1A1F2C] border border-[#E4E4E7] dark:border-[#27272A]">
+                  <span className="font-semibold block">Staff Administrators</span>
+                  <div className="text-xl font-bold font-mono mt-1">{dataset?.userMetrics.adminsCount}</div>
+                  <span className="text-[10px] text-[#71717A]">Platform operators & moderators</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* =========================================================================
+            8. TAB 5: DELIVERY (Section 10)
+           ========================================================================= */}
+        {activeTab === "Delivery" && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="p-4 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs">
+                <span className="text-[11px] font-medium text-[#71717A]">Assigned Dispatches</span>
+                <div className="text-2xl font-bold font-mono mt-1">{dataset?.deliveryMetrics.totalAssigned}</div>
+                <span className="text-[10px] text-[#71717A]">Field dispatches</span>
+              </div>
+              <div className="p-4 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs">
+                <span className="text-[11px] font-medium text-[#16865C]">Delivered Orders</span>
+                <div className="text-2xl font-bold font-mono text-[#16865C] mt-1">{dataset?.deliveryMetrics.completed}</div>
+                <span className="text-[10px] text-[#71717A]">Successfully handed over</span>
+              </div>
+              <div className="p-4 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs">
+                <span className="text-[11px] font-medium text-[#71717A]">In-Transit</span>
+                <div className="text-2xl font-bold font-mono mt-1">{dataset?.deliveryMetrics.inTransit}</div>
+                <span className="text-[10px] text-[#71717A]">En route dispatches</span>
+              </div>
+              <div className="p-4 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs">
+                <span className="text-[11px] font-medium text-[#635BFF]">Dual-PIN Compliance</span>
+                <div className="text-2xl font-bold font-mono text-[#635BFF] mt-1">{dataset?.deliveryMetrics.pinVerificationRate}%</div>
+                <span className="text-[10px] text-[#71717A]">Handover verification</span>
+              </div>
+            </div>
+
+            <div className="p-5 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wide">
+                Delivery Dispatch Audit
+              </h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-[#E4E4E7] dark:border-[#27272A] text-[10px] font-mono uppercase text-[#71717A]">
+                      <th className="py-2 px-2.5">Booking ID</th>
+                      <th className="py-2 px-2.5">Gear</th>
+                      <th className="py-2 px-2.5">Agent</th>
+                      <th className="py-2 px-2.5">Status</th>
+                      <th className="py-2 px-2.5 text-center">Vendor PIN</th>
+                      <th className="py-2 px-2.5 text-center">Renter PIN</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#E4E4E7] dark:divide-[#27272A]">
+                    {dataset?.deliveryMetrics.records.map((d) => (
+                      <tr key={d.id} className="hover:bg-[#F7F7F8] dark:hover:bg-[#1A1F2C]/40">
+                        <td className="py-2.5 px-2.5 font-mono text-[11px] font-medium text-[#635BFF]">{d.bookingId}</td>
+                        <td className="py-2.5 px-2.5 font-medium">{d.productTitle}</td>
+                        <td className="py-2.5 px-2.5 text-[#71717A]">{d.deliveryAgent}</td>
+                        <td className="py-2.5 px-2.5">
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-black/5 dark:bg-white/10">
+                            {d.deliveryStatus}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-2.5 text-center text-[10px] font-semibold text-[#16865C]">
+                          {d.vendorPinVerified ? "✓ Verified" : "Pending"}
+                        </td>
+                        <td className="py-2.5 px-2.5 text-center text-[10px] font-semibold text-[#16865C]">
+                          {d.renterPinVerified ? "✓ Verified" : "Pending"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* =========================================================================
+            9. TAB 6: FINANCE & RECONCILIATION (Section 11)
+           ========================================================================= */}
+        {activeTab === "Finance" && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="p-4 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs">
+                <span className="text-[11px] font-medium text-[#71717A]">Gross Rental Value</span>
+                <div className="text-2xl font-bold font-mono mt-1">₹{dataset?.finance.grossRentalValue.toLocaleString("en-IN")}</div>
+                <span className="text-[10px] text-[#71717A]">Gross rental turnover</span>
+              </div>
+              <div className="p-4 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs">
+                <span className="text-[11px] font-medium text-[#635BFF]">Platform Commission</span>
+                <div className="text-2xl font-bold font-mono text-[#635BFF] mt-1">₹{dataset?.finance.platformRevenue.toLocaleString("en-IN")}</div>
+                <span className="text-[10px] text-[#71717A]">10% platform take-rate</span>
+              </div>
+              <div className="p-4 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs">
+                <span className="text-[11px] font-medium text-[#16865C]">Payments Collected</span>
+                <div className="text-2xl font-bold font-mono text-[#16865C] mt-1">₹{dataset?.finance.paymentsCollected.toLocaleString("en-IN")}</div>
+                <span className="text-[10px] text-[#71717A]">Realized funds</span>
+              </div>
+              <div className="p-4 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs">
+                <span className="text-[11px] font-medium text-[#DC4545]">Completed Refunds</span>
+                <div className="text-2xl font-bold font-mono text-[#DC4545] mt-1">₹{dataset?.finance.completedRefunds.toLocaleString("en-IN")}</div>
+                <span className="text-[10px] text-[#71717A]">Settled returns</span>
+              </div>
+            </div>
+
+            {/* Read-Only Reconciliation Table */}
+            <div className="p-5 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs space-y-3">
+              <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-sm font-bold text-[#242424] dark:text-[#F8FAFC]">
-                    Read-Only Financial Reconciliation Audit
+                  <h3 className="text-xs font-bold uppercase tracking-wide">
+                    Financial Reconciliation Ledger (Read-Only)
                   </h3>
-                  <p className="text-xs text-[#77757D] dark:text-[#9AAAC2]">
-                    10% Platform fee calculation, 90% vendor payout allocation, and settlement status
+                  <p className="text-[11px] text-[#71717A]">
+                    10% Platform fee calculation, 90% vendor payout allocation, and reconciliation status
                   </p>
                 </div>
-
                 <div className="relative">
-                  <Search className="h-3.5 w-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#77757D]" />
+                  <Search className="h-3 w-3 absolute left-2.5 top-1/2 -translate-y-1/2 text-[#71717A]" />
                   <input
                     type="text"
                     placeholder="Search reconciliation..."
@@ -1664,7 +1621,7 @@ export default function Analytics() {
                       setReconciliationSearch(e.target.value);
                       setReconciliationPage(1);
                     }}
-                    className="pl-8 pr-3 py-1.5 rounded-xl bg-[#F8F7F9] dark:bg-[#162238] border border-[#E6E4E9] dark:border-[#273244] text-xs text-[#242424] dark:text-[#F8FAFC] placeholder:text-[#77757D] w-52 focus:outline-none focus:border-[#FF7655]"
+                    className="pl-7 pr-2.5 py-1 rounded-md bg-[#F4F4F5] dark:bg-[#1A1F2C] border border-[#E4E4E7] dark:border-[#27272A] text-xs w-48"
                   />
                 </div>
               </div>
@@ -1672,65 +1629,43 @@ export default function Analytics() {
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead>
-                    <tr className="border-b border-[#E6E4E9] dark:border-[#273244] text-[11px] font-mono uppercase text-[#77757D] dark:text-[#9AAAC2]">
-                      <th className="py-2.5 px-3">Booking ID</th>
-                      <th className="py-2.5 px-3">Customer</th>
-                      <th className="py-2.5 px-3 text-right">Gross Amount</th>
-                      <th className="py-2.5 px-3 text-right">Platform (10%)</th>
-                      <th className="py-2.5 px-3 text-right">Vendor (90%)</th>
-                      <th className="py-2.5 px-3 text-center">Payment</th>
-                      <th className="py-2.5 px-3 text-center">Reconciliation</th>
+                    <tr className="border-b border-[#E4E4E7] dark:border-[#27272A] text-[10px] font-mono uppercase text-[#71717A]">
+                      <th className="py-2 px-2.5">Booking ID</th>
+                      <th className="py-2 px-2.5">Customer</th>
+                      <th className="py-2 px-2.5 text-right">Gross Amount</th>
+                      <th className="py-2 px-2.5 text-right">Platform Fee (10%)</th>
+                      <th className="py-2 px-2.5 text-right">Vendor Settlement (90%)</th>
+                      <th className="py-2 px-2.5 text-center">Payment</th>
+                      <th className="py-2 px-2.5 text-center">Reconciliation</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#E6E4E9] dark:divide-[#273244]">
-                    {paginatedReconciliation.length > 0 ? (
-                      paginatedReconciliation.map((r) => (
-                        <tr key={r.id} className="hover:bg-[#F8F7F9] dark:hover:bg-[#162238]/40 transition-colors">
-                          <td className="py-3 px-3 font-mono font-bold text-[#FF7655]">
-                            {r.bookingId}
-                          </td>
-                          <td className="py-3 px-3 text-[#242424] dark:text-[#F8FAFC]">
-                            {r.customerName}
-                          </td>
-                          <td className="py-3 px-3 text-right font-mono font-bold text-[#242424] dark:text-[#F8FAFC]">
-                            ₹{r.grossAmount.toLocaleString("en-IN")}
-                          </td>
-                          <td className="py-3 px-3 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                            ₹{r.platformFee.toLocaleString("en-IN")}
-                          </td>
-                          <td className="py-3 px-3 text-right font-mono text-[#77757D] dark:text-[#9AAAC2]">
-                            ₹{r.vendorPayout.toLocaleString("en-IN")}
-                          </td>
-                          <td className="py-3 px-3 text-center">
-                            <span className="capitalize text-[10px] font-mono px-2 py-0.5 rounded bg-[#F8F7F9] dark:bg-[#162238] border border-[#E6E4E9] dark:border-[#273244]">
-                              {r.paymentStatus}
-                            </span>
-                          </td>
-                          <td className="py-3 px-3 text-center">
-                            <span
-                              className={cn(
-                                "px-2 py-0.5 rounded text-[10px] font-semibold",
-                                r.reconciliationStatus === "Reconciled"
-                                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                                  : r.reconciliationStatus === "Settlement Due"
-                                  ? "bg-blue-500/10 text-blue-600 dark:text-blue-400"
-                                  : r.reconciliationStatus === "Refunded"
-                                  ? "bg-purple-500/10 text-purple-600 dark:text-purple-400"
-                                  : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
-                              )}
-                            >
-                              {r.reconciliationStatus}
-                            </span>
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan={7} className="text-center py-8 text-xs text-[#77757D]">
-                          No financial records in selected window.
+                  <tbody className="divide-y divide-[#E4E4E7] dark:divide-[#27272A]">
+                    {paginatedReconciliation.map((r) => (
+                      <tr key={r.id} className="hover:bg-[#F7F7F8] dark:hover:bg-[#1A1F2C]/40">
+                        <td className="py-2.5 px-2.5 font-mono text-[11px] font-medium text-[#635BFF]">{r.bookingId}</td>
+                        <td className="py-2.5 px-2.5 text-[#71717A]">{r.customerName}</td>
+                        <td className="py-2.5 px-2.5 text-right font-mono font-medium">₹{r.grossAmount.toLocaleString("en-IN")}</td>
+                        <td className="py-2.5 px-2.5 text-right font-mono font-medium text-[#635BFF]">₹{r.platformFee.toLocaleString("en-IN")}</td>
+                        <td className="py-2.5 px-2.5 text-right font-mono text-[#71717A]">₹{r.vendorPayout.toLocaleString("en-IN")}</td>
+                        <td className="py-2.5 px-2.5 text-center font-mono text-[10px] capitalize text-[#71717A]">{r.paymentStatus}</td>
+                        <td className="py-2.5 px-2.5 text-center">
+                          <span
+                            className={cn(
+                              "px-2 py-0.5 rounded text-[10px] font-medium",
+                              r.reconciliationStatus === "Reconciled"
+                                ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200/50"
+                                : r.reconciliationStatus === "Settlement Due"
+                                ? "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200/50"
+                                : r.reconciliationStatus === "Refunded"
+                                ? "bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border border-purple-200/50"
+                                : "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200/50"
+                            )}
+                          >
+                            {r.reconciliationStatus}
+                          </span>
                         </td>
                       </tr>
-                    )}
+                    ))}
                   </tbody>
                 </table>
               </div>
