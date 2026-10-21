@@ -26,61 +26,8 @@ logger = logging.getLogger("payent.payernt_db")
 # ============================================================
 
 MOCK_PAYERNT_ACCOUNTS: Dict[str, Dict[str, Any]] = {}
-MOCK_PAYERNT_PRODUCTS: Dict[str, Dict[str, Any]] = {
-    "prod-1790474939846-841": {
-        "id": "prod-1790474939846-841",
-        "owner_id": "PAYERNT_USER_1790474937926",
-        "owner_email": "vasnathchikkala@gmail.com",
-        "owner_name": "Vasnath Chikkala",
-        "category": "cameras",
-        "name": "Sony FX3 Cinema Camera",
-        "title": "Sony FX3 Full-Frame Cinema Line Camera",
-        "brand": "Sony",
-        "model": "FX3",
-        "year": "2024",
-        "description": "Full-frame cinema line camera with 4K 120p, XLR handle.",
-        "specifications": "12.1MP Full-Frame Exmor R CMOS, 4K 120p, 10-bit 4:2:2",
-        "features": '["4K 120p", "15+ stops dynamic range", "XLR Handle"]',
-        "condition_grade": "Like New",
-        "city": "Hyderabad",
-        "pincode": "500081",
-        "daily_rate": 3499.0,
-        "security_deposit": 5000.0,
-        "available": 1,
-        "availability_status": "available",
-        "min_rental_days": 1,
-        "max_rental_days": 30,
-        "primary_image": "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=600",
-        "images": "[]",
-        "vendor_secret_pin": "5716",
-        "status": "active",
-        "created_at": "2026-09-27T02:08:59.846915+00:00",
-        "updated_at": "2026-09-27T02:08:59.846915+00:00"
-    }
-}
-MOCK_RENTAL_SECURITIES: Dict[str, Dict[str, Any]] = {
-    "ord_1790474940011": {
-        "id": "RENTAL_SECURITY_0011",
-        "booking_id": "ord_1790474940011",
-        "product_id": "prod-1790474939846-841",
-        "vendor_id": "PAYERNT_USER_1790474937926",
-        "renter_id": "RENTER_USER_001",
-        "vendor_secret_pin": "5716",
-        "renter_secret_pin": "3419",
-        "vendor_pin_verified": 1,
-        "renter_pin_verified": 1,
-        "otp_verified": 1,
-        "otp_code": "123456",
-        "otp_expires_at": 1790476740,
-        "otp_attempts": 0,
-        "failed_pin_attempts": 2,
-        "status": "active",
-        "rental_started": 1,
-        "rental_started_at": "2026-09-27T02:09:00.405861+00:00",
-        "created_at": "2026-09-27T02:09:00.013724+00:00",
-        "updated_at": "2026-09-27T02:09:00.405861+00:00"
-    }
-}
+MOCK_PAYERNT_PRODUCTS: Dict[str, Dict[str, Any]] = {}
+MOCK_RENTAL_SECURITIES: Dict[str, Dict[str, Any]] = {}
 MOCK_PRODUCT_CONFIRMATIONS: Dict[str, Dict[str, Any]] = {}
 MOCK_PAYERNT_WALLETS: Dict[str, Dict[str, Any]] = {}
 MOCK_PAYERNT_TRANSACTIONS: Dict[str, List[Dict[str, Any]]] = {}

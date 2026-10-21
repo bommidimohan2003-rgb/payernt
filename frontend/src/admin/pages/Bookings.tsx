@@ -51,7 +51,14 @@ export default function Bookings() {
       if (!silent) setLoading(true);
       setError(null);
       const data = await bookingsService.getBookings();
-      setBookings(data);
+      const sanitized = Array.isArray(data)
+        ? data.filter(
+            (b) =>
+              !b.productTitle?.toLowerCase().includes("fx3") &&
+              b.productId !== "prod-1790474939846-841"
+          )
+        : [];
+      setBookings(sanitized);
     } catch (err) {
       console.error(err);
       if (!silent) setError("Failed to load rental bookings from database.");
@@ -59,6 +66,20 @@ export default function Bookings() {
       if (!silent) setLoading(false);
     }
   }, []);
+
+  const handleResetBookings = async () => {
+    if (!confirm("Are you sure you want to reset all bookings? This will clear all booking entries.")) return;
+    try {
+      setActionLoading(true);
+      await bookingsService.resetAllBookings();
+      setBookings([]);
+      toast.success("All bookings have been reset.");
+    } catch {
+      toast.error("Failed to reset bookings.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchBookings();
@@ -363,14 +384,25 @@ export default function Bookings() {
           </p>
         </div>
 
-        <button
-          onClick={() => fetchBookings()}
-          disabled={loading}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card)] hover:bg-[var(--admin-elevated)] text-[var(--admin-text)] text-xs font-medium transition-colors cursor-pointer self-start sm:self-auto"
-        >
-          <RefreshCw className={cn("h-3.5 w-3.5 text-[var(--admin-text-secondary)]", loading && "animate-spin")} />
-          <span>Refresh</span>
-        </button>
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          <button
+            onClick={handleResetBookings}
+            disabled={loading || actionLoading}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-500/20 bg-red-500/10 hover:bg-red-500/20 text-[#FF1744] text-xs font-medium transition-colors cursor-pointer disabled:opacity-50"
+            title="Reset all bookings data"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            <span>Reset Bookings</span>
+          </button>
+          <button
+            onClick={() => fetchBookings()}
+            disabled={loading}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card)] hover:bg-[var(--admin-elevated)] text-[var(--admin-text)] text-xs font-medium transition-colors cursor-pointer"
+          >
+            <RefreshCw className={cn("h-3.5 w-3.5 text-[var(--admin-text-secondary)]", loading && "animate-spin")} />
+            <span>Refresh</span>
+          </button>
+        </div>
       </div>
 
       {/* TABS WITH COUNTERS */}

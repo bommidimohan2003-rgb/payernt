@@ -156,7 +156,7 @@ export const FAQ_DATA: FAQItem[] = [
     answer:
       "Most camera power issues stem from battery door micro-switches, unseated batteries, or third-party power adapters.",
     troubleshootingSteps: [
-      "Ensure the battery door is completely closed and clicked into the locked position; many cinema bodies (like Sony FX3) will not turn on if the door sensor is slightly open.",
+      "Ensure the battery door is completely closed and clicked into the locked position; modern cinema bodies will not turn on if the door sensor is slightly open.",
       "Clean the gold battery terminal contacts with a clean, dry micro-fiber cloth.",
       "Check if the battery requires a full charge (test with the supplied wall charger).",
       "Remove any external dummy battery, USB-C PD hub, or V-Mount D-tap cable and test with an original internal battery.",
@@ -1523,7 +1523,7 @@ export default function Support() {
                             type="text"
                             value={ticketBookingId}
                             onChange={(e) => setTicketBookingId(e.target.value)}
-                            placeholder="e.g. ord_1790474940011"
+                            placeholder="e.g. ORD-89211"
                             className="w-full px-3.5 py-2.5 rounded-xl bg-card border border-border text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
                           />
                         )}
@@ -1538,7 +1538,7 @@ export default function Support() {
                           type="text"
                           value={ticketProductRef}
                           onChange={(e) => setTicketProductRef(e.target.value)}
-                          placeholder="e.g. Sony FX3 Cinema Line"
+                          placeholder="e.g. Cinema Camera Package"
                           className="w-full px-3.5 py-2.5 rounded-xl bg-card border border-border text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
                         />
                       </div>

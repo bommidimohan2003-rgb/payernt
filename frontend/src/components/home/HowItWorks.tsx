@@ -260,7 +260,7 @@ export function HowItWorks() {
                         <div className="flex items-center gap-2">
                           <Search className="h-3.5 w-3.5 text-neutral-500 dark:text-neutral-400" />
                           <div>
-                            <div className="text-xs font-bold text-neutral-900 dark:text-white">Sony FX3 Cinema Rig</div>
+                            <div className="text-xs font-bold text-neutral-900 dark:text-white">Sony Alpha A7 IV Kit</div>
                             <div className="text-[10px] text-neutral-500 dark:text-neutral-400 flex items-center gap-1">
                               <MapPin className="h-2.5 w-2.5" /> Indiranagar, Bengaluru
                             </div>

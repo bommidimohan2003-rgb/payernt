@@ -556,7 +556,7 @@ export default function Contact() {
                         if (errors.subject)
                           setErrors((prev) => ({ ...prev, subject: "" }));
                       }}
-                      placeholder="e.g. Question regarding Sony FX3 cinema package in Vizag"
+                      placeholder="e.g. Question regarding camera gear package in Vizag"
                       className={cn(
                         "w-full px-3.5 py-2.5 rounded-xl border bg-transparent text-xs text-neutral-900 dark:text-white placeholder:text-neutral-400 dark:placeholder:text-[#697680] focus:outline-none focus:ring-1 focus:ring-primary",
                         errors.subject

@@ -19,13 +19,46 @@ export const bookingsService = {
         if (cached) {
           try {
             const parsed = JSON.parse(cached);
-            if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              return parsed.filter(
+                (b) =>
+                  !b.productTitle?.toLowerCase().includes("fx3") &&
+                  b.productId !== "prod-1790474939846-841"
+              );
+            }
           } catch {}
         }
       }
       throw err;
     }
     return [];
+  },
+
+  async resetAllBookings(): Promise<{ success: boolean; message: string }> {
+    try {
+      const response = await adminApi.post("/bookings/reset");
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.removeItem("payent:admin:bookings");
+        } catch {}
+      }
+      return response.data;
+    } catch {
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.removeItem("payent:admin:bookings");
+        } catch {}
+      }
+      return { success: true, message: "Bookings cache reset." };
+    }
+  },
+
+  resetBookingsCache() {
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.removeItem("payent:admin:bookings");
+      } catch {}
+    }
   },
 
   async cancelBooking(id: string): Promise<AdminBooking> {

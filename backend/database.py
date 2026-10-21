@@ -1173,68 +1173,14 @@ MOCK_USERS = {
     }
 }
 MOCK_OTPS = {}
-MOCK_ORDERS = {
-    "ord_1790474940011": {
-        "id": "ord_1790474940011",
-        "user_email": "shinyshakhina08@gmail.com",
-        "customer_name": "Shiny Shakhina",
-        "product_id": "prod-1790474939846-841",
-        "product_title": "Sony FX3 Full-Frame Cinema Line Camera",
-        "product_image": "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=600",
-        "start_date": "2026-09-27",
-        "end_date": "2026-10-02",
-        "total": 3499.0,
-        "status": "active",
-        "created_at": "2026-09-27T02:09:00.013724+00:00",
-        "razorpay_order_id": "order_1790474940011",
-        "razorpay_payment_id": "pay_1790474940011_live",
-        "razorpay_signature": "sig_1790474940011_live",
-        "payment_status": "paid",
-        "refund_id": None,
-        "refund_status": None,
-        "delivery_status": "DELIVERED",
-        "owner_name": "Vasnath Chikkala",
-        "owner_email": "vasnathchikkala@gmail.com"
-    }
-}
+MOCK_ORDERS: Dict[str, Dict[str, Any]] = {}
 MOCK_BOOKING_CANCELLATIONS: Dict[str, Dict[str, Any]] = {}
 MOCK_CARTS = {}
 MOCK_WISHLISTS = {}
 MOCK_NOTIFICATIONS = {}
 MOCK_PROCESSED_EVENTS = set()
 MOCK_USER_EVENTS = []
-MOCK_CUSTOM_PRODUCTS = {
-    "prod-1790474939846-841": {
-        "id": "prod-1790474939846-841",
-        "owner_id": "PAYERNT_USER_1790474937926",
-        "owner_email": "vasnathchikkala@gmail.com",
-        "owner_name": "Vasnath Chikkala",
-        "user_email": "vasnathchikkala@gmail.com",
-        "category": "cameras",
-        "name": "Sony FX3 Cinema Camera",
-        "title": "Sony FX3 Full-Frame Cinema Line Camera",
-        "brand": "Sony",
-        "model": "FX3",
-        "year": "2024",
-        "description": "Full-frame cinema line camera with 4K 120p, XLR handle.",
-        "specifications": "12.1MP Full-Frame Exmor R CMOS, 4K 120p, 10-bit 4:2:2",
-        "features": '["4K 120p", "15+ stops dynamic range", "XLR Handle"]',
-        "condition_grade": "Like New",
-        "city": "Hyderabad",
-        "pincode": "500081",
-        "daily_rate": 3499.0,
-        "price_per_day": 3499.0,
-        "security_deposit": 5000.0,
-        "available": True,
-        "availability_status": "available",
-        "primary_image": "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=600",
-        "images": '["https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=600"]',
-        "vendor_secret_pin": "5716",
-        "status": "approved",
-        "created_at": "2026-09-27T02:08:59.846915+00:00",
-        "updated_at": "2026-09-27T02:08:59.846915+00:00"
-    }
-}
+MOCK_CUSTOM_PRODUCTS: Dict[str, Dict[str, Any]] = {}
 MOCK_REVIEWS = {}
 MOCK_DELIVERIES = {}
 MOCK_DELIVERY_LOCATIONS = {}

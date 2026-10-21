@@ -9216,6 +9216,36 @@ def admin_delete_category(id: str, current_admin: dict = Depends(check_admin_use
     return {"success": True}
 
 # Bookings
+@app.post("/api/admin/bookings/reset")
+def admin_reset_bookings(current_admin: dict = Depends(check_admin_user)):
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cursor:
+                for tbl in ["rental_security", "deliveries", "booking_cancellations", "orders"]:
+                    try:
+                        cursor.execute(f"DELETE FROM {tbl}")
+                    except Exception:
+                        pass
+            conn.commit()
+        except Exception as e:
+            logger.warning(f"Error resetting bookings in DB: {e}")
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+    try:
+        from database import MOCK_ORDERS, MOCK_BOOKING_CANCELLATIONS
+        from payernt_database import MOCK_RENTAL_SECURITIES
+        MOCK_ORDERS.clear()
+        MOCK_BOOKING_CANCELLATIONS.clear()
+        MOCK_RENTAL_SECURITIES.clear()
+    except Exception:
+        pass
+    broadcast_admin_event("booking.cancelled", {})
+    return {"success": True, "message": "All bookings have been reset successfully."}
+
 @app.get("/api/admin/bookings")
 def admin_bookings_list(current_admin: dict = Depends(check_admin_user)):
     rows = []

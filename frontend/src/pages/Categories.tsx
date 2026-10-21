@@ -47,7 +47,7 @@ import { PayentLogoMark } from "@/components/common/LogoIcon";
 type SortOption = "featured" | "newest" | "price_asc" | "price_desc" | "rating";
 
 const popularTags = [
-  "Sony FX3",
+  "Sony A7 IV",
   "Canon R5",
   "DJI Mavic 3",
   "MacBook Pro",
@@ -230,7 +230,7 @@ export default function Categories() {
   // Typewriter effect for search placeholder with gear product names
   const SEARCH_SUGGESTIONS = useMemo(
     () => [
-      "Sony FX3 Cinema Camera...",
+      "Sony Alpha A7 IV Camera...",
       "DJI Mavic 3 Pro Drone...",
       "MacBook Pro M3 Max...",
       "Canon EOS R5 C...",
