@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, Link } from "@tanstack/react-router";
 import {
   Eye,
   EyeOff,
@@ -9,12 +9,9 @@ import {
   User,
   ArrowRight,
   ShieldCheck,
-  MapPin,
-  Building2,
-  Compass,
-  Sparkles,
   Loader2,
   CheckCircle2,
+  XCircle,
 } from "lucide-react";
 import { useMemo, useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
@@ -38,7 +35,7 @@ const schema = z
     email: z
       .string()
       .trim()
-      .min(1, "Email is required")
+      .min(1, "Email address is required")
       .email("Enter a valid email address")
       .max(255),
     panNumber: z
@@ -46,18 +43,12 @@ const schema = z
       .trim()
       .toUpperCase()
       .min(1, "PAN Number is required")
-      .regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, "Enter a valid PAN number."),
+      .regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, "Enter a valid 10-character PAN number (e.g. ABCDE1234F)"),
     phone: z
       .string()
       .trim()
-      .min(7, "Enter a valid phone number (at least 7 digits)")
+      .min(10, "Enter a valid 10-digit mobile number")
       .max(20),
-    address: z
-      .string()
-      .trim()
-      .min(5, "Enter complete street address (at least 5 characters)"),
-    city: z.string().trim().optional(),
-    pincode: z.string().trim().min(6, "Enter valid 6-digit PIN code").max(10),
     password: z
       .string()
       .min(8, "Password must be at least 8 characters")
@@ -75,7 +66,7 @@ const schema = z
   })
   .refine((d) => d.password === d.confirm, {
     path: ["confirm"],
-    message: "Passwords don't match",
+    message: "Passwords do not match",
   })
   .refine((d) => !d.isAdmin || (d.adminCode && d.adminCode.trim().length > 0), {
     path: ["adminCode"],
@@ -83,15 +74,6 @@ const schema = z
   });
 
 type FormValues = z.infer<typeof schema>;
-
-function strength(pw: string) {
-  let s = 0;
-  if (pw.length >= 8) s++;
-  if (/[A-Z]/.test(pw)) s++;
-  if (/[0-9]/.test(pw)) s++;
-  if (/[^A-Za-z0-9]/.test(pw)) s++;
-  return s;
-}
 
 function isValidInternalRedirect(url: string | null | undefined, currentPath: string): url is string {
   if (!url || typeof url !== "string") return false;
@@ -105,6 +87,7 @@ export function RegisterForm() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [showPw, setShowPw] = useState(false);
+  const [showConfirmPw, setShowConfirmPw] = useState(false);
   const [error, setErrorState] = useState<string | null>(null);
   const [isChecking, setIsChecking] = useState(false);
 
@@ -147,7 +130,6 @@ export function RegisterForm() {
     register,
     handleSubmit,
     watch,
-    setValue,
     getValues,
     setError,
     formState: { errors, isSubmitting },
@@ -159,14 +141,14 @@ export function RegisterForm() {
   const handleCheckUser = async () => {
     const { fullName, phone, email } = getValues();
     const cleanName = (fullName || "").trim();
-    const cleanPhone = (phone || "").trim();
+    const cleanPhone = (phone || "").replace(/\D/g, "");
     const cleanEmail = (email || "").trim().toLowerCase();
 
     if (!cleanName || cleanName.length < 2) {
       toast.error("Please enter your full name before checking.");
       return;
     }
-    if (!cleanPhone || cleanPhone.replace(/\D/g, "").length < 10) {
+    if (!cleanPhone || cleanPhone.length < 10) {
       toast.error("Please enter a valid 10-digit mobile number before checking.");
       return;
     }
@@ -189,16 +171,13 @@ export function RegisterForm() {
         return;
       }
 
-      if (res.found && res.prefill) {
-        toast.success("Existing account found. Your details have been filled.");
-        if (res.prefill.address) setValue("address", res.prefill.address, { shouldValidate: true });
-        if (res.prefill.pincode) setValue("pincode", res.prefill.pincode, { shouldValidate: true });
-        if (res.prefill.city) setValue("city", res.prefill.city, { shouldValidate: true });
+      if (res.found) {
+        toast.success("Existing verified identity found. You can proceed with registration.");
       } else {
-        toast.info("No existing account found. Please continue registration.");
+        toast.info("No prior account found. Please complete your registration.");
       }
     } catch {
-      toast.error("Unable to check your details. Please try again.");
+      toast.error("Unable to check details. Please proceed with registration.");
     } finally {
       setIsChecking(false);
     }
@@ -210,9 +189,8 @@ export function RegisterForm() {
   const hasLowercase = /[a-z]/.test(pw);
   const hasNumber = /[0-9]/.test(pw);
   const hasSpecial = /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?~`]/.test(pw);
+  const isPasswordValid = hasMinLen && hasUppercase && hasLowercase && hasNumber && hasSpecial;
   const watchIsAdmin = watch("isAdmin") ?? false;
-  const level = useMemo(() => strength(pw), [pw]);
-  const labels = ["Weak", "Fair", "Good", "Strong", "Excellent"];
 
   const showAdminOption = useMemo(() => {
     if (typeof window === "undefined") return false;
@@ -234,16 +212,20 @@ export function RegisterForm() {
       const adminCode =
         showAdminOption && data.isAdmin ? data.adminCode : undefined;
       const panUpper = data.panNumber.toUpperCase().trim();
+      const cleanPhone = data.phone.replace(/\D/g, "");
+
+      // Address and Pincode are deliberately omitted from customer registration payload
+      // per specification (collected in checkout booking workflow).
       const res = await api.registerVerify(
         data.email,
-        data.phone,
+        cleanPhone,
         "DIRECT",
         data.password,
         data.fullName,
         adminCode,
-        data.address,
-        data.city || "India",
-        data.pincode,
+        undefined, // address removed
+        "India",
+        undefined, // pincode removed
         undefined,
         panUpper,
       );
@@ -278,7 +260,6 @@ export function RegisterForm() {
       const accountId = userObj.accountId || `PAYRENT_USER_${data.email}`;
       const panMasked = userObj.panMasked || `XXXXX${panUpper.slice(5)}`;
       const createdRole = userObj.role || (data.isAdmin ? "admin" : "customer");
-      const createdStatus = userObj.status || "PENDING_REVIEW";
 
       if (createdRole === "admin" && res.token) {
         const createdUser: UserType = {
@@ -287,10 +268,7 @@ export function RegisterForm() {
           accountType: "pay₹ent",
           fullName: userObj.fullName || userObj.name || data.fullName,
           email: userObj.email || data.email,
-          phone: userObj.phone || data.phone,
-          address: userObj.address || data.address,
-          city: userObj.city || data.city || "India",
-          pincode: userObj.pincode || data.pincode,
+          phone: cleanPhone,
           panNumber: panUpper,
           panMasked,
           role: "admin",
@@ -306,8 +284,8 @@ export function RegisterForm() {
         return;
       }
 
-      // Normal Payrent Customer Registration -> Route immediately to Account Under Review
-      toast.success("Account created successfully! Your account is currently under review by our Admin team.");
+      // Normal Payrent Customer Registration -> Route to Account Pending / Review
+      toast.success("Account created successfully! Submitted for review.");
       navigate({
         to: "/account-pending",
         search: { type: "payrent", email: data.email } as any,
@@ -341,54 +319,58 @@ export function RegisterForm() {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 text-left">
-      {/* 1. Name */}
+      {/* 1. Full Name */}
       <Input
-        label="Name"
-        placeholder="Your full name"
+        label="Full Name"
+        placeholder="e.g. Rahul Sharma"
+        autoComplete="name"
         icon={<User className="h-4 w-4" />}
         error={errors.fullName?.message}
         {...register("fullName")}
       />
 
-      {/* 2. Mobile Number */}
-      <Input
-        label="Mobile Number"
-        placeholder="+91 98765 43210"
-        icon={<Phone className="h-4 w-4" />}
-        error={errors.phone?.message}
-        {...register("phone")}
-      />
+      {/* 2. Mobile Number & Check button */}
+      <div className="space-y-1.5">
+        <div className="flex items-end gap-2">
+          <div className="flex-1">
+            <Input
+              label="Mobile Number"
+              type="tel"
+              placeholder="9876543210"
+              autoComplete="tel"
+              icon={<Phone className="h-4 w-4" />}
+              error={errors.phone?.message}
+              {...register("phone")}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={handleCheckUser}
+            disabled={isChecking}
+            className="h-12 px-3.5 rounded-xl border border-border bg-secondary hover:bg-secondary/80 text-foreground font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shrink-0 disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-1.5"
+            title="Check existing account records"
+          >
+            {isChecking ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <span>Check</span>
+            )}
+          </button>
+        </div>
+      </div>
 
       {/* 3. Email Address */}
       <Input
         label="Email Address"
         type="email"
-        placeholder="you@example.com"
+        placeholder="rahul@example.com"
+        autoComplete="email"
         icon={<Mail className="h-4 w-4" />}
         error={errors.email?.message}
         {...register("email")}
       />
 
-      {/* CHECK Button */}
-      <div className="pt-1 pb-1 flex justify-end">
-        <button
-          type="button"
-          onClick={handleCheckUser}
-          disabled={isChecking}
-          className="w-[30%] min-w-[110px] flex items-center justify-center gap-2 py-2 px-3 rounded-xl border border-primary/30 bg-primary/10 hover:bg-primary/20 text-primary font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shadow-xs disabled:opacity-60 disabled:cursor-not-allowed"
-        >
-          {isChecking ? (
-            <>
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              <span>Checking...</span>
-            </>
-          ) : (
-            <span>CHECK</span>
-          )}
-        </button>
-      </div>
-
-      {/* 4. PAN Number (Indian format validation: ABCDE1234F) */}
+      {/* 4. PAN Number (Required KYC format: ABCDE1234F) */}
       <Input
         label="PAN Number"
         placeholder="ABCDE1234F"
@@ -403,37 +385,20 @@ export function RegisterForm() {
         })}
       />
 
-      {/* 5. User Address */}
-      <Input
-        label="User Address"
-        placeholder="Street address, house number, area"
-        icon={<MapPin className="h-4 w-4" />}
-        error={errors.address?.message}
-        {...register("address")}
-      />
-
-      {/* 6. Pincode */}
-      <Input
-        label="Pincode"
-        placeholder="500081"
-        icon={<Compass className="h-4 w-4" />}
-        error={errors.pincode?.message}
-        maxLength={6}
-        {...register("pincode")}
-      />
-
-      {/* 7. Password & 8. Confirm Password */}
+      {/* 5. Password & 6. Confirm Password */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Input
           label="Password"
           type={showPw ? "text" : "password"}
-          placeholder="At least 8 characters"
+          autoComplete="new-password"
+          placeholder="••••••••"
           icon={<Lock className="h-4 w-4" />}
           rightAdornment={
             <button
               type="button"
               onClick={() => setShowPw((v) => !v)}
               className="p-1 text-muted-foreground hover:text-foreground cursor-pointer"
+              aria-label={showPw ? "Hide password" : "Show password"}
             >
               {showPw ? (
                 <EyeOff className="h-4 w-4" />
@@ -448,23 +413,53 @@ export function RegisterForm() {
 
         <Input
           label="Confirm Password"
-          type={showPw ? "text" : "password"}
-          placeholder="Repeat password"
+          type={showConfirmPw ? "text" : "password"}
+          autoComplete="new-password"
+          placeholder="••••••••"
           icon={<Lock className="h-4 w-4" />}
+          rightAdornment={
+            <button
+              type="button"
+              onClick={() => setShowConfirmPw((v) => !v)}
+              className="p-1 text-muted-foreground hover:text-foreground cursor-pointer"
+              aria-label={showConfirmPw ? "Hide password" : "Show password"}
+            >
+              {showConfirmPw ? (
+                <EyeOff className="h-4 w-4" />
+              ) : (
+                <Eye className="h-4 w-4" />
+              )}
+            </button>
+          }
           error={errors.confirm?.message}
           {...register("confirm")}
         />
       </div>
 
-      {/* Single-line password requirement hint when not yet fulfilling all rules */}
-      {pw.length > 0 && !(hasMinLen && hasUppercase && hasLowercase && hasNumber && hasSpecial) && (
-        <p className="text-[11px] font-medium text-amber-500 dark:text-amber-400">
-          Must be at least 8 characters with uppercase, lowercase, number & special character (!@#$%^&*...).
-        </p>
+      {/* Password Requirements Guidance */}
+      {pw.length > 0 && !isPasswordValid && (
+        <div className="p-2.5 rounded-xl bg-secondary/80 border border-border/80 text-[11px] space-y-1 text-muted-foreground">
+          <p className="font-semibold text-foreground">Password requirements:</p>
+          <div className="grid grid-cols-2 gap-1">
+            <span className={hasMinLen ? "text-emerald-500 font-medium" : ""}>
+              • 8+ characters
+            </span>
+            <span className={hasUppercase ? "text-emerald-500 font-medium" : ""}>
+              • Uppercase letter
+            </span>
+            <span className={hasLowercase ? "text-emerald-500 font-medium" : ""}>
+              • Lowercase letter
+            </span>
+            <span className={hasNumber && hasSpecial ? "text-emerald-500 font-medium" : ""}>
+              • Number & symbol
+            </span>
+          </div>
+        </div>
       )}
 
+      {/* Secret admin setup toggle if ?admin=true */}
       {showAdminOption && (
-        <div className="space-y-2 p-2.5 rounded-xl bg-secondary border border-border">
+        <div className="space-y-2 p-3 rounded-xl bg-secondary border border-border">
           <label className="flex items-center gap-2 text-xs font-bold cursor-pointer text-foreground">
             <input
               type="checkbox"
@@ -478,7 +473,7 @@ export function RegisterForm() {
           {watchIsAdmin && (
             <Input
               label="Admin Setup Code"
-              placeholder="Enter admin key"
+              placeholder="Enter admin authorization key"
               icon={<Lock className="h-4 w-4" />}
               error={errors.adminCode?.message}
               {...register("adminCode")}
@@ -487,46 +482,71 @@ export function RegisterForm() {
         </div>
       )}
 
-      {/* Terms & Create Account Button */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-border/40">
-        <label className="flex items-center gap-2 text-xs cursor-pointer">
+      {/* Global Server Error Message */}
+      {error && (
+        <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs font-semibold">
+          {error}
+        </div>
+      )}
+
+      {/* Terms & Conditions Checkbox */}
+      <div className="pt-2">
+        <label className="flex items-center gap-2 text-xs cursor-pointer select-none">
           <input
             type="checkbox"
-            className="rounded border-border text-primary focus:ring-primary"
+            className="rounded border-border text-foreground focus:ring-foreground h-4 w-4 cursor-pointer"
             {...register("terms")}
           />
-          <span className="text-muted-foreground text-[11px]">
+          <span className="text-muted-foreground text-[11px] leading-tight">
             I accept the{" "}
             <a href="#" className="text-foreground hover:underline font-bold">
-              Terms
+              Terms of Service
             </a>{" "}
-            &{" "}
+            and{" "}
             <a href="#" className="text-foreground hover:underline font-bold">
               Privacy Policy
             </a>
           </span>
         </label>
-
-        <Button
-          type="submit"
-          className="w-full sm:w-auto px-7 font-extrabold h-11 text-xs rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-md active:scale-98 flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
-          loading={isSubmitting}
-          disabled={isSubmitting}
-        >
-          <span>
-            {isSubmitting ? "Creating..." : "Create Account"}
-          </span>
-          {!isSubmitting && <ArrowRight className="h-3.5 w-3.5" />}
-        </Button>
+        {errors.terms && (
+          <p className="mt-1 text-xs text-destructive font-medium">
+            {errors.terms.message}
+          </p>
+        )}
       </div>
 
-      {errors.terms && (
-        <p className="text-xs text-destructive font-medium">
-          {errors.terms.message}
+      {/* Primary Action Button: Create Payrent Account */}
+      <Button
+        type="submit"
+        className="w-full font-extrabold h-12 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-lg active:scale-98 flex items-center justify-center gap-2 cursor-pointer mt-2"
+        loading={isSubmitting}
+        disabled={isSubmitting}
+      >
+        {isSubmitting ? (
+          <div className="flex items-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span>Creating Payrent Account...</span>
+          </div>
+        ) : (
+          <>
+            <span>Create Payrent Account</span>
+            <ArrowRight className="h-4 w-4" />
+          </>
+        )}
+      </Button>
+
+      {/* Switch to Login Link */}
+      <div className="pt-2 text-center">
+        <p className="text-xs text-muted-foreground">
+          Already have a Payrent account?{" "}
+          <Link
+            to="/login"
+            className="font-bold text-foreground hover:underline cursor-pointer"
+          >
+            Sign in to Payrent
+          </Link>
         </p>
-      )}
-      {error && <p className="text-xs text-destructive font-medium">{error}</p>}
+      </div>
     </form>
   );
 }
-

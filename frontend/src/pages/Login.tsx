@@ -5,8 +5,9 @@ export default function Login() {
   return (
     <AuthLayout
       mode="login"
-      title="Welcome Back"
-      subtitle="Sign in to manage rentals, access booked gear, or list your equipment."
+      title="Welcome, Payrent"
+      subtitle="Find what you need and rent it with ease."
+      role="payrent"
     >
       <LoginForm />
     </AuthLayout>

@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useNavigate } from "@tanstack/react-router";
-import { Eye, EyeOff, Lock, Mail, AlertCircle, ArrowRight } from "lucide-react";
+import { useNavigate, Link } from "@tanstack/react-router";
+import { Eye, EyeOff, Lock, Mail, ArrowRight, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -15,8 +15,8 @@ const schema = z.object({
   email: z
     .string()
     .trim()
-    .min(1, "Email is required")
-    .email("Enter a valid email address"),
+    .min(1, "Email address is required")
+    .email("Please enter a valid email address"),
   password: z
     .string()
     .min(1, "Password is required")
@@ -179,25 +179,31 @@ export function LoginForm() {
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 text-left">
+      {/* Email Address Field with Persistent Label */}
       <Input
         label="Email address"
         type="email"
-        placeholder="you@work.com"
+        autoComplete="email"
+        placeholder="you@example.com"
         icon={<Mail className="h-4 w-4" />}
         error={errors.email?.message}
         {...register("email")}
       />
+
+      {/* Password Field with Persistent Label & Show/Hide */}
       <Input
         label="Password"
         type={showPw ? "text" : "password"}
+        autoComplete="current-password"
         placeholder="••••••••"
         icon={<Lock className="h-4 w-4" />}
         rightAdornment={
           <button
             type="button"
             onClick={() => setShowPw((v) => !v)}
-            className="p-1 text-muted-foreground hover:text-foreground cursor-pointer"
+            className="p-1 text-muted-foreground hover:text-foreground cursor-pointer focus:outline-none transition-colors"
+            aria-label={showPw ? "Hide password" : "Show password"}
           >
             {showPw ? (
               <EyeOff className="h-4 w-4" />
@@ -210,35 +216,64 @@ export function LoginForm() {
         {...register("password")}
       />
 
-      <div className="flex items-center justify-between text-xs sm:text-sm">
-        <label className="inline-flex items-center gap-2 cursor-pointer text-muted-foreground hover:text-foreground transition-colors">
+      {/* Remember Me & Forgot Password Row */}
+      <div className="flex items-center justify-between text-xs sm:text-sm pt-1">
+        <label className="inline-flex items-center gap-2 cursor-pointer text-muted-foreground hover:text-foreground transition-colors select-none">
           <input
             type="checkbox"
-            className="rounded border-border text-foreground focus:ring-foreground"
+            className="rounded border-border text-foreground focus:ring-foreground h-4 w-4 cursor-pointer"
             {...register("remember")}
           />
-          Remember me
+          <span>Remember me</span>
         </label>
         <button
           type="button"
           onClick={() => navigate({ to: "/forgot-password", search: { token: "" } as any })}
-          className="text-foreground hover:underline font-bold text-xs cursor-pointer"
+          className="text-foreground hover:underline font-bold text-xs cursor-pointer focus:outline-none"
         >
           Forgot password?
         </button>
       </div>
 
-      {error && <p className="text-xs text-destructive font-medium">{error}</p>}
+      {/* Global Server Error Message */}
+      {error && (
+        <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs font-semibold">
+          {error}
+        </div>
+      )}
 
+      {/* Primary Action Button: Sign in to Payrent */}
       <Button
         type="submit"
         className="w-full font-extrabold h-12 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-lg active:scale-98 flex items-center justify-center gap-2 cursor-pointer mt-2"
         loading={isSubmitting}
         disabled={isSubmitting}
       >
-        <span>{isSubmitting ? "Signing in..." : "Sign In to Payent"}</span>
-        {!isSubmitting && <ArrowRight className="h-4 w-4" />}
+        {isSubmitting ? (
+          <div className="flex items-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span>Signing in to Payrent...</span>
+          </div>
+        ) : (
+          <>
+            <span>Sign in to Payrent</span>
+            <ArrowRight className="h-4 w-4" />
+          </>
+        )}
       </Button>
+
+      {/* Switch to Register Link */}
+      <div className="pt-2 text-center">
+        <p className="text-xs text-muted-foreground">
+          Don't have a Payrent account?{" "}
+          <Link
+            to="/register"
+            className="font-bold text-foreground hover:underline cursor-pointer"
+          >
+            Create Payrent Account
+          </Link>
+        </p>
+      </div>
     </form>
   );
 }

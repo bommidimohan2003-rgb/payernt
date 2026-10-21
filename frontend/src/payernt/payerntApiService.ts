@@ -114,8 +114,8 @@ export const payerntApi = {
     email: string;
     aadhaarNumber: string;
     phoneNumber: string;
-    address: string;
-    pincode: string;
+    address?: string;
+    pincode?: string;
     password: string;
     confirmPassword?: string;
   }): Promise<{

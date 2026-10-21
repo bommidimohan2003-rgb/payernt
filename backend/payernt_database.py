@@ -518,9 +518,9 @@ def create_payernt_account(
     email: str,
     aadhaar_number: str,
     phone: str,
-    address: str,
-    pincode: str,
-    password: str,
+    address: str = "",
+    pincode: str = "",
+    password: str = "",
 ) -> Dict[str, Any]:
     """Creates a new paye₹nt (Vendor/Lender) account."""
     clean_email = email.strip().lower()
