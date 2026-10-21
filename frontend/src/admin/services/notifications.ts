@@ -43,6 +43,19 @@ export interface DashboardCharts {
   topProducts: { name: string; rentals: number; revenue: number }[];
 }
 
+export interface DashboardFunnelStage {
+  id: string;
+  label: string;
+  count: number;
+  event_name: string;
+  is_tracked: boolean;
+}
+
+export interface DashboardFunnel {
+  days: number;
+  stages: DashboardFunnelStage[];
+}
+
 export interface DashboardActivity {
   id: string;
   type: string;
@@ -220,6 +233,15 @@ export const notificationsService = {
       return response.data;
     }
     return [];
+  },
+
+  async getDashboardFunnel(period = 30): Promise<DashboardFunnel> {
+    const days = typeof period === "number" ? period : parseInt(String(period), 10) || 30;
+    const response = await adminApi.get(`/dashboard/funnel?days=${days}`);
+    if (response.data && typeof response.data === "object") {
+      return response.data as DashboardFunnel;
+    }
+    throw new Error("Invalid funnel response from server");
   },
 
   async resetAnalytics(): Promise<void> {

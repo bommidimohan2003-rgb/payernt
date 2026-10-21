@@ -6285,6 +6285,109 @@ def admin_charts(days: int = Query(30), current_admin: dict = Depends(check_admi
         if conn:
             conn.close()
 
+@app.get("/api/admin/dashboard/funnel")
+def admin_funnel(days: int = Query(30), current_admin: dict = Depends(check_admin_user)):
+    """
+    Returns verified funnel stages based on real user_events and orders:
+    1. Product views ('view_product' events)
+    2. Booking requests initiated ('add_to_cart' events)
+    3. Bookings created / submitted (orders created)
+    4. Bookings confirmed / active (orders confirmed)
+    5. Rentals completed (orders completed)
+    """
+    num_days = max(1, min(days, 365))
+    end_date = datetime.date.today()
+    start_date = end_date - datetime.timedelta(days=num_days - 1)
+    start_iso = start_date.isoformat()
+    
+    funnel_result = {
+        "days": num_days,
+        "stages": [
+            {"id": "views", "label": "Product Views", "count": 0, "event_name": "view_product", "is_tracked": True},
+            {"id": "initiated", "label": "Booking Initiated (Cart)", "count": 0, "event_name": "add_to_cart", "is_tracked": True},
+            {"id": "submitted", "label": "Bookings Created", "count": 0, "event_name": "orders", "is_tracked": True},
+            {"id": "confirmed", "label": "Bookings Confirmed", "count": 0, "event_name": "orders_confirmed", "is_tracked": True},
+            {"id": "completed", "label": "Rentals Completed", "count": 0, "event_name": "orders_completed", "is_tracked": True},
+        ]
+    }
+    
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cursor:
+                # 1. Product views
+                cursor.execute("""
+                    SELECT COUNT(*) as cnt FROM user_events
+                    WHERE event_type = 'view_product' AND created_at >= %s
+                """, (start_iso,))
+                row = cursor.fetchone()
+                views_cnt = int(row.get("cnt", 0) if row else 0)
+                
+                # 2. Add to cart / booking initiated
+                cursor.execute("""
+                    SELECT COUNT(*) as cnt FROM user_events
+                    WHERE event_type = 'add_to_cart' AND created_at >= %s
+                """, (start_iso,))
+                row = cursor.fetchone()
+                cart_cnt = int(row.get("cnt", 0) if row else 0)
+                
+                # 3. Bookings created
+                cursor.execute("""
+                    SELECT COUNT(*) as cnt FROM orders
+                    WHERE created_at >= %s
+                """, (start_iso,))
+                row = cursor.fetchone()
+                submitted_cnt = int(row.get("cnt", 0) if row else 0)
+                
+                # 4. Bookings confirmed / active
+                cursor.execute("""
+                    SELECT COUNT(*) as cnt FROM orders
+                    WHERE status IN ('confirmed', 'active', 'delivered', 'in_progress', 'completed')
+                      AND created_at >= %s
+                """, (start_iso,))
+                row = cursor.fetchone()
+                confirmed_cnt = int(row.get("cnt", 0) if row else 0)
+                
+                # 5. Rentals completed
+                cursor.execute("""
+                    SELECT COUNT(*) as cnt FROM orders
+                    WHERE status = 'completed' AND created_at >= %s
+                """, (start_iso,))
+                row = cursor.fetchone()
+                completed_cnt = int(row.get("cnt", 0) if row else 0)
+                
+                funnel_result["stages"][0]["count"] = views_cnt
+                funnel_result["stages"][1]["count"] = cart_cnt
+                funnel_result["stages"][2]["count"] = submitted_cnt
+                funnel_result["stages"][3]["count"] = confirmed_cnt
+                funnel_result["stages"][4]["count"] = completed_cnt
+        except Exception as e:
+            logger.warning(f"[admin_funnel] database error: {e}")
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+    else:
+        # In-memory mock fallback
+        try:
+            from database import MOCK_ORDERS, MOCK_USER_EVENTS
+            views = [e for e in MOCK_USER_EVENTS if e.get("event_type") == "view_product"]
+            carts = [e for e in MOCK_USER_EVENTS if e.get("event_type") == "add_to_cart"]
+            orders_list = list(MOCK_ORDERS.values())
+            confirmed = [o for o in orders_list if o.get("status") in ('confirmed', 'active', 'delivered', 'in_progress', 'completed')]
+            completed = [o for o in orders_list if o.get("status") == 'completed']
+            
+            funnel_result["stages"][0]["count"] = len(views)
+            funnel_result["stages"][1]["count"] = len(carts)
+            funnel_result["stages"][2]["count"] = len(orders_list)
+            funnel_result["stages"][3]["count"] = len(confirmed)
+            funnel_result["stages"][4]["count"] = len(completed)
+        except Exception as e:
+            logger.warning(f"[admin_funnel] fallback error: {e}")
+            
+    return funnel_result
+
 @app.get("/api/admin/dashboard/activities")
 def admin_dashboard_activities(current_admin: dict = Depends(check_admin_user)):
     conn = get_db_connection()
