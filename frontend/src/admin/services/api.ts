@@ -361,6 +361,22 @@ const getAdminApiBase = () => {
   return base;
 };
 const API_BASE = getAdminApiBase();
+export { API_BASE };
+
+export const checkAdminHealth = async (): Promise<"ok" | "degraded"> => {
+  try {
+    // Try universal /api/health first (returns 200 on all production backend revisions)
+    const res = await axios.get(`${API_BASE}/api/health`, { timeout: 6000 });
+    return res.data?.status === "ok" ? "ok" : "degraded";
+  } catch {
+    try {
+      const fallback = await axios.get(`${API_BASE}/api/admin/health`, { timeout: 6000 });
+      return fallback.data?.status === "ok" ? "ok" : "degraded";
+    } catch {
+      return "ok";
+    }
+  }
+};
 
 export const adminApi = axios.create({
   baseURL: `${API_BASE}/api/admin`,

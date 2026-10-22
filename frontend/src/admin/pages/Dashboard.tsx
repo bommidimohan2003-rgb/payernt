@@ -67,6 +67,7 @@ import {
   AdminReport,
   AdminSupportTicket,
   adminApi,
+  checkAdminHealth,
 } from "../services/api";
 import { adminWS, ConnectionStatus } from "../services/websocket";
 import { useTheme } from "@/hooks/useTheme";
@@ -212,8 +213,8 @@ export function Dashboard() {
 
       // Check backend health silently
       try {
-        const healthRes = await adminApi.get("/health");
-        setHealthStatus(healthRes.data?.status === "ok" ? "ok" : "degraded");
+        const health = await checkAdminHealth();
+        setHealthStatus(health);
       } catch {
         setHealthStatus("ok");
       }

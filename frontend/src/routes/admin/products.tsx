@@ -1,9 +1,7 @@
 import { createFileRoute, useLocation } from "@tanstack/react-router";
-import { lazy, Suspense } from "react";
 import { z } from "zod";
-
-const Products = lazy(() => import("@/admin/pages/Products"));
-const ProductDetails = lazy(() => import("@/admin/pages/ProductDetails"));
+import Products from "@/admin/pages/Products";
+import ProductDetails from "@/admin/pages/ProductDetails";
 
 const productSearchSchema = z.object({
   search: z.string().optional().catch(""),
@@ -15,11 +13,7 @@ function AdminProductsRouteComponent() {
   const pathParts = location.pathname.split("/").filter(Boolean);
   const isDetails = pathParts.length > 2 && pathParts[0] === "admin" && pathParts[1] === "products";
 
-  return (
-    <Suspense fallback={<div className="h-64 flex items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>}>
-      {isDetails ? <ProductDetails /> : <Products />}
-    </Suspense>
-  );
+  return isDetails ? <ProductDetails /> : <Products />;
 }
 
 export const Route = createFileRoute("/admin/products")({
