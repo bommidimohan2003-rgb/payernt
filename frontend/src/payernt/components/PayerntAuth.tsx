@@ -256,15 +256,15 @@ export function PayerntAuth({
     setRegisterErrors({});
     setIsRegistering(true);
 
-    // Note: address and pincode are omitted per requirement (collected during product listing)
+    // Note: address and pincode are omitted from UI per requirement (collected later during product listing and booking)
     payerntApi
       .register({
         name: cleanName,
         email: cleanEmail,
         aadhaarNumber: cleanAadhaar,
         phoneNumber: cleanPhone,
-        address: "",
-        pincode: "",
+        address: "Not Provided",
+        pincode: "000000",
         password,
         confirmPassword,
       })

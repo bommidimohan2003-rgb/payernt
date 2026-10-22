@@ -600,10 +600,10 @@ def register_payernt_vendor(data: PayerntRegisterSchema):
             detail="Please provide a valid 10-digit Indian phone number.",
         )
 
-    # Validate pincode (optional during registration)
+    # Validate pincode (optional during registration, 000000 is accepted placeholder)
     raw_pincode = data.pincode or ""
     clean_pincode = re.sub(r"\D", "", raw_pincode)
-    if clean_pincode and len(clean_pincode) != 6:
+    if clean_pincode and clean_pincode != "000000" and len(clean_pincode) != 6:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Pincode must be exactly 6 numeric digits.",
@@ -617,14 +617,18 @@ def register_payernt_vendor(data: PayerntRegisterSchema):
             detail=msg,
         )
 
+    # Clean address & pincode placeholders for database storage
+    stored_address = "" if (data.address or "").strip().lower() in ("", "not provided") else (data.address or "").strip()
+    stored_pincode = "" if clean_pincode in ("", "000000") else clean_pincode
+
     try:
         account = create_payernt_account(
             name=data.name,
             email=data.email,
             aadhaar_number=clean_aadhaar,
             phone=clean_phone,
-            address=data.address or "",
-            pincode=clean_pincode or "",
+            address=stored_address,
+            pincode=stored_pincode,
             password=data.password,
         )
     except ValueError as err:

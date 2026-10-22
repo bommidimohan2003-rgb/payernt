@@ -199,10 +199,24 @@ export const payerntApi = {
     message?: string;
   }> {
     try {
+      // Address & pincode are collected later during product listing and renter booking.
+      // To guarantee backward and forward compatibility with both legacy and modern backend schemas:
+      // ensure address is at least 5 characters and pincode is exactly 6 digits if omitted or empty.
+      const payload = {
+        ...params,
+        address:
+          params.address && params.address.trim().length >= 5
+            ? params.address.trim()
+            : "Not Provided",
+        pincode:
+          params.pincode && params.pincode.replace(/\D/g, "").length === 6
+            ? params.pincode.replace(/\D/g, "")
+            : "000000",
+      };
       const res = await fetch(`${API_BASE}/api/payernt/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(params),
+        body: JSON.stringify(payload),
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.success) {
