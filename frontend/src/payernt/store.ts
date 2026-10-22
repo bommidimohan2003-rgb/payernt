@@ -441,7 +441,8 @@ export function usePayerntStore() {
           setUnreadMessagesCount(d.messages.unread);
         }
       } else if (dashRes.error) {
-        const errLower = (dashRes.error || "").toLowerCase();
+        const errorStr = typeof dashRes.error === "string" ? dashRes.error : JSON.stringify(dashRes.error);
+        const errLower = errorStr.toLowerCase();
         if (
           errLower.includes("401") ||
           errLower.includes("expired") ||
@@ -454,7 +455,7 @@ export function usePayerntStore() {
           logout();
           return;
         }
-        setDashboardError(dashRes.error);
+        setDashboardError(errorStr);
       }
 
       // Update bookings

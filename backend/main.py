@@ -33,6 +33,7 @@ except ImportError:
 
 from fastapi import FastAPI, HTTPException, Header, Depends, Query, status, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from pydantic import BaseModel, EmailStr, validator, Field
@@ -443,6 +444,43 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={"detail": err_detail},
         headers=headers
     )
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    req_id = request.headers.get("x-request-id") or f"req_{uuid.uuid4().hex[:12]}"
+    errors = exc.errors()
+    messages = []
+    for err in errors:
+        loc_parts = [str(l) for l in err.get("loc", []) if l not in ("body", "query", "path")]
+        loc = ".".join(loc_parts)
+        msg = err.get("msg", "Validation error")
+        messages.append(f"{loc}: {msg}" if loc else msg)
+    clean_message = "; ".join(messages) if messages else "Invalid request data."
+    logger.warning(f"[{req_id}] Validation Error on {request.method} {request.url.path}: {clean_message}")
+
+    origin = request.headers.get("origin")
+    allowed = is_origin_allowed(origin)
+    headers = {
+        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH, HEAD",
+        "Access-Control-Allow-Headers": "*",
+        "X-Request-ID": req_id
+    }
+    if allowed and origin:
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
+
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={
+            "success": False,
+            "error": clean_message,
+            "message": clean_message,
+            "detail": clean_message,
+            "validation_errors": errors,
+        },
+        headers=headers,
+    )
+
 
 @app.get("/")
 @app.get("/api/health")

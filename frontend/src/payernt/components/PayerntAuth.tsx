@@ -121,6 +121,17 @@ export function PayerntAuth({
   const hasSpecial = /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?~`]/.test(password);
   const isPasswordValid = hasMinLen && hasUppercase && hasLowercase && hasNumber && hasSpecial;
 
+  const safeString = (val: any, fallback: string = ""): string => {
+    if (typeof val === "string") return val;
+    if (!val) return fallback;
+    if (typeof val === "object") {
+      if (typeof val.message === "string") return val.message;
+      if (typeof val.msg === "string") return val.msg;
+      return JSON.stringify(val);
+    }
+    return String(val);
+  };
+
   // --- LOGIN SUBMIT ---
   const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -153,13 +164,13 @@ export function PayerntAuth({
           toast.success(`Welcome back, ${res.account.name}!`);
           onAuthSuccess(res.account);
         } else if (res.status === "PENDING_REVIEW" || res.status === "REJECTED") {
-          toast.info(res.error || "Your Payernt account is under administrative review.");
+          toast.info(safeString(res.error, "Your Payernt account is under administrative review."));
           navigate({
             to: "/account-pending",
             search: { type: "payernt", email: cleanEmail } as any,
           });
         } else {
-          const msg = res.error || "Invalid email or password.";
+          const msg = safeString(res.error, "Invalid email or password.");
           setLoginErrors({ general: msg });
           toast.error(msg);
         }
@@ -167,14 +178,14 @@ export function PayerntAuth({
       .catch((err) => {
         setIsLoggingIn(false);
         if (err?.status === "PENDING_REVIEW" || err?.status === "REJECTED" || err?.accountStatus) {
-          toast.info(err?.message || "Your Payernt account is under administrative review.");
+          toast.info(safeString(err?.message, "Your Payernt account is under administrative review."));
           navigate({
             to: "/account-pending",
             search: { type: "payernt", email: cleanEmail } as any,
           });
           return;
         }
-        const msg = err?.message || "Failed to sign in. Please try again.";
+        const msg = safeString(err?.message || err, "Failed to sign in. Please try again.");
         setLoginErrors({ general: msg });
         toast.error(msg);
       });
@@ -266,13 +277,13 @@ export function PayerntAuth({
             search: { type: "payernt", email: cleanEmail } as any,
           });
         } else {
-          const msg = res.error || "Failed to create account.";
+          const msg = safeString(res.error, "Failed to create account.");
           toast.error(msg);
         }
       })
       .catch((err) => {
         setIsRegistering(false);
-        toast.error(err?.message || "Registration failed. Try again.");
+        toast.error(safeString(err?.message || err, "Registration failed. Try again."));
       });
   };
 
@@ -429,7 +440,7 @@ export function PayerntAuth({
                     {loginErrors.general && (
                       <div className="p-3.5 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs font-semibold flex items-center gap-2">
                         <XCircle className="h-4 w-4 shrink-0" />
-                        <span>{loginErrors.general}</span>
+                        <span>{safeString(loginErrors.general)}</span>
                       </div>
                     )}
 

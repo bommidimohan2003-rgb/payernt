@@ -86,6 +86,50 @@ async function fetchWithPayerntAuth(url: string, options: RequestInit = {}): Pro
   return res;
 }
 
+export function extractApiErrorMessage(data: any, fallback: string): string {
+  if (!data) return fallback;
+  if (typeof data === "string") return data.trim() || fallback;
+
+  const detail = data.detail;
+  if (typeof detail === "string" && detail.trim()) {
+    return detail.trim();
+  }
+
+  // Handle FastAPI / Pydantic validation errors (array of { loc, msg, type, ctx })
+  if (Array.isArray(detail) && detail.length > 0) {
+    const formatted = detail
+      .map((item: any) => {
+        if (!item) return null;
+        if (typeof item === "string") return item;
+        if (typeof item === "object") {
+          const locParts = Array.isArray(item.loc)
+            ? item.loc.filter((p: any) => p !== "body" && p !== "query" && p !== "path")
+            : [];
+          const field = locParts.join(".");
+          const msg = item.msg || item.message || JSON.stringify(item);
+          return field ? `${field}: ${msg}` : msg;
+        }
+        return String(item);
+      })
+      .filter(Boolean);
+    if (formatted.length > 0) {
+      return formatted.join("; ");
+    }
+  }
+
+  if (detail && typeof detail === "object") {
+    if (typeof detail.message === "string" && detail.message.trim()) return detail.message.trim();
+    if (typeof detail.error === "string" && detail.error.trim()) return detail.error.trim();
+    if (typeof detail.msg === "string" && detail.msg.trim()) return detail.msg.trim();
+    if (typeof detail.rejectionReason === "string" && detail.rejectionReason.trim()) return detail.rejectionReason.trim();
+  }
+
+  if (typeof data.message === "string" && data.message.trim()) return data.message.trim();
+  if (typeof data.error === "string" && data.error.trim()) return data.error.trim();
+
+  return fallback;
+}
+
 export const payerntApi = {
   // ============================================================
   // AUTHENTICATION & CROSS-ACCOUNT VERIFICATION
@@ -176,7 +220,7 @@ export const payerntApi = {
       }
       return {
         success: false,
-        error: data.detail || data.message || "Registration failed. Please check your details.",
+        error: extractApiErrorMessage(data, "Registration failed. Please check your details."),
       };
     } catch (e: any) {
       return { success: false, error: e?.message || "Unable to connect to the server." };
@@ -226,18 +270,18 @@ export const payerntApi = {
         return { success: true, account: data.account, token: data.token };
       }
       if (res.status === 403) {
-        const detail = typeof data?.detail === "object" ? data.detail : {};
+        const detail = typeof data?.detail === "object" && !Array.isArray(data?.detail) ? data.detail : {};
         return {
           success: false,
           status: detail.status || data.status || "PENDING_REVIEW",
           accountType: detail.accountType || data.accountType || "Payernt",
           rejectionReason: detail.rejectionReason || data.rejectionReason,
-          error: detail.message || data.message || "Your Payernt account is currently under review.",
+          error: extractApiErrorMessage(data, "Your Payernt account is currently under review."),
         };
       }
       return {
         success: false,
-        error: data.detail || data.message || "Invalid email or password for Payernt account.",
+        error: extractApiErrorMessage(data, "Invalid email or password for Payernt account."),
       };
     } catch (e: any) {
       return {
@@ -272,7 +316,7 @@ export const payerntApi = {
       if (res.ok && data.success) {
         return { success: true, status: data.status || "PENDING_REVIEW", message: data.message };
       }
-      return { success: false, error: data.detail || data.message || "Failed to resubmit details." };
+      return { success: false, error: extractApiErrorMessage(data, "Failed to resubmit details.") };
     } catch (e: any) {
       return { success: false, error: e?.message || "Unable to connect to the server." };
     }
@@ -317,7 +361,7 @@ export const payerntApi = {
       if (res.ok && data.success) {
         return { success: true, profile: data.profile };
       }
-      return { success: false, error: data.detail || "Failed to load profile." };
+      return { success: false, error: extractApiErrorMessage(data, "Failed to load profile.") };
     } catch (e: any) {
       return { success: false, error: e?.message || "Failed to fetch profile." };
     }
@@ -333,7 +377,7 @@ export const payerntApi = {
       if (res.ok && data.success) {
         return { success: true, profile: data.profile };
       }
-      return { success: false, error: data.detail || "Failed to update profile." };
+      return { success: false, error: extractApiErrorMessage(data, "Failed to update profile.") };
     } catch (e: any) {
       return { success: false, error: e?.message || "Network error while updating profile." };
     }
@@ -375,7 +419,7 @@ export const payerntApi = {
       }
       return {
         success: false,
-        error: data.detail || data.message || "Failed to submit product listing to database.",
+        error: extractApiErrorMessage(data, "Failed to submit product listing to database."),
       };
     } catch (e: any) {
       return {
@@ -392,7 +436,7 @@ export const payerntApi = {
       if (res.ok && data.success) {
         return { success: true, products: data.products };
       }
-      return { success: false, error: data.detail || "Failed to fetch products." };
+      return { success: false, error: extractApiErrorMessage(data, "Failed to fetch products.") };
     } catch (e: any) {
       return { success: false, error: e?.message || "Network error." };
     }
@@ -405,7 +449,7 @@ export const payerntApi = {
       if (res.ok && data.success) {
         return { success: true, product: data.product };
       }
-      return { success: false, error: data.detail || "Product not found." };
+      return { success: false, error: extractApiErrorMessage(data, "Product not found.") };
     } catch (e: any) {
       return { success: false, error: e?.message || "Network error." };
     }
@@ -421,7 +465,7 @@ export const payerntApi = {
       if (res.ok && data.success) {
         return { success: true, product: data.product };
       }
-      return { success: false, error: data.detail || "Failed to update product." };
+      return { success: false, error: extractApiErrorMessage(data, "Failed to update product.") };
     } catch (e: any) {
       return { success: false, error: e?.message || "Network error." };
     }
@@ -436,7 +480,7 @@ export const payerntApi = {
       if (res.ok && data.success) {
         return { success: true };
       }
-      return { success: false, error: data.detail || "Failed to delete product." };
+      return { success: false, error: extractApiErrorMessage(data, "Failed to delete product.") };
     } catch (e: any) {
       return { success: false, error: e?.message || "Network error." };
     }
@@ -452,7 +496,7 @@ export const payerntApi = {
       if (res.ok && data.success) {
         return { success: true, product: data.product };
       }
-      return { success: false, error: data.detail || "Failed to update product status." };
+      return { success: false, error: extractApiErrorMessage(data, "Failed to update product status.") };
     } catch (e: any) {
       return { success: false, error: e?.message || "Network error." };
     }
@@ -479,7 +523,7 @@ export const payerntApi = {
           bankAccounts: data.bankAccounts,
         };
       }
-      return { success: false, error: data.detail || "Failed to load wallet." };
+      return { success: false, error: extractApiErrorMessage(data, "Failed to load wallet.") };
     } catch (e: any) {
       return { success: false, error: e?.message || "Network error." };
     }
@@ -492,7 +536,7 @@ export const payerntApi = {
       if (res.ok && data.success) {
         return { success: true, transactions: data.transactions };
       }
-      return { success: false, error: data.detail || "Failed to load transactions." };
+      return { success: false, error: extractApiErrorMessage(data, "Failed to load transactions.") };
     } catch (e: any) {
       return { success: false, error: e?.message || "Network error." };
     }
@@ -520,7 +564,7 @@ export const payerntApi = {
       if (res.ok && data.success) {
         return { success: true, message: data.message };
       }
-      return { success: false, error: data.detail || "Withdrawal failed." };
+      return { success: false, error: extractApiErrorMessage(data, "Withdrawal failed.") };
     } catch (e: any) {
       return { success: false, error: e?.message || "Network error during withdrawal." };
     }
@@ -542,7 +586,7 @@ export const payerntApi = {
       if (res.ok && data.success) {
         return { success: true, bankAccount: data.bankAccount };
       }
-      return { success: false, error: data.detail || "Failed to add bank account." };
+      return { success: false, error: extractApiErrorMessage(data, "Failed to add bank account.") };
     } catch (e: any) {
       return { success: false, error: e?.message || "Network error." };
     }
@@ -557,7 +601,7 @@ export const payerntApi = {
       if (res.ok && data.success) {
         return { success: true };
       }
-      return { success: false, error: data.detail || "Failed to delete bank account." };
+      return { success: false, error: extractApiErrorMessage(data, "Failed to delete bank account.") };
     } catch (e: any) {
       return { success: false, error: e?.message || "Network error." };
     }
@@ -573,7 +617,7 @@ export const payerntApi = {
       if (res.ok && data.success) {
         return { success: true, notifications: data.notifications };
       }
-      return { success: false, error: data.detail || "Failed to load notifications." };
+      return { success: false, error: extractApiErrorMessage(data, "Failed to load notifications.") };
     } catch (e: any) {
       return { success: false, error: e?.message || "Network error." };
     }
@@ -610,7 +654,7 @@ export const payerntApi = {
       if (res.ok && data.success) {
         return { success: true, messages: data.messages, unreadCount: data.unreadCount ?? 0 };
       }
-      return { success: false, messages: [], unreadCount: 0, error: data.detail || "Failed to load messages." };
+      return { success: false, messages: [], unreadCount: 0, error: extractApiErrorMessage(data, "Failed to load messages.") };
     } catch (e: any) {
       return { success: false, messages: [], unreadCount: 0, error: e?.message || "Network error." };
     }
@@ -654,7 +698,7 @@ export const payerntApi = {
       if (res.ok && data.success) {
         return { success: true, message: data.message };
       }
-      return { success: false, error: data.detail || "Failed to send message." };
+      return { success: false, error: extractApiErrorMessage(data, "Failed to send message.") };
     } catch (e: any) {
       return { success: false, error: e?.message || "Network error." };
     }
@@ -680,7 +724,7 @@ export const payerntApi = {
       if (res.ok && data.success) {
         return { success: true, message: data.message };
       }
-      return { success: false, error: data.detail || "Failed to send admin message." };
+      return { success: false, error: extractApiErrorMessage(data, "Failed to send admin message.") };
     } catch (e: any) {
       return { success: false, error: e?.message || "Network error." };
     }
@@ -723,7 +767,7 @@ export const payerntApi = {
       }
       return {
         success: false,
-        error: data.detail || data.message || "Failed to load dashboard data.",
+        error: extractApiErrorMessage(data, "Failed to load dashboard data."),
       };
     } catch (e: any) {
       return {
@@ -753,7 +797,7 @@ export const payerntApi = {
         success: false,
         bookings: [],
         total: 0,
-        error: data.detail || data.message || "Failed to load bookings.",
+        error: extractApiErrorMessage(data, "Failed to load bookings."),
       };
     } catch (e: any) {
       return {
@@ -795,7 +839,7 @@ export const payerntApi = {
       }
       return {
         success: false,
-        error: data.detail || data.message || "Failed to cancel booking.",
+        error: extractApiErrorMessage(data, "Failed to cancel booking."),
       };
     } catch (e: any) {
       return {
@@ -831,7 +875,7 @@ export const payerntApi = {
       }
       return {
         success: false,
-        error: data.detail || data.message || "Failed to load availability config.",
+        error: extractApiErrorMessage(data, "Failed to load availability config."),
       };
     } catch (e: any) {
       return {
@@ -873,7 +917,7 @@ export const payerntApi = {
       }
       return {
         success: false,
-        error: data.detail || data.message || "Failed to update availability config.",
+        error: extractApiErrorMessage(data, "Failed to update availability config."),
       };
     } catch (e: any) {
       return {
@@ -907,7 +951,7 @@ export const payerntApi = {
       }
       return {
         success: false,
-        error: data.detail || data.message || "Failed to load earnings summary.",
+        error: extractApiErrorMessage(data, "Failed to load earnings summary."),
       };
     } catch (e: any) {
       return {
@@ -941,7 +985,7 @@ export const payerntApi = {
       }
       return {
         success: false,
-        error: data.detail || data.message || "Failed to prepare product for delivery.",
+        error: extractApiErrorMessage(data, "Failed to prepare product for delivery."),
       };
     } catch (e: any) {
       return {
@@ -973,7 +1017,7 @@ export const payerntApi = {
       }
       return {
         success: false,
-        error: data.detail || data.message || "Failed to send vendor handover OTP.",
+        error: extractApiErrorMessage(data, "Failed to send vendor handover OTP."),
       };
     } catch (e: any) {
       return {
@@ -1004,7 +1048,7 @@ export const payerntApi = {
       }
       return {
         success: false,
-        error: data.detail || data.message || "Failed to verify vendor handover OTP.",
+        error: extractApiErrorMessage(data, "Failed to verify vendor handover OTP."),
       };
     } catch (e: any) {
       return {

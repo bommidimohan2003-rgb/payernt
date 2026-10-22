@@ -178,14 +178,14 @@ class CheckRegistrationSchema(BaseModel):
     mobile: Optional[str] = None
     phone: Optional[str] = None
     phoneNumber: Optional[str] = None
-    email: EmailStr
+    email: str = Field(..., min_length=3)
     targetAccountType: Optional[str] = "paye₹nt"
     target_account_type: Optional[str] = None
 
 
 class PayerntRegisterSchema(BaseModel):
     name: str = Field(..., min_length=2, max_length=100)
-    email: EmailStr
+    email: str = Field(..., min_length=3)
     aadhaarNumber: Optional[str] = None
     aadhaar_number: Optional[str] = None
     phoneNumber: Optional[str] = None
@@ -193,12 +193,12 @@ class PayerntRegisterSchema(BaseModel):
     mobile: Optional[str] = None
     address: Optional[str] = ""
     pincode: Optional[str] = ""
-    password: str = Field(..., min_length=8)
+    password: str = Field(..., min_length=1)
     confirmPassword: Optional[str] = None
 
 
 class PayerntLoginSchema(BaseModel):
-    email: EmailStr
+    email: str = Field(..., min_length=1)
     password: str = Field(..., min_length=1)
 
 
@@ -568,6 +568,13 @@ def payernt_check_registration(data: CheckRegistrationSchema):
 @payernt_router.post("/auth/register", status_code=status.HTTP_201_CREATED)
 def register_payernt_vendor(data: PayerntRegisterSchema):
     """Registers a new paye₹nt Product Owner / Lender account."""
+    clean_email = (data.email or "").strip().lower()
+    if not clean_email or not re.match(r"^[^\s@]+@[^\s@]+\.[^\s@]+$", clean_email):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Please provide a valid email address.",
+        )
+
     if data.confirmPassword and data.password != data.confirmPassword:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
