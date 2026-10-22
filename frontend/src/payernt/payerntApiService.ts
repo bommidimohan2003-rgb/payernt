@@ -59,6 +59,33 @@ function getAuthHeaders(): Record<string, string> {
   return headers;
 }
 
+export function handlePayerntUnauthorized() {
+  try {
+    localStorage.removeItem("paye₹nt_token");
+    localStorage.removeItem("payernt_token");
+    localStorage.removeItem("paye₹nt_refresh_token");
+    localStorage.removeItem("payernt_refresh_token");
+    localStorage.removeItem(STORAGE_KEY_SESSION);
+    localStorage.removeItem(STORAGE_KEY_ACCOUNT);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("paye₹nt_auth_change", { detail: null }));
+    }
+  } catch {}
+}
+
+async function fetchWithPayerntAuth(url: string, options: RequestInit = {}): Promise<Response> {
+  const authHeaders = getAuthHeaders();
+  const headers = {
+    ...authHeaders,
+    ...(options.headers as Record<string, string> || {}),
+  };
+  const res = await fetch(url, { ...options, headers });
+  if (res.status === 401) {
+    handlePayerntUnauthorized();
+  }
+  return res;
+}
+
 export const payerntApi = {
   // ============================================================
   // AUTHENTICATION & CROSS-ACCOUNT VERIFICATION
@@ -187,12 +214,14 @@ export const payerntApi = {
           localStorage.removeItem("pay₹ent_session");
           localStorage.removeItem("pay₹ent_account");
           localStorage.removeItem("payent_token");
-          window.dispatchEvent(new CustomEvent("payent-session-expired"));
           window.dispatchEvent(new CustomEvent("payent:storage_change"));
         } catch {}
 
         if (data.token) {
           localStorage.setItem("paye₹nt_token", data.token);
+        }
+        if (data.refreshToken) {
+          localStorage.setItem("paye₹nt_refresh_token", data.refreshToken);
         }
         return { success: true, account: data.account, token: data.token };
       }
@@ -208,7 +237,7 @@ export const payerntApi = {
       }
       return {
         success: false,
-        error: data.detail || data.message || "Invalid credentials for paye₹nt account.",
+        error: data.detail || data.message || "Invalid email or password for Payernt account.",
       };
     } catch (e: any) {
       return {
@@ -268,12 +297,14 @@ export const payerntApi = {
 
   async logout(): Promise<{ success: boolean }> {
     try {
-      const headers = getAuthHeaders();
       localStorage.removeItem("paye₹nt_token");
       localStorage.removeItem("payernt_token");
-      await fetch(`${API_BASE}/api/payernt/auth/logout`, {
+      localStorage.removeItem("paye₹nt_refresh_token");
+      localStorage.removeItem("payernt_refresh_token");
+      localStorage.removeItem(STORAGE_KEY_SESSION);
+      localStorage.removeItem(STORAGE_KEY_ACCOUNT);
+      await fetchWithPayerntAuth(`${API_BASE}/api/payernt/auth/logout`, {
         method: "POST",
-        headers,
       }).catch(() => {});
     } catch {}
     return { success: true };
@@ -281,9 +312,7 @@ export const payerntApi = {
 
   async getProfile(): Promise<{ success: boolean; profile?: any; error?: string }> {
     try {
-      const res = await fetch(`${API_BASE}/api/payernt/profile`, {
-        headers: getAuthHeaders(),
-      });
+      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/profile`);
       const data = await res.json();
       if (res.ok && data.success) {
         return { success: true, profile: data.profile };
@@ -296,9 +325,8 @@ export const payerntApi = {
 
   async updateProfile(updates: any): Promise<{ success: boolean; profile?: any; error?: string }> {
     try {
-      const res = await fetch(`${API_BASE}/api/payernt/profile`, {
+      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/profile`, {
         method: "PATCH",
-        headers: getAuthHeaders(),
         body: JSON.stringify(updates),
       });
       const data = await res.json();
@@ -327,9 +355,8 @@ export const payerntApi = {
     error?: string;
   }> {
     try {
-      const res = await fetch(`${API_BASE}/api/payernt/products`, {
+      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/products`, {
         method: "POST",
-        headers: getAuthHeaders(),
         body: JSON.stringify(productData),
       });
       const data = await res.json();
@@ -360,9 +387,7 @@ export const payerntApi = {
 
   async getProducts(): Promise<{ success: boolean; products?: PayerntProduct[]; error?: string }> {
     try {
-      const res = await fetch(`${API_BASE}/api/payernt/products`, {
-        headers: getAuthHeaders(),
-      });
+      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/products`);
       const data = await res.json();
       if (res.ok && data.success) {
         return { success: true, products: data.products };
@@ -375,9 +400,7 @@ export const payerntApi = {
 
   async getProductById(id: string): Promise<{ success: boolean; product?: PayerntProduct; error?: string }> {
     try {
-      const res = await fetch(`${API_BASE}/api/payernt/products/${id}`, {
-        headers: getAuthHeaders(),
-      });
+      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/products/${id}`);
       const data = await res.json();
       if (res.ok && data.success) {
         return { success: true, product: data.product };
@@ -390,9 +413,8 @@ export const payerntApi = {
 
   async updateProduct(id: string, updates: Partial<PayerntProduct>): Promise<{ success: boolean; product?: PayerntProduct; error?: string }> {
     try {
-      const res = await fetch(`${API_BASE}/api/payernt/products/${id}`, {
+      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/products/${id}`, {
         method: "PATCH",
-        headers: getAuthHeaders(),
         body: JSON.stringify(updates),
       });
       const data = await res.json();
@@ -407,9 +429,8 @@ export const payerntApi = {
 
   async deleteProduct(id: string): Promise<{ success: boolean; error?: string }> {
     try {
-      const res = await fetch(`${API_BASE}/api/payernt/products/${id}`, {
+      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/products/${id}`, {
         method: "DELETE",
-        headers: getAuthHeaders(),
       });
       const data = await res.json();
       if (res.ok && data.success) {
@@ -423,9 +444,8 @@ export const payerntApi = {
 
   async updateProductStatus(id: string, status: string, availabilityStatus?: string): Promise<{ success: boolean; product?: PayerntProduct; error?: string }> {
     try {
-      const res = await fetch(`${API_BASE}/api/payernt/products/${id}/status`, {
+      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/products/${id}/status`, {
         method: "PATCH",
-        headers: getAuthHeaders(),
         body: JSON.stringify({ status, availability_status: availabilityStatus }),
       });
       const data = await res.json();
@@ -449,9 +469,7 @@ export const payerntApi = {
     error?: string;
   }> {
     try {
-      const res = await fetch(`${API_BASE}/api/payernt/wallet`, {
-        headers: getAuthHeaders(),
-      });
+      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/wallet`);
       const data = await res.json();
       if (res.ok && data.success) {
         return {
@@ -469,9 +487,7 @@ export const payerntApi = {
 
   async getTransactions(): Promise<{ success: boolean; transactions?: WalletTransaction[]; error?: string }> {
     try {
-      const res = await fetch(`${API_BASE}/api/payernt/wallet/transactions`, {
-        headers: getAuthHeaders(),
-      });
+      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/wallet/transactions`);
       const data = await res.json();
       if (res.ok && data.success) {
         return { success: true, transactions: data.transactions };
@@ -496,9 +512,8 @@ export const payerntApi = {
         : amountOrParams;
 
     try {
-      const res = await fetch(`${API_BASE}/api/payernt/wallet/withdraw`, {
+      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/wallet/withdraw`, {
         method: "POST",
-        headers: getAuthHeaders(),
         body: JSON.stringify(payload),
       });
       const data = await res.json();
@@ -519,9 +534,8 @@ export const payerntApi = {
     ifsc: string;
   }): Promise<{ success: boolean; bankAccount?: any; error?: string }> {
     try {
-      const res = await fetch(`${API_BASE}/api/payernt/wallet/bank-accounts`, {
+      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/wallet/bank-accounts`, {
         method: "POST",
-        headers: getAuthHeaders(),
         body: JSON.stringify(bankData),
       });
       const data = await res.json();
@@ -536,9 +550,8 @@ export const payerntApi = {
 
   async deleteBankAccount(bankId: string): Promise<{ success: boolean; error?: string }> {
     try {
-      const res = await fetch(`${API_BASE}/api/payernt/wallet/bank-accounts/${bankId}`, {
+      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/wallet/bank-accounts/${bankId}`, {
         method: "DELETE",
-        headers: getAuthHeaders(),
       });
       const data = await res.json();
       if (res.ok && data.success) {
@@ -555,9 +568,7 @@ export const payerntApi = {
   // ============================================================
   async getNotifications(): Promise<{ success: boolean; notifications?: LenderNotification[]; error?: string }> {
     try {
-      const res = await fetch(`${API_BASE}/api/payernt/notifications`, {
-        headers: getAuthHeaders(),
-      });
+      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/notifications`);
       const data = await res.json();
       if (res.ok && data.success) {
         return { success: true, notifications: data.notifications };
@@ -570,9 +581,8 @@ export const payerntApi = {
 
   async markNotificationRead(id: string): Promise<{ success: boolean }> {
     try {
-      await fetch(`${API_BASE}/api/payernt/notifications/${id}/read`, {
+      await fetchWithPayerntAuth(`${API_BASE}/api/payernt/notifications/${id}/read`, {
         method: "PATCH",
-        headers: getAuthHeaders(),
       });
     } catch {}
     return { success: true };
@@ -580,9 +590,8 @@ export const payerntApi = {
 
   async markAllNotificationsRead(): Promise<{ success: boolean }> {
     try {
-      await fetch(`${API_BASE}/api/payernt/notifications/read-all`, {
+      await fetchWithPayerntAuth(`${API_BASE}/api/payernt/notifications/read-all`, {
         method: "POST",
-        headers: getAuthHeaders(),
       });
     } catch {}
     return { success: true };
@@ -596,9 +605,7 @@ export const payerntApi = {
       const url = productId
         ? `${API_BASE}/api/payernt/messages?product_id=${encodeURIComponent(productId)}`
         : `${API_BASE}/api/payernt/messages`;
-      const res = await fetch(url, {
-        headers: getAuthHeaders(),
-      });
+      const res = await fetchWithPayerntAuth(url);
       const data = await res.json();
       if (res.ok && data.success) {
         return { success: true, messages: data.messages, unreadCount: data.unreadCount ?? 0 };
@@ -611,9 +618,7 @@ export const payerntApi = {
 
   async getUnreadMessagesCount(): Promise<{ success: boolean; unreadCount: number }> {
     try {
-      const res = await fetch(`${API_BASE}/api/payernt/messages/unread-count`, {
-        headers: getAuthHeaders(),
-      });
+      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/messages/unread-count`);
       const data = await res.json();
       if (res.ok && data.success) {
         return { success: true, unreadCount: data.unreadCount ?? 0 };
@@ -624,9 +629,8 @@ export const payerntApi = {
 
   async markMessageRead(messageId: string): Promise<{ success: boolean; unreadCount?: number; error?: string }> {
     try {
-      const res = await fetch(`${API_BASE}/api/payernt/messages/${encodeURIComponent(messageId)}/read`, {
+      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/messages/${encodeURIComponent(messageId)}/read`, {
         method: "PATCH",
-        headers: getAuthHeaders(),
       });
       const data = await res.json();
       if (res.ok && data.success) {
@@ -642,9 +646,8 @@ export const payerntApi = {
     content: string;
   }): Promise<{ success: boolean; message?: any; error?: string }> {
     try {
-      const res = await fetch(`${API_BASE}/api/payernt/messages`, {
+      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/messages`, {
         method: "POST",
-        headers: getAuthHeaders(),
         body: JSON.stringify(params),
       });
       const data = await res.json();
@@ -669,9 +672,8 @@ export const payerntApi = {
     productCategory?: string;
   }): Promise<{ success: boolean; message?: any; error?: string }> {
     try {
-      const res = await fetch(`${API_BASE}/api/payernt/messages/admin-send`, {
+      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/messages/admin-send`, {
         method: "POST",
-        headers: getAuthHeaders(),
         body: JSON.stringify(params),
       });
       const data = await res.json();
@@ -702,9 +704,7 @@ export const payerntApi = {
     error?: string;
   }> {
     try {
-      const res = await fetch(`${API_BASE}/api/payernt/dashboard`, {
-        headers: getAuthHeaders(),
-      });
+      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/dashboard`);
       const data = await res.json();
       if (res.ok && data.success) {
         return {
@@ -740,9 +740,7 @@ export const payerntApi = {
     error?: string;
   }> {
     try {
-      const res = await fetch(`${API_BASE}/api/payernt/bookings?limit=${limit}`, {
-        headers: getAuthHeaders(),
-      });
+      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/bookings?limit=${limit}`);
       const data = await res.json();
       if (res.ok && data.success) {
         return {
@@ -779,9 +777,8 @@ export const payerntApi = {
     error?: string;
   }> {
     try {
-      const res = await fetch(`${API_BASE}/api/payernt/bookings/${bookingId}/cancel`, {
+      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/bookings/${bookingId}/cancel`, {
         method: "POST",
-        headers: getAuthHeaders(),
         body: JSON.stringify({
           reasonCode,
           feedback: feedback?.trim() || undefined,
@@ -824,9 +821,7 @@ export const payerntApi = {
     error?: string;
   }> {
     try {
-      const res = await fetch(`${API_BASE}/api/payernt/products/${productId}/availability-config`, {
-        headers: getAuthHeaders(),
-      });
+      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/products/${productId}/availability-config`);
       const data = await res.json();
       if (res.ok && data.success) {
         return {
@@ -864,9 +859,8 @@ export const payerntApi = {
     error?: string;
   }> {
     try {
-      const res = await fetch(`${API_BASE}/api/payernt/products/${productId}/availability-config`, {
+      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/products/${productId}/availability-config`, {
         method: "POST",
-        headers: getAuthHeaders(),
         body: JSON.stringify(config),
       });
       const data = await res.json();
@@ -899,9 +893,7 @@ export const payerntApi = {
     error?: string;
   }> {
     try {
-      const res = await fetch(`${API_BASE}/api/payernt/earnings/summary`, {
-        headers: getAuthHeaders(),
-      });
+      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/earnings/summary`);
       const data = await res.json();
       if (res.ok && data.success) {
         return {
@@ -934,9 +926,8 @@ export const payerntApi = {
     error?: string;
   }> {
     try {
-      const res = await fetch(`${API_BASE}/api/payernt/bookings/${encodeURIComponent(bookingId)}/prepare`, {
+      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/bookings/${encodeURIComponent(bookingId)}/prepare`, {
         method: "POST",
-        headers: getAuthHeaders(),
       });
       const data = await res.json();
       if (res.ok && data.success) {
@@ -968,9 +959,8 @@ export const payerntApi = {
     error?: string;
   }> {
     try {
-      const res = await fetch(`${API_BASE}/api/deliveries/${encodeURIComponent(bookingId)}/vendor-otp/send`, {
+      const res = await fetchWithPayerntAuth(`${API_BASE}/api/deliveries/${encodeURIComponent(bookingId)}/vendor-otp/send`, {
         method: "POST",
-        headers: getAuthHeaders(),
       });
       const data = await res.json();
       if (res.ok && data.success) {
@@ -1000,9 +990,8 @@ export const payerntApi = {
     error?: string;
   }> {
     try {
-      const res = await fetch(`${API_BASE}/api/deliveries/${encodeURIComponent(bookingId)}/vendor-otp/verify`, {
+      const res = await fetchWithPayerntAuth(`${API_BASE}/api/deliveries/${encodeURIComponent(bookingId)}/vendor-otp/verify`, {
         method: "POST",
-        headers: getAuthHeaders(),
         body: JSON.stringify({ otp }),
       });
       const data = await res.json();

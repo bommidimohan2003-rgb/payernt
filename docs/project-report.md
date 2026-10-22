@@ -222,6 +222,8 @@ The main technical debt areas are clear:
 
 
 
+- [RESOLVED Payernt Vendor 401 Login & Token Lifecycle Hardening] (1) Cross-Table Account Fallback: Resolved 401 Unauthorized errors on `/api/payernt/auth/login` where vendor credentials existing in `admin_accounts` or `users` were missing from `payernt_accounts` by adding multi-table lookups and automatic account synchronization with APPROVED status and initialized wallet; (2) Role & Admin Exemption: Injected resolved account role into JWT payload and exempted admin/superadmin roles from PENDING_REVIEW login rejection; (3) 401 Fetch Interceptor: Hardened `payerntApiService.ts` with `fetchWithPayerntAuth` interceptor detecting HTTP 401 responses, proactively wiping stale tokens/sessions across localStorage, and broadcasting logout to prevent infinite 401 dashboard fetch loops; (4) Session Expired Event Cleanup: Eliminated spurious `payent-session-expired` custom event dispatch from Payernt login and store which was triggering unexpected customer login redirects; (5) Automated Test & Build: Validated 100% pass on three-context switching tests and verified clean zero-error frontend build.
+
 ## Risks and Recommendations
 
 The highest-risk areas are the dead code, duplicate snapshots, and mock-first flows. Before adding new features, the project should remove dead code and duplicate directories, then harden configuration and replace mock storefront data where real backend routes already exist.

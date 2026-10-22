@@ -604,7 +604,7 @@ def resubmit_payernt_account(
 
 
 def get_payernt_account_by_email(email: str) -> Optional[Dict[str, Any]]:
-    """Fetches paye₹nt account by email address."""
+    """Fetches paye₹nt account by email address with fallback to admin and users tables."""
     clean_email = (email or "").strip().lower()
     if not clean_email:
         return None
@@ -616,11 +616,59 @@ def get_payernt_account_by_email(email: str) -> Optional[Dict[str, Any]]:
     except Exception as e:
         logger.warning(f"DB fetch error for payernt_account: {e}")
 
+    # Fallback to admin_accounts (platform admins have universal access)
+    try:
+        admin_row = fetch_one("SELECT * FROM admin_accounts WHERE LOWER(email) = %s LIMIT 1", (clean_email,))
+        if admin_row:
+            return {
+                "id": admin_row.get("id") or f"PAYERNT_ADMIN_{clean_email.replace('@', '_').replace('.', '_')}",
+                "account_type": "paye₹nt",
+                "email": clean_email,
+                "name": admin_row.get("full_name") or admin_row.get("name") or "Admin",
+                "phone": admin_row.get("phone") or "",
+                "address": "Hyderabad, India",
+                "pincode": "500081",
+                "aadhaar_number": "XXXX-XXXX-0000",
+                "password_hash": admin_row.get("password_hash"),
+                "status": "APPROVED",
+                "role": "admin",
+                "avatar": admin_row.get("avatar") or f"https://ui-avatars.com/api/?name={clean_email.split('@')[0]}&background=0c0c0c&color=ffffff",
+                "created_at": str(admin_row.get("created_at") or ""),
+            }
+    except Exception as e:
+        logger.warning(f"DB fetch error for admin in payernt fallback: {e}")
+
+    # Fallback to users table (registered platform users)
+    try:
+        user_row = fetch_one("SELECT * FROM users WHERE LOWER(email) = %s LIMIT 1", (clean_email,))
+        if user_row:
+            is_admin = (user_row.get("role") or "").lower() in ("admin", "superadmin")
+            status_val = "APPROVED" if (is_admin or str(user_row.get("status") or "").upper() in ("APPROVED", "ACTIVE")) else (user_row.get("status") or "PENDING_REVIEW")
+            return {
+                "id": user_row.get("id") or f"PAYERNT_USER_{clean_email.replace('@', '_').replace('.', '_')}",
+                "person_id": user_row.get("person_id"),
+                "personId": user_row.get("person_id"),
+                "account_type": "paye₹nt",
+                "email": clean_email,
+                "name": user_row.get("full_name") or clean_email.split("@")[0],
+                "phone": user_row.get("phone") or "",
+                "address": user_row.get("address") or "",
+                "pincode": user_row.get("pincode") or "",
+                "aadhaar_number": user_row.get("aadhaar_number") or "XXXX-XXXX-0000",
+                "password_hash": user_row.get("password_hash"),
+                "status": status_val,
+                "role": "admin" if is_admin else "vendor",
+                "avatar": user_row.get("avatar") or f"https://ui-avatars.com/api/?name={clean_email.split('@')[0]}&background=0c0c0c&color=ffffff",
+                "created_at": str(user_row.get("created_at") or ""),
+            }
+    except Exception as e:
+        logger.warning(f"DB fetch error for user in payernt fallback: {e}")
+
     return MOCK_PAYERNT_ACCOUNTS.get(clean_email)
 
 
 def get_payernt_account_by_id(account_id: str) -> Optional[Dict[str, Any]]:
-    """Fetches paye₹nt account by unique account ID."""
+    """Fetches paye₹nt account by unique account ID with fallback lookup."""
     if not account_id:
         return None
 
@@ -634,6 +682,11 @@ def get_payernt_account_by_id(account_id: str) -> Optional[Dict[str, Any]]:
     for acc in MOCK_PAYERNT_ACCOUNTS.values():
         if acc.get("id") == account_id:
             return acc
+
+    # If account_id contains email or matches admin/user pattern
+    if "@" in account_id:
+        return get_payernt_account_by_email(account_id)
+
     return None
 
 

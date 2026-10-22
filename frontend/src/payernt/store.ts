@@ -250,7 +250,6 @@ export function usePayerntStore() {
       localStorage.removeItem("pay₹ent_session");
       localStorage.removeItem("pay₹ent_account");
       localStorage.removeItem("payent_token");
-      window.dispatchEvent(new CustomEvent("payent-session-expired"));
       window.dispatchEvent(new CustomEvent("payent:storage_change"));
     } catch {}
 
@@ -301,6 +300,8 @@ export function usePayerntStore() {
     try {
       localStorage.removeItem("paye₹nt_token");
       localStorage.removeItem("payernt_token");
+      localStorage.removeItem("paye₹nt_refresh_token");
+      localStorage.removeItem("payernt_refresh_token");
       localStorage.removeItem(STORAGE_KEY_SESSION);
       localStorage.removeItem(STORAGE_KEY_ACCOUNT);
     } catch {}
@@ -440,10 +441,15 @@ export function usePayerntStore() {
           setUnreadMessagesCount(d.messages.unread);
         }
       } else if (dashRes.error) {
+        const errLower = (dashRes.error || "").toLowerCase();
         if (
-          dashRes.error.includes("401") ||
-          dashRes.error.includes("Session expired") ||
-          dashRes.error.includes("Authorization")
+          errLower.includes("401") ||
+          errLower.includes("expired") ||
+          errLower.includes("unauthorized") ||
+          errLower.includes("revoked") ||
+          errLower.includes("forbidden") ||
+          errLower.includes("session expired") ||
+          errLower.includes("authorization")
         ) {
           logout();
           return;

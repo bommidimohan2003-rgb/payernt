@@ -91,6 +91,18 @@ class TestThreeContextAuthAndSwitching(unittest.TestCase):
         })
         assert res_admin.status_code in (200, 201), f"Admin registration failed: {res_admin.text}"
 
+        # Approve registered accounts for session switching tests
+        execute_query("UPDATE payernt_accounts SET status = 'APPROVED' WHERE email = %s", (self.payernt_email,))
+        execute_query("UPDATE users SET status = 'active', verified = TRUE WHERE email = %s", (self.payrent_email,))
+        execute_query("UPDATE payrent_accounts SET status = 'APPROVED', verified = TRUE WHERE email = %s", (self.payrent_email,))
+        from payernt_database import MOCK_PAYERNT_ACCOUNTS
+        if self.payernt_email in MOCK_PAYERNT_ACCOUNTS:
+            MOCK_PAYERNT_ACCOUNTS[self.payernt_email]["status"] = "APPROVED"
+        from database import MOCK_USERS
+        if self.payrent_email in MOCK_USERS:
+            MOCK_USERS[self.payrent_email]["status"] = "active"
+            MOCK_USERS[self.payrent_email]["verified"] = True
+
     def test_02_login_payernt_activates_payernt_only(self):
         """TEST CASE 1: Login Payernt -> Payernt active."""
         login_res = client.post("/api/payernt/auth/login", json={

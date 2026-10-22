@@ -541,6 +541,7 @@ def _sanitize_payernt_account(account: Dict[str, Any]) -> Dict[str, Any]:
     sanitized.pop("password_hash", None)
     sanitized["accountId"] = sanitized.get("id")
     sanitized["accountType"] = sanitized.get("account_type", "paye₹nt")
+    sanitized["role"] = account.get("role", "vendor")
     aadhaar = sanitized.get("aadhaar_number") or ""
     sanitized["aadhaarNumber"] = aadhaar
     sanitized["aadhaarMasked"] = aadhaar
@@ -642,7 +643,7 @@ def register_payernt_vendor(data: PayerntRegisterSchema):
 
 @payernt_router.post("/auth/login")
 def login_payernt_vendor(data: PayerntLoginSchema, request: Request = None):
-    """Authenticates a paye₹nt Product Owner / Lender."""
+    """Authenticates a paye₹nt Product Owner / Lender with fallback to admin and registered user accounts."""
     clean_email = (data.email or "").strip().lower()
     if not clean_email:
         raise HTTPException(
@@ -662,52 +663,137 @@ def login_payernt_vendor(data: PayerntLoginSchema, request: Request = None):
         if verify_password(data.password, account["password_hash"]):
             authenticated = True
 
+    # Fallback 1: Admin accounts table (Admins have universal access to Payernt)
+    if not authenticated:
+        try:
+            admin_row = fetch_one("SELECT * FROM admin_accounts WHERE LOWER(email) = %s LIMIT 1", (clean_email,))
+            if admin_row and admin_row.get("password_hash") and verify_password(data.password, admin_row["password_hash"]):
+                now_iso = datetime.now(timezone.utc).isoformat()
+                account_id = admin_row.get("id") or f"PAYERNT_ADMIN_{clean_email.replace('@', '_').replace('.', '_')}"
+                account = {
+                    "id": account_id,
+                    "account_type": "paye₹nt",
+                    "email": clean_email,
+                    "name": admin_row.get("full_name") or admin_row.get("name") or "Admin",
+                    "aadhaar_number": "XXXX-XXXX-0000",
+                    "phone": admin_row.get("phone") or "+91 8810519885",
+                    "address": "Hyderabad, India",
+                    "pincode": "500081",
+                    "password_hash": admin_row["password_hash"],
+                    "status": "APPROVED",
+                    "avatar": admin_row.get("avatar") or f"https://ui-avatars.com/api/?name={clean_email.split('@')[0]}&background=0c0c0c&color=ffffff",
+                    "role": "admin",
+                    "created_at": str(admin_row.get("created_at") or now_iso),
+                    "last_login_at": now_iso,
+                    "updated_at": now_iso,
+                }
+                try:
+                    execute_query("""
+                        INSERT INTO payernt_accounts (id, account_type, email, name, aadhaar_number, phone, address, pincode, password_hash, status, avatar, created_at, last_login_at, updated_at)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        ON DUPLICATE KEY UPDATE password_hash = VALUES(password_hash), status = 'APPROVED', updated_at = %s
+                    """, (account["id"], account["account_type"], account["email"], account["name"], account["aadhaar_number"], account["phone"], account["address"], account["pincode"], account["password_hash"], account["status"], account["avatar"], account["created_at"], account["last_login_at"], account["updated_at"], now_iso))
+                except Exception as ins_e:
+                    logger.warning(f"Notice: sync admin to payernt_accounts: {ins_e}")
+                MOCK_PAYERNT_ACCOUNTS[clean_email] = account
+                authenticated = True
+        except Exception as e:
+            logger.warning(f"Error checking admin fallback during payernt login: {e}")
+
+    # Fallback 2: Unified Users table (Platform registered users)
+    if not authenticated:
+        try:
+            user_row = fetch_one("SELECT * FROM users WHERE LOWER(email) = %s LIMIT 1", (clean_email,))
+            if user_row and user_row.get("password_hash") and verify_password(data.password, user_row["password_hash"]):
+                now_iso = datetime.now(timezone.utc).isoformat()
+                account_id = f"PAYERNT_USER_{clean_email.replace('@', '_').replace('.', '_')}"
+                is_admin = (user_row.get("role") or "").lower() in ("admin", "superadmin")
+                user_status_raw = str(user_row.get("status") or "").upper()
+                is_approved = is_admin or user_status_raw in ("APPROVED", "ACTIVE") or bool(user_row.get("verified"))
+                resolved_status = "APPROVED" if is_approved else ("REJECTED" if user_status_raw in ("REJECTED", "DECLINED") else "PENDING_REVIEW")
+                
+                account = {
+                    "id": account_id,
+                    "person_id": user_row.get("person_id"),
+                    "personId": user_row.get("person_id"),
+                    "account_type": "paye₹nt",
+                    "email": clean_email,
+                    "name": user_row.get("full_name") or clean_email.split("@")[0],
+                    "aadhaar_number": user_row.get("aadhaar_number") or "XXXX-XXXX-0000",
+                    "phone": user_row.get("phone") or "",
+                    "address": user_row.get("address") or "",
+                    "pincode": user_row.get("pincode") or "",
+                    "password_hash": user_row["password_hash"],
+                    "status": resolved_status,
+                    "avatar": user_row.get("avatar") or f"https://ui-avatars.com/api/?name={clean_email.split('@')[0]}&background=0c0c0c&color=ffffff",
+                    "role": "admin" if is_admin else "vendor",
+                    "created_at": str(user_row.get("created_at") or now_iso),
+                    "last_login_at": now_iso,
+                    "updated_at": now_iso,
+                }
+                try:
+                    execute_query("""
+                        INSERT INTO payernt_accounts (id, person_id, account_type, email, name, aadhaar_number, phone, address, pincode, password_hash, status, avatar, created_at, last_login_at, updated_at)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        ON DUPLICATE KEY UPDATE password_hash = VALUES(password_hash), updated_at = %s
+                    """, (account["id"], account.get("person_id"), account["account_type"], account["email"], account["name"], account["aadhaar_number"], account["phone"], account["address"], account["pincode"], account["password_hash"], account["status"], account["avatar"], account["created_at"], account["last_login_at"], account["updated_at"], now_iso))
+                except Exception as ins_e:
+                    logger.warning(f"Notice: sync user to payernt_accounts: {ins_e}")
+                MOCK_PAYERNT_ACCOUNTS[clean_email] = account
+                authenticated = True
+        except Exception as e:
+            logger.warning(f"Error checking user fallback during payernt login: {e}")
+
     if not authenticated or not account:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password for paye₹nt vendor account.",
         )
 
-    account_status = str(account.get("status", "PENDING_REVIEW")).upper()
+    # Check approval status (Admins are always exempt from pending review)
+    is_admin_acc = (account.get("role") or "").lower() in ("admin", "superadmin")
+    if not is_admin_acc:
+        account_status = str(account.get("status", "PENDING_REVIEW")).upper()
 
-    if account_status in ("PENDING_REVIEW", "PENDING", "UNVERIFIED"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={
-                "status": "PENDING_REVIEW",
-                "accountType": "Payernt",
-                "email": clean_email,
-                "message": "Your account is still under review. Our Admin team is currently reviewing your submitted information."
-            },
-        )
+        if account_status in ("PENDING_REVIEW", "PENDING", "UNVERIFIED"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "status": "PENDING_REVIEW",
+                    "accountType": "Payernt",
+                    "email": clean_email,
+                    "message": "Your account is still under review. Our Admin team is currently reviewing your submitted information."
+                },
+            )
 
-    if account_status in ("REJECTED", "DECLINED"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={
-                "status": "REJECTED",
-                "accountType": "Payernt",
-                "email": clean_email,
-                "rejectionReason": account.get("rejection_reason") or "Your submitted information could not be verified.",
-                "message": "Your account was not approved."
-            },
-        )
+        if account_status in ("REJECTED", "DECLINED"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "status": "REJECTED",
+                    "accountType": "Payernt",
+                    "email": clean_email,
+                    "rejectionReason": account.get("rejection_reason") or "Your submitted information could not be verified.",
+                    "message": "Your account was not approved."
+                },
+            )
 
-    if account_status in ("SUSPENDED", "BANNED", "INACTIVE"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={
-                "status": "SUSPENDED",
-                "accountType": "Payernt",
-                "email": clean_email,
-                "message": "Your paye₹nt vendor account is inactive or suspended. Please contact support."
-            },
-        )
+        if account_status in ("SUSPENDED", "BANNED", "INACTIVE"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "status": "SUSPENDED",
+                    "accountType": "Payernt",
+                    "email": clean_email,
+                    "message": "Your paye₹nt vendor account is inactive or suspended. Please contact support."
+                },
+            )
 
     try:
         from database import revoke_cross_side_user_sessions, create_db_session, revoke_token
         # 1. Enforce single active user-side session: Revoke any active Payrent sessions
-        revoke_cross_side_user_sessions(account["email"], account.get("person_id"), logging_in_account_type="payernt")
+        if not is_admin_acc:
+            revoke_cross_side_user_sessions(account["email"], account.get("person_id"), logging_in_account_type="payernt")
 
         # 2. Invalidate previous bearer token if present in headers (session switching)
         if request and request.headers.get("authorization"):
@@ -722,13 +808,14 @@ def login_payernt_vendor(data: PayerntLoginSchema, request: Request = None):
                     pass
 
         session_id = f"sess-payernt-{uuid.uuid4()}"
+        resolved_role = account.get("role") or ("admin" if is_admin_acc else "vendor")
         token_payload = {
             "sub": account["email"],
             "account_type": "paye₹nt",
             "accountType": "paye₹nt",
             "user_id": account["id"],
             "name": account.get("name", "Vendor"),
-            "role": "vendor",
+            "role": resolved_role,
             "person_id": account.get("person_id"),
             "sid": session_id,
         }
@@ -748,12 +835,13 @@ def login_payernt_vendor(data: PayerntLoginSchema, request: Request = None):
                 "name": account.get("name", "Vendor"),
                 "email": account["email"],
                 "accountType": "paye₹nt",
+                "role": resolved_role,
             },
             "userId": account["id"],
             "accountType": "paye₹nt",
             "name": account.get("name", "Vendor"),
             "email": account["email"],
-            "role": "vendor",
+            "role": resolved_role,
             "account": sanitized,
             "token": access_token,
             "refreshToken": refresh_token,

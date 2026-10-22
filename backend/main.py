@@ -849,6 +849,11 @@ def get_current_user_email(authorization: Optional[str] = Header(None)) -> str:
     # Account type & role validation
     account_type = (payload.get("account_type") or payload.get("accountType") or "").strip().lower()
     role = str(payload.get("role") or "").strip().lower()
+    if account_type in ("paye₹nt", "payernt") and role not in ("admin", "superadmin"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: This endpoint requires a pay₹ent customer account.",
+        )
     # Allow all valid platform roles (customers, lenders, vendors, owners, admins, etc.)
     valid_roles = (
         "admin", "superadmin", "customer", "renter", "user", "lender",
