@@ -465,6 +465,13 @@ class CreateBookingSchema(BaseModel):
     startTime: Optional[str] = None
     endTime: Optional[str] = None
     total: Optional[float] = None
+    deliveryMethod: Optional[str] = "delivery"
+    deliveryAddress: Optional[str] = None
+    pickupLocation: Optional[str] = None
+    customLocation: Optional[str] = None
+    locationDirections: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
 
 
 class LenderCancelBookingSchema(BaseModel):
@@ -1578,6 +1585,7 @@ def get_vendor_dashboard_endpoint(
 
 
 @payernt_router.get("/bookings")
+@payernt_router.get("/vendor/bookings")
 def get_vendor_bookings_endpoint(
     limit: int = 50,
     account: Dict[str, Any] = Depends(get_current_payernt_account),
@@ -2059,6 +2067,13 @@ def create_booking_with_security(
             "endDatetime": e_dt.isoformat(),
             "total": booking_total,
             "status": "pending",
+            "deliveryMethod": data.deliveryMethod or "delivery",
+            "deliveryAddress": data.deliveryAddress or "",
+            "pickupLocation": data.pickupLocation or "",
+            "customLocation": data.customLocation or "",
+            "locationDirections": data.locationDirections or "",
+            "latitude": data.latitude,
+            "longitude": data.longitude,
             "createdAt": datetime.now(timezone.utc).isoformat(),
         }
         create_order(renter_email, normalized_order)
@@ -2427,6 +2442,27 @@ def vendor_handed_back(booking_id: str):
 @payernt_router.post("/payernt/bookings/{booking_id}/awaiting-inspection")
 def vendor_awaiting_inspection(booking_id: str):
     return vendor_advance_queue_endpoint(booking_id, PayerntQueueAdvanceSchema(milestone="awaiting_inspection"))
+
+
+@payernt_router.post("/bookings/{booking_id}/location-change/approve")
+@payernt_router.post("/paye₹nt/bookings/{booking_id}/location-change/approve")
+@payernt_router.post("/payernt/bookings/{booking_id}/location-change/approve")
+def vendor_approve_location_change(booking_id: str, account: Dict[str, Any] = Depends(get_current_payernt_account)):
+    from database import approve_location_change_request
+    return approve_location_change_request(booking_id, account.get("email", ""))
+
+
+@payernt_router.post("/bookings/{booking_id}/location-change/reject")
+@payernt_router.post("/paye₹nt/bookings/{booking_id}/location-change/reject")
+@payernt_router.post("/payernt/bookings/{booking_id}/location-change/reject")
+def vendor_reject_location_change(
+    booking_id: str,
+    data: Optional[Dict[str, Any]] = None,
+    account: Dict[str, Any] = Depends(get_current_payernt_account)
+):
+    from database import reject_location_change_request
+    feedback = (data or {}).get("feedback")
+    return reject_location_change_request(booking_id, account.get("email", ""), feedback)
 
 
 # ============================================================

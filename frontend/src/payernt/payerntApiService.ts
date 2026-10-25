@@ -1155,6 +1155,45 @@ export const payerntApi = {
   async completeRental(bookingId: string): Promise<any> {
     return this.advanceRentalQueue(bookingId, "completed");
   },
+
+  async approveLocationChange(bookingId: string): Promise<{ success: boolean; message: string; booking?: any; location?: any }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/payernt/bookings/${encodeURIComponent(bookingId)}/location-change/approve`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("payent_orders_updated"));
+        }
+        return { success: true, message: data.message, booking: data.booking, location: data.location };
+      }
+      return { success: false, message: data.detail || data.message || "Failed to approve location change." };
+    } catch (e: any) {
+      return { success: false, message: e?.message || "Network error while approving location change." };
+    }
+  },
+
+  async rejectLocationChange(bookingId: string, feedback?: string): Promise<{ success: boolean; message: string; booking?: any }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/payernt/bookings/${encodeURIComponent(bookingId)}/location-change/reject`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ feedback: feedback || "" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("payent_orders_updated"));
+        }
+        return { success: true, message: data.message, booking: data.booking };
+      }
+      return { success: false, message: data.detail || data.message || "Failed to reject location change." };
+    } catch (e: any) {
+      return { success: false, message: e?.message || "Network error while rejecting location change." };
+    }
+  },
 };
 
 export default payerntApi;

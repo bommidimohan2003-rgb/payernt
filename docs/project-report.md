@@ -1137,5 +1137,61 @@ This release implements two major capabilities on top of Payent's existing archi
    - If authenticated as a non-admin user (403), renders `<PermissionDenied requiredRole="Administrator" />` without redirect looping.
    - If verified admin, renders the Admin Workspace.
 
+---
+
+## 19. Phase 19 Booking Location Clarity & Change Request Workflow
+
+**Status**: COMPLETED & VERIFIED  
+**Date**: October 26, 2026  
+**Test Suite**: `backend/tests/test_booking_location.py` (8/8 tests passing, 100% pass rate)  
+**Regression Suite**: `backend/tests/test_live_rental_queue.py` (1/1 tests passing, 100% pass rate)  
+**Frontend Compilation**: `npm run build` (0 errors, 100% clean)
+
+### 1. Requirements Fulfilled
+1. **Show Booking Location on Every Request**:
+   - In both the Lender Portal (`RentalRequests.tsx`) and Renter Portal (`Orders.tsx`), every booking card clearly renders:
+     - Product Name & Primary Image
+     - Booking ID (`#ord-...`)
+     - Counterparty / Renter Name
+     - Fulfillment Method Badge (`Doorstep Delivery`, `Owner Pickup`, or `Custom Meetup`)
+     - Complete Confirmed Location / Address / Hub / Meetup spot
+     - Additional landmarks, gate codes, or delivery directions
+     - Scheduled Rental Dates & Time Slot
+     - Live Booking & Queue Status
+2. **Location Details & Convenience**:
+   - **Doorstep Delivery**: Displays full street address, city, state, pincode, and delivery instructions.
+   - **Owner Pickup**: Displays verified lender hub / pickup center address and pickup instructions.
+   - **Custom Meetup**: Displays chosen meetup spot, soundstage/landmark details, and meeting directions.
+   - **Interactive Map Link**: Valid coordinates or supported address generate a direct Google Maps link (`https://www.google.com/maps/search/?api=1&query=...`).
+   - **Copy Address Button**: One-click address copy with instant toast confirmation.
+   - **Missing Address Graceful Handling**: Clearly badges incomplete addresses as `Address Missing / Incomplete` without application crashes.
+3. **Location Change & Approval Workflow**:
+   - **Before Lender Acceptance**: If renter updates location before the lender accepts the booking, the request updates immediately and directly.
+   - **After Lender Acceptance**: Any change requires an explicit reason and enters `pending` state as a `locationChangeRequest`. The confirmed location remains active until the lender reviews and approves.
+   - **Lender Approval & Rejection**: Lender can review pending change requests directly from the Lender Portal with `Approve Change` or `Decline` (with feedback reason).
+4. **Privacy and Security (403 Forbidden)**:
+   - Full addresses and location coordinates are protected by strict access control (`GET /api/orders/{id}/location`).
+   - Only the booking's renter, the product's lender, and platform administrators can view or modify location data. Unauthorized users receive `403 Forbidden`.
+   - Customer delivery addresses are never exposed in public product catalog endpoints (`/api/products`, `/api/products/custom/public`).
+
+### 2. Schema and Database Additions
+Safely migrated `orders` and `deliveries` tables in `backend/database.py` with backward compatibility and fallback support:
+- `orders.delivery_method` (VARCHAR: `delivery`, `pickup`, `custom`)
+- `orders.delivery_address` (TEXT)
+- `orders.pickup_location` (TEXT)
+- `orders.custom_location` (TEXT)
+- `orders.location_directions` (TEXT)
+- `orders.location_latitude` (DECIMAL(10, 8))
+- `orders.location_longitude` (DECIMAL(11, 8))
+- `orders.location_change_data` (JSON TEXT: stores pending change request and history)
+
+### 3. API Endpoints
+- `GET /api/orders/{id}/location`: Returns full authorized location response with Google Maps URL and pending change requests.
+- `PUT /api/orders/{id}/location`: Updates location directly (if unaccepted) or submits a change request (if accepted).
+- `POST /api/payernt/bookings/{id}/location-change/approve` & `POST /api/orders/{id}/location-change/approve`: Approves change request and applies new location.
+- `POST /api/payernt/bookings/{id}/location-change/reject` & `POST /api/orders/{id}/location-change/reject`: Rejects change request with feedback; preserves original location.
+- `GET /api/payernt/bookings`: Maps and returns all location fields and map links for lender portal requests.
+
+
 
 

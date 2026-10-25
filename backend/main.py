@@ -224,7 +224,11 @@ from database import (
     MOCK_DEVICES,
     MOCK_DEVICE_SECURITY_HISTORY,
     MOCK_DEVICE_TRANSFERS,
-    update_order_queue_milestone
+    update_order_queue_milestone,
+    format_booking_location_response,
+    update_order_booking_location,
+    approve_location_change_request,
+    reject_location_change_request
 )
 
 from recommendations_ml import check_data_sufficiency, compute_and_save_item_similarities
@@ -2488,6 +2492,18 @@ class OrderSchema(BaseModel):
     end_date: Optional[str] = None
     total: float
     status: Optional[str] = "active"
+    deliveryMethod: Optional[str] = "delivery"
+    delivery_method: Optional[str] = None
+    deliveryAddress: Optional[str] = None
+    delivery_address: Optional[str] = None
+    pickupLocation: Optional[str] = None
+    pickup_location: Optional[str] = None
+    customLocation: Optional[str] = None
+    custom_location: Optional[str] = None
+    locationDirections: Optional[str] = None
+    location_directions: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
 
 class ProductOwnerSchema(BaseModel):
     name: Optional[str] = "Verified Lender"
@@ -2540,6 +2556,35 @@ def fetch_orders(email: str = Depends(get_current_user_email)):
             start = str(o.get("start_date") or o.get("startDate") or "Today")
             end = str(o.get("end_date") or o.get("endDate") or "Tomorrow")
             created = str(o.get("created_at") or o.get("createdAt") or "")
+            del_method = str(o.get("delivery_method") or o.get("deliveryMethod") or "delivery").lower()
+            del_addr = str(o.get("delivery_address") or o.get("deliveryAddress") or "").strip()
+            pick_loc = str(o.get("pickup_location") or o.get("pickupLocation") or "").strip()
+            custom_loc = str(o.get("custom_location") or o.get("customLocation") or "").strip()
+            loc_dir = str(o.get("location_directions") or o.get("locationDirections") or "").strip()
+            lat = o.get("location_latitude") or o.get("locationLatitude") or o.get("latitude")
+            lng = o.get("location_longitude") or o.get("locationLongitude") or o.get("longitude")
+            try:
+                lat = float(lat) if lat is not None else None
+                lng = float(lng) if lng is not None else None
+            except (TypeError, ValueError):
+                lat, lng = None, None
+
+            primary_loc = custom_loc if del_method == "custom" else (pick_loc if del_method == "pickup" else del_addr)
+            map_url = None
+            if lat is not None and lng is not None and (lat != 0.0 or lng != 0.0):
+                map_url = f"https://www.google.com/maps/search/?api=1&query={lat},{lng}"
+            elif primary_loc:
+                import urllib.parse
+                map_url = f"https://www.google.com/maps/search/?api=1&query={urllib.parse.quote_plus(primary_loc)}"
+
+            loc_change = None
+            raw_change = o.get("location_change_data") or o.get("locationChangeRequest")
+            if raw_change:
+                try:
+                    loc_change = json.loads(raw_change) if isinstance(raw_change, str) else raw_change
+                except Exception:
+                    loc_change = None
+
             result.append({
                 "id": str(o.get("id", "")),
                 "productId": pid,
@@ -2566,7 +2611,21 @@ def fetch_orders(email: str = Depends(get_current_user_email)):
                 "awaitingInspectionAt": o.get("awaiting_inspection_at") or o.get("awaitingInspectionAt"),
                 "completedAt": o.get("completed_at") or o.get("completedAt"),
                 "queueNotes": o.get("queue_notes") or o.get("queueNotes"),
-                "category": o.get("category") or get_product_category(pid)
+                "category": o.get("category") or get_product_category(pid),
+                "deliveryMethod": del_method,
+                "delivery_method": del_method,
+                "deliveryAddress": del_addr,
+                "delivery_address": del_addr,
+                "pickupLocation": pick_loc,
+                "pickup_location": pick_loc,
+                "customLocation": custom_loc,
+                "custom_location": custom_loc,
+                "locationDirections": loc_dir,
+                "location_directions": loc_dir,
+                "latitude": lat,
+                "longitude": lng,
+                "mapUrl": map_url,
+                "locationChangeRequest": loc_change,
             })
     return result
 
@@ -2667,6 +2726,18 @@ def add_order(data: OrderSchema, current_user: dict = Depends(get_approved_user)
         "total": data.total,
         "status": data.status or "active",
         "category": prod_category,
+        "delivery_method": data.deliveryMethod or data.delivery_method or "delivery",
+        "deliveryMethod": data.deliveryMethod or data.delivery_method or "delivery",
+        "delivery_address": data.deliveryAddress or data.delivery_address or "",
+        "deliveryAddress": data.deliveryAddress or data.delivery_address or "",
+        "pickup_location": data.pickupLocation or data.pickup_location or "",
+        "pickupLocation": data.pickupLocation or data.pickup_location or "",
+        "custom_location": data.customLocation or data.custom_location or "",
+        "customLocation": data.customLocation or data.custom_location or "",
+        "location_directions": data.locationDirections or data.location_directions or "",
+        "locationDirections": data.locationDirections or data.location_directions or "",
+        "latitude": data.latitude,
+        "longitude": data.longitude,
         "createdAt": datetime.datetime.now(datetime.timezone.utc).isoformat()
     }
     
@@ -2876,7 +2947,35 @@ def get_order_details(id: str, email: str = Depends(get_current_any_user_email))
     img = str(order.get("product_image") or order.get("productImage") or "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=600")
     start = str(order.get("start_date") or order.get("startDate") or "Today")
     end = str(order.get("end_date") or order.get("endDate") or "Tomorrow")
-    created = str(order.get("created_at") or order.get("createdAt") or "")
+    created = str(order.get("created_at") or order.get("createdAt") or dt.now(timezone.utc).isoformat())
+    del_method = str(order.get("delivery_method") or order.get("deliveryMethod") or "delivery").lower()
+    del_addr = str(order.get("delivery_address") or order.get("deliveryAddress") or "").strip()
+    pick_loc = str(order.get("pickup_location") or order.get("pickupLocation") or "").strip()
+    custom_loc = str(order.get("custom_location") or order.get("customLocation") or "").strip()
+    loc_dir = str(order.get("location_directions") or order.get("locationDirections") or "").strip()
+    lat = order.get("location_latitude") or order.get("locationLatitude") or order.get("latitude")
+    lng = order.get("location_longitude") or order.get("locationLongitude") or order.get("longitude")
+    try:
+        lat = float(lat) if lat is not None else None
+        lng = float(lng) if lng is not None else None
+    except (TypeError, ValueError):
+        lat, lng = None, None
+
+    primary_loc = custom_loc if del_method == "custom" else (pick_loc if del_method == "pickup" else del_addr)
+    map_url = None
+    if lat is not None and lng is not None and (lat != 0.0 or lng != 0.0):
+        map_url = f"https://www.google.com/maps/search/?api=1&query={lat},{lng}"
+    elif primary_loc:
+        import urllib.parse
+        map_url = f"https://www.google.com/maps/search/?api=1&query={urllib.parse.quote_plus(primary_loc)}"
+
+    loc_change = None
+    raw_change = order.get("location_change_data") or order.get("locationChangeRequest")
+    if raw_change:
+        try:
+            loc_change = json.loads(raw_change) if isinstance(raw_change, str) else raw_change
+        except Exception:
+            loc_change = None
 
     return {
         "id": str(order.get("id", "")),
@@ -2903,8 +3002,114 @@ def get_order_details(id: str, email: str = Depends(get_current_any_user_email))
         "handedBackAt": order.get("handed_back_at") or order.get("handedBackAt"),
         "awaitingInspectionAt": order.get("awaiting_inspection_at") or order.get("awaitingInspectionAt"),
         "completedAt": order.get("completed_at") or order.get("completedAt"),
-        "queueNotes": order.get("queue_notes") or order.get("queueNotes")
+        "queueNotes": order.get("queue_notes") or order.get("queueNotes"),
+        "category": order.get("category") or get_product_category(pid),
+        "deliveryMethod": del_method,
+        "delivery_method": del_method,
+        "deliveryAddress": del_addr,
+        "delivery_address": del_addr,
+        "pickupLocation": pick_loc,
+        "pickup_location": pick_loc,
+        "customLocation": custom_loc,
+        "custom_location": custom_loc,
+        "locationDirections": loc_dir,
+        "location_directions": loc_dir,
+        "locationLatitude": lat,
+        "locationLongitude": lng,
+        "mapUrl": map_url,
+        "locationChangeRequest": loc_change,
     }
+
+class UpdateBookingLocationSchema(BaseModel):
+    deliveryMethod: Optional[str] = None
+    delivery_method: Optional[str] = None
+    deliveryAddress: Optional[str] = None
+    delivery_address: Optional[str] = None
+    pickupLocation: Optional[str] = None
+    pickup_location: Optional[str] = None
+    customLocation: Optional[str] = None
+    custom_location: Optional[str] = None
+    locationDirections: Optional[str] = None
+    location_directions: Optional[str] = None
+    latitude: Optional[float] = None
+    locationLatitude: Optional[float] = None
+    location_latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    locationLongitude: Optional[float] = None
+    location_longitude: Optional[float] = None
+    reason: Optional[str] = None
+
+class RejectLocationChangeSchema(BaseModel):
+    feedback: Optional[str] = None
+
+@app.get("/api/orders/{id}/location")
+def get_order_location_endpoint(id: str, email: str = Depends(get_current_any_user_email)):
+    """
+    Returns full booking location details.
+    Authorized for renter, product lender, or admin only (Privacy Rule 4).
+    """
+    clean_user = email.strip().lower()
+    order = fetch_one("SELECT * FROM orders WHERE id = %s", (id,))
+    if not order and id in MOCK_ORDERS:
+        order = MOCK_ORDERS[id]
+    if not order:
+        raise HTTPException(status_code=404, detail="Booking/Order not found.")
+
+    cust_email = str(order.get("user_email") or order.get("userEmail") or "").strip().lower()
+    pid = str(order.get("product_id") or order.get("productId") or "")
+    prod = fetch_one_product(pid) if pid else None
+    if not prod and pid in MOCK_CUSTOM_PRODUCTS:
+        prod = MOCK_CUSTOM_PRODUCTS[pid]
+    lender_email = ""
+    if prod and isinstance(prod, dict):
+        lender_email = str(prod.get("user_email") or prod.get("owner_email") or prod.get("ownerId") or prod.get("owner_id") or "").strip().lower()
+
+    user_rec = get_user(clean_user) or {}
+    is_admin = str(user_rec.get("role") or "").lower() in ("admin", "superadmin")
+    is_renter = (clean_user == cust_email)
+    is_lender = bool(lender_email and (clean_user == lender_email or clean_user in lender_email or lender_email in clean_user))
+
+    if not is_renter and not is_lender and not is_admin:
+        raise HTTPException(status_code=403, detail="Forbidden: You are not authorized to view the location for this booking.")
+
+    return format_booking_location_response(order)
+
+@app.put("/api/orders/{id}/location")
+def update_order_location_endpoint(id: str, data: UpdateBookingLocationSchema, email: str = Depends(get_current_any_user_email)):
+    """
+    Update booking location.
+    If before lender acceptance: directly updates location.
+    If after lender acceptance: creates a change request requiring lender approval.
+    """
+    raw = data.model_dump() if hasattr(data, "model_dump") else data.dict()
+    payload = {
+        "deliveryMethod": raw.get("deliveryMethod") or raw.get("delivery_method") or "delivery",
+        "deliveryAddress": raw.get("deliveryAddress") or raw.get("delivery_address") or "",
+        "pickupLocation": raw.get("pickupLocation") or raw.get("pickup_location") or "",
+        "customLocation": raw.get("customLocation") or raw.get("custom_location") or "",
+        "locationDirections": raw.get("locationDirections") or raw.get("location_directions") or "",
+        "latitude": raw.get("latitude") or raw.get("locationLatitude") or raw.get("location_latitude"),
+        "longitude": raw.get("longitude") or raw.get("locationLongitude") or raw.get("location_longitude"),
+        "reason": raw.get("reason"),
+    }
+    return update_order_booking_location(id, email, payload)
+
+@app.post("/api/orders/{id}/location-change/approve")
+@app.post("/api/bookings/{id}/location-change/approve")
+def approve_order_location_change_endpoint(id: str, email: str = Depends(get_current_any_user_email)):
+    """
+    Lender or admin approves a location change request.
+    """
+    return approve_location_change_request(id, email)
+
+@app.post("/api/orders/{id}/location-change/reject")
+@app.post("/api/bookings/{id}/location-change/reject")
+def reject_order_location_change_endpoint(id: str, data: Optional[RejectLocationChangeSchema] = None, email: str = Depends(get_current_any_user_email)):
+    """
+    Lender or admin rejects a location change request.
+    """
+    feedback = data.feedback if data else None
+    return reject_location_change_request(id, email, feedback)
 
 # ============================================================
 # Live Rental Queue & Lifecycle Endpoints
@@ -4526,6 +4731,13 @@ class CreateRazorpayOrderSchema(BaseModel):
     start_date: str
     end_date: str
     coupon_code: Optional[str] = None
+    delivery_method: Optional[str] = "delivery"
+    delivery_address: Optional[str] = None
+    pickup_location: Optional[str] = None
+    custom_location: Optional[str] = None
+    location_directions: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
 
 class VerifyRazorpayPaymentSchema(BaseModel):
     razorpay_order_id: str
@@ -4625,7 +4837,14 @@ def create_razorpay_order(data: CreateRazorpayOrderSchema, current_user: dict = 
         total=total_rupees,
         status="pending",
         razorpay_order_id=razorpay_order_id,
-        payment_status="unpaid"
+        payment_status="unpaid",
+        delivery_method=data.delivery_method or "delivery",
+        delivery_address=data.delivery_address,
+        pickup_location=data.pickup_location,
+        custom_location=data.custom_location,
+        location_directions=data.location_directions,
+        latitude=data.latitude,
+        longitude=data.longitude
     )
 
     return {

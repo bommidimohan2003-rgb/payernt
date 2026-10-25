@@ -28,6 +28,8 @@ import {
   Eye,
   EyeOff,
   Copy,
+  ExternalLink,
+  Navigation,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -43,6 +45,8 @@ interface RentalRequestsProps {
   onAdvanceLifecycle: (requestId: string, nextStatus: RentalRequestStatus) => void;
   onNavigateToWallet: () => void;
   onBack?: () => void;
+  onApproveLocationChange?: (bookingId: string) => Promise<{ success: boolean; message?: string }>;
+  onRejectLocationChange?: (bookingId: string, feedback?: string) => Promise<{ success: boolean; message?: string }>;
 }
 
 const LIFECYCLE_STEPS: { key: RentalRequestStatus; label: string; desc: string }[] = [
@@ -82,8 +86,117 @@ export function RentalRequests({
   onAdvanceLifecycle,
   onNavigateToWallet,
   onBack,
+  onApproveLocationChange,
+  onRejectLocationChange,
 }: RentalRequestsProps) {
   const [filter, setFilter] = useState<"all" | "pending" | "active" | "completed">("all");
+  const [approvingChangeId, setApprovingChangeId] = useState<string | null>(null);
+  const [rejectingChangeId, setRejectingChangeId] = useState<string | null>(null);
+
+  const handleCopyAddress = (text: string) => {
+    if (!text || text.trim() === "") {
+      toast.error("No address available to copy.");
+      return;
+    }
+    navigator.clipboard.writeText(text);
+    toast.success("Location address copied to clipboard!");
+  };
+
+  const handleApproveLocationChange = async (bookingId: string) => {
+    setApprovingChangeId(bookingId);
+    try {
+      if (onApproveLocationChange) {
+        const res = await onApproveLocationChange(bookingId);
+        if (res.success) {
+          toast.success("Location change approved successfully!");
+        } else {
+          toast.error(res.message || "Failed to approve location change");
+        }
+      } else {
+        const res = await payerntApi.approveLocationChange(bookingId);
+        if (res.success) {
+          toast.success("Location change approved successfully!");
+        } else {
+          toast.error(res.message || "Failed to approve location change");
+        }
+      }
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to approve location change");
+    } finally {
+      setApprovingChangeId(null);
+    }
+  };
+
+  const handleRejectLocationChange = async (bookingId: string) => {
+    const feedback = window.prompt("Reason for declining location change (optional):") || "";
+    setRejectingChangeId(bookingId);
+    try {
+      if (onRejectLocationChange) {
+        const res = await onRejectLocationChange(bookingId, feedback);
+        if (res.success) {
+          toast.info("Location change declined.");
+        } else {
+          toast.error(res.message || "Failed to decline location change");
+        }
+      } else {
+        const res = await payerntApi.rejectLocationChange(bookingId, feedback);
+        if (res.success) {
+          toast.info("Location change declined.");
+        } else {
+          toast.error(res.message || "Failed to decline location change");
+        }
+      }
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to decline location change");
+    } finally {
+      setRejectingChangeId(null);
+    }
+  };
+
+  const getLocationDisplay = (req: RentalRequest) => {
+    const method = (req.deliveryMethod || req.delivery_method || "delivery").toLowerCase();
+    let methodLabel = "Doorstep Delivery";
+    let methodIcon = Truck;
+
+    if (method === "pickup") {
+      methodLabel = "Owner Pickup";
+      methodIcon = MapPin;
+    } else if (method === "custom") {
+      methodLabel = "Custom Meetup";
+      methodIcon = Navigation;
+    }
+
+    let address = "";
+    if (method === "delivery") {
+      address = req.deliveryAddress || req.delivery_address || req.renter?.city || "";
+    } else if (method === "pickup") {
+      address = req.pickupLocation || req.pickup_location || "Lender Verified Hub (Details shared after confirmation)";
+    } else {
+      address = req.customLocation || req.custom_location || "Agreed Public Meeting Point";
+    }
+
+    const directions = req.locationDirections || req.location_directions || "";
+    const lat = req.latitude ?? req.location_latitude ?? null;
+    const lng = req.longitude ?? req.location_longitude ?? null;
+
+    let mapUrl = req.mapUrl || req.map_url || "";
+    if (!mapUrl && lat && lng) {
+      mapUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+    } else if (!mapUrl && address && address !== "Address Pending Confirmation") {
+      mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+    }
+
+    return {
+      method,
+      methodLabel,
+      methodIcon,
+      address,
+      directions,
+      lat,
+      lng,
+      mapUrl,
+    };
+  };
 
   // Handover Security Clearance Modal State
   const [handoverReq, setHandoverReq] = useState<RentalRequest | null>(null);
@@ -772,6 +885,154 @@ export function RentalRequests({
                     </div>
                   </div>
                 </div>
+
+                {/* Booking Location & Fulfillment Card */}
+                {(() => {
+                  const loc = getLocationDisplay(req);
+                  const changeReq = req.locationChangeRequest;
+                  const isChangePending = changeReq && (changeReq.status === "pending" || !changeReq.status);
+
+                  return (
+                    <div className="space-y-3">
+                      {/* Pending Location Change Request Alert Banner */}
+                      {isChangePending && (
+                        <div className="p-4 sm:p-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 dark:bg-amber-950/20 space-y-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-bold text-xs sm:text-sm">
+                              <AlertTriangle className="h-4 w-4 shrink-0" />
+                              <span>Location Change Requested by Renter</span>
+                            </div>
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                              Approval Needed
+                            </span>
+                          </div>
+
+                          <div className="text-xs space-y-1.5 text-neutral-800 dark:text-neutral-200 bg-white/50 dark:bg-black/20 p-3 rounded-xl border border-black/5 dark:border-white/5">
+                            <div className="flex items-center gap-2">
+                              <span className="text-neutral-500 dark:text-neutral-400 font-medium">Proposed Method:</span>
+                              <span className="capitalize font-bold text-neutral-900 dark:text-white px-2 py-0.5 rounded bg-amber-500/15">
+                                {changeReq.deliveryMethod ? changeReq.deliveryMethod.replace(/_/g, " ") : loc.methodLabel}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-neutral-500 dark:text-neutral-400 font-medium">Proposed Location: </span>
+                              <span className="font-bold text-neutral-900 dark:text-white">
+                                {changeReq.deliveryAddress || changeReq.customLocation || changeReq.pickupLocation || "New location proposed"}
+                              </span>
+                            </div>
+                            {changeReq.locationDirections && (
+                              <div className="text-[11px] text-neutral-600 dark:text-neutral-300">
+                                <span className="font-medium text-neutral-500">Directions: </span>
+                                {changeReq.locationDirections}
+                              </div>
+                            )}
+                            {changeReq.reason && (
+                              <div className="text-[11px] text-amber-800 dark:text-amber-300 italic pt-1 border-t border-amber-500/20">
+                                Reason: "{changeReq.reason}"
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-3 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => handleApproveLocationChange(req.id)}
+                              disabled={approvingChangeId === req.id}
+                              className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-all active:scale-98"
+                            >
+                              <CheckCircle2 className="h-4 w-4" />
+                              <span>{approvingChangeId === req.id ? "Approving..." : "Approve Change"}</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRejectLocationChange(req.id)}
+                              disabled={rejectingChangeId === req.id}
+                              className="px-4 py-2.5 rounded-xl border border-red-500/30 hover:bg-red-500/10 text-red-600 dark:text-red-400 font-semibold text-xs transition-colors cursor-pointer disabled:opacity-50"
+                            >
+                              <XCircle className="h-4 w-4" />
+                              <span>{rejectingChangeId === req.id ? "Declining..." : "Decline"}</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Confirmed Booking Location Card */}
+                      <div className="p-4 sm:p-5 rounded-2xl border border-black/5 dark:border-[#A1A1AA]/15 bg-neutral-50/70 dark:bg-[#050709]/60 space-y-3 shadow-xs">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold text-neutral-500 dark:text-[#A1A1AA] uppercase tracking-wider">
+                              Confirmed Booking Location
+                            </span>
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide border ${
+                              loc.method === "delivery"
+                                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25"
+                                : loc.method === "pickup"
+                                ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/25"
+                                : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25"
+                            }`}>
+                              <loc.methodIcon className="h-3 w-3" />
+                              <span>{loc.methodLabel}</span>
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            {loc.address && (
+                              <button
+                                type="button"
+                                onClick={() => handleCopyAddress(loc.address)}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-black/10 dark:border-white/10 hover:bg-neutral-200/50 dark:hover:bg-white/5 text-xs font-semibold text-neutral-700 dark:text-neutral-200 transition-colors cursor-pointer"
+                                title="Copy Address to clipboard"
+                              >
+                                <Copy className="h-3.5 w-3.5" />
+                                <span>Copy Address</span>
+                              </button>
+                            )}
+                            {loc.mapUrl && (
+                              <a
+                                href={loc.mapUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-neutral-900 text-white dark:bg-[#F5F5F5] dark:text-[#050709] hover:opacity-95 dark:hover:bg-white text-xs font-bold transition-all shadow-xs"
+                              >
+                                <ExternalLink className="h-3.5 w-3.5" />
+                                <span>Open in Google Maps</span>
+                              </a>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Primary Address Details */}
+                        <div className="space-y-1.5 pt-1">
+                          {loc.address ? (
+                            <div className="flex items-start gap-2.5 text-xs text-neutral-900 dark:text-[#F5F5F5]">
+                              <MapPin className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
+                              <div className="space-y-1">
+                                <p className="font-semibold text-sm leading-relaxed text-neutral-900 dark:text-white">
+                                  {loc.address}
+                                </p>
+                                {loc.directions && (
+                                  <p className="text-xs text-neutral-600 dark:text-[#A1A1AA] italic">
+                                    <strong>Directions / Landmark:</strong> {loc.directions}
+                                  </p>
+                                )}
+                                {loc.lat && loc.lng && (
+                                  <p className="text-[11px] font-mono text-neutral-500 dark:text-neutral-400">
+                                    GPS Coordinates: {loc.lat.toFixed(5)}, {loc.lng.toFixed(5)}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2.5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 text-xs font-semibold">
+                              <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />
+                              <span>Address Pending Confirmation — Renter will provide delivery address prior to handover.</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Vendor Secret PIN Section (Stage 3) */}
                 {(() => {

@@ -978,6 +978,15 @@ export const api = {
             category: String(o.category || ""),
             createdAt: created,
             created_at: created,
+            deliveryMethod: (o.deliveryMethod || o.delivery_method || "delivery") as string,
+            deliveryAddress: (o.deliveryAddress || o.delivery_address || "") as string,
+            pickupLocation: (o.pickupLocation || o.pickup_location || "") as string,
+            customLocation: (o.customLocation || o.custom_location || "") as string,
+            locationDirections: (o.locationDirections || o.location_directions || "") as string,
+            latitude: (o.latitude ?? o.location_latitude ?? null) as number | null,
+            longitude: (o.longitude ?? o.location_longitude ?? null) as number | null,
+            mapUrl: (o.mapUrl || o.map_url || "") as string,
+            locationChangeRequest: (o.locationChangeRequest || o.location_change_request || null) as any,
           };
         }) as Order[];
         storage.set(STORAGE_KEYS.orders, normalized);
@@ -1064,6 +1073,15 @@ export const api = {
       category: String(o.category || ""),
       createdAt: created,
       created_at: created,
+      deliveryMethod: (o.deliveryMethod || o.delivery_method || "delivery") as string,
+      deliveryAddress: (o.deliveryAddress || o.delivery_address || "") as string,
+      pickupLocation: (o.pickupLocation || o.pickup_location || "") as string,
+      customLocation: (o.customLocation || o.custom_location || "") as string,
+      locationDirections: (o.locationDirections || o.location_directions || "") as string,
+      latitude: (o.latitude ?? o.location_latitude ?? null) as number | null,
+      longitude: (o.longitude ?? o.location_longitude ?? null) as number | null,
+      mapUrl: (o.mapUrl || o.map_url || "") as string,
+      locationChangeRequest: (o.locationChangeRequest || o.location_change_request || null) as any,
     } as Order;
   },
 
@@ -1095,6 +1113,13 @@ export const api = {
       category: orderData.category || "",
       createdAt:
         orderData.createdAt || orderData.created_at || new Date().toISOString(),
+      deliveryMethod: orderData.deliveryMethod || (orderData as any).delivery_method || "delivery",
+      deliveryAddress: orderData.deliveryAddress || (orderData as any).delivery_address || "",
+      pickupLocation: orderData.pickupLocation || (orderData as any).pickup_location || "",
+      customLocation: orderData.customLocation || (orderData as any).custom_location || "",
+      locationDirections: orderData.locationDirections || (orderData as any).location_directions || "",
+      latitude: orderData.latitude ?? (orderData as any).location_latitude ?? null,
+      longitude: orderData.longitude ?? (orderData as any).location_longitude ?? null,
     };
 
     const res = await this.fetchWithAuth(`${API_BASE}/api/orders`, {
@@ -1121,6 +1146,84 @@ export const api = {
     this.invalidateCache("user_orders");
     this.invalidateCache("public_stats");
     return res.json();
+  },
+
+  async getOrderLocation(token: string, orderId: string) {
+    const res = await this.fetchWithAuth(`${API_BASE}/api/orders/${orderId}/location`, {
+      method: "GET",
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(parseApiError(data, "Failed to fetch order booking location"));
+    }
+    return await res.json();
+  },
+
+  async updateOrderLocation(token: string, orderId: string, locationData: {
+    deliveryMethod?: string;
+    deliveryAddress?: string;
+    pickupLocation?: string;
+    customLocation?: string;
+    locationDirections?: string;
+    latitude?: number | null;
+    longitude?: number | null;
+    reason?: string;
+  }) {
+    const res = await this.fetchWithAuth(`${API_BASE}/api/orders/${orderId}/location`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        delivery_method: locationData.deliveryMethod,
+        delivery_address: locationData.deliveryAddress,
+        pickup_location: locationData.pickupLocation,
+        custom_location: locationData.customLocation,
+        location_directions: locationData.locationDirections,
+        latitude: locationData.latitude,
+        longitude: locationData.longitude,
+        reason: locationData.reason,
+      }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(parseApiError(data, "Failed to update booking location"));
+    }
+    this.invalidateCache("user_orders");
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("payent_orders_updated"));
+    }
+    return await res.json();
+  },
+
+  async approveOrderLocationChange(token: string, orderId: string) {
+    const res = await this.fetchWithAuth(`${API_BASE}/api/orders/${orderId}/location-change/approve`, {
+      method: "POST",
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(parseApiError(data, "Failed to approve location change"));
+    }
+    this.invalidateCache("user_orders");
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("payent_orders_updated"));
+    }
+    return await res.json();
+  },
+
+  async rejectOrderLocationChange(token: string, orderId: string, feedback?: string) {
+    const res = await this.fetchWithAuth(`${API_BASE}/api/orders/${orderId}/location-change/reject`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ feedback: feedback || "" }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(parseApiError(data, "Failed to reject location change"));
+    }
+    this.invalidateCache("user_orders");
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("payent_orders_updated"));
+    }
+    return await res.json();
   },
 
   async cancelOrder(token: string, orderId: string) {
@@ -1623,6 +1726,15 @@ export const api = {
     startDate: string,
     endDate: string,
     couponCode?: string,
+    locationData?: {
+      deliveryMethod?: string;
+      deliveryAddress?: string;
+      pickupLocation?: string;
+      customLocation?: string;
+      locationDirections?: string;
+      latitude?: number | null;
+      longitude?: number | null;
+    },
   ) {
     const res = await this.fetchWithAuth(
       `${API_BASE}/api/payments/create-order`,
@@ -1636,6 +1748,13 @@ export const api = {
           start_date: startDate,
           end_date: endDate,
           coupon_code: couponCode || null,
+          delivery_method: locationData?.deliveryMethod || "delivery",
+          delivery_address: locationData?.deliveryAddress || "",
+          pickup_location: locationData?.pickupLocation || "",
+          custom_location: locationData?.customLocation || "",
+          location_directions: locationData?.locationDirections || "",
+          latitude: locationData?.latitude ?? null,
+          longitude: locationData?.longitude ?? null,
         }),
       },
     );

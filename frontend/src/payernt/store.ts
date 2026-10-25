@@ -65,6 +65,12 @@ export const INITIAL_REQUESTS: RentalRequest[] = [
     requestDate: new Date().toISOString(),
     paymentStatus: "paid_to_escrow",
     confirmedAt: new Date().toISOString(),
+    deliveryMethod: "delivery",
+    deliveryAddress: "Flat 402, Green Glen Layout, Bellandur, Bengaluru, Karnataka 560103",
+    locationDirections: "Near Central Mall, gate buzzer #402",
+    latitude: 12.926,
+    longitude: 77.6762,
+    mapUrl: "https://www.google.com/maps/search/?api=1&query=12.926,77.6762",
   },
 ];
 
@@ -546,6 +552,15 @@ export function usePayerntStore() {
               awaitingInspectionAt: b.awaitingInspectionAt || b.awaiting_inspection_at,
               completedAt: b.completedAt || b.completed_at,
               queueNotes: b.queueNotes || b.queue_notes,
+              deliveryMethod: b.deliveryMethod || b.delivery_method || "delivery",
+              deliveryAddress: b.deliveryAddress || b.delivery_address || "",
+              pickupLocation: b.pickupLocation || b.pickup_location || "",
+              customLocation: b.customLocation || b.custom_location || "",
+              locationDirections: b.locationDirections || b.location_directions || "",
+              latitude: b.latitude ?? b.location_latitude ?? null,
+              longitude: b.longitude ?? b.location_longitude ?? null,
+              mapUrl: b.mapUrl || b.map_url || (b.latitude && b.longitude ? `https://www.google.com/maps/search/?api=1&query=${b.latitude},${b.longitude}` : (b.deliveryAddress ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(b.deliveryAddress)}` : "")),
+              locationChangeRequest: b.locationChangeRequest || b.location_change_request || null,
             };
           });
           setRentalRequests(mappedRequests);
@@ -1032,6 +1047,88 @@ export function usePayerntStore() {
     }
   };
 
+  // Approve Renter's Location Change Request
+  const approveLocationChange = async (bookingId: string) => {
+    try {
+      const res = await payerntApi.approveLocationChange(bookingId);
+      if (res.success) {
+        setRentalRequests((prev) =>
+          prev.map((req) => {
+            if (req.id !== bookingId) return req;
+            const changeReq = req.locationChangeRequest;
+            const updated: RentalRequest = {
+              ...req,
+              deliveryMethod: changeReq?.deliveryMethod || req.deliveryMethod,
+              deliveryAddress: changeReq?.deliveryAddress !== undefined ? changeReq.deliveryAddress : req.deliveryAddress,
+              pickupLocation: changeReq?.pickupLocation !== undefined ? changeReq.pickupLocation : req.pickupLocation,
+              customLocation: changeReq?.customLocation !== undefined ? changeReq.customLocation : req.customLocation,
+              locationDirections: changeReq?.locationDirections !== undefined ? changeReq.locationDirections : req.locationDirections,
+              latitude: changeReq?.latitude !== undefined ? changeReq.latitude : req.latitude,
+              longitude: changeReq?.longitude !== undefined ? changeReq.longitude : req.longitude,
+              mapUrl: changeReq?.deliveryAddress
+                ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(changeReq.deliveryAddress)}`
+                : req.mapUrl,
+              locationChangeRequest: null,
+            };
+            return updated;
+          })
+        );
+        const notif: LenderNotification = {
+          id: `notif-${Date.now()}`,
+          title: "Location Change Approved",
+          message: `You approved the new booking location for order #${bookingId}.`,
+          type: "success",
+          timestamp: "Just now",
+          read: false,
+          actionRoute: "requests",
+        };
+        setNotifications((prev) => [notif, ...prev]);
+        return { success: true };
+      }
+      return { success: false, message: res.message };
+    } catch (e: any) {
+      return { success: false, message: e?.message || "Failed to approve location change." };
+    }
+  };
+
+  // Reject Renter's Location Change Request
+  const rejectLocationChange = async (bookingId: string, feedback?: string) => {
+    try {
+      const res = await payerntApi.rejectLocationChange(bookingId, feedback);
+      if (res.success) {
+        setRentalRequests((prev) =>
+          prev.map((req) => {
+            if (req.id !== bookingId) return req;
+            return {
+              ...req,
+              locationChangeRequest: req.locationChangeRequest
+                ? {
+                    ...req.locationChangeRequest,
+                    status: "rejected",
+                    rejectionReason: feedback || "Declined by lender",
+                  }
+                : null,
+            };
+          })
+        );
+        const notif: LenderNotification = {
+          id: `notif-${Date.now()}`,
+          title: "Location Change Declined",
+          message: `You declined the location change request for order #${bookingId}.`,
+          type: "info",
+          timestamp: "Just now",
+          read: false,
+          actionRoute: "requests",
+        };
+        setNotifications((prev) => [notif, ...prev]);
+        return { success: true };
+      }
+      return { success: false, message: res.message };
+    } catch (e: any) {
+      return { success: false, message: e?.message || "Failed to reject location change." };
+    }
+  };
+
   useEffect(() => {
     try {
       localStorage.setItem(`wallet_${activeUserId}`, JSON.stringify(wallet));
@@ -1327,6 +1424,8 @@ export function usePayerntStore() {
     simulateVerificationChange,
     handleRequestAction,
     advanceRentalLifecycle,
+    approveLocationChange,
+    rejectLocationChange,
     requestWithdrawal,
     addBankAccount,
     creditRentalPayment,

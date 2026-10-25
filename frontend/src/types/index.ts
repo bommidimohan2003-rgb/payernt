@@ -152,6 +152,38 @@ export interface Order {
   completed_at?: string;
   queueNotes?: string;
   queue_notes?: string;
+  deliveryMethod?: "delivery" | "pickup" | "custom" | string;
+  deliveryAddress?: string;
+  pickupLocation?: string;
+  customLocation?: string;
+  locationDirections?: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  mapUrl?: string;
+  delivery_method?: string;
+  delivery_address?: string;
+  pickup_location?: string;
+  custom_location?: string;
+  location_directions?: string;
+  location_latitude?: number | null;
+  location_longitude?: number | null;
+  map_url?: string;
+  locationChangeRequest?: {
+    deliveryMethod?: string;
+    deliveryAddress?: string;
+    pickupLocation?: string;
+    customLocation?: string;
+    locationDirections?: string;
+    latitude?: number | null;
+    longitude?: number | null;
+    reason?: string;
+    requestedAt?: string;
+    status?: "pending" | "approved" | "rejected";
+    reviewedAt?: string;
+    reviewedBy?: string;
+    rejectionReason?: string;
+  } | null;
+  location_change_request?: any;
 }
 
 export interface Notification {

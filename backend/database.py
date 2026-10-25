@@ -26,6 +26,7 @@ import json
 import threading
 from typing import Optional, List, Set, Dict, Tuple, Any
 from datetime import datetime as dt, timezone, timedelta
+from fastapi import HTTPException
 from config import MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DB, MYSQL_SSL, TIDB_SSL_CA, IS_PRODUCTION
 
 logger = logging.getLogger("payent.database")
@@ -496,6 +497,14 @@ def init_db(force: bool = False):
     add_column_safely("orders", "completed_at VARCHAR(100) NULL")
     add_column_safely("orders", "queue_notes TEXT NULL")
     add_column_safely("orders", "category VARCHAR(100) NULL")
+    add_column_safely("orders", "delivery_method VARCHAR(50) DEFAULT 'delivery'")
+    add_column_safely("orders", "delivery_address TEXT NULL")
+    add_column_safely("orders", "pickup_location TEXT NULL")
+    add_column_safely("orders", "custom_location TEXT NULL")
+    add_column_safely("orders", "location_directions TEXT NULL")
+    add_column_safely("orders", "location_latitude DECIMAL(10, 8) NULL")
+    add_column_safely("orders", "location_longitude DECIMAL(11, 8) NULL")
+    add_column_safely("orders", "location_change_data TEXT NULL")
     add_index_safely("orders", "idx_orders_user_cat", "user_email, category")
     add_index_safely("orders", "idx_orders_user_email", "user_email")
     add_index_safely("orders", "idx_orders_status", "status")
@@ -884,6 +893,9 @@ def init_db(force: bool = False):
     add_column_safely("deliveries", "picked_up_at VARCHAR(100) NULL")
     add_column_safely("deliveries", "arrived_at_renter_at VARCHAR(100) NULL")
     add_column_safely("deliveries", "completed_at VARCHAR(100) NULL")
+    add_column_safely("deliveries", "pickup_location VARCHAR(500) NULL")
+    add_column_safely("deliveries", "custom_location VARCHAR(500) NULL")
+    add_column_safely("deliveries", "location_directions TEXT NULL")
 
     # Create delivery_location_updates table
     execute_query("""
@@ -1918,6 +1930,34 @@ def create_order(email: str, order: dict):
         if restricted:
             raise ValueError(CATEGORY_BOOKING_RESTRICTION_MESSAGE)
 
+    delivery_method = str(order.get("delivery_method") or order.get("deliveryMethod") or "delivery").strip().lower()
+    delivery_address = order.get("delivery_address") or order.get("deliveryAddress") or ""
+    pickup_location = order.get("pickup_location") or order.get("pickupLocation") or ""
+    custom_location = order.get("custom_location") or order.get("customLocation") or ""
+    location_directions = order.get("location_directions") or order.get("locationDirections") or ""
+    lat = order.get("location_latitude") or order.get("locationLatitude") or order.get("latitude")
+    lng = order.get("location_longitude") or order.get("locationLongitude") or order.get("longitude")
+    try:
+        lat = float(lat) if lat is not None else None
+        lng = float(lng) if lng is not None else None
+    except (TypeError, ValueError):
+        lat, lng = None, None
+
+    # Fallback address resolution from user profile if delivery selected but address empty
+    user = get_user(clean_email)
+    if delivery_method == "delivery" and not delivery_address and user and isinstance(user, dict):
+        addr_parts = [p for p in [user.get("address"), user.get("city"), user.get("pincode")] if p]
+        if addr_parts:
+            delivery_address = ", ".join(addr_parts)
+    
+    # Fallback for owner pickup if pickup location empty
+    if delivery_method == "pickup" and not pickup_location:
+        pickup_location = "Payent Partner Hub, Indiranagar, Bengaluru, Karnataka 560038"
+
+    # Fallback for custom location if empty
+    if delivery_method == "custom" and not custom_location:
+        custom_location = delivery_address or "Selected Custom Meetup Location"
+
     normalized = {
         "id": order["id"],
         "user_email": clean_email,
@@ -1957,12 +1997,32 @@ def create_order(email: str, order: dict):
         "completed_at": order.get("completed_at") or order.get("completedAt"),
         "completedAt": order.get("completed_at") or order.get("completedAt"),
         "category": prod_category,
+        "delivery_method": delivery_method,
+        "deliveryMethod": delivery_method,
+        "delivery_address": delivery_address,
+        "deliveryAddress": delivery_address,
+        "pickup_location": pickup_location,
+        "pickupLocation": pickup_location,
+        "custom_location": custom_location,
+        "customLocation": custom_location,
+        "location_directions": location_directions,
+        "locationDirections": location_directions,
+        "location_latitude": lat,
+        "locationLatitude": lat,
+        "location_longitude": lng,
+        "locationLongitude": lng,
+        "location_change_data": None,
+        "locationChangeRequest": None,
     }
     MOCK_ORDERS[order["id"]] = normalized
 
     execute_query("""
-        INSERT INTO orders (id, user_email, product_id, product_title, product_image, start_date, end_date, total, status, created_at, time_slot, duration_type, start_time, end_time, start_datetime, end_datetime, confirmed_at, category)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        INSERT INTO orders (
+            id, user_email, product_id, product_title, product_image, start_date, end_date, total, status, created_at,
+            time_slot, duration_type, start_time, end_time, start_datetime, end_datetime, confirmed_at, category,
+            delivery_method, delivery_address, pickup_location, custom_location, location_directions, location_latitude, location_longitude
+        )
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """, (
         order["id"],
         clean_email,
@@ -1981,12 +2041,67 @@ def create_order(email: str, order: dict):
         start_datetime,
         end_datetime,
         confirmed_at,
-        prod_category
+        prod_category,
+        delivery_method,
+        delivery_address,
+        pickup_location,
+        custom_location,
+        location_directions,
+        lat,
+        lng
     ))
+
+    # Synchronize initial delivery record
+    try:
+        deliv_id = f"del-{order['id']}"
+        now_iso = dt.now(timezone.utc).isoformat()
+        deliv_rec = {
+            "id": deliv_id,
+            "booking_id": order["id"],
+            "delivery_method": delivery_method,
+            "status": "PENDING",
+            "pickup_address": pickup_location or "Payent Logistics Hub, Bengaluru",
+            "delivery_address": delivery_address or custom_location or "Customer Delivery Location",
+            "pickup_location": pickup_location,
+            "custom_location": custom_location,
+            "location_directions": location_directions,
+            "delivery_latitude": lat or 12.9352,
+            "delivery_longitude": lng or 77.6245,
+            "current_latitude": 12.9716,
+            "current_longitude": 77.5946,
+            "eta_minutes": 25,
+            "created_at": now_iso,
+            "updated_at": now_iso
+        }
+        MOCK_DELIVERIES[deliv_id] = deliv_rec
+        MOCK_DELIVERIES[order["id"]] = deliv_rec
+        execute_query("""
+            INSERT INTO deliveries (
+                id, booking_id, delivery_method, status, pickup_address, delivery_address,
+                pickup_location, custom_location, location_directions,
+                delivery_latitude, delivery_longitude, current_latitude, current_longitude,
+                eta_minutes, created_at, updated_at
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE
+                delivery_method = VALUES(delivery_method),
+                delivery_address = VALUES(delivery_address),
+                pickup_location = VALUES(pickup_location),
+                custom_location = VALUES(custom_location),
+                location_directions = VALUES(location_directions),
+                updated_at = VALUES(updated_at)
+        """, (
+            deliv_id, order["id"], delivery_method, "PENDING",
+            pickup_location or "Payent Logistics Hub, Bengaluru",
+            delivery_address or custom_location or "Customer Delivery Location",
+            pickup_location, custom_location, location_directions,
+            lat or 12.9352, lng or 77.6245,
+            12.9716, 77.5946, 25, now_iso, now_iso
+        ))
+    except Exception as del_err:
+        logger.info(f"Delivery record init notice for order {order['id']}: {del_err}")
 
     # Create matching payment transaction
     tx_id = f"tx-{order['id']}"
-    user = get_user(clean_email)
     customer_name = user["full_name"] if (user and isinstance(user, dict) and "full_name" in user) else clean_email.split("@")[0]
     
     execute_query("""
@@ -2006,6 +2121,448 @@ def create_order(email: str, order: dict):
     ))
     return normalized
 
+def format_booking_location_response(order: dict) -> dict:
+    """
+    Format standard location details for a booking, including map link and change-request status.
+    """
+    if not order:
+        return {}
+    oid = str(order.get("id") or order.get("bookingId") or "")
+    del_method = str(order.get("delivery_method") or order.get("deliveryMethod") or "delivery").lower()
+    del_addr = str(order.get("delivery_address") or order.get("deliveryAddress") or "").strip()
+    pickup_loc = str(order.get("pickup_location") or order.get("pickupLocation") or "").strip()
+    custom_loc = str(order.get("custom_location") or order.get("customLocation") or "").strip()
+    directions = str(order.get("location_directions") or order.get("locationDirections") or "").strip()
+    lat = order.get("location_latitude") or order.get("locationLatitude") or order.get("latitude")
+    lng = order.get("location_longitude") or order.get("locationLongitude") or order.get("longitude")
+    try:
+        lat = float(lat) if lat is not None else None
+        lng = float(lng) if lng is not None else None
+    except (TypeError, ValueError):
+        lat, lng = None, None
+
+    # Determine primary display location based on method
+    if del_method == "pickup":
+        primary_location = pickup_loc or "Payent Verified Partner Hub, Indiranagar, Bengaluru"
+    elif del_method == "custom":
+        primary_location = custom_loc or del_addr or "Agreed Meetup Location"
+    else:
+        primary_location = del_addr or "Customer Delivery Location, Bengaluru"
+
+    # Generate Google Maps link
+    map_url = None
+    if lat is not None and lng is not None and (lat != 0.0 or lng != 0.0):
+        map_url = f"https://www.google.com/maps/search/?api=1&query={lat},{lng}"
+    elif primary_location and primary_location.strip():
+        import urllib.parse
+        map_url = f"https://www.google.com/maps/search/?api=1&query={urllib.parse.quote_plus(primary_location.strip())}"
+
+    # Location change request parsing
+    change_raw = order.get("location_change_data") or order.get("locationChangeRequest")
+    change_data = None
+    if change_raw:
+        if isinstance(change_raw, str):
+            try:
+                change_data = json.loads(change_raw)
+            except Exception:
+                change_data = None
+        elif isinstance(change_raw, dict):
+            change_data = change_raw
+
+    raw_status = str(order.get("status") or "").lower()
+    is_accepted = raw_status not in ("requested", "pending", "order_confirmed", "confirmed") or bool(
+        order.get("ready_for_pickup_at") or order.get("readyForPickupAt") or order.get("picked_up_at") or order.get("pickedUpAt")
+    )
+
+    return {
+        "bookingId": oid,
+        "deliveryMethod": del_method,
+        "primaryLocation": primary_location,
+        "displayLocation": primary_location,
+        "deliveryAddress": del_addr,
+        "pickupLocation": pickup_loc,
+        "customLocation": custom_loc,
+        "locationDirections": directions,
+        "latitude": lat,
+        "longitude": lng,
+        "mapUrl": map_url,
+        "isAccepted": is_accepted,
+        "hasMissingAddress": not bool(del_addr.strip()) if del_method == "delivery" else False,
+        "locationChangeRequest": change_data
+    }
+
+def get_product_by_id_internal(product_id: str):
+    if not product_id:
+        return None
+    try:
+        p = fetch_one("SELECT * FROM custom_products WHERE id = %s", (product_id,))
+        if p:
+            return p
+    except Exception:
+        pass
+    if product_id in MOCK_CUSTOM_PRODUCTS:
+        return MOCK_CUSTOM_PRODUCTS[product_id]
+    return None
+
+def broadcast_admin_event_safe(event_type: str, data: dict):
+    try:
+        from main import broadcast_admin_event
+        broadcast_admin_event(event_type, data)
+    except Exception:
+        pass
+
+def update_order_booking_location(order_id: str, caller_email: str, location_data: dict) -> dict:
+    """
+    Updates booking location.
+    If before lender acceptance: directly updates location and synchronized delivery.
+    If after lender acceptance: creates a location change request requiring lender approval.
+    """
+    order = fetch_one("SELECT * FROM orders WHERE id = %s", (order_id,))
+    if not order and order_id in MOCK_ORDERS:
+        order = MOCK_ORDERS[order_id]
+    if not order:
+        raise HTTPException(status_code=404, detail="Booking/Order not found.")
+
+    clean_user = caller_email.strip().lower()
+    cust_email = (order.get("user_email") or order.get("userEmail") or "").strip().lower()
+    user_rec = get_user(clean_user) or {}
+    is_admin = str(user_rec.get("role") or "").lower() in ("admin", "superadmin")
+    is_renter = (clean_user == cust_email)
+
+    if not is_renter and not is_admin:
+        raise HTTPException(status_code=403, detail="Forbidden: Only the renter or admin can update the booking location.")
+
+    new_method = str(location_data.get("deliveryMethod") or location_data.get("delivery_method") or "delivery").lower()
+    new_addr = str(location_data.get("deliveryAddress") or location_data.get("delivery_address") or "").strip()
+    new_pickup = str(location_data.get("pickupLocation") or location_data.get("pickup_location") or "").strip()
+    new_custom = str(location_data.get("customLocation") or location_data.get("custom_location") or "").strip()
+    new_directions = str(location_data.get("locationDirections") or location_data.get("location_directions") or "").strip()
+    new_reason = str(location_data.get("reason") or "Location update requested by renter").strip()
+    
+    lat = location_data.get("latitude") or location_data.get("locationLatitude")
+    lng = location_data.get("longitude") or location_data.get("locationLongitude")
+    try:
+        lat = float(lat) if lat is not None else None
+        lng = float(lng) if lng is not None else None
+    except (TypeError, ValueError):
+        lat, lng = None, None
+
+    raw_status = str(order.get("status") or "").lower()
+    is_accepted = raw_status not in ("requested", "pending", "order_confirmed", "confirmed") or bool(
+        order.get("ready_for_pickup_at") or order.get("readyForPickupAt") or order.get("picked_up_at") or order.get("pickedUpAt")
+    )
+
+    now_iso = dt.now(timezone.utc).isoformat()
+
+    # Find lender email for notifications
+    pid = str(order.get("product_id") or order.get("productId") or "")
+    prod = get_product_by_id_internal(pid) if pid else None
+    lender_email = ""
+    if prod and isinstance(prod, dict):
+        lender_email = str(prod.get("user_email") or prod.get("owner_email") or prod.get("ownerId") or prod.get("owner_id") or "").strip().lower()
+
+    # Rule 3: Before acceptance -> Direct immediate update
+    if not is_accepted:
+        order["delivery_method"] = new_method
+        order["deliveryMethod"] = new_method
+        order["delivery_address"] = new_addr
+        order["deliveryAddress"] = new_addr
+        order["pickup_location"] = new_pickup
+        order["pickupLocation"] = new_pickup
+        order["custom_location"] = new_custom
+        order["customLocation"] = new_custom
+        order["location_directions"] = new_directions
+        order["locationDirections"] = new_directions
+        order["location_latitude"] = lat
+        order["locationLatitude"] = lat
+        order["location_longitude"] = lng
+        order["locationLongitude"] = lng
+        order["location_change_data"] = None
+        order["locationChangeRequest"] = None
+
+        MOCK_ORDERS[order_id] = order
+
+        execute_query("""
+            UPDATE orders SET
+                delivery_method = %s,
+                delivery_address = %s,
+                pickup_location = %s,
+                custom_location = %s,
+                location_directions = %s,
+                location_latitude = %s,
+                location_longitude = %s,
+                location_change_data = NULL
+            WHERE id = %s
+        """, (new_method, new_addr, new_pickup, new_custom, new_directions, lat, lng, order_id))
+
+        execute_query("""
+            UPDATE deliveries SET
+                delivery_method = %s,
+                delivery_address = %s,
+                pickup_location = %s,
+                custom_location = %s,
+                location_directions = %s,
+                delivery_latitude = COALESCE(%s, delivery_latitude),
+                delivery_longitude = COALESCE(%s, delivery_longitude),
+                updated_at = %s
+            WHERE booking_id = %s
+        """, (new_method, new_addr or new_custom or "Customer Location", new_pickup, new_custom, new_directions, lat, lng, now_iso, order_id))
+
+        if lender_email:
+            create_notification(
+                email=lender_email,
+                title="Booking Location Updated 📍",
+                message=f"Renter updated the booking location for #{order_id} before acceptance.",
+                notif_type="booking"
+            )
+
+        broadcast_admin_event_safe("booking.location_updated", {
+            "id": order_id,
+            "bookingId": order_id,
+            "deliveryMethod": new_method,
+            "deliveryAddress": new_addr,
+            "status": "updated_directly"
+        })
+
+        return {
+            "success": True,
+            "updated": True,
+            "requiresApproval": False,
+            "isPendingApproval": False,
+            "message": "Booking location updated successfully.",
+            "location": format_booking_location_response(order)
+        }
+
+    # Rule 3: After acceptance -> Explicit change-request requiring lender approval
+    change_request = {
+        "status": "pending",
+        "requestedAt": now_iso,
+        "requestedBy": clean_user,
+        "deliveryMethod": new_method,
+        "deliveryAddress": new_addr,
+        "pickupLocation": new_pickup,
+        "customLocation": new_custom,
+        "locationDirections": new_directions,
+        "latitude": lat,
+        "longitude": lng,
+        "reason": new_reason
+    }
+
+    change_json = json.dumps(change_request)
+    order["location_change_data"] = change_json
+    order["locationChangeRequest"] = change_request
+    MOCK_ORDERS[order_id] = order
+
+    execute_query("""
+        UPDATE orders SET location_change_data = %s WHERE id = %s
+    """, (change_json, order_id))
+
+    if lender_email:
+        create_notification(
+            email=lender_email,
+            title="Location Change Requested 📍",
+            message=f"Renter requested a change of location for accepted booking #{order_id}. Your approval is required.",
+            notif_type="booking"
+        )
+
+    broadcast_admin_event_safe("booking.location_change_requested", {
+        "id": order_id,
+        "bookingId": order_id,
+        "changeRequest": change_request
+    })
+
+    return {
+        "success": True,
+        "updated": False,
+        "requiresApproval": True,
+        "isPendingApproval": True,
+        "message": "Location change request submitted for lender approval.",
+        "changeRequest": change_request,
+        "location": format_booking_location_response(order)
+    }
+
+def approve_location_change_request(order_id: str, caller_email: str) -> dict:
+    """
+    Approves a pending location change request. Authorized for product lender or admin.
+    """
+    order = fetch_one("SELECT * FROM orders WHERE id = %s", (order_id,))
+    if not order and order_id in MOCK_ORDERS:
+        order = MOCK_ORDERS[order_id]
+    if not order:
+        raise HTTPException(status_code=404, detail="Booking/Order not found.")
+
+    clean_user = caller_email.strip().lower()
+    cust_email = (order.get("user_email") or order.get("userEmail") or "").strip().lower()
+    pid = str(order.get("product_id") or order.get("productId") or "")
+    prod = get_product_by_id_internal(pid) if pid else None
+    lender_email = ""
+    if prod and isinstance(prod, dict):
+        lender_email = str(prod.get("user_email") or prod.get("owner_email") or prod.get("ownerId") or prod.get("owner_id") or "").strip().lower()
+
+    user_rec = get_user(clean_user) or {}
+    is_admin = str(user_rec.get("role") or "").lower() in ("admin", "superadmin")
+    is_lender = (clean_user == lender_email) or (lender_email and (clean_user in lender_email or lender_email in clean_user))
+
+    if not is_lender and not is_admin:
+        raise HTTPException(status_code=403, detail="Forbidden: Only the lender or admin can approve location change requests.")
+
+    raw_change = order.get("location_change_data") or order.get("locationChangeRequest")
+    if not raw_change:
+        raise HTTPException(status_code=400, detail="No location change request found for this booking.")
+    
+    change_req = json.loads(raw_change) if isinstance(raw_change, str) else raw_change
+    if change_req.get("status") != "pending":
+        raise HTTPException(status_code=400, detail=f"Location change request is already {change_req.get('status')}.")
+
+    now_iso = dt.now(timezone.utc).isoformat()
+    change_req["status"] = "approved"
+    change_req["respondedAt"] = now_iso
+    change_req["approvedBy"] = clean_user
+
+    # Apply approved location to order
+    new_method = change_req.get("deliveryMethod") or order.get("delivery_method") or "delivery"
+    new_addr = change_req.get("deliveryAddress") or order.get("delivery_address") or ""
+    new_pickup = change_req.get("pickupLocation") or order.get("pickup_location") or ""
+    new_custom = change_req.get("customLocation") or order.get("custom_location") or ""
+    new_dir = change_req.get("locationDirections") or order.get("location_directions") or ""
+    lat = change_req.get("latitude")
+    lng = change_req.get("longitude")
+
+    order["delivery_method"] = new_method
+    order["deliveryMethod"] = new_method
+    order["delivery_address"] = new_addr
+    order["deliveryAddress"] = new_addr
+    order["pickup_location"] = new_pickup
+    order["pickupLocation"] = new_pickup
+    order["custom_location"] = new_custom
+    order["customLocation"] = new_custom
+    order["location_directions"] = new_dir
+    order["locationDirections"] = new_dir
+    if lat is not None:
+        order["location_latitude"] = lat
+        order["locationLatitude"] = lat
+    if lng is not None:
+        order["location_longitude"] = lng
+        order["locationLongitude"] = lng
+    order["location_change_data"] = None
+    order["locationChangeRequest"] = None
+
+    MOCK_ORDERS[order_id] = order
+
+    execute_query("""
+        UPDATE orders SET
+            delivery_method = %s,
+            delivery_address = %s,
+            pickup_location = %s,
+            custom_location = %s,
+            location_directions = %s,
+            location_latitude = COALESCE(%s, location_latitude),
+            location_longitude = COALESCE(%s, location_longitude),
+            location_change_data = NULL
+        WHERE id = %s
+    """, (new_method, new_addr, new_pickup, new_custom, new_dir, lat, lng, order_id))
+
+    execute_query("""
+        UPDATE deliveries SET
+            delivery_method = %s,
+            delivery_address = %s,
+            pickup_location = %s,
+            custom_location = %s,
+            location_directions = %s,
+            delivery_latitude = COALESCE(%s, delivery_latitude),
+            delivery_longitude = COALESCE(%s, delivery_longitude),
+            updated_at = %s
+        WHERE booking_id = %s
+    """, (new_method, new_addr or new_custom or "Customer Location", new_pickup, new_custom, new_dir, lat, lng, now_iso, order_id))
+
+    if cust_email:
+        create_notification(
+            email=cust_email,
+            title="Location Change Approved! ✅",
+            message=f"Lender approved your updated booking location for booking #{order_id}.",
+            notif_type="booking"
+        )
+
+    broadcast_admin_event_safe("booking.location_change_approved", {
+        "id": order_id,
+        "bookingId": order_id,
+        "changeRequest": change_req
+    })
+
+    return {
+        "success": True,
+        "message": "Location change request approved.",
+        "location": format_booking_location_response(order)
+    }
+
+def reject_location_change_request(order_id: str, caller_email: str, feedback: Optional[str] = None) -> dict:
+    """
+    Rejects a pending location change request. Authorized for product lender or admin.
+    """
+    order = fetch_one("SELECT * FROM orders WHERE id = %s", (order_id,))
+    if not order and order_id in MOCK_ORDERS:
+        order = MOCK_ORDERS[order_id]
+    if not order:
+        raise HTTPException(status_code=404, detail="Booking/Order not found.")
+
+    clean_user = caller_email.strip().lower()
+    cust_email = (order.get("user_email") or order.get("userEmail") or "").strip().lower()
+    pid = str(order.get("product_id") or order.get("productId") or "")
+    prod = get_product_by_id_internal(pid) if pid else None
+    lender_email = ""
+    if prod and isinstance(prod, dict):
+        lender_email = str(prod.get("user_email") or prod.get("owner_email") or prod.get("ownerId") or prod.get("owner_id") or "").strip().lower()
+
+    user_rec = get_user(clean_user) or {}
+    is_admin = str(user_rec.get("role") or "").lower() in ("admin", "superadmin")
+    is_lender = (clean_user == lender_email) or (lender_email and (clean_user in lender_email or lender_email in clean_user))
+
+    if not is_lender and not is_admin:
+        raise HTTPException(status_code=403, detail="Forbidden: Only the lender or admin can reject location change requests.")
+
+    raw_change = order.get("location_change_data") or order.get("locationChangeRequest")
+    if not raw_change:
+        raise HTTPException(status_code=400, detail="No location change request found for this booking.")
+    
+    change_req = json.loads(raw_change) if isinstance(raw_change, str) else raw_change
+    if change_req.get("status") != "pending":
+        raise HTTPException(status_code=400, detail=f"Location change request is already {change_req.get('status')}.")
+
+    now_iso = dt.now(timezone.utc).isoformat()
+    change_req["status"] = "rejected"
+    change_req["respondedAt"] = now_iso
+    change_req["rejectedBy"] = clean_user
+    change_req["feedback"] = feedback or "Lender is unable to accommodate the requested location."
+
+    order["location_change_data"] = json.dumps(change_req)
+    order["locationChangeRequest"] = change_req
+
+    MOCK_ORDERS[order_id] = order
+
+    execute_query("""
+        UPDATE orders SET location_change_data = %s WHERE id = %s
+    """, (json.dumps(change_req), order_id))
+
+    if cust_email:
+        create_notification(
+            email=cust_email,
+            title="Location Change Declined ⚠️",
+            message=f"Lender was unable to accept the location change for booking #{order_id}. Original location remains confirmed.",
+            notif_type="booking"
+        )
+
+    broadcast_admin_event_safe("booking.location_change_rejected", {
+        "id": order_id,
+        "bookingId": order_id,
+        "changeRequest": change_req
+    })
+
+    return {
+        "success": True,
+        "message": "Location change request rejected.",
+        "location": format_booking_location_response(order)
+    }
+
 def cancel_order(order_id: str):
     for key, o in list(MOCK_ORDERS.items()):
         if key == order_id or o.get("id") == order_id or o.get("productId") == order_id or o.get("product_id") == order_id:
@@ -2015,6 +2572,7 @@ def cancel_order(order_id: str):
         execute_query("UPDATE rental_security SET status = 'cancelled' WHERE booking_id = %s", (order_id,))
     except Exception:
         pass
+
 
 def record_booking_cancellation(
     booking_id: str,
@@ -2869,7 +3427,14 @@ def create_order_record(
     total: int,
     status: str = "pending",
     razorpay_order_id: str = None,
-    payment_status: str = "unpaid"
+    payment_status: str = "unpaid",
+    delivery_method: str = "delivery",
+    delivery_address: Optional[str] = None,
+    pickup_location: Optional[str] = None,
+    custom_location: Optional[str] = None,
+    location_directions: Optional[str] = None,
+    latitude: Optional[float] = None,
+    longitude: Optional[float] = None
 ):
     created_at = dt.now(timezone.utc).isoformat()
     order_data = {
@@ -2884,19 +3449,34 @@ def create_order_record(
         "status": status,
         "created_at": created_at,
         "razorpay_order_id": razorpay_order_id,
-        "payment_status": payment_status
+        "payment_status": payment_status,
+        "delivery_method": delivery_method,
+        "deliveryMethod": delivery_method,
+        "delivery_address": delivery_address or "",
+        "deliveryAddress": delivery_address or "",
+        "pickup_location": pickup_location or "",
+        "pickupLocation": pickup_location or "",
+        "custom_location": custom_location or "",
+        "customLocation": custom_location or "",
+        "location_directions": location_directions or "",
+        "locationDirections": location_directions or "",
+        "latitude": latitude,
+        "longitude": longitude
     }
     MOCK_ORDERS[order_id] = order_data
     try:
         execute_query(
             """INSERT INTO orders 
-               (id, user_email, product_id, product_title, product_image, start_date, end_date, total, status, created_at, razorpay_order_id, payment_status) 
-               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+               (id, user_email, product_id, product_title, product_image, start_date, end_date, total, status, created_at, razorpay_order_id, payment_status, delivery_method, delivery_address, pickup_location, custom_location, location_directions, location_latitude, location_longitude) 
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                ON DUPLICATE KEY UPDATE 
                user_email=VALUES(user_email), product_id=VALUES(product_id), product_title=VALUES(product_title),
                product_image=VALUES(product_image), start_date=VALUES(start_date), end_date=VALUES(end_date),
-               total=VALUES(total), status=VALUES(status), razorpay_order_id=VALUES(razorpay_order_id), payment_status=VALUES(payment_status)""",
-            (order_id, user_email, product_id, product_title, product_image, start_date, end_date, total, status, created_at, razorpay_order_id, payment_status)
+               total=VALUES(total), status=VALUES(status), razorpay_order_id=VALUES(razorpay_order_id), payment_status=VALUES(payment_status),
+               delivery_method=VALUES(delivery_method), delivery_address=VALUES(delivery_address), pickup_location=VALUES(pickup_location),
+               custom_location=VALUES(custom_location), location_directions=VALUES(location_directions), location_latitude=VALUES(location_latitude),
+               location_longitude=VALUES(location_longitude)""",
+            (order_id, user_email, product_id, product_title, product_image, start_date, end_date, total, status, created_at, razorpay_order_id, payment_status, delivery_method, delivery_address or "", pickup_location or "", custom_location or "", location_directions or "", latitude, longitude)
         )
     except Exception as e:
         print(f"Notice: Database write error in create_order_record: {e}")

@@ -71,6 +71,8 @@ export function PayerntApp() {
     simulateVerificationChange,
     handleRequestAction,
     advanceRentalLifecycle,
+    approveLocationChange,
+    rejectLocationChange,
     requestWithdrawal,
     addBankAccount,
     creditRentalPayment,
@@ -179,6 +181,8 @@ export function PayerntApp() {
                 onAdvanceLifecycle={advanceRentalLifecycle}
                 onNavigateToWallet={() => setActiveTab("wallet")}
                 onBack={() => setActiveTab("home")}
+                onApproveLocationChange={approveLocationChange}
+                onRejectLocationChange={rejectLocationChange}
               />
             </motion.div>
           )}

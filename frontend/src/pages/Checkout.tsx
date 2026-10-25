@@ -12,6 +12,8 @@ import {
   Wallet,
   QrCode,
   MapPin,
+  Truck,
+  Navigation,
 } from "lucide-react";
 import { useMemo, useState, useRef, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
@@ -117,6 +119,11 @@ export default function Checkout() {
     restricted: boolean;
     message: string;
   } | null>(null);
+
+  // Fulfillment Method & Location State
+  const [fulfillmentMethod, setFulfillmentMethod] = useState<"delivery" | "pickup" | "custom">("delivery");
+  const [customLocation, setCustomLocation] = useState("");
+  const [locationDirections, setLocationDirections] = useState("");
 
   useEffect(() => {
     let isMounted = true;
@@ -335,6 +342,22 @@ export default function Checkout() {
         start,
         end,
         applied ? "SAVE10" : coupon,
+        {
+          deliveryMethod: fulfillmentMethod,
+          deliveryAddress:
+            fulfillmentMethod === "delivery"
+              ? user?.address
+                ? `${user.address}${user.city ? `, ${user.city}` : ""}${user.pincode ? ` - ${user.pincode}` : ""}`
+                : "Registered Address"
+              : "",
+          pickupLocation:
+            fulfillmentMethod === "pickup"
+              ? "Lender Verified Hub (Details shared after booking)"
+              : "",
+          customLocation:
+            fulfillmentMethod === "custom" ? customLocation.trim() : "",
+          locationDirections: locationDirections.trim(),
+        },
       );
 
       // 2. Ensure Razorpay Checkout SDK is loaded
@@ -396,6 +419,20 @@ export default function Checkout() {
               total: Math.round(orderRes.total),
               status: "active",
               createdAt: new Date().toISOString(),
+              deliveryMethod: fulfillmentMethod,
+              deliveryAddress:
+                fulfillmentMethod === "delivery"
+                  ? user?.address
+                    ? `${user.address}${user.city ? `, ${user.city}` : ""}${user.pincode ? ` - ${user.pincode}` : ""}`
+                    : ""
+                  : "",
+              pickupLocation:
+                fulfillmentMethod === "pickup"
+                  ? "Lender Verified Hub"
+                  : "",
+              customLocation:
+                fulfillmentMethod === "custom" ? customLocation.trim() : "",
+              locationDirections: locationDirections.trim(),
             };
 
             api.invalidateCache("user_orders");
@@ -504,44 +541,131 @@ export default function Checkout() {
 
         <div className="mt-8 grid lg:grid-cols-[1fr_380px] gap-8">
           <div className="space-y-6">
-            {/* Delivery Address Card (Prefilled from registration address) */}
-            <div className="spatial-card p-6">
-              <div className="flex items-center justify-between mb-3">
+            {/* Fulfillment & Booking Location Card */}
+            <div className="spatial-card p-6 space-y-4">
+              <div className="flex items-center justify-between">
                 <h3 className="font-bold text-lg flex items-center gap-2">
-                  <MapPin className="h-5 w-5 text-primary shrink-0" /> Delivery
-                  Address
+                  <MapPin className="h-5 w-5 text-primary shrink-0" />
+                  <span>Fulfillment & Booking Location</span>
                 </h3>
+                {fulfillmentMethod === "delivery" && (
+                  <button
+                    type="button"
+                    onClick={() => navigate({ to: "/profile" })}
+                    className="text-xs font-semibold text-primary hover:underline cursor-pointer"
+                  >
+                    Edit Profile Address
+                  </button>
+                )}
+              </div>
+
+              {/* Method Selector Tabs */}
+              <div className="grid grid-cols-3 gap-2 bg-secondary p-1 rounded-xl text-xs font-semibold">
                 <button
                   type="button"
-                  onClick={() => navigate({ to: "/profile" })}
-                  className="text-xs font-semibold text-primary hover:underline cursor-pointer"
+                  onClick={() => setFulfillmentMethod("delivery")}
+                  className={`py-2 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                    fulfillmentMethod === "delivery"
+                      ? "bg-card text-foreground shadow-xs font-bold"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
                 >
-                  Edit Profile Address
+                  <Truck className="h-3.5 w-3.5" />
+                  <span>Delivery</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFulfillmentMethod("pickup")}
+                  className={`py-2 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                    fulfillmentMethod === "pickup"
+                      ? "bg-card text-foreground shadow-xs font-bold"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <MapPin className="h-3.5 w-3.5" />
+                  <span>Owner Pickup</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFulfillmentMethod("custom")}
+                  className={`py-2 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                    fulfillmentMethod === "custom"
+                      ? "bg-card text-foreground shadow-xs font-bold"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Navigation className="h-3.5 w-3.5" />
+                  <span>Custom Meetup</span>
                 </button>
               </div>
-              <div className="p-4 rounded-xl bg-secondary/40 border border-border/80 text-sm space-y-1.5">
-                <div className="font-extrabold text-foreground">
-                  {user?.fullName || "Valued Customer"}
-                </div>
-                <div className="text-muted-foreground font-medium">
-                  {user?.address ? (
-                    <>
-                      {user.address}
-                      {user.city ? `, ${user.city}` : ""}
-                      {user.pincode ? ` - ${user.pincode}` : ""}
-                    </>
-                  ) : (
-                    <span className="text-amber-600 dark:text-amber-400 font-semibold">
-                      No street address registered. Please complete your
-                      delivery address in Profile.
-                    </span>
+
+              {/* Delivery Option Details */}
+              {fulfillmentMethod === "delivery" && (
+                <div className="p-4 rounded-xl bg-secondary/40 border border-border/80 text-sm space-y-1.5">
+                  <div className="font-extrabold text-foreground">
+                    {user?.fullName || "Valued Customer"}
+                  </div>
+                  <div className="text-muted-foreground font-medium text-xs sm:text-sm">
+                    {user?.address ? (
+                      <>
+                        {user.address}
+                        {user.city ? `, ${user.city}` : ""}
+                        {user.pincode ? ` - ${user.pincode}` : ""}
+                      </>
+                    ) : (
+                      <span className="text-amber-600 dark:text-amber-400 font-semibold">
+                        No street address registered. Please complete your
+                        delivery address in Profile.
+                      </span>
+                    )}
+                  </div>
+                  {user?.phone && (
+                    <div className="text-xs text-muted-foreground font-medium pt-1">
+                      Contact Phone: {user.phone}
+                    </div>
                   )}
                 </div>
-                {user?.phone && (
-                  <div className="text-xs text-muted-foreground font-medium pt-1">
-                    Contact Phone: {user.phone}
+              )}
+
+              {/* Owner Pickup Details */}
+              {fulfillmentMethod === "pickup" && (
+                <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs sm:text-sm space-y-1">
+                  <div className="font-bold text-foreground flex items-center gap-1.5">
+                    <MapPin className="h-4 w-4 text-blue-500" />
+                    <span>Lender Verified Hub Pickup</span>
                   </div>
-                )}
+                  <p className="text-muted-foreground text-xs leading-relaxed">
+                    Pick up gear directly from the lender's designated equipment hub. Full pickup contact instructions and security PIN verification will be unlocked upon booking confirmation.
+                  </p>
+                </div>
+              )}
+
+              {/* Custom Meetup Details */}
+              {fulfillmentMethod === "custom" && (
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-foreground">
+                      Agreed Custom Location
+                    </label>
+                    <Input
+                      placeholder="e.g. Studio 4B, Indiranagar or Café Coffee Day, Koramangala"
+                      value={customLocation}
+                      onChange={(e) => setCustomLocation(e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Additional Directions for all methods */}
+              <div className="space-y-1.5 pt-1">
+                <label className="text-xs font-bold text-foreground">
+                  Landmark / Handover Directions (Optional)
+                </label>
+                <Input
+                  placeholder="e.g. Ring bell #302, meet at reception lobby"
+                  value={locationDirections}
+                  onChange={(e) => setLocationDirections(e.target.value)}
+                />
               </div>
             </div>
 

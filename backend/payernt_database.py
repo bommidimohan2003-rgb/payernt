@@ -3642,7 +3642,20 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50) -> List[Dict[st
                 d.status as delivery_status,
                 d.delivery_boy_name,
                 d.delivery_boy_phone,
-                d.picked_up_at
+                d.picked_up_at,
+                o.delivery_method as order_delivery_method,
+                o.delivery_address as order_delivery_address,
+                o.pickup_location as order_pickup_location,
+                o.custom_location as order_custom_location,
+                o.location_directions as order_location_directions,
+                o.location_latitude as order_lat,
+                o.location_longitude as order_lng,
+                o.location_change_data as order_location_change,
+                d.delivery_address as d_delivery_address,
+                d.pickup_address as d_pickup_address,
+                d.delivery_method as d_delivery_method,
+                d.delivery_latitude as d_delivery_lat,
+                d.delivery_longitude as d_delivery_lng
             FROM rental_security sec
             LEFT JOIN orders o ON sec.booking_id = o.id
             LEFT JOIN booking_cancellations bc ON sec.booking_id = bc.booking_id
@@ -3672,6 +3685,36 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50) -> List[Dict[st
                         "cancelledBy": r.get("cancelled_by") or "LENDER"
                     }
                 picked_up_val = r.get("picked_up_at") or r.get("order_picked_up_at") or r.get("rental_started_at") or r.get("activated_at")
+
+                del_method = r.get("order_delivery_method") or r.get("d_delivery_method") or "delivery"
+                del_addr = r.get("order_delivery_address") or r.get("d_delivery_address") or ""
+                pick_loc = r.get("order_pickup_location") or r.get("d_pickup_address") or ""
+                cust_loc = r.get("order_custom_location") or ""
+                loc_dir = r.get("order_location_directions") or ""
+                lat_val = r.get("order_lat") or r.get("d_delivery_lat")
+                lng_val = r.get("order_lng") or r.get("d_delivery_lng")
+                try:
+                    lat_num = float(lat_val) if lat_val is not None else None
+                    lng_num = float(lng_val) if lng_val is not None else None
+                except (TypeError, ValueError):
+                    lat_num, lng_num = None, None
+
+                target_disp = cust_loc if del_method == "custom" else (pick_loc if del_method == "pickup" else del_addr)
+                map_url = None
+                if lat_num is not None and lng_num is not None and (lat_num != 0.0 or lng_num != 0.0):
+                    map_url = f"https://www.google.com/maps/search/?api=1&query={lat_num},{lng_num}"
+                elif target_disp:
+                    import urllib.parse
+                    map_url = f"https://www.google.com/maps/search/?api=1&query={urllib.parse.quote_plus(target_disp)}"
+
+                change_obj = None
+                change_raw = r.get("order_location_change")
+                if change_raw:
+                    try:
+                        change_obj = json.loads(change_raw) if isinstance(change_raw, str) else change_raw
+                    except Exception:
+                        change_obj = None
+
                 bookings.append({
                     "id": b_id,
                     "bookingId": b_id,
@@ -3718,6 +3761,15 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50) -> List[Dict[st
                     "awaitingInspectionAt": r.get("awaiting_inspection_at"),
                     "completedAt": r.get("completed_at"),
                     "queueNotes": r.get("queue_notes"),
+                    "deliveryMethod": del_method,
+                    "deliveryAddress": del_addr,
+                    "pickupLocation": pick_loc,
+                    "customLocation": cust_loc,
+                    "locationDirections": loc_dir,
+                    "latitude": lat_num,
+                    "longitude": lng_num,
+                    "mapUrl": map_url,
+                    "locationChangeRequest": change_obj,
                     "createdAt": r.get("security_created_at") or r.get("order_created_at") or dt.now(timezone.utc).isoformat(),
                 })
     except Exception as e:
@@ -3745,9 +3797,22 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50) -> List[Dict[st
                 o.awaiting_inspection_at,
                 o.completed_at,
                 o.queue_notes,
+                o.delivery_method as order_delivery_method,
+                o.delivery_address as order_delivery_address,
+                o.pickup_location as order_pickup_location,
+                o.custom_location as order_custom_location,
+                o.location_directions as order_location_directions,
+                o.location_latitude as order_lat,
+                o.location_longitude as order_lng,
+                o.location_change_data as order_location_change,
                 pp.category,
                 pp.daily_rate,
-                d.status as delivery_status
+                d.status as delivery_status,
+                d.delivery_address as d_delivery_address,
+                d.pickup_address as d_pickup_address,
+                d.delivery_method as d_delivery_method,
+                d.delivery_latitude as d_delivery_lat,
+                d.delivery_longitude as d_delivery_lng
             FROM orders o
             JOIN payernt_products pp ON o.product_id = pp.id
             LEFT JOIN deliveries d ON o.id = d.booking_id
@@ -3766,6 +3831,36 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50) -> List[Dict[st
                 r_name = renter_email.split("@")[0].capitalize() if renter_email else "Customer"
                 del_status = r.get("delivery_status") or "WAITING_FOR_ADMIN"
                 picked_up_val = r.get("picked_up_at")
+
+                del_method = r.get("order_delivery_method") or r.get("d_delivery_method") or "delivery"
+                del_addr = r.get("order_delivery_address") or r.get("d_delivery_address") or ""
+                pick_loc = r.get("order_pickup_location") or r.get("d_pickup_address") or ""
+                cust_loc = r.get("order_custom_location") or ""
+                loc_dir = r.get("order_location_directions") or ""
+                lat_val = r.get("order_lat") or r.get("d_delivery_lat")
+                lng_val = r.get("order_lng") or r.get("d_delivery_lng")
+                try:
+                    lat_num = float(lat_val) if lat_val is not None else None
+                    lng_num = float(lng_val) if lng_val is not None else None
+                except (TypeError, ValueError):
+                    lat_num, lng_num = None, None
+
+                target_disp = cust_loc if del_method == "custom" else (pick_loc if del_method == "pickup" else del_addr)
+                map_url = None
+                if lat_num is not None and lng_num is not None and (lat_num != 0.0 or lng_num != 0.0):
+                    map_url = f"https://www.google.com/maps/search/?api=1&query={lat_num},{lng_num}"
+                elif target_disp:
+                    import urllib.parse
+                    map_url = f"https://www.google.com/maps/search/?api=1&query={urllib.parse.quote_plus(target_disp)}"
+
+                change_obj = None
+                change_raw = r.get("order_location_change")
+                if change_raw:
+                    try:
+                        change_obj = json.loads(change_raw) if isinstance(change_raw, str) else change_raw
+                    except Exception:
+                        change_obj = None
+
                 bookings.append({
                     "id": b_id,
                     "bookingId": b_id,
@@ -3801,6 +3896,15 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50) -> List[Dict[st
                     "awaitingInspectionAt": r.get("awaiting_inspection_at"),
                     "completedAt": r.get("completed_at"),
                     "queueNotes": r.get("queue_notes"),
+                    "deliveryMethod": del_method,
+                    "deliveryAddress": del_addr,
+                    "pickupLocation": pick_loc,
+                    "customLocation": cust_loc,
+                    "locationDirections": loc_dir,
+                    "latitude": lat_num,
+                    "longitude": lng_num,
+                    "mapUrl": map_url,
+                    "locationChangeRequest": change_obj,
                     "createdAt": r.get("created_at") or dt.now(timezone.utc).isoformat(),
                 })
     except Exception as e:
@@ -3821,6 +3925,23 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50) -> List[Dict[st
                 from database import MOCK_ORDERS
                 mo = MOCK_ORDERS.get(b_id, {})
                 pu_at = sec.get("rental_started_at") or sec.get("activated_at") or mo.get("picked_up_at") or mo.get("pickedUpAt")
+
+                del_method = mo.get("deliveryMethod") or mo.get("delivery_method") or "delivery"
+                del_addr = mo.get("deliveryAddress") or mo.get("delivery_address") or "Indiranagar, Bengaluru, Karnataka"
+                pick_loc = mo.get("pickupLocation") or mo.get("pickup_location") or "Payent Partner Hub, Indiranagar"
+                cust_loc = mo.get("customLocation") or mo.get("custom_location") or ""
+                loc_dir = mo.get("locationDirections") or mo.get("location_directions") or ""
+                lat_num = mo.get("locationLatitude") or mo.get("latitude")
+                lng_num = mo.get("locationLongitude") or mo.get("longitude")
+
+                target_disp = cust_loc if del_method == "custom" else (pick_loc if del_method == "pickup" else del_addr)
+                map_url = None
+                if lat_num is not None and lng_num is not None:
+                    map_url = f"https://www.google.com/maps/search/?api=1&query={lat_num},{lng_num}"
+                elif target_disp:
+                    import urllib.parse
+                    map_url = f"https://www.google.com/maps/search/?api=1&query={urllib.parse.quote_plus(target_disp)}"
+
                 bookings.append({
                     "id": b_id,
                     "bookingId": b_id,
@@ -3850,7 +3971,103 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50) -> List[Dict[st
                     "awaitingInspectionAt": mo.get("awaitingInspectionAt"),
                     "completedAt": mo.get("completedAt"),
                     "queueNotes": mo.get("queueNotes"),
+                    "deliveryMethod": del_method,
+                    "deliveryAddress": del_addr,
+                    "pickupLocation": pick_loc,
+                    "customLocation": cust_loc,
+                    "locationDirections": loc_dir,
+                    "latitude": lat_num,
+                    "longitude": lng_num,
+                    "mapUrl": map_url,
+                    "locationChangeRequest": mo.get("locationChangeRequest"),
                     "createdAt": sec.get("created_at") or dt.now(timezone.utc).isoformat(),
+                })
+
+        from database import MOCK_ORDERS, MOCK_CUSTOM_PRODUCTS
+        for b_id, mo in MOCK_ORDERS.items():
+            if b_id in seen_ids:
+                continue
+            pid = str(mo.get("product_id") or mo.get("productId") or "")
+            prod = MOCK_CUSTOM_PRODUCTS.get(pid) or MOCK_PAYERNT_PRODUCTS.get(pid)
+            owner = ""
+            if prod:
+                owner = str(prod.get("user_email") or prod.get("owner_email") or prod.get("ownerId") or prod.get("owner_id") or "").strip().lower()
+            clean_v = str(vendor_id or "").strip().lower()
+            if owner and (owner == clean_v or clean_v in owner or owner in clean_v):
+                seen_ids.add(b_id)
+                del_method = mo.get("deliveryMethod") or mo.get("delivery_method") or "delivery"
+                del_addr = mo.get("deliveryAddress") or mo.get("delivery_address") or ""
+                pick_loc = mo.get("pickupLocation") or mo.get("pickup_location") or ""
+                cust_loc = mo.get("customLocation") or mo.get("custom_location") or ""
+                loc_dir = mo.get("locationDirections") or mo.get("location_directions") or ""
+                lat_num = mo.get("locationLatitude") or mo.get("latitude")
+                lng_num = mo.get("locationLongitude") or mo.get("longitude")
+                try:
+                    lat_num = float(lat_num) if lat_num is not None else None
+                    lng_num = float(lng_num) if lng_num is not None else None
+                except (TypeError, ValueError):
+                    lat_num, lng_num = None, None
+
+                target_disp = cust_loc if del_method == "custom" else (pick_loc if del_method == "pickup" else del_addr)
+                map_url = None
+                if lat_num is not None and lng_num is not None and (lat_num != 0.0 or lng_num != 0.0):
+                    map_url = f"https://www.google.com/maps/search/?api=1&query={lat_num},{lng_num}"
+                elif target_disp:
+                    import urllib.parse
+                    map_url = f"https://www.google.com/maps/search/?api=1&query={urllib.parse.quote_plus(target_disp)}"
+
+                change_obj = None
+                change_raw = mo.get("location_change_data") or mo.get("locationChangeRequest")
+                if change_raw:
+                    try:
+                        change_obj = json.loads(change_raw) if isinstance(change_raw, str) else change_raw
+                    except Exception:
+                        change_obj = None
+
+                p_title = mo.get("productTitle") or mo.get("product_title") or (prod.get("title") if prod else "Tech Gear")
+                p_img = mo.get("productImage") or mo.get("product_image") or (prod.get("primary_image") if prod else "")
+                r_email = mo.get("userEmail") or mo.get("user_email") or ""
+                r_name = r_email.split("@")[0].capitalize() if r_email else "Customer"
+
+                bookings.append({
+                    "id": b_id,
+                    "bookingId": b_id,
+                    "productId": pid,
+                    "productTitle": p_title,
+                    "productImage": p_img,
+                    "category": mo.get("category") or (prod.get("category") if prod else "Tech"),
+                    "renterId": r_email or "renter",
+                    "renterName": r_name,
+                    "renterEmail": r_email,
+                    "startDate": mo.get("startDate") or mo.get("start_date") or "",
+                    "endDate": mo.get("endDate") or mo.get("end_date") or "",
+                    "amount": float(mo.get("total") or 0.0),
+                    "total": float(mo.get("total") or 0.0),
+                    "status": mo.get("status") or "pending",
+                    "bookingStatus": mo.get("status") or "CONFIRMED",
+                    "deliveryStatus": "WAITING_FOR_ADMIN",
+                    "securityStatus": "pending",
+                    "vendorPinVerified": False,
+                    "renterPinVerified": False,
+                    "vendorOtpVerified": False,
+                    "renterOtpVerified": False,
+                    "vendorHandoverVerified": False,
+                    "renterHandoverVerified": False,
+                    "otpVerified": False,
+                    "rentalStarted": bool(mo.get("picked_up_at") or mo.get("pickedUpAt")),
+                    "rentalStartedAt": mo.get("picked_up_at") or mo.get("pickedUpAt"),
+                    "pickedUpAt": mo.get("picked_up_at") or mo.get("pickedUpAt"),
+                    "confirmedAt": mo.get("confirmed_at") or mo.get("confirmedAt") or mo.get("created_at"),
+                    "deliveryMethod": del_method,
+                    "deliveryAddress": del_addr,
+                    "pickupLocation": pick_loc,
+                    "customLocation": cust_loc,
+                    "locationDirections": loc_dir,
+                    "latitude": lat_num,
+                    "longitude": lng_num,
+                    "mapUrl": map_url,
+                    "locationChangeRequest": change_obj,
+                    "createdAt": mo.get("created_at") or dt.now(timezone.utc).isoformat(),
                 })
 
     return bookings[:limit]
