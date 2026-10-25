@@ -31,6 +31,7 @@ import type { Order, Product, Notification } from "@/types";
 import { Button } from "@/components/common/Button";
 import { getOptimizedImageUrl } from "@/utils/images";
 import { SecretPinDisplay } from "@/components/common/SecretPinDisplay";
+import { LiveRentalQueue } from "@/components/rental/LiveRentalQueue";
 
 export default function Dashboard() {
   const { user, ready } = useAuth();
@@ -515,6 +516,42 @@ export default function Dashboard() {
                           </div>
                         )}
                       </div>
+
+                      {/* Live Rental Queue with 8 milestones and live timer */}
+                      {o.status !== "cancelled" && (
+                        <div className="pt-2">
+                          <LiveRentalQueue
+                            orderId={o.id}
+                            currentStatus={o.status}
+                            role="renter"
+                            compact={true}
+                            startDate={o.startDate || o.start_date}
+                            endDate={o.endDate || o.end_date}
+                            timeSlot={(o as any).timeSlot || (o as any).time_slot}
+                            confirmedAt={o.confirmedAt || o.confirmed_at || o.createdAt || (o as any).created_at}
+                            readyForPickupAt={o.readyForPickupAt || o.ready_for_pickup_at}
+                            pickedUpAt={o.pickedUpAt || o.picked_up_at}
+                            returnInitiatedAt={o.returnInitiatedAt || o.return_initiated_at}
+                            handedBackAt={o.handedBackAt || o.handed_back_at}
+                            awaitingInspectionAt={o.awaitingInspectionAt || o.awaiting_inspection_at}
+                            completedAt={o.completedAt || o.completed_at}
+                            queueNotes={o.queueNotes || (o as any).queue_notes}
+                            onStatusUpdated={(newStatus, updatedTimestamps) => {
+                              setOrders((prev) =>
+                                prev.map((item) =>
+                                  item.id === o.id
+                                    ? {
+                                        ...item,
+                                        status: newStatus as any,
+                                        ...updatedTimestamps,
+                                      }
+                                    : item
+                                )
+                              );
+                            }}
+                          />
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

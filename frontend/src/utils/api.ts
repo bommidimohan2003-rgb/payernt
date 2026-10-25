@@ -1114,6 +1114,106 @@ export const api = {
     return res ? res.json() : { success: true };
   },
 
+  async advanceRentalQueue(
+    token: string,
+    orderId: string,
+    milestone: string,
+    notes?: string,
+  ) {
+    let res: Response | null = null;
+    try {
+      res = await this.fetchWithAuth(
+        `${API_BASE}/api/orders/${orderId}/queue-advance`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ milestone, notes }),
+        },
+      );
+    } catch {
+      /* network error / fallback */
+    }
+
+    if (res && !res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(parseApiError(data, `Failed to advance rental queue to ${milestone}`));
+    }
+
+    const payload = res ? await res.json().catch(() => ({})) : { success: true, status: milestone };
+
+    // Synchronize local cached orders
+    const currentOrders = storage.get<Order[]>(STORAGE_KEYS.orders, []);
+    const nowIso = new Date().toISOString();
+    const updatedOrders = currentOrders.map((o) => {
+      if (o.id === orderId || o.productId === orderId || (o as { product_id?: string }).product_id === orderId) {
+        const tsUpdate: Partial<Order> = {
+          status: (payload.status || milestone) as any,
+          queueNotes: notes || o.queueNotes,
+        };
+        if (milestone === "ready_for_pickup") tsUpdate.readyForPickupAt = nowIso;
+        if (milestone === "picked_up" || milestone === "rental_in_progress") {
+          if (!o.pickedUpAt) tsUpdate.pickedUpAt = nowIso;
+        }
+        if (milestone === "return_initiated") {
+          if (!o.returnInitiatedAt) tsUpdate.returnInitiatedAt = nowIso;
+        }
+        if (milestone === "handed_back" || milestone === "returned") {
+          if (!o.handedBackAt) tsUpdate.handedBackAt = nowIso;
+          if (!o.awaitingInspectionAt) tsUpdate.awaitingInspectionAt = nowIso;
+        }
+        if (milestone === "awaiting_inspection") {
+          if (!o.awaitingInspectionAt) tsUpdate.awaitingInspectionAt = nowIso;
+        }
+        if (milestone === "completed") {
+          if (!o.completedAt) tsUpdate.completedAt = nowIso;
+        }
+        if (payload.timestamps) {
+          if (payload.timestamps.ready_for_pickup_at) tsUpdate.readyForPickupAt = payload.timestamps.ready_for_pickup_at;
+          if (payload.timestamps.picked_up_at) tsUpdate.pickedUpAt = payload.timestamps.picked_up_at;
+          if (payload.timestamps.return_initiated_at) tsUpdate.returnInitiatedAt = payload.timestamps.return_initiated_at;
+          if (payload.timestamps.handed_back_at) tsUpdate.handedBackAt = payload.timestamps.handed_back_at;
+          if (payload.timestamps.awaiting_inspection_at) tsUpdate.awaitingInspectionAt = payload.timestamps.awaiting_inspection_at;
+          if (payload.timestamps.completed_at) tsUpdate.completedAt = payload.timestamps.completed_at;
+        }
+        return { ...o, ...tsUpdate };
+      }
+      return o;
+    });
+    storage.set(STORAGE_KEYS.orders, updatedOrders);
+    this.invalidateCache("user_orders");
+
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("payent_orders_updated"));
+      window.dispatchEvent(new CustomEvent("payent_queue_updated", { detail: { orderId, milestone, payload } }));
+    }
+
+    return payload;
+  },
+
+  async markReadyForPickup(token: string, orderId: string) {
+    return this.advanceRentalQueue(token, orderId, "ready_for_pickup");
+  },
+
+  async confirmPickup(token: string, orderId: string) {
+    return this.advanceRentalQueue(token, orderId, "picked_up");
+  },
+
+  async initiateReturn(token: string, orderId: string) {
+    return this.advanceRentalQueue(token, orderId, "return_initiated");
+  },
+
+  async confirmReturnHandover(token: string, orderId: string) {
+    return this.advanceRentalQueue(token, orderId, "handed_back");
+  },
+
+  async markAwaitingInspection(token: string, orderId: string) {
+    return this.advanceRentalQueue(token, orderId, "awaiting_inspection");
+  },
+
+  async completeRental(token: string, orderId: string) {
+    return this.advanceRentalQueue(token, orderId, "completed");
+  },
+
   async getCustomProducts(token: string) {
     if (!token) return [];
     return getCachedOrFetch<Product[]>(

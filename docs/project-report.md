@@ -152,11 +152,22 @@ The project has a mixed integration state. Some customer-facing features are bac
 | **Secure Device Identity & QR** | `GET/POST /api/devices/*`, `POST /api/devices/{id}/verify-password`, `GET /api/verify/device/{token}`, `GET/POST /api/device-transfers/*`, `GET /api/admin/devices` backed by MySQL `devices`, `device_security_history`, `device_transfers` | Real   |
 | **Lender Booking Cancellation** | `POST /api/payernt/bookings/{id}/cancel`, `POST /api/bookings/{id}/cancel` with reason code, feedback validation, handover verification safeguards & counterparty notifications | Real   |
 | **Flexible Time-Slot Booking**  | Half-day (Morning 08:00–12:00, Afternoon 13:00–17:00), Full-Day, Turnaround Buffer & Interval Overlap Math, `GET /api/products/{id}/slots`, `GET/POST /api/payernt/products/{id}/availability-config` | Real   |
+| **Live Rental Queue**          | 8-Milestone lifecycle tracking (Order Confirmed → Ready for Pickup → Picked Up [Timer Start] → Rental in Progress [Elapsed & Remaining] → Return Initiated → Item Handed Back to Owner [Timer Stop] → Awaiting Owner Inspection → Rental Completed), persistent ISO timestamps, cross-portal sync via `/api/orders/{id}/queue-advance` & `/api/payernt/bookings/{id}/queue-advance`, `LiveRentalQueue.tsx` in both Renter Portal (`/orders`, `/dashboard`) & Lender Portal (`/payernt/bookings`, `/lender-portal`) | Real   |
 
 ## Technical Debt
 
 The main technical debt areas are clear:
 
+- [RESOLVED Live Rental Queue & Cross-Portal Synchronization] Implemented synchronized 8-milestone Live Rental Queue in both Renter Portal (`Orders.tsx`, `Dashboard.tsx`) and Lender Portal (`RentalRequests.tsx`, `LenderPortal.tsx`):
+  1. *Order Confirmed* (`confirmed_at`)
+  2. *Ready for Pickup* (`ready_for_pickup_at`)
+  3. *Picked Up* (`picked_up_at`) — timer starts strictly upon verified pickup
+  4. *Rental in Progress* — live digital HUD displaying elapsed time and time remaining with overdue detection
+  5. *Return Initiated* (`return_initiated_at`)
+  6. *Item Handed Back to Owner* (`handed_back_at`) — timer stops at verified handover timestamp
+  7. *Awaiting Owner Inspection* (`awaiting_inspection_at`)
+  8. *Rental Completed* (`completed_at`) — deposit released & wallet credited
+  All timestamps are persisted transactionally in MySQL datastore and in-memory fallbacks (`update_order_queue_milestone`), ensuring browser page reloads never reset or lose timer duration. Synchronized via unified queue advance endpoints (`/api/orders/{id}/queue-advance`, `/api/payernt/bookings/{id}/queue-advance`), custom browser window events (`payent_queue_updated`, `payent_orders_updated`), and periodic background polling. Full test suite in `backend/tests/test_live_rental_queue.py` passing 100% and clean Vite production build.
 - [RESOLVED Phase 1] The duplicate snapshot `rentwise-pro-main/`, `api/index.py`, and `scratch/` orphaned maintenance scripts have been removed.
 - [RESOLVED Phase 1] Dependency artifacts consolidated across root `requirements.txt` and `backend/requirements.txt`.
 - [RESOLVED Phase 2] The Razorpay SDK client is enabled and active in `backend/main.py` with full order creation, signature verification, webhook handling, and refund endpoints.

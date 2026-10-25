@@ -219,7 +219,8 @@ from database import (
     touch_device_last_verified,
     MOCK_DEVICES,
     MOCK_DEVICE_SECURITY_HISTORY,
-    MOCK_DEVICE_TRANSFERS
+    MOCK_DEVICE_TRANSFERS,
+    update_order_queue_milestone
 )
 
 from recommendations_ml import check_data_sufficiency, compute_and_save_item_similarities
@@ -2479,7 +2480,15 @@ def fetch_orders(email: str = Depends(get_current_user_email)):
                 "createdAt": created,
                 "created_at": created,
                 "userEmail": clean_email,
-                "user_email": clean_email
+                "user_email": clean_email,
+                "confirmedAt": o.get("confirmed_at") or o.get("confirmedAt") or o.get("created_at") or created,
+                "readyForPickupAt": o.get("ready_for_pickup_at") or o.get("readyForPickupAt"),
+                "pickedUpAt": o.get("picked_up_at") or o.get("pickedUpAt"),
+                "returnInitiatedAt": o.get("return_initiated_at") or o.get("returnInitiatedAt"),
+                "handedBackAt": o.get("handed_back_at") or o.get("handedBackAt"),
+                "awaitingInspectionAt": o.get("awaiting_inspection_at") or o.get("awaitingInspectionAt"),
+                "completedAt": o.get("completed_at") or o.get("completedAt"),
+                "queueNotes": o.get("queue_notes") or o.get("queueNotes")
             })
     return result
 
@@ -2744,134 +2753,294 @@ def get_order_details(id: str, email: str = Depends(get_current_user_email)):
         "createdAt": created,
         "created_at": created,
         "user_email": order_owner,
-        "userEmail": order_owner
+        "userEmail": order_owner,
+        "confirmedAt": order.get("confirmed_at") or order.get("confirmedAt") or order.get("created_at") or created,
+        "readyForPickupAt": order.get("ready_for_pickup_at") or order.get("readyForPickupAt"),
+        "pickedUpAt": order.get("picked_up_at") or order.get("pickedUpAt"),
+        "returnInitiatedAt": order.get("return_initiated_at") or order.get("returnInitiatedAt"),
+        "handedBackAt": order.get("handed_back_at") or order.get("handedBackAt"),
+        "awaitingInspectionAt": order.get("awaiting_inspection_at") or order.get("awaitingInspectionAt"),
+        "completedAt": order.get("completed_at") or order.get("completedAt"),
+        "queueNotes": order.get("queue_notes") or order.get("queueNotes")
     }
 
 # ============================================================
-# Order Return & Rental Completion Endpoints
+# Live Rental Queue & Lifecycle Endpoints
 # ============================================================
 
-@app.post("/api/orders/{id}/return")
-def initiate_order_return(id: str, current_user_email: str = Depends(get_current_user_email)):
-    clean_user = current_user_email.strip().lower()
-    order = fetch_one("SELECT * FROM orders WHERE id = %s", (id,))
+class QueueAdvanceSchema(BaseModel):
+    milestone: str
+    notes: Optional[str] = None
+    checklist: Optional[Dict[str, Any]] = None
+
+def _get_order_and_check_access(order_id: str, email: str):
+    clean_user = (email or "").strip().lower()
+    order = fetch_one("SELECT * FROM orders WHERE id = %s", (order_id,))
     if not order:
-        order = MOCK_ORDERS.get(id)
+        order = MOCK_ORDERS.get(order_id)
     if not order:
-        raise HTTPException(status_code=404, detail="Order not found.")
+        # Check by product_id
+        for mo in MOCK_ORDERS.values():
+            if mo.get("id") == order_id or mo.get("productId") == order_id:
+                order = mo
+                break
+    if not order:
+        raise HTTPException(status_code=404, detail="Order/Booking not found.")
 
-    cust_email = (order.get("user_email") or "").strip().lower()
-    user_rec = get_user(clean_user) or {}
-    is_admin = user_rec.get("role") == "admin"
-    if clean_user != cust_email and not is_admin:
-        raise HTTPException(status_code=403, detail="Forbidden. Only the renter or admin can initiate a return.")
-
-    status_val = str(order.get("status") or "").lower()
-    if status_val in ("cancelled", "refunded", "rejected"):
-        raise HTTPException(status_code=400, detail=f"Cannot initiate return on {status_val} booking.")
-    if status_val == "completed":
-        raise HTTPException(status_code=400, detail="Booking is already completed.")
-
-    execute_query("UPDATE orders SET status = 'return_initiated' WHERE id = %s", (id,))
-    if id in MOCK_ORDERS:
-        MOCK_ORDERS[id]["status"] = "return_initiated"
-
-    # Notify lender
-    pid = order.get("product_id") or ""
+    cust_email = (order.get("user_email") or order.get("userEmail") or "").strip().lower()
+    pid = order.get("product_id") or order.get("productId") or ""
     prod = fetch_one_product(pid) if pid else None
     lender_email = (prod.get("user_email") if prod else "").strip().lower()
-    if lender_email:
-        create_notification(
-            email=lender_email,
-            title="Rental Return Initiated 🔄",
-            message=f"Customer has initiated gear return for booking #{id}.",
-            notif_type="booking"
-        )
+    if not lender_email and prod:
+        lender_email = str(prod.get("owner_id") or "").strip().lower()
 
-    broadcast_admin_event("booking.return_initiated", {"id": id, "status": "return_initiated"})
-    return {"success": True, "message": "Return initiated successfully.", "status": "return_initiated"}
+    user_rec = get_user(clean_user) or {}
+    role = str(user_rec.get("role") or "").lower()
+    is_admin = role in ("admin", "superadmin")
+    is_renter = (clean_user == cust_email)
+    is_lender = (clean_user == lender_email) if lender_email else False
+
+    # Also check if caller is product owner or vendor in payernt accounts
+    if not is_lender and clean_user:
+        if lender_email and (clean_user in lender_email or lender_email in clean_user):
+            is_lender = True
+        elif not lender_email:
+            # If lender_email not in product, allow owner
+            is_lender = True
+
+    if not is_renter and not is_lender and not is_admin:
+        raise HTTPException(status_code=403, detail="Forbidden: You are not authorized for this booking.")
+
+    return order, cust_email, lender_email, is_renter, is_lender, is_admin
+
+def _execute_queue_milestone_transition(
+    order_id: str,
+    milestone: str,
+    caller_email: str,
+    notes: Optional[str] = None,
+    checklist: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    norm_m = milestone.strip().lower()
+    order, cust_email, lender_email, is_renter, is_lender, is_admin = _get_order_and_check_access(order_id, caller_email)
+    current_status = str(order.get("status") or "").lower()
+    now_iso = dt.now(timezone.utc).isoformat()
+    ts_updates = {}
+
+    if norm_m == "order_confirmed" or norm_m == "confirmed":
+        new_status = "order_confirmed"
+        if not order.get("confirmed_at") and not order.get("confirmedAt"):
+            ts_updates["confirmed_at"] = now_iso
+
+    elif norm_m == "ready_for_pickup":
+        if not is_lender and not is_admin:
+            raise HTTPException(status_code=403, detail="Forbidden: Only the lender or admin can mark gear as ready for pickup.")
+        new_status = "ready_for_pickup"
+        if not order.get("ready_for_pickup_at") and not order.get("readyForPickupAt"):
+            ts_updates["ready_for_pickup_at"] = now_iso
+        if cust_email:
+            create_notification(
+                email=cust_email,
+                title="Gear Ready for Pickup 📦",
+                message=f"Your gear for booking #{order_id} is packed and ready for pickup.",
+                notif_type="booking"
+            )
+
+    elif norm_m in ("picked_up", "rental_in_progress", "active"):
+        # Confirm pickup - start rental timer!
+        new_status = "rental_in_progress"
+        # Always persist pickup timestamp if not yet set
+        existing_pu = order.get("picked_up_at") or order.get("pickedUpAt")
+        if not existing_pu:
+            ts_updates["picked_up_at"] = now_iso
+            ts_updates["rental_started_at"] = now_iso
+        if not order.get("ready_for_pickup_at") and not order.get("readyForPickupAt"):
+            ts_updates["ready_for_pickup_at"] = now_iso
+        
+        # Notify both parties
+        if cust_email:
+            create_notification(
+                email=cust_email,
+                title="Rental In Progress ⏱️",
+                message=f"Pickup confirmed for booking #{order_id}. Your live rental timer has started.",
+                notif_type="booking"
+            )
+        if lender_email:
+            create_notification(
+                email=lender_email,
+                title="Rental Started 🚀",
+                message=f"Renter has picked up gear for booking #{order_id}. Rental is now in progress.",
+                notif_type="booking"
+            )
+
+    elif norm_m == "return_initiated":
+        if not is_renter and not is_admin:
+            raise HTTPException(status_code=403, detail="Forbidden: Only the renter or admin can initiate gear return.")
+        if current_status in ("cancelled", "completed"):
+            raise HTTPException(status_code=400, detail=f"Cannot initiate return on {current_status} booking.")
+        new_status = "return_initiated"
+        if not order.get("return_initiated_at") and not order.get("returnInitiatedAt"):
+            ts_updates["return_initiated_at"] = now_iso
+        if lender_email:
+            create_notification(
+                email=lender_email,
+                title="Rental Return Initiated 🔄",
+                message=f"Customer has initiated return for booking #{order_id}.",
+                notif_type="booking"
+            )
+
+    elif norm_m in ("handed_back", "returned"):
+        # Item handed back to owner - stop the rental timer!
+        new_status = "handed_back"
+        existing_hb = order.get("handed_back_at") or order.get("handedBackAt")
+        if not existing_hb:
+            ts_updates["handed_back_at"] = now_iso
+        if not order.get("awaiting_inspection_at") and not order.get("awaitingInspectionAt"):
+            ts_updates["awaiting_inspection_at"] = now_iso
+        if not order.get("return_initiated_at") and not order.get("returnInitiatedAt"):
+            ts_updates["return_initiated_at"] = now_iso
+        
+        if cust_email:
+            create_notification(
+                email=cust_email,
+                title="Item Handed Back to Owner 🤝",
+                message=f"Gear return receipt confirmed for booking #{order_id}. Rental timer stopped.",
+                notif_type="booking"
+            )
+        if lender_email:
+            create_notification(
+                email=lender_email,
+                title="Gear Received Back ✅",
+                message=f"Return handover verified for booking #{order_id}. Gear is awaiting your inspection.",
+                notif_type="booking"
+            )
+
+    elif norm_m in ("awaiting_inspection", "inspection"):
+        if not is_lender and not is_admin:
+            raise HTTPException(status_code=403, detail="Forbidden: Only the lender or admin can manage inspection.")
+        new_status = "awaiting_inspection"
+        if not order.get("awaiting_inspection_at") and not order.get("awaitingInspectionAt"):
+            ts_updates["awaiting_inspection_at"] = now_iso
+        if not order.get("handed_back_at") and not order.get("handedBackAt"):
+            ts_updates["handed_back_at"] = now_iso
+        if cust_email:
+            create_notification(
+                email=cust_email,
+                title="Gear Inspection Underway 🔍",
+                message=f"Lender is inspecting returned gear for booking #{order_id}.",
+                notif_type="booking"
+            )
+
+    elif norm_m == "completed":
+        if not is_lender and not is_admin:
+            raise HTTPException(status_code=403, detail="Forbidden: Only the lender or admin can finalize and complete the rental.")
+        new_status = "completed"
+        if not order.get("completed_at") and not order.get("completedAt"):
+            ts_updates["completed_at"] = now_iso
+        if not order.get("handed_back_at") and not order.get("handedBackAt"):
+            ts_updates["handed_back_at"] = now_iso
+        if not order.get("awaiting_inspection_at") and not order.get("awaitingInspectionAt"):
+            ts_updates["awaiting_inspection_at"] = now_iso
+        
+        # Credit vendor wallet if applicable
+        try:
+            from payernt_database import complete_rental_and_credit_vendor
+            complete_rental_and_credit_vendor(order_id)
+        except Exception as cw_err:
+            logger.info(f"Wallet settlement notice for order {order_id}: {cw_err}")
+
+        if cust_email:
+            create_notification(
+                email=cust_email,
+                title="Rental Completed! 🌟",
+                message=f"Your rental #{order_id} is complete and deposit settled. You can now leave a review.",
+                notif_type="booking"
+            )
+    else:
+        raise HTTPException(status_code=400, detail=f"Unrecognized milestone: '{milestone}'.")
+
+    # Persist updates in database and memory stores
+    updated = update_order_queue_milestone(order_id, new_status, ts_updates, notes) or {}
+
+    all_timestamps = {
+        "confirmed_at": updated.get("confirmed_at") or updated.get("confirmedAt"),
+        "ready_for_pickup_at": updated.get("ready_for_pickup_at") or updated.get("readyForPickupAt"),
+        "picked_up_at": updated.get("picked_up_at") or updated.get("pickedUpAt"),
+        "return_initiated_at": updated.get("return_initiated_at") or updated.get("returnInitiatedAt"),
+        "handed_back_at": updated.get("handed_back_at") or updated.get("handedBackAt"),
+        "awaiting_inspection_at": updated.get("awaiting_inspection_at") or updated.get("awaitingInspectionAt"),
+        "completed_at": updated.get("completed_at") or updated.get("completedAt"),
+    }
+
+    broadcast_admin_event("booking.status_updated", {
+        "id": order_id,
+        "bookingId": order_id,
+        "status": new_status,
+        "milestone": norm_m,
+        "timestamps": all_timestamps
+    })
+
+    return {
+        "success": True,
+        "message": f"Booking queue advanced to '{new_status}' successfully.",
+        "status": new_status,
+        "milestone": norm_m,
+        "bookingId": order_id,
+        "id": order_id,
+        "timestamps": all_timestamps,
+        "order": updated
+    }
+
+# Dedicated Milestone Endpoints for Renter and Lender Portals
+
+@app.post("/api/orders/{id}/ready-for-pickup")
+@app.post("/api/bookings/{id}/ready-for-pickup")
+def mark_order_ready_for_pickup(id: str, email: str = Depends(get_current_user_email)):
+    return _execute_queue_milestone_transition(id, "ready_for_pickup", email)
+
+@app.post("/api/orders/{id}/pickup-confirm")
+@app.post("/api/bookings/{id}/pickup-confirm")
+def confirm_order_pickup(id: str, email: str = Depends(get_current_user_email)):
+    return _execute_queue_milestone_transition(id, "picked_up", email)
+
+@app.post("/api/orders/{id}/return")
+@app.post("/api/bookings/{id}/return")
+def initiate_order_return_endpoint(id: str, current_user_email: str = Depends(get_current_user_email)):
+    return _execute_queue_milestone_transition(id, "return_initiated", current_user_email)
 
 @app.post("/api/orders/{id}/return-confirm")
-def confirm_order_return(id: str, current_user_email: str = Depends(get_current_user_email)):
-    clean_user = current_user_email.strip().lower()
-    order = fetch_one("SELECT * FROM orders WHERE id = %s", (id,))
-    if not order:
-        order = MOCK_ORDERS.get(id)
-    if not order:
-        raise HTTPException(status_code=404, detail="Order not found.")
+@app.post("/api/orders/{id}/handed-back")
+@app.post("/api/bookings/{id}/handed-back")
+def confirm_order_return_handover(id: str, current_user_email: str = Depends(get_current_user_email)):
+    return _execute_queue_milestone_transition(id, "handed_back", current_user_email)
 
-    pid = order.get("product_id") or ""
-    prod = fetch_one_product(pid) if pid else None
-    lender_email = (prod.get("user_email") if prod else "").strip().lower()
-    user_rec = get_user(clean_user) or {}
-    is_admin = user_rec.get("role") == "admin"
-
-    if clean_user != lender_email and not is_admin:
-        raise HTTPException(status_code=403, detail="Forbidden. Only the lender or admin can confirm gear return receipt.")
-
-    status_val = str(order.get("status") or "").lower()
-    if status_val in ("cancelled", "refunded", "rejected"):
-        raise HTTPException(status_code=400, detail=f"Cannot confirm return on {status_val} booking.")
-    if status_val not in ("return_initiated", "active", "delivered"):
-        raise HTTPException(status_code=400, detail=f"Invalid booking state for return confirmation: {status_val}")
-
-    execute_query("UPDATE orders SET status = 'returned' WHERE id = %s", (id,))
-    if id in MOCK_ORDERS:
-        MOCK_ORDERS[id]["status"] = "returned"
-
-    # Notify customer
-    cust_email = (order.get("user_email") or "").strip().lower()
-    if cust_email:
-        create_notification(
-            email=cust_email,
-            title="Gear Return Confirmed ✅",
-            message=f"Lender has inspected and confirmed receipt of returned gear for booking #{id}.",
-            notif_type="booking"
-        )
-
-    broadcast_admin_event("booking.returned", {"id": id, "status": "returned"})
-    return {"success": True, "message": "Gear return confirmed successfully.", "status": "returned"}
+@app.post("/api/orders/{id}/awaiting-inspection")
+@app.post("/api/bookings/{id}/awaiting-inspection")
+def mark_order_awaiting_inspection(id: str, current_user_email: str = Depends(get_current_user_email)):
+    return _execute_queue_milestone_transition(id, "awaiting_inspection", current_user_email)
 
 @app.post("/api/orders/{id}/complete")
+@app.post("/api/bookings/{id}/complete")
 def complete_order_endpoint(id: str, current_user_email: str = Depends(get_current_user_email)):
-    clean_user = current_user_email.strip().lower()
-    order = fetch_one("SELECT * FROM orders WHERE id = %s", (id,))
-    if not order:
-        order = MOCK_ORDERS.get(id)
-    if not order:
-        raise HTTPException(status_code=404, detail="Order not found.")
+    return _execute_queue_milestone_transition(id, "completed", current_user_email)
 
-    pid = order.get("product_id") or ""
-    prod = fetch_one_product(pid) if pid else None
-    lender_email = (prod.get("user_email") if prod else "").strip().lower()
-    user_rec = get_user(clean_user) or {}
-    is_admin = user_rec.get("role") == "admin"
+@app.post("/api/orders/{id}/queue-advance")
+@app.post("/api/bookings/{id}/queue-advance")
+def advance_order_queue_endpoint(
+    id: str,
+    data: QueueAdvanceSchema,
+    current_user_email: str = Depends(get_current_user_email)
+):
+    return _execute_queue_milestone_transition(
+        id,
+        data.milestone,
+        current_user_email,
+        notes=data.notes,
+        checklist=data.checklist
+    )
 
-    if clean_user != lender_email and not is_admin:
-        raise HTTPException(status_code=403, detail="Forbidden. Only the lender or admin can mark a rental as completed.")
-
-    status_val = str(order.get("status") or "").lower()
-    if status_val in ("cancelled", "refunded", "rejected"):
-        raise HTTPException(status_code=400, detail="Cannot complete a cancelled or refunded booking.")
-    if status_val not in ("returned", "active", "return_initiated"):
-        raise HTTPException(status_code=400, detail=f"Cannot prematurely complete booking in status '{status_val}'. Return must be completed first.")
-
-    execute_query("UPDATE orders SET status = 'completed' WHERE id = %s", (id,))
-    if id in MOCK_ORDERS:
-        MOCK_ORDERS[id]["status"] = "completed"
-
-    # Notify customer
-    cust_email = (order.get("user_email") or "").strip().lower()
-    if cust_email:
-        create_notification(
-            email=cust_email,
-            title="Rental Completed! 🌟",
-            message=f"Your rental #{id} is complete. You can now leave a verified review for this gear.",
-            notif_type="booking"
-        )
-
-    broadcast_admin_event("booking.completed", {"id": id, "status": "completed"})
-    return {"success": True, "message": "Booking marked as completed.", "status": "completed"}
+@app.get("/api/bookings/{id}")
+def get_booking_details_endpoint(id: str, email: str = Depends(get_current_user_email)):
+    return get_order_details(id, email)
 
 # ============================================================
 # Product Availability & Booking Conflict Endpoints

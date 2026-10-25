@@ -37,7 +37,36 @@ export const DEMO_USERS: DemoUser[] = [];
 
 export const INITIAL_PRODUCTS: PayerntProduct[] = [];
 
-export const INITIAL_REQUESTS: RentalRequest[] = [];
+export const INITIAL_REQUESTS: RentalRequest[] = [
+  {
+    id: "ord-fx3-cinema-782",
+    productId: "prod-sony-fx3",
+    productTitle: "Sony FX3 Cinema Camera Kit",
+    productImage: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=600",
+    category: "Cameras",
+    renter: {
+      name: "Arjun Verma",
+      avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100",
+      rating: 4.9,
+      completedRentals: 6,
+      phone: "+91 98765 43210",
+      email: "arjun.creator@payent.com",
+      city: "Bengaluru",
+    },
+    startDate: "2026-10-26",
+    endDate: "2026-10-29",
+    totalDays: 3,
+    dailyRate: 3500,
+    grossRental: 10500,
+    platformFee: 525,
+    netEarnings: 9975,
+    securityDeposit: 5000,
+    status: "confirmed",
+    requestDate: new Date().toISOString(),
+    paymentStatus: "paid_to_escrow",
+    confirmedAt: new Date().toISOString(),
+  },
+];
 
 export const INITIAL_EARNINGS: EarningTransaction[] = [];
 
@@ -468,36 +497,59 @@ export function usePayerntStore() {
       if (bookingsRes.success && Array.isArray(bookingsRes.bookings)) {
         const mappedRequests: RentalRequest[] = bookingsRes.bookings.map((b: any) => {
           const daily = Number(b.amount || b.daily_rate || b.dailyRate || 500);
-          return {
-            id: b.bookingId || b.id,
-            productId: b.productId,
-            productTitle: b.productTitle || "Tech Gear",
-            productImage: b.productImage || "",
-            category: b.category || "Tech Gear",
-            renter: {
-              name: b.renterName || (b.renterEmail ? b.renterEmail.split("@")[0] : "Verified Renter"),
-              avatar: "",
-              rating: 5.0,
-              completedRentals: 1,
-              phone: "",
-              email: b.renterEmail || "",
-              city: "",
-            },
-            startDate: b.startDate || "",
-            endDate: b.endDate || "",
-            totalDays: 3,
-            dailyRate: daily,
-            grossRental: daily * 3,
-            platformFee: 0,
-            netEarnings: daily * 3,
-            securityDeposit: 0,
-            status: (b.status === "active" || b.rentalStarted ? "active" : b.status === "completed" ? "completed" : "approved") as RentalRequestStatus,
-            requestDate: b.createdAt || new Date().toISOString(),
-            paymentStatus: b.status === "completed" ? "settled_to_lender" : "paid_to_escrow",
-          };
-        });
-        setRentalRequests(mappedRequests);
-      }
+          const rawStatus = String(b.status || "").toLowerCase().trim();
+            let parsedStatus: RentalRequestStatus = "approved";
+            if (rawStatus === "order confirmed" || rawStatus === "confirmed") parsedStatus = "confirmed";
+            else if (rawStatus === "ready for pickup" || rawStatus === "ready_for_pickup") parsedStatus = "ready_for_pickup";
+            else if (rawStatus === "picked up" || rawStatus === "picked_up") parsedStatus = "picked_up";
+            else if (rawStatus === "rental in progress" || rawStatus === "rental_in_progress" || rawStatus === "active" || b.rentalStarted) parsedStatus = "active";
+            else if (rawStatus === "return initiated" || rawStatus === "return_initiated") parsedStatus = "return_initiated";
+            else if (rawStatus === "item handed back to owner" || rawStatus === "handed_back" || rawStatus === "handed back") parsedStatus = "handed_back";
+            else if (rawStatus === "awaiting owner inspection" || rawStatus === "awaiting_inspection" || rawStatus === "inspection") parsedStatus = "awaiting_inspection";
+            else if (rawStatus === "rental completed" || rawStatus === "completed") parsedStatus = "completed";
+            else if (rawStatus === "cancelled") parsedStatus = "cancelled";
+            else if (rawStatus === "rejected") parsedStatus = "rejected";
+            else if (rawStatus === "handover") parsedStatus = "handover";
+            else parsedStatus = (b.status || "approved") as RentalRequestStatus;
+
+            return {
+              id: b.bookingId || b.id,
+              productId: b.productId,
+              productTitle: b.productTitle || "Tech Gear",
+              productImage: b.productImage || "",
+              category: b.category || "Tech Gear",
+              renter: {
+                name: b.renterName || (b.renterEmail ? b.renterEmail.split("@")[0] : "Verified Renter"),
+                avatar: "",
+                rating: 5.0,
+                completedRentals: 1,
+                phone: "",
+                email: b.renterEmail || "",
+                city: "",
+              },
+              startDate: b.startDate || "",
+              endDate: b.endDate || "",
+              totalDays: 3,
+              dailyRate: daily,
+              grossRental: daily * 3,
+              platformFee: 0,
+              netEarnings: daily * 3,
+              securityDeposit: 0,
+              status: parsedStatus,
+              requestDate: b.createdAt || new Date().toISOString(),
+              paymentStatus: parsedStatus === "completed" ? "settled_to_lender" : "paid_to_escrow",
+              confirmedAt: b.confirmedAt || b.confirmed_at || b.createdAt || b.created_at,
+              readyForPickupAt: b.readyForPickupAt || b.ready_for_pickup_at,
+              pickedUpAt: b.pickedUpAt || b.picked_up_at,
+              returnInitiatedAt: b.returnInitiatedAt || b.return_initiated_at,
+              handedBackAt: b.handedBackAt || b.handed_back_at,
+              awaitingInspectionAt: b.awaitingInspectionAt || b.awaiting_inspection_at,
+              completedAt: b.completedAt || b.completed_at,
+              queueNotes: b.queueNotes || b.queue_notes,
+            };
+          });
+          setRentalRequests(mappedRequests);
+        }
 
       // Also fetch full user products and wallet transactions for detail pages
       const [prodRes, walletRes, notifRes, msgRes] = await Promise.all([
@@ -555,9 +607,19 @@ export function usePayerntStore() {
 
     window.addEventListener("paye₹nt_data_refresh", handleRefresh);
     window.addEventListener("payernt_data_refresh", handleRefresh);
+    window.addEventListener("payent_orders_updated", handleRefresh);
+    window.addEventListener("payent_queue_updated", handleRefresh);
+
+    const pollInterval = setInterval(() => {
+      refreshDashboard();
+    }, 6000);
+
     return () => {
       window.removeEventListener("paye₹nt_data_refresh", handleRefresh);
       window.removeEventListener("payernt_data_refresh", handleRefresh);
+      window.removeEventListener("payent_orders_updated", handleRefresh);
+      window.removeEventListener("payent_queue_updated", handleRefresh);
+      clearInterval(pollInterval);
     };
   }, [activeAccount, isAuthenticated, refreshDashboard]);
 
@@ -857,16 +919,52 @@ export function usePayerntStore() {
 
   // Step Rental Lifecycle
   const advanceRentalLifecycle = (requestId: string, nextStatus: RentalRequestStatus) => {
+    const nowIso = new Date().toISOString();
     setRentalRequests((prev) =>
       prev.map((req) => {
         if (req.id !== requestId) return req;
-        const updated = { ...req, status: nextStatus };
+        const updated: RentalRequest = { ...req, status: nextStatus };
+        if (nextStatus === "ready_for_pickup") updated.readyForPickupAt = updated.readyForPickupAt || nowIso;
+        if (nextStatus === "picked_up" || nextStatus === "active") updated.pickedUpAt = updated.pickedUpAt || nowIso;
+        if (nextStatus === "return_initiated") updated.returnInitiatedAt = updated.returnInitiatedAt || nowIso;
+        if (nextStatus === "handed_back") {
+          updated.handedBackAt = updated.handedBackAt || nowIso;
+          updated.awaitingInspectionAt = updated.awaitingInspectionAt || nowIso;
+        }
+        if (nextStatus === "awaiting_inspection") updated.awaitingInspectionAt = updated.awaitingInspectionAt || nowIso;
         if (nextStatus === "completed") {
           updated.paymentStatus = "settled_to_lender";
+          updated.completedAt = updated.completedAt || nowIso;
         }
         return updated;
       })
     );
+
+    // Asynchronously synchronize with backend datastore
+    payerntApi
+      .advanceRentalQueue(requestId, nextStatus)
+      .then((res) => {
+        if (res.success && res.all_timestamps) {
+          setRentalRequests((prev) =>
+            prev.map((r) => {
+              if (r.id !== requestId) return r;
+              return {
+                ...r,
+                confirmedAt: res.all_timestamps?.confirmed_at || r.confirmedAt,
+                readyForPickupAt: res.all_timestamps?.ready_for_pickup_at || r.readyForPickupAt,
+                pickedUpAt: res.all_timestamps?.picked_up_at || r.pickedUpAt,
+                returnInitiatedAt: res.all_timestamps?.return_initiated_at || r.returnInitiatedAt,
+                handedBackAt: res.all_timestamps?.handed_back_at || r.handedBackAt,
+                awaitingInspectionAt: res.all_timestamps?.awaiting_inspection_at || r.awaitingInspectionAt,
+                completedAt: res.all_timestamps?.completed_at || r.completedAt,
+              };
+            })
+          );
+        }
+      })
+      .catch((err) => {
+        console.warn("Backend rental queue sync notice:", err);
+      });
 
     const req = rentalRequests.find((r) => r.id === requestId);
     if (!req) return;

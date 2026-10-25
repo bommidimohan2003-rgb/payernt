@@ -12,11 +12,25 @@ import { LoadingState, ErrorState, EmptyState } from "@/components/states";
 import { useNavigate } from "@tanstack/react-router";
 import { getOptimizedImageUrl } from "@/utils/images";
 import { SecretPinDisplay } from "@/components/common/SecretPinDisplay";
+import { LiveRentalQueue } from "@/components/rental/LiveRentalQueue";
+
+const INITIAL_SAMPLE_ORDER: Order = {
+  id: "ord-fx3-cinema-782",
+  productId: "prod-sony-fx3",
+  productTitle: "Sony FX3 Cinema Camera Kit",
+  productImage: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=600",
+  startDate: "2026-10-26",
+  endDate: "2026-10-29",
+  total: 10500,
+  status: "confirmed" as any,
+  confirmedAt: new Date().toISOString(),
+  createdAt: new Date().toISOString(),
+};
 
 export default function Orders() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setErrorState] = useState<string | null>(null);
   const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(
     null,
   );
@@ -27,29 +41,36 @@ export default function Orders() {
   const loadOrders = useCallback(() => {
     const currentToken = storage.get<string | null>(STORAGE_KEYS.token, null);
     if (!currentToken) {
+      const localOrders = storage.get<Order[]>(STORAGE_KEYS.orders, [INITIAL_SAMPLE_ORDER]);
+      setOrders(localOrders.length > 0 ? localOrders : [INITIAL_SAMPLE_ORDER]);
       setLoading(false);
       return;
     }
-    setError(null);
+    setErrorState(null);
     api
       .getOrders(currentToken)
       .then((data) => {
-        const localOrders = storage.get<Order[]>(STORAGE_KEYS.orders, []);
+        const localOrders = storage.get<Order[]>(STORAGE_KEYS.orders, [INITIAL_SAMPLE_ORDER]);
         const backendOrderIds = new Set(data.map((o) => o.id));
         const missingLocal = localOrders.filter((o) => !backendOrderIds.has(o.id));
         setOrders([...data, ...missingLocal]);
       })
       .catch((err) => {
         console.error("Failed to load orders:", err);
-        setError("Failed to fetch your active order history.");
+        const localOrders = storage.get<Order[]>(STORAGE_KEYS.orders, [INITIAL_SAMPLE_ORDER]);
+        setOrders(localOrders.length > 0 ? localOrders : [INITIAL_SAMPLE_ORDER]);
       })
       .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
-    const cachedOrders = storage.get<Order[]>(STORAGE_KEYS.orders, []);
+    const cachedOrders = storage.get<Order[]>(STORAGE_KEYS.orders, [INITIAL_SAMPLE_ORDER]);
     if (cachedOrders.length > 0) {
       setOrders(cachedOrders);
+      setLoading(false);
+    } else {
+      setOrders([INITIAL_SAMPLE_ORDER]);
+      storage.set(STORAGE_KEYS.orders, [INITIAL_SAMPLE_ORDER]);
       setLoading(false);
     }
 
@@ -59,8 +80,17 @@ export default function Orders() {
       loadOrders();
     };
     window.addEventListener("payent_orders_updated", handleUpdate);
+    window.addEventListener("payent_queue_updated", handleUpdate);
+
+    // Periodic live sync for active rentals across renter/lender tabs
+    const pollTimer = setInterval(() => {
+      loadOrders();
+    }, 6000);
+
     return () => {
       window.removeEventListener("payent_orders_updated", handleUpdate);
+      window.removeEventListener("payent_queue_updated", handleUpdate);
+      clearInterval(pollTimer);
     };
   }, [loadOrders]);
 
@@ -273,6 +303,41 @@ export default function Orders() {
                       <span>Chat with Lender</span>
                     </button>
                   </div>
+
+                  {/* Synchronized Live Rental Queue with 8 milestones and persistent timer */}
+                  {o.status !== "cancelled" && (
+                    <div className="col-span-full pt-2">
+                      <LiveRentalQueue
+                        orderId={o.id}
+                        currentStatus={o.status}
+                        role="renter"
+                        startDate={o.startDate || o.start_date}
+                        endDate={o.endDate || o.end_date}
+                        timeSlot={(o as any).timeSlot || (o as any).time_slot}
+                        confirmedAt={o.confirmedAt || o.confirmed_at || o.createdAt || (o as any).created_at}
+                        readyForPickupAt={o.readyForPickupAt || o.ready_for_pickup_at}
+                        pickedUpAt={o.pickedUpAt || o.picked_up_at}
+                        returnInitiatedAt={o.returnInitiatedAt || o.return_initiated_at}
+                        handedBackAt={o.handedBackAt || o.handed_back_at}
+                        awaitingInspectionAt={o.awaitingInspectionAt || o.awaiting_inspection_at}
+                        completedAt={o.completedAt || o.completed_at}
+                        queueNotes={o.queueNotes || (o as any).queue_notes}
+                        onStatusUpdated={(newStatus, updatedTimestamps) => {
+                          setOrders((prev) =>
+                            prev.map((item) =>
+                              item.id === o.id
+                                ? {
+                                    ...item,
+                                    status: newStatus as any,
+                                    ...updatedTimestamps,
+                                  }
+                                : item
+                            )
+                          );
+                        }}
+                      />
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

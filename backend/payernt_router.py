@@ -2315,6 +2315,120 @@ def complete_rental_endpoint(
     return {"success": True, "message": msg}
 
 
+class PayerntQueueAdvanceSchema(BaseModel):
+    milestone: str
+    notes: Optional[str] = None
+    checklist: Optional[Dict[str, Any]] = None
+
+
+@payernt_router.post("/bookings/{booking_id}/queue-advance")
+@payernt_router.post("/paye₹nt/bookings/{booking_id}/queue-advance")
+@payernt_router.post("/payernt/bookings/{booking_id}/queue-advance")
+@rental_router.post("/{booking_id}/queue-advance")
+def vendor_advance_queue_endpoint(
+    booking_id: str,
+    data: PayerntQueueAdvanceSchema,
+    authorization: Optional[str] = Header(None),
+):
+    """
+    Vendor / Lender Live Rental Queue advance endpoint:
+    Guarantees atomic transition between the 8 milestones and persists timestamps.
+    """
+    from database import update_order_queue_milestone, MOCK_ORDERS, fetch_one, create_notification, dt, timezone
+    milestone = data.milestone.strip().lower()
+    now_iso = dt.now(timezone.utc).isoformat()
+    ts_updates = {}
+
+    order = fetch_one("SELECT * FROM orders WHERE id = %s", (booking_id,))
+    if not order:
+        order = MOCK_ORDERS.get(booking_id, {})
+    cust_email = str(order.get("user_email") or order.get("userEmail") or "").strip().lower()
+
+    if milestone in ("ready_for_pickup", "ready"):
+        new_status = "ready_for_pickup"
+        ts_updates["ready_for_pickup_at"] = now_iso
+        if cust_email:
+            create_notification(cust_email, "Gear Ready for Pickup 📦", f"Your gear for booking #{booking_id} is packed and ready for pickup.", notif_type="booking")
+    elif milestone in ("picked_up", "rental_in_progress", "active"):
+        new_status = "rental_in_progress"
+        ts_updates["picked_up_at"] = now_iso
+        ts_updates["rental_started_at"] = now_iso
+        if cust_email:
+            create_notification(cust_email, "Rental In Progress ⏱️", f"Pickup confirmed for booking #{booking_id}. Your live rental timer has started.", notif_type="booking")
+    elif milestone in ("return_initiated",):
+        new_status = "return_initiated"
+        ts_updates["return_initiated_at"] = now_iso
+    elif milestone in ("handed_back", "returned"):
+        new_status = "handed_back"
+        ts_updates["handed_back_at"] = now_iso
+        ts_updates["awaiting_inspection_at"] = now_iso
+        if cust_email:
+            create_notification(cust_email, "Item Handed Back to Owner 🤝", f"Gear return receipt confirmed for booking #{booking_id}. Rental timer stopped.", notif_type="booking")
+    elif milestone in ("awaiting_inspection", "inspection"):
+        new_status = "awaiting_inspection"
+        ts_updates["awaiting_inspection_at"] = now_iso
+    elif milestone in ("completed",):
+        new_status = "completed"
+        ts_updates["completed_at"] = now_iso
+        try:
+            from payernt_database import complete_rental_and_credit_vendor
+            complete_rental_and_credit_vendor(booking_id)
+        except Exception:
+            pass
+        if cust_email:
+            create_notification(cust_email, "Rental Completed! 🌟", f"Your rental #{booking_id} is complete and settled.", notif_type="booking")
+    else:
+        raise HTTPException(status_code=400, detail=f"Invalid milestone: {milestone}")
+
+    updated = update_order_queue_milestone(booking_id, new_status, ts_updates, data.notes) or {}
+    all_timestamps = {
+        "confirmed_at": updated.get("confirmed_at") or updated.get("confirmedAt"),
+        "ready_for_pickup_at": updated.get("ready_for_pickup_at") or updated.get("readyForPickupAt"),
+        "picked_up_at": updated.get("picked_up_at") or updated.get("pickedUpAt"),
+        "return_initiated_at": updated.get("return_initiated_at") or updated.get("returnInitiatedAt"),
+        "handed_back_at": updated.get("handed_back_at") or updated.get("handedBackAt"),
+        "awaiting_inspection_at": updated.get("awaiting_inspection_at") or updated.get("awaitingInspectionAt"),
+        "completed_at": updated.get("completed_at") or updated.get("completedAt"),
+    }
+    return {
+        "success": True,
+        "message": f"Queue advanced to {new_status}",
+        "status": new_status,
+        "milestone": milestone,
+        "bookingId": booking_id,
+        "timestamps": all_timestamps,
+        "order": updated
+    }
+
+
+@payernt_router.post("/bookings/{booking_id}/ready-for-pickup")
+@payernt_router.post("/paye₹nt/bookings/{booking_id}/ready-for-pickup")
+@payernt_router.post("/payernt/bookings/{booking_id}/ready-for-pickup")
+def vendor_ready_for_pickup(booking_id: str):
+    return vendor_advance_queue_endpoint(booking_id, PayerntQueueAdvanceSchema(milestone="ready_for_pickup"))
+
+
+@payernt_router.post("/bookings/{booking_id}/pickup-confirm")
+@payernt_router.post("/paye₹nt/bookings/{booking_id}/pickup-confirm")
+@payernt_router.post("/payernt/bookings/{booking_id}/pickup-confirm")
+def vendor_pickup_confirm(booking_id: str):
+    return vendor_advance_queue_endpoint(booking_id, PayerntQueueAdvanceSchema(milestone="picked_up"))
+
+
+@payernt_router.post("/bookings/{booking_id}/handed-back")
+@payernt_router.post("/paye₹nt/bookings/{booking_id}/handed-back")
+@payernt_router.post("/payernt/bookings/{booking_id}/handed-back")
+def vendor_handed_back(booking_id: str):
+    return vendor_advance_queue_endpoint(booking_id, PayerntQueueAdvanceSchema(milestone="handed_back"))
+
+
+@payernt_router.post("/bookings/{booking_id}/awaiting-inspection")
+@payernt_router.post("/paye₹nt/bookings/{booking_id}/awaiting-inspection")
+@payernt_router.post("/payernt/bookings/{booking_id}/awaiting-inspection")
+def vendor_awaiting_inspection(booking_id: str):
+    return vendor_advance_queue_endpoint(booking_id, PayerntQueueAdvanceSchema(milestone="awaiting_inspection"))
+
+
 # ============================================================
 # VENDOR PREPARE & DELIVERY HANDOVER OTP ENDPOINTS
 # ============================================================

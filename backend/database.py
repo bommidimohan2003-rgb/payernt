@@ -486,6 +486,14 @@ def init_db(force: bool = False):
     add_column_safely("orders", "start_datetime VARCHAR(100) NULL")
     add_column_safely("orders", "end_datetime VARCHAR(100) NULL")
     add_column_safely("orders", "cancellation_id VARCHAR(255) NULL")
+    add_column_safely("orders", "confirmed_at VARCHAR(100) NULL")
+    add_column_safely("orders", "ready_for_pickup_at VARCHAR(100) NULL")
+    add_column_safely("orders", "picked_up_at VARCHAR(100) NULL")
+    add_column_safely("orders", "return_initiated_at VARCHAR(100) NULL")
+    add_column_safely("orders", "handed_back_at VARCHAR(100) NULL")
+    add_column_safely("orders", "awaiting_inspection_at VARCHAR(100) NULL")
+    add_column_safely("orders", "completed_at VARCHAR(100) NULL")
+    add_column_safely("orders", "queue_notes TEXT NULL")
     add_index_safely("orders", "idx_orders_user_email", "user_email")
     add_index_safely("orders", "idx_orders_status", "status")
     add_index_safely("orders", "idx_orders_created_at", "created_at")
@@ -1801,7 +1809,8 @@ def get_orders(email: str):
                     cursor.execute("""
                         SELECT id, user_email, product_id, product_title, product_image,
                                start_date, end_date, total, status, created_at,
-                               razorpay_order_id, razorpay_payment_id, payment_status, refund_id, refund_status
+                               razorpay_order_id, razorpay_payment_id, payment_status, refund_id, refund_status,
+                               confirmed_at, ready_for_pickup_at, picked_up_at, return_initiated_at, handed_back_at, awaiting_inspection_at, completed_at, queue_notes
                         FROM orders
                         WHERE user_email = %s
                         ORDER BY created_at DESC
@@ -1840,6 +1849,8 @@ def create_order(email: str, order: dict):
     start_dt, end_dt = normalize_slot_interval(start, time_slot, start_time, end_time)
     start_datetime = order.get("start_datetime") or order.get("startDatetime") or start_dt.isoformat()
     end_datetime = order.get("end_datetime") or order.get("endDatetime") or end_dt.isoformat()
+
+    confirmed_at = order.get("confirmed_at") or order.get("confirmedAt") or created
 
     if pid and start and end and status not in ("cancelled", "rejected", "failed"):
         s_date = parse_date_safely(start)
@@ -1914,13 +1925,27 @@ def create_order(email: str, order: dict):
         "total": total,
         "status": status,
         "createdAt": created,
-        "created_at": created
+        "created_at": created,
+        "confirmed_at": confirmed_at,
+        "confirmedAt": confirmed_at,
+        "ready_for_pickup_at": order.get("ready_for_pickup_at") or order.get("readyForPickupAt"),
+        "readyForPickupAt": order.get("ready_for_pickup_at") or order.get("readyForPickupAt"),
+        "picked_up_at": order.get("picked_up_at") or order.get("pickedUpAt"),
+        "pickedUpAt": order.get("picked_up_at") or order.get("pickedUpAt"),
+        "return_initiated_at": order.get("return_initiated_at") or order.get("returnInitiatedAt"),
+        "returnInitiatedAt": order.get("return_initiated_at") or order.get("returnInitiatedAt"),
+        "handed_back_at": order.get("handed_back_at") or order.get("handedBackAt"),
+        "handedBackAt": order.get("handed_back_at") or order.get("handedBackAt"),
+        "awaiting_inspection_at": order.get("awaiting_inspection_at") or order.get("awaitingInspectionAt"),
+        "awaitingInspectionAt": order.get("awaiting_inspection_at") or order.get("awaitingInspectionAt"),
+        "completed_at": order.get("completed_at") or order.get("completedAt"),
+        "completedAt": order.get("completed_at") or order.get("completedAt"),
     }
     MOCK_ORDERS[order["id"]] = normalized
 
     execute_query("""
-        INSERT INTO orders (id, user_email, product_id, product_title, product_image, start_date, end_date, total, status, created_at, time_slot, duration_type, start_time, end_time, start_datetime, end_datetime)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        INSERT INTO orders (id, user_email, product_id, product_title, product_image, start_date, end_date, total, status, created_at, time_slot, duration_type, start_time, end_time, start_datetime, end_datetime, confirmed_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """, (
         order["id"],
         clean_email,
@@ -1937,7 +1962,8 @@ def create_order(email: str, order: dict):
         start_time,
         end_time,
         start_datetime,
-        end_datetime
+        end_datetime,
+        confirmed_at
     ))
 
     # Create matching payment transaction
@@ -2071,6 +2097,95 @@ def record_booking_cancellation(
             conn.close()
             
     return canc_record
+
+def update_order_queue_milestone(
+    order_id: str,
+    new_status: str,
+    timestamps: Optional[Dict[str, str]] = None,
+    notes: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
+    """
+    Authoritative transactional update for live rental queue milestones.
+    Synchronizes orders table, MOCK_ORDERS, and rental_security.
+    Guarantees timestamps are persisted and never reset on page refreshes.
+    """
+    if not order_id:
+        return None
+    b_id = str(order_id).strip()
+    now_iso = dt.now(timezone.utc).isoformat()
+    ts = timestamps or {}
+
+    # Update in-memory MOCK_ORDERS
+    mock_order = None
+    for key, o in list(MOCK_ORDERS.items()):
+        if key == b_id or o.get("id") == b_id or o.get("productId") == b_id:
+            mock_order = MOCK_ORDERS[key]
+            mock_order["status"] = new_status
+            if notes is not None:
+                mock_order["queue_notes"] = notes
+                mock_order["queueNotes"] = notes
+            for field, val in ts.items():
+                if val:
+                    mock_order[field] = val
+                    # CamelCase alias
+                    parts = field.split("_")
+                    camel = parts[0] + "".join(p.capitalize() for p in parts[1:])
+                    mock_order[camel] = val
+            break
+
+    # Update in database
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cursor:
+                # Build dynamic update query
+                set_clauses = ["status = %s"]
+                params = [new_status]
+                if notes is not None:
+                    set_clauses.append("queue_notes = %s")
+                    params.append(notes)
+                for field, val in ts.items():
+                    if val and field in (
+                        "confirmed_at", "ready_for_pickup_at", "picked_up_at",
+                        "return_initiated_at", "handed_back_at", "awaiting_inspection_at",
+                        "completed_at"
+                    ):
+                        set_clauses.append(f"{field} = %s")
+                        params.append(val)
+                params.append(b_id)
+
+                sql = f"UPDATE orders SET {', '.join(set_clauses)} WHERE id = %s"
+                cursor.execute(sql, tuple(params))
+
+                # Also synchronize rental_security if it exists
+                sec_sets = ["status = %s", "updated_at = %s"]
+                sec_params = [new_status, now_iso]
+                if "picked_up_at" in ts and ts["picked_up_at"]:
+                    sec_sets.append("rental_started = TRUE")
+                    sec_sets.append("rental_started_at = %s")
+                    sec_params.append(ts["picked_up_at"])
+                if "awaiting_inspection_at" in ts and ts["awaiting_inspection_at"]:
+                    sec_sets.append("inspection_confirmed_at = %s")
+                    sec_params.append(ts["awaiting_inspection_at"])
+                sec_params.append(b_id)
+                try:
+                    cursor.execute(f"UPDATE rental_security SET {', '.join(sec_sets)} WHERE booking_id = %s", tuple(sec_params))
+                except Exception:
+                    pass
+
+            conn.commit()
+        except Exception as e:
+            logger.warning(f"Database error in update_order_queue_milestone: {e}")
+            if conn:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+        finally:
+            conn.close()
+
+    # Fetch and return updated record
+    return fetch_one("SELECT * FROM orders WHERE id = %s", (b_id,)) or mock_order
 
 def get_booking_cancellation(booking_id: str) -> Optional[Dict[str, Any]]:
     """Retrieves the cancellation record for a given booking ID."""

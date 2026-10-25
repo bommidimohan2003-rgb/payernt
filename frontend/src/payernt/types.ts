@@ -14,9 +14,15 @@ export type RentalRequestStatus =
   | "pending"
   | "approved"
   | "accepted"
+  | "order_confirmed"
+  | "ready_for_pickup"
+  | "picked_up"
+  | "rental_in_progress"
   | "handover"
   | "active"
   | "return_initiated"
+  | "handed_back"
+  | "awaiting_inspection"
   | "returned"
   | "completed"
   | "rejected"
@@ -275,6 +281,14 @@ export interface RentalRequest {
   status: RentalRequestStatus;
   requestDate: string;
   paymentStatus: "paid_to_escrow" | "pending_renter" | "settled_to_lender";
+  confirmedAt?: string;
+  readyForPickupAt?: string;
+  pickedUpAt?: string;
+  returnInitiatedAt?: string;
+  handedBackAt?: string;
+  awaitingInspectionAt?: string;
+  completedAt?: string;
+  queueNotes?: string;
 }
 
 export interface EarningTransaction {

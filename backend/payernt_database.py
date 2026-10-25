@@ -3623,6 +3623,14 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50) -> List[Dict[st
                 o.total,
                 o.status as order_status,
                 o.created_at as order_created_at,
+                o.confirmed_at,
+                o.ready_for_pickup_at,
+                o.picked_up_at as order_picked_up_at,
+                o.return_initiated_at,
+                o.handed_back_at,
+                o.awaiting_inspection_at,
+                o.completed_at,
+                o.queue_notes,
                 bc.reason_code as cancellation_reason,
                 bc.feedback as cancellation_feedback,
                 bc.created_at as cancelled_at,
@@ -3663,6 +3671,7 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50) -> List[Dict[st
                         "cancelledAt": r.get("cancelled_at") or r.get("order_created_at"),
                         "cancelledBy": r.get("cancelled_by") or "LENDER"
                     }
+                picked_up_val = r.get("picked_up_at") or r.get("order_picked_up_at") or r.get("rental_started_at") or r.get("activated_at")
                 bookings.append({
                     "id": b_id,
                     "bookingId": b_id,
@@ -3695,13 +3704,20 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50) -> List[Dict[st
                     "vendorHandoverVerified": bool(r.get("vendor_handover_verified")),
                     "renterHandoverVerified": bool(r.get("renter_handover_verified")),
                     "otpVerified": bool(r.get("vendor_otp_verified") and r.get("renter_otp_verified")),
-                    "rentalStarted": bool(r.get("rental_started")),
-                    "rentalStartedAt": r.get("rental_started_at") or r.get("activated_at"),
+                    "rentalStarted": bool(r.get("rental_started")) or bool(picked_up_val),
+                    "rentalStartedAt": picked_up_val,
                     "activatedAt": r.get("activated_at"),
                     "earningsStartedAt": r.get("earnings_started_at"),
                     "deliveryBoyName": r.get("delivery_boy_name"),
                     "deliveryBoyPhone": r.get("delivery_boy_phone"),
-                    "pickedUpAt": r.get("picked_up_at"),
+                    "pickedUpAt": picked_up_val,
+                    "confirmedAt": r.get("confirmed_at") or r.get("order_created_at") or r.get("security_created_at"),
+                    "readyForPickupAt": r.get("ready_for_pickup_at"),
+                    "returnInitiatedAt": r.get("return_initiated_at"),
+                    "handedBackAt": r.get("handed_back_at"),
+                    "awaitingInspectionAt": r.get("awaiting_inspection_at"),
+                    "completedAt": r.get("completed_at"),
+                    "queueNotes": r.get("queue_notes"),
                     "createdAt": r.get("security_created_at") or r.get("order_created_at") or dt.now(timezone.utc).isoformat(),
                 })
     except Exception as e:
@@ -3721,6 +3737,14 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50) -> List[Dict[st
                 o.total,
                 o.status as order_status,
                 o.created_at,
+                o.confirmed_at,
+                o.ready_for_pickup_at,
+                o.picked_up_at,
+                o.return_initiated_at,
+                o.handed_back_at,
+                o.awaiting_inspection_at,
+                o.completed_at,
+                o.queue_notes,
                 pp.category,
                 pp.daily_rate,
                 d.status as delivery_status
@@ -3741,6 +3765,7 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50) -> List[Dict[st
                 renter_email = r.get("renter_email") or ""
                 r_name = renter_email.split("@")[0].capitalize() if renter_email else "Customer"
                 del_status = r.get("delivery_status") or "WAITING_FOR_ADMIN"
+                picked_up_val = r.get("picked_up_at")
                 bookings.append({
                     "id": b_id,
                     "bookingId": b_id,
@@ -3766,8 +3791,16 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50) -> List[Dict[st
                     "vendorHandoverVerified": False,
                     "renterHandoverVerified": False,
                     "otpVerified": False,
-                    "rentalStarted": False,
-                    "rentalStartedAt": None,
+                    "rentalStarted": bool(picked_up_val),
+                    "rentalStartedAt": picked_up_val,
+                    "pickedUpAt": picked_up_val,
+                    "confirmedAt": r.get("confirmed_at") or r.get("created_at"),
+                    "readyForPickupAt": r.get("ready_for_pickup_at"),
+                    "returnInitiatedAt": r.get("return_initiated_at"),
+                    "handedBackAt": r.get("handed_back_at"),
+                    "awaitingInspectionAt": r.get("awaiting_inspection_at"),
+                    "completedAt": r.get("completed_at"),
+                    "queueNotes": r.get("queue_notes"),
                     "createdAt": r.get("created_at") or dt.now(timezone.utc).isoformat(),
                 })
     except Exception as e:
@@ -3785,26 +3818,38 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50) -> List[Dict[st
                 seen_ids.add(b_id)
                 prod = MOCK_PAYERNT_PRODUCTS.get(sec.get("product_id", ""))
                 daily = float(prod.get("daily_rate", 500) if prod else 500)
+                from database import MOCK_ORDERS
+                mo = MOCK_ORDERS.get(b_id, {})
+                pu_at = sec.get("rental_started_at") or sec.get("activated_at") or mo.get("picked_up_at") or mo.get("pickedUpAt")
                 bookings.append({
                     "id": b_id,
                     "bookingId": b_id,
                     "productId": sec.get("product_id") or "",
-                    "productTitle": prod.get("title", "Tech Gear") if prod else "Tech Gear",
-                    "productImage": prod.get("primary_image", "") if prod else "",
+                    "productTitle": prod.get("title", "Tech Gear") if prod else mo.get("productTitle", "Tech Gear"),
+                    "productImage": prod.get("primary_image", "") if prod else mo.get("productImage", ""),
                     "category": prod.get("category", "Tech") if prod else "Tech",
                     "renterId": sec.get("renter_id", "renter"),
                     "renterName": "Customer",
-                    "renterEmail": "",
-                    "startDate": "",
-                    "endDate": "",
+                    "renterEmail": mo.get("userEmail", ""),
+                    "startDate": mo.get("startDate", ""),
+                    "endDate": mo.get("endDate", ""),
                     "amount": daily,
                     "total": daily,
-                    "status": sec.get("status", "security_pending"),
+                    "status": mo.get("status") or sec.get("status", "security_pending"),
                     "securityStatus": sec.get("status", "security_pending"),
                     "vendorPinVerified": bool(sec.get("vendor_pin_verified")),
                     "renterPinVerified": bool(sec.get("renter_pin_verified")),
                     "otpVerified": bool(sec.get("otp_verified")),
-                    "rentalStarted": bool(sec.get("rental_started")),
+                    "rentalStarted": bool(sec.get("rental_started")) or bool(pu_at),
+                    "rentalStartedAt": pu_at,
+                    "pickedUpAt": pu_at,
+                    "confirmedAt": mo.get("confirmedAt") or sec.get("created_at"),
+                    "readyForPickupAt": mo.get("readyForPickupAt"),
+                    "returnInitiatedAt": mo.get("returnInitiatedAt"),
+                    "handedBackAt": mo.get("handedBackAt"),
+                    "awaitingInspectionAt": mo.get("awaitingInspectionAt"),
+                    "completedAt": mo.get("completedAt"),
+                    "queueNotes": mo.get("queueNotes"),
                     "createdAt": sec.get("created_at") or dt.now(timezone.utc).isoformat(),
                 })
 

@@ -35,6 +35,7 @@ import { rentalSecurityService } from "@/services/rentalSecurityService";
 import { payerntApi } from "../payerntApiService";
 import type { RentalRequest, RentalRequestStatus } from "../types";
 import { SecretPinDisplay, SecretPinInput } from "@/components/common/SecretPinDisplay";
+import { LiveRentalQueue } from "@/components/rental/LiveRentalQueue";
 
 interface RentalRequestsProps {
   requests: RentalRequest[];
@@ -634,50 +635,26 @@ export function RentalRequests({
                   </div>
                 </div>
 
-                {/* Card Lifecycle Progress Rail */}
+                {/* Live Rental Queue with 8 Milestones, Persistent Timer & Lender Actions */}
                 {!isDeclined && (
-                  <div className="p-4 sm:p-5 rounded-2xl border border-black/5 dark:border-[#A1A1AA]/15 bg-neutral-50 dark:bg-[#050709]/70 space-y-3">
-                    <div className="flex items-center justify-between text-xs font-bold text-neutral-500 dark:text-[#A1A1AA]">
-                      <span className="uppercase tracking-wider text-[10px]">Rental Lifecycle Tracker</span>
-                      <span className="text-neutral-950 dark:text-[#F5F5F5] font-mono text-[11px]">
-                        Step {currentStepIdx + 1} of {LIFECYCLE_STEPS.length}
-                      </span>
-                    </div>
-
-                    {/* Progress Dots / Bar */}
-                    <div className="grid grid-cols-6 gap-2">
-                      {LIFECYCLE_STEPS.map((step, idx) => {
-                        const isDone = currentStepIdx > idx;
-                        const isCurrent = currentStepIdx === idx;
-                        return (
-                          <div key={step.key} className="space-y-1.5 text-center">
-                            <div
-                              className={`h-2 rounded-full transition-all ${
-                                isDone
-                                  ? "bg-neutral-900 dark:bg-[#F5F5F5]"
-                                  : isCurrent
-                                  ? "bg-neutral-900 dark:bg-[#F5F5F5] animate-pulse"
-                                  : "bg-black/10 dark:bg-white/10"
-                              }`}
-                            />
-                            <div className="hidden sm:block">
-                              <p
-                                className={`text-[10px] font-bold truncate ${
-                                  isCurrent
-                                    ? "text-neutral-950 dark:text-[#F5F5F5] font-black"
-                                    : isDone
-                                    ? "text-neutral-800 dark:text-[#F5F5F5]"
-                                    : "text-neutral-400 dark:text-[#A1A1AA]/60"
-                                }`}
-                              >
-                                {step.label}
-                              </p>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
+                  <LiveRentalQueue
+                    orderId={req.id}
+                    currentStatus={req.status}
+                    role="lender"
+                    startDate={req.startDate}
+                    endDate={req.endDate}
+                    confirmedAt={req.confirmedAt || req.requestDate}
+                    readyForPickupAt={req.readyForPickupAt}
+                    pickedUpAt={req.pickedUpAt}
+                    returnInitiatedAt={req.returnInitiatedAt}
+                    handedBackAt={req.handedBackAt}
+                    awaitingInspectionAt={req.awaitingInspectionAt}
+                    completedAt={req.completedAt}
+                    queueNotes={req.queueNotes}
+                    onStatusUpdated={(newStatus) => {
+                      onAdvanceLifecycle(req.id, newStatus as any);
+                    }}
+                  />
                 )}
 
                 {/* Card Middle 3-Column Info Matrix */}

@@ -101,6 +101,22 @@ export interface Category {
   image?: string;
 }
 
+export type OrderRentalStatus =
+  | "order_confirmed"
+  | "ready_for_pickup"
+  | "picked_up"
+  | "rental_in_progress"
+  | "return_initiated"
+  | "handed_back"
+  | "awaiting_inspection"
+  | "completed"
+  | "active"
+  | "completed"
+  | "cancelled"
+  | "pending"
+  | "returned"
+  | string;
+
 export interface Order {
   id: string;
   productId: string;
@@ -109,7 +125,7 @@ export interface Order {
   startDate: string;
   endDate: string;
   total: number;
-  status: "active" | "completed" | "cancelled" | "pending";
+  status: OrderRentalStatus;
   createdAt: string;
   product_id?: string;
   product_title?: string;
@@ -119,6 +135,22 @@ export interface Order {
   created_at?: string;
   user_email?: string;
   userEmail?: string;
+  confirmedAt?: string;
+  confirmed_at?: string;
+  readyForPickupAt?: string;
+  ready_for_pickup_at?: string;
+  pickedUpAt?: string;
+  picked_up_at?: string;
+  returnInitiatedAt?: string;
+  return_initiated_at?: string;
+  handedBackAt?: string;
+  handed_back_at?: string;
+  awaitingInspectionAt?: string;
+  awaiting_inspection_at?: string;
+  completedAt?: string;
+  completed_at?: string;
+  queueNotes?: string;
+  queue_notes?: string;
 }
 
 export interface Notification {

@@ -1086,6 +1086,75 @@ export const payerntApi = {
       };
     }
   },
+
+  // ============================================================
+  // LIVE RENTAL QUEUE (Lender / Vendor Milestones)
+  // ============================================================
+  async advanceRentalQueue(
+    bookingId: string,
+    milestone: string,
+    notes?: string
+  ): Promise<{
+    success: boolean;
+    status?: string;
+    booking?: any;
+    all_timestamps?: Record<string, string>;
+    timestamps?: Record<string, string>;
+    message?: string;
+    error?: string;
+  }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/payernt/bookings/${encodeURIComponent(bookingId)}/queue-advance`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ milestone, notes }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && (data.success || data.status)) {
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("payent_queue_updated", { detail: { bookingId, milestone, data } }));
+          window.dispatchEvent(new CustomEvent("payent_orders_updated"));
+        }
+        return {
+          success: true,
+          status: data.status,
+          booking: data.booking,
+          all_timestamps: data.all_timestamps || data.timestamps,
+          timestamps: data.all_timestamps || data.timestamps,
+          message: data.message,
+        };
+      }
+      return {
+        success: false,
+        error: data.detail || data.message || "Failed to advance rental queue.",
+      };
+    } catch (e: any) {
+      return {
+        success: false,
+        error: e?.message || "Network error while advancing rental queue.",
+      };
+    }
+  },
+
+  async markReadyForPickup(bookingId: string): Promise<any> {
+    return this.advanceRentalQueue(bookingId, "ready_for_pickup");
+  },
+
+  async confirmPickup(bookingId: string): Promise<any> {
+    return this.advanceRentalQueue(bookingId, "picked_up");
+  },
+
+  async confirmReturnHandover(bookingId: string): Promise<any> {
+    return this.advanceRentalQueue(bookingId, "handed_back");
+  },
+
+  async markAwaitingInspection(bookingId: string): Promise<any> {
+    return this.advanceRentalQueue(bookingId, "awaiting_inspection");
+  },
+
+  async completeRental(bookingId: string): Promise<any> {
+    return this.advanceRentalQueue(bookingId, "completed");
+  },
 };
 
 export default payerntApi;
