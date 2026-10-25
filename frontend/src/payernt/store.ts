@@ -298,14 +298,20 @@ export function usePayerntStore() {
   const logout = useCallback(() => {
     setActiveAccount(null);
     try {
+      payerntApi.logout().catch(() => {});
       localStorage.removeItem("paye₹nt_token");
       localStorage.removeItem("payernt_token");
       localStorage.removeItem("paye₹nt_refresh_token");
       localStorage.removeItem("payernt_refresh_token");
       localStorage.removeItem(STORAGE_KEY_SESSION);
       localStorage.removeItem(STORAGE_KEY_ACCOUNT);
+      localStorage.removeItem("payent:admin:token");
+      localStorage.removeItem("payent:admin:current_user");
+      localStorage.setItem("payent:signed_out", "true");
     } catch {}
+    window.dispatchEvent(new Event("payent:admin:profile-updated"));
     window.dispatchEvent(new CustomEvent("paye₹nt_auth_change", { detail: null }));
+    window.dispatchEvent(new CustomEvent("payent:storage_change"));
   }, []);
 
   // Sync to localStorage and broadcast updates

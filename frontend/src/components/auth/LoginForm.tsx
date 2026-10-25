@@ -63,14 +63,21 @@ export function LoginForm() {
       }
 
       const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
-      if (isValidInternalRedirect(redirectUrl, currentPath)) {
-        navigate({ to: redirectUrl as any });
+      const isAdmin = user.role === "admin" || (user as any).role === "superadmin";
+
+      // If user is not admin, prevent redirect to any /admin routes
+      const effectiveRedirect = isValidInternalRedirect(redirectUrl, currentPath)
+        ? (redirectUrl.startsWith("/admin") && !isAdmin ? null : redirectUrl)
+        : null;
+
+      if (effectiveRedirect) {
+        navigate({ to: effectiveRedirect as any });
       } else if (pendingProductId && `/product/${pendingProductId}` !== currentPath) {
         navigate({ to: `/product/${pendingProductId}` as any });
-      } else if (user.role === "admin" && currentPath !== "/admin/dashboard") {
+      } else if (isAdmin && currentPath !== "/admin/dashboard") {
         navigate({ to: "/admin/dashboard" });
-      } else if (currentPath !== "/categories") {
-        navigate({ to: "/categories" });
+      } else if (currentPath !== "/dashboard") {
+        navigate({ to: "/dashboard" });
       }
     }
   }, [user, navigate]);
@@ -147,7 +154,11 @@ export function LoginForm() {
       localStorage.removeItem("pendingProductId");
     }
 
-    if (currentUser?.role === "admin" || currentUser?.role === "superadmin") {
+    const loggedInUser = (res as any).user || currentUser;
+    const isAdmin = loggedInUser?.role === "admin" || (loggedInUser as any)?.role === "superadmin";
+    const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
+
+    if (isAdmin && loggedInUser) {
       const userToken = storage.get<string | null>(STORAGE_KEYS.token, null);
       if (userToken) {
         localStorage.setItem("payent:admin:token", userToken);
@@ -155,22 +166,34 @@ export function LoginForm() {
       localStorage.setItem(
         "payent:admin:current_user",
         JSON.stringify({
-          id: currentUser.id,
-          fullName: currentUser.fullName,
-          email: currentUser.email,
+          id: loggedInUser.id,
+          fullName: loggedInUser.fullName,
+          email: loggedInUser.email,
           role: "admin",
           status: "active",
           verified: true,
+          avatar: loggedInUser.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(loggedInUser.fullName)}&background=10b981&color=fff`,
+          createdAt: new Date().toISOString(),
         }),
       );
+      localStorage.removeItem("payent:admin:logged_out");
+      localStorage.removeItem("payent:signed_out");
       window.dispatchEvent(new Event("payent:admin:profile-updated"));
-      navigate({ to: "/admin/dashboard" });
+
+      if (isValidInternalRedirect(redirectUrl, currentPath) && redirectUrl.startsWith("/admin")) {
+        navigate({ to: redirectUrl as any });
+      } else {
+        navigate({ to: "/admin/dashboard" });
+      }
       return;
     }
 
-    const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
-    if (isValidInternalRedirect(redirectUrl, currentPath)) {
-      navigate({ to: redirectUrl as any });
+    const effectiveRedirect = isValidInternalRedirect(redirectUrl, currentPath)
+      ? (redirectUrl.startsWith("/admin") ? null : redirectUrl)
+      : null;
+
+    if (effectiveRedirect) {
+      navigate({ to: effectiveRedirect as any });
     } else if (pendingProductId && `/product/${pendingProductId}` !== currentPath) {
       navigate({ to: `/product/${pendingProductId}` as any });
     } else {

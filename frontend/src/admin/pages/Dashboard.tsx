@@ -110,8 +110,8 @@ type DateRange = "7D" | "30D" | "90D";
 
 export function Dashboard() {
   const shouldReduceMotion = useReducedMotion();
-  const { resolvedTheme } = useTheme();
-  const isDark = resolvedTheme === "dark";
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
 
   // ----------------------------------------------------------------------
   // State Management

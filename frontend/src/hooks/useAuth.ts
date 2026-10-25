@@ -234,13 +234,14 @@ export function useAuth() {
         if ((loggedUser.role === "admin" || (loggedUser as any).role === "superadmin") && typeof window !== "undefined") {
           localStorage.setItem("payent:admin:token", res.token);
           localStorage.setItem("payent:admin:current_user", JSON.stringify(loggedUser));
+          localStorage.removeItem("payent:admin:logged_out");
           window.dispatchEvent(new Event("payent:admin:profile-updated"));
         }
         setUser(loggedUser);
         if (typeof window !== "undefined") {
           window.dispatchEvent(new CustomEvent("payent:storage_change"));
         }
-        return { ok: true };
+        return { ok: true, user: loggedUser };
       }
       return { ok: false, error: "Invalid credentials from server." };
     } catch (e) {
@@ -284,8 +285,12 @@ export function useAuth() {
       localStorage.setItem("payent:signed_out", "true");
       localStorage.removeItem("pay₹ent_session");
       localStorage.removeItem("pay₹ent_account");
+      localStorage.removeItem("payent:admin:token");
+      localStorage.removeItem("payent:admin:current_user");
+      localStorage.removeItem("payent:admin:logged_out");
+      window.dispatchEvent(new Event("payent:admin:profile-updated"));
       window.dispatchEvent(new CustomEvent("payent:storage_change"));
-      window.location.href = "/";
+      window.location.replace("/login");
     }
   }, []);
 
@@ -306,9 +311,10 @@ export function useAuth() {
       localStorage.removeItem("pay₹ent_account");
       localStorage.removeItem("payent:admin:token");
       localStorage.removeItem("payent:admin:current_user");
+      localStorage.removeItem("payent:admin:logged_out");
       window.dispatchEvent(new Event("payent:admin:profile-updated"));
       window.dispatchEvent(new CustomEvent("payent:storage_change"));
-      window.location.href = "/";
+      window.location.replace("/login");
     }
   }, []);
 

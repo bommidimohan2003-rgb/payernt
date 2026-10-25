@@ -1472,7 +1472,7 @@ export default function Analytics() {
                         <div className="h-1.5 w-full bg-[#E4E4E7] dark:bg-[#27272A] rounded-full overflow-hidden mt-1">
                           <div
                             className="h-full bg-[#635BFF] rounded-full"
-                            style={{ width: `${Math.min(100, stage.conversionRate)}%` }}
+                            style={{ width: `${Math.min(100, stage.conversionRate || 0)}%` }}
                           />
                         </div>
                       </div>

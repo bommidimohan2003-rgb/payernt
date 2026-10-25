@@ -51,6 +51,8 @@ export interface DashboardFunnelStage {
   count: number;
   event_name: string;
   is_tracked: boolean;
+  name?: string;
+  conversionRate?: number;
 }
 
 export interface DashboardFunnel {
@@ -65,6 +67,10 @@ export interface DashboardActivity {
   detail: string;
   time: string;
   icon: string;
+  action?: string;
+  target?: string;
+  user?: string;
+  timestamp?: string;
 }
 
 export const notificationsService = {
@@ -220,8 +226,8 @@ export const notificationsService = {
     throw new Error("Invalid stats response from server");
   },
 
-  async getDashboardCharts(period = "30"): Promise<DashboardCharts> {
-    const days = parseInt(period, 10) || 30;
+  async getDashboardCharts(period: string | number = "30"): Promise<DashboardCharts> {
+    const days = typeof period === "number" ? period : parseInt(period, 10) || 30;
     const response = await adminApi.get(`/dashboard/charts?days=${days}`);
     if (response.data && typeof response.data === "object") {
       return response.data as DashboardCharts;

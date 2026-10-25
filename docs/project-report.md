@@ -1072,4 +1072,48 @@ This release implements two major capabilities on top of Payent's existing archi
 - Regression suite `backend/tests/test_listing_confirmation_security.py` passed **5/5 tests (100% OK)**.
 - Frontend build `npm run build` in `frontend/` passed with **0 errors**.
 
+---
+
+# Phase 16 — Authentication, Role-Based Routing & Session Cleanup Hardening
+
+**Status**: COMPLETED & VERIFIED  
+**Date**: October 25, 2026  
+**Test Suite**: `backend/tests/test_role_routing_and_admin_security.py` (5/5 tests passing, 100% pass rate)  
+**Regression Suite**: `backend/tests/test_three_context_auth_and_switching.py` (10/10 tests passing, 100% pass rate)  
+**Frontend Compilation**: `npx tsc --noEmit` & `npm run build` (0 errors, 100% clean)
+
+### 1. Root Cause Analysis
+1. **Admin Logout Re-render & Looping**:
+   - `authService.logout()` in `frontend/src/admin/services/auth.ts` only removed `payent:admin:token` and `payent:admin:current_user`, leaving `payent:currentUser` and `payent:token` in localStorage.
+   - When redirecting to `/admin/login`, `authService.getCurrentUser()` read the persistent `payent:currentUser` and immediately re-created `payent:admin:token` and `payent:admin:current_user`.
+   - In dev mode, lines 167–183 automatically generated a fake `DEFAULT_ADMIN` session whenever `payent:admin:logged_out` was not set.
+   - TanStack Router's `routes/admin.tsx` saw `loggedIn === true` and navigated back to `/admin/dashboard`, causing an infinite re-render loop.
+   - In `routes/admin/index.tsx`, line 10 explicitly threw `redirect({ to: "/admin/login" })`.
+2. **Payernt Admin Login Redirection Missing**:
+   - When an administrator logged in via the public `/payernt` entry point, `PayerntAuth.tsx` only called `onAuthSuccess` and did not redirect to `/admin/dashboard`.
+3. **Payernt Logout Client Invalidation Flaw**:
+   - `payerntApiService.logout()` removed `paye₹nt_token` from localStorage before invoking the backend logout endpoint, meaning the server never received the Bearer token and never invalidated the server session or JTI.
+4. **Ordinary User Admin Route Bleed**:
+   - When normal users logged in with a redirect URL pointing to `/admin/*`, the frontend previously attempted navigation to the admin route rather than stripping it to `/dashboard`.
+
+### 2. Architectural Implementation
+1. **Two Public Login Entry Points**:
+   - Exactly two public entry points exist: **Payernt Login** (`/payernt`) for product owners/lenders, and **Payrent Login** (`/login`) for renters/customers.
+   - No separate public admin login page or public admin registration route exists.
+   - Visiting `/admin/login` or `/admin/` verifies admin session authority; if unauthenticated, visitors are redirected to `/login?redirect=/admin/dashboard`.
+2. **Backend Authoritative Role Detection**:
+   - Both `/login` and `/payernt` authenticate users against the live database and determine the authoritative role (`admin`, `customer`, `vendor`).
+   - If verified as `admin` or `superadmin`, the frontend sets administrative session tokens and routes directly to `/admin/dashboard`.
+   - Ordinary users with a redirect parameter targeting `/admin/*` are prevented from redirecting to admin and guided to `/dashboard`.
+3. **Thorough Session Cleanup on Logout**:
+   - Admin logout revokes server-side session via `POST /api/admin/auth/logout` and `POST /api/auth/logout`, removes all admin keys (`payent:admin:*`), all customer keys (`payent:token`, `payent:currentUser`), and all vendor keys (`paye₹nt_*`), sets `payent:signed_out`, dispatches storage events, and uses `window.location.replace("/login")`.
+   - Payernt logout sends Bearer token to `POST /api/payernt/auth/logout` before clearing local keys, clearing both vendor and admin tokens.
+   - Payrent logout revokes server token, removes all tokens, and uses `window.location.replace("/login")` to ensure browser Back navigation cannot restore authenticated views.
+4. **Authoritative Admin Session Verification**:
+   - `verifyAdminSession()` calls `/api/admin/auth/me` to cryptographically verify credentials with the backend.
+   - If unauthenticated (401), redirects to public `/login`.
+   - If authenticated as a non-admin user (403), renders `<PermissionDenied requiredRole="Administrator" />` without redirect looping.
+   - If verified admin, renders the Admin Workspace.
+
+
 

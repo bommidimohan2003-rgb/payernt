@@ -170,6 +170,8 @@ export interface AdminProduct {
     customerName: string;
     createdAt: string;
   }>;
+  rentalCount?: number;
+  ownerName?: string;
   owner: {
     id: string;
     name: string;
@@ -204,6 +206,8 @@ export interface AdminBooking {
   productImage: string;
   customerId: string;
   customerName: string;
+  renterName?: string;
+  totalAmount?: number;
   ownerId: string;
   ownerName: string;
   startDate: string;
@@ -280,6 +284,7 @@ export interface AdminReport {
   ownerName: string;
   ownerId: string;
   status: "open" | "resolved" | "dismissed";
+  reportedType?: string;
   createdAt: string;
 }
 
@@ -297,7 +302,7 @@ export interface AdminSupportTicket {
   subject: string;
   category: string;
   status: "open" | "pending" | "in_progress" | "resolved" | "closed";
-  priority: "low" | "medium" | "high";
+  priority: "low" | "medium" | "high" | "urgent" | string;
   userName: string;
   userEmail: string;
   messages: {

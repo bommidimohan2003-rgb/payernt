@@ -355,15 +355,30 @@ export const payerntApi = {
 
   async logout(): Promise<{ success: boolean }> {
     try {
+      const token =
+        localStorage.getItem("paye₹nt_token") ||
+        localStorage.getItem("payernt_token") ||
+        localStorage.getItem("payent:admin:token");
+
+      if (token) {
+        await fetch(`${API_BASE}/api/payernt/auth/logout`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }).catch(() => {});
+      }
+
       localStorage.removeItem("paye₹nt_token");
       localStorage.removeItem("payernt_token");
       localStorage.removeItem("paye₹nt_refresh_token");
       localStorage.removeItem("payernt_refresh_token");
       localStorage.removeItem(STORAGE_KEY_SESSION);
       localStorage.removeItem(STORAGE_KEY_ACCOUNT);
-      await fetchWithPayerntAuth(`${API_BASE}/api/payernt/auth/logout`, {
-        method: "POST",
-      }).catch(() => {});
+      localStorage.removeItem("payent:admin:token");
+      localStorage.removeItem("payent:admin:current_user");
+      window.dispatchEvent(new Event("payent:admin:profile-updated"));
     } catch {}
     return { success: true };
   },

@@ -78,9 +78,8 @@ function AdminPageTransitionOutlet() {
 function AdminLayout() {
   const navigate = useNavigate();
   const currentPath = useRouterState({ select: (s) => s.location.pathname });
-  const isLoginPage = currentPath === "/admin/login" || currentPath === "/admin/login/";
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [loading, setLoading] = useState(!isLoginPage);
+  const [loading, setLoading] = useState(true);
   const [isDenied, setIsDenied] = useState(false);
 
   useEffect(() => {
@@ -88,37 +87,27 @@ function AdminLayout() {
 
     const checkAuth = async () => {
       const { authService } = await import("@/admin/services/auth");
-      const loggedIn = authService.isAuthenticated();
-      const currentUser = authService.getCurrentUser();
+      const { isValid, isForbidden } = await authService.verifyAdminSession();
 
       if (!isMounted) return;
 
-      if (isLoginPage) {
-        if (loggedIn) {
-          navigate({ to: "/admin/dashboard" });
-        }
-        setLoading(false);
-        return;
-      }
-
-      if (!loggedIn) {
+      if (!isValid) {
         setIsAuthenticated(false);
         setLoading(false);
-        navigate({
-          to: "/admin/login",
-        });
+        if (isForbidden) {
+          setIsDenied(true);
+        } else {
+          // Unauthenticated visitor -> redirect to public login entry point
+          navigate({
+            to: "/login",
+            search: { redirect: currentPath } as any,
+          });
+        }
         return;
       }
 
       setIsAuthenticated(true);
-
-      // If user is authenticated but not an admin role, show PermissionDenied
-      if (currentUser && currentUser.role !== "admin" && (currentUser as any).role !== "superadmin") {
-        setIsDenied(true);
-      } else {
-        setIsDenied(false);
-      }
-
+      setIsDenied(false);
       setLoading(false);
     };
 
@@ -132,11 +121,7 @@ function AdminLayout() {
       isMounted = false;
       window.removeEventListener("payent:admin:profile-updated", handleProfileUpdate);
     };
-  }, [navigate, isLoginPage]);
-
-  if (isLoginPage) {
-    return <Outlet />;
-  }
+  }, [navigate, currentPath]);
 
   if (loading) {
     return (

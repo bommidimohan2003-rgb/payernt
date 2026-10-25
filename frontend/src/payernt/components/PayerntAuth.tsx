@@ -161,6 +161,32 @@ export function PayerntAuth({
       .then((res) => {
         setIsLoggingIn(false);
         if (res.success && res.account) {
+          const role = res.account.role || (res as any).role || (res as any).user?.role;
+          if (role === "admin" || role === "superadmin") {
+            if (res.token) {
+              localStorage.setItem("payent:admin:token", res.token);
+            }
+            localStorage.setItem(
+              "payent:admin:current_user",
+              JSON.stringify({
+                id: res.account.email || res.account.accountId || (res.account as any).id,
+                fullName: res.account.name || "Administrator",
+                email: res.account.email,
+                role: "admin",
+                status: "active",
+                verified: true,
+                avatar: res.account.avatar,
+                createdAt: res.account.createdAt || (res.account as any).created_at || new Date().toISOString(),
+              })
+            );
+            localStorage.removeItem("payent:admin:logged_out");
+            localStorage.removeItem("payent:signed_out");
+            window.dispatchEvent(new Event("payent:admin:profile-updated"));
+            toast.success(`Welcome back, ${res.account.name} (Administrator)!`);
+            navigate({ to: "/admin/dashboard" });
+            return;
+          }
+
           toast.success(`Welcome back, ${res.account.name}!`);
           onAuthSuccess(res.account);
         } else if (res.status === "PENDING_REVIEW" || res.status === "REJECTED") {
