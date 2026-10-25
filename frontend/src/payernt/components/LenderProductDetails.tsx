@@ -31,6 +31,7 @@ import { usePayernt } from "../context";
 import { getOptimizedImageUrl } from "@/utils/images";
 import type { PayerntProduct } from "../types";
 import payerntApi from "../payerntApiService";
+import { VendorAvailabilityCalendar } from "./VendorAvailabilityCalendar";
 
 export function LenderProductDetails({ productId: propId }: { productId?: string }) {
   const navigate = useNavigate();
@@ -512,56 +513,34 @@ export function LenderProductDetails({ productId: propId }: { productId?: string
               </p>
             </div>
 
-            {/* Block Personal-Use Dates */}
-            <div className="pt-3 border-t border-border/70 space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-muted-foreground block">
-                  Block Dates for Personal Use
-                </label>
-                <span className="text-[10px] text-muted-foreground font-mono">
-                  {blockedDates.length} Blocked
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <input
-                  type="date"
-                  min={new Date().toISOString().split("T")[0]}
-                  value={newBlockedDate}
-                  onChange={(e) => setNewBlockedDate(e.target.value)}
-                  className="flex-1 px-3 py-1.5 rounded-xl border border-border bg-background text-xs font-semibold text-foreground focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
-                />
-                <button
-                  type="button"
-                  onClick={handleAddBlockedDate}
-                  disabled={!newBlockedDate}
-                  className="px-3 py-1.5 rounded-xl bg-secondary text-secondary-foreground text-xs font-bold hover:bg-secondary/80 disabled:opacity-40 transition-all cursor-pointer inline-flex items-center gap-1"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  Block
-                </button>
-              </div>
-
-              {blockedDates.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  {blockedDates.map((d) => (
-                    <span
-                      key={d}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 text-[11px] font-mono font-medium"
-                    >
-                      <CalendarOff className="w-3 h-3 text-amber-600 dark:text-amber-400" />
-                      <span>{d}</span>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveBlockedDate(d)}
-                        className="ml-1 hover:text-destructive cursor-pointer"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
+            {/* Block Personal-Use Dates (Visual Interactive Calendar) */}
+            <div className="pt-3 border-t border-border/70">
+              <VendorAvailabilityCalendar
+                productId={productId}
+                initialBlockedDates={blockedDates}
+                onDatesChange={(newDates) => setBlockedDates(newDates)}
+                standalone={true}
+                onSave={async (newDates) => {
+                  setBlockedDates(newDates);
+                  const res = await payerntApi.updateProductAvailabilityConfig(productId, {
+                    allowHalfDay,
+                    morningSlotEnabled,
+                    afternoonSlotEnabled,
+                    fullDaySlotEnabled,
+                    halfDayRate: halfDayRate ? Number(halfDayRate) : undefined,
+                    bufferMinutes,
+                    blockedDates: newDates,
+                  });
+                  if (res.success) {
+                    toast.success("Blocked dates updated and saved to database!");
+                  } else {
+                    toast.error(res.error || "Failed to update blocked dates.");
+                    throw new Error(res.error || "Failed to update blocked dates.");
+                  }
+                }}
+                title="Block Dates for Personal Use / Servicing"
+                subtitle="Select individual dates or continuous date ranges to block equipment from renter bookings."
+              />
             </div>
 
             {/* Save Config Button */}

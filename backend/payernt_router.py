@@ -33,6 +33,7 @@ from database import (
     record_booking_cancellation,
     create_notification,
     check_product_interval_conflicts,
+    check_products_booking_conflicts,
     normalize_slot_interval,
     parse_datetime_safely,
     parse_date_safely,
@@ -1831,21 +1832,25 @@ def update_product_availability_config_endpoint(
     if product.get("owner_id") != account["id"] and account.get("role") not in ("admin", "superadmin"):
         raise HTTPException(status_code=403, detail="Unauthorized: You do not own this listing.")
         
+    clean_new_blocked = None
     if data.blockedDates is not None:
+        clean_new_blocked = []
         for b_date_str in data.blockedDates:
             d = parse_date_safely(b_date_str)
             if not d:
                 continue
-            day_start = datetime.combine(d, datetime.min.time()).replace(tzinfo=timezone.utc)
-            day_end = datetime.combine(d, datetime.max.time()).replace(tzinfo=timezone.utc)
-            has_conflict, reason = check_product_interval_conflicts(
-                product_id, day_start, day_end, buffer_minutes=0
+            date_iso = d.strftime("%Y-%m-%d")
+            clean_new_blocked.append(date_iso)
+            # Check for conflict only with existing confirmed renter bookings (orders), not self-conflict
+            order_conflicts = check_products_booking_conflicts(
+                [product_id], date_iso, date_iso, include_blocked_dates=False
             )
-            if has_conflict:
+            if product_id in order_conflicts:
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
-                    detail=f"Cannot block date {b_date_str}: {reason}. Please resolve existing bookings first."
+                    detail=f"Cannot block date {date_iso}: An active renter reservation already exists for this date."
                 )
+        clean_new_blocked = sorted(list(set(clean_new_blocked)))
 
     update_fields = {}
     if data.allowHalfDay is not None:
@@ -1860,8 +1865,8 @@ def update_product_availability_config_endpoint(
         update_fields["half_day_rate"] = data.halfDayRate
     if data.bufferMinutes is not None:
         update_fields["buffer_minutes"] = data.bufferMinutes
-    if data.blockedDates is not None:
-        update_fields["blocked_dates"] = json.dumps(data.blockedDates)
+    if clean_new_blocked is not None:
+        update_fields["blocked_dates"] = json.dumps(clean_new_blocked)
 
     if update_fields:
         conn = get_db_connection()
@@ -1907,7 +1912,7 @@ def update_product_availability_config_endpoint(
             "fullDaySlotEnabled": data.fullDaySlotEnabled if data.fullDaySlotEnabled is not None else product.get("full_day_slot_enabled", True),
             "halfDayRate": data.halfDayRate if data.halfDayRate is not None else product.get("half_day_rate"),
             "bufferMinutes": data.bufferMinutes if data.bufferMinutes is not None else product.get("buffer_minutes", 60),
-            "blockedDates": data.blockedDates if data.blockedDates is not None else product.get("blocked_dates", []),
+            "blockedDates": clean_new_blocked if clean_new_blocked is not None else product.get("blocked_dates", []),
         }
     }
 

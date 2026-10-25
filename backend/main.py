@@ -2912,26 +2912,151 @@ def check_availability_batch(data: BatchAvailabilitySchema):
 @app.get("/api/products/{id}/availability")
 def check_single_product_availability(
     id: str,
-    start_date: str = Query(...),
-    end_date: str = Query(...)
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None)
 ):
-    start_dt = parse_date_safely(start_date)
-    end_dt = parse_date_safely(end_date)
-    if not start_dt or not end_dt:
-        raise HTTPException(status_code=400, detail="Invalid start_date or end_date format.")
-    if start_dt > end_dt:
-        raise HTTPException(status_code=400, detail="start_date cannot be after end_date.")
+    """
+    Returns authoritative product availability and full blocked/booked date lists
+    for rendering interactive booking calendars and validating reservation requests.
+    """
+    from database import (
+        fetch_one,
+        get_db_connection,
+        parse_date_safely,
+        evaluate_product_availability,
+        MOCK_ORDERS,
+        MOCK_CUSTOM_PRODUCTS,
+    )
 
-    avail_map = evaluate_products_availability_batch([id], start_date, end_date)
-    info = avail_map.get(id, {"status": "available", "is_available": True, "reason": None})
+    prod = None
+    try:
+        from payernt_database import get_payernt_product_by_id, MOCK_PAYERNT_PRODUCTS
+        prod = get_payernt_product_by_id(id)
+    except Exception:
+        pass
+    if not prod:
+        prod = fetch_one_product(id)
+    if not prod:
+        prod = fetch_one("SELECT * FROM custom_products WHERE id = %s", (id,))
+    if not prod:
+        prod = MOCK_CUSTOM_PRODUCTS.get(id)
+
+    if not prod:
+        raise HTTPException(status_code=404, detail=f"Product '{id}' not found.")
+
+    # 1. Extract and sanitize vendor blocked dates
+    b_raw = prod.get("blocked_dates") or prod.get("blockedDates")
+    blocked_dates_list = []
+    if isinstance(b_raw, str):
+        try:
+            blocked_dates_list = json.loads(b_raw)
+        except Exception:
+            blocked_dates_list = []
+    elif isinstance(b_raw, list):
+        blocked_dates_list = b_raw
+
+    clean_blocked_dates = []
+    for d_str in blocked_dates_list:
+        pd = parse_date_safely(d_str)
+        if pd:
+            clean_blocked_dates.append(pd.strftime("%Y-%m-%d"))
+    clean_blocked_dates = sorted(list(set(clean_blocked_dates)))
+
+    # 2. Extract active reservation dates from orders
+    booked_dates_set = set()
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT start_date, end_date FROM orders
+                    WHERE product_id = %s AND status NOT IN ('cancelled', 'refunded', 'rejected')
+                """, (id,))
+                for row in cursor.fetchall():
+                    s_ord = parse_date_safely(row.get("start_date"))
+                    e_ord = parse_date_safely(row.get("end_date"))
+                    if s_ord and e_ord:
+                        curr = s_ord
+                        while curr <= e_ord:
+                            booked_dates_set.add(curr.strftime("%Y-%m-%d"))
+                            curr += datetime.timedelta(days=1)
+        except Exception as e:
+            logger.warning(f"Error fetching booked dates for product {id}: {e}")
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+    for order in MOCK_ORDERS.values():
+        pid = str(order.get("product_id") or order.get("productId") or "")
+        if pid == id:
+            st = str(order.get("status") or "active").lower()
+            if st not in ('cancelled', 'refunded', 'rejected'):
+                s_ord = parse_date_safely(order.get("start_date") or order.get("startDate"))
+                e_ord = parse_date_safely(order.get("end_date") or order.get("endDate"))
+                if s_ord and e_ord:
+                    curr = s_ord
+                    while curr <= e_ord:
+                        booked_dates_set.add(curr.strftime("%Y-%m-%d"))
+                        curr += datetime.timedelta(days=1)
+
+    daily_val = int(float(prod.get("daily_rate") or prod.get("price") or 2499))
+    half_day_val = int(float(prod.get("half_day_rate") or round(daily_val * 0.6)))
+
+    # 3. Evaluate requested range if provided
+    is_avail = bool(prod.get("available", True))
+    status_str = "available" if is_avail else "unavailable"
+    reason_str = None
+
+    if start_date and end_date:
+        start_dt = parse_date_safely(start_date)
+        end_dt = parse_date_safely(end_date)
+        if not start_dt or not end_dt:
+            raise HTTPException(status_code=400, detail="Invalid start_date or end_date format.")
+        if start_dt > end_dt:
+            raise HTTPException(status_code=400, detail="start_date cannot be after end_date.")
+
+        # Check blocked dates overlap
+        curr = start_dt
+        while curr <= end_dt:
+            curr_s = curr.strftime("%Y-%m-%d")
+            if curr_s in clean_blocked_dates:
+                is_avail = False
+                status_str = "blocked"
+                reason_str = f"Date {curr_s} has been blocked by the owner for personal use or maintenance."
+                break
+            if curr_s in booked_dates_set:
+                is_avail = False
+                status_str = "booked"
+                reason_str = f"Date {curr_s} is already booked by another customer."
+                break
+            curr += datetime.timedelta(days=1)
+
+        if is_avail:
+            base_avail, base_status, base_reason = evaluate_product_availability(prod)
+            if not base_avail:
+                is_avail = False
+                status_str = base_status
+                reason_str = base_reason
 
     return {
+        "success": True,
         "product_id": id,
+        "productId": id,
         "start_date": start_date,
         "end_date": end_date,
-        "is_available": info.get("is_available", True),
-        "status": info.get("status", "available"),
-        "reason": info.get("reason")
+        "is_available": is_avail,
+        "isAvailable": is_avail,
+        "status": status_str,
+        "reason": reason_str,
+        "blocked_dates": clean_blocked_dates,
+        "blockedDates": clean_blocked_dates,
+        "booked_dates": sorted(list(booked_dates_set)),
+        "bookedDates": sorted(list(booked_dates_set)),
+        "allowHalfDay": bool(prod.get("allow_half_day", True)),
+        "dailyRate": daily_val,
+        "halfDayRate": half_day_val,
     }
 
 @app.get("/api/products/{id}/slots")

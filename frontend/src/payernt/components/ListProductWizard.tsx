@@ -56,6 +56,7 @@ import type {
 import { usePayerntStore } from "../store";
 import { payerntApi } from "../payerntApiService";
 import { uploadVideoToCloudinary, uploadImageToCloudinary } from "@/utils/cloudinary";
+import { VendorAvailabilityCalendar } from "./VendorAvailabilityCalendar";
 
 interface ListProductWizardProps {
   initialDraft?: Partial<PayerntProduct> | null;
@@ -1505,6 +1506,8 @@ export function ListProductWizard({
         unavailableDates,
         bufferDaysBetweenRentals: bufferDays,
       },
+      blocked_dates: unavailableDates,
+      blockedDates: unavailableDates,
       verificationDocs: {
         ownerFullName: ownerName,
         ownerPhone: activeAccount?.phone || "",
@@ -2683,56 +2686,15 @@ export function ListProductWizard({
                     </div>
                   </div>
 
-                  {/* Blocked Dates Manager */}
-                  <div className="space-y-2 pt-2 border-t border-border/60">
-                    <label className="text-xs font-semibold text-foreground">
-                      Block Dates (Personal Use / Maintenance)
-                    </label>
-                    <div className="flex gap-2">
-                      <input
-                        type="date"
-                        value={newBlockedDate}
-                        min={new Date().toISOString().split("T")[0]}
-                        onChange={(e) => setNewBlockedDate(e.target.value)}
-                        className="flex-1 px-3.5 py-2 rounded-xl border border-border bg-background text-foreground text-xs focus:ring-2 focus:ring-primary outline-none"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (!newBlockedDate) return;
-                          if (unavailableDates.includes(newBlockedDate)) {
-                            toast.error("Date already blocked.");
-                            return;
-                          }
-                          setUnavailableDates((prev) => [...prev, newBlockedDate].sort());
-                          setNewBlockedDate("");
-                          toast.info(`Blocked date ${newBlockedDate}.`);
-                        }}
-                        className="px-4 py-2 rounded-xl bg-secondary hover:bg-secondary/80 text-foreground font-semibold text-xs transition-all cursor-pointer"
-                      >
-                        Block Date
-                      </button>
-                    </div>
-
-                    {unavailableDates.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 pt-1">
-                        {unavailableDates.map((d) => (
-                          <span
-                            key={d}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-destructive/10 text-destructive text-[11px] font-mono font-semibold border border-destructive/20"
-                          >
-                            <span>{d}</span>
-                            <button
-                              type="button"
-                              onClick={() => setUnavailableDates((prev) => prev.filter((item) => item !== d))}
-                              className="hover:opacity-75 cursor-pointer"
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </span>
-                        ))}
-                      </div>
-                    )}
+                  {/* Vendor Availability Calendar */}
+                  <div className="pt-2 border-t border-border/60">
+                    <VendorAvailabilityCalendar
+                      initialBlockedDates={unavailableDates}
+                      onDatesChange={(dates) => setUnavailableDates(dates)}
+                      standalone={false}
+                      title="Manage Availability & Block Dates"
+                      subtitle="Select individual dates or continuous date ranges when your equipment is unavailable. Blocked dates cannot be booked by renters."
+                    />
                   </div>
                 </div>
 

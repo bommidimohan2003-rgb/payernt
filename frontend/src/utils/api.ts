@@ -1052,11 +1052,6 @@ export const api = {
         orderData.createdAt || orderData.created_at || new Date().toISOString(),
     };
 
-    const currentOrders = storage.get<Order[]>(STORAGE_KEYS.orders, []);
-    if (!currentOrders.some((o) => o.id === orderData.id)) {
-      storage.set(STORAGE_KEYS.orders, [payload as Order, ...currentOrders]);
-    }
-
     const res = await this.fetchWithAuth(`${API_BASE}/api/orders`, {
       method: "POST",
       headers: {
@@ -1064,7 +1059,20 @@ export const api = {
       },
       body: JSON.stringify(payload),
     });
-    if (!res.ok) throw new Error("Failed to create order");
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      const detail =
+        (errData && (errData.detail || errData.message || errData.error)) ||
+        "Failed to create booking reservation";
+      throw new Error(detail);
+    }
+
+    const currentOrders = storage.get<Order[]>(STORAGE_KEYS.orders, []);
+    if (!currentOrders.some((o) => o.id === orderData.id)) {
+      storage.set(STORAGE_KEYS.orders, [payload as Order, ...currentOrders]);
+    }
+
     this.invalidateCache("user_orders");
     this.invalidateCache("public_stats");
     return res.json();

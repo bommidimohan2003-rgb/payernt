@@ -40,6 +40,7 @@ import { PhotoDetailViewer } from "@/components/common/PhotoDetailViewer";
 import { ProductRotationViewer } from "@/components/common/ProductRotationViewer";
 import { ProductAngleViewer } from "@/components/common/ProductAngleViewer";
 import { RecommendationSection } from "@/components/recommendations/RecommendationSection";
+import { RenterBookingCalendar } from "@/components/booking/RenterBookingCalendar";
 import { tracker } from "@/utils/eventTracker";
 import { api } from "@/utils/api";
 import { storage, STORAGE_KEYS } from "@/utils/storage";
@@ -377,7 +378,7 @@ export default function ProductDetails() {
   };
 
   // CHECK AVAILABILITY LOGIC
-  const handleCheckAvailability = () => {
+  const handleCheckAvailability = async () => {
     if (!startDate) {
       toast.error("Please select a Rental Date.");
       return;
@@ -418,6 +419,13 @@ export default function ProductDetails() {
     if (durationMode !== "custom" && daySlots.length > 0) {
       const targetSlot = daySlots.find((s) => s.id === selectedSlot);
       if (targetSlot) {
+        if (targetSlot.status === "blocked" || (targetSlot as any).isBlocked) {
+          setIsAvailableForDates(false);
+          setAvailabilityMessage(`The selected date or time slot is blocked by the owner for maintenance or personal use.`);
+          setAvailabilityChecked(true);
+          toast.error("Date or slot is blocked by owner.");
+          return;
+        }
         if (targetSlot.status === "booked") {
           setIsAvailableForDates(false);
           setAvailabilityMessage(`The ${targetSlot.name} slot is already booked for ${startDate}. Please choose another slot.`);
@@ -433,6 +441,36 @@ export default function ProductDetails() {
           return;
         }
       }
+    }
+
+    // Backend authoritative availability verification for requested date span
+    try {
+      const checkEnd = durationMode === "custom" ? endDate : startDate;
+      const res = await fetch(
+        `/api/products/${encodeURIComponent(id)}/availability?start_date=${startDate}&end_date=${checkEnd}`
+      );
+      if (res.ok) {
+        const availData = await res.json();
+        if (availData.conflicts && availData.conflicts.length > 0) {
+          const firstConflict = availData.conflicts[0];
+          const isBlocked = firstConflict.reason === "blocked";
+          setIsAvailableForDates(false);
+          setAvailabilityMessage(
+            isBlocked
+              ? `Unavailable: Date ${firstConflict.date} is blocked by the equipment owner.`
+              : `Unavailable: Date ${firstConflict.date} is already reserved by another renter.`
+          );
+          setAvailabilityChecked(true);
+          toast.error(
+            isBlocked
+              ? `Date ${firstConflict.date} is blocked by owner.`
+              : `Date ${firstConflict.date} is already reserved.`
+          );
+          return;
+        }
+      }
+    } catch (e) {
+      console.debug("Backend availability check error:", e);
     }
 
     // Check overlap with existing confirmed bookings
@@ -547,19 +585,12 @@ export default function ProductDetails() {
       toast.success("Rental booking confirmed successfully!");
       setIsCreatingBooking(false);
       navigate({ to: "/dashboard" });
-    } catch (err: unknown) {
-      console.warn("Booking creation notice:", err);
-      // Fallback local save to guarantee optimistic state
-      const allOrders = storage.get<Order[]>(STORAGE_KEYS.orders, []);
-      if (!allOrders.some((o) => o.id === newOrder.id)) {
-        storage.set(STORAGE_KEYS.orders, [newOrder, ...allOrders]);
-      }
-      api.invalidateCache("user_orders");
-      window.dispatchEvent(new CustomEvent("payent_orders_updated"));
-
-      toast.success("Rental booking request placed!");
+    } catch (err: any) {
+      console.error("Booking creation failed:", err);
+      const errMsg = err?.message || "Failed to confirm booking reservation.";
+      toast.error(errMsg);
       setIsCreatingBooking(false);
-      navigate({ to: "/dashboard" });
+      return;
     }
   };
 
@@ -1035,6 +1066,24 @@ export default function ProductDetails() {
                           <div className="text-[9px] opacity-75 font-normal">2+ Days</div>
                         </button>
                       </div>
+                    </div>
+
+                    {/* Visual Interactive Booking Calendar (With Red Vendor-Blocked Dates) */}
+                    <div className="pt-1">
+                      <RenterBookingCalendar
+                        productId={id}
+                        selectedStartDate={startDate}
+                        selectedEndDate={durationMode === "custom" ? endDate : startDate}
+                        onDateChange={(start, end) => {
+                          setStartDate(start);
+                          setEndDate(durationMode === "custom" ? end : start);
+                          setAvailabilityChecked(false);
+                          setIsAvailableForDates(null);
+                          setAvailabilityMessage("");
+                        }}
+                        durationMode={durationMode}
+                        minDate={todayStr}
+                      />
                     </div>
 
                     {/* Date Inputs Grid */}

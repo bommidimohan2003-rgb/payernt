@@ -1842,6 +1842,42 @@ def create_order(email: str, order: dict):
     end_datetime = order.get("end_datetime") or order.get("endDatetime") or end_dt.isoformat()
 
     if pid and start and end and status not in ("cancelled", "rejected", "failed"):
+        s_date = parse_date_safely(start)
+        e_date = parse_date_safely(end)
+        if s_date and e_date:
+            if s_date > e_date:
+                s_date, e_date = e_date, s_date
+
+            # Authoritative Blocked Dates Verification across every date in the requested rental period
+            product_rec = None
+            try:
+                from payernt_database import get_payernt_product_by_id
+                product_rec = get_payernt_product_by_id(pid)
+            except Exception:
+                pass
+            if not product_rec:
+                product_rec = fetch_one("SELECT * FROM custom_products WHERE id = %s", (pid,))
+            if not product_rec:
+                product_rec = MOCK_CUSTOM_PRODUCTS.get(pid)
+
+            if product_rec:
+                b_raw = product_rec.get("blocked_dates") or product_rec.get("blockedDates")
+                if b_raw:
+                    b_list = json.loads(b_raw) if isinstance(b_raw, str) else b_raw
+                    if isinstance(b_list, list):
+                        blocked_set = set()
+                        for b_str in b_list:
+                            b_d = parse_date_safely(b_str)
+                            if b_d:
+                                blocked_set.add(b_d.strftime("%Y-%m-%d"))
+
+                        curr = s_date
+                        while curr <= e_date:
+                            curr_str = curr.strftime("%Y-%m-%d")
+                            if curr_str in blocked_set:
+                                raise ValueError(f"Requested booking dates conflict with date {curr_str}, which has been blocked by the owner for personal use or maintenance.")
+                            curr += datetime.timedelta(days=1)
+
         # 1. Authoritative slot & interval conflict check with turnaround buffer
         has_slot_conf, conf_reason = check_product_interval_conflicts(
             pid, start_dt, end_dt, buffer_minutes=60, exclude_order_id=order.get("id")
@@ -1849,9 +1885,9 @@ def create_order(email: str, order: dict):
         if has_slot_conf:
             raise ValueError(f"Double booking conflict: Product '{pid}' is already booked ({conf_reason}).")
 
-        # 2. Date-level check for multi-day bookings
+        # 2. Date-level check for multi-day bookings (includes orders and blocked dates)
         if duration_type == "multi_day" or (start != end and time_slot == "full_day"):
-            conflicts = check_products_booking_conflicts([pid], start, end, exclude_order_id=order.get("id"))
+            conflicts = check_products_booking_conflicts([pid], start, end, exclude_order_id=order.get("id"), include_blocked_dates=True)
             if pid in conflicts:
                 raise ValueError(f"Double booking conflict: Product '{pid}' is already booked for {start} to {end}.")
 
@@ -4177,12 +4213,16 @@ def get_product_slots_for_date(product_id: str, date_str: str) -> Dict[str, Any]
                 product_id, start_dt, end_dt, buffer_minutes=buffer_min
             )
             if has_conflict:
-                status = "booked"
-                status_label = "Booked"
+                if reason and ("personal use" in reason.lower() or "blocked" in reason.lower() or "unavailable period" in reason.lower()):
+                    status = "blocked"
+                    status_label = "Blocked by Owner"
+                else:
+                    status = "booked"
+                    status_label = "Booked"
             else:
                 status = "available"
                 status_label = "Available"
-                
+
         slots_out.append({
             "id": s_id,
             "name": s_name,
@@ -4197,12 +4237,15 @@ def get_product_slots_for_date(product_id: str, date_str: str) -> Dict[str, Any]
             "rateFormatted": f"₹{rate:,}",
             "enabled": enabled
         })
-        
+
+    is_blocked_day = any(s.get("status") == "blocked" for s in slots_out)
+
     return {
         "success": True,
         "productId": product_id,
         "date": date_str,
         "bufferMinutes": buffer_min,
+        "isBlocked": is_blocked_day,
         "pricing": {
             "dailyRate": daily_rate,
             "halfDayRate": half_day_rate
@@ -4210,11 +4253,17 @@ def get_product_slots_for_date(product_id: str, date_str: str) -> Dict[str, Any]
         "slots": slots_out
     }
 
-def check_products_booking_conflicts(product_ids: List[str], start_date_str: str, end_date_str: str, exclude_order_id: Optional[str] = None) -> Set[str]:
+def check_products_booking_conflicts(
+    product_ids: List[str],
+    start_date_str: str,
+    end_date_str: str,
+    exclude_order_id: Optional[str] = None,
+    include_blocked_dates: bool = True
+) -> Set[str]:
     """
     Batched query to check whether any of the specified products have conflicting active/confirmed bookings
-    for the requested date range [start_date, end_date].
-    Conflict condition: requested_start <= order_end AND requested_end >= order_start.
+    or vendor-blocked dates for the requested date range [start_date, end_date].
+    Conflict condition: requested_start <= order_end AND requested_end >= order_start, OR any blocked_date in range.
     Returns a set of product_id strings that have conflicts.
     """
     conflicted: Set[str] = set()
@@ -4255,12 +4304,53 @@ def check_products_booking_conflicts(product_ids: List[str], start_date_str: str
                     if ord_start and ord_end:
                         if req_start <= ord_end and req_end >= ord_start:
                             conflicted.add(pid)
+
+                # 2. Check vendor blocked dates in payernt_products and custom_products tables
+                if include_blocked_dates:
+                    try:
+                        cursor.execute(f"""
+                            SELECT id, blocked_dates FROM payernt_products WHERE id IN ({placeholders})
+                        """, tuple(product_ids))
+                        for row in cursor.fetchall():
+                            pid = str(row.get("id") or "")
+                            b_raw = row.get("blocked_dates")
+                            if b_raw:
+                                b_list = json.loads(b_raw) if isinstance(b_raw, str) else b_raw
+                                if isinstance(b_list, list):
+                                    for b_str in b_list:
+                                        b_d = parse_date_safely(b_str)
+                                        if b_d and req_start <= b_d <= req_end:
+                                            conflicted.add(pid)
+                                            break
+                    except Exception as b_err:
+                        logger.warning(f"Error checking payernt_products blocked dates: {b_err}")
+
+                    try:
+                        cursor.execute(f"""
+                            SELECT id, blocked_dates FROM custom_products WHERE id IN ({placeholders})
+                        """, tuple(product_ids))
+                        for row in cursor.fetchall():
+                            pid = str(row.get("id") or "")
+                            b_raw = row.get("blocked_dates")
+                            if b_raw:
+                                b_list = json.loads(b_raw) if isinstance(b_raw, str) else b_raw
+                                if isinstance(b_list, list):
+                                    for b_str in b_list:
+                                        b_d = parse_date_safely(b_str)
+                                        if b_d and req_start <= b_d <= req_end:
+                                            conflicted.add(pid)
+                                            break
+                    except Exception as cb_err:
+                        logger.warning(f"Error checking custom_products blocked dates: {cb_err}")
         except Exception as e:
             logger.warning(f"Error checking booking conflicts in database: {e}")
         finally:
-            conn.close()
+            try:
+                conn.close()
+            except Exception:
+                pass
 
-    # 2. Also check in-memory MOCK_ORDERS fallback
+    # 3. Also check in-memory MOCK_ORDERS fallback
     for order in MOCK_ORDERS.values():
         if exclude_order_id and order.get("id") == exclude_order_id:
             continue
@@ -4273,6 +4363,24 @@ def check_products_booking_conflicts(product_ids: List[str], start_date_str: str
                 if ord_start and ord_end:
                     if req_start <= ord_end and req_end >= ord_start:
                         conflicted.add(pid)
+
+    # 4. In-memory product blocked dates fallback
+    if include_blocked_dates:
+        try:
+            from payernt_database import MOCK_PAYERNT_PRODUCTS
+            for pid in product_ids:
+                p = MOCK_PAYERNT_PRODUCTS.get(pid) or MOCK_CUSTOM_PRODUCTS.get(pid)
+                if p and p.get("blocked_dates"):
+                    b_raw = p["blocked_dates"]
+                    b_list = json.loads(b_raw) if isinstance(b_raw, str) else b_raw
+                    if isinstance(b_list, list):
+                        for b_str in b_list:
+                            b_d = parse_date_safely(b_str)
+                            if b_d and req_start <= b_d <= req_end:
+                                conflicted.add(pid)
+                                break
+        except Exception:
+            pass
 
     return conflicted
 

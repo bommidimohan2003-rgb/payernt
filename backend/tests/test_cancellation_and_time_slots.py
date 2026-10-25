@@ -286,15 +286,22 @@ class TestLenderCancellationAndTimeSlots:
         # Mark handover verified
         try:
             execute_query(
-                "UPDATE orders SET vendor_handover_verified = 1, delivery_status = 'PICKED_UP_FROM_VENDOR' WHERE id = %s",
+                "UPDATE rental_security SET vendor_handover_verified = 1 WHERE booking_id = %s",
+                (booking_id,),
+            )
+            execute_query(
+                "UPDATE orders SET status = 'active' WHERE id = %s",
                 (booking_id,),
             )
         except Exception:
             pass
+        from payernt_database import MOCK_RENTAL_SECURITIES
+        if booking_id in MOCK_RENTAL_SECURITIES:
+            MOCK_RENTAL_SECURITIES[booking_id]["vendor_handover_verified"] = True
         for o in MOCK_ORDERS.values():
             if isinstance(o, dict) and str(o.get("id")) == booking_id:
                 o["vendor_handover_verified"] = True
-                o["delivery_status"] = "PICKED_UP_FROM_VENDOR"
+                o["status"] = "active"
 
         res = client.post(
             f"/api/payernt/bookings/{booking_id}/cancel",

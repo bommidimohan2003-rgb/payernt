@@ -16,6 +16,7 @@ from database import (
     execute_query,
     fetch_one,
     fetch_all,
+    parse_date_safely,
 )
 from auth import hash_password, verify_password
 
@@ -1049,6 +1050,36 @@ def create_payernt_product(
     max_p = apr.get("maxPrice") or apr.get("max_price") if isinstance(apr, dict) else None
     price_status_val = "SET" if (min_p is not None and max_p is not None) else "NOT_SET"
 
+    # Availability, Blocked Dates & Time Slots extraction
+    blocked_dates_list = []
+    if isinstance(data.get("blocked_dates"), list):
+        blocked_dates_list = [str(d).strip() for d in data["blocked_dates"] if str(d).strip()]
+    elif isinstance(data.get("blockedDates"), list):
+        blocked_dates_list = [str(d).strip() for d in data["blockedDates"] if str(d).strip()]
+    elif isinstance(data.get("availability"), dict):
+        avail = data["availability"]
+        raw_u = avail.get("unavailableDates") or avail.get("blockedDates") or []
+        if isinstance(raw_u, list):
+            blocked_dates_list = [str(d).strip() for d in raw_u if str(d).strip()]
+
+    clean_blocked_dates = []
+    for d_str in blocked_dates_list:
+        parsed_d = parse_date_safely(d_str)
+        if parsed_d:
+            clean_blocked_dates.append(parsed_d.strftime("%Y-%m-%d"))
+    clean_blocked_dates = sorted(list(set(clean_blocked_dates)))
+    blocked_dates_json = json.dumps(clean_blocked_dates)
+
+    allow_half_day_val = 1 if bool(data.get("allow_half_day", data.get("allowHalfDay", True))) else 0
+    morning_slot_val = 1 if bool(data.get("morning_slot_enabled", data.get("morningSlotEnabled", True))) else 0
+    afternoon_slot_val = 1 if bool(data.get("afternoon_slot_enabled", data.get("afternoonSlotEnabled", True))) else 0
+    full_day_slot_val = 1 if bool(data.get("full_day_slot_enabled", data.get("fullDaySlotEnabled", True))) else 0
+    half_day_rate_val = int(data.get("half_day_rate") or data.get("halfDayRate") or round(daily_val * 0.6))
+    buffer_min_val = int(data.get("buffer_minutes") or data.get("bufferMinutes") or (data.get("availability", {}).get("bufferDaysBetweenRentals", 0) * 1440) or 60)
+
+    avail_from = data.get("available_from_date") or data.get("availableFromDate") or (data.get("availability", {}).get("availableFromDate") if isinstance(data.get("availability"), dict) else "")
+    avail_until = data.get("available_until_date") or data.get("availableUntilDate") or (data.get("availability", {}).get("availableUntilDate") if isinstance(data.get("availability"), dict) else "")
+
     product = {
         "id": product_id,
         "owner_id": owner_id,
@@ -1087,6 +1118,23 @@ def create_payernt_product(
         "price_status": price_status_val,
         "vendor_secret_pin": vendor_pin,  # GENERATED ONCE AND PRESERVED FOREVER
         "status": data.get("status", "under_review"),
+        "allow_half_day": bool(allow_half_day_val),
+        "morning_slot_enabled": bool(morning_slot_val),
+        "afternoon_slot_enabled": bool(afternoon_slot_val),
+        "full_day_slot_enabled": bool(full_day_slot_val),
+        "half_day_rate": half_day_rate_val,
+        "buffer_minutes": buffer_min_val,
+        "blocked_dates": clean_blocked_dates,
+        "blockedDates": clean_blocked_dates,
+        "availability": {
+            "type": "always",
+            "availableNow": bool(data.get("available", False)),
+            "availableFromDate": avail_from,
+            "availableUntilDate": avail_until,
+            "unavailableDates": clean_blocked_dates,
+            "blockedDates": clean_blocked_dates,
+            "bufferDaysBetweenRentals": max(0, buffer_min_val // 1440),
+        },
         "created_at": now_iso,
         "updated_at": now_iso,
     }
@@ -1099,8 +1147,9 @@ def create_payernt_product(
                 city, area, pincode, pickup_instructions, daily_rate, weekly_rate, monthly_rate,
                 security_deposit, available, availability_status, min_rental_days, max_rental_days,
                 primary_image, images, video_url, min_price, max_price, price_unit, price_status,
-                vendor_secret_pin, status, created_at, updated_at
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                vendor_secret_pin, status, allow_half_day, morning_slot_enabled, afternoon_slot_enabled,
+                full_day_slot_enabled, half_day_rate, buffer_minutes, blocked_dates, created_at, updated_at
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON DUPLICATE KEY UPDATE
                 category = VALUES(category), name = VALUES(name), title = VALUES(title),
                 brand = VALUES(brand), model = VALUES(model), year = VALUES(year),
@@ -1111,7 +1160,10 @@ def create_payernt_product(
                 pickup_instructions = VALUES(pickup_instructions), daily_rate = VALUES(daily_rate),
                 weekly_rate = VALUES(weekly_rate), monthly_rate = VALUES(monthly_rate),
                 primary_image = VALUES(primary_image), images = VALUES(images), video_url = VALUES(video_url),
-                status = VALUES(status), updated_at = VALUES(updated_at)
+                status = VALUES(status), allow_half_day = VALUES(allow_half_day),
+                morning_slot_enabled = VALUES(morning_slot_enabled), afternoon_slot_enabled = VALUES(afternoon_slot_enabled),
+                full_day_slot_enabled = VALUES(full_day_slot_enabled), half_day_rate = VALUES(half_day_rate),
+                buffer_minutes = VALUES(buffer_minutes), blocked_dates = VALUES(blocked_dates), updated_at = VALUES(updated_at)
         """, (
             product["id"], product["owner_id"], product["owner_email"], product["owner_name"],
             product["category"], product["name"], product["title"], product["brand"], product["model"],
@@ -1122,14 +1174,107 @@ def create_payernt_product(
             product["available"], product["availability_status"], product["min_rental_days"], product["max_rental_days"],
             product["primary_image"], product["images"], product["video_url"], product["min_price"], product["max_price"],
             product["price_unit"], product["price_status"], product["vendor_secret_pin"], product["status"],
+            allow_half_day_val, morning_slot_val, afternoon_slot_val, full_day_slot_val,
+            half_day_rate_val, buffer_min_val, blocked_dates_json,
             product["created_at"], product["updated_at"]
         ))
     except Exception as e:
         logger.warning(f"DB insert error for payernt_product: {e}")
 
+    # Synchronize to custom_products for unified customer catalog visibility
+    try:
+        execute_query("""
+            INSERT INTO custom_products (
+                id, user_email, title, description, price, image, category,
+                rating, reviews, available, status, owner_name, owner_avatar,
+                owner_rating, created_at, blocked_dates, allow_half_day,
+                morning_slot_enabled, afternoon_slot_enabled, full_day_slot_enabled,
+                half_day_rate, buffer_minutes
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, 5.0, 0, %s, %s, %s, %s, 5.0, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE
+                title = VALUES(title), description = VALUES(description), price = VALUES(price),
+                image = VALUES(image), category = VALUES(category), available = VALUES(available),
+                status = VALUES(status), blocked_dates = VALUES(blocked_dates),
+                allow_half_day = VALUES(allow_half_day), morning_slot_enabled = VALUES(morning_slot_enabled),
+                afternoon_slot_enabled = VALUES(afternoon_slot_enabled), full_day_slot_enabled = VALUES(full_day_slot_enabled),
+                half_day_rate = VALUES(half_day_rate), buffer_minutes = VALUES(buffer_minutes)
+        """, (
+            product["id"], owner_email, product["title"], product["description"],
+            product["daily_rate"], product["primary_image"], product["category"],
+            1 if product["available"] else 0, product["status"], owner_name, "",
+            now_iso, blocked_dates_json, allow_half_day_val, morning_slot_val,
+            afternoon_slot_val, full_day_slot_val, half_day_rate_val, buffer_min_val
+        ))
+    except Exception as e:
+        logger.warning(f"DB sync to custom_products notice: {e}")
+
     MOCK_PAYERNT_PRODUCTS[product["id"]] = product
     log_payernt_audit_event("PRODUCT_CREATE", owner_id, {"productId": product_id, "category": product["category"]})
     return product
+
+
+def _normalize_payernt_product_dict(row: Dict[str, Any], include_pin: bool = False) -> Dict[str, Any]:
+    if not row:
+        return {}
+    clean = dict(row)
+    if not include_pin:
+        clean.pop("vendor_secret_pin", None)
+
+    # Parse blocked_dates
+    b_raw = clean.get("blocked_dates") or clean.get("blockedDates")
+    b_list = []
+    if isinstance(b_raw, str):
+        try:
+            b_list = json.loads(b_raw)
+        except Exception:
+            b_list = []
+    elif isinstance(b_raw, list):
+        b_list = b_raw
+
+    clean_b = []
+    for d in b_list:
+        pd = parse_date_safely(d)
+        if pd:
+            clean_b.append(pd.strftime("%Y-%m-%d"))
+    clean_b = sorted(list(set(clean_b)))
+    clean["blocked_dates"] = clean_b
+    clean["blockedDates"] = clean_b
+
+    # Ensure slot flags are boolean
+    clean["allow_half_day"] = bool(clean.get("allow_half_day", True))
+    clean["allowHalfDay"] = clean["allow_half_day"]
+    clean["morning_slot_enabled"] = bool(clean.get("morning_slot_enabled", True))
+    clean["morningSlotEnabled"] = clean["morning_slot_enabled"]
+    clean["afternoon_slot_enabled"] = bool(clean.get("afternoon_slot_enabled", True))
+    clean["afternoonSlotEnabled"] = clean["afternoon_slot_enabled"]
+    clean["full_day_slot_enabled"] = bool(clean.get("full_day_slot_enabled", True))
+    clean["fullDaySlotEnabled"] = clean["full_day_slot_enabled"]
+
+    daily = int(float(clean.get("daily_rate") or clean.get("price") or 2499))
+    half_day = clean.get("half_day_rate") or round(daily * 0.6)
+    clean["daily_rate"] = daily
+    clean["half_day_rate"] = int(half_day)
+    clean["halfDayRate"] = int(half_day)
+    clean["buffer_minutes"] = int(clean.get("buffer_minutes") or 60)
+    clean["bufferMinutes"] = clean["buffer_minutes"]
+
+    if not clean.get("availability") or not isinstance(clean.get("availability"), dict):
+        clean["availability"] = {
+            "type": "always",
+            "availableNow": bool(clean.get("available", False)),
+            "availableFromDate": clean.get("created_at", "")[:10] if clean.get("created_at") else "",
+            "availableUntilDate": "",
+            "unavailableDates": clean_b,
+            "blockedDates": clean_b,
+            "bufferDaysBetweenRentals": clean["buffer_minutes"] // 1440,
+        }
+    else:
+        avail = dict(clean["availability"])
+        avail["unavailableDates"] = clean_b
+        avail["blockedDates"] = clean_b
+        clean["availability"] = avail
+
+    return clean
 
 
 def get_payernt_product_by_id(product_id: str, include_pin: bool = False) -> Optional[Dict[str, Any]]:
@@ -1149,10 +1294,7 @@ def get_payernt_product_by_id(product_id: str, include_pin: bool = False) -> Opt
     if not row:
         return None
 
-    clean = dict(row)
-    if not include_pin:
-        clean.pop("vendor_secret_pin", None)
-    return clean
+    return _normalize_payernt_product_dict(row, include_pin=include_pin)
 
 
 def get_payernt_products_by_owner(owner_id: str, owner_email: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -1169,13 +1311,13 @@ def get_payernt_products_by_owner(owner_id: str, owner_email: Optional[str] = No
         else:
             rows = fetch_all("SELECT * FROM payernt_products WHERE owner_id = %s ORDER BY created_at DESC", (owner_id,))
         if rows:
-            return rows
+            return [_normalize_payernt_product_dict(r, include_pin=True) for r in rows]
     except Exception as e:
         logger.warning(f"DB fetch error for payernt_products by owner: {e}")
 
     clean_email = (owner_email or "").strip().lower()
     return [
-        p for p in MOCK_PAYERNT_PRODUCTS.values()
+        _normalize_payernt_product_dict(p, include_pin=True) for p in MOCK_PAYERNT_PRODUCTS.values()
         if (owner_id and p.get("owner_id") == owner_id) or (clean_email and p.get("owner_email", "").strip().lower() == clean_email)
     ]
 
@@ -1185,21 +1327,14 @@ def get_all_active_payernt_products() -> List[Dict[str, Any]]:
     try:
         rows = fetch_all("SELECT * FROM payernt_products WHERE status IN ('active', 'approved') ORDER BY created_at DESC")
         if rows:
-            clean_list = []
-            for r in rows:
-                c = dict(r)
-                c.pop("vendor_secret_pin", None)
-                clean_list.append(c)
-            return clean_list
+            return [_normalize_payernt_product_dict(r, include_pin=False) for r in rows]
     except Exception as e:
         logger.warning(f"DB fetch error for active payernt_products: {e}")
 
     clean_list = []
     for p in MOCK_PAYERNT_PRODUCTS.values():
         if p.get("status") in ("active", "approved"):
-            c = dict(p)
-            c.pop("vendor_secret_pin", None)
-            clean_list.append(c)
+            clean_list.append(_normalize_payernt_product_dict(p, include_pin=False))
     return clean_list
 
 
@@ -1218,7 +1353,9 @@ def update_payernt_product(product_id: str, owner_id: str, updates: Dict[str, An
         "name", "title", "category", "brand", "model", "year", "description",
         "specifications", "condition_grade", "accessories", "city", "area", "pincode",
         "pickup_instructions", "daily_rate", "weekly_rate", "monthly_rate",
-        "available", "availability_status", "primary_image", "status"
+        "available", "availability_status", "primary_image", "status",
+        "allow_half_day", "morning_slot_enabled", "afternoon_slot_enabled",
+        "full_day_slot_enabled", "half_day_rate", "buffer_minutes"
     ]
 
     # Normalize nested pricing if provided
@@ -1246,6 +1383,23 @@ def update_payernt_product(product_id: str, owner_id: str, updates: Dict[str, An
             set_clauses.append(f"{field} = %s")
             params.append(updates[field])
 
+    # Blocked dates update support
+    raw_b = updates.get("blocked_dates") or updates.get("blockedDates")
+    if raw_b is not None:
+        b_list = json.loads(raw_b) if isinstance(raw_b, str) else raw_b
+        clean_b = []
+        if isinstance(b_list, list):
+            for d in b_list:
+                pd = parse_date_safely(d)
+                if pd:
+                    clean_b.append(pd.strftime("%Y-%m-%d"))
+        clean_b = sorted(list(set(clean_b)))
+        b_json = json.dumps(clean_b)
+        existing["blocked_dates"] = clean_b
+        existing["blockedDates"] = clean_b
+        set_clauses.append("blocked_dates = %s")
+        params.append(b_json)
+
     if "features" in updates:
         feat_json = json.dumps(updates["features"]) if isinstance(updates["features"], list) else str(updates["features"])
         existing["features"] = feat_json
@@ -1261,6 +1415,11 @@ def update_payernt_product(product_id: str, owner_id: str, updates: Dict[str, An
     params.extend([product_id, owner_id])
     try:
         execute_query(f"UPDATE payernt_products SET {', '.join(set_clauses)} WHERE id = %s AND owner_id = %s", tuple(params))
+        # Keep custom_products in sync
+        try:
+            execute_query(f"UPDATE custom_products SET {', '.join(set_clauses)} WHERE id = %s", tuple(params[:-1]))
+        except Exception:
+            pass
     except Exception as e:
         logger.warning(f"DB update error for payernt_product: {e}")
 
