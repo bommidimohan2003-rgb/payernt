@@ -153,11 +153,21 @@ The project has a mixed integration state. Some customer-facing features are bac
 | **Lender Booking Cancellation** | `POST /api/payernt/bookings/{id}/cancel`, `POST /api/bookings/{id}/cancel` with reason code, feedback validation, handover verification safeguards & counterparty notifications | Real   |
 | **Flexible Time-Slot Booking**  | Half-day (Morning 08:00–12:00, Afternoon 13:00–17:00), Full-Day, Turnaround Buffer & Interval Overlap Math, `GET /api/products/{id}/slots`, `GET/POST /api/payernt/products/{id}/availability-config` | Real   |
 | **Live Rental Queue**          | 8-Milestone lifecycle tracking (Order Confirmed → Ready for Pickup → Picked Up [Timer Start] → Rental in Progress [Elapsed & Remaining] → Return Initiated → Item Handed Back to Owner [Timer Stop] → Awaiting Owner Inspection → Rental Completed), persistent ISO timestamps, cross-portal sync via `/api/orders/{id}/queue-advance` & `/api/payernt/bookings/{id}/queue-advance`, `LiveRentalQueue.tsx` in both Renter Portal (`/orders`, `/dashboard`) & Lender Portal (`/payernt/bookings`, `/lender-portal`) | Real   |
+| **Category-Based Booking Restriction** | Strict one-product-per-category concurrency rule during booking-to-delivery lifecycle. Blocks duplicate bookings in the same category from lender acceptance until delivery confirmation (`picked_up`). Thread-safe backend validation on `POST /api/orders` & `POST /api/payments/create-order`, real-time status endpoints (`GET /api/orders/category-restrictions`, `GET /api/orders/check-category-restriction`), and frontend lockouts on `ProductDetails.tsx` & `Checkout.tsx` with exact message: *"You already have a product in this category awaiting delivery. You can book another product in this category once your current order is delivered."* | Real   |
 
 ## Technical Debt
 
 The main technical debt areas are clear:
 
+- [RESOLVED Category-Based Booking Restriction] Implemented full category-concurrency policy:
+  1. *Policy*: Only one product per category can be in the booking-to-delivery process for the same renter at a time.
+  2. *Activation*: Active once lender accepts booking and remains active during preparation, dispatch, and awaiting pickup/delivery.
+  3. *Release on Delivery*: Released immediately upon confirmed delivery/pickup (`picked_up`), allowing renter to book another product in the same category even while the first rental remains actively in progress.
+  4. *Independent Categories*: Products in different categories can be booked without restriction.
+  5. *Release on Cancellation*: Released immediately if booking is cancelled before delivery.
+  6. *Thread-Safe Backend*: Guarded by `_CATEGORY_RESTRICTION_LOCK` and MySQL indexed `orders(user_email, category)` column queries.
+  7. *Exact Error Message*: `"You already have a product in this category awaiting delivery. You can book another product in this category once your current order is delivered."`
+  8. *End-to-End Test Suite*: `backend/tests/test_category_booking_restriction.py` verifying all 5 core scenarios (multiple same-category, different categories, delivery release, cancellation release, simultaneous requests) passing 100%.
 - [RESOLVED Live Rental Queue & Cross-Portal Synchronization] Implemented synchronized 8-milestone Live Rental Queue in both Renter Portal (`Orders.tsx`, `Dashboard.tsx`) and Lender Portal (`RentalRequests.tsx`, `LenderPortal.tsx`):
   1. *Order Confirmed* (`confirmed_at`)
   2. *Ready for Pickup* (`ready_for_pickup_at`)

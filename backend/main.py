@@ -182,6 +182,10 @@ from database import (
     add_delivery_location,
     get_delivery_locations,
     confirm_delivery_receipt,
+    check_renter_category_booking_restriction,
+    get_product_category,
+    get_renter_active_category_restrictions,
+    CATEGORY_BOOKING_RESTRICTION_MESSAGE,
     get_or_create_booking_conversation,
     get_or_create_product_conversation,
     get_conversation,
@@ -902,6 +906,79 @@ def get_current_user_email(authorization: Optional[str] = Header(None)) -> str:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Forbidden: Invalid or unauthorized account role.",
+        )
+
+    user_email = payload["sub"].strip().lower()
+    user = get_user(user_email)
+    if not user:
+        return user_email
+    user_status = str(user.get("status") or "").lower().strip()
+    if user_status == "suspended":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account suspended. Please contact support."
+        )
+    if user_status == "deleted":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account has been deleted or deactivated."
+        )
+    if user_status == "rejected":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account application has been rejected. Please contact support."
+        )
+
+    return user_email
+
+def get_current_any_user_email(authorization: Optional[str] = Header(None)) -> str:
+    """
+    Validates JWT for any authenticated platform role (customer, renter, lender, vendor, admin).
+    Does not restrict based on account_type == 'paye₹nt'/'payernt'.
+    """
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing or invalid Authorization header. Must start with 'Bearer '"
+        )
+    
+    token = authorization.split(" ")[1]
+
+    # 1. Try Firebase Admin SDK cryptographic verification if initialized
+    if HAS_FIREBASE and firebase_admin and firebase_admin._apps:
+        try:
+            decoded_token = firebase_auth.verify_id_token(token)
+            email = decoded_token.get("email")
+            uid = decoded_token.get("uid")
+            name = decoded_token.get("name") or (email.split("@")[0] if email else "User")
+            picture = decoded_token.get("picture") or ""
+            if email:
+                save_google_user(email=email, full_name=name, firebase_uid=uid, avatar=picture)
+                return email.strip().lower()
+        except Exception:
+            pass
+
+    # 2. Cryptographic JWT access token verification
+    payload = decode_access_token(token, expected_type="access")
+    if not payload or "sub" not in payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials or Token expired"
+        )
+
+    # Check server-side token & session revocation
+    jti = payload.get("jti")
+    if jti and is_token_revoked(jti):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has been revoked or logged out."
+        )
+
+    sid = payload.get("sid")
+    if sid and is_session_revoked(sid):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session has been revoked or expired."
         )
 
     user_email = payload["sub"].strip().lower()
@@ -2488,9 +2565,42 @@ def fetch_orders(email: str = Depends(get_current_user_email)):
                 "handedBackAt": o.get("handed_back_at") or o.get("handedBackAt"),
                 "awaitingInspectionAt": o.get("awaiting_inspection_at") or o.get("awaitingInspectionAt"),
                 "completedAt": o.get("completed_at") or o.get("completedAt"),
-                "queueNotes": o.get("queue_notes") or o.get("queueNotes")
+                "queueNotes": o.get("queue_notes") or o.get("queueNotes"),
+                "category": o.get("category") or get_product_category(pid)
             })
     return result
+
+@app.get("/api/orders/category-restrictions")
+def get_category_restrictions_endpoint(email: str = Depends(get_current_user_email)):
+    """
+    Returns active category restrictions for the authenticated renter.
+    """
+    clean_email = email.strip().lower()
+    return get_renter_active_category_restrictions(clean_email)
+
+@app.get("/api/orders/check-category-restriction")
+def check_category_restriction_endpoint(
+    category: Optional[str] = None,
+    product_id: Optional[str] = None,
+    email: str = Depends(get_current_user_email)
+):
+    """
+    Checks if booking in `category` is currently blocked for the authenticated renter.
+    """
+    clean_email = email.strip().lower()
+    cat = category
+    if not cat and product_id:
+        cat = get_product_category(product_id)
+    if not cat:
+        return {"restricted": False, "category": "", "message": ""}
+
+    restricted, blocking_order = check_renter_category_booking_restriction(clean_email, cat)
+    return {
+        "restricted": restricted,
+        "category": cat,
+        "message": CATEGORY_BOOKING_RESTRICTION_MESSAGE if restricted else "",
+        "blockingOrderId": blocking_order.get("id") if (restricted and blocking_order) else None
+    }
 
 @app.post("/api/orders")
 def add_order(data: OrderSchema, current_user: dict = Depends(get_approved_user)):
@@ -2526,6 +2636,22 @@ def add_order(data: OrderSchema, current_user: dict = Depends(get_approved_user)
     if not is_avail:
         raise HTTPException(status_code=400, detail=f"Product is currently unavailable: {reason}")
 
+    prod_category = (prod.get("category") or "").strip()
+    if not prod_category:
+        prod_category = get_product_category(pid)
+
+    # Category booking restriction check:
+    # Only one product per category can be in the booking-to-delivery process for the same renter at a time.
+    if prod_category:
+        restricted, _ = check_renter_category_booking_restriction(
+            clean_email, prod_category, exclude_order_id=data.id
+        )
+        if restricted:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=CATEGORY_BOOKING_RESTRICTION_MESSAGE
+            )
+
     normalized_order = {
         "id": data.id,
         "productId": pid,
@@ -2540,15 +2666,22 @@ def add_order(data: OrderSchema, current_user: dict = Depends(get_approved_user)
         "end_date": end,
         "total": data.total,
         "status": data.status or "active",
+        "category": prod_category,
         "createdAt": datetime.datetime.now(datetime.timezone.utc).isoformat()
     }
     
     try:
         create_order(clean_email, normalized_order)
     except ValueError as ve:
+        err_msg = str(ve)
+        if "awaiting delivery" in err_msg:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=err_msg
+            )
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=str(ve)
+            detail=err_msg
         )
     try:
         from payernt_database import create_or_get_rental_security_record
@@ -2708,7 +2841,7 @@ def cancel_user_order(id: str, email: str = Depends(get_current_user_email)):
     return {"success": True, "message": "Order cancelled successfully."}
 
 @app.get("/api/orders/{id}")
-def get_order_details(id: str, email: str = Depends(get_current_user_email)):
+def get_order_details(id: str, email: str = Depends(get_current_any_user_email)):
     clean_email = email.strip().lower()
     order = fetch_one("SELECT * FROM orders WHERE id = %s", (id,))
     if not order and id in MOCK_ORDERS:
@@ -2725,8 +2858,17 @@ def get_order_details(id: str, email: str = Depends(get_current_user_email)):
 
     order_owner = (order.get("user_email") or order.get("userEmail") or "").strip().lower()
     user = get_user(clean_email)
-    is_admin = (user.get("role") == "admin") if (user and isinstance(user, dict)) else False
-    if order_owner and order_owner != clean_email and not is_admin:
+    is_admin = (user.get("role") in ("admin", "superadmin")) if (user and isinstance(user, dict)) else False
+
+    # Check if caller is product lender or owner
+    pid = str(order.get("product_id") or order.get("productId") or "")
+    prod = fetch_one_product(pid) if pid else None
+    lender_email = (prod.get("user_email") if prod else "").strip().lower()
+    if not lender_email and prod:
+        lender_email = str(prod.get("owner_id") or "").strip().lower()
+    is_lender = (clean_email == lender_email) or (lender_email and (clean_email in lender_email or lender_email in clean_email))
+
+    if order_owner and order_owner != clean_email and not is_admin and not is_lender:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden. You do not have permission to view this order.")
 
     pid = str(order.get("product_id") or order.get("productId") or "")
@@ -2987,6 +3129,7 @@ def _execute_queue_milestone_transition(
         "bookingId": order_id,
         "id": order_id,
         "timestamps": all_timestamps,
+        "all_timestamps": all_timestamps,
         "order": updated
     }
 
@@ -2994,33 +3137,33 @@ def _execute_queue_milestone_transition(
 
 @app.post("/api/orders/{id}/ready-for-pickup")
 @app.post("/api/bookings/{id}/ready-for-pickup")
-def mark_order_ready_for_pickup(id: str, email: str = Depends(get_current_user_email)):
+def mark_order_ready_for_pickup(id: str, email: str = Depends(get_current_any_user_email)):
     return _execute_queue_milestone_transition(id, "ready_for_pickup", email)
 
 @app.post("/api/orders/{id}/pickup-confirm")
 @app.post("/api/bookings/{id}/pickup-confirm")
-def confirm_order_pickup(id: str, email: str = Depends(get_current_user_email)):
+def confirm_order_pickup(id: str, email: str = Depends(get_current_any_user_email)):
     return _execute_queue_milestone_transition(id, "picked_up", email)
 
 @app.post("/api/orders/{id}/return")
 @app.post("/api/bookings/{id}/return")
-def initiate_order_return_endpoint(id: str, current_user_email: str = Depends(get_current_user_email)):
+def initiate_order_return_endpoint(id: str, current_user_email: str = Depends(get_current_any_user_email)):
     return _execute_queue_milestone_transition(id, "return_initiated", current_user_email)
 
 @app.post("/api/orders/{id}/return-confirm")
 @app.post("/api/orders/{id}/handed-back")
 @app.post("/api/bookings/{id}/handed-back")
-def confirm_order_return_handover(id: str, current_user_email: str = Depends(get_current_user_email)):
+def confirm_order_return_handover(id: str, current_user_email: str = Depends(get_current_any_user_email)):
     return _execute_queue_milestone_transition(id, "handed_back", current_user_email)
 
 @app.post("/api/orders/{id}/awaiting-inspection")
 @app.post("/api/bookings/{id}/awaiting-inspection")
-def mark_order_awaiting_inspection(id: str, current_user_email: str = Depends(get_current_user_email)):
+def mark_order_awaiting_inspection(id: str, current_user_email: str = Depends(get_current_any_user_email)):
     return _execute_queue_milestone_transition(id, "awaiting_inspection", current_user_email)
 
 @app.post("/api/orders/{id}/complete")
 @app.post("/api/bookings/{id}/complete")
-def complete_order_endpoint(id: str, current_user_email: str = Depends(get_current_user_email)):
+def complete_order_endpoint(id: str, current_user_email: str = Depends(get_current_any_user_email)):
     return _execute_queue_milestone_transition(id, "completed", current_user_email)
 
 @app.post("/api/orders/{id}/queue-advance")
@@ -3028,7 +3171,7 @@ def complete_order_endpoint(id: str, current_user_email: str = Depends(get_curre
 def advance_order_queue_endpoint(
     id: str,
     data: QueueAdvanceSchema,
-    current_user_email: str = Depends(get_current_user_email)
+    current_user_email: str = Depends(get_current_any_user_email)
 ):
     return _execute_queue_milestone_transition(
         id,
@@ -3039,7 +3182,7 @@ def advance_order_queue_endpoint(
     )
 
 @app.get("/api/bookings/{id}")
-def get_booking_details_endpoint(id: str, email: str = Depends(get_current_user_email)):
+def get_booking_details_endpoint(id: str, email: str = Depends(get_current_any_user_email)):
     return get_order_details(id, email)
 
 # ============================================================
@@ -4414,6 +4557,19 @@ def create_razorpay_order(data: CreateRazorpayOrderSchema, current_user: dict = 
             status_code=status.HTTP_409_CONFLICT,
             detail="This gear is already booked by another creator for the selected dates. Please select different dates."
         )
+
+    # Category booking restriction check:
+    # Only one product per category can be in the booking-to-delivery process for the same renter at a time.
+    category = (product.get("category") or "").strip()
+    if not category:
+        category = get_product_category(data.product_id)
+    if category:
+        restricted, _ = check_renter_category_booking_restriction(current_user_email, category)
+        if restricted:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=CATEGORY_BOOKING_RESTRICTION_MESSAGE
+            )
 
     price_per_day = int(product.get("price", 0))
     product_title = product.get("title", "Tech Gear Rental")

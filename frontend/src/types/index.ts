@@ -127,6 +127,7 @@ export interface Order {
   total: number;
   status: OrderRentalStatus;
   createdAt: string;
+  category?: string;
   product_id?: string;
   product_title?: string;
   product_image?: string;

@@ -23,6 +23,7 @@ import time
 import secrets
 import random
 import json
+import threading
 from typing import Optional, List, Set, Dict, Tuple, Any
 from datetime import datetime as dt, timezone, timedelta
 from config import MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DB, MYSQL_SSL, TIDB_SSL_CA, IS_PRODUCTION
@@ -494,6 +495,8 @@ def init_db(force: bool = False):
     add_column_safely("orders", "awaiting_inspection_at VARCHAR(100) NULL")
     add_column_safely("orders", "completed_at VARCHAR(100) NULL")
     add_column_safely("orders", "queue_notes TEXT NULL")
+    add_column_safely("orders", "category VARCHAR(100) NULL")
+    add_index_safely("orders", "idx_orders_user_cat", "user_email, category")
     add_index_safely("orders", "idx_orders_user_email", "user_email")
     add_index_safely("orders", "idx_orders_status", "status")
     add_index_safely("orders", "idx_orders_created_at", "created_at")
@@ -1810,7 +1813,8 @@ def get_orders(email: str):
                         SELECT id, user_email, product_id, product_title, product_image,
                                start_date, end_date, total, status, created_at,
                                razorpay_order_id, razorpay_payment_id, payment_status, refund_id, refund_status,
-                               confirmed_at, ready_for_pickup_at, picked_up_at, return_initiated_at, handed_back_at, awaiting_inspection_at, completed_at, queue_notes
+                               confirmed_at, ready_for_pickup_at, picked_up_at, return_initiated_at, handed_back_at, awaiting_inspection_at, completed_at, queue_notes,
+                               category
                         FROM orders
                         WHERE user_email = %s
                         ORDER BY created_at DESC
@@ -1902,6 +1906,18 @@ def create_order(email: str, order: dict):
             if pid in conflicts:
                 raise ValueError(f"Double booking conflict: Product '{pid}' is already booked for {start} to {end}.")
 
+    # Category-based booking restriction validation
+    prod_category = (order.get("category") or "").strip()
+    if not prod_category:
+        prod_category = get_product_category(pid)
+
+    if clean_email and prod_category and status not in ("cancelled", "rejected", "failed"):
+        restricted, active_b = check_renter_category_booking_restriction(
+            clean_email, prod_category, exclude_order_id=order.get("id")
+        )
+        if restricted:
+            raise ValueError(CATEGORY_BOOKING_RESTRICTION_MESSAGE)
+
     normalized = {
         "id": order["id"],
         "user_email": clean_email,
@@ -1940,12 +1956,13 @@ def create_order(email: str, order: dict):
         "awaitingInspectionAt": order.get("awaiting_inspection_at") or order.get("awaitingInspectionAt"),
         "completed_at": order.get("completed_at") or order.get("completedAt"),
         "completedAt": order.get("completed_at") or order.get("completedAt"),
+        "category": prod_category,
     }
     MOCK_ORDERS[order["id"]] = normalized
 
     execute_query("""
-        INSERT INTO orders (id, user_email, product_id, product_title, product_image, start_date, end_date, total, status, created_at, time_slot, duration_type, start_time, end_time, start_datetime, end_datetime, confirmed_at)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        INSERT INTO orders (id, user_email, product_id, product_title, product_image, start_date, end_date, total, status, created_at, time_slot, duration_type, start_time, end_time, start_datetime, end_datetime, confirmed_at, category)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """, (
         order["id"],
         clean_email,
@@ -1963,7 +1980,8 @@ def create_order(email: str, order: dict):
         end_time,
         start_datetime,
         end_datetime,
-        confirmed_at
+        confirmed_at,
+        prod_category
     ))
 
     # Create matching payment transaction
@@ -4499,6 +4517,284 @@ def check_products_booking_conflicts(
 
     return conflicted
 
+# ============================================================
+# CATEGORY-BASED BOOKING RESTRICTION ENGINE
+# ============================================================
+# Rule: Only one product per category can be in the booking-to-delivery process
+# for the same renter at a time. The restriction ends at confirmed delivery to
+# the renter, not when the rental is returned.
+# ============================================================
+
+CATEGORY_BOOKING_RESTRICTION_MESSAGE = (
+    "You already have a product in this category awaiting delivery. "
+    "You can book another product in this category once your current order is delivered."
+)
+
+_CATEGORY_RESTRICTION_LOCK = threading.RLock()
+
+
+def get_product_category(product_id: Optional[str]) -> str:
+    """
+    Authoritative product category resolver across MySQL custom_products,
+    payernt_products, in-memory catalogs, and fallback mocks.
+    """
+    if not product_id:
+        return ""
+    pid = str(product_id).strip()
+
+    # 1. custom_products table
+    try:
+        row = fetch_one("SELECT category FROM custom_products WHERE id = %s", (pid,))
+        if row and row.get("category"):
+            return str(row["category"]).strip()
+    except Exception:
+        pass
+
+    # 2. payernt_products table
+    try:
+        row = fetch_one("SELECT category FROM payernt_products WHERE id = %s", (pid,))
+        if row and row.get("category"):
+            return str(row["category"]).strip()
+    except Exception:
+        pass
+
+    # 3. MOCK_CUSTOM_PRODUCTS
+    if pid in MOCK_CUSTOM_PRODUCTS:
+        cat = MOCK_CUSTOM_PRODUCTS[pid].get("category")
+        if cat:
+            return str(cat).strip()
+
+    # 4. MOCK_PAYERNT_PRODUCTS
+    try:
+        from payernt_database import MOCK_PAYERNT_PRODUCTS
+        if pid in MOCK_PAYERNT_PRODUCTS:
+            cat = MOCK_PAYERNT_PRODUCTS[pid].get("category")
+            if cat:
+                return str(cat).strip()
+    except Exception:
+        pass
+
+    return ""
+
+
+def check_renter_category_booking_restriction(
+    user_email: str,
+    category: str,
+    exclude_order_id: Optional[str] = None
+) -> Tuple[bool, Optional[Dict[str, Any]]]:
+    """
+    Authoritative check enforcing category-based booking restriction:
+    Only one product per category can be in the booking-to-delivery process
+    for the same renter at a time.
+
+    Stages considered in the booking-to-delivery process:
+    - Accepted, prepared, ready for pickup, out for delivery, awaiting pickup/delivery.
+    
+    Stages where restriction is NOT active (released):
+    - Confirmed delivery / picked up (picked_up_at IS NOT NULL, status == 'picked_up' / 'in_progress' / etc.)
+    - Cancelled before delivery (status == 'cancelled', cancellation_id IS NOT NULL)
+
+    Returns: (is_restricted: bool, blocking_order: Optional[dict])
+    """
+    if not user_email or not category:
+        return False, None
+
+    clean_email = str(user_email).strip().lower()
+    norm_cat = str(category).strip().lower()
+    if not norm_cat:
+        return False, None
+
+    POST_DELIVERY_OR_TERMINAL_STATUSES = {
+        "picked_up", "rental_in_progress", "in_progress", "active_rental",
+        "return_initiated", "handed_back", "awaiting_inspection", "completed",
+        "returned", "cancelled", "rejected", "failed"
+    }
+
+    with _CATEGORY_RESTRICTION_LOCK:
+        # 1. Check in-memory MOCK_ORDERS first
+        for o_id, order in list(MOCK_ORDERS.items()):
+            if exclude_order_id and (o_id == exclude_order_id or order.get("id") == exclude_order_id):
+                continue
+
+            o_email = (order.get("user_email") or order.get("userEmail") or "").strip().lower()
+            if o_email != clean_email:
+                continue
+
+            o_status = str(order.get("status") or "").strip().lower()
+            # If cancelled or terminated, restriction is released
+            if o_status in ("cancelled", "rejected", "failed") or order.get("cancellation_id"):
+                continue
+
+            # If delivery/pickup already confirmed, restriction is released
+            picked_up_at = order.get("picked_up_at") or order.get("pickedUpAt")
+            if picked_up_at:
+                continue
+
+            if o_status in POST_DELIVERY_OR_TERMINAL_STATUSES:
+                continue
+
+            # Match category
+            o_cat = (order.get("category") or "").strip().lower()
+            if not o_cat:
+                o_pid = order.get("product_id") or order.get("productId")
+                o_cat = get_product_category(o_pid).lower()
+
+            if o_cat == norm_cat:
+                return True, order
+
+        # 2. Check Database orders table
+        conn = get_db_connection()
+        if conn:
+            try:
+                with conn.cursor() as cursor:
+                    cursor.execute("""
+                        SELECT id, user_email, product_id, product_title, status, category,
+                               confirmed_at, ready_for_pickup_at, picked_up_at, return_initiated_at,
+                               handed_back_at, awaiting_inspection_at, completed_at, cancellation_id
+                        FROM orders
+                        WHERE user_email = %s
+                          AND status NOT IN ('cancelled', 'rejected', 'failed', 'picked_up', 'in_progress', 'rental_in_progress', 'return_initiated', 'handed_back', 'awaiting_inspection', 'completed', 'returned')
+                          AND (picked_up_at IS NULL OR picked_up_at = '')
+                          AND (cancellation_id IS NULL OR cancellation_id = '')
+                        ORDER BY created_at DESC
+                    """, (clean_email,))
+                    rows = cursor.fetchall() or []
+                    for row in rows:
+                        row_id = row.get("id")
+                        if exclude_order_id and row_id == exclude_order_id:
+                            continue
+
+                        row_cat = (row.get("category") or "").strip().lower()
+                        if not row_cat:
+                            row_cat = get_product_category(row.get("product_id")).lower()
+
+                        if row_cat == norm_cat:
+                            # Verify deliveries table doesn't already have confirmed delivery
+                            deliv = fetch_one("""
+                                SELECT status, customer_confirmed_at, delivered_at
+                                FROM deliveries
+                                WHERE booking_id = %s
+                            """, (row_id,))
+                            if deliv:
+                                deliv_st = str(deliv.get("status") or "").upper()
+                                if deliv_st in ("DELIVERED", "RENTER_VERIFIED", "CONFIRMED", "COMPLETED") or deliv.get("customer_confirmed_at"):
+                                    continue
+
+                            return True, row
+            except Exception as e:
+                logger.debug(f"Notice: check_renter_category_booking_restriction SQL check: {e}")
+            finally:
+                conn.close()
+
+    return False, None
+
+
+def get_renter_active_category_restrictions(user_email: str) -> Dict[str, Any]:
+    """
+    Returns active category restrictions for the renter, listing:
+    - restrictedCategories: List[str]
+    - activeOrders: List[Dict[str, Any]]
+    """
+    if not user_email:
+        return {"restrictedCategories": [], "activeOrders": []}
+
+    clean_email = str(user_email).strip().lower()
+    restricted_cats = set()
+    active_orders = []
+    seen_order_ids = set()
+
+    with _CATEGORY_RESTRICTION_LOCK:
+        # 1. Database
+        conn = get_db_connection()
+        if conn:
+            try:
+                with conn.cursor() as cursor:
+                    cursor.execute("""
+                        SELECT id, user_email, product_id, product_title, status, category,
+                               confirmed_at, ready_for_pickup_at, picked_up_at, created_at, cancellation_id
+                        FROM orders
+                        WHERE user_email = %s
+                          AND status NOT IN ('cancelled', 'rejected', 'failed', 'picked_up', 'in_progress', 'rental_in_progress', 'return_initiated', 'handed_back', 'awaiting_inspection', 'completed', 'returned')
+                          AND (picked_up_at IS NULL OR picked_up_at = '')
+                          AND (cancellation_id IS NULL OR cancellation_id = '')
+                        ORDER BY created_at DESC
+                    """, (clean_email,))
+                    rows = cursor.fetchall() or []
+                    for row in rows:
+                        o_id = row.get("id")
+                        if o_id in seen_order_ids:
+                            continue
+                        cat = (row.get("category") or "").strip()
+                        if not cat:
+                            cat = get_product_category(row.get("product_id"))
+                        if not cat:
+                            continue
+
+                        # Check delivery status
+                        deliv = fetch_one("""
+                            SELECT status, customer_confirmed_at, delivered_at
+                            FROM deliveries
+                            WHERE booking_id = %s
+                        """, (o_id,))
+                        if deliv:
+                            deliv_st = str(deliv.get("status") or "").upper()
+                            if deliv_st in ("DELIVERED", "RENTER_VERIFIED", "CONFIRMED", "COMPLETED") or deliv.get("customer_confirmed_at"):
+                                continue
+
+                        seen_order_ids.add(o_id)
+                        restricted_cats.add(cat.lower())
+                        active_orders.append({
+                            "orderId": o_id,
+                            "productId": row.get("product_id"),
+                            "productTitle": row.get("product_title"),
+                            "category": cat,
+                            "status": row.get("status"),
+                            "readyForPickupAt": row.get("ready_for_pickup_at"),
+                            "confirmedAt": row.get("confirmed_at")
+                        })
+            except Exception as e:
+                logger.debug(f"Notice: get_renter_active_category_restrictions error: {e}")
+            finally:
+                conn.close()
+
+        # 2. In-memory MOCK_ORDERS
+        for o_id, order in list(MOCK_ORDERS.items()):
+            if o_id in seen_order_ids or order.get("id") in seen_order_ids:
+                continue
+            o_email = (order.get("user_email") or order.get("userEmail") or "").strip().lower()
+            if o_email != clean_email:
+                continue
+            o_status = str(order.get("status") or "").strip().lower()
+            if o_status in ("cancelled", "rejected", "failed") or order.get("cancellation_id"):
+                continue
+            if order.get("picked_up_at") or order.get("pickedUpAt"):
+                continue
+            if o_status in ("picked_up", "rental_in_progress", "in_progress", "active_rental", "return_initiated", "handed_back", "awaiting_inspection", "completed", "returned"):
+                continue
+
+            cat = (order.get("category") or "").strip()
+            if not cat:
+                cat = get_product_category(order.get("product_id") or order.get("productId"))
+            if not cat:
+                continue
+
+            seen_order_ids.add(o_id)
+            restricted_cats.add(cat.lower())
+            active_orders.append({
+                "orderId": order.get("id") or o_id,
+                "productId": order.get("product_id") or order.get("productId"),
+                "productTitle": order.get("product_title") or order.get("productTitle"),
+                "category": cat,
+                "status": o_status,
+                "readyForPickupAt": order.get("ready_for_pickup_at") or order.get("readyForPickupAt"),
+                "confirmedAt": order.get("confirmed_at") or order.get("confirmedAt")
+            })
+
+    return {
+        "restrictedCategories": sorted(list(restricted_cats)),
+        "activeOrders": active_orders
+    }
+
 def fetch_cart_validation_bundle(
     product_id: str,
     user_email: str,
@@ -5208,6 +5504,14 @@ def confirm_delivery_receipt(delivery_id: str, user_email: str) -> dict:
             updated_at = %s
         WHERE id = %s
     """, (now_iso, now_iso, now_iso, delivery_id))
+
+    # Synchronize confirmed delivery with Live Rental Queue milestone
+    bid = delivery.get("booking_id")
+    if bid:
+        try:
+            update_order_queue_milestone(bid, "picked_up", {"picked_up_at": now_iso})
+        except Exception as e:
+            logger.debug(f"Notice: update_order_queue_milestone on delivery confirm: {e}")
 
     return delivery
 

@@ -975,6 +975,7 @@ export const api = {
             end_date: end,
             total: Number(o.total || 0),
             status: (o.status as Order["status"]) || "active",
+            category: String(o.category || ""),
             createdAt: created,
             created_at: created,
           };
@@ -984,6 +985,44 @@ export const api = {
       },
       { ttlMs: 15000, userIsolated: true, staleWhileRevalidate: true }
     );
+  },
+
+  async checkCategoryRestriction(
+    token: string,
+    category?: string,
+    productId?: string
+  ): Promise<{ restricted: boolean; category: string; message: string; blockingOrderId?: string }> {
+    if (!token || (!category && !productId)) {
+      return { restricted: false, category: "", message: "" };
+    }
+    try {
+      const params = new URLSearchParams();
+      if (category) params.append("category", category);
+      if (productId) params.append("product_id", productId);
+      const res = await this.fetchWithAuth(
+        `${API_BASE}/api/orders/check-category-restriction?${params.toString()}`,
+        { method: "GET" }
+      );
+      if (!res.ok) return { restricted: false, category: category || "", message: "" };
+      return await res.json();
+    } catch {
+      return { restricted: false, category: category || "", message: "" };
+    }
+  },
+
+  async getCategoryRestrictions(
+    token: string
+  ): Promise<{ restrictedCategories: string[]; activeOrders: any[] }> {
+    if (!token) return { restrictedCategories: [], activeOrders: [] };
+    try {
+      const res = await this.fetchWithAuth(`${API_BASE}/api/orders/category-restrictions`, {
+        method: "GET",
+      });
+      if (!res.ok) return { restrictedCategories: [], activeOrders: [] };
+      return await res.json();
+    } catch {
+      return { restrictedCategories: [], activeOrders: [] };
+    }
   },
 
   async getOrderDetails(token: string, orderId: string) {
@@ -1022,6 +1061,7 @@ export const api = {
       end_date: end,
       total: Number(o.total || 0),
       status: (o.status as Order["status"]) || "active",
+      category: String(o.category || ""),
       createdAt: created,
       created_at: created,
     } as Order;
@@ -1052,6 +1092,7 @@ export const api = {
       end_date: end,
       total: orderData.total,
       status: orderData.status || "active",
+      category: orderData.category || "",
       createdAt:
         orderData.createdAt || orderData.created_at || new Date().toISOString(),
     };

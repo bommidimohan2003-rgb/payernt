@@ -904,6 +904,13 @@ export function usePayerntStore() {
       })
     );
 
+    // Sync state to backend
+    if (action === "accept") {
+      payerntApi.advanceRentalQueue(requestId, "accepted").catch(() => {});
+    }
+    window.dispatchEvent(new CustomEvent("payent_orders_updated"));
+    window.dispatchEvent(new CustomEvent("payent_queue_updated"));
+
     const req = rentalRequests.find((r) => r.id === requestId);
     const notif: LenderNotification = {
       id: `notif-${Date.now()}`,

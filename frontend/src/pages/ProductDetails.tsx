@@ -112,6 +112,10 @@ export default function ProductDetails() {
   const [justAddedToCart, setJustAddedToCart] = useState(false);
   const [showMessageModal, setShowMessageModal] = useState(false);
   const [securityRecord, setSecurityRecord] = useState<RentalSecurity | null>(null);
+  const [categoryRestriction, setCategoryRestriction] = useState<{
+    restricted: boolean;
+    message: string;
+  } | null>(null);
 
   // Instant cache lookup for zero-latency initial render
   const initialCachedProduct = id ? api.getCachedProduct(id) : null;
@@ -531,6 +535,14 @@ export default function ProductDetails() {
       return;
     }
 
+    if (categoryRestriction?.restricted) {
+      toast.error(
+        categoryRestriction.message ||
+        "You already have a product in this category awaiting delivery. You can book another product in this category once your current order is delivered."
+      );
+      return;
+    }
+
     setIsCreatingBooking(true);
 
     const token = storage.get<string | null>(STORAGE_KEYS.token, null);
@@ -550,6 +562,7 @@ export default function ProductDetails() {
       end_date: durationMode === "custom" ? endDate : startDate,
       total: estimatedTotal,
       status: "pending", // Booking requested
+      category: product.category || "",
       createdAt: new Date().toISOString(),
       created_at: new Date().toISOString(),
       user_email: user.email,
@@ -637,6 +650,50 @@ export default function ProductDetails() {
       isMounted = false;
     };
   }, [product?.id, product?.category]);
+
+  // Category-based Booking Restriction Check
+  useEffect(() => {
+    if (!product?.category || !user) {
+      setCategoryRestriction(null);
+      return;
+    }
+    const token = storage.get<string | null>(STORAGE_KEYS.token, null);
+    if (!token) return;
+
+    let isMounted = true;
+    const evaluateRestriction = async () => {
+      try {
+        const res = await api.checkCategoryRestriction(token, product.category, product.id);
+        if (isMounted) {
+          if (res.restricted) {
+            setCategoryRestriction({
+              restricted: true,
+              message:
+                res.message ||
+                "You already have a product in this category awaiting delivery. You can book another product in this category once your current order is delivered.",
+            });
+          } else {
+            setCategoryRestriction(null);
+          }
+        }
+      } catch {
+        if (isMounted) setCategoryRestriction(null);
+      }
+    };
+
+    evaluateRestriction();
+
+    const handleSync = () => {
+      evaluateRestriction();
+    };
+    window.addEventListener("payent_orders_updated", handleSync);
+    window.addEventListener("payent_queue_updated", handleSync);
+    return () => {
+      isMounted = false;
+      window.removeEventListener("payent_orders_updated", handleSync);
+      window.removeEventListener("payent_queue_updated", handleSync);
+    };
+  }, [product?.id, product?.category, user]);
 
   if (productLoading && !product) {
     return (
@@ -1284,16 +1341,36 @@ export default function ProductDetails() {
                           </div>
                         </div>
 
+                        {/* Category Restriction Warning */}
+                        {categoryRestriction?.restricted && (
+                          <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3.5 text-xs text-amber-200 flex items-start gap-2.5">
+                            <AlertCircle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+                            <div>
+                              <span className="font-bold text-amber-300 block mb-0.5">Category Restriction Active</span>
+                              {categoryRestriction.message}
+                            </div>
+                          </div>
+                        )}
+
                         {/* Confirm Booking Button */}
                         <button
                           type="button"
-                          disabled={isCreatingBooking}
+                          disabled={isCreatingBooking || categoryRestriction?.restricted}
                           onClick={handleConfirmBooking}
                           id="confirm-booking-btn"
-                          className="w-full py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow-lg active:scale-98 transition-all cursor-pointer flex items-center justify-center gap-2"
+                          className={`w-full py-3.5 px-4 rounded-xl font-extrabold text-xs shadow-lg transition-all flex items-center justify-center gap-2 ${
+                            categoryRestriction?.restricted
+                              ? "bg-amber-900/40 text-amber-300/80 border border-amber-500/30 cursor-not-allowed opacity-80"
+                              : "bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer active:scale-98"
+                          }`}
                         >
                           {isCreatingBooking ? (
                             <span>Creating Booking Request...</span>
+                          ) : categoryRestriction?.restricted ? (
+                            <>
+                              <AlertCircle className="h-4 w-4" />
+                              <span>Awaiting Delivery (Category Locked)</span>
+                            </>
                           ) : (
                             <>
                               <CheckCircle2 className="h-4 w-4" />

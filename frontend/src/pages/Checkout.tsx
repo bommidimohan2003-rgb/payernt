@@ -113,6 +113,10 @@ export default function Checkout() {
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [confirmedOrder, setConfirmedOrder] = useState<Order | null>(null);
   const [upsellProducts, setUpsellProducts] = useState<Product[]>([]);
+  const [categoryRestriction, setCategoryRestriction] = useState<{
+    restricted: boolean;
+    message: string;
+  } | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -127,6 +131,47 @@ export default function Checkout() {
       isMounted = false;
     };
   }, [product]);
+
+  // Check Category Restriction
+  useEffect(() => {
+    if (!product?.category) {
+      setCategoryRestriction(null);
+      return;
+    }
+    const token = storage.get<string | null>(STORAGE_KEYS.token, null);
+    if (!token) return;
+
+    let isMounted = true;
+    const evaluate = async () => {
+      try {
+        const res = await api.checkCategoryRestriction(token, product.category, product.id);
+        if (isMounted) {
+          if (res.restricted) {
+            setCategoryRestriction({
+              restricted: true,
+              message:
+                res.message ||
+                "You already have a product in this category awaiting delivery. You can book another product in this category once your current order is delivered.",
+            });
+          } else {
+            setCategoryRestriction(null);
+          }
+        }
+      } catch {
+        if (isMounted) setCategoryRestriction(null);
+      }
+    };
+
+    evaluate();
+    const handleSync = () => evaluate();
+    window.addEventListener("payent_orders_updated", handleSync);
+    window.addEventListener("payent_queue_updated", handleSync);
+    return () => {
+      isMounted = false;
+      window.removeEventListener("payent_orders_updated", handleSync);
+      window.removeEventListener("payent_queue_updated", handleSync);
+    };
+  }, [product?.id, product?.category]);
 
   // Payment Method: "card" | "upi"
   const [paymentMethod, setPaymentMethod] = useState<"card" | "upi">("card");
@@ -268,6 +313,15 @@ export default function Checkout() {
     if (!token) {
       toast.error("Please sign in to complete your gear rental.");
       navigate({ to: "/login" });
+      return;
+    }
+
+    if (categoryRestriction?.restricted) {
+      const msg =
+        categoryRestriction.message ||
+        "You already have a product in this category awaiting delivery. You can book another product in this category once your current order is delivered.";
+      toast.error(msg);
+      setPaymentError(msg);
       return;
     }
 
@@ -819,6 +873,13 @@ export default function Checkout() {
                             size="sm"
                             variant="outline"
                             onClick={() => {
+                              if (categoryRestriction?.restricted) {
+                                toast.error(
+                                  categoryRestriction.message ||
+                                    "You already have a product in this category awaiting delivery. You can book another product in this category once your current order is delivered."
+                                );
+                                return;
+                              }
                               toast.success(
                                 "UPI App payment verified. Proceeding...",
                               );
@@ -986,12 +1047,22 @@ export default function Checkout() {
               </div>
             )}
 
+            {categoryRestriction?.restricted && (
+              <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3.5 text-xs text-amber-200 flex items-start gap-2.5 mb-3">
+                <AlertCircle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+                <div>
+                  <span className="font-bold text-amber-300 block mb-0.5">Category Restriction Active</span>
+                  {categoryRestriction.message}
+                </div>
+              </div>
+            )}
+
             <Button
               size="lg"
               className="w-full font-bold"
               onClick={handlePayWithRazorpay}
               loading={isProcessing || isVerifying}
-              disabled={isProcessing || isVerifying}
+              disabled={isProcessing || isVerifying || categoryRestriction?.restricted}
             >
               {isVerifying ? (
                 <span className="flex items-center gap-2">

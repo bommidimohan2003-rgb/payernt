@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { toast } from "sonner";
-import { Package, Truck, MessageSquare, KeyRound, AlertTriangle, Clock } from "lucide-react";
+import { Package, Truck, MessageSquare, KeyRound, AlertTriangle, Clock, Lock, CheckCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/common/Button";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
@@ -220,6 +220,23 @@ export default function Orders() {
                     <div className="text-xs text-neutral-500 dark:text-[#A1A1AA] font-mono">
                       Booking #{o.id}
                     </div>
+
+                    {/* Category Restriction Status Indicator */}
+                    {o.category && (
+                      <div className="pt-0.5">
+                        {(!o.pickedUpAt && !o.picked_up_at && !["cancelled", "rejected", "failed", "completed"].includes(o.status)) ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                            <Lock className="w-2.5 h-2.5" />
+                            {o.category}: Awaiting Delivery (Locked)
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                            <CheckCircle className="w-2.5 h-2.5" />
+                            {o.category}: Delivery Confirmed (Unlocked)
+                          </span>
+                        )}
+                      </div>
+                    )}
 
                     {/* 4-Digit Renter Secret PIN UI */}
                     <div className="pt-1">
