@@ -3068,10 +3068,31 @@ def get_product_slots_endpoint(
     Returns time-slot availability (morning, afternoon, full-day) for a given date,
     evaluating lender configuration, existing reservations, buffer rules, and duration rates.
     """
-    from database import get_product_slots_for_date
-    if not date:
-        date = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
-    result = get_product_slots_for_date(id, date)
+    from database import get_product_slots_for_date, parse_date_safely, fetch_one, MOCK_CUSTOM_PRODUCTS
+    from payernt_database import get_payernt_product_by_id
+
+    prod = None
+    try:
+        prod = get_payernt_product_by_id(id)
+    except Exception:
+        pass
+    if not prod:
+        prod = fetch_one("SELECT * FROM custom_products WHERE id = %s", (id,))
+    if not prod:
+        prod = MOCK_CUSTOM_PRODUCTS.get(id)
+
+    if not prod:
+        raise HTTPException(status_code=404, detail=f"Product '{id}' not found.")
+
+    if date:
+        parsed_d = parse_date_safely(date)
+        if not parsed_d:
+            raise HTTPException(status_code=400, detail="Invalid date format. Expected YYYY-MM-DD.")
+        date_str = parsed_d.strftime("%Y-%m-%d")
+    else:
+        date_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
+
+    result = get_product_slots_for_date(id, date_str)
     return result
 
 # ============================================================

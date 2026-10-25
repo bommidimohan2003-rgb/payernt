@@ -42,7 +42,7 @@ import { ProductAngleViewer } from "@/components/common/ProductAngleViewer";
 import { RecommendationSection } from "@/components/recommendations/RecommendationSection";
 import { RenterBookingCalendar } from "@/components/booking/RenterBookingCalendar";
 import { tracker } from "@/utils/eventTracker";
-import { api } from "@/utils/api";
+import { api, getApiBase } from "@/utils/api";
 import { storage, STORAGE_KEYS } from "@/utils/storage";
 import { formatOwnerAddress } from "@/utils/formatters";
 import type { Product, Order } from "@/types";
@@ -273,7 +273,8 @@ export default function ProductDetails() {
     let isMounted = true;
     setLoadingSlots(true);
 
-    fetch(`/api/products/${encodeURIComponent(id)}/slots?date=${encodeURIComponent(startDate)}`)
+    const apiBase = getApiBase();
+    fetch(`${apiBase}/api/products/${encodeURIComponent(id)}/slots?date=${encodeURIComponent(startDate)}`)
       .then((r) => r.json())
       .then((data) => {
         if (!isMounted) return;
@@ -446,8 +447,9 @@ export default function ProductDetails() {
     // Backend authoritative availability verification for requested date span
     try {
       const checkEnd = durationMode === "custom" ? endDate : startDate;
+      const apiBase = getApiBase();
       const res = await fetch(
-        `/api/products/${encodeURIComponent(id)}/availability?start_date=${startDate}&end_date=${checkEnd}`
+        `${apiBase}/api/products/${encodeURIComponent(id)}/availability?start_date=${startDate}&end_date=${checkEnd}`
       );
       if (res.ok) {
         const availData = await res.json();

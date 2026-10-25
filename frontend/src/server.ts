@@ -66,6 +66,80 @@ function isH3SwallowedErrorBody(body: string): boolean {
 
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
+    const url = new URL(request.url);
+
+    // Proxy /api/* requests directly to the Railway backend
+    if (url.pathname.startsWith("/api/")) {
+      const backendBase =
+        (env as Record<string, string>)?.VITE_API_URL ||
+        (env as Record<string, string>)?.BACKEND_URL ||
+        "https://payernt-production.up.railway.app";
+
+      const targetUrl = new URL(url.pathname + url.search, backendBase);
+
+      // Handle CORS preflight
+      if (request.method === "OPTIONS") {
+        return new Response(null, {
+          status: 204,
+          headers: {
+            "Access-Control-Allow-Origin": request.headers.get("Origin") || "*",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+            "Access-Control-Allow-Headers": request.headers.get("Access-Control-Request-Headers") || "*",
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Max-Age": "86400",
+          },
+        });
+      }
+
+      const proxyHeaders = new Headers(request.headers);
+      proxyHeaders.set("Host", targetUrl.host);
+      const clientIp = request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for");
+      if (clientIp) {
+        proxyHeaders.set("X-Forwarded-For", clientIp);
+      }
+      proxyHeaders.set("X-Forwarded-Proto", url.protocol.replace(":", ""));
+
+      try {
+        const fetchInit: RequestInit & { duplex?: string } = {
+          method: request.method,
+          headers: proxyHeaders,
+          redirect: "follow",
+        };
+
+        if (request.method !== "GET" && request.method !== "HEAD") {
+          fetchInit.body = request.body;
+          fetchInit.duplex = "half";
+        }
+
+        const backendResponse = await fetch(targetUrl.toString(), fetchInit);
+
+        const resHeaders = new Headers(backendResponse.headers);
+        const origin = request.headers.get("Origin");
+        if (origin) {
+          resHeaders.set("Access-Control-Allow-Origin", origin);
+          resHeaders.set("Access-Control-Allow-Credentials", "true");
+        }
+
+        return new Response(backendResponse.body, {
+          status: backendResponse.status,
+          statusText: backendResponse.statusText,
+          headers: resHeaders,
+        });
+      } catch (err: any) {
+        console.error("Cloudflare Worker /api proxy error:", err);
+        return new Response(
+          JSON.stringify({
+            error: "Gateway Proxy Error",
+            detail: err?.message || String(err),
+          }),
+          {
+            status: 502,
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+      }
+    }
+
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);

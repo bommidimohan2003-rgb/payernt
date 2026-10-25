@@ -11,6 +11,7 @@ import {
   Info,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getApiBase } from "@/utils/api";
 
 export interface RenterBookingCalendarProps {
   productId: string | number;
@@ -114,8 +115,9 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
         threeMonthsLater.getDate()
       );
 
+      const apiBase = getApiBase();
       const res = await fetch(
-        `/api/products/${encodeURIComponent(productId)}/availability?start_date=${viewStartDateStr}&end_date=${lookaheadEndStr}`
+        `${apiBase}/api/products/${encodeURIComponent(productId)}/availability?start_date=${viewStartDateStr}&end_date=${lookaheadEndStr}`
       );
 
       if (!res.ok) {

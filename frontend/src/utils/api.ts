@@ -19,7 +19,7 @@ import type {
   RealtimeMessage,
 } from "@/types";
 
-const getApiBase = () => {
+export const getApiBase = () => {
   if (typeof window !== "undefined") {
     const win = window as unknown as { PAYENT_API_URL?: string };
     if (win.PAYENT_API_URL) return win.PAYENT_API_URL;
@@ -28,6 +28,7 @@ const getApiBase = () => {
     const isLocal = host === "localhost" || host === "127.0.0.1";
     if (isLocal) return "http://127.0.0.1:8001";
     if (host.endsWith(".vercel.app")) return "";
+    if (host.endsWith(".workers.dev")) return "https://payernt-production.up.railway.app";
   }
   if (import.meta.env.VITE_API_URL) {
     const apiUrl = import.meta.env.VITE_API_URL;
@@ -36,12 +37,15 @@ const getApiBase = () => {
     }
     return apiUrl;
   }
+  if (import.meta.env.VITE_PAYERNT_API_URL) {
+    return import.meta.env.VITE_PAYERNT_API_URL;
+  }
   if (typeof window !== "undefined") {
     return window.location.origin;
   }
-  return "";
+  return "https://payernt-production.up.railway.app";
 };
-const API_BASE = getApiBase();
+export const API_BASE = getApiBase();
 
 function parseApiError(data: unknown, fallback: string): string {
   const obj = data as {
