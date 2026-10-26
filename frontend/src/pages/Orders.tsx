@@ -710,13 +710,7 @@ export default function Orders() {
                             )}
                             {((o as any).cancelledAt || (o as any).cancelled_at) && (
                               <p className="text-[11px] text-neutral-500 dark:text-[#A1A1AA] font-mono pt-0.5">
-                                Cancelled on: {new Date((o as any).cancelledAt || (o as any).cancelled_at).toLocaleString("en-IN", {
-                                  day: "numeric",
-                                  month: "short",
-                                  year: "numeric",
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                })}
+                                Cancelled on: {formatBookingDateTime((o as any).cancelledAt || (o as any).cancelled_at) || String((o as any).cancelledAt || (o as any).cancelled_at)}
                               </p>
                             )}
                           </div>

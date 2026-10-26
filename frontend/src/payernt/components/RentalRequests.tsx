@@ -914,7 +914,7 @@ export function RentalRequests({
                           )}
                           {((req as any).cancelledAt || (req as any).cancelled_at) && (
                             <p className="text-[11px] text-neutral-500 dark:text-[#A1A1AA] font-mono pt-0.5">
-                              Cancelled on: {new Date((req as any).cancelledAt || (req as any).cancelled_at).toLocaleString("en-IN")}
+                              Cancelled on: {formatBookingDateTime((req as any).cancelledAt || (req as any).cancelled_at) || String((req as any).cancelledAt || (req as any).cancelled_at)}
                             </p>
                           )}
                         </div>
