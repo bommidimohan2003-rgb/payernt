@@ -84,24 +84,13 @@ class TestPayerntMasterBackend(unittest.TestCase):
         self.assertIn(res.status_code, (200, 201))
         data = res.json()
         self.assertTrue(data.get("success"))
-        self.assertIn(data.get("accountType"), ("Payernt", "paye₹nt"))
-        self.assertEqual(data.get("status"), "PENDING_REVIEW")
+        self.assertEqual(data.get("accountType"), "paye₹nt")
+        self.assertIn("token", data)
         self.assertNotIn("password_hash", data.get("account", {}))
 
         # 4. Duplicate registration rejected
         res_dup = self.client.post("/api/paye₹nt/auth/register", json=valid_payload)
         self.assertEqual(res_dup.status_code, 409)
-
-        # Approve account for authenticated test suite
-        from database import execute_query
-        from payernt_database import MOCK_PAYERNT_ACCOUNTS, invalidate_payernt_account_cache
-        try:
-            execute_query("UPDATE payernt_accounts SET status = 'APPROVED' WHERE email = %s", (self.test_email,))
-        except Exception:
-            pass
-        if self.test_email in MOCK_PAYERNT_ACCOUNTS:
-            MOCK_PAYERNT_ACCOUNTS[self.test_email]["status"] = "APPROVED"
-        invalidate_payernt_account_cache(self.test_email)
 
     def test_03_login_and_token_claims(self):
         """Test paye₹nt authentication and token claims."""
@@ -120,7 +109,7 @@ class TestPayerntMasterBackend(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         data = res.json()
         self.assertTrue(data.get("success"))
-        self.assertIn(data.get("accountType"), ("Payernt", "paye₹nt"))
+        self.assertEqual(data.get("accountType"), "paye₹nt")
         self.__class__.vendor_token = data.get("token")
         self.__class__.vendor_id = data.get("userId")
 
@@ -190,21 +179,11 @@ class TestPayerntMasterBackend(unittest.TestCase):
         prod_id = self.created_product_id
         original_vendor_pin = self.vendor_pin
 
-        # Mark product as available for renting
-        from payernt_database import update_payernt_product
-        from database import execute_query
-        update_payernt_product(prod_id, self.vendor_id, {"available": True, "availability_status": "available", "status": "active"})
-        try:
-            execute_query("UPDATE payernt_products SET available = TRUE, availability_status = 'available', status = 'active' WHERE id = %s", (prod_id,))
-        except Exception:
-            pass
-
         # Generate renter token for Booking #1
-        r1_uid = uuid.uuid4().hex[:6]
         renter1_token = create_access_token({
-            "sub": f"renter1_{r1_uid}@test.com",
+            "sub": "renter1@test.com",
             "account_type": "pay₹ent",
-            "user_id": f"RENTER_USER_{r1_uid}",
+            "user_id": "RENTER_USER_001",
             "role": "renter",
         })
         renter1_headers = {"Authorization": f"Bearer {renter1_token}"}
@@ -214,10 +193,10 @@ class TestPayerntMasterBackend(unittest.TestCase):
             "startDate": "2026-10-01",
             "endDate": "2026-10-04",
         }, headers=renter1_headers)
-        self.assertEqual(booking1_res.status_code, 200, f"Booking 1 failed: {booking1_res.text}")
+        self.assertEqual(booking1_res.status_code, 200)
         b1_data = booking1_res.json()
         b1_id = b1_data["booking"]["id"]
-        b1_renter_pin = b1_data.get("booking", {}).get("renterSecretPin") or b1_data.get("security", {}).get("renter_secret_pin") or b1_data.get("security", {}).get("renterSecretPin")
+        b1_renter_pin = b1_data["booking"]["renterSecretPin"]
 
         # Check RentalSecurity Record #1
         sec1 = get_rental_security_record(b1_id)
@@ -227,11 +206,10 @@ class TestPayerntMasterBackend(unittest.TestCase):
         self.assertNotEqual(sec1["renter_secret_pin"], original_vendor_pin)
 
         # Generate renter token for Booking #2
-        r2_uid = uuid.uuid4().hex[:6]
         renter2_token = create_access_token({
-            "sub": f"renter2_{r2_uid}@test.com",
+            "sub": "renter2@test.com",
             "account_type": "pay₹ent",
-            "user_id": f"RENTER_USER_{r2_uid}",
+            "user_id": "RENTER_USER_002",
             "role": "renter",
         })
         renter2_headers = {"Authorization": f"Bearer {renter2_token}"}
@@ -244,7 +222,7 @@ class TestPayerntMasterBackend(unittest.TestCase):
         self.assertEqual(booking2_res.status_code, 200)
         b2_data = booking2_res.json()
         b2_id = b2_data["booking"]["id"]
-        b2_renter_pin = b2_data.get("booking", {}).get("renterSecretPin") or b2_data.get("security", {}).get("renter_secret_pin") or b2_data.get("security", {}).get("renterSecretPin")
+        b2_renter_pin = b2_data["booking"]["renterSecretPin"]
 
         # Check RentalSecurity Record #2
         sec2 = get_rental_security_record(b2_id)
@@ -292,11 +270,8 @@ class TestPayerntMasterBackend(unittest.TestCase):
         otp_res = self.client.post(f"/api/bookings/{b_id}/security/otp", json={"otp": "123456"})
         self.assertEqual(otp_res.status_code, 200)
 
-        act_res = self.client.post(f"/api/bookings/{b_id}/security/activate")
-        self.assertEqual(act_res.status_code, 200)
-
         sec_after = get_rental_security_record(b_id)
-        self.assertTrue(bool(sec_after["rental_started"]))
+        self.assertTrue(sec_after["rental_started"])
         self.assertEqual(sec_after["status"], "active")
         self.assertIsNotNone(sec_after["rental_started_at"])
 

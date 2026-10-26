@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { createFileRoute, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
 import { MyProducts } from "@/payernt/components/MyProducts";
 import { usePayernt } from "@/payernt/context";
@@ -22,12 +21,7 @@ function PayerntProductsRoute() {
     toggleAvailability,
     deleteProduct,
     updateProduct,
-    fetchProducts,
   } = usePayernt();
-
-  useEffect(() => {
-    fetchProducts();
-  }, [fetchProducts]);
 
   const isExactProducts =
     location.pathname === "/payernt/products" ||

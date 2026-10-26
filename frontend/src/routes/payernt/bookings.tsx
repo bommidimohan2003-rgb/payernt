@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { RentalRequests } from "@/payernt/components/RentalRequests";
 import { usePayernt } from "@/payernt/context";
@@ -20,12 +19,7 @@ function PayerntBookingsRoute() {
     rentalRequests,
     handleRequestAction,
     advanceRentalLifecycle,
-    fetchBookings,
   } = usePayernt();
-
-  useEffect(() => {
-    fetchBookings();
-  }, [fetchBookings]);
 
   return (
     <RentalRequests

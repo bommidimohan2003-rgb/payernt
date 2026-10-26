@@ -1,14 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
-import ProductSelection from "@/components/selection/ProductSelection";
+import Home from "@/pages/Home";
 import { getSeoMetadata } from "@/utils/seo";
 
 export const Route = createFileRoute("/")({
   head: () =>
     getSeoMetadata({
-      title: "paye₹nt | pay₹ent — Choose Your Experience",
+      title: "Paye₹nt — Rent Professional Tech | Peer-to-Peer Rental Marketplace",
       description:
-        "Choose between paye₹nt peer-to-peer tech gear lending platform and pay₹ent gear rental marketplace.",
+        "Create Without Limits. Peer-to-peer marketplace to rent cinema cameras, drones, laptops, and production gear.",
       path: "/",
     }),
-  component: ProductSelection,
+  component: Home,
 });

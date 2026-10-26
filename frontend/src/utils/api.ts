@@ -1288,26 +1288,17 @@ export const api = {
       throw new Error(parseApiError(data, "Failed to cancel order"));
     }
 
-    const nowIso = new Date().toISOString();
     const currentOrders = storage.get<Order[]>(STORAGE_KEYS.orders, []);
     const updatedOrders = currentOrders.map((o) =>
       o.id === orderId ||
       o.productId === orderId ||
       (o as { product_id?: string }).product_id === orderId
-        ? { ...o, status: "cancelled" as const, cancelledAt: nowIso, cancelled_at: nowIso }
+        ? { ...o, status: "cancelled" as const }
         : o,
     );
     storage.set(STORAGE_KEYS.orders, updatedOrders);
     this.invalidateCache("user_orders");
     this.invalidateCache("public_stats");
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(
-        new CustomEvent("payent_queue_updated", {
-          detail: { bookingId: orderId, status: "cancelled", cancelled_at: nowIso },
-        }),
-      );
-      window.dispatchEvent(new CustomEvent("payent_orders_updated"));
-    }
     return res ? res.json() : { success: true };
   },
 

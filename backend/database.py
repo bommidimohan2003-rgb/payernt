@@ -105,12 +105,12 @@ def get_db_pool():
     try:
         _db_pool = PooledDB(
             creator=pymysql,
-            mincached=5,
-            maxcached=35,
+            mincached=3,
+            maxcached=20,
             maxshared=0,
-            maxconnections=50,
-            blocking=True,
-            maxusage=2000,
+            maxconnections=0,
+            blocking=False,
+            maxusage=1000,
             ping=1,  # ping on checkout from pool if connection was closed/dropped, NOT on every cursor/execute
             host=MYSQL_HOST,
             port=MYSQL_PORT,
@@ -489,9 +489,6 @@ def init_db(force: bool = False):
     add_column_safely("orders", "start_datetime VARCHAR(100) NULL")
     add_column_safely("orders", "end_datetime VARCHAR(100) NULL")
     add_column_safely("orders", "cancellation_id VARCHAR(255) NULL")
-    add_column_safely("orders", "cancelled_at VARCHAR(100) NULL")
-    add_column_safely("orders", "cancellation_reason VARCHAR(255) NULL")
-    add_column_safely("orders", "cancelled_by VARCHAR(50) NULL")
     add_column_safely("orders", "confirmed_at VARCHAR(100) NULL")
     add_column_safely("orders", "ready_for_pickup_at VARCHAR(100) NULL")
     add_column_safely("orders", "picked_up_at VARCHAR(100) NULL")
@@ -1830,7 +1827,6 @@ def get_orders(email: str):
                                start_date, end_date, total, status, created_at,
                                razorpay_order_id, razorpay_payment_id, payment_status, refund_id, refund_status,
                                confirmed_at, ready_for_pickup_at, picked_up_at, return_initiated_at, handed_back_at, awaiting_inspection_at, completed_at, queue_notes,
-                               cancelled_at, cancellation_reason, cancellation_id,
                                category
                         FROM orders
                         WHERE user_email = %s
@@ -2562,15 +2558,12 @@ def reject_location_change_request(order_id: str, caller_email: str, feedback: O
     }
 
 def cancel_order(order_id: str):
-    now_iso = dt.now(timezone.utc).isoformat()
     for key, o in list(MOCK_ORDERS.items()):
         if key == order_id or o.get("id") == order_id or o.get("productId") == order_id or o.get("product_id") == order_id:
             MOCK_ORDERS[key]["status"] = "cancelled"
-            MOCK_ORDERS[key]["cancelled_at"] = now_iso
-            MOCK_ORDERS[key]["cancelledAt"] = now_iso
-    execute_query("UPDATE orders SET status = 'cancelled', cancelled_at = %s WHERE id = %s", (now_iso, order_id,))
+    execute_query("UPDATE orders SET status = 'cancelled' WHERE id = %s", (order_id,))
     try:
-        execute_query("UPDATE rental_security SET status = 'cancelled', updated_at = %s WHERE booking_id = %s", (now_iso, order_id,))
+        execute_query("UPDATE rental_security SET status = 'cancelled' WHERE booking_id = %s", (order_id,))
     except Exception:
         pass
 
@@ -2651,9 +2644,9 @@ def record_booking_cancellation(
                 ))
                 cursor.execute("""
                     UPDATE orders 
-                    SET status = %s, cancellation_id = %s, cancelled_at = %s, cancellation_reason = %s, cancelled_by = %s
+                    SET status = %s, cancellation_id = %s 
                     WHERE id = %s
-                """, (new_status, canc_id, now_iso, reason_code, initiated_by, booking_id))
+                """, (new_status, canc_id, booking_id))
                 try:
                     cursor.execute("""
                         UPDATE rental_security 
@@ -2691,12 +2684,6 @@ def update_order_queue_milestone(
     b_id = str(order_id).strip()
     now_iso = dt.now(timezone.utc).isoformat()
     ts = timestamps or {}
-
-    # Reject advance if booking is already cancelled
-    conn_chk = fetch_one("SELECT status FROM orders WHERE id = %s", (b_id,)) or MOCK_ORDERS.get(b_id)
-    if conn_chk and str(conn_chk.get("status") or "").strip().lower() in ("cancelled", "canceled"):
-        logger.warning(f"[QueueMilestone] Refusing to advance cancelled order #{b_id}")
-        return fetch_one("SELECT * FROM orders WHERE id = %s", (b_id,)) or MOCK_ORDERS.get(b_id)
 
     # Update in-memory MOCK_ORDERS
     mock_order = None
@@ -2769,153 +2756,6 @@ def update_order_queue_milestone(
 
     # Fetch and return updated record
     return fetch_one("SELECT * FROM orders WHERE id = %s", (b_id,)) or mock_order
-
-def check_booking_authorization(
-    order: Dict[str, Any],
-    caller_email: str,
-    caller_role: str = ""
-) -> Tuple[bool, bool, bool, str, str]:
-    """
-    Authoritative server-side booking access and ownership validation.
-    Returns (is_renter, is_lender, is_admin, cust_email, lender_email).
-
-    Validates:
-    - Renter identity against order.user_email.
-    - Admin identity against caller_role and user profile.
-    - Lender identity against:
-        1. Product owner_email / user_email.
-        2. Product owner_id / accountId matching caller's vendor account.
-        3. Rental security vendor_id matching caller's vendor account or email.
-        4. Order lender_email / vendor_email / vendor_id.
-    """
-    clean_user = str(caller_email or "").strip().lower()
-    cust_email = str(order.get("user_email") or order.get("userEmail") or "").strip().lower()
-    is_renter = bool(clean_user and (clean_user == cust_email or clean_user in cust_email or cust_email in clean_user))
-
-    is_admin = caller_role in ("admin", "superadmin")
-    if not is_admin and clean_user:
-        user_rec = get_user(clean_user) or {}
-        if str(user_rec.get("role") or "").lower() in ("admin", "superadmin"):
-            is_admin = True
-
-    is_lender = False
-
-    # Resolve caller's vendor account if available
-    caller_vendor_ids = set()
-    from payernt_database import (
-        get_payernt_account_by_email,
-        get_payernt_product_by_id,
-        get_payernt_account_by_id,
-    )
-    if clean_user:
-        try:
-            vendor_acc = get_payernt_account_by_email(clean_user)
-            if vendor_acc:
-                if vendor_acc.get("id"):
-                    caller_vendor_ids.add(str(vendor_acc["id"]).strip().lower())
-                if vendor_acc.get("accountId"):
-                    caller_vendor_ids.add(str(vendor_acc["accountId"]).strip().lower())
-        except Exception:
-            pass
-
-    pid = str(order.get("product_id") or order.get("productId") or "").strip()
-    pprod = None
-    cprod = None
-    if pid:
-        try:
-            pprod = get_payernt_product_by_id(pid)
-        except Exception:
-            pass
-        try:
-            cprod = fetch_one("SELECT * FROM custom_products WHERE id = %s", (pid,))
-            if not cprod and pid in MOCK_CUSTOM_PRODUCTS:
-                cprod = MOCK_CUSTOM_PRODUCTS[pid]
-        except Exception:
-            pass
-
-    prod_owner_emails = set()
-    prod_owner_ids = set()
-
-    if pprod and isinstance(pprod, dict):
-        if pprod.get("owner_email"):
-            prod_owner_emails.add(str(pprod["owner_email"]).strip().lower())
-        if pprod.get("user_email"):
-            prod_owner_emails.add(str(pprod["user_email"]).strip().lower())
-        if pprod.get("owner_id"):
-            prod_owner_ids.add(str(pprod["owner_id"]).strip().lower())
-
-    if cprod and isinstance(cprod, dict):
-        if cprod.get("user_email"):
-            prod_owner_emails.add(str(cprod["user_email"]).strip().lower())
-        if cprod.get("owner_email"):
-            prod_owner_emails.add(str(cprod["owner_email"]).strip().lower())
-        if cprod.get("owner_id"):
-            prod_owner_ids.add(str(cprod["owner_id"]).strip().lower())
-
-    order_lender_emails = set()
-    order_vendor_ids = set()
-
-    for k in ("lender_email", "vendor_email", "owner_email"):
-        val = str(order.get(k) or "").strip().lower()
-        if val:
-            order_lender_emails.add(val)
-
-    for k in ("vendor_id", "lender_id", "owner_id"):
-        val = str(order.get(k) or "").strip().lower()
-        if val:
-            order_vendor_ids.add(val)
-
-    booking_id = str(order.get("id") or "").strip()
-    sec = None
-    if booking_id:
-        try:
-            sec = fetch_one("SELECT * FROM rental_security WHERE booking_id = %s", (booking_id,))
-        except Exception:
-            pass
-    if sec and sec.get("vendor_id"):
-        order_vendor_ids.add(str(sec["vendor_id"]).strip().lower())
-
-    # 1. Email matching
-    if clean_user:
-        if any(clean_user == em or clean_user in em or em in clean_user for em in prod_owner_emails):
-            is_lender = True
-        elif any(clean_user == em or clean_user in em or em in clean_user for em in order_lender_emails):
-            is_lender = True
-        elif any(clean_user == oid for oid in prod_owner_ids):
-            is_lender = True
-        elif any(clean_user == vid for vid in order_vendor_ids):
-            is_lender = True
-
-    # 2. Vendor Account ID matching
-    if not is_lender and caller_vendor_ids:
-        if any(vid in prod_owner_ids for vid in caller_vendor_ids):
-            is_lender = True
-        elif any(vid in order_vendor_ids for vid in caller_vendor_ids):
-            is_lender = True
-
-    # 3. Product owner / Vendor ID account lookup
-    if not is_lender and clean_user:
-        all_candidate_ids = prod_owner_ids | order_vendor_ids
-        for cid in all_candidate_ids:
-            try:
-                cand_acc = get_payernt_account_by_id(cid)
-                if cand_acc:
-                    cand_email = str(cand_acc.get("email") or "").strip().lower()
-                    if cand_email and (clean_user == cand_email or clean_user in cand_email or cand_email in clean_user):
-                        is_lender = True
-                        break
-            except Exception:
-                pass
-
-    resolved_lender_email = ""
-    if prod_owner_emails:
-        resolved_lender_email = next(iter(prod_owner_emails))
-    elif order_lender_emails:
-        resolved_lender_email = next(iter(order_lender_emails))
-    elif is_lender:
-        resolved_lender_email = clean_user
-
-    return is_renter, is_lender, is_admin, cust_email, resolved_lender_email
 
 def get_booking_cancellation(booking_id: str) -> Optional[Dict[str, Any]]:
     """Retrieves the cancellation record for a given booking ID."""
@@ -4300,14 +4140,10 @@ def revoke_cross_side_user_sessions(user_email: str, person_id: Optional[str] = 
     target_emails = {clean_email}
     try:
         if person_id:
-            rows = fetch_all("""
-                SELECT email FROM payrent_accounts WHERE person_id = %s
-                UNION
-                SELECT email FROM users WHERE person_id = %s
-                UNION
-                SELECT email FROM payernt_accounts WHERE person_id = %s
-            """, (person_id, person_id, person_id)) or []
-            for r in rows:
+            rows_payrent = fetch_all("SELECT email FROM payrent_accounts WHERE person_id = %s", (person_id,)) or []
+            rows_users = fetch_all("SELECT email FROM users WHERE person_id = %s", (person_id,)) or []
+            rows_payernt = fetch_all("SELECT email FROM payernt_accounts WHERE person_id = %s", (person_id,)) or []
+            for r in rows_payrent + rows_users + rows_payernt:
                 if r and r.get("email"):
                     target_emails.add(r["email"].strip().lower())
         else:
@@ -4315,65 +4151,51 @@ def revoke_cross_side_user_sessions(user_email: str, person_id: Optional[str] = 
             p_payernt = fetch_one("SELECT person_id, phone FROM payernt_accounts WHERE email = %s", (clean_email,))
             pid = (p_user and p_user.get("person_id")) or (p_payernt and p_payernt.get("person_id"))
             if pid:
-                rows = fetch_all("""
-                    SELECT email FROM payrent_accounts WHERE person_id = %s
-                    UNION
-                    SELECT email FROM users WHERE person_id = %s
-                    UNION
-                    SELECT email FROM payernt_accounts WHERE person_id = %s
-                """, (pid, pid, pid)) or []
-                for r in rows:
+                rows_payrent = fetch_all("SELECT email FROM payrent_accounts WHERE person_id = %s", (pid,)) or []
+                rows_users = fetch_all("SELECT email FROM users WHERE person_id = %s", (pid,)) or []
+                rows_payernt = fetch_all("SELECT email FROM payernt_accounts WHERE person_id = %s", (pid,)) or []
+                for r in rows_payrent + rows_users + rows_payernt:
                     if r and r.get("email"):
                         target_emails.add(r["email"].strip().lower())
             phone = (p_user and p_user.get("phone")) or (p_payernt and p_payernt.get("phone"))
             if phone:
-                rows = fetch_all("""
-                    SELECT email FROM users WHERE phone = %s
-                    UNION
-                    SELECT email FROM payernt_accounts WHERE phone = %s
-                """, (phone, phone)) or []
-                for r in rows:
+                rows_u = fetch_all("SELECT email FROM users WHERE phone = %s", (phone,)) or []
+                rows_p = fetch_all("SELECT email FROM payernt_accounts WHERE phone = %s", (phone,)) or []
+                for r in rows_u + rows_p:
                     if r and r.get("email"):
                         target_emails.add(r["email"].strip().lower())
     except Exception as e:
         logger.warning(f"Notice: cross-side email discovery error: {e}")
 
     norm_target = "payrent" if logging_in_account_type.lower() in ("payrent", "pay₹ent", "customer") else "payernt"
-    if target_emails:
-        clean_list = [em.strip().lower() for em in target_emails if em]
-        placeholders = ", ".join(["%s"] * len(clean_list))
-        params_tuple = (now_str,) + tuple(clean_list)
+    for em in target_emails:
         try:
             if norm_target == "payrent":
                 # Revoke payernt sessions
-                execute_query(f"""
+                execute_query("""
                     UPDATE sessions 
                     SET revoked_at = %s 
-                    WHERE LOWER(user_email) IN ({placeholders}) 
+                    WHERE LOWER(user_email) = LOWER(%s) 
                       AND (account_type IN ('payernt', 'paye₹nt', 'vendor') OR account_type IS NULL)
                       AND account_type NOT IN ('admin')
                       AND revoked_at IS NULL
-                """, params_tuple)
+                """, (now_str, em))
             else:
                 # Revoke payrent sessions
-                execute_query(f"""
+                execute_query("""
                     UPDATE sessions 
                     SET revoked_at = %s 
-                    WHERE LOWER(user_email) IN ({placeholders}) 
+                    WHERE LOWER(user_email) = LOWER(%s) 
                       AND (account_type IN ('payrent', 'pay₹ent', 'customer') OR account_type IS NULL)
                       AND account_type NOT IN ('admin')
                       AND revoked_at IS NULL
-                """, params_tuple)
+                """, (now_str, em))
         except Exception:
-            for em in clean_list:
-                try:
-                    execute_query("""
-                        UPDATE sessions 
-                        SET revoked_at = %s 
-                        WHERE LOWER(user_email) = LOWER(%s) AND revoked_at IS NULL
-                    """, (now_str, em))
-                except Exception:
-                    pass
+            execute_query("""
+                UPDATE sessions 
+                SET revoked_at = %s 
+                WHERE LOWER(user_email) = LOWER(%s) AND revoked_at IS NULL
+            """, (now_str, em))
 
     return True
 

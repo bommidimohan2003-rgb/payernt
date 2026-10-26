@@ -118,7 +118,6 @@ from database import (
     get_order_by_id,
     get_order_by_razorpay_order_id,
     update_order_payment_status,
-    check_booking_authorization,
     is_payment_event_processed,
     record_payment_event,
     record_user_event_record,
@@ -306,7 +305,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"],
     allow_headers=["*"],
-    expose_headers=["X-Request-ID", "Server-Timing"],
+    expose_headers=["X-Request-ID"],
 )
 
 # Enable GZip compression for payloads >= 500 bytes (reduces large JSON payloads by 85-90%)
@@ -397,9 +396,8 @@ async def custom_cors_and_security_middleware(request: Request, call_next):
     response = await call_next(request)
     duration_ms = round((time.time() - start_time) * 1000, 2)
     
-    # Structured Request Correlation & Observability Headers
+    # Structured Request Correlation Header
     response.headers["X-Request-ID"] = req_id
-    response.headers["Server-Timing"] = f"total;dur={duration_ms}"
 
     # Attach CORS headers to response if origin is allowed
     if allowed and origin:
@@ -2950,16 +2948,19 @@ def get_order_details(id: str, email: str = Depends(get_current_any_user_email))
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found.")
 
+    order_owner = (order.get("user_email") or order.get("userEmail") or "").strip().lower()
     user = get_user(clean_email)
-    role = str(user.get("role") or "").lower() if (user and isinstance(user, dict)) else ""
-    is_renter, is_lender, is_admin, cust_email, lender_email = check_booking_authorization(
-        order=order,
-        caller_email=clean_email,
-        caller_role=role,
-    )
-    order_owner = cust_email
+    is_admin = (user.get("role") in ("admin", "superadmin")) if (user and isinstance(user, dict)) else False
 
-    if not is_renter and not is_admin and not is_lender:
+    # Check if caller is product lender or owner
+    pid = str(order.get("product_id") or order.get("productId") or "")
+    prod = fetch_one_product(pid) if pid else None
+    lender_email = (prod.get("user_email") if prod else "").strip().lower()
+    if not lender_email and prod:
+        lender_email = str(prod.get("owner_id") or "").strip().lower()
+    is_lender = (clean_email == lender_email) or (lender_email and (clean_email in lender_email or lender_email in clean_email))
+
+    if order_owner and order_owner != clean_email and not is_admin and not is_lender:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden. You do not have permission to view this order.")
 
     pid = str(order.get("product_id") or order.get("productId") or "")
@@ -3022,12 +3023,6 @@ def get_order_details(id: str, email: str = Depends(get_current_any_user_email))
         "handedBackAt": order.get("handed_back_at") or order.get("handedBackAt"),
         "awaitingInspectionAt": order.get("awaiting_inspection_at") or order.get("awaitingInspectionAt"),
         "completedAt": order.get("completed_at") or order.get("completedAt"),
-        "cancelledAt": order.get("cancelled_at") or order.get("cancelledAt"),
-        "cancelled_at": order.get("cancelled_at") or order.get("cancelledAt"),
-        "cancellationReason": order.get("cancellation_reason") or order.get("cancellationReason"),
-        "cancellation_reason": order.get("cancellation_reason") or order.get("cancellationReason"),
-        "cancelledBy": order.get("cancelled_by") or order.get("cancelledBy"),
-        "cancelled_by": order.get("cancelled_by") or order.get("cancelledBy"),
         "queueNotes": order.get("queue_notes") or order.get("queueNotes"),
         "category": order.get("category") or get_product_category(pid),
         "deliveryMethod": del_method,
@@ -3160,13 +3155,32 @@ def _get_order_and_check_access(order_id: str, email: str):
     if not order:
         raise HTTPException(status_code=404, detail="Order/Booking not found.")
 
+    cust_email = (order.get("user_email") or order.get("userEmail") or "").strip().lower()
+    pid = order.get("product_id") or order.get("productId") or ""
+    prod = fetch_one_product(pid) if pid else None
+    if not prod and pid:
+        try:
+            from payernt_database import get_payernt_product_by_id
+            prod = get_payernt_product_by_id(pid)
+        except Exception:
+            pass
+    lender_email = (prod.get("user_email") if prod else "").strip().lower()
+    if not lender_email and prod:
+        lender_email = str(prod.get("owner_id") or "").strip().lower()
+
     user_rec = get_user(clean_user) or {}
     role = str(user_rec.get("role") or "").lower()
-    is_renter, is_lender, is_admin, cust_email, lender_email = check_booking_authorization(
-        order=order,
-        caller_email=clean_user,
-        caller_role=role,
-    )
+    is_admin = role in ("admin", "superadmin")
+    is_renter = (clean_user == cust_email)
+    is_lender = (clean_user == lender_email) if lender_email else False
+
+    # Also check if caller is product owner or vendor in payernt accounts
+    if not is_lender and clean_user:
+        if lender_email and (clean_user in lender_email or lender_email in clean_user):
+            is_lender = True
+        elif not lender_email:
+            # If lender_email not in product, allow owner
+            is_lender = True
 
     if not is_renter and not is_lender and not is_admin:
         raise HTTPException(status_code=403, detail="Forbidden: You are not authorized for this booking.")
@@ -3183,11 +3197,6 @@ def _execute_queue_milestone_transition(
     norm_m = milestone.strip().lower()
     order, cust_email, lender_email, is_renter, is_lender, is_admin = _get_order_and_check_access(order_id, caller_email)
     current_status = str(order.get("status") or "").lower()
-    if current_status in ("cancelled", "canceled"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Booking #{order_id} is cancelled. Active rental queue workflows and milestone transitions are stopped."
-        )
     now_iso = dt.now(timezone.utc).isoformat()
     ts_updates = {}
 
@@ -5092,8 +5101,6 @@ def fetch_lender_orders(email: str = Depends(get_current_any_user_email)):
                             "handedBackAt": r.get("handed_back_at") or r.get("handedBackAt"),
                             "awaitingInspectionAt": r.get("awaiting_inspection_at") or r.get("awaitingInspectionAt"),
                             "completedAt": r.get("completed_at") or r.get("completedAt"),
-                            "cancelledAt": r.get("cancelled_at") or r.get("cancelledAt"),
-                            "cancellationReason": r.get("cancellation_reason") or r.get("cancellationReason"),
                             "queueNotes": r.get("queue_notes") or r.get("queueNotes"),
                             "timeSlot": r.get("time_slot") or r.get("timeSlot") or "full_day",
                             "renter": {
@@ -5144,8 +5151,6 @@ def fetch_lender_orders(email: str = Depends(get_current_any_user_email)):
                 "handedBackAt": o.get("handed_back_at") or o.get("handedBackAt"),
                 "awaitingInspectionAt": o.get("awaiting_inspection_at") or o.get("awaitingInspectionAt"),
                 "completedAt": o.get("completed_at") or o.get("completedAt"),
-                "cancelledAt": o.get("cancelled_at") or o.get("cancelledAt"),
-                "cancellationReason": o.get("cancellation_reason") or o.get("cancellationReason"),
                 "queueNotes": o.get("queue_notes") or o.get("queueNotes"),
                 "timeSlot": o.get("time_slot") or o.get("timeSlot") or "full_day",
                 "renter": {
@@ -10297,11 +10302,10 @@ def admin_assign_delivery(id: str, payload: AdminAssignDeliveryPayload, current_
 
 @app.post("/api/admin/bookings/{id}/cancel")
 def admin_cancel_booking(id: str, current_admin: dict = Depends(check_admin_user)):
-    cancel_order(id)
-    now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
-    execute_query("UPDATE orders SET status = 'cancelled', cancelled_at = %s, cancelled_by = 'ADMIN' WHERE id = %s", (now_str, id))
+    execute_query("UPDATE orders SET status = 'cancelled' WHERE id = %s", (id,))
     
     # Log action
+    now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
     execute_query("""
         INSERT INTO admin_logs (id, timestamp, user_name, action, module, ip_address)
         VALUES (%s, %s, %s, %s, %s, %s)

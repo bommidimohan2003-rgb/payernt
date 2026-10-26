@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { PayerntMessages } from "@/payernt/components/PayerntMessages";
 import { usePayernt } from "@/payernt/context";
@@ -21,12 +20,7 @@ function PayerntMessagesRoute() {
     userProducts,
     unreadMessagesCount,
     markMessageRead,
-    fetchMessages,
   } = usePayernt();
-
-  useEffect(() => {
-    fetchMessages();
-  }, [fetchMessages]);
 
   return (
     <PayerntMessages

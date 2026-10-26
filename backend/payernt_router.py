@@ -1605,8 +1605,7 @@ def get_vendor_bookings_endpoint(
 def process_lender_booking_cancellation(
     booking_id: str,
     data: LenderCancelBookingSchema,
-    vendor_id: str,
-    vendor_email: Optional[str] = None,
+    vendor_id: str
 ) -> Dict[str, Any]:
     """
     Core atomic handler for lender-initiated booking cancellation.
@@ -1678,28 +1677,9 @@ def process_lender_booking_cancellation(
     actual_vendor_id = (
         (sec.get("vendor_id") if sec else None)
         or (product.get("owner_id") if product else None)
-        or (product.get("user_email") if product else None)
         or (order.get("owner_id") if order else None)
-        or (order.get("lender_email") if order else None)
     )
-    valid_ids = {
-        str(vendor_id).strip().lower(),
-        str(vendor_email or "").strip().lower(),
-    }
-    valid_ids.discard("")
-
-    actual_vendor_str = str(actual_vendor_id or "").strip().lower()
-    is_authorized_vendor = (
-        vendor_id in ("admin", "superadmin")
-        or not actual_vendor_id
-        or any(
-            actual_vendor_str == v
-            or actual_vendor_str in v
-            or v in actual_vendor_str
-            for v in valid_ids
-        )
-    )
-    if not is_authorized_vendor:
+    if actual_vendor_id and actual_vendor_id != vendor_id and vendor_id not in ("admin", "superadmin"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Unauthorized: You are not the lender associated with this booking."
@@ -1807,7 +1787,7 @@ def payernt_cancel_booking_endpoint(
     Safely cancels an eligible booking, records reason and feedback,
     releases the reservation interval, and notifies the renter.
     """
-    return process_lender_booking_cancellation(booking_id, data, account["id"], account.get("email"))
+    return process_lender_booking_cancellation(booking_id, data, account["id"])
 
 
 @payernt_router.get("/products/{product_id}/availability-config")
@@ -2368,10 +2348,6 @@ def verify_otp_endpoint(
     data: VerifyOtpSchema,
 ):
     """Verifies Handover OTP."""
-    from database import fetch_one, MOCK_ORDERS
-    order = fetch_one("SELECT status FROM orders WHERE id = %s", (booking_id,)) or MOCK_ORDERS.get(booking_id)
-    if order and str(order.get("status") or "").strip().lower() in ("cancelled", "canceled"):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Booking #{booking_id} is cancelled. Cannot verify handover OTP.")
     valid, msg, record = verify_handover_otp_backend(booking_id, data.otp)
     if not valid:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
@@ -2398,11 +2374,6 @@ def activate_rental_endpoint(
         if payload:
             user_id = payload.get("user_id", "")
 
-    from database import fetch_one, MOCK_ORDERS
-    order = fetch_one("SELECT status FROM orders WHERE id = %s", (booking_id,)) or MOCK_ORDERS.get(booking_id)
-    if order and str(order.get("status") or "").strip().lower() in ("cancelled", "canceled"):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Booking #{booking_id} is cancelled. Cannot activate rental.")
-
     valid, msg, record = activate_rental_transactional(booking_id, user_id)
     if not valid:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
@@ -2425,10 +2396,6 @@ def complete_rental_endpoint(
     booking_id: str,
 ):
     """Completes the rental and credits the vendor's wallet with earnings."""
-    from database import fetch_one, MOCK_ORDERS
-    order = fetch_one("SELECT status FROM orders WHERE id = %s", (booking_id,)) or MOCK_ORDERS.get(booking_id)
-    if order and str(order.get("status") or "").strip().lower() in ("cancelled", "canceled"):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Booking #{booking_id} is cancelled. Cannot complete rental.")
     success, msg, record = complete_rental_and_credit_vendor(booking_id)
     if not success:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
@@ -2457,7 +2424,6 @@ def vendor_advance_queue_endpoint(
     """
     from database import (
         update_order_queue_milestone,
-        check_booking_authorization,
         MOCK_ORDERS,
         MOCK_CUSTOM_PRODUCTS,
         fetch_one,
@@ -2503,20 +2469,40 @@ def vendor_advance_queue_endpoint(
         logger.warning(f"[QueueAdvance] Booking #{booking_id} not found (requested by {caller_email})")
         raise HTTPException(status_code=404, detail=f"Booking #{booking_id} not found.")
 
-    curr_status = str(order.get("status") or "").strip().lower()
-    if curr_status in ("cancelled", "canceled"):
-        logger.warning(f"[QueueAdvance] Cannot advance cancelled booking #{booking_id} (requested by {caller_email})")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Booking #{booking_id} is cancelled. Active rental queue workflows and milestone transitions are stopped."
-        )
+    cust_email = str(order.get("user_email") or order.get("userEmail") or "").strip().lower()
+    pid = str(order.get("product_id") or order.get("productId") or "").strip()
 
-    # 3. Robust role and ownership authorization check
-    is_renter, is_lender, is_admin, cust_email, lender_email = check_booking_authorization(
-        order=order,
-        caller_email=caller_email,
-        caller_role=caller_role,
-    )
+    # Resolve lender email
+    lender_email = ""
+    if pid:
+        try:
+            pprod = get_payernt_product_by_id(pid)
+            if pprod:
+                lender_email = str(pprod.get("owner_id") or pprod.get("user_email") or "").strip().lower()
+        except Exception:
+            pass
+        if not lender_email:
+            try:
+                cprod = fetch_one("SELECT * FROM custom_products WHERE id = %s", (pid,))
+                if not cprod:
+                    cprod = MOCK_CUSTOM_PRODUCTS.get(pid)
+                if cprod:
+                    lender_email = str(cprod.get("user_email") or cprod.get("owner_id") or "").strip().lower()
+            except Exception:
+                pass
+    if not lender_email:
+        lender_email = str(order.get("lender_email") or order.get("vendor_id") or order.get("vendor_email") or "").strip().lower()
+
+    is_renter = (caller_email == cust_email)
+    is_lender = (caller_email == lender_email) if lender_email else False
+    if not is_lender and caller_email:
+        if lender_email and (caller_email in lender_email or lender_email in caller_email):
+            is_lender = True
+        elif not lender_email:
+            # If product lender is not explicitly set, check if caller is registered vendor
+            vendor_acc = get_payernt_account_by_email(caller_email)
+            if vendor_acc:
+                is_lender = True
 
     if not is_renter and not is_lender and not is_admin:
         logger.warning(f"[QueueAdvance] Unauthorized access attempt on booking #{booking_id} by {caller_email}")

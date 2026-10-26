@@ -72,6 +72,18 @@ html, body {
   --input: #e4e4e7;
   --ring: #161616;
 
+  /* Paye₹nt Reference Design Specification Tokens */
+  --color-brand: #6622aa;
+  --color-surface: #ffffff;
+  --color-primary-forest: #0d2a1f;
+  --color-text-nearblack: #0a0a0a;
+  --color-muted-mediumgray: #5a6460;
+  --color-border-darkgreen: #1a2d24;
+  --color-mint-background: #dceee1;
+  --color-mint-pill: #ddf0e4;
+  --radius-card: 28px;
+  --radius-panel: 30px;
+
   /* Button Tokens - Light Mode */
   --btn-primary-bg: #161616;
   --btn-primary-text: #FFFFFF;

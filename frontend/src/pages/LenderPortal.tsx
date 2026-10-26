@@ -475,8 +475,6 @@ export default function LenderPortal() {
                             handedBackAt={booking.handedBackAt || booking.handed_back_at}
                             awaitingInspectionAt={booking.awaitingInspectionAt || booking.awaiting_inspection_at}
                             completedAt={booking.completedAt || booking.completed_at}
-                            cancelledAt={booking.cancelledAt || booking.cancelled_at}
-                            cancellationReason={booking.cancellationReason || booking.cancellation_reason}
                             queueNotes={booking.queueNotes || (booking as any).queue_notes}
                             onStatusUpdated={(newStatus, updatedTimestamps) => {
                               setBookings((prev) =>

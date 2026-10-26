@@ -6,9 +6,7 @@ import type {
   BankAccount,
   LenderNotification,
 } from "./types";
-
-const STORAGE_KEY_SESSION = "paye₹nt_session";
-const STORAGE_KEY_ACCOUNT = "paye₹nt_account";
+import { STORAGE_KEY_SESSION, STORAGE_KEY_ACCOUNT } from "./store";
 
 const getApiBase = () => {
   if (typeof window !== "undefined") {
@@ -77,54 +75,17 @@ export function handlePayerntUnauthorized() {
   } catch {}
 }
 
-const inFlightGetRequests = new Map<string, Promise<Response>>();
-
-async function fetchWithPayerntAuth(
-  url: string,
-  options: RequestInit = {},
-  timeoutMs: number = 12000
-): Promise<Response> {
-  const method = (options.method || "GET").toUpperCase();
-  const isGet = method === "GET";
-
-  // Deduplicate identical in-flight GET requests
-  if (isGet && inFlightGetRequests.has(url)) {
-    const existing = inFlightGetRequests.get(url)!;
-    return existing.then((res) => res.clone());
-  }
-
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  if (options.signal) {
-    options.signal.addEventListener("abort", () => controller.abort());
-  }
-
+async function fetchWithPayerntAuth(url: string, options: RequestInit = {}): Promise<Response> {
   const authHeaders = getAuthHeaders();
   const headers = {
     ...authHeaders,
-    ...((options.headers as Record<string, string>) || {}),
+    ...(options.headers as Record<string, string> || {}),
   };
-
-  const fetchPromise = (async () => {
-    try {
-      const res = await fetch(url, { ...options, headers, signal: controller.signal });
-      if (res.status === 401) {
-        handlePayerntUnauthorized();
-      }
-      return res;
-    } finally {
-      clearTimeout(timer);
-      if (isGet) {
-        inFlightGetRequests.delete(url);
-      }
-    }
-  })();
-
-  if (isGet) {
-    inFlightGetRequests.set(url, fetchPromise);
+  const res = await fetch(url, { ...options, headers });
+  if (res.status === 401) {
+    handlePayerntUnauthorized();
   }
-
-  return fetchPromise;
+  return res;
 }
 
 export function extractApiErrorMessage(data: any, fallback: string): string {
