@@ -996,7 +996,7 @@ export function ListProductWizard({
 
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
-        audio: true,
+        audio: false,
       });
       videoMediaStreamRef.current = stream;
       if (liveVideoFeedRef.current) {
@@ -1055,6 +1055,13 @@ export function ListProductWizard({
   const start10SecondRecording = (activeStream?: MediaStream) => {
     const stream = activeStream || videoMediaStreamRef.current;
     if (!stream) return;
+
+    // Strict video-only guarantee: stop and remove any audio tracks
+    stream.getAudioTracks().forEach((track) => {
+      track.stop();
+      stream.removeTrack(track);
+    });
+
     recordedBlobsRef.current = [];
     setVideoCountdown(10);
     setIsRecordingVideo(true);
