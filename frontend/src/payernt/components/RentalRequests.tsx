@@ -124,6 +124,15 @@ export function RentalRequests({
 }: RentalRequestsProps) {
   const [filter, setFilter] = useState<LenderBookingFilter>("all");
   const [expandedBookingId, setExpandedBookingId] = useState<string | null>(null);
+
+  const toggleRequestDetails = useCallback((requestId: string | number) => {
+    const idStr = String(requestId);
+    setExpandedBookingId((prev) => (prev !== null && String(prev) === idStr ? null : idStr));
+  }, []);
+
+  const closeRequestDetails = useCallback(() => {
+    setExpandedBookingId(null);
+  }, []);
   const [approvingChangeId, setApprovingChangeId] = useState<string | null>(null);
   const [rejectingChangeId, setRejectingChangeId] = useState<string | null>(null);
 
@@ -791,7 +800,7 @@ export function RentalRequests({
       ) : (
         <div className="space-y-4">
           {filteredRequests.map((req) => {
-            const isExpanded = expandedBookingId === req.id;
+            const isExpanded = Boolean(expandedBookingId !== null && String(expandedBookingId) === String(req.id));
             const isCancelled = isCancelledRequest(req);
             const isDeclined = req.status === "rejected" || isCancelled;
             const actualCreationTs = req.createdAt || (req as any).created_at || req.requestDate;
@@ -799,9 +808,9 @@ export function RentalRequests({
             const bookingDate = formattedBookingTime || req.requestDate || req.startDate || "Recent";
 
             return (
-              <motion.div
-                layout
+              <div
                 key={req.id}
+                id={`rental-request-card-${req.id}`}
                 className={`rounded-3xl border transition-all ${
                   isExpanded
                     ? "border-black/20 dark:border-[#A1A1AA]/35 bg-white dark:bg-[#10151B] p-5 sm:p-7 space-y-6 shadow-sm"
@@ -845,7 +854,7 @@ export function RentalRequests({
                       onClick={(e) => {
                         e.stopPropagation();
                         e.preventDefault();
-                        setExpandedBookingId(isExpanded ? null : req.id);
+                        toggleRequestDetails(req.id);
                       }}
                       aria-expanded={isExpanded}
                       aria-controls={`rental-request-details-${req.id}`}
@@ -878,7 +887,7 @@ export function RentalRequests({
                         onClick={(e) => {
                           e.stopPropagation();
                           e.preventDefault();
-                          setExpandedBookingId(null);
+                          closeRequestDetails();
                         }}
                         className="inline-flex items-center gap-1 text-xs text-neutral-600 dark:text-[#A1A1AA] hover:text-neutral-950 dark:hover:text-white font-semibold cursor-pointer transition-colors"
                       >
@@ -1376,7 +1385,7 @@ export function RentalRequests({
                         onClick={(e) => {
                           e.stopPropagation();
                           e.preventDefault();
-                          setExpandedBookingId(null);
+                          closeRequestDetails();
                         }}
                         className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-black/10 dark:border-[#A1A1AA]/30 text-xs font-bold text-neutral-700 dark:text-[#A1A1AA] hover:text-neutral-950 dark:hover:text-white transition-colors cursor-pointer"
                       >
@@ -1386,7 +1395,7 @@ export function RentalRequests({
                     </div>
                   </div>
                 )}
-              </motion.div>
+              </div>
             );
           })}
         </div>

@@ -194,6 +194,15 @@ export default function Orders() {
   const [activeFilter, setActiveFilter] = useState<BookingFilter>("all");
   const [expandedBookingId, setExpandedBookingId] = useState<string | null>(null);
 
+  const toggleBookingDetails = useCallback((orderId: string | number) => {
+    const idStr = String(orderId);
+    setExpandedBookingId((prev) => (prev !== null && String(prev) === idStr ? null : idStr));
+  }, []);
+
+  const closeBookingDetails = useCallback(() => {
+    setExpandedBookingId(null);
+  }, []);
+
   // Location Edit / Change-Request Modal State
   const [locationModalOrder, setLocationModalOrder] = useState<Order | null>(null);
   const [editMethod, setEditMethod] = useState<"delivery" | "pickup" | "custom">("delivery");
@@ -574,7 +583,7 @@ export default function Orders() {
               const isCancelled = isCancelledBooking(o);
               const badge = getStatusBadge(o.status, isCancelled);
               const bookingDate = formatBookingDate(o);
-              const isCardExpanded = expandedBookingId === o.id;
+              const isCardExpanded = Boolean(expandedBookingId !== null && String(expandedBookingId) === String(o.id));
 
               return (
                 <div
@@ -639,7 +648,7 @@ export default function Orders() {
                         onClick={(e) => {
                           e.stopPropagation();
                           e.preventDefault();
-                          setExpandedBookingId(isCardExpanded ? null : o.id);
+                          toggleBookingDetails(o.id);
                         }}
                         aria-expanded={isCardExpanded}
                         aria-controls={`booking-details-${o.id}`}
@@ -674,7 +683,7 @@ export default function Orders() {
                           onClick={(e) => {
                             e.stopPropagation();
                             e.preventDefault();
-                            setExpandedBookingId(null);
+                            closeBookingDetails();
                           }}
                           className="inline-flex items-center gap-1 text-xs text-neutral-600 dark:text-[#A1A1AA] hover:text-neutral-950 dark:hover:text-white font-semibold cursor-pointer transition-colors"
                         >
@@ -1094,7 +1103,7 @@ export default function Orders() {
                           onClick={(e) => {
                             e.stopPropagation();
                             e.preventDefault();
-                            setExpandedBookingId(null);
+                            closeBookingDetails();
                           }}
                           className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-black/10 dark:border-[#A1A1AA]/30 text-xs font-bold text-neutral-700 dark:text-[#A1A1AA] hover:text-neutral-950 dark:hover:text-white transition-colors cursor-pointer"
                         >
