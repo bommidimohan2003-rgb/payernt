@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   CheckCircle2,
   Clock,
@@ -346,11 +346,15 @@ export function LiveRentalQueue({
   });
   const [isAdvancing, setIsAdvancing] = useState<boolean>(false);
   const [isExpanded, setIsExpanded] = useState<boolean>(!compact);
+  const prevCompactRef = useRef<boolean>(compact);
 
-  // Synchronize expansion state if orderId or compact prop changes
+  // Synchronize expansion state ONLY if the compact prop explicitly changes
   useEffect(() => {
-    setIsExpanded(!compact);
-  }, [orderId, compact]);
+    if (prevCompactRef.current !== compact) {
+      prevCompactRef.current = compact;
+      setIsExpanded(!compact);
+    }
+  }, [compact]);
 
   // Exact authoritative booking creation timestamp
   const actualBookingCreatedAt =
@@ -720,9 +724,11 @@ export function LiveRentalQueue({
             type="button"
             onClick={(e) => {
               e.stopPropagation();
+              e.preventDefault();
               setIsExpanded((prev) => !prev);
             }}
             aria-expanded={isExpanded}
+            aria-controls={`rental-queue-details-${orderId}`}
             aria-label={isExpanded ? "Collapse Live Rental Queue" : "Expand Live Rental Queue"}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border border-black/10 dark:border-white/10 bg-neutral-100 dark:bg-white/10 hover:bg-neutral-200 dark:hover:bg-white/15 text-neutral-800 dark:text-[#F5F5F5] shrink-0 shadow-2xs"
           >
@@ -738,7 +744,10 @@ export function LiveRentalQueue({
 
       {/* 2. Collapsible Details Container: Cancellation Banner, Timer HUD, Action Buttons, and Milestones */}
       {isExpanded && (
-        <div className="space-y-4 pt-3 border-t border-black/5 dark:border-white/5 transition-all">
+        <div
+          id={`rental-queue-details-${orderId}`}
+          className="space-y-4 pt-3 border-t border-black/5 dark:border-white/5 transition-all"
+        >
           {/* Prominent Cancellation Status Banner */}
           {isCancelled && (
         <div className="rounded-xl border border-red-500/25 bg-red-50/80 dark:bg-red-950/20 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">

@@ -842,7 +842,14 @@ export function RentalRequests({
 
                     <button
                       type="button"
-                      onClick={() => setExpandedBookingId(isExpanded ? null : req.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        setExpandedBookingId(isExpanded ? null : req.id);
+                      }}
+                      aria-expanded={isExpanded}
+                      aria-controls={`rental-request-details-${req.id}`}
+                      aria-label={isExpanded ? `Close details for booking ${req.id}` : `View details for booking ${req.id}`}
                       className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
                         isExpanded
                           ? "bg-neutral-900 text-white dark:bg-[#F5F5F5] dark:text-[#050709] border-transparent shadow-xs"
@@ -857,7 +864,10 @@ export function RentalRequests({
 
                 {/* 2. FULL DETAILS CONTAINER (ONLY rendered when isExpanded is true!) */}
                 {isExpanded && (
-                  <div className="space-y-6 pt-5 border-t border-black/5 dark:border-white/5">
+                  <div
+                    id={`rental-request-details-${req.id}`}
+                    className="space-y-6 pt-5 border-t border-black/5 dark:border-white/5"
+                  >
                     {/* Close Details Top Bar */}
                     <div className="flex items-center justify-between pb-2 border-b border-black/5 dark:border-white/5">
                       <span className="text-xs font-bold text-neutral-500 dark:text-[#A1A1AA] uppercase tracking-wider">
@@ -865,7 +875,11 @@ export function RentalRequests({
                       </span>
                       <button
                         type="button"
-                        onClick={() => setExpandedBookingId(null)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          setExpandedBookingId(null);
+                        }}
                         className="inline-flex items-center gap-1 text-xs text-neutral-600 dark:text-[#A1A1AA] hover:text-neutral-950 dark:hover:text-white font-semibold cursor-pointer transition-colors"
                       >
                         <X className="h-3.5 w-3.5" />
@@ -1359,7 +1373,11 @@ export function RentalRequests({
                     <div className="pt-2 flex justify-end border-t border-black/5 dark:border-white/5">
                       <button
                         type="button"
-                        onClick={() => setExpandedBookingId(null)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          setExpandedBookingId(null);
+                        }}
                         className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-black/10 dark:border-[#A1A1AA]/30 text-xs font-bold text-neutral-700 dark:text-[#A1A1AA] hover:text-neutral-950 dark:hover:text-white transition-colors cursor-pointer"
                       >
                         <X className="h-3.5 w-3.5" />
