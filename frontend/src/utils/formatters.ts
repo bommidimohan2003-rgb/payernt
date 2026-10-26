@@ -97,3 +97,53 @@ export function formatRelativeTime(dateStr?: string | null): string {
     return dateStr;
   }
 }
+
+/**
+ * Format booking creation timestamp into the required standard:
+ * "DD-MM-YYYY, HH:MM AM/PM" (Asia/Kolkata timezone)
+ * Example: "26-10-2026, 03:45 PM"
+ */
+export function formatBookingDateTime(dateStr?: string | null): string {
+  if (!dateStr) return "";
+  const s = String(dateStr).trim();
+  if (!s) return "";
+  try {
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return "";
+
+    const formatter = new Intl.DateTimeFormat("en-IN", {
+      timeZone: "Asia/Kolkata",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+
+    const parts = formatter.formatToParts(d);
+    let day = "";
+    let month = "";
+    let year = "";
+    let hour = "";
+    let minute = "";
+    let dayPeriod = "";
+
+    for (const part of parts) {
+      if (part.type === "day") day = part.value;
+      else if (part.type === "month") month = part.value;
+      else if (part.type === "year") year = part.value;
+      else if (part.type === "hour") hour = part.value;
+      else if (part.type === "minute") minute = part.value;
+      else if (part.type === "dayPeriod") dayPeriod = part.value.toUpperCase();
+    }
+
+    if (day && month && year && hour && minute) {
+      return `${day}-${month}-${year}, ${hour}:${minute} ${dayPeriod || "AM"}`;
+    }
+
+    return d.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" });
+  } catch {
+    return "";
+  }
+}

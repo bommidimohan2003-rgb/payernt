@@ -18,11 +18,13 @@ import {
   ArrowRight,
   XCircle,
   Ban,
+  Calendar,
 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/utils/api";
 import { payerntApi } from "@/payernt/payerntApiService";
 import { storage, STORAGE_KEYS } from "@/utils/storage";
+import { formatBookingDateTime } from "@/utils/formatters";
 
 export type QueueMilestoneKey =
   | "confirmed"
@@ -52,6 +54,8 @@ export interface LiveRentalQueueProps {
   startDate?: string;
   endDate?: string;
   timeSlot?: string;
+  createdAt?: string | null;
+  requestDate?: string | null;
   confirmedAt?: string | null;
   readyForPickupAt?: string | null;
   pickedUpAt?: string | null;
@@ -312,6 +316,8 @@ export function LiveRentalQueue({
   startDate,
   endDate,
   timeSlot,
+  createdAt: propCreatedAt,
+  requestDate: propRequestDate,
   confirmedAt: propConfirmedAt,
   readyForPickupAt: propReadyForPickupAt,
   pickedUpAt: propPickedUpAt,
@@ -339,6 +345,16 @@ export function LiveRentalQueue({
   });
   const [isAdvancing, setIsAdvancing] = useState<boolean>(false);
   const [isExpanded, setIsExpanded] = useState<boolean>(!compact);
+
+  // Exact authoritative booking creation timestamp
+  const actualBookingCreatedAt =
+    propCreatedAt ||
+    propRequestDate ||
+    (timestamps as any)?.created_at ||
+    (timestamps as any)?.createdAt ||
+    timestamps.confirmed_at ||
+    propConfirmedAt;
+  const bookedOnFormatted = formatBookingDateTime(actualBookingCreatedAt);
 
   // Keep state synced with incoming props
   useEffect(() => {
@@ -665,8 +681,14 @@ export function LiveRentalQueue({
           </div>
         </div>
 
-        {/* Current status chip */}
-        <div className="flex items-center gap-2 self-start sm:self-auto">
+        {/* Current status chip & Booked On Display */}
+        <div className="flex items-center gap-2.5 self-start sm:self-auto flex-wrap sm:flex-nowrap">
+          {bookedOnFormatted && (
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-neutral-100 dark:bg-white/10 text-neutral-800 dark:text-[#F5F5F5] border border-black/10 dark:border-white/10 shadow-2xs">
+              <Calendar className="h-3.5 w-3.5 text-neutral-500 dark:text-[#A1A1AA]" />
+              <span>Booked On: <span className="font-mono font-bold">{bookedOnFormatted}</span></span>
+            </div>
+          )}
           {isCancelled ? (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border transition-colors bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/25">
               <XCircle className="h-3.5 w-3.5 shrink-0" />
@@ -1007,7 +1029,11 @@ export function LiveRentalQueue({
                     {m.shortLabel}
                   </span>
 
-                  {m.timestamp ? (
+                  {m.key === "confirmed" && bookedOnFormatted ? (
+                    <span className="text-[9px] font-mono font-bold text-neutral-800 dark:text-[#F5F5F5] mt-1" title={`Booked On: ${bookedOnFormatted}`}>
+                      {bookedOnFormatted}
+                    </span>
+                  ) : m.timestamp ? (
                     <span className="text-[9px] font-mono text-neutral-500 dark:text-[#A1A1AA] mt-1">
                       {formatTimestamp(m.timestamp)}
                     </span>
@@ -1062,7 +1088,11 @@ export function LiveRentalQueue({
                   </div>
 
                   <div className="text-right shrink-0">
-                    {m.timestamp ? (
+                    {m.key === "confirmed" && bookedOnFormatted ? (
+                      <span className="text-[10px] font-mono font-bold text-neutral-800 dark:text-[#F5F5F5]">
+                        Booked On: {bookedOnFormatted}
+                      </span>
+                    ) : m.timestamp ? (
                       <span className="text-[10px] font-mono text-neutral-600 dark:text-neutral-400">
                         {formatTimestamp(m.timestamp)}
                       </span>

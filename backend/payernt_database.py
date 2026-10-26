@@ -3818,7 +3818,9 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50) -> List[Dict[st
                     "longitude": lng_num,
                     "mapUrl": map_url,
                     "locationChangeRequest": change_obj,
-                    "createdAt": r.get("security_created_at") or r.get("order_created_at") or dt.now(timezone.utc).isoformat(),
+                    "createdAt": r.get("order_created_at") or r.get("security_created_at") or r.get("created_at") or "",
+                    "created_at": r.get("order_created_at") or r.get("security_created_at") or r.get("created_at") or "",
+                    "requestDate": r.get("order_created_at") or r.get("security_created_at") or r.get("created_at") or "",
                 })
     except Exception as e:
         logger.warning(f"DB error fetching vendor bookings from rental_security: {e}")
@@ -3953,7 +3955,9 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50) -> List[Dict[st
                     "longitude": lng_num,
                     "mapUrl": map_url,
                     "locationChangeRequest": change_obj,
-                    "createdAt": r.get("created_at") or dt.now(timezone.utc).isoformat(),
+                    "createdAt": r.get("created_at") or "",
+                    "created_at": r.get("created_at") or "",
+                    "requestDate": r.get("created_at") or "",
                 })
     except Exception as e:
         logger.warning(f"DB error fetching vendor orders: {e}")
@@ -4028,7 +4032,9 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50) -> List[Dict[st
                     "longitude": lng_num,
                     "mapUrl": map_url,
                     "locationChangeRequest": mo.get("locationChangeRequest"),
-                    "createdAt": sec.get("created_at") or dt.now(timezone.utc).isoformat(),
+                    "createdAt": mo.get("created_at") or mo.get("createdAt") or sec.get("created_at") or "",
+                    "created_at": mo.get("created_at") or mo.get("createdAt") or sec.get("created_at") or "",
+                    "requestDate": mo.get("created_at") or mo.get("createdAt") or sec.get("created_at") or "",
                 })
 
         from database import MOCK_ORDERS, MOCK_CUSTOM_PRODUCTS
@@ -4115,7 +4121,9 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50) -> List[Dict[st
                     "longitude": lng_num,
                     "mapUrl": map_url,
                     "locationChangeRequest": change_obj,
-                    "createdAt": mo.get("created_at") or dt.now(timezone.utc).isoformat(),
+                    "createdAt": mo.get("created_at") or mo.get("createdAt") or "",
+                    "created_at": mo.get("created_at") or mo.get("createdAt") or "",
+                    "requestDate": mo.get("created_at") or mo.get("createdAt") or "",
                 })
 
     return bookings[:limit]

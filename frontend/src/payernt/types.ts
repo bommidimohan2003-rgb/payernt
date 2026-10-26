@@ -280,6 +280,8 @@ export interface RentalRequest {
   securityDeposit: number;
   status: RentalRequestStatus;
   requestDate: string;
+  createdAt?: string;
+  created_at?: string;
   paymentStatus: "paid_to_escrow" | "pending_renter" | "settled_to_lender";
   confirmedAt?: string;
   readyForPickupAt?: string;

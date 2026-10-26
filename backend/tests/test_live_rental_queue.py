@@ -242,6 +242,8 @@ def test_payernt_vendor_queue_advance_endpoint():
         "userEmail": renter_email,
         "user_email": renter_email,
         "lender_email": lender_email,
+        "createdAt": "2026-10-26T10:00:00Z",
+        "created_at": "2026-10-26T10:00:00Z",
         "confirmedAt": "2026-10-26T10:00:00Z",
         "confirmed_at": "2026-10-26T10:00:00Z",
     }
@@ -284,6 +286,15 @@ def test_payernt_vendor_queue_advance_endpoint():
     assert my_order["status"] == "ready_for_pickup"
     assert my_order["readyForPickupAt"] == ready_data["timestamps"]["ready_for_pickup_at"]
     assert my_order.get("pickedUpAt") is None  # Timer still not started
+
+    # Verify identical creation timestamp across Renter and Lender views
+    renter_order_info = client.get(f"/api/orders/{order_id}", headers=renter_headers).json()
+    assert renter_order_info.get("createdAt") is not None
+    assert my_order.get("createdAt") is not None
+    assert (
+        renter_order_info.get("createdAt") == my_order.get("createdAt")
+        or renter_order_info.get("created_at") == my_order.get("created_at")
+    )
 
     # 6. Lender confirms Pickup Handover -> starts timer
     pickup_res = client.post(f"/api/payernt/bookings/{order_id}/queue-advance", json={

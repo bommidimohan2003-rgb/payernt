@@ -41,6 +41,7 @@ import { payerntApi } from "../payerntApiService";
 import type { RentalRequest, RentalRequestStatus } from "../types";
 import { SecretPinDisplay, SecretPinInput } from "@/components/common/SecretPinDisplay";
 import { LiveRentalQueue } from "@/components/rental/LiveRentalQueue";
+import { formatBookingDateTime } from "@/utils/formatters";
 
 interface RentalRequestsProps {
   requests: RentalRequest[];
@@ -793,7 +794,9 @@ export function RentalRequests({
             const isExpanded = expandedBookingId === req.id;
             const isCancelled = isCancelledRequest(req);
             const isDeclined = req.status === "rejected" || isCancelled;
-            const bookingDate = req.requestDate || req.startDate || "Recent";
+            const actualCreationTs = req.createdAt || (req as any).created_at || req.requestDate;
+            const formattedBookingTime = formatBookingDateTime(actualCreationTs);
+            const bookingDate = formattedBookingTime || req.requestDate || req.startDate || "Recent";
 
             return (
               <motion.div
@@ -825,7 +828,9 @@ export function RentalRequests({
                         <span>•</span>
                         <span className="flex items-center gap-1">
                           <Calendar className="h-3 w-3 text-[#A1A1AA]" />
-                          <span suppressHydrationWarning>Booked on {bookingDate}</span>
+                          <span suppressHydrationWarning>
+                            {formattedBookingTime ? `Booked On: ${formattedBookingTime}` : `Booked on ${bookingDate}`}
+                          </span>
                         </span>
                       </div>
                     </div>
@@ -900,6 +905,8 @@ export function RentalRequests({
                       role="lender"
                       startDate={req.startDate}
                       endDate={req.endDate}
+                      createdAt={req.createdAt || (req as any).created_at || req.requestDate}
+                      requestDate={req.requestDate || req.createdAt || (req as any).created_at}
                       confirmedAt={req.confirmedAt || req.requestDate}
                       readyForPickupAt={req.readyForPickupAt}
                       pickedUpAt={req.pickedUpAt}
@@ -972,6 +979,15 @@ export function RentalRequests({
                             <span className="text-xs text-neutral-500 dark:text-[#A1A1AA] font-semibold">Days Total</span>
                           </div>
                           <div className="p-2.5 rounded-xl bg-neutral-100/60 dark:bg-white/[0.03] border border-black/5 dark:border-white/5 text-[11px] space-y-1">
+                            <div className="flex justify-between items-center pb-1 border-b border-black/5 dark:border-white/5">
+                              <span className="text-neutral-500 dark:text-[#A1A1AA] flex items-center gap-1 font-medium">
+                                <Clock className="h-3 w-3 text-primary" />
+                                <span>Booking Placed:</span>
+                              </span>
+                              <span className="font-bold text-neutral-950 dark:text-[#F5F5F5] font-mono">
+                                {formattedBookingTime ? `Booked On: ${formattedBookingTime}` : `Booked on ${bookingDate}`}
+                              </span>
+                            </div>
                             <div className="flex justify-between">
                               <span className="text-neutral-500 dark:text-[#A1A1AA]">Start:</span>
                               <span className="font-bold text-neutral-950 dark:text-[#F5F5F5]">{req.startDate}</span>

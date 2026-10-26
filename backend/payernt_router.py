@@ -2148,6 +2148,7 @@ def create_booking_with_security(
             "latitude": data.latitude,
             "longitude": data.longitude,
             "createdAt": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
         }
         create_order(renter_email, normalized_order)
     except ValueError as ve:
@@ -2191,6 +2192,9 @@ def create_booking_with_security(
             "status": "pending",
             "renterId": renter_id,
             "vendorId": vendor_id,
+            "createdAt": normalized_order["createdAt"],
+            "created_at": normalized_order["createdAt"],
+            "requestDate": normalized_order["createdAt"],
         },
         "security": sanitized_sec,
     }

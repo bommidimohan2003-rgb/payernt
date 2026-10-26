@@ -1003,7 +1003,7 @@ export const api = {
           const start = String(o.startDate || o.start_date || "Today");
           const end = String(o.endDate || o.end_date || "Tomorrow");
           const created = String(
-            o.createdAt || o.created_at || new Date().toISOString(),
+            o.createdAt || o.created_at || (o as any).requestDate || (o as any).request_date || "",
           );
           return {
             id: String(o.id || ""),

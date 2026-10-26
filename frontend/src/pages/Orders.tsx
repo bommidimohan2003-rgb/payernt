@@ -34,6 +34,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { getOptimizedImageUrl } from "@/utils/images";
 import { SecretPinDisplay } from "@/components/common/SecretPinDisplay";
 import { LiveRentalQueue } from "@/components/rental/LiveRentalQueue";
+import { formatBookingDateTime } from "@/utils/formatters";
 
 export type BookingFilter = "all" | "pending" | "ongoing" | "cancelled" | "completed";
 
@@ -46,8 +47,9 @@ const INITIAL_SAMPLE_ORDER: Order = {
   endDate: "2026-10-29",
   total: 10500,
   status: "confirmed" as any,
-  confirmedAt: new Date().toISOString(),
-  createdAt: new Date().toISOString(),
+  confirmedAt: "2026-10-26T10:15:00.000Z",
+  createdAt: "2026-10-26T10:15:00.000Z",
+  created_at: "2026-10-26T10:15:00.000Z",
   deliveryMethod: "delivery",
   deliveryAddress: "Flat 402, Green Glen Layout, Bellandur, Bengaluru, Karnataka 560103",
   locationDirections: "Near Central Mall, gate buzzer #402",
@@ -163,6 +165,11 @@ function getStatusBadge(status: string, isCancelled: boolean) {
  * Format clean booking date for compact row/card
  */
 function formatBookingDate(order: Order): string {
+  const created = order.createdAt || (order as any).created_at;
+  const formatted = formatBookingDateTime(created);
+  if (formatted) {
+    return formatted;
+  }
   const start = order.startDate || order.start_date;
   const end = order.endDate || order.end_date;
   if (start) {
@@ -170,17 +177,6 @@ function formatBookingDate(order: Order): string {
       return `${start} – ${end}`;
     }
     return start;
-  }
-  const created = order.createdAt || (order as any).created_at;
-  if (created) {
-    try {
-      const d = new Date(created);
-      if (!isNaN(d.getTime())) {
-        return d.toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" });
-      }
-    } catch {
-      // fallback
-    }
   }
   return "Recent";
 }
@@ -607,7 +603,22 @@ export default function Orders() {
                 </div>
 
                 {/* Rental Details & Payment/Escrow Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-black/5 dark:border-white/5 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-black/5 dark:border-white/5 text-xs">
+                  <div className="p-4 rounded-2xl bg-neutral-50 dark:bg-white/[0.02] border border-black/5 dark:border-white/5 space-y-1">
+                    <div className="text-neutral-500 dark:text-[#A1A1AA] font-medium flex items-center gap-1.5">
+                      <Clock className="h-3.5 w-3.5 text-primary" />
+                      <span>Booking Placed</span>
+                    </div>
+                    <div className="text-sm font-bold text-neutral-950 dark:text-[#F5F5F5]">
+                      {formatBookingDateTime(selectedOrder.createdAt || (selectedOrder as any).created_at)
+                        ? `Booked On: ${formatBookingDateTime(selectedOrder.createdAt || (selectedOrder as any).created_at)}`
+                        : "Booked On: Confirmed"}
+                    </div>
+                    <div className="text-[11px] text-neutral-500 dark:text-[#A1A1AA]">
+                      Official timestamp in Asia/Kolkata
+                    </div>
+                  </div>
+
                   <div className="p-4 rounded-2xl bg-neutral-50 dark:bg-white/[0.02] border border-black/5 dark:border-white/5 space-y-1">
                     <div className="text-neutral-500 dark:text-[#A1A1AA] font-medium flex items-center gap-1.5">
                       <Calendar className="h-3.5 w-3.5" />
@@ -852,6 +863,8 @@ export default function Orders() {
                     startDate={selectedOrder.startDate || (selectedOrder as any).start_date}
                     endDate={selectedOrder.endDate || (selectedOrder as any).end_date}
                     timeSlot={(selectedOrder as any).timeSlot || (selectedOrder as any).time_slot}
+                    createdAt={selectedOrder.createdAt || (selectedOrder as any).created_at}
+                    requestDate={selectedOrder.createdAt || (selectedOrder as any).created_at}
                     confirmedAt={
                       selectedOrder.confirmedAt ||
                       (selectedOrder as any).confirmed_at ||
@@ -1025,10 +1038,18 @@ export default function Orders() {
                           </div>
                         </div>
 
-                        {/* 3. Booking Date */}
+                        {/* 3. Booking Date & Time */}
                         <div className="text-xs text-neutral-600 dark:text-[#A1A1AA] flex items-center gap-1.5 font-medium">
                           <Calendar className="h-3.5 w-3.5 shrink-0 text-neutral-400 dark:text-neutral-500" />
-                          <span className="truncate">{bookingDate}</span>
+                          <span className="truncate">
+                            {formatBookingDateTime(o.createdAt || (o as any).created_at) ? (
+                              <span title={`Booked On: ${formatBookingDateTime(o.createdAt || (o as any).created_at)}`}>
+                                Booked On: {formatBookingDateTime(o.createdAt || (o as any).created_at)}
+                              </span>
+                            ) : (
+                              bookingDate
+                            )}
+                          </span>
                         </div>
 
                         {/* 4. Current Status */}
@@ -1092,7 +1113,13 @@ export default function Orders() {
                         <div className="flex items-center justify-between pt-2 border-t border-black/5 dark:border-white/5">
                           <div className="text-xs text-neutral-600 dark:text-[#A1A1AA] flex items-center gap-1 font-medium">
                             <Calendar className="h-3 w-3 text-neutral-400" />
-                            <span>{bookingDate}</span>
+                            <span>
+                              {formatBookingDateTime(o.createdAt || (o as any).created_at) ? (
+                                `Booked On: ${formatBookingDateTime(o.createdAt || (o as any).created_at)}`
+                              ) : (
+                                bookingDate
+                              )}
+                            </span>
                           </div>
 
                           <button
