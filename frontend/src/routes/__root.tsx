@@ -212,13 +212,14 @@ function RootContent() {
     return () => clearTimeout(timer);
   }, []);
 
-  const isPayentHome = pathname === "/" || pathname === "/payent" || pathname === "/payant" || pathname === "/select";
+  const isGateway = pathname === "/" || pathname === "/select";
   const isPayernt =
     pathname.startsWith("/payernt") ||
     pathname.startsWith("/paye₹nt") ||
     pathname === "/become-lender" ||
     pathname === "/lender-portal";
-  const hideMainNavigation = isPayentHome || isPayernt || pathname.startsWith("/admin");
+  const hideMainNavigation =
+    isGateway || isPayernt || pathname.startsWith("/admin");
 
   return (
     <>
@@ -226,8 +227,8 @@ function RootContent() {
       {!hideMainNavigation && <Navigation4 />}
       <Outlet />
 
-      {!isPayentHome && !isPayernt && <CartDrawer />}
-      {showChatbot && !isPayentHome && !isPayernt && <HelpChatbot />}
+      {!isGateway && !isPayernt && <CartDrawer />}
+      {showChatbot && !isGateway && !isPayernt && <HelpChatbot />}
       <Toaster position="bottom-right" richColors />
     </>
   );
