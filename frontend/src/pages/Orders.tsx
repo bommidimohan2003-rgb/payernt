@@ -1,18 +1,41 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { toast } from "sonner";
-import { Package, Truck, MessageSquare, KeyRound, AlertTriangle, Clock, Lock, CheckCircle, MapPin, Copy, ExternalLink, Edit3, Navigation, X } from "lucide-react";
+import {
+  Package,
+  Truck,
+  MessageSquare,
+  KeyRound,
+  AlertTriangle,
+  Clock,
+  Lock,
+  CheckCircle,
+  MapPin,
+  Copy,
+  ExternalLink,
+  Edit3,
+  Navigation,
+  X,
+  ArrowLeft,
+  ChevronRight,
+  Ban,
+  Calendar,
+  ShieldCheck,
+  CheckCircle2,
+  Filter,
+} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/common/Button";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
 import { STORAGE_KEYS, storage } from "@/utils/storage";
 import { api } from "@/utils/api";
-import { rentalSecurityService } from "@/services/rentalSecurityService";
 import type { Order } from "@/types";
 import { LoadingState, ErrorState, EmptyState } from "@/components/states";
 import { useNavigate } from "@tanstack/react-router";
 import { getOptimizedImageUrl } from "@/utils/images";
 import { SecretPinDisplay } from "@/components/common/SecretPinDisplay";
 import { LiveRentalQueue } from "@/components/rental/LiveRentalQueue";
+
+export type BookingFilter = "all" | "pending" | "ongoing" | "cancelled" | "completed";
 
 const INITIAL_SAMPLE_ORDER: Order = {
   id: "ord-fx3-cinema-782",
@@ -33,15 +56,146 @@ const INITIAL_SAMPLE_ORDER: Order = {
   mapUrl: "https://www.google.com/maps/search/?api=1&query=12.926,77.6762",
 };
 
+/**
+ * Status categorization logic mapped to backend booking statuses
+ */
+export const isCancelledBooking = (o: Order): boolean => {
+  const s = String(o.status || "").toLowerCase().trim();
+  return (
+    s === "cancelled" ||
+    s === "canceled" ||
+    s === "rejected" ||
+    s === "failed" ||
+    Boolean(o.cancelledAt || (o as any).cancelled_at)
+  );
+};
+
+export const isCompletedBooking = (o: Order): boolean => {
+  if (isCancelledBooking(o)) return false;
+  const s = String(o.status || "").toLowerCase().trim();
+  return s === "completed" || s === "rental_completed" || s === "returned";
+};
+
+export const isPendingBooking = (o: Order): boolean => {
+  if (isCancelledBooking(o) || isCompletedBooking(o)) return false;
+  const s = String(o.status || "").toLowerCase().trim();
+  return (
+    s === "pending" ||
+    s === "requested" ||
+    s === "security_pending" ||
+    s === "awaiting_confirmation" ||
+    s === "payment_pending"
+  );
+};
+
+export const isOngoingBooking = (o: Order): boolean => {
+  if (isCancelledBooking(o) || isCompletedBooking(o) || isPendingBooking(o)) return false;
+  // All active, confirmed, in-preparation, ready for pickup, or in-transit milestones
+  return true;
+};
+
+/**
+ * Human-readable status badge helper
+ */
+function getStatusBadge(status: string, isCancelled: boolean) {
+  const norm = (status || "").toLowerCase().trim();
+  if (isCancelled || norm === "cancelled" || norm === "canceled" || norm === "rejected" || norm === "failed") {
+    return {
+      label: norm === "rejected" ? "Rejected" : "Cancelled",
+      classes: "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20",
+    };
+  }
+  if (norm === "completed" || norm === "rental_completed" || norm === "returned") {
+    return {
+      label: "Completed",
+      classes: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
+    };
+  }
+  if (norm === "pending" || norm === "requested" || norm === "security_pending" || norm === "awaiting_confirmation") {
+    return {
+      label: norm === "security_pending" ? "Security Pending" : norm === "requested" ? "Requested" : "Pending",
+      classes: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
+    };
+  }
+  if (norm === "ready_for_pickup" || norm === "ready") {
+    return {
+      label: "Ready for Pickup",
+      classes: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
+    };
+  }
+  if (norm === "picked_up") {
+    return {
+      label: "Picked Up",
+      classes: "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20",
+    };
+  }
+  if (norm === "rental_in_progress" || norm === "active") {
+    return {
+      label: "Active Rental",
+      classes: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
+    };
+  }
+  if (norm === "return_initiated") {
+    return {
+      label: "Return Initiated",
+      classes: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
+    };
+  }
+  if (norm === "handed_back" || norm === "item_handed_back") {
+    return {
+      label: "Handed Back",
+      classes: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20",
+    };
+  }
+  if (norm === "awaiting_inspection" || norm === "inspection") {
+    return {
+      label: "Awaiting Inspection",
+      classes: "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/20",
+    };
+  }
+  return {
+    label: norm.replace(/_/g, " "),
+    classes: "bg-neutral-100 dark:bg-white/10 text-neutral-700 dark:text-[#A1A1AA] border-neutral-200 dark:border-white/10",
+  };
+}
+
+/**
+ * Format clean booking date for compact row/card
+ */
+function formatBookingDate(order: Order): string {
+  const start = order.startDate || order.start_date;
+  const end = order.endDate || order.end_date;
+  if (start) {
+    if (end && end !== start) {
+      return `${start} – ${end}`;
+    }
+    return start;
+  }
+  const created = order.createdAt || (order as any).created_at;
+  if (created) {
+    try {
+      const d = new Date(created);
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" });
+      }
+    } catch {
+      // fallback
+    }
+  }
+  return "Recent";
+}
+
 export default function Orders() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setErrorState] = useState<string | null>(null);
-  const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(
-    null,
-  );
+  const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null);
   const [revealedPins, setRevealedPins] = useState<Record<string, { pin: string; instructions?: string }>>({});
   const [loadingPinOrderId, setLoadingPinOrderId] = useState<string | null>(null);
+
+  // Filter & Selected Booking View State
+  const [activeFilter, setActiveFilter] = useState<BookingFilter>("all");
+  const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
 
   // Location Edit / Change-Request Modal State
   const [locationModalOrder, setLocationModalOrder] = useState<Order | null>(null);
@@ -64,8 +218,12 @@ export default function Orders() {
 
   const handleOpenLocationModal = (order: Order) => {
     const method = (order.deliveryMethod || (order as any).delivery_method || "delivery").toLowerCase();
-    const address = order.deliveryAddress || (order as any).delivery_address ||
-      (method === "pickup" ? (order.pickupLocation || (order as any).pickup_location || "") : (order.customLocation || (order as any).custom_location || ""));
+    const address =
+      order.deliveryAddress ||
+      (order as any).delivery_address ||
+      (method === "pickup"
+        ? order.pickupLocation || (order as any).pickup_location || ""
+        : order.customLocation || (order as any).custom_location || "");
     const directions = order.locationDirections || (order as any).location_directions || "";
 
     setEditMethod(method === "pickup" ? "pickup" : method === "custom" ? "custom" : "delivery");
@@ -99,14 +257,19 @@ export default function Orders() {
       const payload: any = {
         deliveryMethod: editMethod,
         deliveryAddress: editMethod === "delivery" ? editAddress.trim() : "",
-        pickupLocation: editMethod === "pickup" ? (editAddress.trim() || "Lender Verified Hub") : "",
+        pickupLocation: editMethod === "pickup" ? editAddress.trim() || "Lender Verified Hub" : "",
         customLocation: editMethod === "custom" ? editAddress.trim() : "",
         locationDirections: editDirections.trim(),
         reason: editReason.trim(),
       };
 
       const res = await api.updateOrderLocation(token, locationModalOrder.id, payload);
-      toast.success(res.message || (isAccepted ? "Location change request submitted for lender approval." : "Booking location updated successfully!"));
+      toast.success(
+        res.message ||
+          (isAccepted
+            ? "Location change request submitted for lender approval."
+            : "Booking location updated successfully!")
+      );
 
       // Refresh orders
       loadOrders();
@@ -223,22 +386,22 @@ export default function Orders() {
       .then(() => {
         setOrders((prev) =>
           prev.map((o) =>
-            o.id === orderId || o.productId === orderId || o.product_id === orderId
+            o.id === orderId || o.productId === orderId || (o as any).product_id === orderId
               ? {
                   ...o,
                   status: "cancelled" as const,
                   cancelledAt: nowIso,
                   cancelled_at: nowIso,
                 }
-              : o,
-          ),
+              : o
+          )
         );
         toast.success("Order cancelled successfully.");
         // Notify any active queue components or listeners
         window.dispatchEvent(
           new CustomEvent("payent_queue_updated", {
             detail: { bookingId: orderId, status: "cancelled", cancelled_at: nowIso },
-          }),
+          })
         );
       })
       .catch((err) => {
@@ -247,307 +410,711 @@ export default function Orders() {
       .finally(() => setCancellingOrderId(null));
   };
 
+  // Compute filter counts
+  const filterCounts = useMemo(() => {
+    let pending = 0;
+    let ongoing = 0;
+    let cancelled = 0;
+    let completed = 0;
+
+    for (const o of orders) {
+      if (isCancelledBooking(o)) {
+        cancelled++;
+      } else if (isCompletedBooking(o)) {
+        completed++;
+      } else if (isPendingBooking(o)) {
+        pending++;
+      } else {
+        ongoing++;
+      }
+    }
+
+    return {
+      all: orders.length,
+      pending,
+      ongoing,
+      cancelled,
+      completed,
+    };
+  }, [orders]);
+
+  // Filter bookings list
+  const filteredOrders = useMemo(() => {
+    return orders.filter((o) => {
+      switch (activeFilter) {
+        case "pending":
+          return isPendingBooking(o);
+        case "ongoing":
+          return isOngoingBooking(o);
+        case "cancelled":
+          return isCancelledBooking(o);
+        case "completed":
+          return isCompletedBooking(o);
+        case "all":
+        default:
+          return true;
+      }
+    });
+  }, [orders, activeFilter]);
+
+  // Selected order details object (if View Details is active)
+  const selectedOrder = useMemo(() => {
+    if (!selectedBookingId) return null;
+    return orders.find((o) => o.id === selectedBookingId) || null;
+  }, [orders, selectedBookingId]);
+
+  const FILTER_TABS: { key: BookingFilter; label: string; count: number }[] = [
+    { key: "all", label: "All", count: filterCounts.all },
+    { key: "pending", label: "Pending", count: filterCounts.pending },
+    { key: "ongoing", label: "Ongoing", count: filterCounts.ongoing },
+    { key: "cancelled", label: "Cancelled", count: filterCounts.cancelled },
+    { key: "completed", label: "Completed", count: filterCounts.completed },
+  ];
+
   return (
     <DashboardLayout>
       <div className="max-w-6xl mx-auto space-y-6">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-black font-display flex items-center gap-2.5 text-[#F5F5F5] tracking-tight">
-            <Package className="h-7 w-7 text-[#A1A1AA]" />
-            <span>Orders & Bookings</span>
-          </h1>
-          <p className="mt-1.5 text-xs sm:text-sm text-[#A1A1AA]">
-            Track, manage, and coordinate all your gear rentals and handover PIN credentials in real time.
-          </p>
+        {/* Page Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-black font-display flex items-center gap-2.5 text-[#F5F5F5] tracking-tight">
+              <Package className="h-7 w-7 text-[#A1A1AA]" />
+              <span>Booking History</span>
+            </h1>
+            <p className="mt-1.5 text-xs sm:text-sm text-[#A1A1AA]">
+              View, track, and manage all your gear rentals and handover PIN credentials in one place.
+            </p>
+          </div>
+
+          {/* Quick Return to Marketplace */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate({ to: "/categories" })}
+            className="w-fit text-xs font-semibold rounded-xl"
+          >
+            Browse Marketplace
+          </Button>
         </div>
 
-        <div className="mt-6">
-          {loading ? (
-            <LoadingState type="list" count={4} />
-          ) : error ? (
-            <ErrorState
-              title="Unable to load orders"
-              error={error}
-              onRetry={loadOrders}
-            />
-          ) : orders.length === 0 ? (
-            <EmptyState
-              title="No orders yet"
-              description="You haven't booked any tech gear rentals yet. Explore the marketplace to find gear!"
-              icon={Package}
-              actionLabel="Browse Marketplace"
-              onAction={() => navigate({ to: "/categories" })}
-            />
-          ) : (
-            <div className="rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#10151B] overflow-hidden shadow-sm">
-              <div className="hidden md:grid grid-cols-[70px_1fr_130px_100px_110px_180px] gap-4 p-4 border-b border-black/5 dark:border-[#A1A1AA]/15 text-xs uppercase text-[#A1A1AA] font-bold">
-                <div>Item</div>
-                <div>Details</div>
-                <div>Rental Dates</div>
-                <div>Total</div>
-                <div>Status</div>
-                <div className="text-right">Live Actions</div>
+        {/* DETAILS VIEW (Active when a booking is selected) */}
+        {selectedOrder ? (
+          <div className="space-y-6">
+            {/* Details Top Bar with Back Button */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl bg-white dark:bg-[#10151B] border border-black/10 dark:border-[#A1A1AA]/20 shadow-xs">
+              <button
+                type="button"
+                onClick={() => setSelectedBookingId(null)}
+                className="inline-flex items-center gap-2 text-xs sm:text-sm font-bold text-neutral-600 dark:text-[#A1A1AA] hover:text-neutral-950 dark:hover:text-white transition-colors cursor-pointer w-fit group"
+              >
+                <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
+                <span>Back to Booking History</span>
+              </button>
+
+              <div className="flex items-center gap-2.5">
+                <span className="text-xs text-neutral-500 dark:text-[#A1A1AA] font-mono">
+                  Booking #{selectedOrder.id}
+                </span>
+                {(() => {
+                  const badge = getStatusBadge(selectedOrder.status, isCancelledBooking(selectedOrder));
+                  return (
+                    <span
+                      className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider border ${badge.classes}`}
+                    >
+                      {badge.label}
+                    </span>
+                  );
+                })()}
               </div>
-              {orders.map((o) => (
-                <div
-                  key={o.id}
-                  className="grid grid-cols-1 md:grid-cols-[70px_1fr_130px_100px_110px_180px] gap-4 p-4 sm:p-5 items-start md:items-center border-b border-black/5 dark:border-[#A1A1AA]/15 last:border-0 hover:bg-neutral-50 dark:hover:bg-white/[0.02] transition-colors"
-                >
-                  {o.productImage || o.product_image ? (
-                    <img
-                      src={getOptimizedImageUrl(o.productImage || o.product_image, 'thumb')}
-                      alt=""
-                      loading="lazy"
-                      decoding="async"
-                      className="h-14 w-14 rounded-xl object-cover border border-black/10 dark:border-[#A1A1AA]/20 shrink-0"
-                    />
-                  ) : (
-                    <div className="h-14 w-14 rounded-xl border border-black/10 dark:border-[#A1A1AA]/20 bg-secondary/30 flex items-center justify-center text-muted-foreground/50 shrink-0">
-                      <Package className="h-6 w-6 opacity-60" />
+            </div>
+
+            {/* Cancelled Booking Banner */}
+            {isCancelledBooking(selectedOrder) && (
+              <div className="p-4 sm:p-5 rounded-2xl bg-red-500/10 border border-red-500/25 flex items-start gap-3.5">
+                <Ban className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <div className="font-bold text-sm text-red-600 dark:text-red-400">
+                    Booking Cancelled
+                  </div>
+                  <p className="text-xs text-neutral-700 dark:text-neutral-300 leading-relaxed">
+                    This gear rental has been cancelled. Active rental queue actions, handover PINs, and live milestones are permanently disabled.
+                  </p>
+                  {((selectedOrder as any).cancellationReason || (selectedOrder as any).cancellation_reason) && (
+                    <div className="text-xs text-red-600 dark:text-red-400 font-medium pt-0.5">
+                      Reason: {String((selectedOrder as any).cancellationReason || (selectedOrder as any).cancellation_reason).replace(/_/g, " ")}
                     </div>
                   )}
-                  <div className="min-w-0 space-y-1.5">
-                    <div className="font-bold text-sm text-neutral-950 dark:text-[#F5F5F5] leading-snug">
-                      {o.productTitle || o.product_title || "Gear Rental"}
+                  {((selectedOrder as any).cancelledAt || (selectedOrder as any).cancelled_at) && (
+                    <div className="text-[11px] text-neutral-500 dark:text-[#A1A1AA] font-mono pt-0.5">
+                      Cancelled on: {new Date((selectedOrder as any).cancelledAt || (selectedOrder as any).cancelled_at).toLocaleString("en-IN", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
                     </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Full Booking Details Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Product & Schedule Card (Left 2 cols) */}
+              <div className="lg:col-span-2 rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#10151B] p-5 sm:p-6 space-y-6 shadow-sm">
+                <div className="flex flex-col sm:flex-row items-start gap-4">
+                  {selectedOrder.productImage || (selectedOrder as any).product_image ? (
+                    <img
+                      src={getOptimizedImageUrl(selectedOrder.productImage || (selectedOrder as any).product_image, "card")}
+                      alt=""
+                      loading="lazy"
+                      className="h-20 w-20 sm:h-24 sm:w-24 rounded-2xl object-cover border border-black/10 dark:border-[#A1A1AA]/20 shrink-0"
+                    />
+                  ) : (
+                    <div className="h-20 w-20 sm:h-24 sm:w-24 rounded-2xl border border-black/10 dark:border-[#A1A1AA]/20 bg-secondary/30 flex items-center justify-center text-muted-foreground/50 shrink-0">
+                      <Package className="h-8 w-8 opacity-60" />
+                    </div>
+                  )}
+
+                  <div className="space-y-1.5 min-w-0 flex-1">
+                    <h2 className="text-lg sm:text-xl font-bold text-neutral-950 dark:text-[#F5F5F5] leading-snug">
+                      {selectedOrder.productTitle || (selectedOrder as any).product_title || "Gear Rental"}
+                    </h2>
                     <div className="text-xs text-neutral-500 dark:text-[#A1A1AA] font-mono">
-                      Booking #{o.id}
+                      Booking Reference #{selectedOrder.id}
                     </div>
 
-                    {/* Category Restriction Status Indicator */}
-                    {o.category && (
-                      <div className="pt-0.5">
-                        {(!o.pickedUpAt && !o.picked_up_at && !["cancelled", "rejected", "failed", "completed"].includes(o.status)) ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20">
-                            <Lock className="w-2.5 h-2.5" />
-                            {o.category}: Awaiting Delivery (Locked)
+                    {/* Category Lock Status */}
+                    {selectedOrder.category && (
+                      <div className="pt-1">
+                        {!selectedOrder.pickedUpAt &&
+                        !(selectedOrder as any).picked_up_at &&
+                        !["cancelled", "rejected", "failed", "completed"].includes(selectedOrder.status) ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                            <Lock className="w-3 h-3" />
+                            {selectedOrder.category}: Awaiting Handover (Locked)
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-                            <CheckCircle className="w-2.5 h-2.5" />
-                            {o.category}: Delivery Confirmed (Unlocked)
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                            <CheckCircle className="w-3 h-3" />
+                            {selectedOrder.category}: Delivery Confirmed (Unlocked)
                           </span>
                         )}
                       </div>
                     )}
+                  </div>
+                </div>
 
-                    {/* 4-Digit Renter Secret PIN UI */}
-                    <div className="pt-1">
-                      {revealedPins[o.id] ? (
+                {/* Rental Details & Payment/Escrow Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-black/5 dark:border-white/5 text-xs">
+                  <div className="p-4 rounded-2xl bg-neutral-50 dark:bg-white/[0.02] border border-black/5 dark:border-white/5 space-y-1">
+                    <div className="text-neutral-500 dark:text-[#A1A1AA] font-medium flex items-center gap-1.5">
+                      <Calendar className="h-3.5 w-3.5" />
+                      <span>Rental Duration</span>
+                    </div>
+                    <div className="text-sm font-bold text-neutral-950 dark:text-[#F5F5F5]">
+                      {selectedOrder.startDate || (selectedOrder as any).start_date || "Today"}
+                      {selectedOrder.endDate && selectedOrder.endDate !== selectedOrder.startDate
+                        ? ` – ${selectedOrder.endDate}`
+                        : ""}
+                    </div>
+                    {((selectedOrder as any).timeSlot || (selectedOrder as any).time_slot) && (
+                      <div className="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-primary/10 text-primary uppercase">
+                        <Clock className="h-3 w-3" />
+                        {String((selectedOrder as any).timeSlot || (selectedOrder as any).time_slot).replace(/_/g, " ")}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-neutral-50 dark:bg-white/[0.02] border border-black/5 dark:border-white/5 space-y-1">
+                    <div className="text-neutral-500 dark:text-[#A1A1AA] font-medium flex items-center gap-1.5">
+                      <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
+                      <span>Total Payment & Escrow</span>
+                    </div>
+                    <div className="text-lg font-black font-mono text-neutral-950 dark:text-[#F5F5F5]">
+                      ₹{selectedOrder.total}
+                    </div>
+                    <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                      <CheckCircle2 className="h-3 w-3" />
+                      <span>Escrow Secured Deposit</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Booking Location & Fulfillment Details */}
+                {(() => {
+                  const method = (
+                    selectedOrder.deliveryMethod ||
+                    (selectedOrder as any).delivery_method ||
+                    "delivery"
+                  ).toLowerCase();
+                  const address =
+                    selectedOrder.deliveryAddress ||
+                    (selectedOrder as any).delivery_address ||
+                    (method === "pickup"
+                      ? selectedOrder.pickupLocation || (selectedOrder as any).pickup_location || "Lender Verified Hub"
+                      : selectedOrder.customLocation || (selectedOrder as any).custom_location || "");
+                  const directions =
+                    selectedOrder.locationDirections || (selectedOrder as any).location_directions || "";
+                  const mapUrl =
+                    selectedOrder.mapUrl ||
+                    (selectedOrder as any).map_url ||
+                    (address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}` : "");
+                  const changeReq =
+                    selectedOrder.locationChangeRequest || (selectedOrder as any).location_change_request;
+                  const isChangePending = changeReq && (changeReq.status === "pending" || !changeReq.status);
+
+                  return (
+                    <div className="p-4 sm:p-5 rounded-2xl bg-neutral-50 dark:bg-white/[0.02] border border-black/5 dark:border-white/5 space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${
+                            method === "delivery"
+                              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                              : method === "pickup"
+                              ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
+                              : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
+                          }`}
+                        >
+                          {method === "delivery" ? <Truck className="h-3 w-3" /> : <MapPin className="h-3 w-3" />}
+                          <span>
+                            {method === "delivery"
+                              ? "Doorstep Delivery"
+                              : method === "pickup"
+                              ? "Owner Pickup"
+                              : "Custom Meetup"}
+                          </span>
+                        </span>
+
+                        <div className="flex items-center gap-2">
+                          {address && (
+                            <button
+                              type="button"
+                              onClick={() => handleCopyAddress(address)}
+                              className="inline-flex items-center gap-1 text-xs text-neutral-500 dark:text-[#A1A1AA] hover:text-neutral-900 dark:hover:text-white cursor-pointer transition-colors"
+                              title="Copy location address"
+                            >
+                              <Copy className="h-3.5 w-3.5" />
+                              <span>Copy</span>
+                            </button>
+                          )}
+
+                          {mapUrl && (
+                            <a
+                              href={mapUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-xs text-primary hover:underline font-semibold"
+                            >
+                              <ExternalLink className="h-3.5 w-3.5" />
+                              <span>Map</span>
+                            </a>
+                          )}
+
+                          {!isCancelledBooking(selectedOrder) &&
+                            selectedOrder.status !== "completed" && (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenLocationModal(selectedOrder)}
+                                className="inline-flex items-center gap-1 text-xs text-neutral-600 dark:text-neutral-400 hover:text-primary font-medium cursor-pointer transition-colors"
+                              >
+                                <Edit3 className="h-3.5 w-3.5" />
+                                <span>{isChangePending ? "View Change Request" : "Change Location"}</span>
+                              </button>
+                            )}
+                        </div>
+                      </div>
+
+                      {address ? (
+                        <div className="text-xs text-neutral-700 dark:text-neutral-300 leading-snug">
+                          <span className="font-semibold text-neutral-500 dark:text-[#A1A1AA]">Location: </span>
+                          <span>{address}</span>
+                          {directions && (
+                            <span className="text-[11px] text-neutral-500 dark:text-neutral-400 italic block mt-1">
+                              Directions: {directions}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="text-amber-600 dark:text-amber-400 text-xs font-medium flex items-center gap-1.5">
+                          <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                          <span>Address pending. Please set your delivery location.</span>
+                        </div>
+                      )}
+
+                      {/* Pending Change Request Alert */}
+                      {isChangePending && (
+                        <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-700 dark:text-amber-300 space-y-1">
+                          <div className="font-bold flex items-center gap-1">
+                            <Clock className="h-3.5 w-3.5" />
+                            <span>Location change pending lender approval</span>
+                          </div>
+                          <div className="truncate text-[11px]">
+                            Requested: {changeReq.deliveryAddress || changeReq.customLocation || changeReq.pickupLocation}
+                          </div>
+                          {changeReq.reason && <div className="italic text-[11px]">"{changeReq.reason}"</div>}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Sidebar Action Cards (Right 1 col) */}
+              <div className="space-y-6">
+                {/* 4-Digit Renter Secret PIN Card */}
+                {!isCancelledBooking(selectedOrder) && (
+                  <div className="rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#10151B] p-5 space-y-3 shadow-xs">
+                    <div className="flex items-center gap-2">
+                      <KeyRound className="h-4 w-4 text-[#A1A1AA]" />
+                      <h3 className="font-bold text-sm text-neutral-950 dark:text-[#F5F5F5]">Handover PIN</h3>
+                    </div>
+                    <p className="text-xs text-neutral-500 dark:text-[#A1A1AA] leading-relaxed">
+                      Provide your 4-digit PIN to the lender at equipment handover to unlock custody.
+                    </p>
+
+                    <div>
+                      {revealedPins[selectedOrder.id] ? (
                         <SecretPinDisplay
-                          pin={revealedPins[o.id].pin}
+                          pin={revealedPins[selectedOrder.id].pin}
                           type="renter"
                           title="Renter Secret PIN"
                           subtitle="Provide to owner at equipment handover."
-                          onHide={() => handleRevealSecretPin(o.id)}
+                          onHide={() => handleRevealSecretPin(selectedOrder.id)}
                           compact={true}
                         />
                       ) : (
                         <button
                           type="button"
-                          onClick={() => handleRevealSecretPin(o.id)}
-                          disabled={loadingPinOrderId === o.id || o.status === "cancelled"}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl border border-black/10 dark:border-[#A1A1AA]/30 hover:bg-neutral-100 dark:hover:bg-white/5 text-neutral-800 dark:text-[#F5F5F5] text-xs font-semibold transition-colors disabled:opacity-50 cursor-pointer"
+                          onClick={() => handleRevealSecretPin(selectedOrder.id)}
+                          disabled={loadingPinOrderId === selectedOrder.id}
+                          className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-black/10 dark:border-[#A1A1AA]/30 hover:bg-neutral-100 dark:hover:bg-white/5 text-neutral-800 dark:text-[#F5F5F5] text-xs font-semibold transition-colors disabled:opacity-50 cursor-pointer"
                         >
                           <KeyRound className="h-3.5 w-3.5 text-[#A1A1AA]" />
-                          <span>{loadingPinOrderId === o.id ? "Retrieving..." : "Reveal Secret PIN"}</span>
+                          <span>{loadingPinOrderId === selectedOrder.id ? "Retrieving PIN..." : "Reveal Secret PIN"}</span>
                         </button>
                       )}
                     </div>
-
-                    {/* Booking Location & Fulfillment Details */}
-                    {(() => {
-                      const method = (o.deliveryMethod || (o as any).delivery_method || "delivery").toLowerCase();
-                      const address = o.deliveryAddress || (o as any).delivery_address ||
-                        (method === "pickup" ? (o.pickupLocation || (o as any).pickup_location || "Lender Verified Hub") : (o.customLocation || (o as any).custom_location || ""));
-                      const directions = o.locationDirections || (o as any).location_directions || "";
-                      const mapUrl = o.mapUrl || (o as any).map_url || (address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}` : "");
-                      const changeReq = o.locationChangeRequest || (o as any).location_change_request;
-                      const isChangePending = changeReq && (changeReq.status === "pending" || !changeReq.status);
-
-                      return (
-                        <div className="pt-2 space-y-1.5 text-xs">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                              method === "delivery"
-                                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
-                                : method === "pickup"
-                                ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
-                                : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
-                            }`}>
-                              {method === "delivery" ? <Truck className="h-2.5 w-2.5" /> : <MapPin className="h-2.5 w-2.5" />}
-                              <span>{method === "delivery" ? "Doorstep Delivery" : method === "pickup" ? "Owner Pickup" : "Custom Meetup"}</span>
-                            </span>
-
-                            {address && (
-                              <button
-                                type="button"
-                                onClick={() => handleCopyAddress(address)}
-                                className="inline-flex items-center gap-1 text-[11px] text-neutral-500 dark:text-[#A1A1AA] hover:text-neutral-900 dark:hover:text-white cursor-pointer transition-colors"
-                                title="Copy location address"
-                              >
-                                <Copy className="h-3 w-3" />
-                                <span>Copy</span>
-                              </button>
-                            )}
-
-                            {mapUrl && (
-                              <a
-                                href={mapUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline font-semibold"
-                              >
-                                <ExternalLink className="h-3 w-3" />
-                                <span>Map</span>
-                              </a>
-                            )}
-
-                            {o.status !== "cancelled" && o.status !== "completed" && (
-                              <button
-                                type="button"
-                                onClick={() => handleOpenLocationModal(o)}
-                                className="inline-flex items-center gap-1 text-[11px] text-neutral-600 dark:text-neutral-400 hover:text-primary font-medium cursor-pointer transition-colors"
-                              >
-                                <Edit3 className="h-3 w-3" />
-                                <span>{isChangePending ? "View Change Request" : "Change Location"}</span>
-                              </button>
-                            )}
-                          </div>
-
-                          {address ? (
-                            <div className="text-neutral-700 dark:text-neutral-300 leading-snug">
-                              <span className="font-medium text-neutral-500 dark:text-[#A1A1AA]">Location: </span>
-                              <span>{address}</span>
-                              {directions && (
-                                <span className="text-[11px] text-neutral-500 dark:text-neutral-400 italic block">
-                                  Directions: {directions}
-                                </span>
-                              )}
-                            </div>
-                          ) : (
-                            <div className="text-amber-600 dark:text-amber-400 text-[11px] font-medium flex items-center gap-1">
-                              <AlertTriangle className="h-3 w-3 shrink-0" />
-                              <span>Address pending. Please set your delivery location.</span>
-                            </div>
-                          )}
-
-                          {/* Pending Change Request Alert */}
-                          {isChangePending && (
-                            <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-700 dark:text-amber-300 space-y-0.5">
-                              <div className="font-bold flex items-center gap-1">
-                                <Clock className="h-3 w-3" />
-                                <span>Location change pending lender approval</span>
-                              </div>
-                              <div className="truncate">
-                                Requested: {changeReq.deliveryAddress || changeReq.customLocation || changeReq.pickupLocation}
-                              </div>
-                              {changeReq.reason && <div className="italic">"{changeReq.reason}"</div>}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
                   </div>
-                  <div className="text-xs text-neutral-500 dark:text-[#A1A1AA] space-y-1">
-                    <div>
-                      {o.startDate || o.start_date || "Today"} {o.endDate && o.endDate !== o.startDate ? `– ${o.endDate}` : ""}
-                    </div>
-                    {((o as any).timeSlot || (o as any).time_slot) && (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-primary/10 text-primary uppercase">
-                        <Clock className="h-2.5 w-2.5" />
-                        {((o as any).timeSlot || (o as any).time_slot).replace(/_/g, " ")}
-                      </span>
-                    )}
-                  </div>
-                  <div className="font-black text-sm font-mono text-neutral-950 dark:text-[#F5F5F5]">
-                    ₹{o.total}
-                  </div>
-                  <div className="flex flex-col gap-1 items-start">
-                    <span
-                      className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider w-fit border ${
-                        o.status === "active"
-                          ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
-                          : o.status === "pending"
-                            ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
-                            : o.status === "cancelled"
-                              ? "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20"
-                              : "bg-neutral-100 dark:bg-white/10 text-neutral-700 dark:text-[#A1A1AA] border-neutral-200 dark:border-white/10"
-                      }`}
-                    >
-                      {o.status}
-                    </span>
-                    {o.status === "cancelled" && ((o as any).cancellationReason || (o as any).cancellation_reason) && (
-                      <span className="text-[10px] text-red-500 dark:text-red-400 font-medium leading-tight">
-                        Reason: {String((o as any).cancellationReason || (o as any).cancellation_reason).replace(/_/g, " ")}
-                      </span>
-                    )}
-                    {(o.status === "active" || o.status === "pending") && (
-                      <button
-                        onClick={() => setCancellingOrderId(o.id)}
-                        className="text-[10px] text-red-500 dark:text-red-400 hover:underline font-semibold mt-1 cursor-pointer"
-                      >
-                        Cancel Rental
-                      </button>
-                    )}
-                  </div>
-                  <div className="flex flex-col sm:flex-row md:flex-col gap-1.5 w-full">
+                )}
+
+                {/* Quick Actions Card */}
+                <div className="rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#10151B] p-5 space-y-3 shadow-xs">
+                  <h3 className="font-bold text-sm text-neutral-950 dark:text-[#F5F5F5]">Quick Actions</h3>
+
+                  <div className="flex flex-col gap-2">
                     <button
-                      onClick={() => navigate({ to: `/delivery/${o.id}` })}
-                      className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-neutral-900 dark:bg-[#F5F5F5] text-white dark:text-[#050709] font-bold text-xs shadow-sm hover:opacity-95 dark:hover:bg-white transition-all cursor-pointer"
+                      type="button"
+                      onClick={() => navigate({ to: `/delivery/${selectedOrder.id}` })}
+                      className="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-neutral-900 dark:bg-[#F5F5F5] text-white dark:text-[#050709] font-bold text-xs shadow-xs hover:opacity-95 dark:hover:bg-white transition-all cursor-pointer"
                     >
                       <Truck className="h-3.5 w-3.5" />
                       <span>Track Delivery</span>
                     </button>
+
                     <button
-                      onClick={() => navigate({ to: "/messages", search: { bookingId: o.id } as any })}
-                      className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl border border-black/10 dark:border-[#A1A1AA]/30 bg-transparent text-neutral-900 dark:text-[#F5F5F5] font-semibold text-xs hover:bg-neutral-100 dark:hover:bg-white/5 transition-all cursor-pointer"
+                      type="button"
+                      onClick={() => navigate({ to: "/messages", search: { bookingId: selectedOrder.id } as any })}
+                      className="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl border border-black/10 dark:border-[#A1A1AA]/30 bg-transparent text-neutral-900 dark:text-[#F5F5F5] font-semibold text-xs hover:bg-neutral-100 dark:hover:bg-white/5 transition-all cursor-pointer"
                     >
                       <MessageSquare className="h-3.5 w-3.5 text-[#A1A1AA]" />
                       <span>Chat with Lender</span>
                     </button>
-                  </div>
 
-                  {/* Synchronized Live Rental Queue with 8 milestones and persistent timer */}
-                  <div className="col-span-full pt-2">
-                    <LiveRentalQueue
-                      orderId={o.id}
-                      currentStatus={o.status}
-                      role="renter"
-                      startDate={o.startDate || o.start_date}
-                      endDate={o.endDate || o.end_date}
-                      timeSlot={(o as any).timeSlot || (o as any).time_slot}
-                      confirmedAt={o.confirmedAt || o.confirmed_at || o.createdAt || (o as any).created_at}
-                      readyForPickupAt={o.readyForPickupAt || o.ready_for_pickup_at}
-                      pickedUpAt={o.pickedUpAt || o.picked_up_at}
-                      returnInitiatedAt={o.returnInitiatedAt || o.return_initiated_at}
-                      handedBackAt={o.handedBackAt || o.handed_back_at}
-                      awaitingInspectionAt={o.awaitingInspectionAt || o.awaiting_inspection_at}
-                      completedAt={o.completedAt || o.completed_at}
-                      cancelledAt={(o as any).cancelledAt || (o as any).cancelled_at}
-                      cancellationReason={(o as any).cancellationReason || (o as any).cancellation_reason}
-                      queueNotes={o.queueNotes || (o as any).queue_notes}
-                      onStatusUpdated={(newStatus, updatedTimestamps) => {
-                        setOrders((prev) =>
-                          prev.map((item) =>
-                            item.id === o.id
-                              ? {
-                                  ...item,
-                                  status: newStatus as any,
-                                  ...updatedTimestamps,
-                                }
-                              : item
-                          )
-                        );
-                      }}
-                    />
+                    {!isCancelledBooking(selectedOrder) &&
+                      selectedOrder.status !== "completed" && (
+                        <button
+                          type="button"
+                          onClick={() => setCancellingOrderId(selectedOrder.id)}
+                          className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-red-500 hover:text-red-600 hover:bg-red-500/10 text-xs font-semibold transition-colors cursor-pointer mt-1"
+                        >
+                          <Ban className="h-3.5 w-3.5" />
+                          <span>Cancel Booking</span>
+                        </button>
+                      )}
                   </div>
                 </div>
-              ))}
+              </div>
+
+              {/* Synchronized Live Rental Queue (Full width) */}
+              <div className="col-span-full">
+                <div className="rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#10151B] p-5 sm:p-6 shadow-sm">
+                  <h3 className="text-base font-bold text-neutral-950 dark:text-[#F5F5F5] mb-4 flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-[#A1A1AA]" />
+                    <span>Live Rental Queue & Milestones</span>
+                  </h3>
+
+                  <LiveRentalQueue
+                    orderId={selectedOrder.id}
+                    currentStatus={selectedOrder.status}
+                    role="renter"
+                    startDate={selectedOrder.startDate || (selectedOrder as any).start_date}
+                    endDate={selectedOrder.endDate || (selectedOrder as any).end_date}
+                    timeSlot={(selectedOrder as any).timeSlot || (selectedOrder as any).time_slot}
+                    confirmedAt={
+                      selectedOrder.confirmedAt ||
+                      (selectedOrder as any).confirmed_at ||
+                      selectedOrder.createdAt ||
+                      (selectedOrder as any).created_at
+                    }
+                    readyForPickupAt={
+                      selectedOrder.readyForPickupAt || (selectedOrder as any).ready_for_pickup_at
+                    }
+                    pickedUpAt={selectedOrder.pickedUpAt || (selectedOrder as any).picked_up_at}
+                    returnInitiatedAt={
+                      selectedOrder.returnInitiatedAt || (selectedOrder as any).return_initiated_at
+                    }
+                    handedBackAt={selectedOrder.handedBackAt || (selectedOrder as any).handed_back_at}
+                    awaitingInspectionAt={
+                      selectedOrder.awaitingInspectionAt || (selectedOrder as any).awaiting_inspection_at
+                    }
+                    completedAt={selectedOrder.completedAt || (selectedOrder as any).completed_at}
+                    cancelledAt={(selectedOrder as any).cancelledAt || (selectedOrder as any).cancelled_at}
+                    cancellationReason={
+                      (selectedOrder as any).cancellationReason || (selectedOrder as any).cancellation_reason
+                    }
+                    queueNotes={selectedOrder.queueNotes || (selectedOrder as any).queue_notes}
+                    onStatusUpdated={(newStatus, updatedTimestamps) => {
+                      setOrders((prev) =>
+                        prev.map((item) =>
+                          item.id === selectedOrder.id
+                            ? {
+                                ...item,
+                                status: newStatus as any,
+                                ...updatedTimestamps,
+                              }
+                            : item
+                        )
+                      );
+                    }}
+                  />
+                </div>
+              </div>
             </div>
-          )}
-        </div>
+          </div>
+        ) : (
+          /* COMPACT LIST VIEW */
+          <div className="space-y-6">
+            {/* Filter Tabs Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-3 p-1.5 rounded-2xl bg-neutral-100 dark:bg-white/[0.04] border border-black/5 dark:border-white/10 w-fit">
+              {FILTER_TABS.map((tab) => {
+                const isActive = activeFilter === tab.key;
+                return (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => setActiveFilter(tab.key)}
+                    className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      isActive
+                        ? "bg-neutral-900 text-white dark:bg-[#F5F5F5] dark:text-[#050709] shadow-xs"
+                        : "text-neutral-600 dark:text-[#A1A1AA] hover:text-neutral-950 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5"
+                    }`}
+                  >
+                    <span>{tab.label}</span>
+                    <span
+                      className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+                        isActive
+                          ? "bg-white/20 dark:bg-black/15 text-inherit"
+                          : "bg-black/5 dark:bg-white/10 text-neutral-500 dark:text-[#A1A1AA]"
+                      }`}
+                    >
+                      {tab.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* List Content */}
+            {loading ? (
+              <LoadingState type="list" count={4} />
+            ) : error ? (
+              <ErrorState title="Unable to load orders" error={error} onRetry={loadOrders} />
+            ) : orders.length === 0 ? (
+              <EmptyState
+                title="No orders yet"
+                description="You haven't booked any tech gear rentals yet. Explore the marketplace to find gear!"
+                icon={Package}
+                actionLabel="Browse Marketplace"
+                onAction={() => navigate({ to: "/categories" })}
+              />
+            ) : filteredOrders.length === 0 ? (
+              /* Clear empty state message per filter */
+              <div className="rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#10151B] p-8 sm:p-12 text-center space-y-4 shadow-xs">
+                <div className="h-12 w-12 rounded-2xl bg-neutral-100 dark:bg-white/5 flex items-center justify-center mx-auto text-neutral-400">
+                  <Filter className="h-6 w-6" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-base font-bold text-neutral-950 dark:text-[#F5F5F5]">
+                    {activeFilter === "cancelled"
+                      ? "No cancelled bookings found."
+                      : activeFilter === "pending"
+                      ? "No pending bookings found."
+                      : activeFilter === "ongoing"
+                      ? "No ongoing rentals found."
+                      : activeFilter === "completed"
+                      ? "No completed bookings found."
+                      : "No bookings found."}
+                  </h3>
+                  <p className="text-xs text-neutral-500 dark:text-[#A1A1AA] max-w-sm mx-auto">
+                    {activeFilter === "cancelled"
+                      ? "You do not have any cancelled bookings in your history."
+                      : `There are currently no bookings with status "${activeFilter}".`}
+                  </p>
+                </div>
+                {activeFilter !== "all" && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setActiveFilter("all")}
+                    className="text-xs font-semibold rounded-xl"
+                  >
+                    View All Bookings ({orders.length})
+                  </Button>
+                )}
+              </div>
+            ) : (
+              /* Compact Booking Cards / Rows */
+              <div className="rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#10151B] overflow-hidden shadow-xs divide-y divide-black/5 dark:divide-white/5">
+                {/* Table Header (Desktop only) */}
+                <div className="hidden md:grid grid-cols-[56px_1fr_160px_140px_130px] gap-4 p-4 bg-neutral-50/50 dark:bg-white/[0.01] text-xs uppercase text-[#A1A1AA] font-bold tracking-wider">
+                  <div>Item</div>
+                  <div>Product & Booking ID</div>
+                  <div>Booking Date</div>
+                  <div>Current Status</div>
+                  <div className="text-right">Action</div>
+                </div>
+
+                {/* Booking Compact Rows */}
+                {filteredOrders.map((o) => {
+                  const isCancelled = isCancelledBooking(o);
+                  const badge = getStatusBadge(o.status, isCancelled);
+                  const bookingDate = formatBookingDate(o);
+
+                  return (
+                    <div
+                      key={o.id}
+                      className="p-4 sm:p-4.5 hover:bg-neutral-50/70 dark:hover:bg-white/[0.02] transition-colors"
+                    >
+                      {/* Desktop Grid Layout */}
+                      <div className="hidden md:grid grid-cols-[56px_1fr_160px_140px_130px] gap-4 items-center">
+                        {/* 1. Product Image */}
+                        <div>
+                          {o.productImage || (o as any).product_image ? (
+                            <img
+                              src={getOptimizedImageUrl(o.productImage || (o as any).product_image, "thumb")}
+                              alt=""
+                              loading="lazy"
+                              className="h-12 w-12 rounded-xl object-cover border border-black/10 dark:border-[#A1A1AA]/20 shrink-0"
+                            />
+                          ) : (
+                            <div className="h-12 w-12 rounded-xl border border-black/10 dark:border-[#A1A1AA]/20 bg-secondary/30 flex items-center justify-center text-muted-foreground/50 shrink-0">
+                              <Package className="h-5 w-5 opacity-60" />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* 2. Product Name & Booking ID */}
+                        <div className="min-w-0 pr-2">
+                          <div className="font-bold text-sm text-neutral-950 dark:text-[#F5F5F5] truncate leading-snug">
+                            {o.productTitle || (o as any).product_title || "Gear Rental"}
+                          </div>
+                          <div className="text-xs text-neutral-500 dark:text-[#A1A1AA] font-mono mt-0.5">
+                            #{o.id}
+                          </div>
+                        </div>
+
+                        {/* 3. Booking Date */}
+                        <div className="text-xs text-neutral-600 dark:text-[#A1A1AA] flex items-center gap-1.5 font-medium">
+                          <Calendar className="h-3.5 w-3.5 shrink-0 text-neutral-400 dark:text-neutral-500" />
+                          <span className="truncate">{bookingDate}</span>
+                        </div>
+
+                        {/* 4. Current Status */}
+                        <div>
+                          <span
+                            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${badge.classes}`}
+                          >
+                            {badge.label}
+                          </span>
+                        </div>
+
+                        {/* 5. View Details Button */}
+                        <div className="text-right">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedBookingId(o.id)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-black/10 dark:border-[#A1A1AA]/30 bg-neutral-900/5 dark:bg-white/5 hover:bg-neutral-900 hover:text-white dark:hover:bg-white dark:hover:text-[#050709] text-neutral-900 dark:text-[#F5F5F5] text-xs font-bold transition-all cursor-pointer"
+                          >
+                            <span>View Details</span>
+                            <ChevronRight className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Mobile Compact Card Layout */}
+                      <div className="md:hidden flex flex-col gap-3">
+                        <div className="flex items-start gap-3">
+                          {/* Image */}
+                          {o.productImage || (o as any).product_image ? (
+                            <img
+                              src={getOptimizedImageUrl(o.productImage || (o as any).product_image, "thumb")}
+                              alt=""
+                              loading="lazy"
+                              className="h-14 w-14 rounded-xl object-cover border border-black/10 dark:border-[#A1A1AA]/20 shrink-0"
+                            />
+                          ) : (
+                            <div className="h-14 w-14 rounded-xl border border-black/10 dark:border-[#A1A1AA]/20 bg-secondary/30 flex items-center justify-center text-muted-foreground/50 shrink-0">
+                              <Package className="h-6 w-6 opacity-60" />
+                            </div>
+                          )}
+
+                          {/* Info */}
+                          <div className="min-w-0 flex-1 space-y-1">
+                            <div className="font-bold text-sm text-neutral-950 dark:text-[#F5F5F5] leading-snug line-clamp-1">
+                              {o.productTitle || (o as any).product_title || "Gear Rental"}
+                            </div>
+                            <div className="text-[11px] text-neutral-500 dark:text-[#A1A1AA] font-mono">
+                              #{o.id}
+                            </div>
+                            <div className="pt-0.5">
+                              <span
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider border ${badge.classes}`}
+                              >
+                                {badge.label}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Bottom Row: Date & View Details */}
+                        <div className="flex items-center justify-between pt-2 border-t border-black/5 dark:border-white/5">
+                          <div className="text-xs text-neutral-600 dark:text-[#A1A1AA] flex items-center gap-1 font-medium">
+                            <Calendar className="h-3 w-3 text-neutral-400" />
+                            <span>{bookingDate}</span>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => setSelectedBookingId(o.id)}
+                            className="inline-flex items-center gap-1 px-3 py-1 rounded-xl border border-black/10 dark:border-[#A1A1AA]/30 bg-neutral-900/5 dark:bg-white/5 hover:bg-neutral-900 hover:text-white dark:hover:bg-white dark:hover:text-[#050709] text-neutral-900 dark:text-[#F5F5F5] text-xs font-bold transition-all cursor-pointer"
+                          >
+                            <span>View Details</span>
+                            <ChevronRight className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
+      {/* Cancellation Confirmation Modal */}
       <AnimatePresence>
         {cancellingOrderId && (
           <div className="fixed inset-0 z-50 grid place-items-center p-4">
@@ -572,9 +1139,7 @@ export default function Orders() {
                   Cancel Gear Rental
                 </h3>
                 <p className="text-xs sm:text-sm text-neutral-500 dark:text-[#A1A1AA] leading-relaxed">
-                  Are you sure you want to cancel this gear rental? Once
-                  cancelled, the reservation holds will be released back to the
-                  lender. This action cannot be undone.
+                  Are you sure you want to cancel this gear rental? Once cancelled, the reservation holds will be released back to the lender. This action cannot be undone.
                 </p>
               </div>
               <div className="mt-6 flex justify-end gap-3">
