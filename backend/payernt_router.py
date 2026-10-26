@@ -2453,6 +2453,7 @@ def vendor_advance_queue_endpoint(
     """
     from database import (
         update_order_queue_milestone,
+        check_booking_authorization,
         MOCK_ORDERS,
         MOCK_CUSTOM_PRODUCTS,
         fetch_one,
@@ -2506,40 +2507,12 @@ def vendor_advance_queue_endpoint(
             detail=f"Booking #{booking_id} is cancelled. Active rental queue workflows and milestone transitions are stopped."
         )
 
-    cust_email = str(order.get("user_email") or order.get("userEmail") or "").strip().lower()
-    pid = str(order.get("product_id") or order.get("productId") or "").strip()
-
-    # Resolve lender email
-    lender_email = ""
-    if pid:
-        try:
-            pprod = get_payernt_product_by_id(pid)
-            if pprod:
-                lender_email = str(pprod.get("owner_id") or pprod.get("user_email") or "").strip().lower()
-        except Exception:
-            pass
-        if not lender_email:
-            try:
-                cprod = fetch_one("SELECT * FROM custom_products WHERE id = %s", (pid,))
-                if not cprod:
-                    cprod = MOCK_CUSTOM_PRODUCTS.get(pid)
-                if cprod:
-                    lender_email = str(cprod.get("user_email") or cprod.get("owner_id") or "").strip().lower()
-            except Exception:
-                pass
-    if not lender_email:
-        lender_email = str(order.get("lender_email") or order.get("vendor_id") or order.get("vendor_email") or "").strip().lower()
-
-    is_renter = (caller_email == cust_email)
-    is_lender = (caller_email == lender_email) if lender_email else False
-    if not is_lender and caller_email:
-        if lender_email and (caller_email in lender_email or lender_email in caller_email):
-            is_lender = True
-        elif not lender_email:
-            # If product lender is not explicitly set, check if caller is registered vendor
-            vendor_acc = get_payernt_account_by_email(caller_email)
-            if vendor_acc:
-                is_lender = True
+    # 3. Robust role and ownership authorization check
+    is_renter, is_lender, is_admin, cust_email, lender_email = check_booking_authorization(
+        order=order,
+        caller_email=caller_email,
+        caller_role=caller_role,
+    )
 
     if not is_renter and not is_lender and not is_admin:
         logger.warning(f"[QueueAdvance] Unauthorized access attempt on booking #{booking_id} by {caller_email}")

@@ -2770,6 +2770,153 @@ def update_order_queue_milestone(
     # Fetch and return updated record
     return fetch_one("SELECT * FROM orders WHERE id = %s", (b_id,)) or mock_order
 
+def check_booking_authorization(
+    order: Dict[str, Any],
+    caller_email: str,
+    caller_role: str = ""
+) -> Tuple[bool, bool, bool, str, str]:
+    """
+    Authoritative server-side booking access and ownership validation.
+    Returns (is_renter, is_lender, is_admin, cust_email, lender_email).
+
+    Validates:
+    - Renter identity against order.user_email.
+    - Admin identity against caller_role and user profile.
+    - Lender identity against:
+        1. Product owner_email / user_email.
+        2. Product owner_id / accountId matching caller's vendor account.
+        3. Rental security vendor_id matching caller's vendor account or email.
+        4. Order lender_email / vendor_email / vendor_id.
+    """
+    clean_user = str(caller_email or "").strip().lower()
+    cust_email = str(order.get("user_email") or order.get("userEmail") or "").strip().lower()
+    is_renter = bool(clean_user and (clean_user == cust_email or clean_user in cust_email or cust_email in clean_user))
+
+    is_admin = caller_role in ("admin", "superadmin")
+    if not is_admin and clean_user:
+        user_rec = get_user(clean_user) or {}
+        if str(user_rec.get("role") or "").lower() in ("admin", "superadmin"):
+            is_admin = True
+
+    is_lender = False
+
+    # Resolve caller's vendor account if available
+    caller_vendor_ids = set()
+    from payernt_database import (
+        get_payernt_account_by_email,
+        get_payernt_product_by_id,
+        get_payernt_account_by_id,
+    )
+    if clean_user:
+        try:
+            vendor_acc = get_payernt_account_by_email(clean_user)
+            if vendor_acc:
+                if vendor_acc.get("id"):
+                    caller_vendor_ids.add(str(vendor_acc["id"]).strip().lower())
+                if vendor_acc.get("accountId"):
+                    caller_vendor_ids.add(str(vendor_acc["accountId"]).strip().lower())
+        except Exception:
+            pass
+
+    pid = str(order.get("product_id") or order.get("productId") or "").strip()
+    pprod = None
+    cprod = None
+    if pid:
+        try:
+            pprod = get_payernt_product_by_id(pid)
+        except Exception:
+            pass
+        try:
+            cprod = fetch_one("SELECT * FROM custom_products WHERE id = %s", (pid,))
+            if not cprod and pid in MOCK_CUSTOM_PRODUCTS:
+                cprod = MOCK_CUSTOM_PRODUCTS[pid]
+        except Exception:
+            pass
+
+    prod_owner_emails = set()
+    prod_owner_ids = set()
+
+    if pprod and isinstance(pprod, dict):
+        if pprod.get("owner_email"):
+            prod_owner_emails.add(str(pprod["owner_email"]).strip().lower())
+        if pprod.get("user_email"):
+            prod_owner_emails.add(str(pprod["user_email"]).strip().lower())
+        if pprod.get("owner_id"):
+            prod_owner_ids.add(str(pprod["owner_id"]).strip().lower())
+
+    if cprod and isinstance(cprod, dict):
+        if cprod.get("user_email"):
+            prod_owner_emails.add(str(cprod["user_email"]).strip().lower())
+        if cprod.get("owner_email"):
+            prod_owner_emails.add(str(cprod["owner_email"]).strip().lower())
+        if cprod.get("owner_id"):
+            prod_owner_ids.add(str(cprod["owner_id"]).strip().lower())
+
+    order_lender_emails = set()
+    order_vendor_ids = set()
+
+    for k in ("lender_email", "vendor_email", "owner_email"):
+        val = str(order.get(k) or "").strip().lower()
+        if val:
+            order_lender_emails.add(val)
+
+    for k in ("vendor_id", "lender_id", "owner_id"):
+        val = str(order.get(k) or "").strip().lower()
+        if val:
+            order_vendor_ids.add(val)
+
+    booking_id = str(order.get("id") or "").strip()
+    sec = None
+    if booking_id:
+        try:
+            sec = fetch_one("SELECT * FROM rental_security WHERE booking_id = %s", (booking_id,))
+        except Exception:
+            pass
+    if sec and sec.get("vendor_id"):
+        order_vendor_ids.add(str(sec["vendor_id"]).strip().lower())
+
+    # 1. Email matching
+    if clean_user:
+        if any(clean_user == em or clean_user in em or em in clean_user for em in prod_owner_emails):
+            is_lender = True
+        elif any(clean_user == em or clean_user in em or em in clean_user for em in order_lender_emails):
+            is_lender = True
+        elif any(clean_user == oid for oid in prod_owner_ids):
+            is_lender = True
+        elif any(clean_user == vid for vid in order_vendor_ids):
+            is_lender = True
+
+    # 2. Vendor Account ID matching
+    if not is_lender and caller_vendor_ids:
+        if any(vid in prod_owner_ids for vid in caller_vendor_ids):
+            is_lender = True
+        elif any(vid in order_vendor_ids for vid in caller_vendor_ids):
+            is_lender = True
+
+    # 3. Product owner / Vendor ID account lookup
+    if not is_lender and clean_user:
+        all_candidate_ids = prod_owner_ids | order_vendor_ids
+        for cid in all_candidate_ids:
+            try:
+                cand_acc = get_payernt_account_by_id(cid)
+                if cand_acc:
+                    cand_email = str(cand_acc.get("email") or "").strip().lower()
+                    if cand_email and (clean_user == cand_email or clean_user in cand_email or cand_email in clean_user):
+                        is_lender = True
+                        break
+            except Exception:
+                pass
+
+    resolved_lender_email = ""
+    if prod_owner_emails:
+        resolved_lender_email = next(iter(prod_owner_emails))
+    elif order_lender_emails:
+        resolved_lender_email = next(iter(order_lender_emails))
+    elif is_lender:
+        resolved_lender_email = clean_user
+
+    return is_renter, is_lender, is_admin, cust_email, resolved_lender_email
+
 def get_booking_cancellation(booking_id: str) -> Optional[Dict[str, Any]]:
     """Retrieves the cancellation record for a given booking ID."""
     if not booking_id:

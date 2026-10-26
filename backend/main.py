@@ -118,6 +118,7 @@ from database import (
     get_order_by_id,
     get_order_by_razorpay_order_id,
     update_order_payment_status,
+    check_booking_authorization,
     is_payment_event_processed,
     record_payment_event,
     record_user_event_record,
@@ -2949,19 +2950,16 @@ def get_order_details(id: str, email: str = Depends(get_current_any_user_email))
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found.")
 
-    order_owner = (order.get("user_email") or order.get("userEmail") or "").strip().lower()
     user = get_user(clean_email)
-    is_admin = (user.get("role") in ("admin", "superadmin")) if (user and isinstance(user, dict)) else False
+    role = str(user.get("role") or "").lower() if (user and isinstance(user, dict)) else ""
+    is_renter, is_lender, is_admin, cust_email, lender_email = check_booking_authorization(
+        order=order,
+        caller_email=clean_email,
+        caller_role=role,
+    )
+    order_owner = cust_email
 
-    # Check if caller is product lender or owner
-    pid = str(order.get("product_id") or order.get("productId") or "")
-    prod = fetch_one_product(pid) if pid else None
-    lender_email = (prod.get("user_email") if prod else "").strip().lower()
-    if not lender_email and prod:
-        lender_email = str(prod.get("owner_id") or "").strip().lower()
-    is_lender = (clean_email == lender_email) or (lender_email and (clean_email in lender_email or lender_email in clean_email))
-
-    if order_owner and order_owner != clean_email and not is_admin and not is_lender:
+    if not is_renter and not is_admin and not is_lender:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden. You do not have permission to view this order.")
 
     pid = str(order.get("product_id") or order.get("productId") or "")
@@ -3162,32 +3160,13 @@ def _get_order_and_check_access(order_id: str, email: str):
     if not order:
         raise HTTPException(status_code=404, detail="Order/Booking not found.")
 
-    cust_email = (order.get("user_email") or order.get("userEmail") or "").strip().lower()
-    pid = order.get("product_id") or order.get("productId") or ""
-    prod = fetch_one_product(pid) if pid else None
-    if not prod and pid:
-        try:
-            from payernt_database import get_payernt_product_by_id
-            prod = get_payernt_product_by_id(pid)
-        except Exception:
-            pass
-    lender_email = (prod.get("user_email") if prod else "").strip().lower()
-    if not lender_email and prod:
-        lender_email = str(prod.get("owner_id") or "").strip().lower()
-
     user_rec = get_user(clean_user) or {}
     role = str(user_rec.get("role") or "").lower()
-    is_admin = role in ("admin", "superadmin")
-    is_renter = (clean_user == cust_email)
-    is_lender = (clean_user == lender_email) if lender_email else False
-
-    # Also check if caller is product owner or vendor in payernt accounts
-    if not is_lender and clean_user:
-        if lender_email and (clean_user in lender_email or lender_email in clean_user):
-            is_lender = True
-        elif not lender_email:
-            # If lender_email not in product, allow owner
-            is_lender = True
+    is_renter, is_lender, is_admin, cust_email, lender_email = check_booking_authorization(
+        order=order,
+        caller_email=clean_user,
+        caller_role=role,
+    )
 
     if not is_renter and not is_lender and not is_admin:
         raise HTTPException(status_code=403, detail="Forbidden: You are not authorized for this booking.")
