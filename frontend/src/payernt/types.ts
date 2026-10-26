@@ -388,6 +388,10 @@ export interface LenderNotification {
   timestamp: string;
   read: boolean;
   actionRoute?: string;
+  bookingId?: string;
+  productName?: string;
+  link?: string;
+  eventKey?: string;
 }
 
 export interface PayerntAccount {

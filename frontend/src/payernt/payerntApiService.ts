@@ -880,6 +880,33 @@ export const payerntApi = {
     }
   },
 
+  async rejectBooking(
+    bookingId: string,
+    reason?: string,
+    feedback?: string
+  ): Promise<{ success: boolean; message?: string; error?: string }> {
+    try {
+      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/bookings/${encodeURIComponent(bookingId)}/reject`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason, feedback }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        return {
+          success: false,
+          error: extractApiErrorMessage(data, "Failed to decline booking request."),
+        };
+      }
+      return { success: true, message: data.message };
+    } catch (e: any) {
+      return {
+        success: false,
+        error: e?.message || "Network error while declining booking request.",
+      };
+    }
+  },
+
   async getProductAvailabilityConfig(productId: string): Promise<{
     success: boolean;
     config?: {

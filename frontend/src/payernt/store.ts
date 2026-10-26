@@ -720,12 +720,14 @@ export function usePayerntStore() {
           setDashboardError(errorStr);
         }
 
+        // Always refresh notifications with dashboard
+        fetchNotifications(forceFull).catch(() => {});
+
         if (forceFull) {
           await Promise.allSettled([
             fetchBookings(true),
             fetchProducts(true),
             fetchWallet(true),
-            fetchNotifications(true),
             fetchMessages(),
           ]);
         }
@@ -746,16 +748,19 @@ export function usePayerntStore() {
   useEffect(() => {
     if (!activeAccount || !isAuthenticated) return;
     refreshDashboard();
+    fetchNotifications(true);
 
     const handleRefresh = () => {
       refreshDashboard();
+      fetchNotifications(true);
     };
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
         const elapsed = Date.now() - lastDashboardFetchRef.current;
-        if (elapsed > 30000) {
+        if (elapsed > 15000) {
           refreshDashboard();
+          fetchNotifications(true);
         }
       }
     };
@@ -769,8 +774,9 @@ export function usePayerntStore() {
     const pollInterval = setInterval(() => {
       if (typeof document !== "undefined" && document.visibilityState === "visible") {
         refreshDashboard();
+        fetchNotifications(true);
       }
-    }, 45000);
+    }, 15000);
 
     return () => {
       window.removeEventListener("paye₹nt_data_refresh", handleRefresh);
@@ -1073,10 +1079,13 @@ export function usePayerntStore() {
     lastBookingsFetchRef.current = 0;
     lastDashboardFetchRef.current = 0;
     if (action === "accept") {
-      payerntApi.advanceRentalQueue(requestId, "accepted").catch(() => {});
+      payerntApi.advanceRentalQueue(requestId, "confirmed").catch(() => {});
+    } else if (action === "reject") {
+      payerntApi.rejectBooking(requestId).catch(() => {});
     }
     window.dispatchEvent(new CustomEvent("payent_orders_updated"));
     window.dispatchEvent(new CustomEvent("payent_queue_updated"));
+    fetchNotifications(true).catch(() => {});
 
     const req = rentalRequests.find((r) => r.id === requestId);
     const notif: LenderNotification = {
@@ -1382,14 +1391,18 @@ export function usePayerntStore() {
     setNotifications((prev) =>
       prev.map((n) => (n.id === notifId ? { ...n, read: true } : n))
     );
-    payerntApi.markNotificationRead(notifId).catch(() => {});
+    payerntApi.markNotificationRead(notifId).catch((err) => {
+      console.warn("[Payernt] Failed to mark notification read on backend:", err);
+    });
   };
 
   const markAllNotificationsRead = () => {
     lastNotifsFetchRef.current = 0;
     lastDashboardFetchRef.current = 0;
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-    payerntApi.markAllNotificationsRead().catch(() => {});
+    payerntApi.markAllNotificationsRead().catch((err) => {
+      console.warn("[Payernt] Failed to mark all notifications read on backend:", err);
+    });
   };
 
   const markMessageRead = useCallback(

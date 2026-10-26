@@ -286,6 +286,21 @@ def init_payernt_tables():
         )
     """)
 
+    def _add_pn_col(col_def: str):
+        try:
+            execute_query(f"ALTER TABLE payernt_notifications ADD COLUMN {col_def}")
+        except Exception:
+            pass
+
+    _add_pn_col("booking_id VARCHAR(255) NULL")
+    _add_pn_col("product_name VARCHAR(255) NULL")
+    _add_pn_col("event_key VARCHAR(255) NULL")
+    try:
+        from database import add_index_safely
+        add_index_safely("payernt_notifications", "idx_pn_event_key", "owner_id, event_key")
+    except Exception:
+        pass
+
     # 8. Messages Table
     execute_query("""
         CREATE TABLE IF NOT EXISTS payernt_messages (
@@ -2781,42 +2796,126 @@ def delete_payernt_bank_account(owner_id: str, bank_id: str) -> bool:
 # ============================================================
 
 def get_payernt_notifications(owner_id: str) -> List[Dict[str, Any]]:
-    """Fetches notifications for the authenticated vendor."""
+    """Fetches notifications for the authenticated vendor across both account ID and email."""
+    clean_id = (owner_id or "").strip()
+    if not clean_id:
+        return []
+    clean_email = clean_id.lower() if "@" in clean_id else ""
     try:
-        rows = fetch_all("SELECT * FROM payernt_notifications WHERE owner_id = %s ORDER BY created_at DESC", (owner_id,))
+        rows = fetch_all("""
+            SELECT * FROM payernt_notifications
+            WHERE owner_id = %s
+               OR (owner_id IN (SELECT id FROM payernt_accounts WHERE LOWER(email) = %s))
+               OR (owner_id IN (SELECT email FROM payernt_accounts WHERE id = %s))
+            ORDER BY created_at DESC
+            LIMIT 50
+        """, (clean_id, clean_email or clean_id, clean_id))
         if rows:
-            return rows
+            formatted = []
+            for r in rows:
+                formatted.append({
+                    "id": r["id"],
+                    "owner_id": r["owner_id"],
+                    "title": r["title"],
+                    "message": r["message"],
+                    "type": r.get("type") or "info",
+                    "action_route": r.get("action_route") or "requests",
+                    "actionRoute": r.get("action_route") or "requests",
+                    "read": bool(r.get("is_read") or r.get("read")),
+                    "is_read": bool(r.get("is_read") or r.get("read")),
+                    "timestamp": r.get("created_at") or "",
+                    "created_at": r.get("created_at") or "",
+                    "createdAt": r.get("created_at") or "",
+                    "booking_id": r.get("booking_id"),
+                    "bookingId": r.get("booking_id"),
+                    "product_name": r.get("product_name"),
+                    "productName": r.get("product_name"),
+                    "event_key": r.get("event_key"),
+                })
+            return formatted
     except Exception as e:
         logger.warning(f"DB fetch error for notifications: {e}")
 
-    return MOCK_PAYERNT_NOTIFICATIONS.get(owner_id, [])
+    mock_list = []
+    for m in MOCK_PAYERNT_NOTIFICATIONS.get(clean_id, []):
+        mock_list.append(m)
+    return mock_list
 
 
-def add_payernt_notification(owner_id: str, title: str, message: str, type_: str = "info", action_route: str = "products") -> Dict[str, Any]:
-    """Adds a notification for a vendor."""
+def add_payernt_notification(
+    owner_id: str,
+    title: str,
+    message: str,
+    type_: str = "info",
+    action_route: str = "products",
+    booking_id: Optional[str] = None,
+    product_name: Optional[str] = None,
+    event_key: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Adds a notification for a vendor with idempotency check."""
+    clean_id = (owner_id or "").strip()
+    if not clean_id:
+        return {}
+
+    # Check for existing notification if event_key is specified (Prevent duplicate notifications)
+    if event_key:
+        try:
+            conn = get_db_connection()
+            if conn:
+                try:
+                    with conn.cursor() as cursor:
+                        cursor.execute("""
+                            SELECT * FROM payernt_notifications
+                            WHERE owner_id = %s AND event_key = %s
+                            LIMIT 1
+                        """, (clean_id, event_key))
+                        existing = cursor.fetchone()
+                        if existing:
+                            return existing
+                finally:
+                    conn.close()
+        except Exception:
+            pass
+
+        for n in MOCK_PAYERNT_NOTIFICATIONS.get(clean_id, []):
+            if n.get("event_key") == event_key:
+                return n
+
     notif_id = f"notif-{int(time.time() * 1000)}"
     now_iso = dt.now(timezone.utc).isoformat()
     notif = {
         "id": notif_id,
-        "owner_id": owner_id,
+        "owner_id": clean_id,
         "title": title,
         "message": message,
         "type": type_,
         "action_route": action_route,
+        "actionRoute": action_route,
         "read": False,
+        "is_read": False,
+        "timestamp": now_iso,
         "created_at": now_iso,
+        "createdAt": now_iso,
+        "booking_id": booking_id,
+        "bookingId": booking_id,
+        "product_name": product_name,
+        "productName": product_name,
+        "event_key": event_key,
     }
 
     try:
         execute_query("""
-            INSERT INTO payernt_notifications (id, owner_id, title, message, type, action_route, is_read, created_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-        """, (notif_id, owner_id, title, message, type_, action_route, False, now_iso))
+            INSERT INTO payernt_notifications (id, owner_id, title, message, type, action_route, is_read, created_at, booking_id, product_name, event_key)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (notif_id, clean_id, title, message, type_, action_route, False, now_iso, booking_id, product_name, event_key))
     except Exception as e:
         logger.warning(f"DB insert error for notification: {e}")
 
-    MOCK_PAYERNT_NOTIFICATIONS.setdefault(owner_id, []).insert(0, notif)
-    invalidate_vendor_dashboard_cache(owner_id)
+    MOCK_PAYERNT_NOTIFICATIONS.setdefault(clean_id, []).insert(0, notif)
+    try:
+        invalidate_vendor_dashboard_cache(clean_id)
+    except Exception:
+        pass
     return notif
 
 

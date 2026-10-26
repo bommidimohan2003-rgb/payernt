@@ -32,6 +32,7 @@ from database import (
     get_order_by_id,
     record_booking_cancellation,
     create_notification,
+    notify_booking_event,
     check_product_interval_conflicts,
     check_products_booking_conflicts,
     normalize_slot_interval,
@@ -1761,29 +1762,17 @@ def process_lender_booking_cancellation(
     )
     
     human_reason = VALID_CANCELLATION_REASONS.get(code, code)
+    if feedback:
+        human_reason = f"{human_reason} (Feedback: {feedback})"
     try:
-        if renter_id and "@" in renter_id:
-            create_notification(
-                email=renter_id,
-                n={
-                    "id": f"notif_{int(time.time()*1000)}",
-                    "title": "Booking Cancelled by Lender",
-                    "message": f"Your booking for '{prod_title}' (Booking ID: {booking_id}) was cancelled by the lender. Reason: {human_reason}.",
-                    "type": "warning",
-                    "booking_id": booking_id,
-                    "read": False,
-                    "created_at": datetime.now(timezone.utc).isoformat()
-                }
-            )
-        add_payernt_notification(
-            owner_id=renter_id,
-            title="Booking Cancelled by Lender",
-            message=f"Your booking for '{prod_title}' (Booking ID: {booking_id}) was cancelled by the lender. Reason: {human_reason}.",
-            type_="booking_cancelled",
-            action_route="orders",
+        notify_booking_event(
+            booking_id=booking_id,
+            event_type="cancelled_by_lender",
+            actor_email=vendor_id,
+            reason=human_reason
         )
     except Exception as notif_err:
-        logger.warning(f"Could not dispatch cancellation notification to renter {renter_id}: {notif_err}")
+        logger.warning(f"Could not dispatch cancellation notification for booking {booking_id}: {notif_err}")
         
     updated_order = get_order_by_id(booking_id) or order or {}
     
@@ -1809,6 +1798,48 @@ def payernt_cancel_booking_endpoint(
     releases the reservation interval, and notifies the renter.
     """
     return process_lender_booking_cancellation(booking_id, data, account["id"], account.get("email"))
+
+
+class LenderRejectBookingSchema(BaseModel):
+    reason: Optional[str] = None
+    feedback: Optional[str] = None
+
+
+@payernt_router.post("/bookings/{booking_id}/reject")
+@payernt_router.post("/requests/{booking_id}/reject")
+@payernt_router.post("/paye₹nt/bookings/{booking_id}/reject")
+@payernt_router.post("/payernt/bookings/{booking_id}/reject")
+def payernt_reject_booking_endpoint(
+    booking_id: str,
+    data: Optional[LenderRejectBookingSchema] = None,
+    account: Dict[str, Any] = Depends(get_current_payernt_account),
+):
+    """
+    Lender declines a rental request. Updates booking status and notifies both parties.
+    """
+    order = fetch_one("SELECT * FROM orders WHERE id = %s", (booking_id,))
+    if not order:
+        order = MOCK_ORDERS.get(booking_id)
+    if not order:
+        raise HTTPException(status_code=404, detail=f"Booking #{booking_id} not found.")
+
+    curr_status = str(order.get("status") or "").lower()
+    if curr_status in ("cancelled", "rejected", "declined"):
+        raise HTTPException(status_code=400, detail=f"Booking is already {curr_status}.")
+
+    reason_text = (data.reason if data and data.reason else (data.feedback if data else None)) or "Lender declined rental request"
+    execute_query("UPDATE orders SET status = %s WHERE id = %s", ("rejected", booking_id))
+    order["status"] = "rejected"
+    MOCK_ORDERS[booking_id] = order
+
+    notify_booking_event(booking_id, "booking_rejected", actor_email=account.get("email") or account.get("id"), reason=reason_text)
+
+    return {
+        "success": True,
+        "message": f"Booking request #{booking_id} declined.",
+        "status": "rejected",
+        "bookingId": booking_id
+    }
 
 
 @payernt_router.get("/products/{product_id}/availability-config")
@@ -2555,19 +2586,19 @@ def vendor_advance_queue_endpoint(
     ts_updates = {}
 
     try:
-        if milestone in ("ready_for_pickup", "ready"):
+        if milestone in ("order_confirmed", "confirmed", "accepted"):
+            new_status = "order_confirmed"
+            if not order.get("confirmed_at") and not order.get("confirmedAt"):
+                ts_updates["confirmed_at"] = now_iso
+            notify_booking_event(booking_id, "booking_confirmed", actor_email=caller_email)
+
+        elif milestone in ("ready_for_pickup", "ready"):
             if not is_lender and not is_admin:
                 raise HTTPException(status_code=403, detail="Forbidden: Only the lender or admin can mark gear as ready for pickup.")
             new_status = "ready_for_pickup"
             if not order.get("ready_for_pickup_at") and not order.get("readyForPickupAt"):
                 ts_updates["ready_for_pickup_at"] = now_iso
-            if cust_email:
-                create_notification(
-                    email=cust_email,
-                    title="Gear Ready for Pickup 📦",
-                    message=f"Your gear for booking #{booking_id} is packed and ready for pickup.",
-                    notif_type="booking"
-                )
+            notify_booking_event(booking_id, "ready_for_pickup", actor_email=caller_email)
 
         elif milestone in ("picked_up", "rental_in_progress", "active"):
             new_status = "rental_in_progress"
@@ -2577,20 +2608,7 @@ def vendor_advance_queue_endpoint(
                 ts_updates["rental_started_at"] = now_iso
             if not order.get("ready_for_pickup_at") and not order.get("readyForPickupAt"):
                 ts_updates["ready_for_pickup_at"] = now_iso
-            if cust_email:
-                create_notification(
-                    email=cust_email,
-                    title="Rental In Progress ⏱️",
-                    message=f"Pickup confirmed for booking #{booking_id}. Your live rental timer has started.",
-                    notif_type="booking"
-                )
-            if lender_email:
-                create_notification(
-                    email=lender_email,
-                    title="Rental Started 🚀",
-                    message=f"Renter has picked up gear for booking #{booking_id}. Rental is now in progress.",
-                    notif_type="booking"
-                )
+            notify_booking_event(booking_id, "picked_up", actor_email=caller_email)
 
         elif milestone in ("return_initiated",):
             if not is_renter and not is_admin:
@@ -2598,13 +2616,7 @@ def vendor_advance_queue_endpoint(
             new_status = "return_initiated"
             if not order.get("return_initiated_at") and not order.get("returnInitiatedAt"):
                 ts_updates["return_initiated_at"] = now_iso
-            if lender_email:
-                create_notification(
-                    email=lender_email,
-                    title="Rental Return Initiated 🔄",
-                    message=f"Customer has initiated return for booking #{booking_id}.",
-                    notif_type="booking"
-                )
+            notify_booking_event(booking_id, "return_initiated", actor_email=caller_email)
 
         elif milestone in ("handed_back", "returned"):
             new_status = "handed_back"
@@ -2615,20 +2627,7 @@ def vendor_advance_queue_endpoint(
                 ts_updates["awaiting_inspection_at"] = now_iso
             if not order.get("return_initiated_at") and not order.get("returnInitiatedAt"):
                 ts_updates["return_initiated_at"] = now_iso
-            if cust_email:
-                create_notification(
-                    email=cust_email,
-                    title="Item Handed Back to Owner 🤝",
-                    message=f"Gear return receipt confirmed for booking #{booking_id}. Rental timer stopped.",
-                    notif_type="booking"
-                )
-            if lender_email:
-                create_notification(
-                    email=lender_email,
-                    title="Gear Received Back ✅",
-                    message=f"Return handover verified for booking #{booking_id}. Gear is awaiting your inspection.",
-                    notif_type="booking"
-                )
+            notify_booking_event(booking_id, "handed_back", actor_email=caller_email)
 
         elif milestone in ("awaiting_inspection", "inspection"):
             if not is_lender and not is_admin:
@@ -2638,13 +2637,7 @@ def vendor_advance_queue_endpoint(
                 ts_updates["awaiting_inspection_at"] = now_iso
             if not order.get("handed_back_at") and not order.get("handedBackAt"):
                 ts_updates["handed_back_at"] = now_iso
-            if cust_email:
-                create_notification(
-                    email=cust_email,
-                    title="Gear Inspection Underway 🔍",
-                    message=f"Lender is inspecting returned gear for booking #{booking_id}.",
-                    notif_type="booking"
-                )
+            notify_booking_event(booking_id, "awaiting_inspection", actor_email=caller_email)
 
         elif milestone in ("completed",):
             if not is_lender and not is_admin:
@@ -2661,13 +2654,7 @@ def vendor_advance_queue_endpoint(
                 complete_rental_and_credit_vendor(booking_id)
             except Exception as w_err:
                 logger.info(f"Wallet settlement notice for order {booking_id}: {w_err}")
-            if cust_email:
-                create_notification(
-                    email=cust_email,
-                    title="Rental Completed! 🌟",
-                    message=f"Your rental #{booking_id} is complete and settled.",
-                    notif_type="booking"
-                )
+            notify_booking_event(booking_id, "completed", actor_email=caller_email)
         else:
             raise HTTPException(status_code=400, detail=f"Unrecognized milestone: '{milestone}'.")
 

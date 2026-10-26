@@ -193,6 +193,10 @@ export interface Notification {
   type: "info" | "success" | "warning";
   read: boolean;
   createdAt: string;
+  productName?: string;
+  bookingId?: string;
+  link?: string;
+  eventKey?: string;
 }
 
 export interface UserProfileStats {

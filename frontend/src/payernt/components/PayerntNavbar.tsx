@@ -125,7 +125,9 @@ export function PayerntNavbar({
               >
                 <Bell className="h-4 w-4" />
                 {unreadCount > 0 && (
-                  <span className="absolute top-2 right-2 flex h-2 w-2 rounded-full bg-neutral-900 dark:bg-white shadow-xs animate-pulse" />
+                  <span className="absolute -top-1 -right-1 flex h-4 min-w-4 px-1 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white shadow-xs">
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </span>
                 )}
               </button>
 
@@ -142,6 +144,7 @@ export function PayerntNavbar({
                       <span className="font-bold text-xs text-neutral-900 dark:text-white">{tCommon.notifications}</span>
                       {unreadCount > 0 && (
                         <button
+                          type="button"
                           onClick={onMarkAllNotificationsRead}
                           className="text-[11px] text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white font-medium cursor-pointer"
                         >
@@ -159,7 +162,15 @@ export function PayerntNavbar({
                         notifications.map((n) => (
                           <div
                             key={n.id}
-                            onClick={() => onMarkNotificationRead(n.id)}
+                            onClick={() => {
+                              onMarkNotificationRead(n.id);
+                              setIsNotifOpen(false);
+                              if (n.actionRoute) {
+                                navigate({ to: `/payernt/${n.actionRoute}` as any });
+                              } else if (n.bookingId) {
+                                navigate({ to: "/payernt/requests" as any });
+                              }
+                            }}
                             className={`p-2.5 rounded-xl border text-xs transition-colors cursor-pointer ${
                               n.read
                                 ? "border-neutral-200/60 dark:border-white/5 bg-neutral-50 dark:bg-white/[0.02] text-neutral-500 dark:text-neutral-400"
@@ -171,9 +182,27 @@ export function PayerntNavbar({
                               <span className="text-[10px] text-neutral-500">{n.timestamp}</span>
                             </div>
                             <p className="text-[11px] text-neutral-600 dark:text-neutral-400 mt-0.5">{n.message}</p>
+                            {n.productName && (
+                              <div className="mt-1.5 flex items-center gap-1 text-[10px] text-neutral-500 dark:text-neutral-400">
+                                <span className="font-medium text-neutral-700 dark:text-neutral-300 truncate max-w-[200px]">📦 {n.productName}</span>
+                              </div>
+                            )}
                           </div>
                         ))
                       )}
+                    </div>
+
+                    <div className="pt-2 border-t border-neutral-200/80 dark:border-white/10 text-center">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsNotifOpen(false);
+                          navigate({ to: "/payernt/notifications" as any });
+                        }}
+                        className="text-xs font-bold text-neutral-900 dark:text-white hover:underline cursor-pointer"
+                      >
+                        View all notifications &rarr;
+                      </button>
                     </div>
                   </motion.div>
                 )}

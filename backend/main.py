@@ -101,8 +101,10 @@ from database import (
     create_custom_product,
     get_notifications,
     create_notification,
+    notify_booking_event,
     get_admin_notifications,
     mark_notifications_read,
+    mark_notification_read,
     execute_query,
     get_db_connection,
     invalidate_user_cache,
@@ -2794,23 +2796,11 @@ def add_order(data: OrderSchema, current_user: dict = Depends(get_approved_user)
     user = current_user
     cust_name = user["full_name"] if (user and isinstance(user, dict) and "full_name" in user) else clean_email.split("@")[0]
 
-    # Notify customer
-    create_notification(
-        email=clean_email,
-        title="Booking Request Confirmed 🎉",
-        message=f"Your rental reservation for '{title}' (#{data.id}) has been created.",
-        notif_type="booking"
-    )
-
-    # Notify lender
-    lender_email = (prod.get("user_email") or "").strip().lower()
-    if lender_email and lender_email != clean_email:
-        create_notification(
-            email=lender_email,
-            title="New Rental Booking Received 📦",
-            message=f"New booking #{data.id} for '{title}' from {cust_name}.",
-            notif_type="booking"
-        )
+    # Authoritative lifecycle notification for renter and lender
+    try:
+        notify_booking_event(data.id, "booking_created")
+    except Exception as e:
+        logger.warning(f"Could not dispatch booking_created notification: {e}")
     
     broadcast_admin_event("booking.created", {
         "id": data.id,
@@ -2926,13 +2916,45 @@ def cancel_user_order(id: str, email: str = Depends(get_current_user_email)):
         if order_owner and order_owner != clean_email and not is_admin:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden. You do not have permission to cancel this order.")
 
+    target_id = str(order.get("id")) if (order and order.get("id")) else id
     cancel_order(id)
     if order and order.get("id"):
         cancel_order(str(order.get("id")))
 
-    logger.info(f"Order {id} cancelled by {clean_email}")
-    broadcast_admin_event("booking.cancelled", {"id": id, "status": "cancelled"})
+    # Dispatch authoritative cancellation notifications to both renter and lender
+    try:
+        notify_booking_event(target_id, "cancelled_by_renter", actor_email=clean_email)
+    except Exception as e:
+        logger.warning(f"Could not dispatch cancel notification for order {target_id}: {e}")
+
+    logger.info(f"Order {target_id} cancelled by {clean_email}")
+    broadcast_admin_event("booking.cancelled", {"id": target_id, "status": "cancelled"})
     return {"success": True, "message": "Order cancelled successfully."}
+
+@app.post("/api/orders/{id}/reject")
+def reject_user_order(id: str, email: str = Depends(get_current_any_user_email)):
+    clean_email = email.strip().lower()
+    order = get_order_by_id(id)
+    if not order:
+        order = fetch_one("SELECT * FROM orders WHERE id = %s OR product_id = %s", (id, id))
+    if not order and id in MOCK_ORDERS:
+        order = MOCK_ORDERS[id]
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found.")
+
+    target_id = str(order.get("id") or id)
+    execute_query("UPDATE orders SET status = 'rejected' WHERE id = %s", (target_id,))
+    if target_id in MOCK_ORDERS:
+        MOCK_ORDERS[target_id]["status"] = "rejected"
+
+    try:
+        notify_booking_event(target_id, "booking_rejected", actor_email=clean_email)
+    except Exception as e:
+        logger.warning(f"Could not dispatch reject notification for order {target_id}: {e}")
+
+    logger.info(f"Order {target_id} rejected by {clean_email}")
+    broadcast_admin_event("booking.rejected", {"id": target_id, "status": "rejected"})
+    return {"success": True, "message": "Booking request declined."}
 
 @app.get("/api/orders/{id}")
 def get_order_details(id: str, email: str = Depends(get_current_any_user_email)):
@@ -3217,6 +3239,7 @@ def _execute_queue_milestone_transition(
         new_status = "order_confirmed"
         if not order.get("confirmed_at") and not order.get("confirmedAt"):
             ts_updates["confirmed_at"] = now_iso
+        notify_booking_event(order_id, "booking_confirmed", actor_email=caller_email)
 
     elif norm_m == "ready_for_pickup":
         if not is_lender and not is_admin:
@@ -3224,13 +3247,7 @@ def _execute_queue_milestone_transition(
         new_status = "ready_for_pickup"
         if not order.get("ready_for_pickup_at") and not order.get("readyForPickupAt"):
             ts_updates["ready_for_pickup_at"] = now_iso
-        if cust_email:
-            create_notification(
-                email=cust_email,
-                title="Gear Ready for Pickup 📦",
-                message=f"Your gear for booking #{order_id} is packed and ready for pickup.",
-                notif_type="booking"
-            )
+        notify_booking_event(order_id, "ready_for_pickup", actor_email=caller_email)
 
     elif norm_m in ("picked_up", "rental_in_progress", "active"):
         # Confirm pickup - start rental timer!
@@ -3242,22 +3259,7 @@ def _execute_queue_milestone_transition(
             ts_updates["rental_started_at"] = now_iso
         if not order.get("ready_for_pickup_at") and not order.get("readyForPickupAt"):
             ts_updates["ready_for_pickup_at"] = now_iso
-        
-        # Notify both parties
-        if cust_email:
-            create_notification(
-                email=cust_email,
-                title="Rental In Progress ⏱️",
-                message=f"Pickup confirmed for booking #{order_id}. Your live rental timer has started.",
-                notif_type="booking"
-            )
-        if lender_email:
-            create_notification(
-                email=lender_email,
-                title="Rental Started 🚀",
-                message=f"Renter has picked up gear for booking #{order_id}. Rental is now in progress.",
-                notif_type="booking"
-            )
+        notify_booking_event(order_id, "picked_up", actor_email=caller_email)
 
     elif norm_m == "return_initiated":
         if not is_renter and not is_admin:
@@ -3267,13 +3269,7 @@ def _execute_queue_milestone_transition(
         new_status = "return_initiated"
         if not order.get("return_initiated_at") and not order.get("returnInitiatedAt"):
             ts_updates["return_initiated_at"] = now_iso
-        if lender_email:
-            create_notification(
-                email=lender_email,
-                title="Rental Return Initiated 🔄",
-                message=f"Customer has initiated return for booking #{order_id}.",
-                notif_type="booking"
-            )
+        notify_booking_event(order_id, "return_initiated", actor_email=caller_email)
 
     elif norm_m in ("handed_back", "returned"):
         # Item handed back to owner - stop the rental timer!
@@ -3285,21 +3281,7 @@ def _execute_queue_milestone_transition(
             ts_updates["awaiting_inspection_at"] = now_iso
         if not order.get("return_initiated_at") and not order.get("returnInitiatedAt"):
             ts_updates["return_initiated_at"] = now_iso
-        
-        if cust_email:
-            create_notification(
-                email=cust_email,
-                title="Item Handed Back to Owner 🤝",
-                message=f"Gear return receipt confirmed for booking #{order_id}. Rental timer stopped.",
-                notif_type="booking"
-            )
-        if lender_email:
-            create_notification(
-                email=lender_email,
-                title="Gear Received Back ✅",
-                message=f"Return handover verified for booking #{order_id}. Gear is awaiting your inspection.",
-                notif_type="booking"
-            )
+        notify_booking_event(order_id, "handed_back", actor_email=caller_email)
 
     elif norm_m in ("awaiting_inspection", "inspection"):
         if not is_lender and not is_admin:
@@ -3309,13 +3291,7 @@ def _execute_queue_milestone_transition(
             ts_updates["awaiting_inspection_at"] = now_iso
         if not order.get("handed_back_at") and not order.get("handedBackAt"):
             ts_updates["handed_back_at"] = now_iso
-        if cust_email:
-            create_notification(
-                email=cust_email,
-                title="Gear Inspection Underway 🔍",
-                message=f"Lender is inspecting returned gear for booking #{order_id}.",
-                notif_type="booking"
-            )
+        notify_booking_event(order_id, "awaiting_inspection", actor_email=caller_email)
 
     elif norm_m == "completed":
         if not is_lender and not is_admin:
@@ -3335,13 +3311,7 @@ def _execute_queue_milestone_transition(
         except Exception as cw_err:
             logger.info(f"Wallet settlement notice for order {order_id}: {cw_err}")
 
-        if cust_email:
-            create_notification(
-                email=cust_email,
-                title="Rental Completed! 🌟",
-                message=f"Your rental #{order_id} is complete and deposit settled. You can now leave a review.",
-                notif_type="booking"
-            )
+        notify_booking_event(order_id, "completed", actor_email=caller_email)
     else:
         raise HTTPException(status_code=400, detail=f"Unrecognized milestone: '{milestone}'.")
 
@@ -4930,12 +4900,7 @@ def verify_razorpay_payment(data: VerifyRazorpayPaymentSchema, current_user_emai
         razorpay_signature=data.razorpay_signature
     )
 
-    create_notification(
-        user_email=order["user_email"],
-        title="Payment Verified & Booking Confirmed 🎉",
-        message=f"Payment for '{order['product_title']}' has been verified. Your rental is active!",
-        notif_type="success"
-    )
+    notify_booking_event(order["id"], "payment_verified")
 
     return {
         "success": True,
@@ -4999,12 +4964,7 @@ async def razorpay_webhook_handler(request: Request):
                         status="active",
                         razorpay_payment_id=razorpay_payment_id
                     )
-                    create_notification(
-                        user_email=order["user_email"],
-                        title="Payment Captured via Webhook 💳",
-                        message=f"Payment for '{order['product_title']}' was captured successfully.",
-                        notif_type="success"
-                    )
+                    notify_booking_event(order["id"], "payment_verified")
             elif event in ("payment.failed", "payment.disputed"):
                 if order.get("payment_status") != "paid":
                     update_order_payment_status(
@@ -5052,11 +5012,10 @@ def process_admin_refund(data: RefundPaymentSchema, current_admin: dict = Depend
         refund_status="processed"
     )
 
-    create_notification(
-        user_email=order["user_email"],
-        title="Refund Processed 💰",
-        message=f"Refund of ₹{refund_amount_rupees} for '{order['product_title']}' has been processed.",
-        notif_type="info"
+    notify_booking_event(
+        order["id"],
+        "refund_processed",
+        custom_message=f"Refund of ₹{refund_amount_rupees} for '{order['product_title']}' has been processed."
     )
 
     return {
@@ -5178,9 +5137,53 @@ def fetch_lender_orders(email: str = Depends(get_current_any_user_email)):
             })
     return mock_results
 
+def check_due_and_overdue_bookings_for_user(user_email: str):
+    """
+    Checks if any active orders for this user (as renter or lender)
+    are approaching their due date (within 24 hours) or are overdue,
+    and dispatches idempotency-protected notifications.
+    """
+    try:
+        clean_email = (user_email or "").strip().lower()
+        if not clean_email:
+            return
+        rows = fetch_all("""
+            SELECT id, user_email, product_id, product_title, start_date, end_date, status
+            FROM orders
+            WHERE (LOWER(user_email) = %s OR product_id IN (SELECT id FROM custom_products WHERE LOWER(user_email) = %s))
+              AND status IN ('rental_in_progress', 'active', 'picked_up', 'return_initiated')
+        """, (clean_email, clean_email))
+        if not rows:
+            return
+
+        now = dt.now(timezone.utc)
+        for r in rows:
+            end_str = r.get("end_date")
+            if not end_str:
+                continue
+            try:
+                end_dt = None
+                if "T" in str(end_str):
+                    end_dt = dt.fromisoformat(str(end_str).replace("Z", "+00:00"))
+                else:
+                    end_dt = dt.strptime(str(end_str)[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+
+                if end_dt:
+                    diff_hours = (end_dt - now).total_seconds() / 3600.0
+                    if diff_hours < 0:
+                        notify_booking_event(r["id"], "overdue")
+                    elif diff_hours <= 24:
+                        notify_booking_event(r["id"], "due_approaching")
+            except Exception:
+                pass
+    except Exception as e:
+        logger.debug(f"Check due notice: {e}")
+
 @app.get("/api/notifications")
-def fetch_notifications(email: str = Depends(get_current_user_email)):
-    notifications = get_notifications(email)
+def fetch_notifications(email: str = Depends(get_current_any_user_email)):
+    clean_email = email.strip().lower()
+    check_due_and_overdue_bookings_for_user(clean_email)
+    notifications = get_notifications(clean_email)
     if not notifications:
         return []
     
@@ -5190,17 +5193,28 @@ def fetch_notifications(email: str = Depends(get_current_user_email)):
             "id": n["id"],
             "title": n["title"],
             "message": n["message"],
-            "type": n["type"],
-            "read": bool(n["is_read"]),
-            "createdAt": n["created_at"]
+            "type": n.get("type") or "info",
+            "read": bool(n.get("is_read") or n.get("read")),
+            "createdAt": n.get("created_at") or n.get("createdAt"),
+            "productName": n.get("product_name") or n.get("productName"),
+            "bookingId": n.get("booking_id") or n.get("bookingId"),
+            "link": n.get("link") or (f"/orders" if n.get("booking_id") else None),
+            "eventKey": n.get("event_key") or n.get("eventKey"),
         })
     return result
 
 
+@app.post("/api/notifications/{id}/read")
+@app.patch("/api/notifications/{id}/read")
+def read_single_notification(id: str, email: str = Depends(get_current_any_user_email)):
+    mark_notification_read(id, email)
+    return {"success": True, "message": "Notification marked as read."}
+
+
 @app.post("/api/notifications/read")
-def read_all_notifications(email: str = Depends(get_current_user_email)):
+def read_all_notifications(email: str = Depends(get_current_any_user_email)):
     mark_notifications_read(email)
-    return {"success": True}
+    return {"success": True, "message": "All notifications marked as read."}
 
 
 # ----------------------------------------------------------------------

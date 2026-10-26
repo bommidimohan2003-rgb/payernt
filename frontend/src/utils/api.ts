@@ -1564,6 +1564,28 @@ export const api = {
     return res.json();
   },
 
+  async markNotificationRead(token: string, id: string) {
+    const res = await this.fetchWithAuth(`${API_BASE}/api/notifications/${id}/read`, {
+      method: "POST",
+    });
+    if (!res.ok) throw new Error("Failed to mark notification as read");
+    this.invalidateCache("user_notifications");
+    return res.json();
+  },
+
+  async rejectOrder(token: string, orderId: string, reason?: string) {
+    const res = await this.fetchWithAuth(`${API_BASE}/api/orders/${orderId}/reject`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(parseApiError(data, "Failed to reject order"));
+    this.invalidateCache("user_notifications");
+    this.invalidateCache("orders");
+    return data;
+  },
+
   async getLenderOrders(token: string) {
     const res = await this.fetchWithAuth(`${API_BASE}/api/lender/orders`, {
       method: "GET",

@@ -671,8 +671,14 @@ def init_db(force: bool = False):
             created_at VARCHAR(100)
         )
     """)
+    add_column_safely("notifications", "product_name VARCHAR(255) NULL")
+    add_column_safely("notifications", "booking_id VARCHAR(255) NULL")
+    add_column_safely("notifications", "link VARCHAR(500) NULL")
+    add_column_safely("notifications", "event_key VARCHAR(255) NULL")
     add_index_safely("notifications", "idx_notif_user_read", "user_email, is_read")
     add_index_safely("notifications", "idx_notif_user_created", "user_email, created_at")
+    add_index_safely("notifications", "idx_notif_event_key", "user_email, event_key")
+    add_index_safely("notifications", "idx_notif_booking", "booking_id")
 
     # Create categories table
     execute_query("""
@@ -1081,38 +1087,39 @@ def init_db(force: bool = False):
 
     # Seed initial data if tables are empty
     conn = get_db_connection()
-    try:
-        with conn.cursor() as cursor:
-            # Seed default admin user
-            cursor.execute("SELECT COUNT(*) as count FROM users WHERE LOWER(email) = 'bommidimohan2003@gmail.com'")
-            if cursor.fetchone()["count"] == 0:
-                hashed_pwd = "$2b$12$C5VVRIUA/lybUikMFKuB4eFwl..AsnVwYmblb/lfgJ0I.GXM.SYuG"
-                created_at = dt.now(timezone.utc).isoformat()
-                cursor.execute("""
-                    INSERT INTO users (email, phone, password_hash, full_name, role, created_at, last_login_at, status, verified)
-                    VALUES ('bommidimohan2003@gmail.com', '+91 8810519885', %s, 'Bommidi Mohan', 'admin', %s, %s, 'active', TRUE)
-                """, (hashed_pwd, created_at, created_at))
-                print("Seeded admin user bommidimohan2003@gmail.com into users table.")
+    if conn:
+        try:
+            with conn.cursor() as cursor:
+                # Seed default admin user
+                cursor.execute("SELECT COUNT(*) as count FROM users WHERE LOWER(email) = 'bommidimohan2003@gmail.com'")
+                if cursor.fetchone()["count"] == 0:
+                    hashed_pwd = "$2b$12$C5VVRIUA/lybUikMFKuB4eFwl..AsnVwYmblb/lfgJ0I.GXM.SYuG"
+                    created_at = dt.now(timezone.utc).isoformat()
+                    cursor.execute("""
+                        INSERT INTO users (email, phone, password_hash, full_name, role, created_at, last_login_at, status, verified)
+                        VALUES ('bommidimohan2003@gmail.com', '+91 8810519885', %s, 'Bommidi Mohan', 'admin', %s, %s, 'active', TRUE)
+                    """, (hashed_pwd, created_at, created_at))
+                    print("Seeded admin user bommidimohan2003@gmail.com into users table.")
 
-            # Auto-purge any leftover automated test dummy accounts
-            try:
-                for tbl in ("users", "payernt_accounts", "payrent_accounts", "admin_accounts"):
-                    cursor.execute(f"""
-                        DELETE FROM `{tbl}` 
-                        WHERE email LIKE '%@example.com' OR email LIKE '%@test.com' OR email LIKE '%@fake.com'
-                           OR email LIKE 'test_%' OR email LIKE 'fake_%' OR email LIKE 'reset_test_%'
+                # Auto-purge any leftover automated test dummy accounts
+                try:
+                    for tbl in ("users", "payernt_accounts", "payrent_accounts", "admin_accounts"):
+                        cursor.execute(f"""
+                            DELETE FROM `{tbl}` 
+                            WHERE email LIKE '%@example.com' OR email LIKE '%@test.com' OR email LIKE '%@fake.com'
+                               OR email LIKE 'test_%' OR email LIKE 'fake_%' OR email LIKE 'reset_test_%'
+                        """)
+                    cursor.execute("""
+                        DELETE FROM `agents` 
+                        WHERE user_email LIKE '%@example.com' OR user_email LIKE '%@test.com'
+                           OR user_email LIKE 'test_%' OR user_email LIKE 'fake_%'
                     """)
-                cursor.execute("""
-                    DELETE FROM `agents` 
-                    WHERE user_email LIKE '%@example.com' OR user_email LIKE '%@test.com'
-                       OR user_email LIKE 'test_%' OR user_email LIKE 'fake_%'
-                """)
-            except Exception as purge_err:
-                logger.warning(f"Notice: initial fake accounts cleanup: {purge_err}")
+                except Exception as purge_err:
+                    logger.warning(f"Notice: initial fake accounts cleanup: {purge_err}")
 
-        conn.commit()
-    finally:
-        conn.close()
+            conn.commit()
+        finally:
+            conn.close()
 
     # Auto-synchronize all existing product owners to agents table
     try:
@@ -2382,13 +2389,7 @@ def update_order_booking_location(order_id: str, caller_email: str, location_dat
         UPDATE orders SET location_change_data = %s WHERE id = %s
     """, (change_json, order_id))
 
-    if lender_email:
-        create_notification(
-            email=lender_email,
-            title="Location Change Requested 📍",
-            message=f"Renter requested a change of location for accepted booking #{order_id}. Your approval is required.",
-            notif_type="booking"
-        )
+    notify_booking_event(order_id, "location_change_requested", actor_email=caller_email)
 
     broadcast_admin_event_safe("booking.location_change_requested", {
         "id": order_id,
@@ -2500,13 +2501,7 @@ def approve_location_change_request(order_id: str, caller_email: str) -> dict:
         WHERE booking_id = %s
     """, (new_method, new_addr or new_custom or "Customer Location", new_pickup, new_custom, new_dir, lat, lng, now_iso, order_id))
 
-    if cust_email:
-        create_notification(
-            email=cust_email,
-            title="Location Change Approved! ✅",
-            message=f"Lender approved your updated booking location for booking #{order_id}.",
-            notif_type="booking"
-        )
+    notify_booking_event(order_id, "location_change_approved", actor_email=caller_email)
 
     broadcast_admin_event_safe("booking.location_change_approved", {
         "id": order_id,
@@ -2568,13 +2563,7 @@ def reject_location_change_request(order_id: str, caller_email: str, feedback: O
         UPDATE orders SET location_change_data = %s WHERE id = %s
     """, (json.dumps(change_req), order_id))
 
-    if cust_email:
-        create_notification(
-            email=cust_email,
-            title="Location Change Declined ⚠️",
-            message=f"Lender was unable to accept the location change for booking #{order_id}. Original location remains confirmed.",
-            notif_type="booking"
-        )
+    notify_booking_event(order_id, "location_change_rejected", actor_email=caller_email, reason=feedback)
 
     broadcast_admin_event_safe("booking.location_change_rejected", {
         "id": order_id,
@@ -3158,21 +3147,25 @@ def update_custom_product(product_id: str, email: str, patch: dict):
         )
     return MOCK_CUSTOM_PRODUCTS.get(product_id)
 
-# Notifications CRUD
+# Notifications CRUD & Event Orchestrator
 def get_notifications(email: str):
     clean_email = (email or "").strip().lower()
+    if not clean_email:
+        return []
     try:
         conn = get_db_connection()
         if conn:
             try:
                 with conn.cursor() as cursor:
                     cursor.execute("""
-                        SELECT id, user_email, title, message, type, is_read, created_at
+                        SELECT id, user_email, title, message, type, is_read, created_at,
+                               product_name, booking_id, link, event_key
                         FROM notifications
                         WHERE user_email = %s
+                           OR user_email IN (SELECT id FROM payernt_accounts WHERE LOWER(email) = %s)
                         ORDER BY created_at DESC
                         LIMIT 50
-                    """, (clean_email,))
+                    """, (clean_email, clean_email))
                     rows = cursor.fetchall()
                     if rows:
                         return rows
@@ -3180,7 +3173,10 @@ def get_notifications(email: str):
                 conn.close()
     except Exception as e:
         print(f"Notice: Database read error in get_notifications: {e}")
-    return [n for n in MOCK_NOTIFICATIONS.values() if (n.get("user_email") or n.get("userEmail")) == clean_email]
+    return [
+        n for n in MOCK_NOTIFICATIONS.values()
+        if (n.get("user_email") or n.get("userEmail") or "").strip().lower() == clean_email
+    ]
 
 def create_notification(email: str = None, title_or_dict: Any = None, message: str = None, **kwargs):
     clean_email = (email or kwargs.get("user_email") or "").strip().lower()
@@ -3191,6 +3187,10 @@ def create_notification(email: str = None, title_or_dict: Any = None, message: s
     notif_type = kwargs.get("notif_type") or kwargs.get("type") or "info"
     notif_read = kwargs.get("read") or kwargs.get("is_read") or False
     notif_created_at = kwargs.get("createdAt") or kwargs.get("created_at") or dt.now(timezone.utc).isoformat()
+    notif_product_name = kwargs.get("product_name") or kwargs.get("productName")
+    notif_booking_id = kwargs.get("booking_id") or kwargs.get("bookingId")
+    notif_link = kwargs.get("link") or kwargs.get("action_route") or kwargs.get("actionRoute")
+    notif_event_key = kwargs.get("event_key") or kwargs.get("eventKey")
 
     if isinstance(title_or_dict, dict):
         notif_id = title_or_dict.get("id") or notif_id
@@ -3199,12 +3199,56 @@ def create_notification(email: str = None, title_or_dict: Any = None, message: s
         notif_type = title_or_dict.get("type") or notif_type
         notif_read = title_or_dict.get("read") or title_or_dict.get("is_read") or notif_read
         notif_created_at = title_or_dict.get("createdAt") or title_or_dict.get("created_at") or notif_created_at
+        notif_product_name = title_or_dict.get("product_name") or title_or_dict.get("productName") or notif_product_name
+        notif_booking_id = title_or_dict.get("booking_id") or title_or_dict.get("bookingId") or notif_booking_id
+        notif_link = title_or_dict.get("link") or title_or_dict.get("action_route") or notif_link
+        notif_event_key = title_or_dict.get("event_key") or title_or_dict.get("eventKey") or notif_event_key
     elif isinstance(title_or_dict, str):
         notif_title = title_or_dict
         notif_message = message or kwargs.get("message") or ""
     else:
-        notif_title = kwargs.get("title") or "Notification"
-        notif_message = message or kwargs.get("message") or ""
+        # Check if kwargs passed 'n' dictionary
+        if isinstance(kwargs.get("n"), dict):
+            n_data = kwargs["n"]
+            notif_id = n_data.get("id") or notif_id
+            notif_title = n_data.get("title") or "Notification"
+            notif_message = n_data.get("message") or message or ""
+            notif_type = n_data.get("type") or notif_type
+            notif_read = n_data.get("read") or n_data.get("is_read") or notif_read
+            notif_created_at = n_data.get("createdAt") or n_data.get("created_at") or notif_created_at
+            notif_product_name = n_data.get("product_name") or n_data.get("productName") or notif_product_name
+            notif_booking_id = n_data.get("booking_id") or n_data.get("bookingId") or notif_booking_id
+            notif_link = n_data.get("link") or n_data.get("action_route") or notif_link
+            notif_event_key = n_data.get("event_key") or n_data.get("eventKey") or notif_event_key
+        else:
+            notif_title = kwargs.get("title") or "Notification"
+            notif_message = message or kwargs.get("message") or ""
+
+    # Check for existing notification if event_key is specified (Prevent duplicate notifications)
+    if notif_event_key:
+        try:
+            conn = get_db_connection()
+            if conn:
+                try:
+                    with conn.cursor() as cursor:
+                        cursor.execute("""
+                            SELECT id, user_email, title, message, type, is_read, created_at,
+                                   product_name, booking_id, link, event_key
+                            FROM notifications
+                            WHERE user_email = %s AND event_key = %s
+                            LIMIT 1
+                        """, (clean_email, notif_event_key))
+                        existing = cursor.fetchone()
+                        if existing:
+                            return existing
+                finally:
+                    conn.close()
+        except Exception:
+            pass
+
+        for n in MOCK_NOTIFICATIONS.values():
+            if (n.get("user_email") or "").strip().lower() == clean_email and n.get("event_key") == notif_event_key:
+                return n
 
     notif_data = {
         "id": notif_id,
@@ -3216,12 +3260,20 @@ def create_notification(email: str = None, title_or_dict: Any = None, message: s
         "read": notif_read,
         "created_at": notif_created_at,
         "createdAt": notif_created_at,
+        "product_name": notif_product_name,
+        "productName": notif_product_name,
+        "booking_id": notif_booking_id,
+        "bookingId": notif_booking_id,
+        "link": notif_link,
+        "event_key": notif_event_key,
+        "eventKey": notif_event_key,
     }
     MOCK_NOTIFICATIONS[notif_id] = notif_data
+
     try:
         execute_query("""
-            INSERT INTO notifications (id, user_email, title, message, type, is_read, created_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO notifications (id, user_email, title, message, type, is_read, created_at, product_name, booking_id, link, event_key)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
             notif_id,
             clean_email,
@@ -3229,19 +3281,454 @@ def create_notification(email: str = None, title_or_dict: Any = None, message: s
             notif_message,
             notif_type,
             notif_read,
-            notif_created_at
+            notif_created_at,
+            notif_product_name,
+            notif_booking_id,
+            notif_link,
+            notif_event_key
         ))
     except Exception as e:
         print(f"Notice: Database write error in create_notification: {e}")
+
+    # Cross-sync to payernt_notifications if user is a vendor or owner
+    try:
+        from payernt_database import add_payernt_notification
+        add_payernt_notification(
+            owner_id=clean_email,
+            title=notif_title,
+            message=notif_message,
+            type_=notif_type,
+            action_route=notif_link or "orders",
+            booking_id=notif_booking_id,
+            product_name=notif_product_name,
+            event_key=notif_event_key
+        )
+    except Exception:
+        pass
+
     return notif_data
+
+def mark_notification_read(notification_id: str, email: str = None):
+    clean_email = (email or "").strip().lower()
+    for n in MOCK_NOTIFICATIONS.values():
+        if n.get("id") == notification_id:
+            if not clean_email or (n.get("user_email") or n.get("userEmail") or "").strip().lower() == clean_email:
+                n["is_read"] = True
+                n["read"] = True
+    if clean_email:
+        execute_query("UPDATE notifications SET is_read = TRUE WHERE id = %s AND (user_email = %s OR user_email IN (SELECT id FROM payernt_accounts WHERE LOWER(email) = %s))", (notification_id, clean_email, clean_email))
+    else:
+        execute_query("UPDATE notifications SET is_read = TRUE WHERE id = %s", (notification_id,))
 
 def mark_notifications_read(email: str):
     clean_email = (email or "").strip().lower()
     for n in MOCK_NOTIFICATIONS.values():
-        if (n.get("user_email") or n.get("userEmail")) == clean_email:
+        if (n.get("user_email") or n.get("userEmail") or "").strip().lower() == clean_email:
             n["is_read"] = True
             n["read"] = True
-    execute_query("UPDATE notifications SET is_read = TRUE WHERE user_email = %s", (clean_email,))
+    execute_query("UPDATE notifications SET is_read = TRUE WHERE user_email = %s OR user_email IN (SELECT id FROM payernt_accounts WHERE LOWER(email) = %s)", (clean_email, clean_email))
+    try:
+        from payernt_database import mark_all_payernt_notifications_read
+        mark_all_payernt_notifications_read(clean_email)
+    except Exception:
+        pass
+
+def notify_booking_event(
+    booking_id: str,
+    event_type: str,
+    actor_email: Optional[str] = None,
+    custom_message: Optional[str] = None,
+    reason: Optional[str] = None,
+    extra_details: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """
+    Authoritative booking lifecycle notification dispatcher.
+    Emits distinct, personalized, persistent notifications to the renter, lender,
+    and platform administrators without exposing private counterparty information.
+    Guarantees event idempotency and cross-portal synchronicity (Payent & Payernt).
+    """
+    if not booking_id:
+        return {}
+
+    order = get_order_by_id(booking_id)
+    if not order:
+        order = fetch_one("SELECT * FROM orders WHERE id = %s OR product_id = %s", (booking_id, booking_id))
+    if not order:
+        order = MOCK_ORDERS.get(booking_id) or {}
+
+    order_id = str(order.get("id") or booking_id)
+    renter_email = (order.get("user_email") or order.get("userEmail") or "").strip().lower()
+    prod_id = str(order.get("product_id") or order.get("productId") or "")
+    prod_title = str(order.get("product_title") or order.get("productTitle") or "Tech Gear")
+    renter_name = renter_email.split("@")[0].capitalize() if renter_email else "Customer"
+
+    # Resolve lender email & account id
+    lender_email = ""
+    lender_account_id = ""
+
+    if prod_id:
+        p_row = fetch_one("SELECT user_email FROM custom_products WHERE id = %s", (prod_id,))
+        if p_row and p_row.get("user_email"):
+            lender_email = p_row["user_email"].strip().lower()
+        if not lender_email:
+            pp_row = fetch_one("SELECT owner_email, owner_id FROM payernt_products WHERE id = %s", (prod_id,))
+            if pp_row:
+                lender_email = (pp_row.get("owner_email") or "").strip().lower()
+                lender_account_id = (pp_row.get("owner_id") or "").strip()
+
+    if not lender_email:
+        sec = None
+        try:
+            from payernt_database import get_rental_security_by_booking_id
+            sec = get_rental_security_by_booking_id(order_id)
+        except Exception:
+            pass
+        if not sec:
+            sec = fetch_one("SELECT vendor_id FROM rental_security_deposits WHERE booking_id = %s", (order_id,))
+        if sec:
+            v_id = (sec.get("vendor_id") or "").strip()
+            if "@" in v_id:
+                lender_email = v_id.lower()
+            else:
+                lender_account_id = v_id
+                acc_row = fetch_one("SELECT email FROM payernt_accounts WHERE id = %s", (v_id,))
+                if acc_row and acc_row.get("email"):
+                    lender_email = acc_row["email"].strip().lower()
+
+    if not lender_email:
+        mock_p = MOCK_CUSTOM_PRODUCTS.get(prod_id) or {}
+        lender_email = (mock_p.get("user_email") or "").strip().lower()
+
+    results = {}
+    norm_event = event_type.strip().lower()
+
+    renter_notif = None
+    lender_notif = None
+
+    if norm_event in ("booking_created", "pending", "requested"):
+        renter_notif = {
+            "title": "Booking Request Submitted 🎉",
+            "message": f"Your reservation request for '{prod_title}' (#{order_id}) has been submitted and is pending lender approval.",
+            "type": "info",
+            "link": "/orders",
+            "event_key": f"booking_created_{order_id}_{renter_email}"
+        }
+        lender_notif = {
+            "title": "New Booking Request Received 📦",
+            "message": f"New rental request #{order_id} for '{prod_title}' received from {renter_name}.",
+            "type": "warning",
+            "link": "/payernt/requests",
+            "event_key": f"booking_created_{order_id}_{lender_email or lender_account_id}"
+        }
+
+    elif norm_event in ("booking_confirmed", "confirmed", "accepted", "order_confirmed"):
+        renter_notif = {
+            "title": "Booking Accepted & Confirmed ✅",
+            "message": f"Great news! The lender confirmed your rental reservation for '{prod_title}' (#{order_id}).",
+            "type": "success",
+            "link": "/orders",
+            "event_key": f"confirmed_{order_id}_{renter_email}"
+        }
+        lender_notif = {
+            "title": "Booking Confirmed ✅",
+            "message": f"You confirmed rental booking #{order_id} for '{prod_title}'. Please get the equipment packed and ready.",
+            "type": "success",
+            "link": "/payernt/requests",
+            "event_key": f"confirmed_{order_id}_{lender_email or lender_account_id}"
+        }
+
+    elif norm_event in ("booking_rejected", "declined", "rejected"):
+        renter_notif = {
+            "title": "Booking Request Declined ❌",
+            "message": f"The lender was unable to accept your rental request for '{prod_title}' (#{order_id})." + (f" Reason: {reason}" if reason else ""),
+            "type": "warning",
+            "link": "/orders",
+            "event_key": f"rejected_{order_id}_{renter_email}"
+        }
+        lender_notif = {
+            "title": "Booking Request Declined ❌",
+            "message": f"You declined rental request #{order_id} for '{prod_title}'.",
+            "type": "info",
+            "link": "/payernt/requests",
+            "event_key": f"rejected_{order_id}_{lender_email or lender_account_id}"
+        }
+
+    elif norm_event in ("cancelled_by_renter", "renter_cancelled"):
+        renter_notif = {
+            "title": "Booking Cancelled 🚫",
+            "message": f"You cancelled your rental booking #{order_id} for '{prod_title}'." + (f" Reason: {reason}" if reason else ""),
+            "type": "warning",
+            "link": "/orders",
+            "event_key": f"renter_cancel_{order_id}_{renter_email}"
+        }
+        lender_notif = {
+            "title": "Booking Cancelled by Renter ⚠️",
+            "message": f"Renter {renter_name} cancelled booking #{order_id} for '{prod_title}'." + (f" Reason: {reason}" if reason else ""),
+            "type": "warning",
+            "link": "/payernt/requests",
+            "event_key": f"renter_cancel_{order_id}_{lender_email or lender_account_id}"
+        }
+
+    elif norm_event in ("cancelled_by_lender", "lender_cancelled"):
+        renter_notif = {
+            "title": "Booking Cancelled by Lender ⚠️",
+            "message": f"Your booking #{order_id} for '{prod_title}' was cancelled by the lender." + (f" Reason: {reason}" if reason else ""),
+            "type": "warning",
+            "link": "/orders",
+            "event_key": f"lender_cancel_{order_id}_{renter_email}"
+        }
+        lender_notif = {
+            "title": "Booking Cancellation Confirmed 🚫",
+            "message": f"You cancelled booking #{order_id} for '{prod_title}'." + (f" Reason: {reason}" if reason else ""),
+            "type": "info",
+            "link": "/payernt/requests",
+            "event_key": f"lender_cancel_{order_id}_{lender_email or lender_account_id}"
+        }
+
+    elif norm_event in ("ready_for_pickup", "ready"):
+        renter_notif = {
+            "title": "Gear Ready for Pickup 📦",
+            "message": f"Your gear '{prod_title}' for booking #{order_id} is packed and ready for pickup.",
+            "type": "info",
+            "link": "/orders",
+            "event_key": f"ready_pickup_{order_id}_{renter_email}"
+        }
+        lender_notif = {
+            "title": "Marked Ready for Pickup 📦",
+            "message": f"You marked '{prod_title}' (booking #{order_id}) as ready for handover.",
+            "type": "info",
+            "link": "/payernt/requests",
+            "event_key": f"ready_pickup_{order_id}_{lender_email or lender_account_id}"
+        }
+
+    elif norm_event in ("picked_up", "rental_started", "rental_in_progress", "active"):
+        renter_notif = {
+            "title": "Rental Started & Pickup Confirmed ⏱️",
+            "message": f"Pickup confirmed for '{prod_title}' (#{order_id}). Your live rental timer has started.",
+            "type": "success",
+            "link": "/orders",
+            "event_key": f"picked_up_{order_id}_{renter_email}"
+        }
+        lender_notif = {
+            "title": "Rental Started 🚀",
+            "message": f"Renter {renter_name} has picked up '{prod_title}' (#{order_id}). Rental is now in progress.",
+            "type": "success",
+            "link": "/payernt/requests",
+            "event_key": f"picked_up_{order_id}_{lender_email or lender_account_id}"
+        }
+
+    elif norm_event in ("return_initiated",):
+        renter_notif = {
+            "title": "Return Initiated 🔄",
+            "message": f"You initiated return for booking #{order_id} ('{prod_title}'). Please hand back the equipment.",
+            "type": "info",
+            "link": "/orders",
+            "event_key": f"return_init_{order_id}_{renter_email}"
+        }
+        lender_notif = {
+            "title": "Rental Return Initiated 🔄",
+            "message": f"Renter {renter_name} has initiated return for booking #{order_id} ('{prod_title}').",
+            "type": "info",
+            "link": "/payernt/requests",
+            "event_key": f"return_init_{order_id}_{lender_email or lender_account_id}"
+        }
+
+    elif norm_event in ("handed_back", "returned"):
+        renter_notif = {
+            "title": "Item Handed Back to Owner 🤝",
+            "message": f"Gear return receipt confirmed for booking #{order_id}. Rental timer stopped.",
+            "type": "success",
+            "link": "/orders",
+            "event_key": f"handed_back_{order_id}_{renter_email}"
+        }
+        lender_notif = {
+            "title": "Gear Received Back ✅",
+            "message": f"Return handover verified for booking #{order_id} ('{prod_title}'). Gear is awaiting your inspection.",
+            "type": "success",
+            "link": "/payernt/requests",
+            "event_key": f"handed_back_{order_id}_{lender_email or lender_account_id}"
+        }
+
+    elif norm_event in ("awaiting_inspection", "inspection"):
+        renter_notif = {
+            "title": "Gear Inspection Underway 🔍",
+            "message": f"Lender is inspecting returned gear for booking #{order_id}.",
+            "type": "info",
+            "link": "/orders",
+            "event_key": f"inspection_{order_id}_{renter_email}"
+        }
+        lender_notif = {
+            "title": "Inspection in Progress 🔍",
+            "message": f"You are inspecting returned gear for booking #{order_id} ('{prod_title}').",
+            "type": "info",
+            "link": "/payernt/requests",
+            "event_key": f"inspection_{order_id}_{lender_email or lender_account_id}"
+        }
+
+    elif norm_event in ("completed",):
+        renter_notif = {
+            "title": "Rental Completed! 🌟",
+            "message": f"Your rental #{order_id} for '{prod_title}' is completed and deposit settled. You can now leave a review!",
+            "type": "success",
+            "link": "/orders",
+            "event_key": f"completed_{order_id}_{renter_email}"
+        }
+        lender_notif = {
+            "title": "Rental Completed & Earnings Credited 💰",
+            "message": f"Rental #{order_id} for '{prod_title}' is completed. Payout finalized to your wallet.",
+            "type": "success",
+            "link": "/payernt/requests",
+            "event_key": f"completed_{order_id}_{lender_email or lender_account_id}"
+        }
+
+    elif norm_event in ("payment_verified", "payment_captured"):
+        renter_notif = {
+            "title": "Payment Verified & Escrow Secured 💳",
+            "message": f"Payment for '{prod_title}' (#{order_id}) is verified and held securely in escrow.",
+            "type": "success",
+            "link": "/orders",
+            "event_key": f"payment_verified_{order_id}_{renter_email}"
+        }
+        lender_notif = {
+            "title": "Booking Payment Escrowed 🔒",
+            "message": f"Rental payment for #{order_id} ('{prod_title}') has been funded in escrow.",
+            "type": "info",
+            "link": "/payernt/requests",
+            "event_key": f"payment_verified_{order_id}_{lender_email or lender_account_id}"
+        }
+
+    elif norm_event in ("refund_processed", "refunded"):
+        renter_notif = {
+            "title": "Refund Processed 💰",
+            "message": custom_message or f"Refund for booking #{order_id} ('{prod_title}') has been processed.",
+            "type": "info",
+            "link": "/orders",
+            "event_key": f"refund_{order_id}_{renter_email}"
+        }
+        lender_notif = {
+            "title": "Booking Refunded 💰",
+            "message": f"Booking #{order_id} for '{prod_title}' has been refunded.",
+            "type": "info",
+            "link": "/payernt/requests",
+            "event_key": f"refund_{order_id}_{lender_email or lender_account_id}"
+        }
+
+    elif norm_event in ("location_change_requested",):
+        renter_notif = {
+            "title": "Location Change Submitted 📍",
+            "message": f"Your location change request for booking #{order_id} has been submitted for lender approval.",
+            "type": "info",
+            "link": "/orders",
+            "event_key": f"loc_req_{order_id}_{renter_email}"
+        }
+        lender_notif = {
+            "title": "Location Change Requested 📍",
+            "message": f"Renter requested a location change for booking #{order_id}. Your approval is required.",
+            "type": "warning",
+            "link": "/payernt/requests",
+            "event_key": f"loc_req_{order_id}_{lender_email or lender_account_id}"
+        }
+
+    elif norm_event in ("location_change_approved",):
+        renter_notif = {
+            "title": "Location Change Approved ✅",
+            "message": f"Lender approved your location change for booking #{order_id}.",
+            "type": "success",
+            "link": "/orders",
+            "event_key": f"loc_appr_{order_id}_{renter_email}"
+        }
+        lender_notif = {
+            "title": "Location Change Approved ✅",
+            "message": f"You approved the location change for booking #{order_id}.",
+            "type": "info",
+            "link": "/payernt/requests",
+            "event_key": f"loc_appr_{order_id}_{lender_email or lender_account_id}"
+        }
+
+    elif norm_event in ("location_change_rejected",):
+        renter_notif = {
+            "title": "Location Change Declined ❌",
+            "message": f"Lender declined your location change for booking #{order_id}." + (f" Feedback: {reason}" if reason else ""),
+            "type": "warning",
+            "link": "/orders",
+            "event_key": f"loc_rej_{order_id}_{renter_email}"
+        }
+        lender_notif = {
+            "title": "Location Change Declined ❌",
+            "message": f"You declined the location change for booking #{order_id}.",
+            "type": "info",
+            "link": "/payernt/requests",
+            "event_key": f"loc_rej_{order_id}_{lender_email or lender_account_id}"
+        }
+
+    elif norm_event in ("due_approaching",):
+        renter_notif = {
+            "title": "Rental Due Date Approaching ⏰",
+            "message": f"Your rental #{order_id} for '{prod_title}' is approaching its scheduled return date.",
+            "type": "warning",
+            "link": "/orders",
+            "event_key": f"due_appr_{order_id}_{renter_email}"
+        }
+
+    elif norm_event in ("overdue",):
+        renter_notif = {
+            "title": "Rental Overdue Notice ⚠️",
+            "message": f"Your rental #{order_id} for '{prod_title}' is past its scheduled return time. Please initiate return promptly.",
+            "type": "warning",
+            "link": "/orders",
+            "event_key": f"overdue_{order_id}_{renter_email}"
+        }
+        lender_notif = {
+            "title": "Rental Overdue Alert ⚠️",
+            "message": f"Booking #{order_id} for '{prod_title}' from {renter_name} is past its scheduled return time.",
+            "type": "warning",
+            "link": "/payernt/requests",
+            "event_key": f"overdue_{order_id}_{lender_email or lender_account_id}"
+        }
+
+    # Dispatch to renter
+    if renter_notif and renter_email:
+        results["renter"] = create_notification(
+            email=renter_email,
+            title=renter_notif["title"],
+            message=renter_notif["message"],
+            type=renter_notif["type"],
+            product_name=prod_title,
+            booking_id=order_id,
+            link=renter_notif["link"],
+            event_key=renter_notif["event_key"]
+        )
+
+    # Dispatch to lender
+    target_lender_id = lender_email or lender_account_id
+    if lender_notif and target_lender_id:
+        results["lender"] = create_notification(
+            email=target_lender_id,
+            title=lender_notif["title"],
+            message=lender_notif["message"],
+            type=lender_notif["type"],
+            product_name=prod_title,
+            booking_id=order_id,
+            link=lender_notif["link"],
+            event_key=lender_notif["event_key"]
+        )
+        if lender_account_id and lender_account_id != target_lender_id:
+            try:
+                from payernt_database import add_payernt_notification
+                add_payernt_notification(
+                    owner_id=lender_account_id,
+                    title=lender_notif["title"],
+                    message=lender_notif["message"],
+                    type_=lender_notif["type"],
+                    action_route="requests",
+                    booking_id=order_id,
+                    product_name=prod_title,
+                    event_key=lender_notif["event_key"]
+                )
+            except Exception:
+                pass
+
+    return results
 
 def delete_custom_product(product_id: str, email: str):
     clean_email = (email or "").strip().lower()
