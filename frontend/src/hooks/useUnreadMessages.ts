@@ -70,6 +70,22 @@ export function useUnreadMessages() {
     setToken(currentToken);
     setUnreadCount(_globalUnreadCount);
     _unreadListeners.add(setUnreadCount);
+
+    const pathname = typeof window !== "undefined" ? window.location.pathname : "";
+    const isGatewayOrAuth =
+      pathname === "/" ||
+      pathname === "/select" ||
+      pathname === "/login" ||
+      pathname === "/register" ||
+      pathname === "/otp" ||
+      pathname.startsWith("/account-pending");
+
+    if (isGatewayOrAuth || !currentToken) {
+      return () => {
+        _unreadListeners.delete(setUnreadCount);
+      };
+    }
+
     triggerUnreadFetch(currentToken);
     ensureGlobalPolling(currentToken);
 

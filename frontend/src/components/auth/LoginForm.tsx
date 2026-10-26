@@ -35,52 +35,64 @@ function isValidInternalRedirect(url: string | null | undefined, currentPath: st
 }
 
 export function LoginForm() {
-  const { user, login } = useAuth();
+  const { user, ready, login } = useAuth();
   const navigate = useNavigate();
   const [showPw, setShowPw] = useState(false);
   const [error, setErrorState] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user) {
-      const searchParams =
-        typeof window !== "undefined"
-          ? new URLSearchParams(window.location.search)
-          : null;
-      const redirectUrl =
-        searchParams?.get("redirect") ||
-        searchParams?.get("returnUrl") ||
-        (typeof window !== "undefined"
-          ? localStorage.getItem("pay₹ent_pending_product_redirect")
-          : null);
-      const pendingProductId =
-        typeof window !== "undefined"
-          ? localStorage.getItem("pendingProductId")
-          : null;
-
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("pay₹ent_pending_product_redirect");
-        localStorage.removeItem("pendingProductId");
-      }
-
-      const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
-      const isAdmin = user.role === "admin" || (user as any).role === "superadmin";
-
-      // If user is not admin, prevent redirect to any /admin routes
-      const effectiveRedirect = isValidInternalRedirect(redirectUrl, currentPath)
-        ? (redirectUrl.startsWith("/admin") && !isAdmin ? null : redirectUrl)
+    // Only auto-redirect if auth initialization is ready, user is active with a real token,
+    // and the user did not explicitly sign out
+    const isSignedOut =
+      typeof window !== "undefined" &&
+      localStorage.getItem("payent:signed_out") === "true";
+    const token =
+      typeof window !== "undefined"
+        ? storage.get<string | null>(STORAGE_KEYS.token, null)
         : null;
 
-      if (effectiveRedirect) {
-        navigate({ to: effectiveRedirect as any });
-      } else if (pendingProductId && `/product/${pendingProductId}` !== currentPath) {
-        navigate({ to: `/product/${pendingProductId}` as any });
-      } else if (isAdmin && currentPath !== "/admin/dashboard") {
-        navigate({ to: "/admin/dashboard" });
-      } else if (currentPath !== "/dashboard") {
-        navigate({ to: "/dashboard" });
-      }
+    if (!ready || !user || !token || isSignedOut) {
+      return;
     }
-  }, [user, navigate]);
+
+    const searchParams =
+      typeof window !== "undefined"
+        ? new URLSearchParams(window.location.search)
+        : null;
+    const redirectUrl =
+      searchParams?.get("redirect") ||
+      searchParams?.get("returnUrl") ||
+      (typeof window !== "undefined"
+        ? localStorage.getItem("pay₹ent_pending_product_redirect")
+        : null);
+    const pendingProductId =
+      typeof window !== "undefined"
+        ? localStorage.getItem("pendingProductId")
+        : null;
+
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("pay₹ent_pending_product_redirect");
+      localStorage.removeItem("pendingProductId");
+    }
+
+    const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
+    const isAdmin = user.role === "admin" || (user as any).role === "superadmin";
+
+    // If user is not admin, prevent redirect to any /admin routes
+    const effectiveRedirect = isValidInternalRedirect(redirectUrl, currentPath)
+      ? (redirectUrl.startsWith("/admin") && !isAdmin ? null : redirectUrl)
+      : null;
+
+    if (effectiveRedirect) {
+      navigate({ to: effectiveRedirect as any });
+    } else if (pendingProductId && `/product/${pendingProductId}` !== currentPath) {
+      navigate({ to: `/product/${pendingProductId}` as any });
+    } else if (isAdmin && currentPath !== "/admin/dashboard") {
+      navigate({ to: "/admin/dashboard" });
+    } else if (currentPath !== "/dashboard") {
+      navigate({ to: "/dashboard" });
+    }
+  }, [ready, user, navigate]);
 
   const {
     register,

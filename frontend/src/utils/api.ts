@@ -59,6 +59,41 @@ function parseApiError(data: unknown, fallback: string): string {
   return fallback;
 }
 
+export async function fetchWithTimeout(
+  url: string,
+  options: RequestInit & { timeoutMs?: number } = {},
+  defaultTimeoutMs = 8000
+): Promise<Response> {
+  const timeoutMs = options.timeoutMs ?? defaultTimeoutMs;
+  const controller = new AbortController();
+  let isTimeout = false;
+  const timer = setTimeout(() => {
+    isTimeout = true;
+    controller.abort();
+  }, timeoutMs);
+
+  if (options.signal) {
+    options.signal.addEventListener("abort", () => controller.abort());
+  }
+
+  const { timeoutMs: _, ...cleanOptions } = options;
+
+  try {
+    return await fetch(url, { ...cleanOptions, signal: controller.signal });
+  } catch (err: unknown) {
+    const e = err as { name?: string; message?: string };
+    if (isTimeout || e?.name === "AbortError") {
+      const timeoutErr = new Error(`Request to ${url} timed out after ${timeoutMs}ms`);
+      (timeoutErr as any).name = "TimeoutError";
+      (timeoutErr as any).isTimeout = true;
+      throw timeoutErr;
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 let _lastSessionExpiredTime = 0;
 export function handleSessionExpiration(loginPath = "/login") {
   storage.remove(STORAGE_KEYS.token);
@@ -614,18 +649,17 @@ export const api = {
     return getCachedOrFetch<User | null>(
       `auth_profile_token_${token.slice(-16)}`,
       async () => {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 6000);
-
         try {
-          const res = await fetch(`${API_BASE}/api/me`, {
-            method: "GET",
-            headers: {
-              Authorization: `Bearer ${token}`,
+          const res = await fetchWithTimeout(
+            `${API_BASE}/api/me`,
+            {
+              method: "GET",
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
             },
-            signal: controller.signal,
-          });
-          clearTimeout(timeoutId);
+            8000
+          );
 
           if (!res.ok) {
             if (res.status === 401 && typeof window !== "undefined") {
@@ -642,12 +676,13 @@ export const api = {
           }
           return await res.json();
         } catch (err: unknown) {
-          clearTimeout(timeoutId);
-          const e = err as { name?: string; message?: string };
+          const e = err as { name?: string; message?: string; isTimeout?: boolean };
           if (
             e?.name === "AbortError" ||
+            e?.name === "TimeoutError" ||
+            e?.isTimeout ||
             e?.message?.includes("aborted") ||
-            e?.message?.includes("signal is aborted")
+            e?.message?.includes("timed out")
           ) {
             const cached = storage.get<User | null>(STORAGE_KEYS.currentUser, null);
             if (cached) return cached;
@@ -806,7 +841,7 @@ export const api = {
 
   async fetchWithAuth(
     url: string,
-    options: RequestInit = {},
+    options: RequestInit & { timeoutMs?: number } = {},
   ): Promise<Response> {
     const token = storage.get<string | null>(STORAGE_KEYS.token, null);
     const refreshToken = storage.get<string | null>(STORAGE_KEYS.refreshToken, null);
@@ -822,7 +857,8 @@ export const api = {
     }
     options.headers = headers;
 
-    let res = await fetch(url, options);
+    const timeout = options.timeoutMs ?? 8000;
+    let res = await fetchWithTimeout(url, options, timeout);
 
     if (
       res.status === 401 &&
@@ -834,7 +870,7 @@ export const api = {
         const retryHeaders = new Headers(options.headers || {});
         retryHeaders.set("Authorization", `Bearer ${newToken}`);
         options.headers = retryHeaders;
-        res = await fetch(url, options);
+        res = await fetchWithTimeout(url, options, timeout);
       } else {
         handleSessionExpiration();
       }
@@ -848,15 +884,19 @@ export const api = {
         STORAGE_KEYS.refreshToken,
         null,
       );
-      await fetch(`${API_BASE}/api/auth/logout`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+      await fetchWithTimeout(
+        `${API_BASE}/api/auth/logout`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          credentials: "include",
+          body: JSON.stringify({ refresh_token: currentRefreshToken }),
         },
-        credentials: "include",
-        body: JSON.stringify({ refresh_token: currentRefreshToken }),
-      }).catch(() => {});
+        3000
+      ).catch(() => {});
     } finally {
       this.clearUserCache();
       storage.remove(STORAGE_KEYS.token);
@@ -867,13 +907,17 @@ export const api = {
 
   async logoutAll(token: string) {
     try {
-      await fetch(`${API_BASE}/api/auth/logout-all`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
+      await fetchWithTimeout(
+        `${API_BASE}/api/auth/logout-all`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          credentials: "include",
         },
-        credentials: "include",
-      });
+        3000
+      ).catch(() => {});
     } finally {
       this.clearUserCache();
       storage.remove(STORAGE_KEYS.token);
@@ -1380,9 +1424,11 @@ export const api = {
         let items: Product[] = [];
         if (API_BASE) {
           try {
-            const res = await fetch(`${API_BASE}/api/products/custom/public`, {
-              method: "GET",
-            });
+            const res = await fetchWithTimeout(
+              `${API_BASE}/api/products/custom/public`,
+              { method: "GET" },
+              8000
+            );
             if (res.ok) {
               const json = await res.json();
               if (Array.isArray(json)) {
@@ -1430,7 +1476,7 @@ export const api = {
       "public_categories",
       async () => {
         try {
-          const res = await fetch(`${API_BASE}/api/categories/public`);
+          const res = await fetchWithTimeout(`${API_BASE}/api/categories/public`, {}, 8000);
           if (!res.ok) return null;
           return await res.json();
         } catch {
@@ -1559,7 +1605,7 @@ export const api = {
       "public_stats",
       async () => {
         try {
-          const res = await fetch(`${API_BASE}/api/stats/public`);
+          const res = await fetchWithTimeout(`${API_BASE}/api/stats/public`, {}, 8000);
           if (res.ok) {
             return await res.json();
           }
@@ -1928,7 +1974,7 @@ export const api = {
   async getSearchStats() {
     if (!API_BASE) return null;
     try {
-      const res = await fetch(`${API_BASE}/api/search/stats`);
+      const res = await fetchWithTimeout(`${API_BASE}/api/search/stats`, {}, 5000);
       if (!res.ok) return null;
       return await res.json();
     } catch {

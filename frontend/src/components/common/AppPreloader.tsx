@@ -37,11 +37,24 @@ export function AppPreloader({
   // Translation delta from viewport center to navbar target
   const [delta, setDelta] = useState({ x: -200, y: -300 });
 
-  // Check if session has already seen the preloader
+  // Check if session has already seen the preloader or is on an auth route
   useEffect(() => {
     setMounted(true);
     let hasSeen = false;
     try {
+      const pathname = typeof window !== "undefined" ? window.location.pathname : "";
+      const isAuthRoute =
+        pathname === "/login" ||
+        pathname === "/register" ||
+        pathname === "/otp" ||
+        pathname.startsWith("/account-pending") ||
+        pathname.startsWith("/forgot-password") ||
+        pathname.startsWith("/reset-password");
+      if (isAuthRoute) {
+        if (onComplete) onComplete();
+        return;
+      }
+
       // Check query param ?preload=true for instant replay testing
       const urlParams = new URLSearchParams(window.location.search);
       const replay = urlParams.get("preload") === "true";

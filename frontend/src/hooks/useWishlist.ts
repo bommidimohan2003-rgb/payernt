@@ -56,6 +56,23 @@ export function useWishlist() {
       };
     }
 
+    const pathname = typeof window !== "undefined" ? window.location.pathname : "";
+    const isGatewayOrAuth =
+      pathname === "/" ||
+      pathname === "/select" ||
+      pathname === "/login" ||
+      pathname === "/register" ||
+      pathname === "/otp" ||
+      pathname.startsWith("/account-pending") ||
+      pathname.startsWith("/payernt") ||
+      pathname.startsWith("/paye₹nt");
+
+    if (isGatewayOrAuth) {
+      return () => {
+        _wishlistListeners.delete(setIds);
+      };
+    }
+
     fetchWishlistDeduplicated(currentToken);
 
     return () => {

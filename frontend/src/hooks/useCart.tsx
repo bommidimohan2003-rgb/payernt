@@ -9,6 +9,7 @@ import React, {
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/utils/api";
 import { useAuth } from "@/hooks/useAuth";
+import { storage, STORAGE_KEYS } from "@/utils/storage";
 import { toast } from "sonner";
 import type { CartItem, CartResponse } from "@/types";
 
@@ -44,6 +45,25 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const closeCart = useCallback(() => setIsCartOpen(false), []);
   const toggleCart = useCallback(() => setIsCartOpen((prev) => !prev), []);
 
+  const isCartEnabled = useMemo(() => {
+    if (!user) return false;
+    if (typeof window === "undefined") return false;
+    const token = storage.get<string | null>(STORAGE_KEYS.token, null);
+    if (!token) return false;
+    const pathname = window.location.pathname;
+    const isGatewayOrAuth =
+      pathname === "/" ||
+      pathname === "/select" ||
+      pathname === "/login" ||
+      pathname === "/register" ||
+      pathname === "/otp" ||
+      pathname.startsWith("/account-pending") ||
+      pathname.startsWith("/payernt") ||
+      pathname.startsWith("/paye₹nt") ||
+      pathname.startsWith("/admin");
+    return !isGatewayOrAuth || isCartOpen;
+  }, [user, isCartOpen]);
+
   const {
     data: cartData,
     isLoading,
@@ -61,7 +81,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         return { items: [], count: 0, subtotal: 0, tax: 0, total: 0 };
       }
     },
-    enabled: !!user,
+    enabled: isCartEnabled,
     staleTime: 1000 * 30,
   });
 

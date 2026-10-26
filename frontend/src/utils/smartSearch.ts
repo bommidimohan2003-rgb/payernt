@@ -2,6 +2,7 @@ import type { Product } from "@/types";
 import { advancedSearch } from "./searchEngine";
 import { getSessionId } from "./eventTracker";
 import { storage, STORAGE_KEYS } from "./storage";
+import { fetchWithTimeout } from "./api";
 
 export interface MLSearchResult {
   results: Product[];
@@ -142,7 +143,7 @@ export async function searchWithML(
  */
 export async function getSearchStats(): Promise<SearchStats> {
   try {
-    const res = await fetch(`${API_BASE}/api/search/stats`);
+    const res = await fetchWithTimeout(`${API_BASE}/api/search/stats`, {}, 5000);
     if (res.ok) {
       const data = await res.json();
       return {

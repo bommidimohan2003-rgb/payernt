@@ -84,18 +84,30 @@ export function useAuth() {
   useEffect(() => {
     let isMounted = true;
     const initAuth = async () => {
+      const isSignedOut =
+        typeof window !== "undefined" &&
+        localStorage.getItem("payent:signed_out") === "true";
+      const token = storage.get<string | null>(STORAGE_KEYS.token, null);
+
+      if (isSignedOut || !token) {
+        if (isMounted) {
+          setUser(null);
+          setReady(true);
+        }
+        return;
+      }
+
       const cachedUser = storage.get<User | null>(
         STORAGE_KEYS.currentUser,
         null,
       );
-      const token = storage.get<string | null>(STORAGE_KEYS.token, null);
 
       if (isMounted) {
         setUser(cachedUser);
         setReady(true);
       }
 
-      if (token && token !== "payent-active-session-token" && cachedUser) {
+      if (token !== "payent-active-session-token") {
         const synced = await fetchAuthProfile(token, cachedUser);
         if (isMounted) {
           setUser(synced);
@@ -106,7 +118,15 @@ export function useAuth() {
     initAuth();
 
     const onStorage = () => {
-      setUser(storage.get<User | null>(STORAGE_KEYS.currentUser, null));
+      const isSignedOut =
+        typeof window !== "undefined" &&
+        localStorage.getItem("payent:signed_out") === "true";
+      const token = storage.get<string | null>(STORAGE_KEYS.token, null);
+      if (isSignedOut || !token) {
+        setUser(null);
+      } else {
+        setUser(storage.get<User | null>(STORAGE_KEYS.currentUser, null));
+      }
     };
 
     const onSessionExpired = () => {

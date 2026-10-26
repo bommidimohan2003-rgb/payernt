@@ -493,7 +493,8 @@ export function usePayerntStore() {
           errLower.includes("session expired") ||
           errLower.includes("authorization")
         ) {
-          logout();
+          setActiveAccount(null);
+          setIsLoadingDashboard(false);
           return;
         }
         setDashboardError(errorStr);

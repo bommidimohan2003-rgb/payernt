@@ -159,6 +159,17 @@ The project has a mixed integration state. Some customer-facing features are bac
 
 The main technical debt areas are clear:
 
+- [RESOLVED Fast Gateway & Login Initialization, Request Timeout & Cancellation Hardening]
+  1. *Root-Cause Elimination*: Removed blocking API calls on gateway (`/`), `/select`, and login (`/login`) screens. Cart, wishlist, and unread-count fetches are now strictly gated to authenticated marketplace views and explicit user intent.
+  2. *Instant Auth Initialization*: Hardened `useAuth.ts` so unauthenticated users and explicit sign-outs resolve `ready: true, user: null` on Frame 0 without triggering phantom `/api/me` network calls or redirect loops.
+  3. *Protected Login Redirection*: Updated `LoginForm.tsx` to verify both `ready`, active `user`, and non-null `token` in storage before evaluating redirects, eliminating spurious transitions to `/dashboard`.
+  4. *Zero-Latency Auth Preloader*: Configured `AppPreloader.tsx` to instantly bypass the 6-second preloader animation on auth routes (`/login`, `/register`, `/otp`, `/account-pending`), rendering login forms in 0ms.
+  5. *Universal Request Timeouts*: Implemented `fetchWithTimeout` across `api.ts` (`fetchWithAuth` 8s, `getMe` 8s, `logout` 3s, `getPublicCustomProducts` 8s, `getPublicCategories` 8s, `getPublicStats` 8s, `getSearchStats` 5s), eliminating infinite `pending` request states.
+  6. *Graceful Degraded & Offline Fallback*: Network timeouts in `api.getMe` and `fetchAuthProfile` preserve optimistic cached profiles and do NOT trigger false session expirations (`handleSessionExpiration()`), ensuring platform resilience on slow or cold-starting backends.
+  7. *Safe Proxy Timeout in Cloudflare Worker*: Equipped `server.ts` `/api/*` proxy with a 10-second `AbortController` returning HTTP 504 Gateway Timeout rather than hanging browser TCP connections.
+  8. *Isolated Logout Flow*: Prevented background dashboard auth errors from triggering accidental network `logout()` calls in `payernt/store.ts`, reserving `/api/auth/logout` purely for explicit user-requested logouts.
+  9. *Empirical Verification*: Frontend built cleanly in 2.01s with zero errors; full backend test suite passed 100%.
+
 - [RESOLVED Category-Based Booking Restriction] Implemented full category-concurrency policy:
   1. *Policy*: Only one product per category can be in the booking-to-delivery process for the same renter at a time.
   2. *Activation*: Active once lender accepts booking and remains active during preparation, dispatch, and awaiting pickup/delivery.

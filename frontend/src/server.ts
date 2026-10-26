@@ -100,10 +100,14 @@ export default {
       proxyHeaders.set("X-Forwarded-Proto", url.protocol.replace(":", ""));
 
       try {
+        const proxyController = new AbortController();
+        const proxyTimer = setTimeout(() => proxyController.abort(), 10000);
+
         const fetchInit: RequestInit & { duplex?: string } = {
           method: request.method,
           headers: proxyHeaders,
           redirect: "follow",
+          signal: proxyController.signal,
         };
 
         if (request.method !== "GET" && request.method !== "HEAD") {
@@ -111,7 +115,12 @@ export default {
           fetchInit.duplex = "half";
         }
 
-        const backendResponse = await fetch(targetUrl.toString(), fetchInit);
+        let backendResponse: Response;
+        try {
+          backendResponse = await fetch(targetUrl.toString(), fetchInit);
+        } finally {
+          clearTimeout(proxyTimer);
+        }
 
         const resHeaders = new Headers(backendResponse.headers);
         const origin = request.headers.get("Origin");
@@ -126,14 +135,17 @@ export default {
           headers: resHeaders,
         });
       } catch (err: any) {
+        const isTimeout = err?.name === "AbortError" || String(err?.message || "").includes("aborted");
         console.error("Cloudflare Worker /api proxy error:", err);
         return new Response(
           JSON.stringify({
-            error: "Gateway Proxy Error",
-            detail: err?.message || String(err),
+            error: isTimeout ? "Gateway Timeout" : "Gateway Proxy Error",
+            detail: isTimeout
+              ? "Upstream backend did not respond within 10 seconds."
+              : err?.message || String(err),
           }),
           {
-            status: 502,
+            status: isTimeout ? 504 : 502,
             headers: { "Content-Type": "application/json" },
           }
         );
