@@ -1506,7 +1506,6 @@ export function ListProductWizard({
         unavailableDates,
         bufferDaysBetweenRentals: bufferDays,
       },
-      blocked_dates: unavailableDates,
       blockedDates: unavailableDates,
       verificationDocs: {
         ownerFullName: ownerName,

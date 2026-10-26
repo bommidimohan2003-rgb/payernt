@@ -23,6 +23,7 @@ export function PhotoDetailViewer({
   const [transformStyle, setTransformStyle] = useState("");
   const [shadowStyle, setShadowStyle] = useState("");
   const [isDisabled, setIsDisabled] = useState(false);
+  const [imageErrorMap, setImageErrorMap] = useState<Record<string, boolean>>({});
   const containerRef = useRef<HTMLDivElement>(null);
 
   const imagesList = angles && angles.length > 0 ? angles : (primaryImage ? [primaryImage] : []);
@@ -111,19 +112,40 @@ export function PhotoDetailViewer({
           </div>
         ) : (
           <>
-            {/* Real Product Photo */}
-            <img
-              key={activeSrc}
-              src={getOptimizedImageUrl(activeSrc, 'detail') || activeSrc}
-              srcSet={getResponsiveImageSrcSet(activeSrc, [480, 768, 1024, 1200]) || undefined}
-              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 60vw, 800px"
-              alt={productTitle}
-              fetchPriority="high"
-              decoding="async"
-              width={800}
-              height={600}
-              className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
-            />
+            {/* Real Product Photo with Safe Fallback */}
+            {!activeSrc || activeSrc.trim() === "" || activeSrc === "/placeholder.png" || imageErrorMap[activeSrc] ? (
+              <div className="h-full w-full flex flex-col items-center justify-center bg-gradient-to-br from-secondary/60 via-card to-secondary/30 p-8 text-center select-none relative overflow-hidden">
+                <div className="absolute -top-24 -right-24 w-72 h-72 rounded-full bg-primary/10 blur-3xl pointer-events-none" />
+                <div className="absolute -bottom-24 -left-24 w-72 h-72 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
+                <div className="relative z-10 space-y-3 max-w-sm flex flex-col items-center">
+                  <div className="h-20 w-20 rounded-3xl bg-secondary/80 border border-border flex items-center justify-center shadow-lg text-primary">
+                    <ImageIcon className="h-10 w-10 stroke-[1.5]" />
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="font-bold text-base text-foreground line-clamp-1">{productTitle}</h3>
+                    <p className="text-xs text-muted-foreground">Verified equipment asset preview</p>
+                  </div>
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-[10px] font-bold border border-primary/20">
+                    <Sparkles className="h-3 w-3" />
+                    <span>Payent Verified Listing</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <img
+                key={activeSrc}
+                src={getOptimizedImageUrl(activeSrc, 'detail') || activeSrc}
+                srcSet={getResponsiveImageSrcSet(activeSrc, [480, 768, 1024, 1200]) || undefined}
+                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 60vw, 800px"
+                alt={productTitle}
+                fetchPriority="high"
+                decoding="async"
+                width={800}
+                height={600}
+                onError={() => setImageErrorMap(prev => ({ ...prev, [activeSrc]: true }))}
+                className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
+              />
+            )}
 
             {/* Left / Right Chevron Controls (If Multiple Images) */}
             {imagesList.length > 1 && (
@@ -194,19 +216,24 @@ export function PhotoDetailViewer({
                 setActiveAngleIndex(idx);
               }}
               className={cn(
-                "relative aspect-square w-16 sm:w-20 rounded-2xl overflow-hidden border-2 transition-all spatial-surface cursor-pointer bg-card shrink-0",
+                "relative aspect-square w-16 sm:w-20 rounded-2xl overflow-hidden border-2 transition-all spatial-surface cursor-pointer bg-card shrink-0 flex items-center justify-center",
                 !isVideoActive && activeAngleIndex === idx
                   ? "border-primary ring-2 ring-primary/30 scale-105 opacity-100 shadow-md"
                   : "border-border/40 opacity-75 hover:opacity-100 hover:border-primary/50",
               )}
             >
-              <img
-                src={getOptimizedImageUrl(src, 'thumb') || src}
-                alt={`Photo ${idx + 1}`}
-                loading="lazy"
-                decoding="async"
-                className="h-full w-full object-cover"
-              />
+              {!src || src.trim() === "" || imageErrorMap[src] ? (
+                <ImageIcon className="h-6 w-6 text-muted-foreground/60" />
+              ) : (
+                <img
+                  src={getOptimizedImageUrl(src, 'thumb') || src}
+                  alt={`Photo ${idx + 1}`}
+                  loading="lazy"
+                  decoding="async"
+                  onError={() => setImageErrorMap(prev => ({ ...prev, [src]: true }))}
+                  className="h-full w-full object-cover"
+                />
+              )}
               <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded-md bg-black/70 text-white text-[9px] font-bold">
                 #{idx + 1}
               </span>
