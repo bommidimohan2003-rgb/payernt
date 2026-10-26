@@ -900,6 +900,7 @@ export function RentalRequests({
 
                     {/* Live Rental Queue with 8 Milestones, Persistent Timer & Lender Actions */}
                     <LiveRentalQueue
+                      key={`request-queue-${req.id}`}
                       orderId={req.id}
                       currentStatus={req.status}
                       role="lender"

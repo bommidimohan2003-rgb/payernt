@@ -19,6 +19,7 @@ import {
   XCircle,
   Ban,
   Calendar,
+  ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/utils/api";
@@ -345,6 +346,11 @@ export function LiveRentalQueue({
   });
   const [isAdvancing, setIsAdvancing] = useState<boolean>(false);
   const [isExpanded, setIsExpanded] = useState<boolean>(!compact);
+
+  // Synchronize expansion state if orderId or compact prop changes
+  useEffect(() => {
+    setIsExpanded(!compact);
+  }, [orderId, compact]);
 
   // Exact authoritative booking creation timestamp
   const actualBookingCreatedAt =
@@ -711,16 +717,30 @@ export function LiveRentalQueue({
             </span>
           )}
           <button
-            onClick={() => setIsExpanded(!isExpanded)}
-            className="text-xs font-semibold text-neutral-500 dark:text-[#A1A1AA] hover:text-neutral-900 dark:hover:text-white px-2 py-1 rounded-lg hover:bg-neutral-100 dark:hover:bg-white/5 cursor-pointer transition-colors"
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsExpanded((prev) => !prev);
+            }}
+            aria-expanded={isExpanded}
+            aria-label={isExpanded ? "Collapse Live Rental Queue" : "Expand Live Rental Queue"}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border border-black/10 dark:border-white/10 bg-neutral-100 dark:bg-white/10 hover:bg-neutral-200 dark:hover:bg-white/15 text-neutral-800 dark:text-[#F5F5F5] shrink-0 shadow-2xs"
           >
-            {isExpanded ? "Collapse" : "Details"}
+            <span>{isExpanded ? "Collapse" : "Expand"}</span>
+            <ChevronDown
+              className={`h-3.5 w-3.5 transition-transform duration-200 shrink-0 ${
+                isExpanded ? "rotate-180" : ""
+              }`}
+            />
           </button>
         </div>
       </div>
 
-      {/* Prominent Cancellation Status Banner */}
-      {isCancelled && (
+      {/* 2. Collapsible Details Container: Cancellation Banner, Timer HUD, Action Buttons, and Milestones */}
+      {isExpanded && (
+        <div className="space-y-4 pt-3 border-t border-black/5 dark:border-white/5 transition-all">
+          {/* Prominent Cancellation Status Banner */}
+          {isCancelled && (
         <div className="rounded-xl border border-red-500/25 bg-red-50/80 dark:bg-red-950/20 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
           <div className="flex items-start sm:items-center gap-2.5">
             <div className="h-8 w-8 rounded-lg bg-red-500/15 text-red-600 dark:text-red-400 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
@@ -985,8 +1005,7 @@ export function LiveRentalQueue({
       </div>
 
       {/* 3. 8-MILESTONE PROGRESS TRACKER */}
-      {isExpanded && (
-        <div className="space-y-4 pt-1">
+      <div className="space-y-4 pt-1">
           {/* Desktop/Tablet Horizontal Rail */}
           <div className="hidden lg:grid grid-cols-8 gap-2 relative">
             {milestones.map((m, idx) => {
@@ -1107,6 +1126,7 @@ export function LiveRentalQueue({
             })}
           </div>
         </div>
+      </div>
       )}
     </div>
   );

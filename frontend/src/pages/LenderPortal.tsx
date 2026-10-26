@@ -462,6 +462,7 @@ export default function LenderPortal() {
                         {/* Live Rental Queue with 8 milestones and synchronized persistent timer */}
                         <div className="w-full pt-3 border-t border-border">
                           <LiveRentalQueue
+                            key={`lender-queue-${booking.id}`}
                             orderId={booking.id}
                             currentStatus={booking.status}
                             role="lender"

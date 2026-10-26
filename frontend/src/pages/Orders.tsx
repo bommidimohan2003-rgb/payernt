@@ -857,6 +857,7 @@ export default function Orders() {
                   </h3>
 
                   <LiveRentalQueue
+                    key={`queue-order-${selectedOrder.id}`}
                     orderId={selectedOrder.id}
                     currentStatus={selectedOrder.status}
                     role="renter"

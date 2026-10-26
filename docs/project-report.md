@@ -1203,6 +1203,31 @@ Safely migrated `orders` and `deliveries` tables in `backend/database.py` with b
 - `POST /api/payernt/bookings/{id}/location-change/reject` & `POST /api/orders/{id}/location-change/reject`: Rejects change request with feedback; preserves original location.
 - `GET /api/payernt/bookings`: Maps and returns all location fields and map links for lender portal requests.
 
+---
 
+## 20. Live Rental Queue Expand/Collapse & View State Isolation
 
+**Status**: COMPLETED & VERIFIED  
+**Date**: October 26, 2026  
+**Frontend Compilation**: `npm run build` (0 errors, 100% clean)
 
+### 1. Root Cause Analysis
+- **Uncontained Milestone & HUD Layout**: Previously, the Live Rental Queue's cancellation status banner, action buttons, and countdown timer were rendered outside the collapsible state container, meaning partial details remained visible even when collapsed.
+- **Button Event Bubbling**: The expand/collapse button lacked `e.stopPropagation()`, causing parent click events on expandable booking cards to trigger conflicting toggles.
+- **Key Collisions & State Desynchronization**: Missing or generic React component keys caused instances of `LiveRentalQueue` across multiple bookings in `Dashboard.tsx`, `Orders.tsx`, `LenderPortal.tsx`, and `RentalRequests.tsx` to share or carry over expand/collapse state when filtering or re-rendering.
+
+### 2. Implemented Fixes
+1. **Contained Expand/Collapse Rendering**:
+   - Wrapped the cancellation banner, timer HUD, milestone action controls, and 8-milestone tracker in a single collapsible container controlled by `isExpanded`.
+   - When collapsed, all milestones, timer HUD, and action buttons are cleanly hidden.
+   - When expanded, all permitted milestone stages, action buttons, and rental countdowns display with full responsive spacing.
+2. **Explicit Button Controls & Accessibility**:
+   - Updated button to explicitly use `type="button"`, `aria-expanded={isExpanded}`, and an animated `ChevronDown` indicator.
+   - Stopped click propagation to avoid parent card toggle collisions.
+   - Dynamic label accurately indicates `Expand` or `Collapse`.
+3. **Synchronized State & React Key Isolation**:
+   - Added `useEffect` in `LiveRentalQueue` to synchronize `isExpanded` when `orderId` or `compact` prop updates.
+   - Assigned stable, unique React keys across all consumer views (`dashboard-queue-${o.id}`, `queue-order-${selectedOrder.id}`, `lender-queue-${booking.id}`, `request-queue-${req.id}`) ensuring independent state management across multiple bookings.
+4. **Behavior Preservation**:
+   - Kept authoritative booking creation timestamp display ("Booked On: DD-MM-YYYY, HH:MM AM/PM") intact in both collapsed header and expanded details.
+   - Maintained all existing cancellation safeguards and timer freeze logic.

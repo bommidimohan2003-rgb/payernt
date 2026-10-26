@@ -521,6 +521,7 @@ export default function Dashboard() {
                       {o.status !== "cancelled" && (
                         <div className="pt-2">
                           <LiveRentalQueue
+                            key={`dashboard-queue-${o.id}`}
                             orderId={o.id}
                             currentStatus={o.status}
                             role="renter"
@@ -535,6 +536,8 @@ export default function Dashboard() {
                             handedBackAt={o.handedBackAt || o.handed_back_at}
                             awaitingInspectionAt={o.awaitingInspectionAt || o.awaiting_inspection_at}
                             completedAt={o.completedAt || o.completed_at}
+                            cancelledAt={(o as any).cancelledAt || (o as any).cancelled_at}
+                            cancellationReason={(o as any).cancellationReason || (o as any).cancellation_reason}
                             queueNotes={o.queueNotes || (o as any).queue_notes}
                             onStatusUpdated={(newStatus, updatedTimestamps) => {
                               setOrders((prev) =>
