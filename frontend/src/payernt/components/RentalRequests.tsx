@@ -763,6 +763,8 @@ export function RentalRequests({
                     handedBackAt={req.handedBackAt}
                     awaitingInspectionAt={req.awaitingInspectionAt}
                     completedAt={req.completedAt}
+                    cancelledAt={(req as any).cancelledAt || (req as any).cancelled_at}
+                    cancellationReason={(req as any).cancellationReason || (req as any).cancellation_reason}
                     queueNotes={req.queueNotes}
                     onStatusUpdated={(newStatus) => {
                       onAdvanceLifecycle(req.id, newStatus as any);

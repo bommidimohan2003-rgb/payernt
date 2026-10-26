@@ -150,6 +150,12 @@ export interface Order {
   awaiting_inspection_at?: string;
   completedAt?: string;
   completed_at?: string;
+  cancelledAt?: string;
+  cancelled_at?: string;
+  cancellationReason?: string;
+  cancellation_reason?: string;
+  cancelledBy?: string;
+  cancelled_by?: string;
   queueNotes?: string;
   queue_notes?: string;
   deliveryMethod?: "delivery" | "pickup" | "custom" | string;
