@@ -80,6 +80,7 @@ import razorpay
 
 from database import (
     init_db,
+    prewarm_db_pool,
     get_user,
     get_user_by_phone,
     get_user_by_aadhaar,
@@ -272,7 +273,8 @@ from contextlib import asynccontextmanager
 def _async_startup_tasks():
     try:
         init_db()
-        logger.info("MySQL database initialized successfully.")
+        prewarm_db_pool(5)
+        logger.info("MySQL database initialized and connection pool pre-warmed successfully.")
     except Exception as e:
         logger.error(f"Could not initialize MySQL database at startup: {e}")
 
@@ -3023,6 +3025,12 @@ def get_order_details(id: str, email: str = Depends(get_current_any_user_email))
         "handedBackAt": order.get("handed_back_at") or order.get("handedBackAt"),
         "awaitingInspectionAt": order.get("awaiting_inspection_at") or order.get("awaitingInspectionAt"),
         "completedAt": order.get("completed_at") or order.get("completedAt"),
+        "cancelledAt": order.get("cancelled_at") or order.get("cancelledAt"),
+        "cancelled_at": order.get("cancelled_at") or order.get("cancelledAt"),
+        "cancellationReason": order.get("cancellation_reason") or order.get("cancellationReason"),
+        "cancellation_reason": order.get("cancellation_reason") or order.get("cancellationReason"),
+        "cancelledBy": order.get("cancelled_by") or order.get("cancelledBy"),
+        "cancelled_by": order.get("cancelled_by") or order.get("cancelledBy"),
         "queueNotes": order.get("queue_notes") or order.get("queueNotes"),
         "category": order.get("category") or get_product_category(pid),
         "deliveryMethod": del_method,
@@ -3197,6 +3205,11 @@ def _execute_queue_milestone_transition(
     norm_m = milestone.strip().lower()
     order, cust_email, lender_email, is_renter, is_lender, is_admin = _get_order_and_check_access(order_id, caller_email)
     current_status = str(order.get("status") or "").lower()
+    if current_status in ("cancelled", "canceled"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Booking #{order_id} is cancelled. Active rental queue workflows and milestone transitions are stopped."
+        )
     now_iso = dt.now(timezone.utc).isoformat()
     ts_updates = {}
 
@@ -5101,6 +5114,8 @@ def fetch_lender_orders(email: str = Depends(get_current_any_user_email)):
                             "handedBackAt": r.get("handed_back_at") or r.get("handedBackAt"),
                             "awaitingInspectionAt": r.get("awaiting_inspection_at") or r.get("awaitingInspectionAt"),
                             "completedAt": r.get("completed_at") or r.get("completedAt"),
+                            "cancelledAt": r.get("cancelled_at") or r.get("cancelledAt"),
+                            "cancellationReason": r.get("cancellation_reason") or r.get("cancellationReason"),
                             "queueNotes": r.get("queue_notes") or r.get("queueNotes"),
                             "timeSlot": r.get("time_slot") or r.get("timeSlot") or "full_day",
                             "renter": {
@@ -5151,6 +5166,8 @@ def fetch_lender_orders(email: str = Depends(get_current_any_user_email)):
                 "handedBackAt": o.get("handed_back_at") or o.get("handedBackAt"),
                 "awaitingInspectionAt": o.get("awaiting_inspection_at") or o.get("awaitingInspectionAt"),
                 "completedAt": o.get("completed_at") or o.get("completedAt"),
+                "cancelledAt": o.get("cancelled_at") or o.get("cancelledAt"),
+                "cancellationReason": o.get("cancellation_reason") or o.get("cancellationReason"),
                 "queueNotes": o.get("queue_notes") or o.get("queueNotes"),
                 "timeSlot": o.get("time_slot") or o.get("timeSlot") or "full_day",
                 "renter": {
@@ -10302,7 +10319,9 @@ def admin_assign_delivery(id: str, payload: AdminAssignDeliveryPayload, current_
 
 @app.post("/api/admin/bookings/{id}/cancel")
 def admin_cancel_booking(id: str, current_admin: dict = Depends(check_admin_user)):
-    execute_query("UPDATE orders SET status = 'cancelled' WHERE id = %s", (id,))
+    cancel_order(id)
+    now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    execute_query("UPDATE orders SET status = 'cancelled', cancelled_at = %s, cancelled_by = 'ADMIN' WHERE id = %s", (now_str, id))
     
     # Log action
     now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()

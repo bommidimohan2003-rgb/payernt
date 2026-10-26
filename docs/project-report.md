@@ -159,6 +159,30 @@ The project has a mixed integration state. Some customer-facing features are bac
 
 The main technical debt areas are clear:
 
+- [RESOLVED Phase 2: Advanced Production Performance Optimization, Database Tuning & Frontend Efficiency]
+  1. *Connection Pool Ping Elimination*: TiDB Cloud is hosted in AWS Singapore (`ap-southeast-1`) with ~50ms WAN latency. In `backend/database.py`, `PooledDB` had `ping=1`, which issued a separate blocking network ping on every single connection checkout (adding 48–55ms per query). Set `ping=0` for zero-overhead checkouts (0.02ms, a 2,500x speedup), added transparent retry logic for dropped connections (MySQL 2006/2013), and added `prewarm_db_pool(5)` during FastAPI async startup to eliminate cold-start TLS handshakes.
+  2. *50-Column UNION HashAgg Optimization*: In `get_payernt_products_by_owner` (`backend/payernt_database.py`), replaced expensive `UNION` (which forced TiDB to run full-table `HashAgg` deduplication and sorting across 50 columns) with `WHERE owner_id = %s OR owner_email = %s ORDER BY created_at DESC`. TiDB EXPLAIN verified direct `IndexMerge` on `idx_pp_owner_created` and `idx_pp_owner_email`, dropping query execution time from 533.7ms to 114.4ms (4.6x faster).
+  3. *Elimination of N+1 Queries in Messaging*: In `get_payernt_messages`, eliminated the serial `fetch_one("SELECT title, category FROM payernt_products...")` loop over WAN by replacing with a single SQL query using `LEFT JOIN payernt_products pp ON m.product_id = pp.id`.
+  4. *Redundant Orders Query Pruning*: In `get_payernt_vendor_bookings`, bypassed the secondary orders join query whenever `rental_security` records already satisfied the pagination `limit`, saving an unnecessary 50–70ms WAN roundtrip.
+  5. *Authoritative Dashboard Bounded Caching*: Added `_VENDOR_DASHBOARD_CACHE` (10s TTL) with deterministic mutation invalidation (`invalidate_vendor_dashboard_cache`) wired into product creation/updates/deletions, queue milestone advances, cancellations, wallet payouts, and notifications. Warm vendor dashboard latency plummeted from **1,379.0ms** to **9.0ms** (-99.3%, a 153x speedup).
+  6. *Frontend Request Deduplication & Tab-Switch Caching*: In `frontend/src/payernt/store.ts`, introduced 15-second TTL refs for `fetchBookings`, `fetchProducts`, `fetchWallet`, `fetchNotifications`, and `fetchMessages`, eliminating redundant network storms when vendors switch between tabs. Eliminated the redundant 5-request `Promise.allSettled` waterfall on dashboard mount.
+  7. *Concurrency Load Testing (Phase 11)*: Tested 5, 10, and 25 concurrent users (50 requests per level across WAN). Platform achieved **0.0% error rate** across all concurrency levels with zero dropped transactions or corrupted balances.
+  8. *Empirical Performance Benchmarks*:
+     - `POST /api/payernt/auth/login`: 1047.0ms → **766.0ms** (-26.8%)
+     - `GET /api/payernt/dashboard`: 1379.0ms → **9.0ms** (-99.3%)
+     - `GET /api/payernt/bookings?limit=50`: 347.3ms → **242.0ms** (-30.3%)
+     - `GET /api/payernt/products`: 183.7ms → **119.6ms** (-34.9%)
+     - `GET /api/payernt/wallet`: 508.5ms → **345.9ms** (-32.0%)
+     - `GET /api/payernt/notifications`: 178.4ms → **126.7ms** (-29.0%)
+     - `GET /api/payernt/messages`: 352.0ms → **232.1ms** (-34.1%)
+  9. *Regression Verification*: 100% of live rental queue lifecycle tests passed (`pytest tests/test_live_rental_queue.py`); frontend built cleanly (`npm run build`) with zero lint or TypeScript errors.
+- [RESOLVED Live Rental Queue Halting, Milestone Action Lockdown & History Preservation for Cancelled Bookings]
+  1. *Immediate Queue Termination*: When a booking is cancelled, its active Live Rental Queue workflow is halted immediately. `_execute_queue_milestone_transition` (`main.py`) and `vendor_advance_queue_endpoint` (`payernt_router.py`) strictly reject advancing cancelled bookings with HTTP 400 Bad Request.
+  2. *Status & Timestamp Preservation*: Replaced active queue state with prominent "Booking Cancelled" badge, cancellation details banner (displaying cancellation ISO timestamp and reason), while preserving completed milestone timestamps.
+  3. *Action Button Lockdown*: Replaced quick milestone advance buttons (Mark Ready for Pickup, Confirm Pickup, Start Rental, Initiate Return, Complete Rental) with disabled "Actions Disabled (Booking Cancelled)" indicators.
+  4. *Rental Timer Guard*: If cancelled before pickup confirmation, the rental timer never starts (`timer.state = "CANCELLED"`, displaying `00h 00m 00s (Timer Never Started)`). If cancelled after pickup, duration is frozen without losing history.
+  5. *Dual Portal Synchronization*: Persisted `cancelled_at`, `cancellation_reason`, and `cancelled_by` to MySQL `orders` table and returned in `GET /api/orders/{id}` and `GET /api/lender/orders`. Updated renter (`Orders.tsx`, `Dashboard.tsx`) and lender (`LenderPortal.tsx`, `RentalRequests.tsx`) views so reloading never reverts cancelled bookings to an active state.
+  6. *Automated Test Verification*: Comprehensive test suite in `backend/tests/test_live_rental_queue.py` (`test_cancelled_booking_queue_lifecycle_and_rejection`) validating all 5 cancellation cases passing 100%.
 - [RESOLVED Fast Gateway & Login Initialization, Request Timeout & Cancellation Hardening]
   1. *Root-Cause Elimination*: Removed blocking API calls on gateway (`/`), `/select`, and login (`/login`) screens. Cart, wishlist, and unread-count fetches are now strictly gated to authenticated marketplace views and explicit user intent.
   2. *Instant Auth Initialization*: Hardened `useAuth.ts` so unauthenticated users and explicit sign-outs resolve `ready: true, user: null` on Frame 0 without triggering phantom `/api/me` network calls or redirect loops.

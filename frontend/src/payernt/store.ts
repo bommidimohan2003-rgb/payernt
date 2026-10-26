@@ -434,6 +434,12 @@ export function usePayerntStore() {
   const inFlightNotifsRef = useRef<Promise<any> | null>(null);
   const inFlightMessagesRef = useRef<Promise<any> | null>(null);
   const lastDashboardFetchRef = useRef<number>(0);
+  const lastBookingsFetchRef = useRef<number>(0);
+  const lastProductsFetchRef = useRef<number>(0);
+  const lastWalletFetchRef = useRef<number>(0);
+  const lastNotifsFetchRef = useRef<number>(0);
+  const lastMessagesFetchRef = useRef<number>(0);
+  const CACHE_TTL_MS = 15000;
 
   const mapRawBookingToRentalRequest = useCallback((b: any): RentalRequest => {
     const daily = Number(b.amount || b.daily_rate || b.dailyRate || 500);
@@ -502,10 +508,12 @@ export function usePayerntStore() {
 
   const fetchBookings = useCallback(async (force: boolean = false) => {
     if (!activeAccount || !isAuthenticated) return;
+    if (!force && Date.now() - lastBookingsFetchRef.current < CACHE_TTL_MS) return;
     if (inFlightBookingsRef.current && !force) return inFlightBookingsRef.current;
     const promise = (async () => {
       try {
         const bookingsRes = await payerntApi.getBookings(50);
+        lastBookingsFetchRef.current = Date.now();
         if (bookingsRes.success && Array.isArray(bookingsRes.bookings)) {
           const mapped = bookingsRes.bookings.map(mapRawBookingToRentalRequest);
           setRentalRequests(mapped);
@@ -522,10 +530,12 @@ export function usePayerntStore() {
 
   const fetchProducts = useCallback(async (force: boolean = false) => {
     if (!activeAccount || !isAuthenticated) return;
+    if (!force && Date.now() - lastProductsFetchRef.current < CACHE_TTL_MS) return;
     if (inFlightProductsRef.current && !force) return inFlightProductsRef.current;
     const promise = (async () => {
       try {
         const prodRes = await payerntApi.getProducts();
+        lastProductsFetchRef.current = Date.now();
         if (prodRes.success && Array.isArray(prodRes.products)) {
           setProducts(prodRes.products.filter((p) => !isMockItem(p.id)));
         }
@@ -541,10 +551,12 @@ export function usePayerntStore() {
 
   const fetchWallet = useCallback(async (force: boolean = false) => {
     if (!activeAccount || !isAuthenticated) return;
+    if (!force && Date.now() - lastWalletFetchRef.current < CACHE_TTL_MS) return;
     if (inFlightWalletRef.current && !force) return inFlightWalletRef.current;
     const promise = (async () => {
       try {
         const walletRes = await payerntApi.getWallet();
+        lastWalletFetchRef.current = Date.now();
         if (walletRes.success && walletRes.wallet) {
           const w = walletRes.wallet as any;
           setWallet((prev) => ({
@@ -573,10 +585,12 @@ export function usePayerntStore() {
 
   const fetchNotifications = useCallback(async (force: boolean = false) => {
     if (!activeAccount || !isAuthenticated) return;
+    if (!force && Date.now() - lastNotifsFetchRef.current < CACHE_TTL_MS) return;
     if (inFlightNotifsRef.current && !force) return inFlightNotifsRef.current;
     const promise = (async () => {
       try {
         const notifRes = await payerntApi.getNotifications();
+        lastNotifsFetchRef.current = Date.now();
         if (notifRes.success && Array.isArray(notifRes.notifications)) {
           setNotifications(notifRes.notifications.filter((n) => n.id !== "notif-1"));
         }
@@ -591,12 +605,14 @@ export function usePayerntStore() {
   }, [activeAccount, isAuthenticated]);
 
   const fetchMessages = useCallback(
-    async (productId?: string) => {
+    async (productId?: string, force: boolean = false) => {
       if (!activeAccount?.accountId) return;
-      if (inFlightMessagesRef.current) return inFlightMessagesRef.current;
+      if (!force && !productId && Date.now() - lastMessagesFetchRef.current < CACHE_TTL_MS) return;
+      if (inFlightMessagesRef.current && !force) return inFlightMessagesRef.current;
       const promise = (async () => {
         try {
           const res = await payerntApi.getMessages(productId);
+          if (!productId) lastMessagesFetchRef.current = Date.now();
           if (res.success && Array.isArray(res.messages)) {
             setMessages(res.messages);
             const count = res.unreadCount ?? res.messages.filter((m: any) => !m.read && !m.is_read).length;
@@ -866,6 +882,8 @@ export function usePayerntStore() {
       } catch {}
       return nextList;
     });
+    lastProductsFetchRef.current = 0;
+    lastDashboardFetchRef.current = 0;
     payerntApi.updateProduct(id, updates).catch((e) => console.warn("[paye₹nt Backend] updateProduct sync:", e));
     window.dispatchEvent(new CustomEvent("payent_products_updated"));
   };
@@ -878,6 +896,8 @@ export function usePayerntStore() {
       } catch {}
       return nextList;
     });
+    lastProductsFetchRef.current = 0;
+    lastDashboardFetchRef.current = 0;
     payerntApi.deleteProduct(id).catch((e) => console.warn("[paye₹nt Backend] deleteProduct sync:", e));
     window.dispatchEvent(new CustomEvent("payent_products_updated"));
   };
@@ -900,6 +920,8 @@ export function usePayerntStore() {
       } catch {}
       return nextList;
     });
+    lastProductsFetchRef.current = 0;
+    lastDashboardFetchRef.current = 0;
     payerntApi.updateProductStatus(id, "active", nextStatus).catch((e) => console.warn("[paye₹nt Backend] toggleAvailability sync:", e));
     window.dispatchEvent(new CustomEvent("payent_products_updated"));
   };
@@ -1048,6 +1070,8 @@ export function usePayerntStore() {
     );
 
     // Sync state to backend
+    lastBookingsFetchRef.current = 0;
+    lastDashboardFetchRef.current = 0;
     if (action === "accept") {
       payerntApi.advanceRentalQueue(requestId, "accepted").catch(() => {});
     }
@@ -1070,6 +1094,8 @@ export function usePayerntStore() {
   // Step Rental Lifecycle
   const advanceRentalLifecycle = (requestId: string, nextStatus: RentalRequestStatus) => {
     const nowIso = new Date().toISOString();
+    lastBookingsFetchRef.current = 0;
+    lastDashboardFetchRef.current = 0;
     setRentalRequests((prev) =>
       prev.map((req) => {
         if (req.id !== requestId) return req;
@@ -1351,17 +1377,25 @@ export function usePayerntStore() {
   };
 
   const markNotificationRead = (notifId: string) => {
+    lastNotifsFetchRef.current = 0;
+    lastDashboardFetchRef.current = 0;
     setNotifications((prev) =>
       prev.map((n) => (n.id === notifId ? { ...n, read: true } : n))
     );
+    payerntApi.markNotificationRead(notifId).catch(() => {});
   };
 
   const markAllNotificationsRead = () => {
+    lastNotifsFetchRef.current = 0;
+    lastDashboardFetchRef.current = 0;
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    payerntApi.markAllNotificationsRead().catch(() => {});
   };
 
   const markMessageRead = useCallback(
     async (messageId: string) => {
+      lastMessagesFetchRef.current = 0;
+      lastDashboardFetchRef.current = 0;
       setMessages((prev) =>
         prev.map((m) =>
           m.id === messageId || m.messageId === messageId
@@ -1394,6 +1428,8 @@ export function usePayerntStore() {
       productName?: string;
       productCategory?: string;
     }) => {
+      lastMessagesFetchRef.current = 0;
+      lastDashboardFetchRef.current = 0;
       const res = await payerntApi.sendAdminMessage(params);
       if (res.success && res.message) {
         setMessages((prev) => [res.message, ...prev]);

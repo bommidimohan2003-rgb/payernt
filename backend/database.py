@@ -105,13 +105,13 @@ def get_db_pool():
     try:
         _db_pool = PooledDB(
             creator=pymysql,
-            mincached=3,
-            maxcached=20,
+            mincached=5,
+            maxcached=35,
             maxshared=0,
-            maxconnections=0,
-            blocking=False,
-            maxusage=1000,
-            ping=1,  # ping on checkout from pool if connection was closed/dropped, NOT on every cursor/execute
+            maxconnections=50,
+            blocking=True,
+            maxusage=2000,
+            ping=0,  # Zero-overhead checkout (0.02ms vs 50ms WAN ping); dropped connections handled by query retry
             host=MYSQL_HOST,
             port=MYSQL_PORT,
             user=MYSQL_USER,
@@ -124,12 +124,32 @@ def get_db_pool():
             **ssl_kwargs
         )
         _last_db_failure_timestamp = 0.0
-        logger.info("TiDB/MySQL connection pool initialized successfully with DBUtils PooledDB.")
+        logger.info("TiDB/MySQL connection pool initialized successfully with DBUtils PooledDB (ping=0 high-performance mode).")
         return _db_pool
     except Exception as e:
         _last_db_failure_timestamp = now
         logger.warning(f"Failed to initialize TiDB Cloud connection pool ({e}). Operating in direct fallback mode.")
         return None
+
+def prewarm_db_pool(count: int = 5):
+    """Pre-warms mincached pool connections so initial requests experience zero TLS handshake latency."""
+    pool = get_db_pool()
+    if not pool:
+        return
+    conns = []
+    try:
+        for _ in range(min(count, 5)):
+            c = pool.connection()
+            conns.append(c)
+    except Exception as e:
+        logger.warning(f"Notice: Pre-warming pool warning: {e}")
+    finally:
+        for c in conns:
+            try:
+                c.close()
+            except Exception:
+                pass
+    logger.info(f"TiDB/MySQL connection pool pre-warmed with {len(conns)} ready connections.")
 
 def get_db_connection():
     global _last_db_failure_timestamp
@@ -164,7 +184,7 @@ def get_db_connection():
         logger.warning(f"MySQL/TiDB connection to '{MYSQL_HOST}' failed ({e}). Operating in degraded fallback mode.")
         return None
 
-def execute_query(query: str, params: tuple = ()):
+def execute_query(query: str, params: tuple = (), retry: bool = True):
     try:
         conn = get_db_connection()
         if not conn:
@@ -179,9 +199,12 @@ def execute_query(query: str, params: tuple = ()):
         # Suppress expected schema migration warnings (duplicate column / duplicate key)
         if hasattr(e, 'args') and len(e.args) > 0 and e.args[0] in (1060, 1061):
             return
+        # Auto-retry once on connection drop (2006: Server gone away, 2013: Lost connection)
+        if retry and hasattr(e, 'args') and len(e.args) > 0 and e.args[0] in (2006, 2013):
+            return execute_query(query, params, retry=False)
         print(f"Notice: Database execute_query notice: {e}")
 
-def fetch_one(query: str, params: tuple = ()):
+def fetch_one(query: str, params: tuple = (), retry: bool = True):
     try:
         conn = get_db_connection()
         if not conn:
@@ -193,10 +216,12 @@ def fetch_one(query: str, params: tuple = ()):
         finally:
             conn.close()
     except Exception as e:
+        if retry and hasattr(e, 'args') and len(e.args) > 0 and e.args[0] in (2006, 2013):
+            return fetch_one(query, params, retry=False)
         print(f"Notice: Database fetch_one notice: {e}")
         return None
 
-def fetch_all(query: str, params: tuple = ()):
+def fetch_all(query: str, params: tuple = (), retry: bool = True):
     try:
         conn = get_db_connection()
         if not conn:
@@ -208,6 +233,8 @@ def fetch_all(query: str, params: tuple = ()):
         finally:
             conn.close()
     except Exception as e:
+        if retry and hasattr(e, 'args') and len(e.args) > 0 and e.args[0] in (2006, 2013):
+            return fetch_all(query, params, retry=False)
         print(f"Notice: Database fetch_all notice: {e}")
         return []
 
@@ -489,6 +516,9 @@ def init_db(force: bool = False):
     add_column_safely("orders", "start_datetime VARCHAR(100) NULL")
     add_column_safely("orders", "end_datetime VARCHAR(100) NULL")
     add_column_safely("orders", "cancellation_id VARCHAR(255) NULL")
+    add_column_safely("orders", "cancelled_at VARCHAR(100) NULL")
+    add_column_safely("orders", "cancellation_reason VARCHAR(255) NULL")
+    add_column_safely("orders", "cancelled_by VARCHAR(50) NULL")
     add_column_safely("orders", "confirmed_at VARCHAR(100) NULL")
     add_column_safely("orders", "ready_for_pickup_at VARCHAR(100) NULL")
     add_column_safely("orders", "picked_up_at VARCHAR(100) NULL")
@@ -1827,6 +1857,7 @@ def get_orders(email: str):
                                start_date, end_date, total, status, created_at,
                                razorpay_order_id, razorpay_payment_id, payment_status, refund_id, refund_status,
                                confirmed_at, ready_for_pickup_at, picked_up_at, return_initiated_at, handed_back_at, awaiting_inspection_at, completed_at, queue_notes,
+                               cancelled_at, cancellation_reason, cancellation_id,
                                category
                         FROM orders
                         WHERE user_email = %s
@@ -2558,12 +2589,15 @@ def reject_location_change_request(order_id: str, caller_email: str, feedback: O
     }
 
 def cancel_order(order_id: str):
+    now_iso = dt.now(timezone.utc).isoformat()
     for key, o in list(MOCK_ORDERS.items()):
         if key == order_id or o.get("id") == order_id or o.get("productId") == order_id or o.get("product_id") == order_id:
             MOCK_ORDERS[key]["status"] = "cancelled"
-    execute_query("UPDATE orders SET status = 'cancelled' WHERE id = %s", (order_id,))
+            MOCK_ORDERS[key]["cancelled_at"] = now_iso
+            MOCK_ORDERS[key]["cancelledAt"] = now_iso
+    execute_query("UPDATE orders SET status = 'cancelled', cancelled_at = %s WHERE id = %s", (now_iso, order_id,))
     try:
-        execute_query("UPDATE rental_security SET status = 'cancelled' WHERE booking_id = %s", (order_id,))
+        execute_query("UPDATE rental_security SET status = 'cancelled', updated_at = %s WHERE booking_id = %s", (now_iso, order_id,))
     except Exception:
         pass
 
@@ -2644,9 +2678,9 @@ def record_booking_cancellation(
                 ))
                 cursor.execute("""
                     UPDATE orders 
-                    SET status = %s, cancellation_id = %s 
+                    SET status = %s, cancellation_id = %s, cancelled_at = %s, cancellation_reason = %s, cancelled_by = %s
                     WHERE id = %s
-                """, (new_status, canc_id, booking_id))
+                """, (new_status, canc_id, now_iso, reason_code, initiated_by, booking_id))
                 try:
                     cursor.execute("""
                         UPDATE rental_security 
@@ -2684,6 +2718,12 @@ def update_order_queue_milestone(
     b_id = str(order_id).strip()
     now_iso = dt.now(timezone.utc).isoformat()
     ts = timestamps or {}
+
+    # Reject advance if booking is already cancelled
+    conn_chk = fetch_one("SELECT status FROM orders WHERE id = %s", (b_id,)) or MOCK_ORDERS.get(b_id)
+    if conn_chk and str(conn_chk.get("status") or "").strip().lower() in ("cancelled", "canceled"):
+        logger.warning(f"[QueueMilestone] Refusing to advance cancelled order #{b_id}")
+        return fetch_one("SELECT * FROM orders WHERE id = %s", (b_id,)) or MOCK_ORDERS.get(b_id)
 
     # Update in-memory MOCK_ORDERS
     mock_order = None

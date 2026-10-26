@@ -1,4 +1,5 @@
 import os
+import copy
 import re
 import json
 import time
@@ -1210,6 +1211,7 @@ def create_payernt_product(
 
     MOCK_PAYERNT_PRODUCTS[product["id"]] = product
     log_payernt_audit_event("PRODUCT_CREATE", owner_id, {"productId": product_id, "category": product["category"]})
+    invalidate_vendor_dashboard_cache(owner_id)
     return product
 
 
@@ -1304,9 +1306,10 @@ def get_payernt_products_by_owner(owner_id: str, owner_email: Optional[str] = No
 
     try:
         if owner_email:
+            owner_clean = str(owner_email).strip().lower()
             rows = fetch_all(
-                "SELECT * FROM payernt_products WHERE owner_id = %s OR (owner_email IS NOT NULL AND LOWER(owner_email) = LOWER(%s)) ORDER BY created_at DESC",
-                (owner_id or "", owner_email)
+                "SELECT * FROM payernt_products WHERE owner_id = %s OR owner_email = %s ORDER BY created_at DESC",
+                (owner_id or "", owner_clean)
             )
         else:
             rows = fetch_all("SELECT * FROM payernt_products WHERE owner_id = %s ORDER BY created_at DESC", (owner_id,))
@@ -1425,6 +1428,7 @@ def update_payernt_product(product_id: str, owner_id: str, updates: Dict[str, An
 
     MOCK_PAYERNT_PRODUCTS[product_id] = existing
     log_payernt_audit_event("PRODUCT_UPDATE", owner_id, {"productId": product_id, "fields": list(updates.keys())})
+    invalidate_vendor_dashboard_cache(owner_id)
     return existing
 
 
@@ -1443,6 +1447,7 @@ def delete_payernt_product(product_id: str, owner_id: str) -> bool:
 
     MOCK_PAYERNT_PRODUCTS.pop(product_id, None)
     log_payernt_audit_event("PRODUCT_DELETE", owner_id, {"productId": product_id})
+    invalidate_vendor_dashboard_cache(owner_id)
     return True
 
 
@@ -2420,6 +2425,7 @@ def complete_rental_and_credit_vendor(booking_id: str) -> Tuple[bool, str, Optio
     )
 
     log_payernt_audit_event("RENTAL_COMPLETED", vendor_id, {"bookingId": booking_id, "amount": total_amount})
+    invalidate_vendor_dashboard_cache(vendor_id)
     return True, "Rental completed and vendor wallet settled successfully.", record
 
 
@@ -2687,6 +2693,7 @@ def withdraw_payernt_wallet(owner_id: str, amount: float, bank_account_id: str) 
 
     MOCK_PAYERNT_TRANSACTIONS.setdefault(owner_id, []).insert(0, txn)
     log_payernt_audit_event("WALLET_WITHDRAW", owner_id, {"amount": amount, "bankAccountId": bank_account_id, "txnId": txn_id})
+    invalidate_vendor_dashboard_cache(owner_id)
     return True, "Withdrawal processed successfully.", txn
 
 
@@ -2809,6 +2816,7 @@ def add_payernt_notification(owner_id: str, title: str, message: str, type_: str
         logger.warning(f"DB insert error for notification: {e}")
 
     MOCK_PAYERNT_NOTIFICATIONS.setdefault(owner_id, []).insert(0, notif)
+    invalidate_vendor_dashboard_cache(owner_id)
     return notif
 
 
@@ -2823,6 +2831,7 @@ def mark_payernt_notification_read(owner_id: str, notification_id: str) -> bool:
     for n in notifs:
         if n.get("id") == notification_id:
             n["read"] = True
+    invalidate_vendor_dashboard_cache(owner_id)
     return True
 
 
@@ -2836,6 +2845,7 @@ def mark_all_payernt_notifications_read(owner_id: str) -> bool:
     notifs = MOCK_PAYERNT_NOTIFICATIONS.get(owner_id, [])
     for n in notifs:
         n["read"] = True
+    invalidate_vendor_dashboard_cache(owner_id)
     return True
 
 
@@ -2845,12 +2855,24 @@ def get_payernt_messages(user_id: str, product_id: Optional[str] = None) -> List
     try:
         if product_id:
             raw_list = fetch_all(
-                "SELECT * FROM payernt_messages WHERE receiver_id = %s AND product_id = %s ORDER BY created_at DESC",
+                """
+                SELECT m.*, pp.title AS pp_title, pp.category AS pp_category
+                FROM payernt_messages m
+                LEFT JOIN payernt_products pp ON m.product_id = pp.id
+                WHERE m.receiver_id = %s AND m.product_id = %s
+                ORDER BY m.created_at DESC
+                """,
                 (user_id, product_id),
             ) or []
         else:
             raw_list = fetch_all(
-                "SELECT * FROM payernt_messages WHERE receiver_id = %s ORDER BY created_at DESC",
+                """
+                SELECT m.*, pp.title AS pp_title, pp.category AS pp_category
+                FROM payernt_messages m
+                LEFT JOIN payernt_products pp ON m.product_id = pp.id
+                WHERE m.receiver_id = %s
+                ORDER BY m.created_at DESC
+                """,
                 (user_id,),
             ) or []
     except Exception as e:
@@ -2867,21 +2889,12 @@ def get_payernt_messages(user_id: str, product_id: Optional[str] = None) -> List
     results = []
     for r in raw_list:
         p_id = r.get("product_id") or r.get("productId")
-        p_name = r.get("product_name") or r.get("productName")
-        p_cat = r.get("product_category") or r.get("productCategory")
+        p_name = r.get("product_name") or r.get("productName") or r.get("pp_title")
+        p_cat = r.get("product_category") or r.get("productCategory") or r.get("pp_category")
 
-        # If product_name or category is missing, look up from payernt_products
-        if p_id and (not p_name or not p_cat):
-            try:
-                prod = fetch_one("SELECT title, category FROM payernt_products WHERE id = %s", (p_id,))
-                if prod:
-                    p_name = p_name or prod.get("title")
-                    p_cat = p_cat or prod.get("category")
-            except Exception:
-                pass
-            if not p_name and p_id in MOCK_PAYERNT_PRODUCTS:
-                p_name = MOCK_PAYERNT_PRODUCTS[p_id].get("title", "Equipment")
-                p_cat = MOCK_PAYERNT_PRODUCTS[p_id].get("category", "General")
+        if not p_name and p_id and p_id in MOCK_PAYERNT_PRODUCTS:
+            p_name = MOCK_PAYERNT_PRODUCTS[p_id].get("title", "Equipment")
+            p_cat = MOCK_PAYERNT_PRODUCTS[p_id].get("category", "General")
 
         is_read = bool(r.get("is_read") or r.get("read"))
         msg_id = r.get("id") or r.get("messageId") or f"msg-{int(time.time() * 1000)}"
@@ -3777,142 +3790,144 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50) -> List[Dict[st
     except Exception as e:
         logger.warning(f"DB error fetching vendor bookings from rental_security: {e}")
 
-    # 2. Also check orders table for orders whose product is owned by vendor
-    try:
-        orders_query = """
-            SELECT 
-                o.id as booking_id,
-                o.product_id,
-                o.product_title,
-                o.product_image,
-                o.user_email as renter_email,
-                o.start_date,
-                o.end_date,
-                o.total,
-                o.status as order_status,
-                o.created_at,
-                o.confirmed_at,
-                o.ready_for_pickup_at,
-                o.picked_up_at,
-                o.return_initiated_at,
-                o.handed_back_at,
-                o.awaiting_inspection_at,
-                o.completed_at,
-                o.queue_notes,
-                o.delivery_method as order_delivery_method,
-                o.delivery_address as order_delivery_address,
-                o.pickup_location as order_pickup_location,
-                o.custom_location as order_custom_location,
-                o.location_directions as order_location_directions,
-                o.location_latitude as order_lat,
-                o.location_longitude as order_lng,
-                o.location_change_data as order_location_change,
-                pp.category,
-                pp.daily_rate,
-                d.status as delivery_status,
-                d.delivery_address as d_delivery_address,
-                d.pickup_address as d_pickup_address,
-                d.delivery_method as d_delivery_method,
-                d.delivery_latitude as d_delivery_lat,
-                d.delivery_longitude as d_delivery_lng
-            FROM orders o
-            JOIN payernt_products pp ON o.product_id = pp.id
-            LEFT JOIN deliveries d ON o.id = d.booking_id
-            WHERE pp.owner_id = %s
-            ORDER BY o.created_at DESC
-            LIMIT %s
-        """
-        o_rows = fetch_all(orders_query, (vendor_id, limit))
-        if o_rows:
-            for r in o_rows:
-                b_id = r.get("booking_id")
-                if not b_id or b_id in seen_ids:
-                    continue
-                seen_ids.add(b_id)
-                renter_email = r.get("renter_email") or ""
-                r_name = renter_email.split("@")[0].capitalize() if renter_email else "Customer"
-                del_status = r.get("delivery_status") or "WAITING_FOR_ADMIN"
-                picked_up_val = r.get("picked_up_at")
+    # 2. Also check orders table for orders whose product is owned by vendor (only if needed)
+    if len(bookings) < limit:
+        remaining_limit = limit - len(bookings)
+        try:
+            orders_query = """
+                SELECT 
+                    o.id as booking_id,
+                    o.product_id,
+                    o.product_title,
+                    o.product_image,
+                    o.user_email as renter_email,
+                    o.start_date,
+                    o.end_date,
+                    o.total,
+                    o.status as order_status,
+                    o.created_at,
+                    o.confirmed_at,
+                    o.ready_for_pickup_at,
+                    o.picked_up_at,
+                    o.return_initiated_at,
+                    o.handed_back_at,
+                    o.awaiting_inspection_at,
+                    o.completed_at,
+                    o.queue_notes,
+                    o.delivery_method as order_delivery_method,
+                    o.delivery_address as order_delivery_address,
+                    o.pickup_location as order_pickup_location,
+                    o.custom_location as order_custom_location,
+                    o.location_directions as order_location_directions,
+                    o.location_latitude as order_lat,
+                    o.location_longitude as order_lng,
+                    o.location_change_data as order_location_change,
+                    pp.category,
+                    pp.daily_rate,
+                    d.status as delivery_status,
+                    d.delivery_address as d_delivery_address,
+                    d.pickup_address as d_pickup_address,
+                    d.delivery_method as d_delivery_method,
+                    d.delivery_latitude as d_delivery_lat,
+                    d.delivery_longitude as d_delivery_lng
+                FROM orders o
+                JOIN payernt_products pp ON o.product_id = pp.id
+                LEFT JOIN deliveries d ON o.id = d.booking_id
+                WHERE pp.owner_id = %s
+                ORDER BY o.created_at DESC
+                LIMIT %s
+            """
+            o_rows = fetch_all(orders_query, (vendor_id, remaining_limit))
+            if o_rows:
+                for r in o_rows:
+                    b_id = r.get("booking_id")
+                    if not b_id or b_id in seen_ids:
+                        continue
+                    seen_ids.add(b_id)
+                    renter_email = r.get("renter_email") or ""
+                    r_name = renter_email.split("@")[0].capitalize() if renter_email else "Customer"
+                    del_status = r.get("delivery_status") or "WAITING_FOR_ADMIN"
+                    picked_up_val = r.get("picked_up_at")
 
-                del_method = r.get("order_delivery_method") or r.get("d_delivery_method") or "delivery"
-                del_addr = r.get("order_delivery_address") or r.get("d_delivery_address") or ""
-                pick_loc = r.get("order_pickup_location") or r.get("d_pickup_address") or ""
-                cust_loc = r.get("order_custom_location") or ""
-                loc_dir = r.get("order_location_directions") or ""
-                lat_val = r.get("order_lat") or r.get("d_delivery_lat")
-                lng_val = r.get("order_lng") or r.get("d_delivery_lng")
-                try:
-                    lat_num = float(lat_val) if lat_val is not None else None
-                    lng_num = float(lng_val) if lng_val is not None else None
-                except (TypeError, ValueError):
-                    lat_num, lng_num = None, None
-
-                target_disp = cust_loc if del_method == "custom" else (pick_loc if del_method == "pickup" else del_addr)
-                map_url = None
-                if lat_num is not None and lng_num is not None and (lat_num != 0.0 or lng_num != 0.0):
-                    map_url = f"https://www.google.com/maps/search/?api=1&query={lat_num},{lng_num}"
-                elif target_disp:
-                    import urllib.parse
-                    map_url = f"https://www.google.com/maps/search/?api=1&query={urllib.parse.quote_plus(target_disp)}"
-
-                change_obj = None
-                change_raw = r.get("order_location_change")
-                if change_raw:
+                    del_method = r.get("order_delivery_method") or r.get("d_delivery_method") or "delivery"
+                    del_addr = r.get("order_delivery_address") or r.get("d_delivery_address") or ""
+                    pick_loc = r.get("order_pickup_location") or r.get("d_pickup_address") or ""
+                    cust_loc = r.get("order_custom_location") or ""
+                    loc_dir = r.get("order_location_directions") or ""
+                    lat_val = r.get("order_lat") or r.get("d_delivery_lat")
+                    lng_val = r.get("order_lng") or r.get("d_delivery_lng")
                     try:
-                        change_obj = json.loads(change_raw) if isinstance(change_raw, str) else change_raw
-                    except Exception:
-                        change_obj = None
+                        lat_num = float(lat_val) if lat_val is not None else None
+                        lng_num = float(lng_val) if lng_val is not None else None
+                    except (TypeError, ValueError):
+                        lat_num, lng_num = None, None
 
-                bookings.append({
-                    "id": b_id,
-                    "bookingId": b_id,
-                    "productId": r.get("product_id") or "",
-                    "productTitle": r.get("product_title") or "Gear Listing",
-                    "productImage": r.get("product_image") or "",
-                    "category": r.get("category") or "Tech Gear",
-                    "renterId": renter_email or "renter",
-                    "renterName": r_name,
-                    "renterEmail": renter_email,
-                    "startDate": r.get("start_date") or "",
-                    "endDate": r.get("end_date") or "",
-                    "amount": float(r.get("total") or r.get("daily_rate") or 0.0),
-                    "total": float(r.get("total") or r.get("daily_rate") or 0.0),
-                    "status": r.get("order_status") or "pending",
-                    "bookingStatus": r.get("order_status") or "CONFIRMED",
-                    "deliveryStatus": del_status,
-                    "securityStatus": "pending",
-                    "vendorPinVerified": False,
-                    "renterPinVerified": False,
-                    "vendorOtpVerified": False,
-                    "renterOtpVerified": False,
-                    "vendorHandoverVerified": False,
-                    "renterHandoverVerified": False,
-                    "otpVerified": False,
-                    "rentalStarted": bool(picked_up_val),
-                    "rentalStartedAt": picked_up_val,
-                    "pickedUpAt": picked_up_val,
-                    "confirmedAt": r.get("confirmed_at") or r.get("created_at"),
-                    "readyForPickupAt": r.get("ready_for_pickup_at"),
-                    "returnInitiatedAt": r.get("return_initiated_at"),
-                    "handedBackAt": r.get("handed_back_at"),
-                    "awaitingInspectionAt": r.get("awaiting_inspection_at"),
-                    "completedAt": r.get("completed_at"),
-                    "queueNotes": r.get("queue_notes"),
-                    "deliveryMethod": del_method,
-                    "deliveryAddress": del_addr,
-                    "pickupLocation": pick_loc,
-                    "customLocation": cust_loc,
-                    "locationDirections": loc_dir,
-                    "latitude": lat_num,
-                    "longitude": lng_num,
-                    "mapUrl": map_url,
-                    "locationChangeRequest": change_obj,
-                    "createdAt": r.get("created_at") or "",
-                    "created_at": r.get("created_at") or "",
-                    "requestDate": r.get("created_at") or "",
-                })
-    except Exception as e:
-        logger.warning(f"DB error fetching vendor orders: {e}")
+                    target_disp = cust_loc if del_method == "custom" else (pick_loc if del_method == "pickup" else del_addr)
+                    map_url = None
+                    if lat_num is not None and lng_num is not None and (lat_num != 0.0 or lng_num != 0.0):
+                        map_url = f"https://www.google.com/maps/search/?api=1&query={lat_num},{lng_num}"
+                    elif target_disp:
+                        import urllib.parse
+                        map_url = f"https://www.google.com/maps/search/?api=1&query={urllib.parse.quote_plus(target_disp)}"
+
+                    change_obj = None
+                    change_raw = r.get("order_location_change")
+                    if change_raw:
+                        try:
+                            change_obj = json.loads(change_raw) if isinstance(change_raw, str) else change_raw
+                        except Exception:
+                            change_obj = None
+
+                    bookings.append({
+                        "id": b_id,
+                        "bookingId": b_id,
+                        "productId": r.get("product_id") or "",
+                        "productTitle": r.get("product_title") or "Gear Listing",
+                        "productImage": r.get("product_image") or "",
+                        "category": r.get("category") or "Tech Gear",
+                        "renterId": renter_email or "renter",
+                        "renterName": r_name,
+                        "renterEmail": renter_email,
+                        "startDate": r.get("start_date") or "",
+                        "endDate": r.get("end_date") or "",
+                        "amount": float(r.get("total") or r.get("daily_rate") or 0.0),
+                        "total": float(r.get("total") or r.get("daily_rate") or 0.0),
+                        "status": r.get("order_status") or "pending",
+                        "bookingStatus": r.get("order_status") or "CONFIRMED",
+                        "deliveryStatus": del_status,
+                        "securityStatus": "pending",
+                        "vendorPinVerified": False,
+                        "renterPinVerified": False,
+                        "vendorOtpVerified": False,
+                        "renterOtpVerified": False,
+                        "vendorHandoverVerified": False,
+                        "renterHandoverVerified": False,
+                        "otpVerified": False,
+                        "rentalStarted": bool(picked_up_val),
+                        "rentalStartedAt": picked_up_val,
+                        "pickedUpAt": picked_up_val,
+                        "confirmedAt": r.get("confirmed_at") or r.get("created_at"),
+                        "readyForPickupAt": r.get("ready_for_pickup_at"),
+                        "returnInitiatedAt": r.get("return_initiated_at"),
+                        "handedBackAt": r.get("handed_back_at"),
+                        "awaitingInspectionAt": r.get("awaiting_inspection_at"),
+                        "completedAt": r.get("completed_at"),
+                        "queueNotes": r.get("queue_notes"),
+                        "deliveryMethod": del_method,
+                        "deliveryAddress": del_addr,
+                        "pickupLocation": pick_loc,
+                        "customLocation": cust_loc,
+                        "locationDirections": loc_dir,
+                        "latitude": lat_num,
+                        "longitude": lng_num,
+                        "mapUrl": map_url,
+                        "locationChangeRequest": change_obj,
+                        "createdAt": r.get("created_at") or dt.now(timezone.utc).isoformat(),
+                        "created_at": r.get("created_at") or dt.now(timezone.utc).isoformat(),
+                        "requestDate": r.get("created_at") or dt.now(timezone.utc).isoformat(),
+                    })
+        except Exception as e:
+            logger.warning(f"DB error fetching vendor orders: {e}")
 
     # 3. Fallback to in-memory mock store if database is offline or empty
     if not bookings:
@@ -4081,12 +4096,31 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50) -> List[Dict[st
     return bookings[:limit]
 
 
+
+# In-memory bounded cache for vendor dashboard (TTL = 10s)
+_VENDOR_DASHBOARD_CACHE: Dict[str, Tuple[float, Dict[str, Any]]] = {}
+_VENDOR_DASHBOARD_CACHE_TTL = 10.0
+
+
+def invalidate_vendor_dashboard_cache(vendor_id: Optional[str] = None):
+    """Invalidates vendor dashboard cache for a specific vendor or all vendors."""
+    global _VENDOR_DASHBOARD_CACHE
+    if vendor_id:
+        _VENDOR_DASHBOARD_CACHE.pop(vendor_id, None)
+    else:
+        _VENDOR_DASHBOARD_CACHE.clear()
+
 def get_payernt_vendor_dashboard(vendor_id: str, email: str) -> Dict[str, Any]:
     """
     Authoritative single-request dashboard aggregation for paye₹nt Home (Desktop and Mobile).
     Returns real wallet balances, earnings, product listings counts, rental counts,
     upcoming bookings, products preview, recent activities, and unread notification/message counts.
     """
+    global _VENDOR_DASHBOARD_CACHE
+    now = time.time()
+    cached = _VENDOR_DASHBOARD_CACHE.get(vendor_id)
+    if cached and (now - cached[0] < _VENDOR_DASHBOARD_CACHE_TTL):
+        return copy.deepcopy(cached[1])
     # 1. Authoritative Wallet & Transactions
     wallet = get_or_create_payernt_wallet(vendor_id, email)
     avail_bal = float(wallet.get("available_balance", 0.0))
@@ -4169,7 +4203,7 @@ def get_payernt_vendor_dashboard(vendor_id: str, email: str) -> Dict[str, Any]:
         clean_p.pop("vendor_secret_pin", None)
         preview_products.append(clean_p)
 
-    return {
+    _dash_res = {
         "wallet": {
             "availableBalance": avail_bal,
             "pendingAmount": pending_amt,
@@ -4203,4 +4237,6 @@ def get_payernt_vendor_dashboard(vendor_id: str, email: str) -> Dict[str, Any]:
             "unread": unread_msgs,
         },
     }
+    _VENDOR_DASHBOARD_CACHE[vendor_id] = (time.time(), copy.deepcopy(_dash_res))
+    return _dash_res
 
