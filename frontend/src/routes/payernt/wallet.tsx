@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { UserWalletView } from "@/payernt/components/UserWallet";
 import { usePayernt } from "@/payernt/context";
@@ -21,7 +22,12 @@ function PayerntWalletRoute() {
     addBankAccount,
     creditRentalPayment,
     resetWalletData,
+    fetchWallet,
   } = usePayernt();
+
+  useEffect(() => {
+    fetchWallet();
+  }, [fetchWallet]);
 
   return (
     <UserWalletView

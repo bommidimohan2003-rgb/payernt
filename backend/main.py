@@ -305,7 +305,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"],
     allow_headers=["*"],
-    expose_headers=["X-Request-ID"],
+    expose_headers=["X-Request-ID", "Server-Timing"],
 )
 
 # Enable GZip compression for payloads >= 500 bytes (reduces large JSON payloads by 85-90%)
@@ -396,8 +396,9 @@ async def custom_cors_and_security_middleware(request: Request, call_next):
     response = await call_next(request)
     duration_ms = round((time.time() - start_time) * 1000, 2)
     
-    # Structured Request Correlation Header
+    # Structured Request Correlation & Observability Headers
     response.headers["X-Request-ID"] = req_id
+    response.headers["Server-Timing"] = f"total;dur={duration_ms}"
 
     # Attach CORS headers to response if origin is allowed
     if allowed and origin:

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import type {
   PayerntProduct,
   RentalRequest,
@@ -425,192 +425,274 @@ export function usePayerntStore() {
     };
   }, []);
 
-  // Authoritative real paye₹nt backend synchronization
-  const refreshDashboard = useCallback(async () => {
+  const inFlightDashboardRef = useRef<Promise<any> | null>(null);
+  const inFlightBookingsRef = useRef<Promise<any> | null>(null);
+  const inFlightProductsRef = useRef<Promise<any> | null>(null);
+  const inFlightWalletRef = useRef<Promise<any> | null>(null);
+  const inFlightNotifsRef = useRef<Promise<any> | null>(null);
+  const lastDashboardFetchRef = useRef<number>(0);
+
+  const mapRawBookingToRentalRequest = useCallback((b: any): RentalRequest => {
+    const daily = Number(b.amount || b.daily_rate || b.dailyRate || 500);
+    const rawStatus = String(b.status || "").toLowerCase().trim();
+    let parsedStatus: RentalRequestStatus = "approved";
+    if (rawStatus === "order confirmed" || rawStatus === "confirmed") parsedStatus = "confirmed";
+    else if (rawStatus === "ready for pickup" || rawStatus === "ready_for_pickup") parsedStatus = "ready_for_pickup";
+    else if (rawStatus === "picked up" || rawStatus === "picked_up") parsedStatus = "picked_up";
+    else if (rawStatus === "rental in progress" || rawStatus === "rental_in_progress" || rawStatus === "active" || b.rentalStarted) parsedStatus = "active";
+    else if (rawStatus === "return initiated" || rawStatus === "return_initiated") parsedStatus = "return_initiated";
+    else if (rawStatus === "item handed back to owner" || rawStatus === "handed_back" || rawStatus === "handed back") parsedStatus = "handed_back";
+    else if (rawStatus === "awaiting owner inspection" || rawStatus === "awaiting_inspection" || rawStatus === "inspection") parsedStatus = "awaiting_inspection";
+    else if (rawStatus === "rental completed" || rawStatus === "completed") parsedStatus = "completed";
+    else if (rawStatus === "cancelled") parsedStatus = "cancelled";
+    else if (rawStatus === "rejected") parsedStatus = "rejected";
+    else if (rawStatus === "handover") parsedStatus = "handover";
+    else parsedStatus = (b.status || "approved") as RentalRequestStatus;
+
+    return {
+      id: b.bookingId || b.id,
+      productId: b.productId,
+      productTitle: b.productTitle || "Tech Gear",
+      productImage: b.productImage || "",
+      category: b.category || "Tech Gear",
+      renter: {
+        name: b.renterName || (b.renterEmail ? b.renterEmail.split("@")[0] : "Verified Renter"),
+        avatar: "",
+        rating: 5.0,
+        completedRentals: 1,
+        phone: "",
+        email: b.renterEmail || "",
+        city: "",
+      },
+      startDate: b.startDate || "",
+      endDate: b.endDate || "",
+      totalDays: 3,
+      dailyRate: daily,
+      grossRental: daily * 3,
+      platformFee: 0,
+      netEarnings: daily * 3,
+      securityDeposit: 0,
+      status: parsedStatus,
+      requestDate: b.createdAt || new Date().toISOString(),
+      paymentStatus: parsedStatus === "completed" ? "settled_to_lender" : "paid_to_escrow",
+      confirmedAt: b.confirmedAt || b.confirmed_at || b.createdAt || b.created_at,
+      readyForPickupAt: b.readyForPickupAt || b.ready_for_pickup_at,
+      pickedUpAt: b.pickedUpAt || b.picked_up_at,
+      returnInitiatedAt: b.returnInitiatedAt || b.return_initiated_at,
+      handedBackAt: b.handedBackAt || b.handed_back_at,
+      awaitingInspectionAt: b.awaitingInspectionAt || b.awaiting_inspection_at,
+      completedAt: b.completedAt || b.completed_at,
+      queueNotes: b.queueNotes || b.queue_notes,
+      deliveryMethod: b.deliveryMethod || b.delivery_method || "delivery",
+      deliveryAddress: b.deliveryAddress || b.delivery_address || "",
+      pickupLocation: b.pickupLocation || b.pickup_location || "",
+      customLocation: b.customLocation || b.custom_location || "",
+      locationDirections: b.locationDirections || b.location_directions || "",
+      latitude: b.latitude ?? b.location_latitude ?? null,
+      longitude: b.longitude ?? b.location_longitude ?? null,
+      mapUrl: b.mapUrl || b.map_url || (b.latitude && b.longitude ? `https://www.google.com/maps/search/?api=1&query=${b.latitude},${b.longitude}` : (b.deliveryAddress ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(b.deliveryAddress)}` : "")),
+      locationChangeRequest: b.locationChangeRequest || b.location_change_request || null,
+    };
+  }, []);
+
+  const fetchBookings = useCallback(async (force: boolean = false) => {
     if (!activeAccount || !isAuthenticated) return;
+    if (inFlightBookingsRef.current && !force) return inFlightBookingsRef.current;
+    const promise = (async () => {
+      try {
+        const bookingsRes = await payerntApi.getBookings(50);
+        if (bookingsRes.success && Array.isArray(bookingsRes.bookings)) {
+          const mapped = bookingsRes.bookings.map(mapRawBookingToRentalRequest);
+          setRentalRequests(mapped);
+        }
+      } catch (err) {
+        console.warn("[paye₹nt Store] fetchBookings error:", err);
+      } finally {
+        inFlightBookingsRef.current = null;
+      }
+    })();
+    inFlightBookingsRef.current = promise;
+    return promise;
+  }, [activeAccount, isAuthenticated, mapRawBookingToRentalRequest]);
+
+  const fetchProducts = useCallback(async (force: boolean = false) => {
+    if (!activeAccount || !isAuthenticated) return;
+    if (inFlightProductsRef.current && !force) return inFlightProductsRef.current;
+    const promise = (async () => {
+      try {
+        const prodRes = await payerntApi.getProducts();
+        if (prodRes.success && Array.isArray(prodRes.products)) {
+          setProducts(prodRes.products.filter((p) => !isMockItem(p.id)));
+        }
+      } catch (err) {
+        console.warn("[paye₹nt Store] fetchProducts error:", err);
+      } finally {
+        inFlightProductsRef.current = null;
+      }
+    })();
+    inFlightProductsRef.current = promise;
+    return promise;
+  }, [activeAccount, isAuthenticated]);
+
+  const fetchWallet = useCallback(async (force: boolean = false) => {
+    if (!activeAccount || !isAuthenticated) return;
+    if (inFlightWalletRef.current && !force) return inFlightWalletRef.current;
+    const promise = (async () => {
+      try {
+        const walletRes = await payerntApi.getWallet();
+        if (walletRes.success && walletRes.wallet) {
+          const w = walletRes.wallet as any;
+          setWallet((prev) => ({
+            ...prev,
+            availableBalance: Number(w.available_balance ?? w.availableBalance ?? prev.availableBalance),
+            pendingBalance: Number(w.pending_amount ?? w.pendingBalance ?? prev.pendingBalance),
+            totalReceived: Number(w.total_received ?? w.totalReceived ?? prev.totalReceived),
+            totalWithdrawn: Number(w.total_withdrawn ?? w.totalWithdrawn ?? prev.totalWithdrawn),
+            bankAccounts: Array.isArray(walletRes.bankAccounts)
+              ? (walletRes.bankAccounts as any).filter((b: any) => !b.id?.startsWith("bank-00"))
+              : prev.bankAccounts,
+            transactions: Array.isArray(walletRes.transactions)
+              ? (walletRes.transactions as any).filter((t: any) => !t.id?.startsWith("wtx-00"))
+              : prev.transactions,
+          }));
+        }
+      } catch (err) {
+        console.warn("[paye₹nt Store] fetchWallet error:", err);
+      } finally {
+        inFlightWalletRef.current = null;
+      }
+    })();
+    inFlightWalletRef.current = promise;
+    return promise;
+  }, [activeAccount, isAuthenticated]);
+
+  const fetchNotifications = useCallback(async (force: boolean = false) => {
+    if (!activeAccount || !isAuthenticated) return;
+    if (inFlightNotifsRef.current && !force) return inFlightNotifsRef.current;
+    const promise = (async () => {
+      try {
+        const notifRes = await payerntApi.getNotifications();
+        if (notifRes.success && Array.isArray(notifRes.notifications)) {
+          setNotifications(notifRes.notifications.filter((n) => n.id !== "notif-1"));
+        }
+      } catch (err) {
+        console.warn("[paye₹nt Store] fetchNotifications error:", err);
+      } finally {
+        inFlightNotifsRef.current = null;
+      }
+    })();
+    inFlightNotifsRef.current = promise;
+    return promise;
+  }, [activeAccount, isAuthenticated]);
+
+  // Authoritative real paye₹nt backend synchronization
+  const refreshDashboard = useCallback(async (forceFull: boolean = false) => {
+    if (!activeAccount || !isAuthenticated) return;
+    if (inFlightDashboardRef.current && !forceFull) {
+      return inFlightDashboardRef.current;
+    }
+
     setIsLoadingDashboard(true);
     setDashboardError(null);
 
-    try {
-      const [dashRes, bookingsRes] = await Promise.all([
-        payerntApi.getDashboard(),
-        payerntApi.getBookings(),
-      ]);
+    const promise = (async () => {
+      try {
+        const dashRes = await payerntApi.getDashboard();
+        lastDashboardFetchRef.current = Date.now();
 
-      if (dashRes.success && dashRes.dashboard) {
-        const d = dashRes.dashboard;
-        setBackendDashboard(d);
+        if (dashRes.success && dashRes.dashboard) {
+          const d = dashRes.dashboard;
+          setBackendDashboard(d);
 
-        // Update wallet
-        if (d.wallet) {
-          setWallet((prev) => ({
-            ...prev,
-            availableBalance: Number(d.wallet.availableBalance ?? prev.availableBalance),
-            pendingBalance: Number(d.wallet.pendingAmount ?? prev.pendingBalance),
-            totalReceived: Number(d.wallet.totalReceived ?? prev.totalReceived),
-            totalWithdrawn: Number(d.wallet.totalWithdrawn ?? prev.totalWithdrawn),
-          }));
+          // Update wallet balances from dashboard aggregation
+          if (d.wallet) {
+            setWallet((prev) => ({
+              ...prev,
+              availableBalance: Number(d.wallet.availableBalance ?? prev.availableBalance),
+              pendingBalance: Number(d.wallet.pendingAmount ?? prev.pendingBalance),
+              totalReceived: Number(d.wallet.totalReceived ?? prev.totalReceived),
+              totalWithdrawn: Number(d.wallet.totalWithdrawn ?? prev.totalWithdrawn),
+            }));
+          }
+
+          // Update recent activities
+          if (Array.isArray(d.recentActivity) && d.recentActivity.length > 0) {
+            setBackendActivities(
+              d.recentActivity.map((act: any) => ({
+                id: act.id,
+                title: act.title,
+                timestamp: act.timestamp
+                  ? new Date(act.timestamp).toLocaleDateString("en-IN", { day: "numeric", month: "short" })
+                  : "Recent",
+                amount: act.amount,
+              }))
+            );
+          }
+
+          // Update products preview if returned
+          if (Array.isArray(d.products) && d.products.length > 0) {
+            setProducts((prev) => {
+              const fetched = d.products.filter((p: any) => !isMockItem(p.id));
+              const map = new Map<string, PayerntProduct>();
+              prev.forEach((p) => map.set(p.id, p));
+              fetched.forEach((p: any) => map.set(p.id, { ...map.get(p.id), ...p }));
+              return Array.from(map.values());
+            });
+          }
+
+          // Update upcoming bookings preview if present and rentalRequests is unpopulated or mock
+          if (Array.isArray(d.bookings) && d.bookings.length > 0) {
+            setRentalRequests((prev) => {
+              const hasRealRequests = prev.some((r) => !isMockItem(r.id) && !r.id.startsWith("ord-fx3"));
+              if (hasRealRequests) return prev;
+              return d.bookings.map(mapRawBookingToRentalRequest);
+            });
+          }
+
+          // Update messages unread count
+          if (d.messages?.unread !== undefined) {
+            setUnreadMessagesCount(d.messages.unread);
+          }
+        } else if (dashRes.error) {
+          const errorStr = typeof dashRes.error === "string" ? dashRes.error : JSON.stringify(dashRes.error);
+          const errLower = errorStr.toLowerCase();
+          if (
+            errLower.includes("401") ||
+            errLower.includes("expired") ||
+            errLower.includes("unauthorized") ||
+            errLower.includes("revoked") ||
+            errLower.includes("forbidden") ||
+            errLower.includes("session expired") ||
+            errLower.includes("authorization")
+          ) {
+            setActiveAccount(null);
+            setIsLoadingDashboard(false);
+            return;
+          }
+          setDashboardError(errorStr);
         }
 
-        // Update recent activities
-        if (Array.isArray(d.recentActivity) && d.recentActivity.length > 0) {
-          setBackendActivities(
-            d.recentActivity.map((act: any) => ({
-              id: act.id,
-              title: act.title,
-              timestamp: act.timestamp
-                ? new Date(act.timestamp).toLocaleDateString("en-IN", { day: "numeric", month: "short" })
-                : "Recent",
-              amount: act.amount,
-            }))
-          );
+        if (forceFull) {
+          await Promise.allSettled([
+            fetchBookings(true),
+            fetchProducts(true),
+            fetchWallet(true),
+            fetchNotifications(true),
+            fetchMessages(),
+          ]);
         }
-
-        // Update products preview if returned
-        if (Array.isArray(d.products) && d.products.length > 0) {
-          setProducts((prev) => {
-            const fetched = d.products.filter((p: any) => !isMockItem(p.id));
-            const map = new Map<string, PayerntProduct>();
-            prev.forEach((p) => map.set(p.id, p));
-            fetched.forEach((p: any) => map.set(p.id, { ...map.get(p.id), ...p }));
-            return Array.from(map.values());
-          });
-        }
-
-        // Update messages unread count
-        if (d.messages?.unread !== undefined) {
-          setUnreadMessagesCount(d.messages.unread);
-        }
-      } else if (dashRes.error) {
-        const errorStr = typeof dashRes.error === "string" ? dashRes.error : JSON.stringify(dashRes.error);
-        const errLower = errorStr.toLowerCase();
-        if (
-          errLower.includes("401") ||
-          errLower.includes("expired") ||
-          errLower.includes("unauthorized") ||
-          errLower.includes("revoked") ||
-          errLower.includes("forbidden") ||
-          errLower.includes("session expired") ||
-          errLower.includes("authorization")
-        ) {
-          setActiveAccount(null);
-          setIsLoadingDashboard(false);
-          return;
-        }
-        setDashboardError(errorStr);
+      } catch (e: any) {
+        console.warn("[paye₹nt Store] Dashboard refresh error:", e);
+        setDashboardError(e?.message || "Failed to synchronize with server.");
+      } finally {
+        setIsLoadingDashboard(false);
+        inFlightDashboardRef.current = null;
       }
+    })();
 
-      // Update bookings
-      if (bookingsRes.success && Array.isArray(bookingsRes.bookings)) {
-        const mappedRequests: RentalRequest[] = bookingsRes.bookings.map((b: any) => {
-          const daily = Number(b.amount || b.daily_rate || b.dailyRate || 500);
-          const rawStatus = String(b.status || "").toLowerCase().trim();
-            let parsedStatus: RentalRequestStatus = "approved";
-            if (rawStatus === "order confirmed" || rawStatus === "confirmed") parsedStatus = "confirmed";
-            else if (rawStatus === "ready for pickup" || rawStatus === "ready_for_pickup") parsedStatus = "ready_for_pickup";
-            else if (rawStatus === "picked up" || rawStatus === "picked_up") parsedStatus = "picked_up";
-            else if (rawStatus === "rental in progress" || rawStatus === "rental_in_progress" || rawStatus === "active" || b.rentalStarted) parsedStatus = "active";
-            else if (rawStatus === "return initiated" || rawStatus === "return_initiated") parsedStatus = "return_initiated";
-            else if (rawStatus === "item handed back to owner" || rawStatus === "handed_back" || rawStatus === "handed back") parsedStatus = "handed_back";
-            else if (rawStatus === "awaiting owner inspection" || rawStatus === "awaiting_inspection" || rawStatus === "inspection") parsedStatus = "awaiting_inspection";
-            else if (rawStatus === "rental completed" || rawStatus === "completed") parsedStatus = "completed";
-            else if (rawStatus === "cancelled") parsedStatus = "cancelled";
-            else if (rawStatus === "rejected") parsedStatus = "rejected";
-            else if (rawStatus === "handover") parsedStatus = "handover";
-            else parsedStatus = (b.status || "approved") as RentalRequestStatus;
-
-            return {
-              id: b.bookingId || b.id,
-              productId: b.productId,
-              productTitle: b.productTitle || "Tech Gear",
-              productImage: b.productImage || "",
-              category: b.category || "Tech Gear",
-              renter: {
-                name: b.renterName || (b.renterEmail ? b.renterEmail.split("@")[0] : "Verified Renter"),
-                avatar: "",
-                rating: 5.0,
-                completedRentals: 1,
-                phone: "",
-                email: b.renterEmail || "",
-                city: "",
-              },
-              startDate: b.startDate || "",
-              endDate: b.endDate || "",
-              totalDays: 3,
-              dailyRate: daily,
-              grossRental: daily * 3,
-              platformFee: 0,
-              netEarnings: daily * 3,
-              securityDeposit: 0,
-              status: parsedStatus,
-              requestDate: b.createdAt || new Date().toISOString(),
-              paymentStatus: parsedStatus === "completed" ? "settled_to_lender" : "paid_to_escrow",
-              confirmedAt: b.confirmedAt || b.confirmed_at || b.createdAt || b.created_at,
-              readyForPickupAt: b.readyForPickupAt || b.ready_for_pickup_at,
-              pickedUpAt: b.pickedUpAt || b.picked_up_at,
-              returnInitiatedAt: b.returnInitiatedAt || b.return_initiated_at,
-              handedBackAt: b.handedBackAt || b.handed_back_at,
-              awaitingInspectionAt: b.awaitingInspectionAt || b.awaiting_inspection_at,
-              completedAt: b.completedAt || b.completed_at,
-              queueNotes: b.queueNotes || b.queue_notes,
-              deliveryMethod: b.deliveryMethod || b.delivery_method || "delivery",
-              deliveryAddress: b.deliveryAddress || b.delivery_address || "",
-              pickupLocation: b.pickupLocation || b.pickup_location || "",
-              customLocation: b.customLocation || b.custom_location || "",
-              locationDirections: b.locationDirections || b.location_directions || "",
-              latitude: b.latitude ?? b.location_latitude ?? null,
-              longitude: b.longitude ?? b.location_longitude ?? null,
-              mapUrl: b.mapUrl || b.map_url || (b.latitude && b.longitude ? `https://www.google.com/maps/search/?api=1&query=${b.latitude},${b.longitude}` : (b.deliveryAddress ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(b.deliveryAddress)}` : "")),
-              locationChangeRequest: b.locationChangeRequest || b.location_change_request || null,
-            };
-          });
-          setRentalRequests(mappedRequests);
-        }
-
-      // Also fetch full user products and wallet transactions for detail pages
-      const [prodRes, walletRes, notifRes, msgRes] = await Promise.all([
-        payerntApi.getProducts(),
-        payerntApi.getWallet(),
-        payerntApi.getNotifications(),
-        payerntApi.getMessages(),
-      ]);
-
-      if (prodRes.success && Array.isArray(prodRes.products)) {
-        setProducts(prodRes.products.filter((p) => !isMockItem(p.id)));
-      }
-
-      if (walletRes.success && walletRes.wallet) {
-        const w = walletRes.wallet as any;
-        setWallet((prev) => ({
-          ...prev,
-          availableBalance: Number(w.available_balance ?? w.availableBalance ?? prev.availableBalance),
-          pendingBalance: Number(w.pending_amount ?? w.pendingBalance ?? prev.pendingBalance),
-          totalReceived: Number(w.total_received ?? w.totalReceived ?? prev.totalReceived),
-          totalWithdrawn: Number(w.total_withdrawn ?? w.totalWithdrawn ?? prev.totalWithdrawn),
-          bankAccounts: Array.isArray(walletRes.bankAccounts)
-            ? (walletRes.bankAccounts as any).filter((b: any) => !b.id?.startsWith("bank-00"))
-            : prev.bankAccounts,
-          transactions: Array.isArray(walletRes.transactions)
-            ? (walletRes.transactions as any).filter((t: any) => !t.id?.startsWith("wtx-00"))
-            : prev.transactions,
-        }));
-      }
-
-      if (notifRes.success && Array.isArray(notifRes.notifications)) {
-        setNotifications(notifRes.notifications.filter((n) => n.id !== "notif-1"));
-      }
-
-      if (msgRes.success && Array.isArray(msgRes.messages)) {
-        setMessages(msgRes.messages);
-        setUnreadMessagesCount(msgRes.unreadCount ?? msgRes.messages.filter((m: any) => !m.read && !m.is_read).length);
-      }
-    } catch (e: any) {
-      console.warn("[paye₹nt Store] Dashboard refresh error:", e);
-      setDashboardError(e?.message || "Failed to synchronize with server.");
-    } finally {
-      setIsLoadingDashboard(false);
-    }
-  }, [activeAccount, isAuthenticated, logout]);
+    inFlightDashboardRef.current = promise;
+    return promise;
+  }, [activeAccount, isAuthenticated, mapRawBookingToRentalRequest, fetchBookings, fetchProducts, fetchWallet, fetchNotifications, fetchMessages]);
 
   // Sync real paye₹nt backend state upon authentication and listen for refresh events
   useEffect(() => {
@@ -621,20 +703,33 @@ export function usePayerntStore() {
       refreshDashboard();
     };
 
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        const elapsed = Date.now() - lastDashboardFetchRef.current;
+        if (elapsed > 30000) {
+          refreshDashboard();
+        }
+      }
+    };
+
     window.addEventListener("paye₹nt_data_refresh", handleRefresh);
     window.addEventListener("payernt_data_refresh", handleRefresh);
     window.addEventListener("payent_orders_updated", handleRefresh);
     window.addEventListener("payent_queue_updated", handleRefresh);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     const pollInterval = setInterval(() => {
-      refreshDashboard();
-    }, 6000);
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        refreshDashboard();
+      }
+    }, 45000);
 
     return () => {
       window.removeEventListener("paye₹nt_data_refresh", handleRefresh);
       window.removeEventListener("payernt_data_refresh", handleRefresh);
       window.removeEventListener("payent_orders_updated", handleRefresh);
       window.removeEventListener("payent_queue_updated", handleRefresh);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       clearInterval(pollInterval);
     };
   }, [activeAccount, isAuthenticated, refreshDashboard]);
@@ -1404,6 +1499,10 @@ export function usePayerntStore() {
     backendDashboard,
     backendActivities,
     refreshDashboard,
+    fetchBookings,
+    fetchProducts,
+    fetchWallet,
+    fetchNotifications,
     stats: {
       totalProductsCount,
       activeProductsCount,

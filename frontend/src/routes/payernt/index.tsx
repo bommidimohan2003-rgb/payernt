@@ -90,7 +90,7 @@ function PayerntHomeRoute() {
       recentActivities={backendActivities}
       isLoading={isLoadingDashboard}
       error={dashboardError}
-      onRefresh={refreshDashboard}
+      onRefresh={() => refreshDashboard(true)}
       onNavigate={handleNavigate}
       onLogout={logout}
       onMarkNotificationRead={markNotificationRead}

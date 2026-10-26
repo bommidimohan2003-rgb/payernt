@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Bell, CheckCircle2, ArrowLeft, Trash2 } from "lucide-react";
 import { usePayernt } from "@/payernt/context";
@@ -19,7 +20,12 @@ function PayerntNotificationsRoute() {
     notifications,
     markNotificationRead,
     markAllNotificationsRead,
+    fetchNotifications,
   } = usePayernt();
+
+  useEffect(() => {
+    fetchNotifications();
+  }, [fetchNotifications]);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 

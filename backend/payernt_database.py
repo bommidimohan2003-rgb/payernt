@@ -118,6 +118,7 @@ def init_payernt_tables():
         except Exception:
             pass
 
+    _add_pp_col("updated_at VARCHAR(100) NULL")
     _add_pp_col("min_price FLOAT NULL")
     _add_pp_col("max_price FLOAT NULL")
     _add_pp_col("price_unit VARCHAR(50) DEFAULT 'PER DAY'")
@@ -403,7 +404,33 @@ def init_payernt_tables():
     except Exception:
         pass
 
+    # Performance composite indexes for rapid dashboard, booking, wallet & message queries
+    for tbl, idx_name, cols in [
+        ("payernt_products", "idx_pp_owner_created", "owner_id, created_at"),
+        ("payernt_products", "idx_pp_owner_email", "owner_email, created_at"),
+        ("rental_security", "idx_rs_vendor_created", "vendor_id, created_at"),
+        ("payernt_wallet_transactions", "idx_pwt_owner_created", "owner_id, created_at"),
+        ("payernt_notifications", "idx_pn_owner_created", "owner_id, created_at"),
+        ("payernt_messages", "idx_pm_receiver_created", "receiver_id, created_at"),
+        ("payernt_audit_logs", "idx_pal_user_created", "user_id, created_at"),
+    ]:
+        try:
+            execute_query(f"CREATE INDEX {idx_name} ON {tbl} ({cols})")
+        except Exception:
+            pass
+
     logger.info("paye₹nt database structures initialized.")
+
+# Short-TTL Account Cache to eliminate repeated database roundtrips during auth checks
+_PAYERNT_ACCOUNT_CACHE: Dict[str, Tuple[float, Dict[str, Any]]] = {}
+_PAYERNT_ACCOUNT_CACHE_TTL = 30.0  # 30-second TTL
+
+def invalidate_payernt_account_cache(email: Optional[str] = None):
+    """Safely clears cached account state upon profile update or role transition."""
+    if not email:
+        _PAYERNT_ACCOUNT_CACHE.clear()
+    else:
+        _PAYERNT_ACCOUNT_CACHE.pop(email.strip().lower(), None)
 
 
 # ============================================================
@@ -610,62 +637,76 @@ def get_payernt_account_by_email(email: str) -> Optional[Dict[str, Any]]:
     if not clean_email:
         return None
 
+    now = time.time()
+    if clean_email in _PAYERNT_ACCOUNT_CACHE:
+        cached_time, cached_acc = _PAYERNT_ACCOUNT_CACHE[clean_email]
+        if now - cached_time < _PAYERNT_ACCOUNT_CACHE_TTL:
+            return cached_acc
+
+    result = None
     try:
         row = fetch_one("SELECT * FROM payernt_accounts WHERE email = %s LIMIT 1", (clean_email,))
         if row:
-            return row
+            result = row
     except Exception as e:
         logger.warning(f"DB fetch error for payernt_account: {e}")
 
     # Fallback to admin_accounts (platform admins have universal access)
-    try:
-        admin_row = fetch_one("SELECT * FROM admin_accounts WHERE LOWER(email) = %s LIMIT 1", (clean_email,))
-        if admin_row:
-            return {
-                "id": admin_row.get("id") or f"PAYERNT_ADMIN_{clean_email.replace('@', '_').replace('.', '_')}",
-                "account_type": "paye₹nt",
-                "email": clean_email,
-                "name": admin_row.get("full_name") or admin_row.get("name") or "Admin",
-                "phone": admin_row.get("phone") or "",
-                "address": "Hyderabad, India",
-                "pincode": "500081",
-                "aadhaar_number": "XXXX-XXXX-0000",
-                "password_hash": admin_row.get("password_hash"),
-                "status": "APPROVED",
-                "role": "admin",
-                "avatar": admin_row.get("avatar") or f"https://ui-avatars.com/api/?name={clean_email.split('@')[0]}&background=0c0c0c&color=ffffff",
-                "created_at": str(admin_row.get("created_at") or ""),
-            }
-    except Exception as e:
-        logger.warning(f"DB fetch error for admin in payernt fallback: {e}")
+    if not result:
+        try:
+            admin_row = fetch_one("SELECT * FROM admin_accounts WHERE LOWER(email) = %s LIMIT 1", (clean_email,))
+            if admin_row:
+                result = {
+                    "id": admin_row.get("id") or f"PAYERNT_ADMIN_{clean_email.replace('@', '_').replace('.', '_')}",
+                    "account_type": "paye₹nt",
+                    "email": clean_email,
+                    "name": admin_row.get("full_name") or admin_row.get("name") or "Admin",
+                    "phone": admin_row.get("phone") or "",
+                    "address": "Hyderabad, India",
+                    "pincode": "500081",
+                    "aadhaar_number": "XXXX-XXXX-0000",
+                    "password_hash": admin_row.get("password_hash"),
+                    "status": "APPROVED",
+                    "role": "admin",
+                    "avatar": admin_row.get("avatar") or f"https://ui-avatars.com/api/?name={clean_email.split('@')[0]}&background=0c0c0c&color=ffffff",
+                    "created_at": str(admin_row.get("created_at") or ""),
+                }
+        except Exception as e:
+            logger.warning(f"DB fetch error for admin in payernt fallback: {e}")
 
     # Fallback to users table (registered platform users)
-    try:
-        user_row = fetch_one("SELECT * FROM users WHERE LOWER(email) = %s LIMIT 1", (clean_email,))
-        if user_row:
-            is_admin = (user_row.get("role") or "").lower() in ("admin", "superadmin")
-            status_val = "APPROVED" if (is_admin or str(user_row.get("status") or "").upper() in ("APPROVED", "ACTIVE")) else (user_row.get("status") or "PENDING_REVIEW")
-            return {
-                "id": user_row.get("id") or f"PAYERNT_USER_{clean_email.replace('@', '_').replace('.', '_')}",
-                "person_id": user_row.get("person_id"),
-                "personId": user_row.get("person_id"),
-                "account_type": "paye₹nt",
-                "email": clean_email,
-                "name": user_row.get("full_name") or clean_email.split("@")[0],
-                "phone": user_row.get("phone") or "",
-                "address": user_row.get("address") or "",
-                "pincode": user_row.get("pincode") or "",
-                "aadhaar_number": user_row.get("aadhaar_number") or "XXXX-XXXX-0000",
-                "password_hash": user_row.get("password_hash"),
-                "status": status_val,
-                "role": "admin" if is_admin else "vendor",
-                "avatar": user_row.get("avatar") or f"https://ui-avatars.com/api/?name={clean_email.split('@')[0]}&background=0c0c0c&color=ffffff",
-                "created_at": str(user_row.get("created_at") or ""),
-            }
-    except Exception as e:
-        logger.warning(f"DB fetch error for user in payernt fallback: {e}")
+    if not result:
+        try:
+            user_row = fetch_one("SELECT * FROM users WHERE LOWER(email) = %s LIMIT 1", (clean_email,))
+            if user_row:
+                is_admin = (user_row.get("role") or "").lower() in ("admin", "superadmin")
+                status_val = "APPROVED" if (is_admin or str(user_row.get("status") or "").upper() in ("APPROVED", "ACTIVE")) else (user_row.get("status") or "PENDING_REVIEW")
+                result = {
+                    "id": user_row.get("id") or f"PAYERNT_USER_{clean_email.replace('@', '_').replace('.', '_')}",
+                    "person_id": user_row.get("person_id"),
+                    "personId": user_row.get("person_id"),
+                    "account_type": "paye₹nt",
+                    "email": clean_email,
+                    "name": user_row.get("full_name") or clean_email.split("@")[0],
+                    "phone": user_row.get("phone") or "",
+                    "address": user_row.get("address") or "",
+                    "pincode": user_row.get("pincode") or "",
+                    "aadhaar_number": user_row.get("aadhaar_number") or "XXXX-XXXX-0000",
+                    "password_hash": user_row.get("password_hash"),
+                    "status": status_val,
+                    "role": "admin" if is_admin else "vendor",
+                    "avatar": user_row.get("avatar") or f"https://ui-avatars.com/api/?name={clean_email.split('@')[0]}&background=0c0c0c&color=ffffff",
+                    "created_at": str(user_row.get("created_at") or ""),
+                }
+        except Exception as e:
+            logger.warning(f"DB fetch error for user in payernt fallback: {e}")
 
-    return MOCK_PAYERNT_ACCOUNTS.get(clean_email)
+    if not result:
+        result = MOCK_PAYERNT_ACCOUNTS.get(clean_email)
+
+    if result:
+        _PAYERNT_ACCOUNT_CACHE[clean_email] = (now, result)
+    return result
 
 
 def get_payernt_account_by_id(account_id: str) -> Optional[Dict[str, Any]]:
@@ -1075,10 +1116,11 @@ def create_payernt_product(
     afternoon_slot_val = 1 if bool(data.get("afternoon_slot_enabled", data.get("afternoonSlotEnabled", True))) else 0
     full_day_slot_val = 1 if bool(data.get("full_day_slot_enabled", data.get("fullDaySlotEnabled", True))) else 0
     half_day_rate_val = int(data.get("half_day_rate") or data.get("halfDayRate") or round(daily_val * 0.6))
-    buffer_min_val = int(data.get("buffer_minutes") or data.get("bufferMinutes") or (data.get("availability", {}).get("bufferDaysBetweenRentals", 0) * 1440) or 60)
+    avail_dict = data.get("availability") if isinstance(data.get("availability"), dict) else {}
+    buffer_min_val = int(data.get("buffer_minutes") or data.get("bufferMinutes") or (avail_dict.get("bufferDaysBetweenRentals", 0) * 1440) or 60)
 
-    avail_from = data.get("available_from_date") or data.get("availableFromDate") or (data.get("availability", {}).get("availableFromDate") if isinstance(data.get("availability"), dict) else "")
-    avail_until = data.get("available_until_date") or data.get("availableUntilDate") or (data.get("availability", {}).get("availableUntilDate") if isinstance(data.get("availability"), dict) else "")
+    avail_from = data.get("available_from_date") or data.get("availableFromDate") or avail_dict.get("availableFromDate") or ""
+    avail_until = data.get("available_until_date") or data.get("availableUntilDate") or avail_dict.get("availableUntilDate") or ""
 
     product = {
         "id": product_id,
@@ -1303,13 +1345,15 @@ def get_payernt_products_by_owner(owner_id: str, owner_email: Optional[str] = No
         return []
 
     try:
-        if owner_email:
+        if owner_id and owner_email and owner_id != owner_email:
             rows = fetch_all(
-                "SELECT * FROM payernt_products WHERE owner_id = %s OR (owner_email IS NOT NULL AND LOWER(owner_email) = LOWER(%s)) ORDER BY created_at DESC",
-                (owner_id or "", owner_email)
+                "SELECT * FROM payernt_products WHERE owner_id = %s UNION SELECT * FROM payernt_products WHERE owner_email = %s ORDER BY created_at DESC",
+                (owner_id, owner_email)
             )
-        else:
+        elif owner_id:
             rows = fetch_all("SELECT * FROM payernt_products WHERE owner_id = %s ORDER BY created_at DESC", (owner_id,))
+        else:
+            rows = fetch_all("SELECT * FROM payernt_products WHERE owner_email = %s ORDER BY created_at DESC", (owner_email,))
         if rows:
             return [_normalize_payernt_product_dict(r, include_pin=True) for r in rows]
     except Exception as e:
@@ -1415,9 +1459,13 @@ def update_payernt_product(product_id: str, owner_id: str, updates: Dict[str, An
     params.extend([product_id, owner_id])
     try:
         execute_query(f"UPDATE payernt_products SET {', '.join(set_clauses)} WHERE id = %s AND owner_id = %s", tuple(params))
-        # Keep custom_products in sync
+        # Keep custom_products in sync (excluding updated_at which custom_products lacks)
         try:
-            execute_query(f"UPDATE custom_products SET {', '.join(set_clauses)} WHERE id = %s", tuple(params[:-1]))
+            cp_indices = [i for i, c in enumerate(set_clauses) if not c.startswith("updated_at")]
+            if cp_indices:
+                cp_clauses = [set_clauses[i] for i in cp_indices]
+                cp_params = [params[i] for i in cp_indices] + [product_id]
+                execute_query(f"UPDATE custom_products SET {', '.join(cp_clauses)} WHERE id = %s", tuple(cp_params))
         except Exception:
             pass
     except Exception as e:
@@ -3661,11 +3709,11 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50) -> List[Dict[st
             LEFT JOIN booking_cancellations bc ON sec.booking_id = bc.booking_id
             LEFT JOIN payernt_products pp ON sec.product_id = pp.id
             LEFT JOIN deliveries d ON sec.booking_id = d.booking_id
-            WHERE sec.vendor_id = %s OR pp.owner_id = %s
+            WHERE sec.vendor_id = %s
             ORDER BY sec.created_at DESC
             LIMIT %s
         """
-        rows = fetch_all(query, (vendor_id, vendor_id, limit))
+        rows = fetch_all(query, (vendor_id, limit))
         if rows:
             for r in rows:
                 b_id = r.get("booking_id")

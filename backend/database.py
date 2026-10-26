@@ -105,12 +105,12 @@ def get_db_pool():
     try:
         _db_pool = PooledDB(
             creator=pymysql,
-            mincached=3,
-            maxcached=20,
+            mincached=5,
+            maxcached=35,
             maxshared=0,
-            maxconnections=0,
-            blocking=False,
-            maxusage=1000,
+            maxconnections=50,
+            blocking=True,
+            maxusage=2000,
             ping=1,  # ping on checkout from pool if connection was closed/dropped, NOT on every cursor/execute
             host=MYSQL_HOST,
             port=MYSQL_PORT,
@@ -4140,10 +4140,14 @@ def revoke_cross_side_user_sessions(user_email: str, person_id: Optional[str] = 
     target_emails = {clean_email}
     try:
         if person_id:
-            rows_payrent = fetch_all("SELECT email FROM payrent_accounts WHERE person_id = %s", (person_id,)) or []
-            rows_users = fetch_all("SELECT email FROM users WHERE person_id = %s", (person_id,)) or []
-            rows_payernt = fetch_all("SELECT email FROM payernt_accounts WHERE person_id = %s", (person_id,)) or []
-            for r in rows_payrent + rows_users + rows_payernt:
+            rows = fetch_all("""
+                SELECT email FROM payrent_accounts WHERE person_id = %s
+                UNION
+                SELECT email FROM users WHERE person_id = %s
+                UNION
+                SELECT email FROM payernt_accounts WHERE person_id = %s
+            """, (person_id, person_id, person_id)) or []
+            for r in rows:
                 if r and r.get("email"):
                     target_emails.add(r["email"].strip().lower())
         else:
@@ -4151,51 +4155,65 @@ def revoke_cross_side_user_sessions(user_email: str, person_id: Optional[str] = 
             p_payernt = fetch_one("SELECT person_id, phone FROM payernt_accounts WHERE email = %s", (clean_email,))
             pid = (p_user and p_user.get("person_id")) or (p_payernt and p_payernt.get("person_id"))
             if pid:
-                rows_payrent = fetch_all("SELECT email FROM payrent_accounts WHERE person_id = %s", (pid,)) or []
-                rows_users = fetch_all("SELECT email FROM users WHERE person_id = %s", (pid,)) or []
-                rows_payernt = fetch_all("SELECT email FROM payernt_accounts WHERE person_id = %s", (pid,)) or []
-                for r in rows_payrent + rows_users + rows_payernt:
+                rows = fetch_all("""
+                    SELECT email FROM payrent_accounts WHERE person_id = %s
+                    UNION
+                    SELECT email FROM users WHERE person_id = %s
+                    UNION
+                    SELECT email FROM payernt_accounts WHERE person_id = %s
+                """, (pid, pid, pid)) or []
+                for r in rows:
                     if r and r.get("email"):
                         target_emails.add(r["email"].strip().lower())
             phone = (p_user and p_user.get("phone")) or (p_payernt and p_payernt.get("phone"))
             if phone:
-                rows_u = fetch_all("SELECT email FROM users WHERE phone = %s", (phone,)) or []
-                rows_p = fetch_all("SELECT email FROM payernt_accounts WHERE phone = %s", (phone,)) or []
-                for r in rows_u + rows_p:
+                rows = fetch_all("""
+                    SELECT email FROM users WHERE phone = %s
+                    UNION
+                    SELECT email FROM payernt_accounts WHERE phone = %s
+                """, (phone, phone)) or []
+                for r in rows:
                     if r and r.get("email"):
                         target_emails.add(r["email"].strip().lower())
     except Exception as e:
         logger.warning(f"Notice: cross-side email discovery error: {e}")
 
     norm_target = "payrent" if logging_in_account_type.lower() in ("payrent", "pay₹ent", "customer") else "payernt"
-    for em in target_emails:
+    if target_emails:
+        clean_list = [em.strip().lower() for em in target_emails if em]
+        placeholders = ", ".join(["%s"] * len(clean_list))
+        params_tuple = (now_str,) + tuple(clean_list)
         try:
             if norm_target == "payrent":
                 # Revoke payernt sessions
-                execute_query("""
+                execute_query(f"""
                     UPDATE sessions 
                     SET revoked_at = %s 
-                    WHERE LOWER(user_email) = LOWER(%s) 
+                    WHERE LOWER(user_email) IN ({placeholders}) 
                       AND (account_type IN ('payernt', 'paye₹nt', 'vendor') OR account_type IS NULL)
                       AND account_type NOT IN ('admin')
                       AND revoked_at IS NULL
-                """, (now_str, em))
+                """, params_tuple)
             else:
                 # Revoke payrent sessions
-                execute_query("""
+                execute_query(f"""
                     UPDATE sessions 
                     SET revoked_at = %s 
-                    WHERE LOWER(user_email) = LOWER(%s) 
+                    WHERE LOWER(user_email) IN ({placeholders}) 
                       AND (account_type IN ('payrent', 'pay₹ent', 'customer') OR account_type IS NULL)
                       AND account_type NOT IN ('admin')
                       AND revoked_at IS NULL
-                """, (now_str, em))
+                """, params_tuple)
         except Exception:
-            execute_query("""
-                UPDATE sessions 
-                SET revoked_at = %s 
-                WHERE LOWER(user_email) = LOWER(%s) AND revoked_at IS NULL
-            """, (now_str, em))
+            for em in clean_list:
+                try:
+                    execute_query("""
+                        UPDATE sessions 
+                        SET revoked_at = %s 
+                        WHERE LOWER(user_email) = LOWER(%s) AND revoked_at IS NULL
+                    """, (now_str, em))
+                except Exception:
+                    pass
 
     return True
 

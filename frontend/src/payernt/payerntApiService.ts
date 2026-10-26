@@ -75,17 +75,54 @@ export function handlePayerntUnauthorized() {
   } catch {}
 }
 
-async function fetchWithPayerntAuth(url: string, options: RequestInit = {}): Promise<Response> {
+const inFlightGetRequests = new Map<string, Promise<Response>>();
+
+async function fetchWithPayerntAuth(
+  url: string,
+  options: RequestInit = {},
+  timeoutMs: number = 12000
+): Promise<Response> {
+  const method = (options.method || "GET").toUpperCase();
+  const isGet = method === "GET";
+
+  // Deduplicate identical in-flight GET requests
+  if (isGet && inFlightGetRequests.has(url)) {
+    const existing = inFlightGetRequests.get(url)!;
+    return existing.then((res) => res.clone());
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  if (options.signal) {
+    options.signal.addEventListener("abort", () => controller.abort());
+  }
+
   const authHeaders = getAuthHeaders();
   const headers = {
     ...authHeaders,
-    ...(options.headers as Record<string, string> || {}),
+    ...((options.headers as Record<string, string>) || {}),
   };
-  const res = await fetch(url, { ...options, headers });
-  if (res.status === 401) {
-    handlePayerntUnauthorized();
+
+  const fetchPromise = (async () => {
+    try {
+      const res = await fetch(url, { ...options, headers, signal: controller.signal });
+      if (res.status === 401) {
+        handlePayerntUnauthorized();
+      }
+      return res;
+    } finally {
+      clearTimeout(timer);
+      if (isGet) {
+        inFlightGetRequests.delete(url);
+      }
+    }
+  })();
+
+  if (isGet) {
+    inFlightGetRequests.set(url, fetchPromise);
   }
-  return res;
+
+  return fetchPromise;
 }
 
 export function extractApiErrorMessage(data: any, fallback: string): string {
