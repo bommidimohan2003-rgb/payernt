@@ -167,6 +167,7 @@ from database import (
     check_products_booking_conflicts,
     evaluate_product_availability,
     evaluate_products_availability_batch,
+    find_authoritative_product,
     get_products_batch,
     fetch_cart_validation_bundle,
     get_user_cart,
@@ -3157,6 +3158,12 @@ def _get_order_and_check_access(order_id: str, email: str):
     cust_email = (order.get("user_email") or order.get("userEmail") or "").strip().lower()
     pid = order.get("product_id") or order.get("productId") or ""
     prod = fetch_one_product(pid) if pid else None
+    if not prod and pid:
+        try:
+            from payernt_database import get_payernt_product_by_id
+            prod = get_payernt_product_by_id(pid)
+        except Exception:
+            pass
     lender_email = (prod.get("user_email") if prod else "").strip().lower()
     if not lender_email and prod:
         lender_email = str(prod.get("owner_id") or "").strip().lower()
@@ -5047,7 +5054,7 @@ def process_admin_refund(data: RefundPaymentSchema, current_admin: dict = Depend
     }
 
 @app.get("/api/lender/orders")
-def fetch_lender_orders(email: str = Depends(get_current_user_email)):
+def fetch_lender_orders(email: str = Depends(get_current_any_user_email)):
     clean_email = email.strip().lower()
     try:
         conn = get_db_connection()
@@ -5087,19 +5094,72 @@ def fetch_lender_orders(email: str = Depends(get_current_user_email)):
                             "status": str(r.get("status", "active")),
                             "createdAt": created,
                             "created_at": created,
+                            "confirmedAt": r.get("confirmed_at") or r.get("confirmedAt") or r.get("created_at") or created,
+                            "readyForPickupAt": r.get("ready_for_pickup_at") or r.get("readyForPickupAt"),
+                            "pickedUpAt": r.get("picked_up_at") or r.get("pickedUpAt"),
+                            "returnInitiatedAt": r.get("return_initiated_at") or r.get("returnInitiatedAt"),
+                            "handedBackAt": r.get("handed_back_at") or r.get("handedBackAt"),
+                            "awaitingInspectionAt": r.get("awaiting_inspection_at") or r.get("awaitingInspectionAt"),
+                            "completedAt": r.get("completed_at") or r.get("completedAt"),
+                            "queueNotes": r.get("queue_notes") or r.get("queueNotes"),
+                            "timeSlot": r.get("time_slot") or r.get("timeSlot") or "full_day",
                             "renter": {
                                 "name": r.get("renter_name") or clean_email.split("@")[0],
                                 "email": r.get("renter_email") or clean_email,
                                 "phone": r.get("renter_phone") or ""
                             }
                         })
-                    return result
+                    if result:
+                        return result
             finally:
                 conn.close()
     except Exception as e:
         logger.warning(f"Failed to fetch lender orders from DB: {e}")
     
-    return []
+    # In-memory / Mock fallback for lender orders
+    mock_results = []
+    for o in MOCK_ORDERS.values():
+        pid = str(o.get("product_id") or o.get("productId") or "")
+        cprod = MOCK_CUSTOM_PRODUCTS.get(pid)
+        is_my_product = False
+        if cprod and str(cprod.get("user_email") or cprod.get("owner_id") or "").lower() == clean_email:
+            is_my_product = True
+        elif str(o.get("lender_email") or o.get("vendor_id") or "").lower() == clean_email:
+            is_my_product = True
+        
+        if is_my_product:
+            mock_results.append({
+                "id": str(o.get("id", "")),
+                "productId": pid,
+                "product_id": pid,
+                "productTitle": str(o.get("product_title") or o.get("productTitle") or "Gear Rental"),
+                "product_title": str(o.get("product_title") or o.get("productTitle") or "Gear Rental"),
+                "productImage": str(o.get("product_image") or o.get("productImage") or ""),
+                "product_image": str(o.get("product_image") or o.get("productImage") or ""),
+                "startDate": str(o.get("start_date") or o.get("startDate") or ""),
+                "start_date": str(o.get("start_date") or o.get("startDate") or ""),
+                "endDate": str(o.get("end_date") or o.get("endDate") or ""),
+                "end_date": str(o.get("end_date") or o.get("endDate") or ""),
+                "total": float(o.get("total", 0)),
+                "status": str(o.get("status", "active")),
+                "createdAt": str(o.get("created_at") or o.get("createdAt") or ""),
+                "created_at": str(o.get("created_at") or o.get("createdAt") or ""),
+                "confirmedAt": o.get("confirmed_at") or o.get("confirmedAt") or o.get("created_at"),
+                "readyForPickupAt": o.get("ready_for_pickup_at") or o.get("readyForPickupAt"),
+                "pickedUpAt": o.get("picked_up_at") or o.get("pickedUpAt"),
+                "returnInitiatedAt": o.get("return_initiated_at") or o.get("returnInitiatedAt"),
+                "handedBackAt": o.get("handed_back_at") or o.get("handedBackAt"),
+                "awaitingInspectionAt": o.get("awaiting_inspection_at") or o.get("awaitingInspectionAt"),
+                "completedAt": o.get("completed_at") or o.get("completedAt"),
+                "queueNotes": o.get("queue_notes") or o.get("queueNotes"),
+                "timeSlot": o.get("time_slot") or o.get("timeSlot") or "full_day",
+                "renter": {
+                    "name": str(o.get("user_email") or o.get("userEmail") or "Customer").split("@")[0],
+                    "email": str(o.get("user_email") or o.get("userEmail") or "Customer"),
+                    "phone": str(o.get("renter_phone") or "")
+                }
+            })
+    return mock_results
 
 @app.get("/api/notifications")
 def fetch_notifications(email: str = Depends(get_current_user_email)):

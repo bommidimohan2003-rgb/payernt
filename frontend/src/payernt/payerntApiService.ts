@@ -47,7 +47,9 @@ function getAuthHeaders(): Record<string, string> {
   try {
     let token =
       localStorage.getItem("paye₹nt_token") ||
-      localStorage.getItem("payernt_token");
+      localStorage.getItem("payernt_token") ||
+      localStorage.getItem("payent_auth_token") ||
+      localStorage.getItem("token");
     if (token) {
       token = token.trim();
       if (token.startsWith('"') && token.endsWith('"')) {
@@ -1093,7 +1095,8 @@ export const payerntApi = {
   async advanceRentalQueue(
     bookingId: string,
     milestone: string,
-    notes?: string
+    notes?: string,
+    customToken?: string
   ): Promise<{
     success: boolean;
     status?: string;
@@ -1104,21 +1107,29 @@ export const payerntApi = {
     error?: string;
   }> {
     try {
+      const headers = getAuthHeaders();
+      if (customToken) {
+        let cleanToken = customToken.trim();
+        if (cleanToken.startsWith('"') && cleanToken.endsWith('"')) {
+          cleanToken = cleanToken.slice(1, -1).trim();
+        }
+        headers["Authorization"] = `Bearer ${cleanToken}`;
+      }
       const res = await fetch(`${API_BASE}/api/payernt/bookings/${encodeURIComponent(bookingId)}/queue-advance`, {
         method: "POST",
-        headers: getAuthHeaders(),
+        headers,
         body: JSON.stringify({ milestone, notes }),
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok && (data.success || data.status)) {
         if (typeof window !== "undefined") {
-          window.dispatchEvent(new CustomEvent("payent_queue_updated", { detail: { bookingId, milestone, data } }));
+          window.dispatchEvent(new CustomEvent("payent_queue_updated", { detail: { bookingId, orderId: bookingId, milestone, data } }));
           window.dispatchEvent(new CustomEvent("payent_orders_updated"));
         }
         return {
           success: true,
           status: data.status,
-          booking: data.booking,
+          booking: data.booking || data.order,
           all_timestamps: data.all_timestamps || data.timestamps,
           timestamps: data.all_timestamps || data.timestamps,
           message: data.message,

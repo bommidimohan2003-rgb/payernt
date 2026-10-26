@@ -318,16 +318,20 @@ export function LiveRentalQueue({
   useEffect(() => {
     const handleQueueUpdate = (e: Event) => {
       const custom = e as CustomEvent<{
-        bookingId: string;
+        bookingId?: string;
+        orderId?: string;
         milestone: string;
         data?: any;
+        payload?: any;
       }>;
-      if (custom.detail?.bookingId === orderId) {
-        if (custom.detail.data?.status) {
-          setStatus(custom.detail.data.status);
+      const targetId = custom.detail?.bookingId || custom.detail?.orderId;
+      if (targetId === orderId) {
+        const payloadData = custom.detail.data || custom.detail.payload;
+        if (payloadData?.status) {
+          setStatus(payloadData.status);
         }
-        if (custom.detail.data?.all_timestamps || custom.detail.data?.timestamps) {
-          const incoming = custom.detail.data.all_timestamps || custom.detail.data.timestamps;
+        if (payloadData?.all_timestamps || payloadData?.timestamps) {
+          const incoming = payloadData.all_timestamps || payloadData.timestamps;
           setTimestamps((prev) => ({
             ...prev,
             ...incoming,
@@ -447,19 +451,40 @@ export function LiveRentalQueue({
 
   // Advance milestone handler
   const handleAdvanceMilestone = async (targetMilestone: string, actionLabel: string) => {
+    // Prevent duplicate clicks while request is processing
+    if (isAdvancing) return;
     setIsAdvancing(true);
-    const token = storage.get<string | null>(STORAGE_KEYS.token, null);
+
+    const token =
+      storage.get<string | null>(STORAGE_KEYS.token, null) ||
+      (typeof localStorage !== "undefined"
+        ? localStorage.getItem("paye₹nt_token") ||
+          localStorage.getItem("payernt_token") ||
+          localStorage.getItem("payent_auth_token")
+        : null);
+
+    if (!token) {
+      toast.error("Please log in to proceed.");
+      setIsAdvancing(false);
+      return;
+    }
 
     try {
       let res: any;
       if (role === "lender") {
-        res = await payerntApi.advanceRentalQueue(orderId, targetMilestone);
-      } else {
-        if (!token) {
-          toast.error("Please login to proceed.");
-          setIsAdvancing(false);
-          return;
+        res = await payerntApi.advanceRentalQueue(orderId, targetMilestone, undefined, token);
+        // Fall back to universal endpoint if vendor endpoint returned an error response
+        if (!res || (!res.success && !res.status)) {
+          try {
+            const fallbackRes = await api.advanceRentalQueue(token, orderId, targetMilestone);
+            if (fallbackRes && (fallbackRes.success || fallbackRes.status)) {
+              res = fallbackRes;
+            }
+          } catch {
+            // Keep original response or error
+          }
         }
+      } else {
         res = await api.advanceRentalQueue(token, orderId, targetMilestone);
       }
 
@@ -478,11 +503,16 @@ export function LiveRentalQueue({
           onStatusUpdated(updatedStatus, newTimestamps);
         }
       } else {
-        toast.error(res?.error || res?.detail || "Could not advance rental status.");
+        const errorMsg =
+          res?.error ||
+          res?.detail ||
+          res?.message ||
+          "Could not advance rental status. Please try again.";
+        toast.error(errorMsg);
       }
     } catch (err: any) {
-      console.error("Queue advance error:", err);
-      toast.error(err?.message || "Failed to advance rental queue.");
+      console.error("[LiveRentalQueue] Queue advance error:", err);
+      toast.error(err?.message || "Failed to advance rental queue. Please check connection.");
     } finally {
       setIsAdvancing(false);
     }

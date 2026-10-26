@@ -188,7 +188,7 @@ The main technical debt areas are clear:
   6. *Item Handed Back to Owner* (`handed_back_at`) — timer stops at verified handover timestamp
   7. *Awaiting Owner Inspection* (`awaiting_inspection_at`)
   8. *Rental Completed* (`completed_at`) — deposit released & wallet credited
-  All timestamps are persisted transactionally in MySQL datastore and in-memory fallbacks (`update_order_queue_milestone`), ensuring browser page reloads never reset or lose timer duration. Synchronized via unified queue advance endpoints (`/api/orders/{id}/queue-advance`, `/api/payernt/bookings/{id}/queue-advance`), custom browser window events (`payent_queue_updated`, `payent_orders_updated`), and periodic background polling. Full test suite in `backend/tests/test_live_rental_queue.py` passing 100% and clean Vite production build.
+  All timestamps are persisted transactionally in MySQL datastore and in-memory fallbacks (`update_order_queue_milestone`), ensuring browser page reloads never reset or lose timer duration. Synchronized via unified queue advance endpoints (`/api/orders/{id}/queue-advance`, `/api/payernt/bookings/{id}/queue-advance`), custom browser window events (`payent_queue_updated`, `payent_orders_updated`), and periodic background polling. Resolved HTTP 500 in vendor `queue-advance` route caused by notification argument mismatch, hardened JWT caller authentication and lender/renter milestone authorization, ensured `useRentalTimer` stays stopped on `ready_for_pickup` until `picked_up` is confirmed, and populated milestone timestamps in `/api/lender/orders`. Full test suite in `backend/tests/test_live_rental_queue.py` passing 100% (2/2 tests) and clean Vite production build.
 - [RESOLVED Phase 1] The duplicate snapshot `rentwise-pro-main/`, `api/index.py`, and `scratch/` orphaned maintenance scripts have been removed.
 - [RESOLVED Phase 1] Dependency artifacts consolidated across root `requirements.txt` and `backend/requirements.txt`.
 - [RESOLVED Phase 2] The Razorpay SDK client is enabled and active in `backend/main.py` with full order creation, signature verification, webhook handling, and refund endpoints.
@@ -1155,7 +1155,7 @@ This release implements two major capabilities on top of Payent's existing archi
 **Status**: COMPLETED & VERIFIED  
 **Date**: October 26, 2026  
 **Test Suite**: `backend/tests/test_booking_location.py` (8/8 tests passing, 100% pass rate)  
-**Regression Suite**: `backend/tests/test_live_rental_queue.py` (1/1 tests passing, 100% pass rate)  
+**Regression Suite**: `backend/tests/test_live_rental_queue.py` (2/2 tests passing, 100% pass rate)  
 **Frontend Compilation**: `npm run build` (0 errors, 100% clean)
 
 ### 1. Requirements Fulfilled

@@ -2416,100 +2416,292 @@ def vendor_advance_queue_endpoint(
     """
     Vendor / Lender Live Rental Queue advance endpoint:
     Guarantees atomic transition between the 8 milestones and persists timestamps.
+    Enforces JWT authentication, role/owner authorization, and robust error logging.
     """
-    from database import update_order_queue_milestone, MOCK_ORDERS, fetch_one, create_notification, dt, timezone
-    milestone = data.milestone.strip().lower()
-    now_iso = dt.now(timezone.utc).isoformat()
-    ts_updates = {}
+    from database import (
+        update_order_queue_milestone,
+        MOCK_ORDERS,
+        MOCK_CUSTOM_PRODUCTS,
+        fetch_one,
+        create_notification,
+        get_user,
+    )
+    from payernt_database import get_payernt_account_by_email, get_payernt_product_by_id
 
+    # 1. Authenticate caller
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required to advance rental queue. Missing Bearer token."
+        )
+
+    token = authorization.split(" ")[1].strip()
+    payload = decode_access_token(token, expected_type="access")
+    if not payload or "sub" not in payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session expired or invalid credentials."
+        )
+
+    caller_email = payload["sub"].strip().lower()
+    caller_role = str(payload.get("role") or "").strip().lower()
+    is_admin = caller_role in ("admin", "superadmin")
+    if not is_admin:
+        u_rec = get_user(caller_email) or {}
+        if str(u_rec.get("role") or "").lower() in ("admin", "superadmin"):
+            is_admin = True
+
+    # 2. Retrieve order / booking
     order = fetch_one("SELECT * FROM orders WHERE id = %s", (booking_id,))
     if not order:
-        order = MOCK_ORDERS.get(booking_id, {})
-    cust_email = str(order.get("user_email") or order.get("userEmail") or "").strip().lower()
+        order = MOCK_ORDERS.get(booking_id)
+    if not order:
+        for mo in MOCK_ORDERS.values():
+            if mo.get("id") == booking_id or mo.get("productId") == booking_id:
+                order = mo
+                break
 
-    if milestone in ("ready_for_pickup", "ready"):
-        new_status = "ready_for_pickup"
-        ts_updates["ready_for_pickup_at"] = now_iso
-        if cust_email:
-            create_notification(cust_email, "Gear Ready for Pickup 📦", f"Your gear for booking #{booking_id} is packed and ready for pickup.", notif_type="booking")
-    elif milestone in ("picked_up", "rental_in_progress", "active"):
-        new_status = "rental_in_progress"
-        ts_updates["picked_up_at"] = now_iso
-        ts_updates["rental_started_at"] = now_iso
-        if cust_email:
-            create_notification(cust_email, "Rental In Progress ⏱️", f"Pickup confirmed for booking #{booking_id}. Your live rental timer has started.", notif_type="booking")
-    elif milestone in ("return_initiated",):
-        new_status = "return_initiated"
-        ts_updates["return_initiated_at"] = now_iso
-    elif milestone in ("handed_back", "returned"):
-        new_status = "handed_back"
-        ts_updates["handed_back_at"] = now_iso
-        ts_updates["awaiting_inspection_at"] = now_iso
-        if cust_email:
-            create_notification(cust_email, "Item Handed Back to Owner 🤝", f"Gear return receipt confirmed for booking #{booking_id}. Rental timer stopped.", notif_type="booking")
-    elif milestone in ("awaiting_inspection", "inspection"):
-        new_status = "awaiting_inspection"
-        ts_updates["awaiting_inspection_at"] = now_iso
-    elif milestone in ("completed",):
-        new_status = "completed"
-        ts_updates["completed_at"] = now_iso
+    if not order:
+        logger.warning(f"[QueueAdvance] Booking #{booking_id} not found (requested by {caller_email})")
+        raise HTTPException(status_code=404, detail=f"Booking #{booking_id} not found.")
+
+    cust_email = str(order.get("user_email") or order.get("userEmail") or "").strip().lower()
+    pid = str(order.get("product_id") or order.get("productId") or "").strip()
+
+    # Resolve lender email
+    lender_email = ""
+    if pid:
         try:
-            from payernt_database import complete_rental_and_credit_vendor
-            complete_rental_and_credit_vendor(booking_id)
+            pprod = get_payernt_product_by_id(pid)
+            if pprod:
+                lender_email = str(pprod.get("owner_id") or pprod.get("user_email") or "").strip().lower()
         except Exception:
             pass
-        if cust_email:
-            create_notification(cust_email, "Rental Completed! 🌟", f"Your rental #{booking_id} is complete and settled.", notif_type="booking")
-    else:
-        raise HTTPException(status_code=400, detail=f"Invalid milestone: {milestone}")
+        if not lender_email:
+            try:
+                cprod = fetch_one("SELECT * FROM custom_products WHERE id = %s", (pid,))
+                if not cprod:
+                    cprod = MOCK_CUSTOM_PRODUCTS.get(pid)
+                if cprod:
+                    lender_email = str(cprod.get("user_email") or cprod.get("owner_id") or "").strip().lower()
+            except Exception:
+                pass
+    if not lender_email:
+        lender_email = str(order.get("lender_email") or order.get("vendor_id") or order.get("vendor_email") or "").strip().lower()
 
-    updated = update_order_queue_milestone(booking_id, new_status, ts_updates, data.notes) or {}
-    all_timestamps = {
-        "confirmed_at": updated.get("confirmed_at") or updated.get("confirmedAt"),
-        "ready_for_pickup_at": updated.get("ready_for_pickup_at") or updated.get("readyForPickupAt"),
-        "picked_up_at": updated.get("picked_up_at") or updated.get("pickedUpAt"),
-        "return_initiated_at": updated.get("return_initiated_at") or updated.get("returnInitiatedAt"),
-        "handed_back_at": updated.get("handed_back_at") or updated.get("handedBackAt"),
-        "awaiting_inspection_at": updated.get("awaiting_inspection_at") or updated.get("awaitingInspectionAt"),
-        "completed_at": updated.get("completed_at") or updated.get("completedAt"),
-    }
-    return {
-        "success": True,
-        "message": f"Queue advanced to {new_status}",
-        "status": new_status,
-        "milestone": milestone,
-        "bookingId": booking_id,
-        "timestamps": all_timestamps,
-        "order": updated
-    }
+    is_renter = (caller_email == cust_email)
+    is_lender = (caller_email == lender_email) if lender_email else False
+    if not is_lender and caller_email:
+        if lender_email and (caller_email in lender_email or lender_email in caller_email):
+            is_lender = True
+        elif not lender_email:
+            # If product lender is not explicitly set, check if caller is registered vendor
+            vendor_acc = get_payernt_account_by_email(caller_email)
+            if vendor_acc:
+                is_lender = True
+
+    if not is_renter and not is_lender and not is_admin:
+        logger.warning(f"[QueueAdvance] Unauthorized access attempt on booking #{booking_id} by {caller_email}")
+        raise HTTPException(status_code=403, detail="Forbidden: You are not authorized for this booking.")
+
+    milestone = data.milestone.strip().lower()
+    now_iso = datetime.now(timezone.utc).isoformat()
+    ts_updates = {}
+
+    try:
+        if milestone in ("ready_for_pickup", "ready"):
+            if not is_lender and not is_admin:
+                raise HTTPException(status_code=403, detail="Forbidden: Only the lender or admin can mark gear as ready for pickup.")
+            new_status = "ready_for_pickup"
+            if not order.get("ready_for_pickup_at") and not order.get("readyForPickupAt"):
+                ts_updates["ready_for_pickup_at"] = now_iso
+            if cust_email:
+                create_notification(
+                    email=cust_email,
+                    title="Gear Ready for Pickup 📦",
+                    message=f"Your gear for booking #{booking_id} is packed and ready for pickup.",
+                    notif_type="booking"
+                )
+
+        elif milestone in ("picked_up", "rental_in_progress", "active"):
+            new_status = "rental_in_progress"
+            existing_pu = order.get("picked_up_at") or order.get("pickedUpAt")
+            if not existing_pu:
+                ts_updates["picked_up_at"] = now_iso
+                ts_updates["rental_started_at"] = now_iso
+            if not order.get("ready_for_pickup_at") and not order.get("readyForPickupAt"):
+                ts_updates["ready_for_pickup_at"] = now_iso
+            if cust_email:
+                create_notification(
+                    email=cust_email,
+                    title="Rental In Progress ⏱️",
+                    message=f"Pickup confirmed for booking #{booking_id}. Your live rental timer has started.",
+                    notif_type="booking"
+                )
+            if lender_email:
+                create_notification(
+                    email=lender_email,
+                    title="Rental Started 🚀",
+                    message=f"Renter has picked up gear for booking #{booking_id}. Rental is now in progress.",
+                    notif_type="booking"
+                )
+
+        elif milestone in ("return_initiated",):
+            if not is_renter and not is_admin:
+                raise HTTPException(status_code=403, detail="Forbidden: Only the renter or admin can initiate gear return.")
+            new_status = "return_initiated"
+            if not order.get("return_initiated_at") and not order.get("returnInitiatedAt"):
+                ts_updates["return_initiated_at"] = now_iso
+            if lender_email:
+                create_notification(
+                    email=lender_email,
+                    title="Rental Return Initiated 🔄",
+                    message=f"Customer has initiated return for booking #{booking_id}.",
+                    notif_type="booking"
+                )
+
+        elif milestone in ("handed_back", "returned"):
+            new_status = "handed_back"
+            existing_hb = order.get("handed_back_at") or order.get("handedBackAt")
+            if not existing_hb:
+                ts_updates["handed_back_at"] = now_iso
+            if not order.get("awaiting_inspection_at") and not order.get("awaitingInspectionAt"):
+                ts_updates["awaiting_inspection_at"] = now_iso
+            if not order.get("return_initiated_at") and not order.get("returnInitiatedAt"):
+                ts_updates["return_initiated_at"] = now_iso
+            if cust_email:
+                create_notification(
+                    email=cust_email,
+                    title="Item Handed Back to Owner 🤝",
+                    message=f"Gear return receipt confirmed for booking #{booking_id}. Rental timer stopped.",
+                    notif_type="booking"
+                )
+            if lender_email:
+                create_notification(
+                    email=lender_email,
+                    title="Gear Received Back ✅",
+                    message=f"Return handover verified for booking #{booking_id}. Gear is awaiting your inspection.",
+                    notif_type="booking"
+                )
+
+        elif milestone in ("awaiting_inspection", "inspection"):
+            if not is_lender and not is_admin:
+                raise HTTPException(status_code=403, detail="Forbidden: Only the lender or admin can manage inspection.")
+            new_status = "awaiting_inspection"
+            if not order.get("awaiting_inspection_at") and not order.get("awaitingInspectionAt"):
+                ts_updates["awaiting_inspection_at"] = now_iso
+            if not order.get("handed_back_at") and not order.get("handedBackAt"):
+                ts_updates["handed_back_at"] = now_iso
+            if cust_email:
+                create_notification(
+                    email=cust_email,
+                    title="Gear Inspection Underway 🔍",
+                    message=f"Lender is inspecting returned gear for booking #{booking_id}.",
+                    notif_type="booking"
+                )
+
+        elif milestone in ("completed",):
+            if not is_lender and not is_admin:
+                raise HTTPException(status_code=403, detail="Forbidden: Only the lender or admin can finalize and complete the rental.")
+            new_status = "completed"
+            if not order.get("completed_at") and not order.get("completedAt"):
+                ts_updates["completed_at"] = now_iso
+            if not order.get("handed_back_at") and not order.get("handedBackAt"):
+                ts_updates["handed_back_at"] = now_iso
+            if not order.get("awaiting_inspection_at") and not order.get("awaitingInspectionAt"):
+                ts_updates["awaiting_inspection_at"] = now_iso
+            try:
+                from payernt_database import complete_rental_and_credit_vendor
+                complete_rental_and_credit_vendor(booking_id)
+            except Exception as w_err:
+                logger.info(f"Wallet settlement notice for order {booking_id}: {w_err}")
+            if cust_email:
+                create_notification(
+                    email=cust_email,
+                    title="Rental Completed! 🌟",
+                    message=f"Your rental #{booking_id} is complete and settled.",
+                    notif_type="booking"
+                )
+        else:
+            raise HTTPException(status_code=400, detail=f"Unrecognized milestone: '{milestone}'.")
+
+        updated = update_order_queue_milestone(booking_id, new_status, ts_updates, data.notes) or {}
+        all_timestamps = {
+            "confirmed_at": updated.get("confirmed_at") or updated.get("confirmedAt"),
+            "ready_for_pickup_at": updated.get("ready_for_pickup_at") or updated.get("readyForPickupAt"),
+            "picked_up_at": updated.get("picked_up_at") or updated.get("pickedUpAt"),
+            "return_initiated_at": updated.get("return_initiated_at") or updated.get("returnInitiatedAt"),
+            "handed_back_at": updated.get("handed_back_at") or updated.get("handedBackAt"),
+            "awaiting_inspection_at": updated.get("awaiting_inspection_at") or updated.get("awaitingInspectionAt"),
+            "completed_at": updated.get("completed_at") or updated.get("completedAt"),
+        }
+
+        logger.info(f"[QueueAdvance] Successfully advanced booking #{booking_id} to '{new_status}' by {caller_email}")
+
+        return {
+            "success": True,
+            "message": f"Queue advanced to {new_status}",
+            "status": new_status,
+            "milestone": milestone,
+            "bookingId": booking_id,
+            "id": booking_id,
+            "timestamps": all_timestamps,
+            "all_timestamps": all_timestamps,
+            "order": updated
+        }
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"[QueueAdvance] Error advancing booking #{booking_id} to '{milestone}': {exc}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to advance rental queue: {str(exc)}"
+        )
 
 
 @payernt_router.post("/bookings/{booking_id}/ready-for-pickup")
 @payernt_router.post("/paye₹nt/bookings/{booking_id}/ready-for-pickup")
 @payernt_router.post("/payernt/bookings/{booking_id}/ready-for-pickup")
-def vendor_ready_for_pickup(booking_id: str):
-    return vendor_advance_queue_endpoint(booking_id, PayerntQueueAdvanceSchema(milestone="ready_for_pickup"))
+def vendor_ready_for_pickup(booking_id: str, authorization: Optional[str] = Header(None)):
+    return vendor_advance_queue_endpoint(
+        booking_id,
+        PayerntQueueAdvanceSchema(milestone="ready_for_pickup"),
+        authorization=authorization
+    )
 
 
 @payernt_router.post("/bookings/{booking_id}/pickup-confirm")
 @payernt_router.post("/paye₹nt/bookings/{booking_id}/pickup-confirm")
 @payernt_router.post("/payernt/bookings/{booking_id}/pickup-confirm")
-def vendor_pickup_confirm(booking_id: str):
-    return vendor_advance_queue_endpoint(booking_id, PayerntQueueAdvanceSchema(milestone="picked_up"))
+def vendor_pickup_confirm(booking_id: str, authorization: Optional[str] = Header(None)):
+    return vendor_advance_queue_endpoint(
+        booking_id,
+        PayerntQueueAdvanceSchema(milestone="picked_up"),
+        authorization=authorization
+    )
 
 
 @payernt_router.post("/bookings/{booking_id}/handed-back")
 @payernt_router.post("/paye₹nt/bookings/{booking_id}/handed-back")
 @payernt_router.post("/payernt/bookings/{booking_id}/handed-back")
-def vendor_handed_back(booking_id: str):
-    return vendor_advance_queue_endpoint(booking_id, PayerntQueueAdvanceSchema(milestone="handed_back"))
+def vendor_handed_back(booking_id: str, authorization: Optional[str] = Header(None)):
+    return vendor_advance_queue_endpoint(
+        booking_id,
+        PayerntQueueAdvanceSchema(milestone="handed_back"),
+        authorization=authorization
+    )
 
 
 @payernt_router.post("/bookings/{booking_id}/awaiting-inspection")
 @payernt_router.post("/paye₹nt/bookings/{booking_id}/awaiting-inspection")
 @payernt_router.post("/payernt/bookings/{booking_id}/awaiting-inspection")
-def vendor_awaiting_inspection(booking_id: str):
-    return vendor_advance_queue_endpoint(booking_id, PayerntQueueAdvanceSchema(milestone="awaiting_inspection"))
+def vendor_awaiting_inspection(booking_id: str, authorization: Optional[str] = Header(None)):
+    return vendor_advance_queue_endpoint(
+        booking_id,
+        PayerntQueueAdvanceSchema(milestone="awaiting_inspection"),
+        authorization=authorization
+    )
 
 
 @payernt_router.post("/bookings/{booking_id}/location-change/approve")

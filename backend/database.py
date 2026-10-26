@@ -3142,25 +3142,29 @@ def get_notifications(email: str):
         print(f"Notice: Database read error in get_notifications: {e}")
     return [n for n in MOCK_NOTIFICATIONS.values() if (n.get("user_email") or n.get("userEmail")) == clean_email]
 
-def create_notification(email: str = None, n: dict = None, **kwargs):
+def create_notification(email: str = None, title_or_dict: Any = None, message: str = None, **kwargs):
     clean_email = (email or kwargs.get("user_email") or "").strip().lower()
     if not clean_email:
         return None
 
-    if n is not None and isinstance(n, dict):
-        notif_id = n.get("id") or f"notif_{uuid.uuid4().hex[:10]}"
-        notif_title = n.get("title") or "Notification"
-        notif_message = n.get("message") or ""
-        notif_type = n.get("type") or "info"
-        notif_read = n.get("read") or n.get("is_read") or False
-        notif_created_at = n.get("createdAt") or n.get("created_at") or dt.now(timezone.utc).isoformat()
+    notif_id = kwargs.get("id") or f"notif_{uuid.uuid4().hex[:10]}"
+    notif_type = kwargs.get("notif_type") or kwargs.get("type") or "info"
+    notif_read = kwargs.get("read") or kwargs.get("is_read") or False
+    notif_created_at = kwargs.get("createdAt") or kwargs.get("created_at") or dt.now(timezone.utc).isoformat()
+
+    if isinstance(title_or_dict, dict):
+        notif_id = title_or_dict.get("id") or notif_id
+        notif_title = title_or_dict.get("title") or "Notification"
+        notif_message = title_or_dict.get("message") or message or ""
+        notif_type = title_or_dict.get("type") or notif_type
+        notif_read = title_or_dict.get("read") or title_or_dict.get("is_read") or notif_read
+        notif_created_at = title_or_dict.get("createdAt") or title_or_dict.get("created_at") or notif_created_at
+    elif isinstance(title_or_dict, str):
+        notif_title = title_or_dict
+        notif_message = message or kwargs.get("message") or ""
     else:
-        notif_id = kwargs.get("id") or f"notif_{uuid.uuid4().hex[:10]}"
         notif_title = kwargs.get("title") or "Notification"
-        notif_message = kwargs.get("message") or ""
-        notif_type = kwargs.get("notif_type") or kwargs.get("type") or "info"
-        notif_read = kwargs.get("read") or kwargs.get("is_read") or False
-        notif_created_at = kwargs.get("createdAt") or kwargs.get("created_at") or dt.now(timezone.utc).isoformat()
+        notif_message = message or kwargs.get("message") or ""
 
     notif_data = {
         "id": notif_id,

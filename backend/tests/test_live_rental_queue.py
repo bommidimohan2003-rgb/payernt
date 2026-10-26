@@ -183,3 +183,113 @@ def test_live_rental_queue_complete_lifecycle():
     }, headers=admin_headers)
     assert test_adv_res.status_code == 200
     assert test_adv_res.json()["success"] is True
+
+
+def test_payernt_vendor_queue_advance_endpoint():
+    """
+    Specifically validates the /api/payernt/bookings/{id}/queue-advance endpoint:
+    - 401 on unauthenticated request
+    - 403 when renter attempts Mark Ready for Pickup
+    - 200 when lender marks Ready for Pickup
+    - Timer stays stopped (picked_up_at is None) upon Ready for Pickup
+    - Persists timestamps to /api/lender/orders and /api/orders across simulated refresh
+    - 404 on nonexistent booking
+    """
+    renter_email = "renter_endpoint_test@payent.com"
+    lender_email = "lender_endpoint_test@payent.com"
+
+    renter_token = create_access_token({"sub": renter_email, "role": "customer", "account_type": "pay₹ent"})
+    lender_token = create_access_token({"sub": lender_email, "role": "lender", "account_type": "paye₹nt"})
+
+    renter_headers = {"Authorization": f"Bearer {renter_token}"}
+    lender_headers = {"Authorization": f"Bearer {lender_token}"}
+
+    from database import MOCK_CUSTOM_PRODUCTS, MOCK_ORDERS, MOCK_USERS
+    MOCK_USERS[renter_email] = {
+        "email": renter_email,
+        "full_name": "Renter Endpoint Tester",
+        "role": "customer",
+        "status": "active",
+    }
+    MOCK_USERS[lender_email] = {
+        "email": lender_email,
+        "full_name": "Lender Endpoint Tester",
+        "role": "lender",
+        "status": "active",
+    }
+
+    prod_id = "test-prod-endpoint-777"
+    MOCK_CUSTOM_PRODUCTS[prod_id] = {
+        "id": prod_id,
+        "title": "Canon Cinema EOS C70",
+        "user_email": lender_email,
+        "owner_id": lender_email,
+        "price_per_day": 3000,
+        "status": "active"
+    }
+
+    order_id = "test-order-endpoint-888"
+    MOCK_ORDERS[order_id] = {
+        "id": order_id,
+        "productId": prod_id,
+        "product_id": prod_id,
+        "productTitle": "Canon Cinema EOS C70",
+        "product_title": "Canon Cinema EOS C70",
+        "startDate": "2026-11-10",
+        "endDate": "2026-11-12",
+        "total": 6000,
+        "status": "order_confirmed",
+        "userEmail": renter_email,
+        "user_email": renter_email,
+        "lender_email": lender_email,
+        "confirmedAt": "2026-10-26T10:00:00Z",
+        "confirmed_at": "2026-10-26T10:00:00Z",
+    }
+
+    # 1. Unauthenticated request must return 401
+    no_auth_res = client.post(f"/api/payernt/bookings/{order_id}/queue-advance", json={
+        "milestone": "ready_for_pickup"
+    })
+    assert no_auth_res.status_code == 401
+
+    # 2. Nonexistent booking must return 404
+    not_found_res = client.post("/api/payernt/bookings/nonexistent-booking-999/queue-advance", json={
+        "milestone": "ready_for_pickup"
+    }, headers=lender_headers)
+    assert not_found_res.status_code == 404
+
+    # 3. Renter cannot mark Ready for Pickup (must return 403 Forbidden)
+    forbidden_res = client.post(f"/api/payernt/bookings/{order_id}/queue-advance", json={
+        "milestone": "ready_for_pickup"
+    }, headers=renter_headers)
+    assert forbidden_res.status_code == 403
+
+    # 4. Lender marks Ready for Pickup -> must succeed (200 OK)
+    ready_res = client.post(f"/api/payernt/bookings/{order_id}/queue-advance", json={
+        "milestone": "ready_for_pickup",
+        "notes": "Lens cleaned and battery charged"
+    }, headers=lender_headers)
+    assert ready_res.status_code == 200, ready_res.text
+    ready_data = ready_res.json()
+    assert ready_data["success"] is True
+    assert ready_data["status"] == "ready_for_pickup"
+    assert ready_data["timestamps"]["ready_for_pickup_at"] is not None
+
+    # CRITICAL: Rental timer MUST remain stopped until pickup is actually confirmed
+    assert ready_data["timestamps"].get("picked_up_at") is None
+
+    # 5. Check simulated page refresh on Lender Portal (/api/lender/orders)
+    lender_orders = client.get("/api/lender/orders", headers=lender_headers).json()
+    my_order = next(o for o in lender_orders if o["id"] == order_id)
+    assert my_order["status"] == "ready_for_pickup"
+    assert my_order["readyForPickupAt"] == ready_data["timestamps"]["ready_for_pickup_at"]
+    assert my_order.get("pickedUpAt") is None  # Timer still not started
+
+    # 6. Lender confirms Pickup Handover -> starts timer
+    pickup_res = client.post(f"/api/payernt/bookings/{order_id}/queue-advance", json={
+        "milestone": "picked_up"
+    }, headers=lender_headers)
+    assert pickup_res.status_code == 200, pickup_res.text
+    pickup_data = pickup_res.json()
+    assert pickup_data["status"] == "rental_in_progress"
+    assert pickup_data["timestamps"]["picked_up_at"] is not None

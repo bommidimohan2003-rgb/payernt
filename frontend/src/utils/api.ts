@@ -1372,7 +1372,7 @@ export const api = {
 
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("payent_orders_updated"));
-      window.dispatchEvent(new CustomEvent("payent_queue_updated", { detail: { orderId, milestone, payload } }));
+      window.dispatchEvent(new CustomEvent("payent_queue_updated", { detail: { orderId, bookingId: orderId, milestone, data: payload, payload } }));
     }
 
     return payload;
