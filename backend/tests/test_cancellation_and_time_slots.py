@@ -115,10 +115,17 @@ class TestLenderCancellationAndTimeSlots:
         except Exception:
             pass
 
-    def _create_booking(self, start_date: str, end_date: str, time_slot=None, duration_type=None, start_time=None, end_time=None):
+    def _create_booking(self, start_date: str, end_date: str, time_slot=None, duration_type=None, start_time=None, end_time=None, headers=None):
+        import uuid
+        if headers is None:
+            u_email = f"renter_{uuid.uuid4().hex[:8]}@payent.test"
+            u_token = create_access_token(
+                data={"sub": u_email, "account_type": "renter", "user_id": f"PAYRENT_USER_{u_email}"}
+            )
+            headers = {"Authorization": f"Bearer {u_token}"}
         res = client.post(
             "/api/bookings",
-            headers=self.renter_headers,
+            headers=headers,
             json={
                 "productId": self.product_id,
                 "startDate": start_date,

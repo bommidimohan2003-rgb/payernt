@@ -30,6 +30,7 @@ from fastapi import HTTPException
 from config import MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DB, MYSQL_SSL, TIDB_SSL_CA, IS_PRODUCTION
 
 logger = logging.getLogger("payent.database")
+_BOOKING_CONCURRENCY_LOCK = threading.RLock()
 
 def get_ssl_kwargs():
     """
@@ -1842,214 +1843,207 @@ def get_orders(email: str):
     return [o for o in MOCK_ORDERS.values() if (o.get("user_email") or o.get("userEmail")) == clean_email]
 
 def create_order(email: str, order: dict):
-    clean_email = (email or "").strip().lower()
-    pid = order.get("productId") or order.get("product_id") or ""
-    title = order.get("productTitle") or order.get("product_title") or "Gear Rental"
-    img = order.get("productImage") or order.get("product_image") or "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=600"
-    start = order.get("startDate") or order.get("start_date") or "Today"
-    end = order.get("endDate") or order.get("end_date") or "Tomorrow"
-    created = order.get("createdAt") or order.get("created_at") or dt.now(timezone.utc).isoformat()
-    status = order.get("status") or "active"
-    total = float(order.get("total", 0))
+    with _BOOKING_CONCURRENCY_LOCK:
+        clean_email = (email or "").strip().lower()
+        order_id = str(order.get("id") or "").strip()
+        if not order_id:
+            order_id = f"ord_{int(time.time() * 1000)}_{secrets.token_hex(3)}"
+            order["id"] = order_id
 
-    time_slot = order.get("time_slot") or order.get("timeSlot") or "full_day"
-    duration_type = order.get("duration_type") or order.get("durationType") or "full_day"
-    start_time = order.get("start_time") or order.get("startTime")
-    end_time = order.get("end_time") or order.get("endTime")
-    slot_info = DEFAULT_TIME_SLOTS.get(str(time_slot).lower())
-    if not start_time and slot_info:
-        start_time = slot_info["start_time"]
-    if not end_time and slot_info:
-        end_time = slot_info["end_time"]
+        # 1. Idempotency Check: if order already exists, return existing record
+        if order_id in MOCK_ORDERS:
+            return MOCK_ORDERS[order_id]
+        existing_db = get_order_by_id(order_id)
+        if existing_db:
+            return existing_db
+
+        pid = str(order.get("productId") or order.get("product_id") or "").strip()
+        title = order.get("productTitle") or order.get("product_title") or "Gear Rental"
+        img = order.get("productImage") or order.get("product_image") or "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=600"
+        start = str(order.get("startDate") or order.get("start_date") or "Today").strip()
+        end = str(order.get("endDate") or order.get("end_date") or start).strip()
+        created = order.get("createdAt") or order.get("created_at") or dt.now(timezone.utc).isoformat()
+        status = order.get("status") or "active"
+        client_total = float(order.get("total", 0))
+
+        time_slot = (order.get("time_slot") or order.get("timeSlot") or "full_day").strip().lower()
+        duration_type = (order.get("duration_type") or order.get("durationType") or "full_day").strip().lower()
+        start_time = order.get("start_time") or order.get("startTime")
+        end_time = order.get("end_time") or order.get("endTime")
+
+        slot_info = DEFAULT_TIME_SLOTS.get(time_slot)
+        if not start_time and slot_info:
+            start_time = slot_info["start_time"]
+        if not end_time and slot_info:
+            end_time = slot_info["end_time"]
+
+        # 2. Authoritative Product Resolution
+        product_rec = find_authoritative_product(pid)
+        daily_rate = 2499.0
+        half_day_rate = 1499.0
+        buffer_min = DEFAULT_BUFFER_MINUTES
+        if product_rec:
+            daily_rate = float(product_rec.get("daily_rate") or product_rec.get("price") or 2499)
+            half_day_rate = float(product_rec.get("half_day_rate") or round(daily_rate * 0.6))
+            buffer_min = int(product_rec.get("buffer_minutes") or DEFAULT_BUFFER_MINUTES)
+
+        # 3. Canonical Rental Interval Calculation
+        start_dt, end_dt = calculate_booking_interval(
+            start, end, time_slot, duration_type, start_time, end_time,
+            order.get("start_datetime") or order.get("startDatetime"),
+            order.get("end_datetime") or order.get("endDatetime")
+        )
+        start_datetime = start_dt.isoformat()
+        end_datetime = end_dt.isoformat()
+
+        # 4. Authoritative Pricing Calculation (Never trust untrusted client pricing)
+        if duration_type.startswith("half_day") or time_slot in ("morning", "afternoon"):
+            authoritative_total = half_day_rate
+        else:
+            rental_days = max(1, round((end_dt - start_dt).total_seconds() / 86400))
+            authoritative_total = daily_rate * rental_days
+
+        total = authoritative_total if (client_total <= 0 or abs(client_total - authoritative_total) > 1.0) else client_total
+        confirmed_at = order.get("confirmed_at") or order.get("confirmedAt") or created
+
+        # 5. Authoritative Concurrency-Safe Overlap Validation
+        if pid and status not in ("cancelled", "rejected", "failed"):
+            has_slot_conf, conf_reason = check_product_interval_conflicts(
+                pid, start_dt, end_dt, buffer_minutes=buffer_min, exclude_order_id=order_id
+            )
+            if has_slot_conf:
+                raise ValueError(f"Double booking conflict: Product '{pid}' is already booked ({conf_reason}).")
+
+        # 6. Category-based booking restriction validation
+        prod_category = (order.get("category") or "").strip()
+        if not prod_category:
+            prod_category = get_product_category(pid)
+
+        if clean_email and prod_category and status not in ("cancelled", "rejected", "failed"):
+            restricted, active_b = check_renter_category_booking_restriction(
+                clean_email, prod_category, exclude_order_id=order_id
+            )
+            if restricted:
+                raise ValueError(CATEGORY_BOOKING_RESTRICTION_MESSAGE)
+
+        delivery_method = str(order.get("delivery_method") or order.get("deliveryMethod") or "delivery").strip().lower()
+        delivery_address = order.get("delivery_address") or order.get("deliveryAddress") or ""
+        pickup_location = order.get("pickup_location") or order.get("pickupLocation") or ""
+        custom_location = order.get("custom_location") or order.get("customLocation") or ""
+        location_directions = order.get("location_directions") or order.get("locationDirections") or ""
+        lat = order.get("location_latitude") or order.get("locationLatitude") or order.get("latitude")
+        lng = order.get("location_longitude") or order.get("locationLongitude") or order.get("longitude")
+        try:
+            lat = float(lat) if lat is not None else None
+            lng = float(lng) if lng is not None else None
+        except (TypeError, ValueError):
+            lat, lng = None, None
+
+        # Fallback address resolution from user profile if delivery selected but address empty
+        user = get_user(clean_email)
+        if delivery_method == "delivery" and not delivery_address and user and isinstance(user, dict):
+            addr_parts = [p for p in [user.get("address"), user.get("city"), user.get("pincode")] if p]
+            if addr_parts:
+                delivery_address = ", ".join(addr_parts)
         
-    start_dt, end_dt = normalize_slot_interval(start, time_slot, start_time, end_time)
-    start_datetime = order.get("start_datetime") or order.get("startDatetime") or start_dt.isoformat()
-    end_datetime = order.get("end_datetime") or order.get("endDatetime") or end_dt.isoformat()
+        if delivery_method == "pickup" and not pickup_location:
+            pickup_location = "Payent Partner Hub, Indiranagar, Bengaluru, Karnataka 560038"
 
-    confirmed_at = order.get("confirmed_at") or order.get("confirmedAt") or created
+        if delivery_method == "custom" and not custom_location:
+            custom_location = delivery_address or "Selected Custom Meetup Location"
 
-    if pid and start and end and status not in ("cancelled", "rejected", "failed"):
-        s_date = parse_date_safely(start)
-        e_date = parse_date_safely(end)
-        if s_date and e_date:
-            if s_date > e_date:
-                s_date, e_date = e_date, s_date
+        normalized = {
+            "id": order_id,
+            "user_email": clean_email,
+            "userEmail": clean_email,
+            "productId": pid,
+            "product_id": pid,
+            "productTitle": title,
+            "product_title": title,
+            "productImage": img,
+            "product_image": img,
+            "startDate": start,
+            "start_date": start,
+            "endDate": end,
+            "end_date": end,
+            "time_slot": time_slot,
+            "duration_type": duration_type,
+            "start_time": start_time,
+            "end_time": end_time,
+            "start_datetime": start_datetime,
+            "end_datetime": end_datetime,
+            "total": total,
+            "status": status,
+            "createdAt": created,
+            "created_at": created,
+            "confirmed_at": confirmed_at,
+            "confirmedAt": confirmed_at,
+            "ready_for_pickup_at": order.get("ready_for_pickup_at") or order.get("readyForPickupAt"),
+            "readyForPickupAt": order.get("ready_for_pickup_at") or order.get("readyForPickupAt"),
+            "picked_up_at": order.get("picked_up_at") or order.get("pickedUpAt"),
+            "pickedUpAt": order.get("picked_up_at") or order.get("pickedUpAt"),
+            "return_initiated_at": order.get("return_initiated_at") or order.get("returnInitiatedAt"),
+            "returnInitiatedAt": order.get("return_initiated_at") or order.get("returnInitiatedAt"),
+            "handed_back_at": order.get("handed_back_at") or order.get("handedBackAt"),
+            "handedBackAt": order.get("handed_back_at") or order.get("handedBackAt"),
+            "awaiting_inspection_at": order.get("awaiting_inspection_at") or order.get("awaitingInspectionAt"),
+            "awaitingInspectionAt": order.get("awaiting_inspection_at") or order.get("awaitingInspectionAt"),
+            "completed_at": order.get("completed_at") or order.get("completedAt"),
+            "completedAt": order.get("completed_at") or order.get("completedAt"),
+            "category": prod_category,
+            "delivery_method": delivery_method,
+            "deliveryMethod": delivery_method,
+            "delivery_address": delivery_address,
+            "deliveryAddress": delivery_address,
+            "pickup_location": pickup_location,
+            "pickupLocation": pickup_location,
+            "custom_location": custom_location,
+            "customLocation": custom_location,
+            "location_directions": location_directions,
+            "locationDirections": location_directions,
+            "location_latitude": lat,
+            "locationLatitude": lat,
+            "location_longitude": lng,
+            "locationLongitude": lng,
+            "location_change_data": None,
+            "locationChangeRequest": None,
+        }
+        MOCK_ORDERS[order_id] = normalized
 
-            # Authoritative Blocked Dates Verification across every date in the requested rental period
-            product_rec = None
-            try:
-                from payernt_database import get_payernt_product_by_id
-                product_rec = get_payernt_product_by_id(pid)
-            except Exception:
-                pass
-            if not product_rec:
-                product_rec = fetch_one("SELECT * FROM custom_products WHERE id = %s", (pid,))
-            if not product_rec:
-                product_rec = MOCK_CUSTOM_PRODUCTS.get(pid)
-
-            if product_rec:
-                b_raw = product_rec.get("blocked_dates") or product_rec.get("blockedDates")
-                if b_raw:
-                    b_list = json.loads(b_raw) if isinstance(b_raw, str) else b_raw
-                    if isinstance(b_list, list):
-                        blocked_set = set()
-                        for b_str in b_list:
-                            b_d = parse_date_safely(b_str)
-                            if b_d:
-                                blocked_set.add(b_d.strftime("%Y-%m-%d"))
-
-                        curr = s_date
-                        while curr <= e_date:
-                            curr_str = curr.strftime("%Y-%m-%d")
-                            if curr_str in blocked_set:
-                                raise ValueError(f"Requested booking dates conflict with date {curr_str}, which has been blocked by the owner for personal use or maintenance.")
-                            curr += datetime.timedelta(days=1)
-
-        # 1. Authoritative slot & interval conflict check with turnaround buffer
-        has_slot_conf, conf_reason = check_product_interval_conflicts(
-            pid, start_dt, end_dt, buffer_minutes=60, exclude_order_id=order.get("id")
-        )
-        if has_slot_conf:
-            raise ValueError(f"Double booking conflict: Product '{pid}' is already booked ({conf_reason}).")
-
-        # 2. Date-level check for multi-day bookings (includes orders and blocked dates)
-        if duration_type == "multi_day" or (start != end and time_slot == "full_day"):
-            conflicts = check_products_booking_conflicts([pid], start, end, exclude_order_id=order.get("id"), include_blocked_dates=True)
-            if pid in conflicts:
-                raise ValueError(f"Double booking conflict: Product '{pid}' is already booked for {start} to {end}.")
-
-    # Category-based booking restriction validation
-    prod_category = (order.get("category") or "").strip()
-    if not prod_category:
-        prod_category = get_product_category(pid)
-
-    if clean_email and prod_category and status not in ("cancelled", "rejected", "failed"):
-        restricted, active_b = check_renter_category_booking_restriction(
-            clean_email, prod_category, exclude_order_id=order.get("id")
-        )
-        if restricted:
-            raise ValueError(CATEGORY_BOOKING_RESTRICTION_MESSAGE)
-
-    delivery_method = str(order.get("delivery_method") or order.get("deliveryMethod") or "delivery").strip().lower()
-    delivery_address = order.get("delivery_address") or order.get("deliveryAddress") or ""
-    pickup_location = order.get("pickup_location") or order.get("pickupLocation") or ""
-    custom_location = order.get("custom_location") or order.get("customLocation") or ""
-    location_directions = order.get("location_directions") or order.get("locationDirections") or ""
-    lat = order.get("location_latitude") or order.get("locationLatitude") or order.get("latitude")
-    lng = order.get("location_longitude") or order.get("locationLongitude") or order.get("longitude")
-    try:
-        lat = float(lat) if lat is not None else None
-        lng = float(lng) if lng is not None else None
-    except (TypeError, ValueError):
-        lat, lng = None, None
-
-    # Fallback address resolution from user profile if delivery selected but address empty
-    user = get_user(clean_email)
-    if delivery_method == "delivery" and not delivery_address and user and isinstance(user, dict):
-        addr_parts = [p for p in [user.get("address"), user.get("city"), user.get("pincode")] if p]
-        if addr_parts:
-            delivery_address = ", ".join(addr_parts)
-    
-    # Fallback for owner pickup if pickup location empty
-    if delivery_method == "pickup" and not pickup_location:
-        pickup_location = "Payent Partner Hub, Indiranagar, Bengaluru, Karnataka 560038"
-
-    # Fallback for custom location if empty
-    if delivery_method == "custom" and not custom_location:
-        custom_location = delivery_address or "Selected Custom Meetup Location"
-
-    normalized = {
-        "id": order["id"],
-        "user_email": clean_email,
-        "userEmail": clean_email,
-        "productId": pid,
-        "product_id": pid,
-        "productTitle": title,
-        "product_title": title,
-        "productImage": img,
-        "product_image": img,
-        "startDate": start,
-        "start_date": start,
-        "endDate": end,
-        "end_date": end,
-        "time_slot": time_slot,
-        "duration_type": duration_type,
-        "start_time": start_time,
-        "end_time": end_time,
-        "start_datetime": start_datetime,
-        "end_datetime": end_datetime,
-        "total": total,
-        "status": status,
-        "createdAt": created,
-        "created_at": created,
-        "confirmed_at": confirmed_at,
-        "confirmedAt": confirmed_at,
-        "ready_for_pickup_at": order.get("ready_for_pickup_at") or order.get("readyForPickupAt"),
-        "readyForPickupAt": order.get("ready_for_pickup_at") or order.get("readyForPickupAt"),
-        "picked_up_at": order.get("picked_up_at") or order.get("pickedUpAt"),
-        "pickedUpAt": order.get("picked_up_at") or order.get("pickedUpAt"),
-        "return_initiated_at": order.get("return_initiated_at") or order.get("returnInitiatedAt"),
-        "returnInitiatedAt": order.get("return_initiated_at") or order.get("returnInitiatedAt"),
-        "handed_back_at": order.get("handed_back_at") or order.get("handedBackAt"),
-        "handedBackAt": order.get("handed_back_at") or order.get("handedBackAt"),
-        "awaiting_inspection_at": order.get("awaiting_inspection_at") or order.get("awaitingInspectionAt"),
-        "awaitingInspectionAt": order.get("awaiting_inspection_at") or order.get("awaitingInspectionAt"),
-        "completed_at": order.get("completed_at") or order.get("completedAt"),
-        "completedAt": order.get("completed_at") or order.get("completedAt"),
-        "category": prod_category,
-        "delivery_method": delivery_method,
-        "deliveryMethod": delivery_method,
-        "delivery_address": delivery_address,
-        "deliveryAddress": delivery_address,
-        "pickup_location": pickup_location,
-        "pickupLocation": pickup_location,
-        "custom_location": custom_location,
-        "customLocation": custom_location,
-        "location_directions": location_directions,
-        "locationDirections": location_directions,
-        "location_latitude": lat,
-        "locationLatitude": lat,
-        "location_longitude": lng,
-        "locationLongitude": lng,
-        "location_change_data": None,
-        "locationChangeRequest": None,
-    }
-    MOCK_ORDERS[order["id"]] = normalized
-
-    execute_query("""
-        INSERT INTO orders (
-            id, user_email, product_id, product_title, product_image, start_date, end_date, total, status, created_at,
-            time_slot, duration_type, start_time, end_time, start_datetime, end_datetime, confirmed_at, category,
-            delivery_method, delivery_address, pickup_location, custom_location, location_directions, location_latitude, location_longitude
-        )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-    """, (
-        order["id"],
-        clean_email,
-        pid,
-        title,
-        img,
-        start,
-        end,
-        total,
-        status,
-        created,
-        time_slot,
-        duration_type,
-        start_time,
-        end_time,
-        start_datetime,
-        end_datetime,
-        confirmed_at,
-        prod_category,
-        delivery_method,
-        delivery_address,
-        pickup_location,
-        custom_location,
-        location_directions,
-        lat,
-        lng
-    ))
+        execute_query("""
+            INSERT INTO orders (
+                id, user_email, product_id, product_title, product_image, start_date, end_date, total, status, created_at,
+                time_slot, duration_type, start_time, end_time, start_datetime, end_datetime, confirmed_at, category,
+                delivery_method, delivery_address, pickup_location, custom_location, location_directions, location_latitude, location_longitude
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (
+            order_id,
+            clean_email,
+            pid,
+            title,
+            img,
+            start,
+            end,
+            total,
+            status,
+            created,
+            time_slot,
+            duration_type,
+            start_time,
+            end_time,
+            start_datetime,
+            end_datetime,
+            confirmed_at,
+            prod_category,
+            delivery_method,
+            delivery_address,
+            pickup_location,
+            custom_location,
+            location_directions,
+            lat,
+            lng
+        ))
 
     # Synchronize initial delivery record
     try:
@@ -4639,6 +4633,56 @@ def parse_date_safely(date_str) -> Optional[datetime.date]:
             continue
     return None
 
+def find_authoritative_product(product_id: str) -> Optional[Dict[str, Any]]:
+    """
+    Authoritative single product lookup resolving across payernt_products,
+    custom_products, MOCK_PAYERNT_PRODUCTS, and MOCK_CUSTOM_PRODUCTS with
+    whitespace/case-insensitivity support. Prevents 404s due to table mismatches.
+    """
+    if not product_id:
+        return None
+    pid = str(product_id).strip()
+    if not pid:
+        return None
+
+    # 1. Check payernt_products table & in-memory MOCK_PAYERNT_PRODUCTS
+    try:
+        from payernt_database import get_payernt_product_by_id, MOCK_PAYERNT_PRODUCTS
+        p = get_payernt_product_by_id(pid, include_pin=False)
+        if p:
+            return p
+        if pid in MOCK_PAYERNT_PRODUCTS:
+            return MOCK_PAYERNT_PRODUCTS[pid]
+    except Exception:
+        pass
+
+    # 2. Check custom_products table
+    try:
+        p = fetch_one("SELECT * FROM custom_products WHERE id = %s", (pid,))
+        if p:
+            return p
+    except Exception:
+        pass
+
+    # 3. Check MOCK_CUSTOM_PRODUCTS
+    if pid in MOCK_CUSTOM_PRODUCTS:
+        return MOCK_CUSTOM_PRODUCTS[pid]
+
+    # 4. Case-insensitive lookup fallback
+    pid_lower = pid.lower()
+    try:
+        from payernt_database import MOCK_PAYERNT_PRODUCTS
+        for k, v in MOCK_PAYERNT_PRODUCTS.items():
+            if str(k).lower() == pid_lower:
+                return v
+    except Exception:
+        pass
+    for k, v in MOCK_CUSTOM_PRODUCTS.items():
+        if str(k).lower() == pid_lower:
+            return v
+
+    return None
+
 DEFAULT_TIME_SLOTS = {
     "morning": {
         "id": "morning",
@@ -4661,10 +4705,10 @@ DEFAULT_TIME_SLOTS = {
     "full_day": {
         "id": "full_day",
         "name": "Full Day",
-        "label": "Full Day — 8:00 AM to 5:00 PM",
+        "label": "Full Day — 24 Hours",
         "start_time": "08:00",
-        "end_time": "17:00",
-        "duration_hours": 9,
+        "end_time": "08:00",
+        "duration_hours": 24,
         "type": "full_day"
     }
 }
@@ -4698,6 +4742,70 @@ def parse_datetime_safely(dt_val: Any) -> Optional[datetime.datetime]:
             continue
     return None
 
+def calculate_booking_interval(
+    start_date_str: str,
+    end_date_str: Optional[str] = None,
+    time_slot: Optional[str] = "full_day",
+    duration_type: Optional[str] = None,
+    start_time: Optional[str] = None,
+    end_time: Optional[str] = None,
+    start_datetime_str: Optional[str] = None,
+    end_datetime_str: Optional[str] = None,
+) -> Tuple[datetime.datetime, datetime.datetime]:
+    """
+    Authoritative interval calculator implementing canonical Payent rental time rules:
+    - Morning: 08:00 to 12:00 (4 hours)
+    - Afternoon: 13:00 to 17:00 (4 hours)
+    - Full Day: exactly 24 elapsed hours from start timestamp (e.g. 08:00 to 08:00 next day)
+    - Multi-Day: start_dt + (N * 24 hours)
+    """
+    s_parsed = parse_datetime_safely(start_datetime_str)
+    e_parsed = parse_datetime_safely(end_datetime_str)
+    if s_parsed and e_parsed and e_parsed > s_parsed:
+        return s_parsed, e_parsed
+
+    s_date = parse_date_safely(start_date_str) or dt.now(timezone.utc).date()
+    e_date = parse_date_safely(end_date_str) or s_date
+    if s_date > e_date:
+        raise ValueError(f"Invalid rental interval: start date '{start_date_str}' cannot be after end date '{end_date_str}'.")
+
+    slot = (time_slot or "").lower().strip()
+    dur = (duration_type or "").lower().strip()
+
+    # Morning Half-Day: 08:00 - 12:00 (4h)
+    if slot == "morning" or dur == "half_day_morning":
+        start_dt = datetime.datetime(s_date.year, s_date.month, s_date.day, 8, 0, 0, tzinfo=timezone.utc)
+        end_dt = datetime.datetime(s_date.year, s_date.month, s_date.day, 12, 0, 0, tzinfo=timezone.utc)
+        return start_dt, end_dt
+
+    # Afternoon Half-Day: 13:00 - 17:00 (4h)
+    if slot == "afternoon" or dur == "half_day_afternoon":
+        start_dt = datetime.datetime(s_date.year, s_date.month, s_date.day, 13, 0, 0, tzinfo=timezone.utc)
+        end_dt = datetime.datetime(s_date.year, s_date.month, s_date.day, 17, 0, 0, tzinfo=timezone.utc)
+        return start_dt, end_dt
+
+    # Full Day / Multi-Day:
+    s_hour, s_min = 8, 0
+    if start_time:
+        try:
+            parts = [int(x) for x in start_time.split(":")[:2]]
+            s_hour, s_min = parts[0], parts[1]
+        except Exception:
+            s_hour, s_min = 8, 0
+
+    start_dt = datetime.datetime(s_date.year, s_date.month, s_date.day, s_hour, s_min, 0, tzinfo=timezone.utc)
+
+    # Number of 24h rental days:
+    if s_date == e_date and dur != "multi_day" and dur != "custom":
+        rental_days = 1
+    else:
+        rental_days = max(1, (e_date - s_date).days)
+        if s_date == e_date:
+            rental_days = 1
+
+    end_dt = start_dt + datetime.timedelta(hours=24 * rental_days)
+    return start_dt, end_dt
+
 def normalize_slot_interval(
     date_str: str,
     time_slot: str = "full_day",
@@ -4708,48 +4816,49 @@ def normalize_slot_interval(
     d = parse_date_safely(date_str)
     if not d:
         d = dt.now(timezone.utc).date()
-        
-    slot_info = DEFAULT_TIME_SLOTS.get(str(time_slot).lower())
-    s_time_str = start_time or (slot_info["start_time"] if slot_info else "08:00")
-    e_time_str = end_time or (slot_info["end_time"] if slot_info else "17:00")
-    
-    sh, sm = [int(x) for x in s_time_str.split(":")[:2]]
-    eh, em = [int(x) for x in e_time_str.split(":")[:2]]
-    
-    start_dt = datetime.datetime(d.year, d.month, d.day, sh, sm, 0, tzinfo=timezone.utc)
-    end_dt = datetime.datetime(d.year, d.month, d.day, eh, em, 0, tzinfo=timezone.utc)
-    return start_dt, end_dt
+
+    slot_key = str(time_slot).lower().strip()
+    if slot_key == "morning":
+        start_dt = datetime.datetime(d.year, d.month, d.day, 8, 0, 0, tzinfo=timezone.utc)
+        end_dt = datetime.datetime(d.year, d.month, d.day, 12, 0, 0, tzinfo=timezone.utc)
+        return start_dt, end_dt
+    elif slot_key == "afternoon":
+        start_dt = datetime.datetime(d.year, d.month, d.day, 13, 0, 0, tzinfo=timezone.utc)
+        end_dt = datetime.datetime(d.year, d.month, d.day, 17, 0, 0, tzinfo=timezone.utc)
+        return start_dt, end_dt
+    else:
+        # Full day = exactly 24 elapsed hours
+        sh, sm = 8, 0
+        if start_time:
+            try:
+                parts = [int(x) for x in start_time.split(":")[:2]]
+                sh, sm = parts[0], parts[1]
+            except Exception:
+                sh, sm = 8, 0
+        start_dt = datetime.datetime(d.year, d.month, d.day, sh, sm, 0, tzinfo=timezone.utc)
+        end_dt = start_dt + datetime.timedelta(hours=24)
+        return start_dt, end_dt
 
 def _extract_order_interval(order: dict) -> Tuple[Optional[datetime.datetime], Optional[datetime.datetime]]:
     """Extracts UTC start and end datetimes from an order record."""
     s_dt = parse_datetime_safely(order.get("start_datetime"))
     e_dt = parse_datetime_safely(order.get("end_datetime"))
-    if s_dt and e_dt:
+    if s_dt and e_dt and e_dt > s_dt:
         return s_dt, e_dt
-        
+
     s_date_str = str(order.get("start_date") or order.get("startDate") or "")
     e_date_str = str(order.get("end_date") or order.get("endDate") or "")
-    if not s_date_str or not e_date_str:
+    if not s_date_str:
         return None, None
-        
-    t_slot = str(order.get("time_slot") or "").lower()
-    s_time = order.get("start_time")
-    e_time = order.get("end_time")
-    
-    if s_date_str == e_date_str and t_slot in DEFAULT_TIME_SLOTS:
-        return normalize_slot_interval(s_date_str, t_slot, s_time, e_time)
-        
-    s_d = parse_date_safely(s_date_str)
-    e_d = parse_date_safely(e_date_str)
-    if not s_d or not e_d:
-        return None, None
-        
-    sh, sm = [int(x) for x in (s_time or "08:00").split(":")[:2]]
-    eh, em = [int(x) for x in (e_time or "17:00").split(":")[:2]]
-    
-    start_dt = datetime.datetime(s_d.year, s_d.month, s_d.day, sh, sm, 0, tzinfo=timezone.utc)
-    end_dt = datetime.datetime(e_d.year, e_d.month, e_d.day, eh, em, 0, tzinfo=timezone.utc)
-    return start_dt, end_dt
+
+    t_slot = str(order.get("time_slot") or order.get("timeSlot") or "").lower()
+    dur_type = str(order.get("duration_type") or order.get("durationType") or "").lower()
+    s_time = order.get("start_time") or order.get("startTime")
+    e_time = order.get("end_time") or order.get("endTime")
+
+    return calculate_booking_interval(
+        s_date_str, e_date_str, t_slot, dur_type, s_time, e_time
+    )
 
 def check_product_interval_conflicts(
     product_id: str,
@@ -4759,32 +4868,24 @@ def check_product_interval_conflicts(
     exclude_order_id: Optional[str] = None
 ) -> Tuple[bool, Optional[str]]:
     """
-    Determines whether a requested rental interval conflicts with existing reservations
-    or lender blocked dates for product_id.
-    
-    Interval Overlap Formula with turnaround buffer:
-    Conflict occurs if:
-        req_start < (existing_end + buffer) AND (req_end + buffer) > existing_start
+    Authoritative availability validator implementing half-open time interval logic:
+    [req_start, req_end) conflicts with [ord_start, ord_end) when:
+        req_start < (ord_end + buffer) AND (ord_start - buffer) < req_end
+    Also evaluates vendor blocked dates, session blocks, listing pause state, and active reservations.
     """
     if not product_id or not req_start_dt or not req_end_dt:
         return False, None
-        
+
     buf_delta = datetime.timedelta(minutes=max(0, buffer_minutes))
-    
-    # 1. Check Product Blocked Dates / Personal Use Time
-    product = None
-    try:
-        from payernt_database import get_payernt_product_by_id
-        product = get_payernt_product_by_id(product_id)
-    except Exception:
-        pass
-    if not product:
-        product = fetch_one("SELECT * FROM custom_products WHERE id = %s", (product_id,))
-    if not product:
-        product = MOCK_CUSTOM_PRODUCTS.get(product_id)
-            
+    product = find_authoritative_product(product_id)
+
+    # 1. Product Availability Toggle Check
+    if product and not product.get("available", True):
+        return True, "Product listing is currently paused by owner"
+
+    # 2. Check Product Blocked Dates / Personal Use Periods / Sessions
     if product:
-        blocked_raw = product.get("blocked_dates")
+        blocked_raw = product.get("blocked_dates") or product.get("blockedDates")
         if blocked_raw:
             try:
                 blocked_list = json.loads(blocked_raw) if isinstance(blocked_raw, str) else blocked_raw
@@ -4793,37 +4894,52 @@ def check_product_interval_conflicts(
                         if isinstance(b, str):
                             b_d = parse_date_safely(b)
                             if b_d:
-                                b_start = datetime.datetime.combine(b_d, datetime.time(0, 0), tzinfo=timezone.utc)
-                                b_end = datetime.datetime.combine(b_d, datetime.time(23, 59, 59), tzinfo=timezone.utc)
+                                b_start = datetime.datetime(b_d.year, b_d.month, b_d.day, 0, 0, 0, tzinfo=timezone.utc)
+                                b_end = b_start + datetime.timedelta(days=1)
                             else:
                                 b_start = parse_datetime_safely(b)
                                 b_end = b_start + datetime.timedelta(days=1) if b_start else None
                             reason = "Lender personal use / maintenance"
                         elif isinstance(b, dict):
-                            b_start = parse_datetime_safely(b.get("start") or b.get("startDate"))
-                            b_end = parse_datetime_safely(b.get("end") or b.get("endDate"))
+                            b_date = b.get("date")
+                            b_sess = (b.get("session") or b.get("time_slot") or "").lower()
                             reason = b.get("reason", "Lender personal use / maintenance")
+                            if b_date and b_sess in ("morning", "afternoon"):
+                                b_start, b_end = normalize_slot_interval(b_date, b_sess)
+                            elif b_date:
+                                b_d = parse_date_safely(b_date)
+                                if b_d:
+                                    b_start = datetime.datetime(b_d.year, b_d.month, b_d.day, 0, 0, 0, tzinfo=timezone.utc)
+                                    b_end = b_start + datetime.timedelta(days=1)
+                                else:
+                                    b_start, b_end = None, None
+                            else:
+                                b_start = parse_datetime_safely(b.get("start") or b.get("startDate"))
+                                b_end = parse_datetime_safely(b.get("end") or b.get("endDate"))
                         else:
                             continue
 
                         if b_start and b_end:
-                            if req_start_dt < (b_end + buf_delta) and (req_end_dt + buf_delta) > b_start:
+                            # Half-open overlap with blocked interval
+                            if req_start_dt < b_end and b_start < req_end_dt:
                                 return True, f"Conflict with lender unavailable period ({reason})"
             except Exception as e:
                 logger.warning(f"Error parsing product blocked_dates: {e}")
 
-    # 2. Check Database Orders
+    now_utc = dt.now(timezone.utc)
+
+    # 3. Check Database Orders
     conn = get_db_connection()
     if conn:
         try:
             with conn.cursor() as cursor:
-                params = [product_id]
+                params = [str(product_id).strip()]
                 exclude_clause = ""
                 if exclude_order_id:
                     exclude_clause = " AND id != %s"
                     params.append(exclude_order_id)
                 query = f"""
-                    SELECT id, start_date, end_date, start_time, end_time, start_datetime, end_datetime, time_slot, status
+                    SELECT id, start_date, end_date, start_time, end_time, start_datetime, end_datetime, time_slot, duration_type, status, completed_at
                     FROM orders
                     WHERE status NOT IN ('cancelled', 'refunded', 'rejected')
                       AND product_id = %s{exclude_clause}
@@ -4831,27 +4947,38 @@ def check_product_interval_conflicts(
                 cursor.execute(query, tuple(params))
                 rows = cursor.fetchall()
                 for row in rows:
+                    ord_status = str(row.get("status") or "").lower()
                     ord_start, ord_end = _extract_order_interval(row)
                     if ord_start and ord_end:
-                        if req_start_dt < (ord_end + buf_delta) and (req_end_dt + buf_delta) > ord_start:
+                        # If order is completed and its rental period + buffer has elapsed, it no longer conflicts
+                        if ord_status in ("completed", "returned") and (ord_end + buf_delta) <= now_utc:
+                            continue
+
+                        # Half-open interval conflict with turnaround buffer:
+                        if req_start_dt < (ord_end + buf_delta) and (ord_start - buf_delta) < req_end_dt:
                             slot_name = row.get("time_slot") or "rental"
                             return True, f"Conflict with existing {slot_name} booking #{row.get('id')}"
         except Exception as e:
             logger.warning(f"Error checking order interval conflicts in database: {e}")
         finally:
-            conn.close()
+            try:
+                conn.close()
+            except Exception:
+                pass
 
-    # 3. Check in-memory MOCK_ORDERS
-    for order in MOCK_ORDERS.values():
-        if exclude_order_id and order.get("id") == exclude_order_id:
+    # 4. Check in-memory MOCK_ORDERS
+    for order in list(MOCK_ORDERS.values()):
+        if exclude_order_id and (order.get("id") == exclude_order_id or str(order.get("id")) == str(exclude_order_id)):
             continue
-        pid = str(order.get("product_id") or order.get("productId") or "")
-        if pid == product_id:
+        pid = str(order.get("product_id") or order.get("productId") or "").strip()
+        if pid == str(product_id).strip():
             status = str(order.get("status") or "active").lower()
             if status not in ('cancelled', 'refunded', 'rejected'):
                 ord_start, ord_end = _extract_order_interval(order)
                 if ord_start and ord_end:
-                    if req_start_dt < (ord_end + buf_delta) and (req_end_dt + buf_delta) > ord_start:
+                    if status in ("completed", "returned") and (ord_end + buf_delta) <= now_utc:
+                        continue
+                    if req_start_dt < (ord_end + buf_delta) and (ord_start - buf_delta) < req_end_dt:
                         slot_name = order.get("time_slot") or "rental"
                         return True, f"Conflict with existing {slot_name} booking #{order.get('id')}"
 
@@ -4860,19 +4987,10 @@ def check_product_interval_conflicts(
 def get_product_slots_for_date(product_id: str, date_str: str) -> Dict[str, Any]:
     """
     Returns slot availability (morning, afternoon, full_day) for a given date,
-    evaluating buffer, slot enablement, existing reservations, and pricing.
+    evaluating buffer, slot enablement, existing reservations, vendor blocks, and pricing.
     """
-    product = None
-    try:
-        from payernt_database import get_payernt_product_by_id
-        product = get_payernt_product_by_id(product_id)
-    except Exception:
-        pass
-    if not product:
-        product = fetch_one("SELECT * FROM custom_products WHERE id = %s", (product_id,))
-    if not product:
-        product = MOCK_CUSTOM_PRODUCTS.get(product_id)
-            
+    product = find_authoritative_product(product_id)
+
     daily_rate = 2499
     half_day_rate = None
     buffer_min = DEFAULT_BUFFER_MINUTES
@@ -4880,7 +4998,7 @@ def get_product_slots_for_date(product_id: str, date_str: str) -> Dict[str, Any]
     morning_enabled = True
     afternoon_enabled = True
     full_day_enabled = True
-    
+
     if product:
         daily_rate = int(float(product.get("daily_rate") or product.get("price") or 2499))
         half_day_rate = product.get("half_day_rate")
@@ -4889,29 +5007,29 @@ def get_product_slots_for_date(product_id: str, date_str: str) -> Dict[str, Any]
         morning_enabled = bool(product.get("morning_slot_enabled", True)) and allow_half_day
         afternoon_enabled = bool(product.get("afternoon_slot_enabled", True)) and allow_half_day
         full_day_enabled = bool(product.get("full_day_slot_enabled", True))
-        
+
     if not half_day_rate:
         half_day_rate = int(round(daily_rate * 0.6))
     else:
         half_day_rate = int(half_day_rate)
-        
+
     d = parse_date_safely(date_str)
     if not d:
         d = dt.now(timezone.utc).date()
     today_dt = dt.now(timezone.utc).date()
     is_past = d < today_dt
-    
+
     slots_out = []
-    
+
     slot_configs = [
         ("morning", "Half Day — Morning", "08:00", "12:00", "Morning — 8:00 AM to 12:00 PM", morning_enabled, half_day_rate),
         ("afternoon", "Half Day — Afternoon", "13:00", "17:00", "Afternoon — 1:00 PM to 5:00 PM", afternoon_enabled, half_day_rate),
-        ("full_day", "Full Day", "08:00", "17:00", "Full Day — 8:00 AM to 5:00 PM", full_day_enabled, daily_rate),
+        ("full_day", "Full Day", "08:00", "08:00", "Full Day — 24 Hours", full_day_enabled, daily_rate),
     ]
-    
+
     for s_id, s_name, s_time, e_time, s_label, enabled, rate in slot_configs:
         start_dt, end_dt = normalize_slot_interval(date_str, s_id, s_time, e_time)
-        
+
         if is_past:
             status = "not_available"
             status_label = "Past Date"
@@ -4942,6 +5060,7 @@ def get_product_slots_for_date(product_id: str, date_str: str) -> Dict[str, Any]
             "label": s_label,
             "startTime": s_time,
             "endTime": e_time,
+            "durationHours": 4 if s_id in ("morning", "afternoon") else 24,
             "startDatetime": start_dt.isoformat(),
             "endDatetime": end_dt.isoformat(),
             "status": status,
@@ -5207,7 +5326,8 @@ def check_renter_category_booking_restriction(
 
             # If delivery/pickup already confirmed, restriction is released
             picked_up_at = order.get("picked_up_at") or order.get("pickedUpAt")
-            if picked_up_at:
+            handover_verified = bool(order.get("vendor_handover_verified") or order.get("handover_verified") or order.get("pickup_verified"))
+            if picked_up_at or handover_verified:
                 continue
 
             if o_status in POST_DELIVERY_OR_TERMINAL_STATUSES:

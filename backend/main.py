@@ -2504,6 +2504,16 @@ class OrderSchema(BaseModel):
     location_directions: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
+    timeSlot: Optional[str] = None
+    time_slot: Optional[str] = None
+    durationType: Optional[str] = None
+    duration_type: Optional[str] = None
+    durationDays: Optional[int] = None
+    duration_days: Optional[int] = None
+    startTime: Optional[str] = None
+    start_time: Optional[str] = None
+    endTime: Optional[str] = None
+    end_time: Optional[str] = None
 
 class ProductOwnerSchema(BaseModel):
     name: Optional[str] = "Verified Lender"
@@ -2687,7 +2697,7 @@ def add_order(data: OrderSchema, current_user: dict = Depends(get_approved_user)
         raise HTTPException(status_code=400, detail="start_date cannot be after end_date.")
 
     # Authoritative product existence & availability check
-    prod = fetch_one_product(pid)
+    prod = find_authoritative_product(pid)
     if not prod:
         raise HTTPException(status_code=404, detail="Product not found in catalog.")
 
@@ -2723,6 +2733,16 @@ def add_order(data: OrderSchema, current_user: dict = Depends(get_approved_user)
         "start_date": start,
         "endDate": end,
         "end_date": end,
+        "timeSlot": data.timeSlot or data.time_slot,
+        "time_slot": data.timeSlot or data.time_slot,
+        "durationType": data.durationType or data.duration_type,
+        "duration_type": data.durationType or data.duration_type,
+        "durationDays": data.durationDays or data.duration_days,
+        "duration_days": data.durationDays or data.duration_days,
+        "startTime": data.startTime or data.start_time,
+        "start_time": data.startTime or data.start_time,
+        "endTime": data.endTime or data.end_time,
+        "end_time": data.endTime or data.end_time,
         "total": data.total,
         "status": data.status or "active",
         "category": prod_category,
@@ -3441,23 +3461,12 @@ def check_single_product_availability(
         get_db_connection,
         parse_date_safely,
         evaluate_product_availability,
+        find_authoritative_product,
         MOCK_ORDERS,
         MOCK_CUSTOM_PRODUCTS,
     )
 
-    prod = None
-    try:
-        from payernt_database import get_payernt_product_by_id, MOCK_PAYERNT_PRODUCTS
-        prod = get_payernt_product_by_id(id)
-    except Exception:
-        pass
-    if not prod:
-        prod = fetch_one_product(id)
-    if not prod:
-        prod = fetch_one("SELECT * FROM custom_products WHERE id = %s", (id,))
-    if not prod:
-        prod = MOCK_CUSTOM_PRODUCTS.get(id)
-
+    prod = find_authoritative_product(id)
     if not prod:
         raise HTTPException(status_code=404, detail=f"Product '{id}' not found.")
 
@@ -3585,19 +3594,9 @@ def get_product_slots_endpoint(
     Returns time-slot availability (morning, afternoon, full-day) for a given date,
     evaluating lender configuration, existing reservations, buffer rules, and duration rates.
     """
-    from database import get_product_slots_for_date, parse_date_safely, fetch_one, MOCK_CUSTOM_PRODUCTS
-    from payernt_database import get_payernt_product_by_id
+    from database import get_product_slots_for_date, parse_date_safely, find_authoritative_product
 
-    prod = None
-    try:
-        prod = get_payernt_product_by_id(id)
-    except Exception:
-        pass
-    if not prod:
-        prod = fetch_one("SELECT * FROM custom_products WHERE id = %s", (id,))
-    if not prod:
-        prod = MOCK_CUSTOM_PRODUCTS.get(id)
-
+    prod = find_authoritative_product(id)
     if not prod:
         raise HTTPException(status_code=404, detail=f"Product '{id}' not found.")
 

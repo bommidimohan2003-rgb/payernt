@@ -486,7 +486,7 @@ class ProductAvailabilityConfigSchema(BaseModel):
     fullDaySlotEnabled: Optional[bool] = None
     halfDayRate: Optional[float] = None
     bufferMinutes: Optional[int] = None
-    blockedDates: Optional[List[str]] = None
+    blockedDates: Optional[List[Union[str, Dict[str, Any]]]] = None
 
 
 VALID_CANCELLATION_REASONS = {
@@ -1843,22 +1843,45 @@ def update_product_availability_config_endpoint(
     clean_new_blocked = None
     if data.blockedDates is not None:
         clean_new_blocked = []
-        for b_date_str in data.blockedDates:
-            d = parse_date_safely(b_date_str)
-            if not d:
-                continue
-            date_iso = d.strftime("%Y-%m-%d")
-            clean_new_blocked.append(date_iso)
-            # Check for conflict only with existing confirmed renter bookings (orders), not self-conflict
-            order_conflicts = check_products_booking_conflicts(
-                [product_id], date_iso, date_iso, include_blocked_dates=False
-            )
-            if product_id in order_conflicts:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail=f"Cannot block date {date_iso}: An active renter reservation already exists for this date."
+        for b_item in data.blockedDates:
+            if isinstance(b_item, dict):
+                b_date_str = b_item.get("date")
+                session = (b_item.get("session") or b_item.get("time_slot") or "").lower()
+                d = parse_date_safely(b_date_str)
+                if not d:
+                    continue
+                date_iso = d.strftime("%Y-%m-%d")
+                clean_item = {"date": date_iso}
+                if session in ("morning", "afternoon"):
+                    clean_item["session"] = session
+                else:
+                    clean_item["session"] = "full_day"
+                if b_item.get("reason"):
+                    clean_item["reason"] = str(b_item["reason"]).strip()
+                clean_new_blocked.append(clean_item)
+
+                order_conflicts = check_products_booking_conflicts(
+                    [product_id], date_iso, date_iso, include_blocked_dates=False
                 )
-        clean_new_blocked = sorted(list(set(clean_new_blocked)))
+                if product_id in order_conflicts:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail=f"Cannot block date {date_iso}: An active renter reservation already exists for this date."
+                    )
+            elif isinstance(b_item, str):
+                d = parse_date_safely(b_item)
+                if not d:
+                    continue
+                date_iso = d.strftime("%Y-%m-%d")
+                clean_new_blocked.append(date_iso)
+                order_conflicts = check_products_booking_conflicts(
+                    [product_id], date_iso, date_iso, include_blocked_dates=False
+                )
+                if product_id in order_conflicts:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail=f"Cannot block date {date_iso}: An active renter reservation already exists for this date."
+                    )
 
     update_fields = {}
     if data.allowHalfDay is not None:
@@ -1985,6 +2008,10 @@ def create_booking_with_security(
 
     # Verify product existence
     product = get_payernt_product_by_id(data.productId, include_pin=True)
+    if not product:
+        from database import find_authoritative_product
+        product = find_authoritative_product(data.productId)
+
     vendor_id = "PAYERNT_USER_001"
     vendor_pin = "5831"
     prod_title = "Tech Gear Rental"
@@ -2001,17 +2028,28 @@ def create_booking_with_security(
     # Normalize slot interval & check availability
     norm_slot = (data.timeSlot or "full_day").lower()
     norm_dur = data.durationType or ("half_day" if norm_slot in ("morning", "afternoon") else "full_day")
-    if data.startDate == data.endDate or not data.endDate:
-        s_dt, e_dt = normalize_slot_interval(data.startDate, norm_slot, data.startTime, data.endTime)
-    else:
-        s_d = parse_date_safely(data.startDate) or datetime.now(timezone.utc).date()
-        e_d = parse_date_safely(data.endDate) or s_d
-        s_time_str = data.startTime or "08:00"
-        e_time_str = data.endTime or "17:00"
-        sh, sm = [int(x) for x in s_time_str.split(":")[:2]]
-        eh, em = [int(x) for x in e_time_str.split(":")[:2]]
-        s_dt = datetime(s_d.year, s_d.month, s_d.day, sh, sm, 0, tzinfo=timezone.utc)
-        e_dt = datetime(e_d.year, e_d.month, e_d.day, eh, em, 0, tzinfo=timezone.utc)
+
+    from database import calculate_booking_interval, check_renter_category_booking_restriction, CATEGORY_BOOKING_RESTRICTION_MESSAGE
+    s_dt, e_dt = calculate_booking_interval(
+        data.startDate,
+        data.endDate,
+        norm_slot,
+        norm_dur,
+        data.startTime,
+        data.endTime,
+    )
+
+    prod_category = (product.get("category") or "").strip() if product else ""
+    if prod_category:
+        restricted, _ = check_renter_category_booking_restriction(
+            renter_email, prod_category
+        )
+        if restricted:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=CATEGORY_BOOKING_RESTRICTION_MESSAGE
+            )
+
     buffer_min = product.get("buffer_minutes") if product else DEFAULT_BUFFER_MINUTES
     if buffer_min is None:
         buffer_min = DEFAULT_BUFFER_MINUTES
@@ -2055,30 +2093,60 @@ def create_booking_with_security(
         normalized_order = {
             "id": booking_id,
             "productId": data.productId,
+            "product_id": data.productId,
             "productTitle": prod_title,
+            "product_title": prod_title,
             "productImage": prod_img,
+            "product_image": prod_img,
             "startDate": data.startDate,
-            "endDate": data.endDate,
+            "start_date": data.startDate,
+            "endDate": data.endDate or data.startDate,
+            "end_date": data.endDate or data.startDate,
             "timeSlot": norm_slot,
+            "time_slot": norm_slot,
             "durationType": norm_dur,
+            "duration_type": norm_dur,
             "startTime": s_dt.strftime("%H:%M"),
+            "start_time": s_dt.strftime("%H:%M"),
             "endTime": e_dt.strftime("%H:%M"),
+            "end_time": e_dt.strftime("%H:%M"),
             "startDatetime": s_dt.isoformat(),
             "endDatetime": e_dt.isoformat(),
             "total": booking_total,
             "status": "pending",
+            "category": prod_category,
             "deliveryMethod": data.deliveryMethod or "delivery",
+            "delivery_method": data.deliveryMethod or "delivery",
             "deliveryAddress": data.deliveryAddress or "",
+            "delivery_address": data.deliveryAddress or "",
             "pickupLocation": data.pickupLocation or "",
+            "pickup_location": data.pickupLocation or "",
             "customLocation": data.customLocation or "",
+            "custom_location": data.customLocation or "",
             "locationDirections": data.locationDirections or "",
+            "location_directions": data.locationDirections or "",
             "latitude": data.latitude,
             "longitude": data.longitude,
             "createdAt": datetime.now(timezone.utc).isoformat(),
         }
         create_order(renter_email, normalized_order)
+    except ValueError as ve:
+        err_msg = str(ve)
+        if "awaiting delivery" in err_msg:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=err_msg
+            )
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=err_msg
+        )
     except Exception as e:
-        logger.warning(f"Could not persist order record for booking {booking_id}: {e}")
+        logger.error(f"Could not persist order record for booking {booking_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to persist booking reservation."
+        )
 
     # Sanitize security record for renter (removes vendor PIN)
     sanitized_sec = sanitize_security_record_for_user(security_record, "renter", renter_id)

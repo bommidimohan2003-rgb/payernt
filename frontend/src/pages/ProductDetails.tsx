@@ -166,6 +166,7 @@ export default function ProductDetails() {
     price: number;
   }>>([]);
   const [loadingSlots, setLoadingSlots] = useState<boolean>(false);
+  const [slotsError, setSlotsError] = useState<string | null>(null);
 
 
 
@@ -288,20 +289,31 @@ export default function ProductDetails() {
     if (!startDate || !id) return;
     let isMounted = true;
     setLoadingSlots(true);
+    setSlotsError(null);
 
     const apiBase = getApiBase();
     fetch(`${apiBase}/api/products/${encodeURIComponent(id)}/slots?date=${encodeURIComponent(startDate)}`)
-      .then((r) => r.json())
+      .then(async (r) => {
+        if (!r.ok) {
+          const errData = await r.json().catch(() => null);
+          throw new Error(errData?.detail || `Failed to fetch slots (HTTP ${r.status})`);
+        }
+        return r.json();
+      })
       .then((data) => {
         if (!isMounted) return;
         if (data && Array.isArray(data.slots)) {
           setDaySlots(data.slots);
+          setSlotsError(null);
         } else {
           setDaySlots([]);
         }
       })
-      .catch((err) => {
+      .catch((err: any) => {
+        if (!isMounted) return;
         console.warn("Could not fetch slots:", err);
+        setDaySlots([]);
+        setSlotsError(err?.message || "Failed to load real-time slot availability from server.");
       })
       .finally(() => {
         if (isMounted) setLoadingSlots(false);
@@ -332,6 +344,22 @@ export default function ProductDetails() {
     }
   };
 
+  const handleSelectPresetDuration = (days: number) => {
+    setDurationMode("custom");
+    setSelectedSlot("full_day");
+    if (!startDate) return;
+    const parts = startDate.split("-").map(Number);
+    const startObj = new Date(parts[0], parts[1] - 1, parts[2]);
+    // Exactly N elapsed 24-hour days:
+    const endObj = new Date(startObj);
+    endObj.setDate(startObj.getDate() + Math.max(1, days - 1));
+    const endStr = toDateInputValue(endObj);
+    setEndDate(endStr);
+    setAvailabilityChecked(false);
+    setIsAvailableForDates(null);
+    setAvailabilityMessage("");
+  };
+
   const handleSlotSelect = (slotId: "morning" | "afternoon" | "full_day") => {
     setSelectedSlot(slotId);
     if (slotId === "morning") {
@@ -353,6 +381,27 @@ export default function ProductDetails() {
     if (!startDate || !endDate) return 0;
     return calculateInclusiveDays(startDate, endDate);
   }, [durationMode, startDate, endDate]);
+
+  const calculatedEndDateTimeStr = useMemo(() => {
+    if (!startDate) return "";
+    if (durationMode === "half_day_morning") {
+      return `${startDate} at 12:00 PM (4h)`;
+    }
+    if (durationMode === "half_day_afternoon") {
+      return `${startDate} at 5:00 PM (4h)`;
+    }
+    if (durationMode === "full_day") {
+      const parts = startDate.split("-").map(Number);
+      const d = new Date(parts[0], parts[1] - 1, parts[2]);
+      d.setDate(d.getDate() + 1);
+      return `${toDateInputValue(d)} at 10:00 AM (24h)`;
+    }
+    const days = rentalDays > 0 ? rentalDays : 1;
+    const parts = startDate.split("-").map(Number);
+    const d = new Date(parts[0], parts[1] - 1, parts[2]);
+    d.setDate(d.getDate() + days);
+    return `${endDate || toDateInputValue(d)} at 10:00 AM (${days * 24}h)`;
+  }, [startDate, endDate, durationMode, rentalDays]);
 
   const estimatedTotal = useMemo(() => {
     if (!product) return 0;
@@ -467,28 +516,45 @@ export default function ProductDetails() {
       const res = await fetch(
         `${apiBase}/api/products/${encodeURIComponent(id)}/availability?start_date=${startDate}&end_date=${checkEnd}`
       );
-      if (res.ok) {
-        const availData = await res.json();
-        if (availData.conflicts && availData.conflicts.length > 0) {
-          const firstConflict = availData.conflicts[0];
-          const isBlocked = firstConflict.reason === "blocked";
-          setIsAvailableForDates(false);
-          setAvailabilityMessage(
-            isBlocked
-              ? `Unavailable: Date ${firstConflict.date} is blocked by the equipment owner.`
-              : `Unavailable: Date ${firstConflict.date} is already reserved by another renter.`
-          );
-          setAvailabilityChecked(true);
-          toast.error(
-            isBlocked
-              ? `Date ${firstConflict.date} is blocked by owner.`
-              : `Date ${firstConflict.date} is already reserved.`
-          );
-          return;
-        }
+      if (!res.ok) {
+        setIsAvailableForDates(false);
+        setAvailabilityMessage("Could not verify real-time availability with server. Please retry.");
+        setAvailabilityChecked(true);
+        toast.error("Availability check failed. Please retry.");
+        return;
+      }
+      const availData = await res.json();
+      if (availData.is_available === false || availData.isAvailable === false || availData.status === "blocked" || availData.status === "booked") {
+        setIsAvailableForDates(false);
+        const reason = availData.reason || (availData.status === "blocked" ? "Selected dates/slot are blocked by owner." : "Selected dates/slot are already reserved.");
+        setAvailabilityMessage(reason);
+        setAvailabilityChecked(true);
+        toast.error(reason);
+        return;
+      }
+      if (availData.conflicts && availData.conflicts.length > 0) {
+        const firstConflict = availData.conflicts[0];
+        const isBlocked = firstConflict.reason === "blocked";
+        setIsAvailableForDates(false);
+        setAvailabilityMessage(
+          isBlocked
+            ? `Unavailable: Date ${firstConflict.date} is blocked by the equipment owner.`
+            : `Unavailable: Date ${firstConflict.date} is already reserved by another renter.`
+        );
+        setAvailabilityChecked(true);
+        toast.error(
+          isBlocked
+            ? `Date ${firstConflict.date} is blocked by owner.`
+            : `Date ${firstConflict.date} is already reserved.`
+        );
+        return;
       }
     } catch (e) {
       console.debug("Backend availability check error:", e);
+      setIsAvailableForDates(false);
+      setAvailabilityMessage("Network error during availability check. Please check connection.");
+      setAvailabilityChecked(true);
+      return;
     }
 
     // Check overlap with existing confirmed bookings
@@ -1267,27 +1333,65 @@ export default function ProductDetails() {
                       />
                     </div>
 
-                    {/* Multi-Day Selected Range Banner */}
+                    {/* Multi-Day Selected Range Banner & Quick Duration Presets */}
                     {durationMode === "custom" && (
-                      <div className="p-3.5 rounded-2xl bg-secondary/50 border border-border/80 flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2.5">
-                          <Calendar className="h-4 w-4 text-primary shrink-0" />
-                          <div>
-                            <span className="font-extrabold text-foreground block">
-                              {startDate && endDate && startDate !== endDate
-                                ? `${startDate} → ${endDate}`
-                                : startDate
-                                ? `${startDate} (Now pick Return Date on calendar)`
-                                : "Select Start & Return Dates on calendar"}
-                            </span>
-                            <span className="text-[10px] text-muted-foreground">
-                              {rentalDays > 1 ? `${rentalDays} Days Rental` : "Minimum 2 days booking"}
-                            </span>
+                      <div className="space-y-3">
+                        <div className="p-3.5 rounded-2xl bg-secondary/50 border border-border/80 flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2.5">
+                            <Calendar className="h-4 w-4 text-primary shrink-0" />
+                            <div>
+                              <span className="font-extrabold text-foreground block">
+                                {startDate && endDate && startDate !== endDate
+                                  ? `${startDate} → ${endDate}`
+                                  : startDate
+                                  ? `${startDate} (${rentalDays} Day Rental · Return ${endDate || startDate} 10:00 AM)`
+                                  : "Select Start & Return Dates on calendar"}
+                              </span>
+                              <span className="text-[10px] text-muted-foreground">
+                                {rentalDays} {rentalDays === 1 ? "Day" : "Days"} Rental ({rentalDays * 24} Elapsed Hours) · Calculated End: {calculatedEndDateTimeStr}
+                              </span>
+                            </div>
+                          </div>
+                          <span className="text-xs font-mono font-bold text-foreground shrink-0">
+                            ₹{(Number(product.price) || 0).toLocaleString("en-IN")}/day
+                          </span>
+                        </div>
+
+                        {/* Quick Multi-Day Duration Presets (1d, 2d, 3d, 4d, 5d, 7d, 10d, 14d, 30d) */}
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between text-[11px] font-bold text-muted-foreground">
+                            <span>Flexible Duration Presets (N × 24h)</span>
+                            <span className="font-mono text-[10px]">Exact elapsed 24h intervals</span>
+                          </div>
+                          <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+                            {[
+                              { label: "1 Day", days: 1, desc: "24 hrs" },
+                              { label: "2 Days", days: 2, desc: "48 hrs" },
+                              { label: "3 Days", days: 3, desc: "72 hrs" },
+                              { label: "4 Days", days: 4, desc: "96 hrs" },
+                              { label: "5 Days", days: 5, desc: "120 hrs" },
+                              { label: "7 Days", days: 7, desc: "168 hrs" },
+                            ].map((preset) => {
+                              const isSelected = rentalDays === preset.days && durationMode === "custom";
+                              return (
+                                <button
+                                  key={preset.days}
+                                  type="button"
+                                  onClick={() => handleSelectPresetDuration(preset.days)}
+                                  className={cn(
+                                    "p-2 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5",
+                                    isSelected
+                                      ? "bg-primary text-primary-foreground font-black border-primary shadow-xs scale-[1.02]"
+                                      : "border-border/80 bg-card hover:bg-secondary text-foreground text-xs font-semibold"
+                                  )}
+                                >
+                                  <span className="text-xs font-bold">{preset.label}</span>
+                                  <span className="text-[9px] opacity-75 font-mono">{preset.desc}</span>
+                                </button>
+                              );
+                            })}
                           </div>
                         </div>
-                        <span className="text-xs font-mono font-bold text-foreground shrink-0">
-                          ₹{(Number(product.price) || 0).toLocaleString("en-IN")}/day
-                        </span>
                       </div>
                     )}
 
@@ -1297,7 +1401,7 @@ export default function ProductDetails() {
                         <div className="flex items-center justify-between text-xs font-bold text-foreground">
                           <span className="flex items-center gap-1.5">
                             <Clock className="h-3.5 w-3.5 text-primary" />
-                            <span>Available Slots for Selected Date</span>
+                            <span>Available Time Slots for Selected Date</span>
                           </span>
                           <span className="text-[11px] font-mono text-muted-foreground font-medium">
                             {startDate
@@ -1310,67 +1414,106 @@ export default function ProductDetails() {
                           </span>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                          {(daySlots.length > 0 ? daySlots : [
-                            { id: "morning", name: "Half Day — Morning", label: "8:00 AM – 12:00 PM", status: "available", statusLabel: "AVAILABLE", rate: Math.round(Number(product.price || 0) * 0.6) },
-                            { id: "afternoon", name: "Half Day — Afternoon", label: "1:00 PM – 5:00 PM", status: "available", statusLabel: "AVAILABLE", rate: Math.round(Number(product.price || 0) * 0.6) },
-                            { id: "full_day", name: "Full Day", label: "8:00 AM – 5:00 PM", status: "available", statusLabel: "AVAILABLE", rate: Number(product.price || 0) },
-                          ]).map((slot: any) => {
-                            const isSelected = selectedSlot === slot.id;
-                            const isBooked = slot.status === "booked";
-                            const isNotOffered = slot.status === "not_available";
-                            const isClickable = !isBooked && !isNotOffered;
-                            const slotRate = Number(
-                              slot.price ?? slot.rate ?? (slot.id === "full_day" ? Number(product.price || 0) : Math.round(Number(product.price || 0) * 0.6))
-                            );
+                        {loadingSlots ? (
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 py-1">
+                            {[1, 2, 3].map((i) => (
+                              <div key={i} className="h-24 rounded-2xl bg-muted/30 animate-pulse border border-border/60 p-3 flex flex-col justify-between">
+                                <div className="h-3 w-20 bg-muted/70 rounded" />
+                                <div className="h-4 w-12 bg-muted/70 rounded" />
+                              </div>
+                            ))}
+                          </div>
+                        ) : slotsError ? (
+                          <div className="p-3 rounded-2xl bg-destructive/10 border border-destructive/20 text-destructive text-xs font-semibold flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <AlertCircle className="h-4 w-4 shrink-0" />
+                              <span>{slotsError}</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setStartDate((s) => (s ? `${s}` : todayStr));
+                              }}
+                              className="text-xs underline font-bold hover:opacity-80 cursor-pointer"
+                            >
+                              Retry
+                            </button>
+                          </div>
+                        ) : daySlots.length === 0 ? (
+                          <div className="p-3 rounded-2xl bg-muted/30 border border-border/60 text-muted-foreground text-xs text-center">
+                            No slot intervals configured for this date.
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            {daySlots.map((slot: any) => {
+                              const isSelected = selectedSlot === slot.id;
+                              const isBooked = slot.status === "booked";
+                              const isBlocked = slot.status === "blocked" || (slot as any).isBlocked;
+                              const isNotOffered = slot.status === "not_available";
+                              const isClickable = !isBooked && !isBlocked && !isNotOffered;
+                              const slotRate = Number(
+                                slot.price ?? slot.rate ?? (slot.id === "full_day" ? Number(product.price || 0) : Math.round(Number(product.price || 0) * 0.6))
+                              );
 
-                            return (
-                              <button
-                                key={slot.id}
-                                type="button"
-                                disabled={!isClickable}
-                                onClick={() => handleSlotSelect(slot.id as any)}
-                                className={cn(
-                                  "p-3 rounded-2xl border text-left transition-all flex flex-col justify-between cursor-pointer group",
-                                  isSelected
-                                    ? "border-primary bg-primary/10 shadow-sm ring-2 ring-primary/40 scale-[1.02]"
-                                    : isClickable
-                                    ? "border-border/80 bg-card/60 hover:border-primary/40 hover:bg-secondary/40"
-                                    : "border-border/60 bg-muted/30 opacity-60 cursor-not-allowed"
-                                )}
-                              >
-                                <div className="space-y-1">
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-xs font-bold text-foreground">
-                                      {slot.id === "morning" ? "Morning" : slot.id === "afternoon" ? "Afternoon" : "Full Day"}
-                                    </span>
-                                    <span
-                                      className={cn(
-                                        "px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider",
-                                        slot.status === "available" || !slot.status
-                                          ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
-                                          : isBooked
-                                          ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20"
-                                          : "bg-muted text-muted-foreground border border-border"
-                                      )}
-                                    >
-                                      {slot.statusLabel || (isBooked ? "BOOKED" : "AVAILABLE")}
+                              return (
+                                <button
+                                  key={slot.id}
+                                  type="button"
+                                  disabled={!isClickable}
+                                  onClick={() => handleSlotSelect(slot.id as any)}
+                                  className={cn(
+                                    "p-3 rounded-2xl border text-left transition-all flex flex-col justify-between group",
+                                    isSelected
+                                      ? "border-primary bg-primary/10 shadow-sm ring-2 ring-primary/40 scale-[1.02]"
+                                      : isClickable
+                                      ? "border-border/80 bg-card/60 hover:border-primary/40 hover:bg-secondary/40 cursor-pointer"
+                                      : "border-border/60 bg-muted/40 cursor-not-allowed opacity-70"
+                                  )}
+                                >
+                                  <div className="space-y-1">
+                                    <div className="flex items-center justify-between">
+                                      <span className={cn(
+                                        "text-xs font-bold",
+                                        !isClickable ? "line-through decoration-rose-500 decoration-2 text-muted-foreground/70" : "text-foreground"
+                                      )}>
+                                        {slot.id === "morning" ? "Morning" : slot.id === "afternoon" ? "Afternoon" : "Full Day"}
+                                      </span>
+                                      <span
+                                        className={cn(
+                                          "px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider",
+                                          isClickable
+                                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                                            : isBooked
+                                            ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20"
+                                            : isBlocked
+                                            ? "bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30"
+                                            : "bg-muted text-muted-foreground border border-border"
+                                        )}
+                                      >
+                                        {slot.statusLabel || (isBooked ? "BOOKED" : isBlocked ? "BLOCKED" : "AVAILABLE")}
+                                      </span>
+                                    </div>
+                                    <p className={cn(
+                                      "text-[10px] font-mono",
+                                      !isClickable ? "line-through decoration-rose-400 text-muted-foreground/50" : "text-muted-foreground"
+                                    )}>
+                                      {slot.id === "full_day" ? "24 Elapsed Hours (10:00 AM → 10:00 AM)" : (slot.label?.includes("—") ? slot.label.split("—")[1].trim() : slot.label)}
+                                    </p>
+                                  </div>
+                                  <div className="pt-2 mt-2 border-t border-border/40 flex items-center justify-between text-xs">
+                                    <span className="text-muted-foreground text-[10px]">Rate</span>
+                                    <span className={cn(
+                                      "font-extrabold font-mono text-xs sm:text-sm",
+                                      !isClickable ? "line-through decoration-rose-500/60 text-muted-foreground/60" : "text-foreground"
+                                    )}>
+                                      ₹{slotRate.toLocaleString("en-IN")}
                                     </span>
                                   </div>
-                                  <p className="text-[10px] text-muted-foreground font-mono">
-                                    {slot.label?.includes("—") ? slot.label.split("—")[1].trim() : slot.label}
-                                  </p>
-                                </div>
-                                <div className="pt-2 mt-2 border-t border-border/40 flex items-center justify-between text-xs">
-                                  <span className="text-muted-foreground text-[10px]">Rate</span>
-                                  <span className="font-extrabold text-foreground font-mono text-xs sm:text-sm">
-                                    ₹{slotRate.toLocaleString("en-IN")}
-                                  </span>
-                                </div>
-                              </button>
-                            );
-                          })}
-                        </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -1420,38 +1563,51 @@ export default function ProductDetails() {
                         {/* Booking Summary Box */}
                         <div className="p-4 rounded-2xl border border-border/80 bg-secondary/30 space-y-2.5 text-xs">
                           <div className="flex justify-between text-muted-foreground">
-                            <span>Schedule Type:</span>
+                            <span>Selected Gear:</span>
+                            <span className="font-extrabold text-foreground truncate max-w-[200px]">
+                              {product.title}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-muted-foreground">
+                            <span>Rental Schedule:</span>
                             <span className="font-extrabold text-foreground capitalize">
                               {durationMode === "half_day_morning"
-                                ? "Morning Slot (8:00 AM – 12:00 PM)"
+                                ? "Morning Slot (8:00 AM – 12:00 PM · 4 hrs)"
                                 : durationMode === "half_day_afternoon"
-                                ? "Afternoon Slot (1:00 PM – 5:00 PM)"
+                                ? "Afternoon Slot (1:00 PM – 5:00 PM · 4 hrs)"
                                 : durationMode === "full_day"
-                                ? "Full Day (8:00 AM – 5:00 PM)"
-                                : `${rentalDays} Days Multi-Day Rental`}
+                                ? "Full Day (24 Elapsed Hours · 10:00 AM → 10:00 AM)"
+                                : `${rentalDays} Days Rental (${rentalDays * 24} Elapsed Hours)`}
                             </span>
                           </div>
                           <div className="flex justify-between text-muted-foreground">
-                            <span>Rental Date:</span>
+                            <span>Start Instant:</span>
+                            <span className="font-semibold text-foreground font-mono">
+                              {startDate} at {selectedSlot === "morning" ? "8:00 AM" : selectedSlot === "afternoon" ? "1:00 PM" : "10:00 AM"}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-muted-foreground">
+                            <span>Calculated End Instant:</span>
+                            <span className="font-semibold text-foreground font-mono">
+                              {calculatedEndDateTimeStr}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-muted-foreground">
+                            <span>Applicable Unit Rate:</span>
                             <span className="font-semibold text-foreground">
-                              {startDate} {durationMode === "custom" && endDate !== startDate ? `→ ${endDate}` : ""}
+                              {durationMode.startsWith("half_day")
+                                ? `₹${estimatedTotal.toLocaleString("en-IN")} / half-day`
+                                : `₹${(Number(product.price) || 0).toLocaleString("en-IN")} / day`}
                             </span>
                           </div>
                           <div className="flex justify-between text-muted-foreground">
-                            <span>Applicable Rate:</span>
-                            <span className="font-semibold text-foreground">
-                              ₹{estimatedTotal.toLocaleString("en-IN")}
-                              {durationMode.startsWith("half_day") ? " (Half-day rate)" : durationMode === "full_day" ? " (Full-day rate)" : ` (₹${product.price}/day)`}
-                            </span>
-                          </div>
-                          <div className="flex justify-between text-muted-foreground">
-                            <span>Damage Protection:</span>
-                            <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                              Included (₹0)
+                            <span>Availability Verification:</span>
+                            <span className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                              <CheckCircle2 className="h-3.5 w-3.5" /> Authoritative Backend Confirmed
                             </span>
                           </div>
                           <div className="pt-2 border-t border-border flex justify-between items-baseline">
-                            <span className="font-bold text-foreground text-sm">Estimated Total:</span>
+                            <span className="font-bold text-foreground text-sm">Total Estimated Rental Price:</span>
                             <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400 font-display font-mono">
                               ₹{estimatedTotal.toLocaleString("en-IN")}
                             </span>
