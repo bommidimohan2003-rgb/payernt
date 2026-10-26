@@ -430,6 +430,7 @@ export function usePayerntStore() {
   const inFlightProductsRef = useRef<Promise<any> | null>(null);
   const inFlightWalletRef = useRef<Promise<any> | null>(null);
   const inFlightNotifsRef = useRef<Promise<any> | null>(null);
+  const inFlightMessagesRef = useRef<Promise<any> | null>(null);
   const lastDashboardFetchRef = useRef<number>(0);
 
   const mapRawBookingToRentalRequest = useCallback((b: any): RentalRequest => {
@@ -584,6 +585,33 @@ export function usePayerntStore() {
     inFlightNotifsRef.current = promise;
     return promise;
   }, [activeAccount, isAuthenticated]);
+
+  const fetchMessages = useCallback(
+    async (productId?: string) => {
+      if (!activeAccount?.accountId) return;
+      if (inFlightMessagesRef.current) return inFlightMessagesRef.current;
+      const promise = (async () => {
+        try {
+          const res = await payerntApi.getMessages(productId);
+          if (res.success && Array.isArray(res.messages)) {
+            setMessages(res.messages);
+            const count = res.unreadCount ?? res.messages.filter((m: any) => !m.read && !m.is_read).length;
+            setUnreadMessagesCount(count);
+            try {
+              localStorage.setItem(STORAGE_KEY_MESSAGES, JSON.stringify(res.messages));
+            } catch {}
+          }
+        } catch (err) {
+          console.warn("[paye₹nt Store] fetchMessages error:", err);
+        } finally {
+          inFlightMessagesRef.current = null;
+        }
+      })();
+      inFlightMessagesRef.current = promise;
+      return promise;
+    },
+    [activeAccount?.accountId]
+  );
 
   // Authoritative real paye₹nt backend synchronization
   const refreshDashboard = useCallback(async (forceFull: boolean = false) => {
@@ -1327,22 +1355,6 @@ export function usePayerntStore() {
   const markAllNotificationsRead = () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
   };
-
-  const fetchMessages = useCallback(
-    async (productId?: string) => {
-      if (!activeAccount?.accountId) return;
-      const res = await payerntApi.getMessages(productId);
-      if (res.success && Array.isArray(res.messages)) {
-        setMessages(res.messages);
-        const count = res.unreadCount ?? res.messages.filter((m: any) => !m.read && !m.is_read).length;
-        setUnreadMessagesCount(count);
-        try {
-          localStorage.setItem(STORAGE_KEY_MESSAGES, JSON.stringify(res.messages));
-        } catch {}
-      }
-    },
-    [activeAccount?.accountId]
-  );
 
   const markMessageRead = useCallback(
     async (messageId: string) => {

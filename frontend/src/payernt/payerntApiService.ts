@@ -6,7 +6,9 @@ import type {
   BankAccount,
   LenderNotification,
 } from "./types";
-import { STORAGE_KEY_SESSION, STORAGE_KEY_ACCOUNT } from "./store";
+
+const STORAGE_KEY_SESSION = "paye₹nt_session";
+const STORAGE_KEY_ACCOUNT = "paye₹nt_account";
 
 const getApiBase = () => {
   if (typeof window !== "undefined") {
