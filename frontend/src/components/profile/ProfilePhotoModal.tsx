@@ -1,14 +1,12 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   Camera,
-  Upload,
   RefreshCw,
   Check,
   X,
   Trash2,
   AlertCircle,
-  Image as ImageIcon,
-  ShieldCheck,
+  FlipHorizontal,
 } from "lucide-react";
 import { Button } from "@/components/common/Button";
 import { ProfilePhoto } from "@/components/common/ProfilePhoto";
@@ -35,13 +33,13 @@ export function ProfilePhotoModal({
   const [step, setStep] = useState<ModalStep>("select");
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
   const [isStartingCamera, setIsStartingCamera] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isRemoving, setIsRemoving] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Clean up WebRTC tracks
   const stopCameraStream = useCallback(() => {
@@ -72,7 +70,7 @@ export function ProfilePhotoModal({
   }, [stopCameraStream, onClose]);
 
   // Handle starting camera stream
-  const startCameraStream = useCallback(async () => {
+  const startCameraStream = useCallback(async (preferredFacing: "user" | "environment" = facingMode) => {
     stopCameraStream();
     setCameraError(null);
     setIsStartingCamera(true);
@@ -94,7 +92,7 @@ export function ProfilePhotoModal({
         video: {
           width: { ideal: 720 },
           height: { ideal: 720 },
-          facingMode: "user",
+          facingMode: preferredFacing,
         },
         audio: false,
       });
@@ -112,16 +110,23 @@ export function ProfilePhotoModal({
           "Camera permission was denied. Please allow camera access in your browser settings to take a selfie."
         );
       } else if (e.name === "NotFoundError" || e.name === "DevicesNotFoundError") {
-        setCameraError("No front-facing camera device was found on this system.");
+        setCameraError("No camera device was found on this system.");
       } else {
         setCameraError(
-          e.message || "Failed to initialize camera. Please try choosing from gallery instead."
+          e.message || "Failed to initialize camera. Please check camera permissions and retry."
         );
       }
     } finally {
       setIsStartingCamera(false);
     }
-  }, [stopCameraStream]);
+  }, [stopCameraStream, facingMode]);
+
+  // Toggle front/back camera
+  const toggleCameraFacing = async () => {
+    const nextFacing = facingMode === "user" ? "environment" : "user";
+    setFacingMode(nextFacing);
+    await startCameraStream(nextFacing);
+  };
 
   // Cleanup on unmount or modal close
   useEffect(() => {
@@ -134,58 +139,6 @@ export function ProfilePhotoModal({
   }, [isOpen, stopCameraStream]);
 
   if (!isOpen) return null;
-
-  // Process and compress image file from Gallery
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      alert("Please select a valid image file (JPEG, PNG, or WebP).");
-      return;
-    }
-    if (file.size > 8 * 1024 * 1024) {
-      alert("Image exceeds 8MB limit. Please choose a smaller photo.");
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        // Compress and normalize to max 800x800 square
-        const canvas = document.createElement("canvas");
-        const maxDim = 800;
-        let width = img.width;
-        let height = img.height;
-
-        if (width > height) {
-          if (width > maxDim) {
-            height = Math.round((height * maxDim) / width);
-            width = maxDim;
-          }
-        } else {
-          if (height > maxDim) {
-            width = Math.round((width * maxDim) / height);
-            height = maxDim;
-          }
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext("2d");
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, width, height);
-          const compressed = canvas.toDataURL("image/jpeg", 0.9);
-          setSelectedPhoto(compressed);
-          setStep("preview");
-        }
-      };
-      img.src = event.target?.result as string;
-    };
-    reader.readAsDataURL(file);
-    e.target.value = "";
-  };
 
   // Capture current video frame from selfie camera
   const handleCaptureSelfie = () => {
@@ -201,9 +154,11 @@ export function ProfilePhotoModal({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Flip horizontally for intuitive selfie mirror effect
-    ctx.translate(width, 0);
-    ctx.scale(-1, 1);
+    // Flip horizontally for front camera selfie mirror effect
+    if (facingMode === "user") {
+      ctx.translate(width, 0);
+      ctx.scale(-1, 1);
+    }
     ctx.drawImage(video, 0, 0, width, height);
 
     const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
@@ -242,15 +197,6 @@ export function ProfilePhotoModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-md animate-in fade-in duration-200">
-      {/* Hidden file input for device gallery */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/jpeg,image/png,image/webp"
-        className="hidden"
-        onChange={handleFileSelect}
-      />
-
       <div className="w-full max-w-md p-6 rounded-3xl bg-card border border-border shadow-2xl space-y-5 relative overflow-hidden text-center">
         {/* Top Header */}
         <div className="flex items-center justify-between border-b border-border pb-3">
@@ -278,7 +224,7 @@ export function ProfilePhotoModal({
           </button>
         </div>
 
-        {/* STEP 1: Select Mode (Selfie vs Gallery vs Remove) */}
+        {/* STEP 1: Select Mode (Single Option: Take Selfie) */}
         {step === "select" && (
           <div className="space-y-5 py-2">
             <div className="flex flex-col items-center justify-center gap-3">
@@ -294,35 +240,24 @@ export function ProfilePhotoModal({
               </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+            {/* Single Option: Take Selfie */}
+            <div className="pt-2">
               <button
                 type="button"
                 onClick={() => {
                   setStep("camera");
                   startCameraStream();
                 }}
-                className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl border border-border bg-secondary/50 hover:bg-secondary hover:border-primary/50 text-foreground transition-all cursor-pointer group"
+                className="w-full flex items-center justify-center gap-3.5 p-4 rounded-2xl border border-primary/30 bg-primary/10 hover:bg-primary/20 hover:border-primary/50 text-foreground transition-all cursor-pointer group shadow-xs"
               >
-                <div className="p-3 rounded-full bg-primary/10 text-primary group-hover:scale-110 transition-transform">
+                <div className="p-3 rounded-full bg-primary text-primary-foreground group-hover:scale-105 transition-transform shadow-md">
                   <Camera className="h-6 w-6" />
                 </div>
-                <div className="text-center">
-                  <span className="text-xs font-bold block">Take Selfie</span>
-                  <span className="text-[10px] text-muted-foreground">Use front camera</span>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl border border-border bg-secondary/50 hover:bg-secondary hover:border-primary/50 text-foreground transition-all cursor-pointer group"
-              >
-                <div className="p-3 rounded-full bg-primary/10 text-primary group-hover:scale-110 transition-transform">
-                  <Upload className="h-6 w-6" />
-                </div>
-                <div className="text-center">
-                  <span className="text-xs font-bold block">Choose from Gallery</span>
-                  <span className="text-[10px] text-muted-foreground">Upload from device</span>
+                <div className="text-left">
+                  <span className="text-sm font-bold block text-foreground">Take Selfie</span>
+                  <span className="text-xs text-muted-foreground font-medium">
+                    Use front camera for photo verification
+                  </span>
                 </div>
               </button>
             </div>
@@ -357,7 +292,7 @@ export function ProfilePhotoModal({
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={startCameraStream}
+                    onClick={() => startCameraStream()}
                     className="mt-2 text-xs font-bold"
                   >
                     Retry Camera
@@ -369,7 +304,9 @@ export function ProfilePhotoModal({
                   autoPlay
                   playsInline
                   muted
-                  className="w-full h-full object-cover -scale-x-100"
+                  className={`w-full h-full object-cover ${
+                    facingMode === "user" ? "-scale-x-100" : ""
+                  }`}
                 />
               )}
 
@@ -378,6 +315,18 @@ export function ProfilePhotoModal({
                 <div className="absolute inset-4 border-2 border-dashed border-white/40 rounded-full pointer-events-none flex items-center justify-center">
                   <div className="h-28 w-28 rounded-full border border-white/20" />
                 </div>
+              )}
+
+              {/* Camera Flip button */}
+              {!cameraError && (
+                <button
+                  type="button"
+                  onClick={toggleCameraFacing}
+                  className="absolute bottom-3 right-3 p-2 rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors backdrop-blur-xs cursor-pointer shadow-md"
+                  title="Flip Camera"
+                >
+                  <FlipHorizontal className="h-4 w-4" />
+                </button>
               )}
             </div>
 
@@ -420,7 +369,7 @@ export function ProfilePhotoModal({
             </div>
 
             <p className="text-xs text-muted-foreground font-medium">
-              Review your photo preview before saving.
+              Review your selfie preview before saving.
             </p>
 
             <div className="grid grid-cols-2 gap-3 pt-2">
@@ -429,13 +378,14 @@ export function ProfilePhotoModal({
                 variant="outline"
                 onClick={() => {
                   setSelectedPhoto(null);
-                  setStep("select");
+                  setStep("camera");
+                  startCameraStream();
                 }}
                 disabled={isSaving}
                 className="font-bold text-xs py-3 rounded-xl cursor-pointer flex items-center justify-center gap-1.5"
               >
                 <RefreshCw className="h-4 w-4" />
-                <span>Choose Different</span>
+                <span>Retake Selfie</span>
               </Button>
 
               <Button

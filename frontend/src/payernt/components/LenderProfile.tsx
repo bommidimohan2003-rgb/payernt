@@ -188,7 +188,7 @@ export function LenderProfileView({
               className="text-[11px] font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
             >
               <Camera className="h-3 w-3" />
-              <span>Change Photo</span>
+              <span>Take Selfie</span>
             </button>
           </div>
 

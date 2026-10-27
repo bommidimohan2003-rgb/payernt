@@ -486,7 +486,7 @@ export default function Profile() {
                   className="w-full btn-gradient text-xs py-2 px-3.5 rounded-xl font-bold flex items-center justify-center gap-1.5 shadow-md hover:scale-102 active:scale-95 transition-all cursor-pointer"
                 >
                   <Camera className="h-3.5 w-3.5" />
-                  <span>Change Profile Photo</span>
+                  <span>Take Selfie</span>
                 </button>
               </div>
 
