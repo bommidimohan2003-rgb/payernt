@@ -6,6 +6,7 @@ import { notificationsService } from "../services/notifications";
 import { AdminActivityLog } from "../services/api";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { ProfilePhoto } from "@/components/common/ProfilePhoto";
 
 // Helper function to sanitize and redact any sensitive strings from audit logs
 function sanitizeLogText(text: string): string {
@@ -112,9 +113,13 @@ export default function ActivityLogs() {
       label: "Admin",
       render: (row) => (
         <div className="flex items-center gap-2.5">
-          <div className="h-7 w-7 rounded-full bg-[#171C23] border border-[rgba(161,161,170,0.18)] flex items-center justify-center font-bold text-xs text-[#F5F5F5] shrink-0">
-            {(row.userName || "A").charAt(0).toUpperCase()}
-          </div>
+          <ProfilePhoto
+            src=""
+            alt={row.userName || "Admin"}
+            size="xs"
+            shape="circle"
+            className="shrink-0"
+          />
           <span className="font-bold text-[#F5F5F5] text-xs">{row.userName || "Admin"}</span>
         </div>
       ),

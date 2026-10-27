@@ -48,6 +48,7 @@ import { api, getApiBase } from "@/utils/api";
 import { storage, STORAGE_KEYS } from "@/utils/storage";
 import { formatOwnerAddress } from "@/utils/formatters";
 import type { Product, Order } from "@/types";
+import { ProfilePhoto } from "@/components/common/ProfilePhoto";
 import { ProductMessageModal } from "@/components/browse/ProductMessageModal";
 
 const KNOWN_BRANDS = [
@@ -1194,10 +1195,12 @@ export default function ProductDetails() {
                   </div>
 
                   <div className="flex items-center gap-4 flex-wrap sm:flex-nowrap">
-                    <img
-                      src={product.owner?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(product.owner?.name || "Host")}&background=10b981&color=ffffff`}
+                    <ProfilePhoto
+                      src={product.owner?.avatar}
                       alt={product.owner?.name || "Host"}
-                      className="h-14 w-14 rounded-full object-cover border-2 border-primary/20 shadow-sm shrink-0"
+                      size="xl"
+                      shape="circle"
+                      className="border-2 border-primary/20 shadow-sm shrink-0"
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">

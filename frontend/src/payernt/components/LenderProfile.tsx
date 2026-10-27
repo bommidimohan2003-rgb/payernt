@@ -26,11 +26,16 @@ import {
   LogOut,
   FileText,
   ArrowLeft,
+  Camera,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import type { LenderProfile, PayerntAccount } from "../types";
 import { useTheme } from "@/hooks/useTheme";
+import { ProfilePhoto } from "@/components/common/ProfilePhoto";
+import { ProfilePhotoModal } from "@/components/profile/ProfilePhotoModal";
+import { api } from "@/utils/api";
+import { storage, STORAGE_KEYS } from "@/utils/storage";
 
 interface LenderProfileProps {
   profile: LenderProfile;
@@ -54,12 +59,43 @@ export function LenderProfileView({
   const navigate = useNavigate();
   const { theme, toggle: toggleTheme } = useTheme();
   const [isEditing, setIsEditing] = useState(false);
+  const [isPhotoModalOpen, setIsPhotoModalOpen] = useState(false);
   const [name, setName] = useState(activeAccount?.name || profile.name || "");
   const [phone, setPhone] = useState(activeAccount?.phone || profile.phone || "");
   const [city, setCity] = useState(profile.city || "");
   const [area, setArea] = useState(profile.area || "");
   const [address, setAddress] = useState(activeAccount?.address || profile.address || "");
   const [pincode, setPincode] = useState(activeAccount?.pincode || profile.pincode || "");
+
+  const activePhoto = activeAccount?.avatar || profile.avatar || "";
+
+  const handleUploadPhoto = async (photoDataUrl: string) => {
+    onUpdateProfile({ avatar: photoDataUrl });
+    const token = storage.get<string | null>(STORAGE_KEYS.token, null) ||
+                  (typeof window !== "undefined" ? localStorage.getItem("paye₹nt_token") : null);
+    if (token) {
+      await api.uploadProfilePhoto(token, photoDataUrl).catch(() => {});
+    }
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("payent:profile_photo_updated"));
+      window.dispatchEvent(new CustomEvent("payent:storage_change"));
+    }
+    toast.success("Host profile photo updated successfully!");
+  };
+
+  const handleRemovePhoto = async () => {
+    onUpdateProfile({ avatar: "" });
+    const token = storage.get<string | null>(STORAGE_KEYS.token, null) ||
+                  (typeof window !== "undefined" ? localStorage.getItem("paye₹nt_token") : null);
+    if (token) {
+      await api.deleteProfilePhoto(token).catch(() => {});
+    }
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("payent:profile_photo_updated"));
+      window.dispatchEvent(new CustomEvent("payent:storage_change"));
+    }
+    toast.success("Host profile photo removed.");
+  };
 
   const accountId = activeAccount?.accountId || (activeAccount as any)?.id || profile.accountId || "VENDOR_ACTIVE";
   const rawAadhaar = activeAccount?.aadhaarNumber || (activeAccount as any)?.aadhaar_number || profile.aadhaarMasked || "";
@@ -134,18 +170,26 @@ export function LenderProfileView({
       {/* Main Profile Info Card */}
       <div className="rounded-3xl border border-border/80 bg-card p-6 sm:p-8 space-y-6 shadow-sm">
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
-          <div className="relative shrink-0">
-            <img
-              src={activeAccount?.avatar || profile.avatar}
+          <div className="relative shrink-0 flex flex-col items-center gap-2">
+            <ProfilePhoto
+              src={activePhoto}
               alt={name}
-              className="h-24 w-24 sm:h-28 sm:w-28 rounded-3xl object-cover border-2 border-border shadow-md"
+              size="2xl"
+              shape="rounded"
+              editable
+              onEdit={() => setIsPhotoModalOpen(true)}
+              status="verified"
+              statusTitle="Verified Host"
+              className="border-2 border-border shadow-md"
             />
-            <span
-              className="absolute -bottom-2 -right-2 h-8 w-8 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-lg border-2 border-card"
-              title="Verified Host"
+            <button
+              type="button"
+              onClick={() => setIsPhotoModalOpen(true)}
+              className="text-[11px] font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
             >
-              <BadgeCheck className="h-5 w-5" />
-            </span>
+              <Camera className="h-3 w-3" />
+              <span>Change Photo</span>
+            </button>
           </div>
 
           <div className="space-y-2 flex-1">
@@ -431,6 +475,14 @@ export function LenderProfileView({
         </div>
       </div>
 
+      <ProfilePhotoModal
+        isOpen={isPhotoModalOpen}
+        onClose={() => setIsPhotoModalOpen(false)}
+        currentPhotoUrl={activePhoto}
+        onSave={handleUploadPhoto}
+        onRemove={handleRemovePhoto}
+        canRemove={Boolean(activePhoto)}
+      />
     </div>
   );
 }

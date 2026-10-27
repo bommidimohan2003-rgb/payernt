@@ -15,6 +15,7 @@ import { Loader } from "../components/layout/Loader";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "@tanstack/react-router";
+import { ProfilePhoto } from "@/components/common/ProfilePhoto";
 
 export default function Profile() {
   const [profile, setProfile] = useState<AdminUser | null>(null);
@@ -170,11 +171,15 @@ export default function Profile() {
             <p className="text-xs text-[#A1A1AA] mt-0.5">Manage your profile information.</p>
           </div>
 
-          {/* Avatar Area */}
+          {/* Profile Photo Area */}
           <div className="flex items-center gap-4">
-            <div className="h-16 w-16 rounded-full bg-[#171C23] border border-[rgba(161,161,170,0.18)] flex items-center justify-center font-bold text-2xl text-[#F5F5F5]">
-              {(profile?.fullName || "Admin").charAt(0).toUpperCase()}
-            </div>
+            <ProfilePhoto
+              src={profile?.avatar || (profile as any)?.profilePhotoUrl}
+              alt={profile?.fullName || "Admin"}
+              size="xl"
+              shape="circle"
+              className="border border-[rgba(161,161,170,0.18)] shrink-0"
+            />
             <div>
               <div className="text-sm font-bold text-[#F5F5F5]">{profile?.fullName || "Admin"}</div>
               <div className="text-xs text-[#A1A1AA] font-mono mt-0.5">{profile?.email || "admin@payent.com"}</div>

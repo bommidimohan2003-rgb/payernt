@@ -15,6 +15,7 @@ import { notificationsService } from "../services/notifications";
 import { AdminReview } from "../services/api";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { ProfilePhoto } from "@/components/common/ProfilePhoto";
 
 export default function Reviews() {
   const [reviews, setReviews] = useState<AdminReview[]>([]);
@@ -126,13 +127,12 @@ export default function Reviews() {
       label: "Customer / Renter",
       render: (row) => (
         <div className="flex items-center gap-2.5">
-          <div className="h-8 w-8 rounded-full bg-secondary border border-border/80 flex items-center justify-center font-bold text-xs text-foreground overflow-hidden shrink-0">
-            {row.userAvatar ? (
-              <img src={row.userAvatar} alt={row.userName} className="h-full w-full object-cover" />
-            ) : (
-              <span>{(row.userName || "U").charAt(0).toUpperCase()}</span>
-            )}
-          </div>
+          <ProfilePhoto
+            src={row.userAvatar}
+            alt={row.userName}
+            size="sm"
+            shape="circle"
+          />
           <span className="font-bold text-foreground text-xs truncate">{row.userName || "Verified Renter"}</span>
         </div>
       ),

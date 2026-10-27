@@ -38,6 +38,7 @@ import { usersService } from "../services/users";
 import { AdminProduct, AdminUser } from "../services/api";
 import { payerntApi } from "@/payernt/payerntApiService";
 import { Loader } from "../components/layout/Loader";
+import { ProfilePhoto } from "@/components/common/ProfilePhoto";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -390,13 +391,12 @@ export default function ProductDetails() {
             onClick={handleOpenOwnerModal}
             className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border/80 bg-card hover:bg-muted/60 transition-colors text-xs text-foreground cursor-pointer shadow-2xs"
           >
-            <div className="w-5 h-5 rounded-full overflow-hidden bg-muted">
-              {product.owner?.avatar ? (
-                <img src={product.owner.avatar} alt={product.owner.name} className="w-full h-full object-cover" />
-              ) : (
-                <User className="w-3.5 h-3.5 m-auto text-muted-foreground" />
-              )}
-            </div>
+            <ProfilePhoto
+              src={product.owner?.avatar}
+              alt={product.owner?.name || "Lender"}
+              size="xs"
+              shape="circle"
+            />
             <span className="font-medium truncate max-w-[140px]">{product.owner?.name || "Lender"}</span>
             <span className="text-[10px] font-mono uppercase px-1 rounded bg-primary/10 text-primary font-semibold">
               Lender
@@ -1175,13 +1175,13 @@ export default function ProductDetails() {
           <div className="bg-card border border-border/80 rounded-2xl p-6 max-w-lg w-full shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-border/70">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full overflow-hidden bg-muted border border-border">
-                  {product.owner?.avatar ? (
-                    <img src={product.owner.avatar} alt={product.owner.name} className="w-full h-full object-cover" />
-                  ) : (
-                    <User className="w-5 h-5 m-auto text-muted-foreground" />
-                  )}
-                </div>
+                <ProfilePhoto
+                  src={product.owner?.avatar}
+                  alt={product.owner?.name || "Lender Profile"}
+                  size="md"
+                  shape="circle"
+                  className="border border-border"
+                />
                 <div>
                   <h3 className="text-base font-bold text-foreground font-display">{product.owner?.name || "Lender Profile"}</h3>
                   <span className="text-[10px] font-mono text-muted-foreground uppercase">{product.owner?.email}</span>

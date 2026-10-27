@@ -287,7 +287,7 @@ export default function BecomeLender() {
       owner: {
         name: user?.fullName || user?.email || "Verified Lender",
         email: user?.email || "",
-        avatar: user?.avatar || "",
+        avatar: user?.profilePhotoUrl || user?.profile_photo_url || user?.avatar || "",
         rating: 5.0,
         city: ownerCity,
       },

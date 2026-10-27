@@ -746,6 +746,30 @@ export const api = {
     return await res.json();
   },
 
+  async deleteProfilePhoto(token: string) {
+    if (!API_BASE) {
+      const cached = storage.get<User | null>(STORAGE_KEYS.currentUser, null);
+      if (cached) {
+        cached.avatar = "";
+        cached.profilePhotoUrl = "";
+        cached.profile_photo_url = "";
+        storage.set(STORAGE_KEYS.currentUser, cached);
+      }
+      return { success: true, user: cached };
+    }
+    const res = await this.fetchWithAuth(
+      `${API_BASE}/api/users/profile/photo`,
+      {
+        method: "DELETE",
+      },
+    );
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(parseApiError(data, "Failed to remove profile photo."));
+    }
+    return await res.json();
+  },
+
   async reverseGeocode(
     token?: string | null,
     latitude: number = 0,

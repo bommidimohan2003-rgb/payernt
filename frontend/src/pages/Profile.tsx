@@ -42,7 +42,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { api } from "@/utils/api";
 import { storage, STORAGE_KEYS } from "@/utils/storage";
-import { CameraPhotoModal } from "@/components/profile/CameraPhotoModal";
+import { ProfilePhoto, isRealProfilePhoto } from "@/components/common/ProfilePhoto";
+import { ProfilePhotoModal } from "@/components/profile/ProfilePhotoModal";
 import type { User, UserProfileStats } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -50,9 +51,7 @@ export default function Profile() {
   const { user, ready, updateUser, logout, logoutAll, getSessions, revokeSession } = useAuth();
   const navigate = useNavigate();
 
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const [isCameraOpen, setIsCameraOpen] = useState(false);
-  const [isPhotoMenuOpen, setIsPhotoMenuOpen] = useState(false);
+  const [isPhotoModalOpen, setIsPhotoModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"details" | "location" | "payout" | "security">("details");
   const [showPan, setShowPan] = useState(false);
 
@@ -355,82 +354,51 @@ export default function Profile() {
         if (res && res.user) {
           updateUser(res.user);
         } else {
-          updateUser({ avatar: photoDataUrl, profilePhotoUrl: photoDataUrl });
+          updateUser({ avatar: photoDataUrl, profilePhotoUrl: photoDataUrl, profile_photo_url: photoDataUrl });
         }
       } else {
-        updateUser({ avatar: photoDataUrl, profilePhotoUrl: photoDataUrl });
+        updateUser({ avatar: photoDataUrl, profilePhotoUrl: photoDataUrl, profile_photo_url: photoDataUrl });
+      }
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("payent:profile_photo_updated"));
+        window.dispatchEvent(new CustomEvent("payent:storage_change"));
       }
       toast.success("Profile photo updated successfully!");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to upload profile photo.";
       toast.error(msg);
+      throw err;
     }
-  };
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      toast.error("Please select a valid image file (JPEG, PNG, WebP).");
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("Image size exceeds 5MB limit. Please select a smaller photo.");
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
-      handleUploadPhoto(dataUrl);
-      setIsPhotoMenuOpen(false);
-    };
-    reader.onerror = () => {
-      toast.error("Failed to read the selected image file.");
-    };
-    reader.readAsDataURL(file);
-    e.target.value = "";
   };
 
   const handleRemovePhoto = async () => {
     if (!user) return;
     const token = storage.get<string | null>(STORAGE_KEYS.token, null);
-    const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.fullName || user.email || "User")}&background=161616&color=ffffff`;
     try {
       if (token) {
-        await api.updateProfile(token, { avatar: defaultAvatar, profilePhotoUrl: "" });
+        await api.deleteProfilePhoto(token);
       }
-      updateUser({ avatar: defaultAvatar, profilePhotoUrl: "", profile_photo_url: "" });
-      setIsPhotoMenuOpen(false);
+      updateUser({ avatar: "", profilePhotoUrl: "", profile_photo_url: "" });
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("payent:profile_photo_updated"));
+        window.dispatchEvent(new CustomEvent("payent:storage_change"));
+      }
       toast.success("Profile photo removed.");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to remove photo.";
       toast.error(msg);
+      throw err;
     }
   };
 
-  const hasRealPhoto = Boolean(
-    user?.profilePhotoUrl ||
-      user?.profile_photo_url ||
-      (user?.avatar && !user.avatar.includes("ui-avatars.com")),
-  );
-  const activePhoto =
-    user?.profilePhotoUrl || user?.profile_photo_url || user?.avatar;
+  const hasRealPhoto = isRealProfilePhoto(user?.profilePhotoUrl || user?.profile_photo_url || user?.avatar);
+  const activePhoto = hasRealPhoto ? (user?.profilePhotoUrl || user?.profile_photo_url || user?.avatar) : null;
 
   const isPendingApproval = user?.status === "pending";
 
   return (
     <DashboardLayout>
       <div className="space-y-8 max-w-7xl mx-auto pb-12">
-        {/* Hidden File Input for Upload Photo */}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          className="hidden"
-          onChange={handleFileSelect}
-        />
 
         {/* Pending Approval Notice Banner */}
         {isPendingApproval && (
@@ -495,73 +463,31 @@ export default function Profile() {
 
           {/* User Details Row */}
           <div className="p-6 sm:p-8 pt-0 relative flex flex-col md:flex-row md:items-end justify-between gap-6 -mt-16 sm:-mt-20">
-            {/* Avatar & Key Info */}
+            {/* Real Profile Photo & Key Info */}
             <div className="flex flex-col sm:flex-row items-center sm:items-end gap-6 text-center sm:text-left">
               {/* Photo Box */}
               <div className="flex flex-col items-center gap-3 shrink-0 relative">
-                <div className="h-32 w-32 sm:h-36 sm:w-36 rounded-3xl bg-secondary/80 border-4 border-card grid place-items-center text-foreground text-4xl font-extrabold shadow-2xl overflow-hidden relative group">
-                  {hasRealPhoto ? (
-                    <img
-                      src={activePhoto}
-                      alt={user?.fullName || "User Profile Photo"}
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    />
-                  ) : (
-                    <div className="flex flex-col items-center justify-center p-3 text-center text-muted-foreground w-full h-full bg-secondary/90">
-                      <Camera className="h-10 w-10 text-primary mb-1 animate-pulse" />
-                      <span className="text-[11px] font-bold">No Photo</span>
-                    </div>
-                  )}
-                  {/* Status Dot */}
-                  <div
-                    className={cn(
-                      "absolute bottom-2 right-2 h-4 w-4 rounded-full border-2 border-card shadow-md",
-                      isPendingApproval ? "bg-amber-500" : "bg-emerald-500"
-                    )}
-                    title={isPendingApproval ? "Pending Admin Approval" : "Active Account"}
-                  />
-                </div>
+                <ProfilePhoto
+                  src={activePhoto}
+                  alt={user?.fullName || "User Profile Photo"}
+                  size="2xl"
+                  shape="rounded"
+                  editable
+                  onEdit={() => setIsPhotoModalOpen(true)}
+                  status={isPendingApproval ? "pending" : "active"}
+                  statusTitle={isPendingApproval ? "Pending Admin Approval" : "Active Account"}
+                  className="border-4 border-card shadow-2xl"
+                />
 
-                {/* Change Photo Trigger with Dropdown Options */}
-                <div className="relative w-full">
-                  <button
-                    type="button"
-                    onClick={() => setIsPhotoMenuOpen(!isPhotoMenuOpen)}
-                    className="w-full btn-gradient text-xs py-2 px-3.5 rounded-xl font-bold flex items-center justify-center gap-1.5 shadow-md hover:scale-102 active:scale-95 transition-all cursor-pointer"
-                  >
-                    <Camera className="h-3.5 w-3.5" />
-                    <span>Change Profile Photo</span>
-                    <ChevronDown className="h-3 w-3 opacity-70" />
-                  </button>
-
-                  {/* Photo Options Menu */}
-                  {isPhotoMenuOpen && (
-                    <div className="absolute top-full left-0 right-0 mt-2 z-30 bg-card border border-border rounded-2xl p-1.5 shadow-2xl space-y-1 animate-in fade-in zoom-in-95 duration-150">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsPhotoMenuOpen(false);
-                          setIsCameraOpen(true);
-                        }}
-                        className="w-full text-left px-3 py-2 text-xs font-bold rounded-xl text-foreground hover:bg-secondary flex items-center gap-2 transition-colors cursor-pointer"
-                      >
-                        <Camera className="h-3.5 w-3.5 text-primary" />
-                        <span>Take Photo</span>
-                      </button>
-
-                      {hasRealPhoto && (
-                        <button
-                          type="button"
-                          onClick={handleRemovePhoto}
-                          className="w-full text-left px-3 py-2 text-xs font-bold rounded-xl text-destructive hover:bg-destructive/10 flex items-center gap-2 transition-colors cursor-pointer"
-                        >
-                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                          <span>Remove Photo</span>
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
+                {/* Change Photo Trigger */}
+                <button
+                  type="button"
+                  onClick={() => setIsPhotoModalOpen(true)}
+                  className="w-full btn-gradient text-xs py-2 px-3.5 rounded-xl font-bold flex items-center justify-center gap-1.5 shadow-md hover:scale-102 active:scale-95 transition-all cursor-pointer"
+                >
+                  <Camera className="h-3.5 w-3.5" />
+                  <span>Change Profile Photo</span>
+                </button>
               </div>
 
               {/* Bio & Identity Chips */}
@@ -1319,10 +1245,13 @@ export default function Profile() {
         </div>
       </div>
 
-      <CameraPhotoModal
-        isOpen={isCameraOpen}
-        onClose={() => setIsCameraOpen(false)}
-        onCapture={handleUploadPhoto}
+      <ProfilePhotoModal
+        isOpen={isPhotoModalOpen}
+        onClose={() => setIsPhotoModalOpen(false)}
+        currentPhotoUrl={activePhoto}
+        onSave={handleUploadPhoto}
+        onRemove={handleRemovePhoto}
+        canRemove={hasRealPhoto}
       />
     </DashboardLayout>
   );

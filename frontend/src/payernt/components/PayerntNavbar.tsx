@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import type { LenderNotification, DemoUser, PayerntAccount } from "../types";
 import { useTheme } from "@/hooks/useTheme";
 import { useLanguage } from "@/i18n";
+import { ProfilePhoto } from "@/components/common/ProfilePhoto";
 
 interface PayerntNavbarProps {
   activeTab?: string;
@@ -63,8 +64,7 @@ export function PayerntNavbar({
     }
   };
 
-  const displayName = activeAccount?.name || activeUser?.fullName || activeUser?.name || "Mohan";
-  const avatarLetter = (displayName.trim()[0] || "M").toUpperCase();
+  const displayName = activeAccount?.name || activeUser?.fullName || activeUser?.name || "Lender";
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   useEffect(() => {
@@ -209,15 +209,20 @@ export function PayerntNavbar({
               </AnimatePresence>
             </div>
 
-            {/* Profile / Avatar (Monochrome 'M') */}
+            {/* Real User Profile Photo */}
             <button
               type="button"
               onClick={() => navigate({ to: "/payernt/profile" })}
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-neutral-200 hover:bg-neutral-300 border border-neutral-300 text-neutral-900 dark:bg-[#1c202a] dark:hover:bg-[#252b38] dark:border-white/15 dark:text-white font-bold text-xs shadow-sm transition-all cursor-pointer"
+              className="flex items-center justify-center rounded-full hover:ring-2 hover:ring-primary/40 transition-all cursor-pointer"
               title={`${tCommon.profile} (${displayName})`}
               aria-label={`${tCommon.profile}: ${displayName}`}
             >
-              {avatarLetter}
+              <ProfilePhoto
+                src={activeAccount?.avatar || activeUser?.avatar}
+                alt={displayName}
+                size="sm"
+                shape="circle"
+              />
             </button>
           </div>
         </div>

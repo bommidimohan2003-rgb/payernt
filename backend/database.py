@@ -1248,7 +1248,7 @@ MOCK_USERS = {
         "password_hash": _admin_hashed_pwd,
         "full_name": "Bommidi Mohan",
         "role": "admin",
-        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+        "avatar": "",
         "address": "123 Innovation Way",
         "city": "Bangalore",
         "pincode": "560001",
@@ -1264,7 +1264,7 @@ MOCK_USERS = {
         "password_hash": _admin_hashed_pwd,
         "full_name": "Shiny Shakhina",
         "role": "customer",
-        "avatar": "https://ui-avatars.com/api/?name=Shiny+Shakhina&background=0D151D&color=fff",
+        "avatar": "",
         "address": "HiTech City",
         "city": "Hyderabad",
         "pincode": "500081",
@@ -1280,7 +1280,7 @@ MOCK_USERS = {
         "password_hash": _admin_hashed_pwd,
         "full_name": "Vasnath Chikkala",
         "role": "customer",
-        "avatar": "https://ui-avatars.com/api/?name=Vasnath+Chikkala&background=0D151D&color=fff",
+        "avatar": "",
         "address": "Madhapur",
         "city": "Hyderabad",
         "pincode": "500081",
@@ -1296,7 +1296,7 @@ MOCK_USERS = {
         "password_hash": _admin_hashed_pwd,
         "full_name": "Mohan Bommidi",
         "role": "lender",
-        "avatar": "https://ui-avatars.com/api/?name=Mohan+Bommidi&background=0D151D&color=fff",
+        "avatar": "",
         "address": "Gachibowli",
         "city": "Hyderabad",
         "pincode": "500032",
@@ -1312,7 +1312,7 @@ MOCK_USERS = {
         "password_hash": _admin_hashed_pwd,
         "full_name": "Yerni Kumar",
         "role": "customer",
-        "avatar": "https://ui-avatars.com/api/?name=Yerni+Kumar&background=0D151D&color=fff",
+        "avatar": "",
         "address": "Kondapur",
         "city": "Hyderabad",
         "pincode": "500084",
@@ -1675,6 +1675,7 @@ def save_google_user(email: str, full_name: str, firebase_uid: str = "", phone: 
             existing_user["full_name"] = full_name
         if avatar:
             existing_user["avatar"] = avatar
+            existing_user["profile_photo_url"] = avatar
         if phone:
             existing_user["phone"] = phone
         if address:
@@ -1691,6 +1692,7 @@ def save_google_user(email: str, full_name: str, firebase_uid: str = "", phone: 
                     firebase_uid = COALESCE(NULLIF(%s, ''), firebase_uid),
                     full_name = COALESCE(NULLIF(%s, ''), full_name),
                     avatar = COALESCE(NULLIF(%s, ''), avatar),
+                    profile_photo_url = COALESCE(NULLIF(%s, ''), profile_photo_url),
                     phone = COALESCE(NULLIF(%s, ''), phone),
                     address = COALESCE(NULLIF(%s, ''), address),
                     city = COALESCE(NULLIF(%s, ''), city),
@@ -1699,7 +1701,7 @@ def save_google_user(email: str, full_name: str, firebase_uid: str = "", phone: 
                     verified = TRUE
                 WHERE LOWER(email) = LOWER(%s)
                 """,
-                (firebase_uid or "", full_name or "", avatar or "", phone or "", address or "", city or "", pincode or "", now_iso, clean_email)
+                (firebase_uid or "", full_name or "", avatar or "", avatar or "", phone or "", address or "", city or "", pincode or "", now_iso, clean_email)
             )
         except Exception as e:
             print(f"Notice: Database write error in save_google_user update: {e}")
@@ -1713,6 +1715,7 @@ def save_google_user(email: str, full_name: str, firebase_uid: str = "", phone: 
         "full_name": full_name,
         "role": role or "user",
         "avatar": avatar or "",
+        "profile_photo_url": avatar or "",
         "address": address or "",
         "city": city or "",
         "pincode": pincode or "",
@@ -1726,20 +1729,21 @@ def save_google_user(email: str, full_name: str, firebase_uid: str = "", phone: 
     try:
         execute_query(
             """
-            INSERT INTO users (email, firebase_uid, phone, password_hash, full_name, role, avatar, address, city, pincode, created_at, last_login_at, status, verified)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'active', TRUE)
+            INSERT INTO users (email, firebase_uid, phone, password_hash, full_name, role, avatar, profile_photo_url, address, city, pincode, created_at, last_login_at, status, verified)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'active', TRUE)
             ON DUPLICATE KEY UPDATE
                 firebase_uid = COALESCE(NULLIF(VALUES(firebase_uid), ''), firebase_uid),
                 full_name = COALESCE(NULLIF(VALUES(full_name), ''), full_name),
                 phone = COALESCE(NULLIF(VALUES(phone), ''), phone),
                 avatar = COALESCE(NULLIF(VALUES(avatar), ''), avatar),
+                profile_photo_url = COALESCE(NULLIF(VALUES(profile_photo_url), ''), profile_photo_url),
                 address = COALESCE(NULLIF(VALUES(address), ''), address),
                 city = COALESCE(NULLIF(VALUES(city), ''), city),
                 pincode = COALESCE(NULLIF(VALUES(pincode), ''), pincode),
                 last_login_at = VALUES(last_login_at),
                 verified = TRUE
             """,
-            (clean_email, firebase_uid or "", phone or "", None, full_name, role or "user", avatar or "", address or "", city or "", pincode or "", created_at, created_at)
+            (clean_email, firebase_uid or "", phone or "", None, full_name, role or "user", avatar or "", avatar or "", address or "", city or "", pincode or "", created_at, created_at)
         )
     except Exception as e:
         print(f"Notice: Database write error in save_google_user insert: {e}")
@@ -3620,7 +3624,7 @@ def create_custom_product(email: str, product: dict):
     owner_info = product.get("owner") if isinstance(product.get("owner"), dict) else {}
     owner_name = owner_info.get("name") or product.get("owner_name") or clean_email.split("@")[0]
     owner_email = clean_email
-    owner_avatar = owner_info.get("avatar") or product.get("owner_avatar") or "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150"
+    owner_avatar = owner_info.get("avatar") or product.get("owner_avatar") or ""
     owner_rating = float(owner_info.get("rating") or product.get("owner_rating") or 5.0)
 
     prod_id = str(product.get("id") or f"p-custom-{int(time.time() * 1000)}")
@@ -5519,7 +5523,7 @@ def get_reviews_from_db(
             reviews = []
             for r in rows:
                 user_display = r.get("db_user_name") or r.get("user_name") or "Creator"
-                avatar_url = r.get("db_user_avatar") or r.get("user_avatar") or f"https://ui-avatars.com/api/?name={user_display}&background=0D151D&color=fff"
+                avatar_url = r.get("db_user_avatar") or r.get("user_avatar") or ""
                 reviews.append({
                     "id": r["id"],
                     "productId": r.get("product_id"),
@@ -7889,11 +7893,11 @@ def get_user_conversations(user_email: str, search: Optional[str] = None) -> Lis
         # Resolve counterparty metadata from primary JOIN (fallback to cache if needed)
         if is_customer:
             counterparty_name = c.get("lend_full_name") or (counterparty_email.split("@")[0] if counterparty_email else "Partner")
-            counterparty_avatar = c.get("lend_avatar") or c.get("lend_photo_url") or "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120"
+            counterparty_avatar = c.get("lend_photo_url") or c.get("lend_avatar") or ""
             counterparty_verified = bool(c.get("lend_verified", True))
         else:
             counterparty_name = c.get("cust_full_name") or (counterparty_email.split("@")[0] if counterparty_email else "Partner")
-            counterparty_avatar = c.get("cust_avatar") or c.get("cust_photo_url") or "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120"
+            counterparty_avatar = c.get("cust_photo_url") or c.get("cust_avatar") or ""
             counterparty_verified = bool(c.get("cust_verified", True))
 
         last_msg = last_msg_by_conv.get(cid)
@@ -8000,7 +8004,7 @@ def get_conversation_detail(conversation_id: str, current_user_email: str) -> Op
     counterparty_email = lend_email if is_customer else cust_email
     counterparty_user = get_user(counterparty_email) or {}
     counterparty_name = counterparty_user.get("full_name") or (counterparty_email.split("@")[0] if counterparty_email else "Partner")
-    counterparty_avatar = counterparty_user.get("avatar") or counterparty_user.get("profilePhotoUrl") or "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120"
+    counterparty_avatar = counterparty_user.get("profilePhotoUrl") or counterparty_user.get("profile_photo_url") or counterparty_user.get("avatar") or ""
     counterparty_verified = counterparty_user.get("verified", True)
 
     order = None

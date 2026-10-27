@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { ProfilePhoto } from "@/components/common/ProfilePhoto";
 import {
   Tooltip,
   TooltipContent,
@@ -264,13 +265,14 @@ export function Sidebar() {
               <Link
                 to="/admin/profile"
                 aria-label="Admin Profile"
-                className="group relative h-9 w-9 rounded-xl bg-[#F8F7F9] dark:bg-[#162238] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-center text-xs font-bold text-[#242424] dark:text-[#F8FAFC] hover:border-[#3B82F6]/50 transition-colors"
+                className="group relative h-9 w-9 rounded-xl overflow-hidden border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-center hover:border-[#3B82F6]/50 transition-colors"
               >
-                <span>
-                  {currentUser?.fullName?.[0]?.toUpperCase() ||
-                    currentUser?.email?.[0]?.toUpperCase() ||
-                    "A"}
-                </span>
+                <ProfilePhoto
+                  src={currentUser?.avatar}
+                  alt={currentUser?.fullName || "Admin"}
+                  size="sm"
+                  shape="rounded"
+                />
               </Link>
             </TooltipTrigger>
             <TooltipContent

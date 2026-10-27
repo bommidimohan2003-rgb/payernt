@@ -16,7 +16,7 @@ export const authService = {
         role: "admin",
         status: "active",
         verified: true,
-        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(email)}&background=10b981&color=fff`,
+        avatar: "",
         createdAt: new Date().toISOString(),
       };
 
@@ -150,8 +150,7 @@ export const authService = {
           status: response.data.status || "active",
           verified: true,
           avatar:
-            response.data.avatar ||
-            `https://ui-avatars.com/api/?name=${encodeURIComponent(response.data.email)}&background=10b981&color=fff`,
+            response.data.avatar || response.data.profilePhotoUrl || "",
           createdAt: response.data.createdAt || response.data.created_at || new Date().toISOString(),
         };
 
@@ -200,9 +199,7 @@ export const authService = {
             role: "admin",
             status: u.status || "active",
             verified: true,
-            avatar:
-              u.avatar ||
-              `https://ui-avatars.com/api/?name=${encodeURIComponent(u.fullName || u.name || u.email || "Admin")}&background=10b981&color=fff`,
+            avatar: u.profilePhotoUrl || u.avatar || "",
             createdAt: u.createdAt || new Date().toISOString(),
           };
         }
@@ -225,10 +222,8 @@ export const authService = {
             role: "admin",
             status: u.status || "active",
             verified: true,
-            avatar:
-              u.avatar ||
-              `https://ui-avatars.com/api/?name=${encodeURIComponent(u.fullName || u.name || u.email || "Admin")}&background=10b981&color=fff`,
-            createdAt: new Date().toISOString(),
+            avatar: u.profilePhotoUrl || u.avatar || "",
+            createdAt: u.createdAt || new Date().toISOString(),
           };
           localStorage.setItem("payent:admin:current_user", JSON.stringify(adminPayload));
           return adminPayload;
@@ -252,10 +247,8 @@ export const authService = {
             role: "admin",
             status: u.status || "active",
             verified: true,
-            avatar:
-              u.avatar ||
-              `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name || u.fullName || u.email || "Admin")}&background=10b981&color=fff`,
-            createdAt: new Date().toISOString(),
+            avatar: u.profilePhotoUrl || u.avatar || "",
+            createdAt: u.createdAt || new Date().toISOString(),
           };
           localStorage.setItem("payent:admin:current_user", JSON.stringify(adminPayload));
           return adminPayload;

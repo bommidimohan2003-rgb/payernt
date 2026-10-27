@@ -520,7 +520,7 @@ def create_payernt_account(
         "rejection_reason": None,
         "reviewed_by": None,
         "reviewed_at": None,
-        "avatar": f"https://ui-avatars.com/api/?name={name.strip().replace(' ', '+')}&background=0c0c0c&color=ffffff",
+        "avatar": None,
         "created_at": now_iso,
         "last_login_at": now_iso,
         "updated_at": now_iso,
@@ -650,7 +650,7 @@ def get_payernt_account_by_email(email: str) -> Optional[Dict[str, Any]]:
                 "password_hash": admin_row.get("password_hash"),
                 "status": "APPROVED",
                 "role": "admin",
-                "avatar": admin_row.get("avatar") or f"https://ui-avatars.com/api/?name={clean_email.split('@')[0]}&background=0c0c0c&color=ffffff",
+                "avatar": admin_row.get("avatar") or admin_row.get("profile_photo_url") or "",
                 "created_at": str(admin_row.get("created_at") or ""),
             }
     except Exception as e:
@@ -676,7 +676,7 @@ def get_payernt_account_by_email(email: str) -> Optional[Dict[str, Any]]:
                 "password_hash": user_row.get("password_hash"),
                 "status": status_val,
                 "role": "admin" if is_admin else "vendor",
-                "avatar": user_row.get("avatar") or f"https://ui-avatars.com/api/?name={clean_email.split('@')[0]}&background=0c0c0c&color=ffffff",
+                "avatar": user_row.get("avatar") or user_row.get("profile_photo_url") or "",
                 "created_at": str(user_row.get("created_at") or ""),
             }
     except Exception as e:

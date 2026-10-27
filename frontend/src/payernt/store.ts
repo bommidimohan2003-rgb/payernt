@@ -47,7 +47,7 @@ export const INITIAL_REQUESTS: RentalRequest[] = [
     category: "Cameras",
     renter: {
       name: "Arjun Verma",
-      avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100",
+      avatar: "",
       rating: 4.9,
       completedRentals: 6,
       phone: "+91 98765 43210",
@@ -233,7 +233,7 @@ export function usePayerntStore() {
         fullName: activeAccount.name,
         email: activeAccount.email,
         phone: activeAccount.phone || "",
-        avatar: activeAccount.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80",
+        avatar: activeAccount.avatar || "",
         city: activeAccount.address?.split(",")[0]?.trim() || "India",
         role: "Vendor",
       }

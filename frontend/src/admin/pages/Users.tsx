@@ -31,6 +31,7 @@ import { Loader } from "../components/layout/Loader";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { adminWS } from "../services/websocket";
+import { ProfilePhoto } from "@/components/common/ProfilePhoto";
 
 export const isPendingUser = (u?: AdminUser | null): boolean => {
   if (!u || u.role === "admin") return false;
@@ -351,13 +352,12 @@ export default function Users() {
       label: "User Profile",
       render: (row) => (
         <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-full bg-secondary border border-border/80 flex items-center justify-center font-bold text-xs text-foreground overflow-hidden shrink-0">
-            {row.avatar || row.profilePhotoUrl ? (
-              <img src={row.avatar || row.profilePhotoUrl} alt={row.fullName} className="h-full w-full object-cover" />
-            ) : (
-              <span>{(row.fullName || row.email || "U").charAt(0).toUpperCase()}</span>
-            )}
-          </div>
+          <ProfilePhoto
+            src={row.avatar || row.profilePhotoUrl}
+            alt={row.fullName}
+            size="sm"
+            shape="circle"
+          />
           <div className="min-w-0">
             <div className="font-bold text-foreground truncate">{row.fullName || "User"}</div>
             <div className="text-[11px] text-muted-foreground font-mono truncate">{row.email}</div>
@@ -690,13 +690,12 @@ export default function Users() {
             {/* Drawer Header */}
             <div className="p-5 border-b border-border/60 flex items-center justify-between bg-secondary/30">
               <div className="flex items-center gap-3">
-                <div className="h-11 w-11 rounded-full bg-secondary border border-border flex items-center justify-center font-bold text-sm text-foreground overflow-hidden shrink-0">
-                  {selectedUser.avatar || selectedUser.profilePhotoUrl ? (
-                    <img src={selectedUser.avatar || selectedUser.profilePhotoUrl} alt={selectedUser.fullName} className="h-full w-full object-cover" />
-                  ) : (
-                    <span>{(selectedUser.fullName || selectedUser.email).charAt(0).toUpperCase()}</span>
-                  )}
-                </div>
+                <ProfilePhoto
+                  src={selectedUser.avatar || selectedUser.profilePhotoUrl}
+                  alt={selectedUser.fullName}
+                  size="md"
+                  shape="circle"
+                />
                 <div className="min-w-0">
                   <h3 className="text-sm font-bold text-foreground truncate">
                     {selectedUser.fullName || "User Detail"}

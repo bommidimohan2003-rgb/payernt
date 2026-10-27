@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { storage } from "@/utils/storage";
 import type { Product } from "@/types";
+import { ProfilePhoto } from "@/components/common/ProfilePhoto";
 
 export interface ProductMessage {
   id: string;
@@ -56,9 +57,7 @@ export function ProductMessageModal({
     (product as any)?.user_id ||
     "gear_owner";
   const ownerName = product?.owner?.name || "Equipment Owner";
-  const ownerAvatar =
-    product?.owner?.avatar ||
-    `https://ui-avatars.com/api/?name=${encodeURIComponent(ownerName)}&background=10b981&color=ffffff`;
+  const ownerAvatar = product?.owner?.avatar || "";
 
   const [messageText, setMessageText] = useState("");
   const [messages, setMessages] = useState<ProductMessage[]>([]);
@@ -189,10 +188,11 @@ export function ProductMessageModal({
           <div className="p-4 sm:p-5 border-b border-border/70 flex items-center justify-between bg-secondary/30">
             <div className="flex items-center gap-3">
               <div className="relative">
-                <img
+                <ProfilePhoto
                   src={ownerAvatar}
                   alt={ownerName}
-                  className="h-10 w-10 rounded-full object-cover border border-border"
+                  size="md"
+                  shape="circle"
                 />
                 <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-emerald-500 border-2 border-card" />
               </div>

@@ -21,6 +21,8 @@ import traceback
 import re
 import urllib.request
 import urllib.parse
+import io
+import base64
 from typing import Optional, List, Set, Tuple, Dict, Any, Union
 from email_service import send_email_smtp, build_password_reset_email_html, build_password_reset_email_text, is_smtp_configured
 
@@ -1621,7 +1623,8 @@ def login(data: LoginRequestSchema, request: Request, response: Response):
         "address": user.get("address", ""),
         "city": user.get("city", ""),
         "pincode": user.get("pincode", ""),
-        "avatar": user.get("avatar") or f"https://ui-avatars.com/api/?name={display_name}&background=10b981&color=fff",
+        "avatar": user.get("profile_photo_url") or user.get("avatar") or "",
+        "profilePhotoUrl": user.get("profile_photo_url") or user.get("avatar") or "",
         "role": user.get("role", "customer"),
         "status": user.get("status", "active"),
         "verified": True
@@ -2233,17 +2236,73 @@ def update_profile_photo_route(
 
     clean_photo = photo_url.strip()
 
-    # Enforce safe URL / Data URI image format and 3MB size limit
+    # Reject generated avatars or placeholder domains
+    if any(fake in clean_photo.lower() for fake in ["ui-avatars.com", "dicebear", "pravatar"]):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Generated avatars are not allowed. Please upload a real user photo."
+        )
+
+    # Enforce safe URL / Data URI image format and size limit
     if not (clean_photo.startswith("http://") or clean_photo.startswith("https://") or clean_photo.startswith("data:image/")):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid image format. Must be an HTTP/HTTPS URL or base64 image data URI."
         )
-    if len(clean_photo) > 4 * 1024 * 1024:
+
+    if len(clean_photo) > 7 * 1024 * 1024:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail="Profile photo exceeds maximum size limit (3MB)."
+            detail="Profile photo payload exceeds maximum size limit (5MB)."
         )
+
+    # Validate image MIME type and actual image content if data URI
+    if clean_photo.startswith("data:image/"):
+        try:
+            if "," not in clean_photo:
+                raise ValueError("Malformed data URI: missing comma separator.")
+            header, encoded = clean_photo.split(",", 1)
+            mime_part = header.split(";")[0]
+            if ":" not in mime_part:
+                raise ValueError("Malformed MIME prefix in data URI.")
+            mime = mime_part.split(":")[1].strip().lower()
+            allowed_mimes = ["image/jpeg", "image/png", "image/webp", "image/jpg"]
+            if mime not in allowed_mimes:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Unsupported image format: {mime}. Allowed formats: JPEG, PNG, WebP."
+                )
+            raw_bytes = base64.b64decode(encoded)
+            if len(raw_bytes) > 5 * 1024 * 1024:
+                raise HTTPException(
+                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    detail="Profile photo file size exceeds 5MB limit."
+                )
+            # Verify actual image content with PIL
+            try:
+                from PIL import Image
+                with Image.open(io.BytesIO(raw_bytes)) as img:
+                    img.verify()
+                    fmt = (img.format or "").upper()
+                    if fmt not in ["JPEG", "PNG", "WEBP"]:
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"Invalid image content: detected format {fmt}. Allowed: JPEG, PNG, WebP."
+                        )
+            except HTTPException:
+                raise
+            except Exception as pil_err:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Corrupt or invalid image content: {pil_err}"
+                )
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid image encoding or format: {str(e)}"
+            )
 
     # Ensure table columns support LONGTEXT for base64 photo storage
     try:
@@ -2283,7 +2342,7 @@ def update_profile_photo_route(
         MOCK_USERS[clean_email]["profile_photo_url"] = clean_photo
         MOCK_USERS[clean_email]["avatar"] = clean_photo
 
-    # If user is an agent, sync photo to custom_products owner_avatar
+    # If user is an agent/lender, sync photo to custom_products owner_avatar
     try:
         execute_query(
             "UPDATE custom_products SET owner_avatar = %s WHERE LOWER(user_email) = LOWER(%s)",
@@ -2292,6 +2351,23 @@ def update_profile_photo_route(
     except Exception as e:
         logger.warning(f"Notice: Agent product owner avatar sync notice for {clean_email}: {e}")
 
+    try:
+        execute_query(
+            "UPDATE payernt_accounts SET avatar = %s WHERE LOWER(email) = LOWER(%s)",
+            (clean_photo, clean_email)
+        )
+    except Exception:
+        pass
+
+    try:
+        execute_query(
+            "UPDATE payrent_accounts SET avatar = %s WHERE LOWER(email) = LOWER(%s)",
+            (clean_photo, clean_email)
+        )
+    except Exception:
+        pass
+
+    invalidate_user_cache(clean_email)
     user = get_user(clean_email)
     display_name = user.get("full_name") if user else clean_email.split("@")[0]
     aadhaar_num = user.get("aadhaar_number") if user else None
@@ -2306,6 +2382,86 @@ def update_profile_photo_route(
             "profilePhotoUrl": clean_photo,
             "profile_photo_url": clean_photo,
             "avatar": clean_photo,
+            "aadhaarMasked": mask_aadhaar(aadhaar_num),
+            "aadhaar_masked": mask_aadhaar(aadhaar_num)
+        }
+    }
+
+@app.delete("/api/users/profile/photo")
+@app.delete("/api/profile/photo")
+def delete_profile_photo_route(
+    current_user_email: str = Depends(get_current_user_email)
+):
+    clean_email = current_user_email.strip().lower()
+
+    # Reset in MySQL users table
+    try:
+        execute_query(
+            "UPDATE users SET profile_photo_url = NULL, avatar = NULL WHERE LOWER(email) = LOWER(%s)",
+            (clean_email,)
+        )
+    except Exception as e:
+        logger.warning(f"Error deleting profile photo in MySQL for {clean_email}: {e}")
+        try:
+            execute_query(
+                "UPDATE users SET profile_photo_url = NULL WHERE LOWER(email) = LOWER(%s)",
+                (clean_email,)
+            )
+        except Exception:
+            pass
+        try:
+            execute_query(
+                "UPDATE users SET avatar = NULL WHERE LOWER(email) = LOWER(%s)",
+                (clean_email,)
+            )
+        except Exception:
+            pass
+
+    # Update MOCK_USERS if active
+    if clean_email in MOCK_USERS:
+        MOCK_USERS[clean_email]["profile_photo_url"] = None
+        MOCK_USERS[clean_email]["avatar"] = None
+
+    # Clear from custom_products owner_avatar
+    try:
+        execute_query(
+            "UPDATE custom_products SET owner_avatar = NULL WHERE LOWER(user_email) = LOWER(%s)",
+            (clean_email,)
+        )
+    except Exception:
+        pass
+
+    try:
+        execute_query(
+            "UPDATE payernt_accounts SET avatar = NULL WHERE LOWER(email) = LOWER(%s)",
+            (clean_email,)
+        )
+    except Exception:
+        pass
+
+    try:
+        execute_query(
+            "UPDATE payrent_accounts SET avatar = NULL WHERE LOWER(email) = LOWER(%s)",
+            (clean_email,)
+        )
+    except Exception:
+        pass
+
+    invalidate_user_cache(clean_email)
+    user = get_user(clean_email)
+    display_name = user.get("full_name") if user else clean_email.split("@")[0]
+    aadhaar_num = user.get("aadhaar_number") if user else None
+
+    return {
+        "success": True,
+        "message": "Profile photo removed successfully.",
+        "user": {
+            "id": clean_email,
+            "email": clean_email,
+            "fullName": display_name,
+            "profilePhotoUrl": None,
+            "profile_photo_url": None,
+            "avatar": None,
             "aadhaarMasked": mask_aadhaar(aadhaar_num),
             "aadhaar_masked": mask_aadhaar(aadhaar_num)
         }
@@ -2916,7 +3072,7 @@ class AddressCreateSchema(BaseModel):
 
 class ProductOwnerSchema(BaseModel):
     name: Optional[str] = "Verified Lender"
-    avatar: Optional[str] = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120"
+    avatar: Optional[str] = None
     rating: Optional[float] = 5.0
 
 class CustomProductSchema(BaseModel):
@@ -4919,7 +5075,7 @@ def validate_cart_checkout_endpoint(current_user: dict = Depends(get_approved_us
 def format_product_dict(p: dict, is_summary: bool = False, booked_pids_set: Optional[Set[str]] = None, is_public: bool = False) -> dict:
     owner_info = p.get("owner") if isinstance(p.get("owner"), dict) else {}
     owner_name = p.get("owner_full_name") or p.get("owner_name") or owner_info.get("name") or "Lender"
-    owner_avatar = p.get("owner_avatar") or owner_info.get("avatar") or "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150"
+    owner_avatar = p.get("owner_avatar") or owner_info.get("avatar") or ""
     owner_rating = float(p.get("owner_rating") or owner_info.get("rating") or 5.0)
     owner_email = str(p.get("user_email") or p.get("userEmail") or owner_info.get("email") or "").strip().lower()
     owner_status = str(p.get("owner_status") or owner_info.get("status") or "active").strip()
@@ -5061,7 +5217,7 @@ def fetch_public_listings(
                         "reviews": 12,
                         "available": p.get("available", True),
                         "owner_name": p.get("owner_name", "Payent Verified Vendor"),
-                        "owner_avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+                        "owner_avatar": p.get("owner_avatar") or "",
                         "owner_rating": 4.9,
                         "created_at": p.get("created_at"),
                         "status": "approved",
@@ -5144,7 +5300,7 @@ def fetch_product_by_id(id: str, response: Response):
                         "reviews": 12,
                         "available": p.get("available", True),
                         "owner_name": p.get("owner_name", "Payent Verified Vendor"),
-                        "owner_avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+                        "owner_avatar": p.get("owner_avatar") or "",
                         "owner_rating": 4.9,
                         "owner_id": p.get("owner_id"),
                         "status": "approved",
@@ -5205,7 +5361,7 @@ def fetch_user_conversations(current_user_email: str = Depends(get_current_user_
             "createdAt": t.get("created_at"),
             "updatedAt": t.get("updated_at") or t.get("created_at"),
             "partner": "Payent Support & Coordination",
-            "partnerAvatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120",
+            "partnerAvatar": "",
             "lastMessage": last_msg.get("content") or last_msg.get("message") or "",
             "lastMessageAt": last_msg.get("timestamp") or t.get("created_at"),
             "unread": unread_cnt > 0 or (last_msg.get("senderType") != "user" and not last_msg.get("read")),
@@ -5242,7 +5398,7 @@ def fetch_conversation_detail(id: str, current_user_email: str = Depends(get_cur
         "createdAt": ticket.get("created_at"),
         "updatedAt": ticket.get("updated_at") or ticket.get("created_at"),
         "partner": "Payent Support & Coordination",
-        "partnerAvatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120",
+        "partnerAvatar": "",
         "messages": msgs
     }
 
@@ -5609,7 +5765,7 @@ def add_custom_listing(data: CustomProductSchema, current_user: dict = Depends(r
     product_dict["owner"] = {
         "name": owner_info.get("name") or user_rec.get("full_name") or email.split("@")[0],
         "email": email,
-        "avatar": owner_info.get("avatar") or user_rec.get("avatar") or "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120",
+        "avatar": owner_info.get("avatar") or user_rec.get("profile_photo_url") or user_rec.get("avatar") or "",
         "rating": float(owner_info.get("rating") or 5.0)
     }
     product_dict["status"] = "pending"
@@ -8457,7 +8613,7 @@ def admin_users_list(current_admin: dict = Depends(check_admin_user)):
                         "reviewedBy": r.get("reviewed_by"),
                         "reviewedAt": r.get("reviewed_at"),
                         "verified": is_approved,
-                        "avatar": r.get("avatar") or f"https://ui-avatars.com/api/?name={urllib.parse.quote(r.get('name') or em)}&background=0D151D&color=fff",
+                        "avatar": r.get("avatar") or r.get("profile_photo_url") or "",
                         "createdAt": str(r.get("created_at") or ""),
                         "payerntAccount": {
                             "accountId": r.get("id") or f"PAYERNT_USER_{em}",
@@ -8535,7 +8691,7 @@ def admin_users_list(current_admin: dict = Depends(check_admin_user)):
                                 "reviewedBy": r.get("reviewed_by"),
                                 "reviewedAt": r.get("reviewed_at"),
                                 "verified": is_approved,
-                                "avatar": r.get("avatar") or f"https://ui-avatars.com/api/?name={urllib.parse.quote(r.get('full_name') or em)}&background=0D151D&color=fff",
+                                "avatar": r.get("avatar") or r.get("profile_photo_url") or "",
                                 "createdAt": str(r.get("created_at") or ""),
                                 "payrentAccount": payrent_sub
                             }
@@ -8583,7 +8739,7 @@ def admin_users_list(current_admin: dict = Depends(check_admin_user)):
                                 "reviewedBy": r.get("reviewed_by"),
                                 "reviewedAt": r.get("reviewed_at"),
                                 "verified": is_approved,
-                                "avatar": r.get("avatar") or f"https://ui-avatars.com/api/?name={urllib.parse.quote(r.get('full_name') or em)}&background=0D151D&color=fff",
+                                "avatar": r.get("avatar") or r.get("profile_photo_url") or "",
                                 "createdAt": str(r.get("created_at") or "")
                             }
                 except Exception:
@@ -8615,7 +8771,7 @@ def admin_users_list(current_admin: dict = Depends(check_admin_user)):
                             "accountType": "Admin",
                             "status": r.get("status") or "active",
                             "verified": bool(r.get("verified", 1)),
-                            "avatar": r.get("avatar") or "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
+                            "avatar": r.get("avatar") or r.get("profile_photo_url") or "",
                             "createdAt": str(r.get("created_at") or "")
                         }
         except Exception as e:
@@ -8654,7 +8810,7 @@ def admin_users_list(current_admin: dict = Depends(check_admin_user)):
                 "reviewedBy": u.get("reviewed_by"),
                 "reviewedAt": u.get("reviewed_at"),
                 "verified": is_verified,
-                "avatar": u.get("avatar") or f"https://ui-avatars.com/api/?name={urllib.parse.quote(u.get('full_name') or em)}&background=0D151D&color=fff",
+                "avatar": u.get("avatar") or u.get("profile_photo_url") or "",
                 "createdAt": str(u.get("created_at") or "")
             }
 
@@ -8705,7 +8861,7 @@ def admin_users_list(current_admin: dict = Depends(check_admin_user)):
                         "reviewedBy": p.get("reviewed_by"),
                         "reviewedAt": p.get("reviewed_at"),
                         "verified": is_approved,
-                        "avatar": p.get("avatar") or f"https://ui-avatars.com/api/?name={urllib.parse.quote(p.get('name') or em)}&background=0D151D&color=fff",
+                        "avatar": p.get("avatar") or "",
                         "createdAt": str(p.get("created_at") or ""),
                         "payerntAccount": p_sub
                     }
@@ -8737,7 +8893,7 @@ def admin_payernt_users_list(current_admin: dict = Depends(check_admin_user)):
                     "status": p.get("status") or "active",
                     "productCount": prod_count,
                     "walletBalance": 0.0,
-                    "avatar": p.get("avatar") or "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+                    "avatar": p.get("avatar") or "",
                     "createdAt": str(p.get("created_at") or "")
                 })
             return results
@@ -8764,7 +8920,7 @@ def admin_payernt_users_list(current_admin: dict = Depends(check_admin_user)):
                     "status": r.get("status") or "active",
                     "productCount": int(r.get("product_count") or 0),
                     "walletBalance": float(r.get("wallet_balance") or 0.0),
-                    "avatar": r.get("avatar") or "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+                    "avatar": r.get("avatar") or "",
                     "createdAt": str(r.get("created_at") or "")
                 }
                 for r in rows
@@ -8795,7 +8951,7 @@ def admin_payrent_users_list(current_admin: dict = Depends(check_admin_user)):
                     "pincode": u.get("pincode"),
                     "status": u.get("status") or "active",
                     "bookingCount": orders_cnt,
-                    "avatar": u.get("avatar") or "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
+                    "avatar": u.get("avatar") or u.get("profile_photo_url") or "",
                     "createdAt": str(u.get("created_at") or "")
                 })
             return results
@@ -8820,7 +8976,7 @@ def admin_payrent_users_list(current_admin: dict = Depends(check_admin_user)):
                     "pincode": r.get("pincode"),
                     "status": r.get("status") or "active",
                     "bookingCount": int(r.get("booking_count") or 0),
-                    "avatar": r.get("avatar") or "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
+                    "avatar": r.get("avatar") or "",
                     "createdAt": str(r.get("created_at") or "")
                 }
                 for r in rows
@@ -9095,7 +9251,7 @@ def admin_update_user(id: str, data: UserUpdateSchema, current_admin: dict = Dep
         "role": updated.get("role") or "customer",
         "status": updated.get("status") or "active",
         "verified": bool(updated.get("verified", 1)),
-        "avatar": updated.get("avatar") or "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
+        "avatar": updated.get("profile_photo_url") or updated.get("avatar") or "",
         "createdAt": updated.get("created_at") or ""
     }
     broadcast_admin_event("user.updated", res_user)
@@ -9154,7 +9310,7 @@ def admin_suspend_user(id: str, current_admin: dict = Depends(check_admin_user))
         "role": updated["role"],
         "status": "suspended",
         "verified": bool(updated["verified"]),
-        "avatar": updated["avatar"] or "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
+        "avatar": updated.get("profile_photo_url") or updated.get("avatar") or "",
         "createdAt": updated["created_at"]
     }
     broadcast_admin_event("user.updated", res_user)
@@ -9193,7 +9349,7 @@ def admin_activate_user(id: str, current_admin: dict = Depends(check_admin_user)
         "role": updated["role"],
         "status": "active",
         "verified": bool(updated["verified"]),
-        "avatar": updated["avatar"] or updated.get("profile_photo_url") or "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
+        "avatar": updated.get("profile_photo_url") or updated.get("avatar") or "",
         "createdAt": updated.get("created_at", "")
     }
     broadcast_admin_event("user.updated", res_user)
@@ -9413,7 +9569,7 @@ def admin_get_user_details(id: str, current_admin: dict = Depends(check_admin_us
         "bio": user.get("bio") or "",
         "website": user.get("website") or "",
         "upiId": user.get("upiId") or "",
-        "avatar": user.get("avatar") or user.get("profile_photo_url") or f"https://ui-avatars.com/api/?name={urllib.parse.quote(user.get('full_name') or clean_email)}&background=0D151D&color=fff",
+        "avatar": user.get("profile_photo_url") or user.get("avatar") or "",
         "profilePhotoUrl": user.get("profile_photo_url") or user.get("avatar"),
         "aadhaarNumber": raw_aadh_user or None,
         "aadhaarMasked": masked_aadh_user,
@@ -9555,7 +9711,7 @@ def admin_approve_user(id: str, type: Optional[str] = Query(None), current_admin
         "verified": True,
         "reviewedBy": admin_identifier,
         "reviewedAt": now_str,
-        "avatar": updated.get("avatar") or updated.get("profile_photo_url") or f"https://ui-avatars.com/api/?name={urllib.parse.quote(updated.get('full_name') or clean_email)}&background=0D151D&color=fff",
+        "avatar": updated.get("profile_photo_url") or updated.get("avatar") or "",
         "profilePhotoUrl": updated.get("profile_photo_url") or updated.get("avatar"),
         "createdAt": str(updated.get("created_at", ""))
     }
@@ -9697,7 +9853,7 @@ def admin_reject_user(id: str, data: Optional[RejectUserSchema] = None, type: Op
         "reviewedBy": admin_identifier,
         "reviewedAt": now_str,
         "verified": False,
-        "avatar": updated.get("avatar") or updated.get("profile_photo_url") or f"https://ui-avatars.com/api/?name={urllib.parse.quote(updated.get('full_name') or clean_email)}&background=0D151D&color=fff",
+        "avatar": updated.get("profile_photo_url") or updated.get("avatar") or "",
         "profilePhotoUrl": updated.get("profile_photo_url") or updated.get("avatar"),
         "createdAt": str(updated.get("created_at", ""))
     }
@@ -9995,7 +10151,7 @@ def admin_products_list(
                     "owner": {
                         "id": p.get("owner_id") or p.get("user_email") or "",
                         "name": p.get("owner_name") or u.get("full_name") or "Vendor",
-                        "avatar": u.get("avatar") or "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+                        "avatar": u.get("avatar") or u.get("profile_photo_url") or "",
                         "rating": 5.0,
                         "email": p.get("owner_email") or p.get("user_email") or "",
                         "phone": u.get("phone") or "",
@@ -10071,7 +10227,7 @@ def admin_products_list(
                     "owner": {
                         "id": r.get("owner_id") or r.get("owner_email") or "",
                         "name": r.get("owner_name") or (r["owner_email"].split("@")[0] if r.get("owner_email") else "Vendor"),
-                        "avatar": r.get("owner_avatar") or "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+                        "avatar": r.get("owner_avatar") or "",
                         "rating": 5.0,
                         "email": r.get("owner_email") or "",
                         "phone": r.get("owner_phone") or "",
@@ -10280,7 +10436,7 @@ def admin_get_product(id: str, current_admin: dict = Depends(check_admin_user)):
                     "owner": {
                         "id": r.get("owner_id") or owner_email,
                         "name": r.get("owner_name") or (owner_email.split("@")[0] if owner_email else "Vendor"),
-                        "avatar": r.get("owner_avatar") or "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+                        "avatar": r.get("owner_avatar") or "",
                         "rating": 5.0,
                         "email": owner_email,
                         "phone": r.get("owner_phone") or "",
@@ -10480,7 +10636,7 @@ def admin_get_product(id: str, current_admin: dict = Depends(check_admin_user)):
                     "owner": {
                         "id": p.get("owner_id") or p.get("owner_email") or "",
                         "name": p.get("owner_name") or "Vendor",
-                        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+                        "avatar": p.get("owner_avatar") or "",
                         "rating": 5.0,
                         "email": p.get("owner_email") or "",
                         "phone": "",
@@ -10749,7 +10905,7 @@ def admin_approve_product(id: str, data: Optional[ApproveProductSchema] = None, 
                             0,
                             1,
                             p_row.get("owner_name") or "Vendor",
-                            "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+                            p_row.get("owner_avatar") or "",
                             5.0,
                             p_row.get("created_at") or now_str,
                             "approved",
@@ -11864,7 +12020,7 @@ def create_customer_review(
     rev_id = f"rev-{int(time.time() * 1000)}-{secrets.token_hex(4)}"
     now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
     user_name = current_user.get("full_name") or user_email.split("@")[0]
-    user_avatar = current_user.get("avatar") or current_user.get("profile_photo_url") or f"https://ui-avatars.com/api/?name={user_name}&background=0D151D&color=fff"
+    user_avatar = current_user.get("profile_photo_url") or current_user.get("avatar") or ""
     user_location = current_user.get("city") or ""
     user_role = current_user.get("occupation") or "Creator"
 
@@ -12052,7 +12208,7 @@ def admin_reviews_list(current_admin: dict = Depends(check_admin_user)):
             "productId": r["product_id"],
             "productTitle": r["product_title"],
             "userName": r["user_name"],
-            "userAvatar": r["user_avatar"] or "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
+            "userAvatar": r["user_avatar"] or "",
             "rating": r["rating"],
             "comment": r["comment"],
             "hidden": bool(r["hidden"]),
@@ -12960,7 +13116,7 @@ def get_recommendation_catalog() -> List[dict]:
         if db_p.get("status", "approved") == "approved" and not db_p.get("hidden", False):
             owner_info = db_p.get("owner") if isinstance(db_p.get("owner"), dict) else {}
             owner_name = db_p.get("owner_name") or owner_info.get("name") or "Verified Lender"
-            owner_avatar = db_p.get("owner_avatar") or owner_info.get("avatar") or "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150"
+            owner_avatar = db_p.get("owner_avatar") or owner_info.get("avatar") or ""
             owner_rating = float(db_p.get("owner_rating") or owner_info.get("rating") or 5.0)
             
             catalog_map[str(db_p["id"])] = {

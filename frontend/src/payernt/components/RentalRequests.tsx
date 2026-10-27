@@ -42,6 +42,7 @@ import type { RentalRequest, RentalRequestStatus } from "../types";
 import { SecretPinDisplay, SecretPinInput } from "@/components/common/SecretPinDisplay";
 import { LiveRentalQueue } from "@/components/rental/LiveRentalQueue";
 import { formatBookingDateTime } from "@/utils/formatters";
+import { ProfilePhoto } from "@/components/common/ProfilePhoto";
 
 interface RentalRequestsProps {
   requests: RentalRequest[];
@@ -960,10 +961,12 @@ export function RentalRequests({
                         </div>
 
                         <div className="flex items-center gap-3">
-                          <img
+                          <ProfilePhoto
                             src={req.renter.avatar}
                             alt={req.renter.name}
-                            className="h-10 w-10 rounded-full object-cover border border-black/10 dark:border-[#A1A1AA]/20 shadow-xs"
+                            size="md"
+                            shape="circle"
+                            className="border border-black/10 dark:border-[#A1A1AA]/20 shadow-xs"
                           />
                           <div>
                             <p className="font-bold text-neutral-950 dark:text-[#F5F5F5] text-sm">{req.renter.name}</p>

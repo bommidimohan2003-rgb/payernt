@@ -19,6 +19,7 @@ import { AdminAgent } from "../services/api";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "@tanstack/react-router";
+import { ProfilePhoto } from "@/components/common/ProfilePhoto";
 
 export default function Agents() {
   const [agents, setAgents] = useState<AdminAgent[]>([]);
@@ -137,13 +138,12 @@ export default function Agents() {
       label: "Agent / Lender",
       render: (row) => (
         <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-full bg-secondary border border-border/80 flex items-center justify-center font-bold text-xs text-foreground overflow-hidden shrink-0">
-            {row.avatar ? (
-              <img src={row.avatar} alt={row.fullName} className="h-full w-full object-cover" />
-            ) : (
-              <span>{(row.fullName || row.email || "A").charAt(0).toUpperCase()}</span>
-            )}
-          </div>
+          <ProfilePhoto
+            src={row.avatar}
+            alt={row.fullName}
+            size="sm"
+            shape="circle"
+          />
           <div className="min-w-0">
             <div className="font-bold text-foreground truncate">{row.fullName || "Verified Agent"}</div>
             <div className="text-[11px] text-muted-foreground font-mono truncate">{row.email}</div>
@@ -391,13 +391,12 @@ export default function Agents() {
           <div className="w-full max-w-lg bg-card border border-border/80 rounded-2xl shadow-2xl p-6 space-y-5">
             <div className="flex items-center justify-between border-b border-border/40 pb-4">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-full bg-secondary border border-border flex items-center justify-center font-bold text-sm text-foreground overflow-hidden">
-                  {selectedAgent.avatar ? (
-                    <img src={selectedAgent.avatar} alt={selectedAgent.fullName} className="h-full w-full object-cover" />
-                  ) : (
-                    <span>{(selectedAgent.fullName || selectedAgent.email).charAt(0).toUpperCase()}</span>
-                  )}
-                </div>
+                <ProfilePhoto
+                  src={selectedAgent.avatar}
+                  alt={selectedAgent.fullName}
+                  size="md"
+                  shape="circle"
+                />
                 <div>
                   <h3 className="text-sm font-bold text-foreground">{selectedAgent.fullName || "Agent Profile"}</h3>
                   <p className="text-[11px] text-muted-foreground font-mono">{selectedAgent.email}</p>

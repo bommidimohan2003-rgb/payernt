@@ -3,6 +3,7 @@ import { useNavigate, Link } from "@tanstack/react-router";
 import { User, Settings, LogOut, Shield } from "lucide-react";
 import { authService } from "../../services/auth";
 import { AdminUser } from "../../services/api";
+import { ProfilePhoto } from "@/components/common/ProfilePhoto";
 
 export function ProfileDropdown() {
   const [currentUser, setCurrentUser] = useState<AdminUser | null>(null);
@@ -46,10 +47,12 @@ export function ProfileDropdown() {
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2.5 p-1 rounded-full hover:bg-secondary transition-colors"
       >
-        <img
-          src={currentUser.avatar}
+        <ProfilePhoto
+          src={currentUser.avatar || (currentUser as any).profilePhotoUrl}
           alt={currentUser.fullName}
-          className="h-8 w-8 rounded-full object-cover border border-primary/20"
+          size="sm"
+          shape="circle"
+          className="border border-primary/20"
         />
         <div className="hidden lg:flex flex-col text-left pr-2">
           <span className="text-xs font-bold text-foreground leading-none">

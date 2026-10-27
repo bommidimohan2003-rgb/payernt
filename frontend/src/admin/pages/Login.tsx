@@ -300,7 +300,7 @@ export default function Login() {
                       role: "admin",
                       status: "active",
                       verified: true,
-                      avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+                      avatar: "",
                       createdAt: new Date().toISOString(),
                     };
                     localStorage.removeItem("payent:admin:logged_out");

@@ -8,6 +8,7 @@ import { LogoIcon } from "@/components/common/LogoIcon";
 import { useLanguage } from "@/i18n";
 import { storage, STORAGE_KEYS } from "@/utils/storage";
 import { api } from "@/utils/api";
+import { ProfilePhoto } from "@/components/common/ProfilePhoto";
 
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
@@ -136,14 +137,11 @@ export function Navbar() {
                   id="nav-profile-avatar"
                   className="flex items-center gap-2 p-1.5 pl-2 pr-3 sm:pr-4 rounded-xl border border-black/10 dark:border-white/15 bg-white/80 dark:bg-[#0D151D]/80 hover:border-black/20 dark:hover:border-white/30 shadow-xs hover:shadow-sm transition-all active:scale-96"
                 >
-                  <img
-                    src={
-                      user.profilePhotoUrl ||
-                      user.avatar ||
-                      `https://ui-avatars.com/api/?name=${encodeURIComponent(user.fullName || "User")}&background=161616&color=ffffff`
-                    }
+                  <ProfilePhoto
+                    src={user.profilePhotoUrl || user.avatar}
                     alt={user.fullName || "User"}
-                    className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg object-cover ring-1 ring-black/10 dark:ring-white/20"
+                    size="sm"
+                    shape="circle"
                   />
                   <span className="hidden xs:inline sm:inline text-xs sm:text-sm font-bold text-neutral-900 dark:text-white max-w-[100px] sm:max-w-[120px] truncate">
                     {user.role === "admin" || user.role === "superadmin" ? "Admin" : user.fullName?.split(" ")[0] || tCommon.profile}

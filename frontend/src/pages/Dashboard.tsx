@@ -23,6 +23,7 @@ import {
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { toast } from "sonner";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
+import { ProfilePhoto, isRealProfilePhoto } from "@/components/common/ProfilePhoto";
 import { useAuth } from "@/hooks/useAuth";
 import { useWishlist } from "@/hooks/useWishlist";
 import { STORAGE_KEYS, storage } from "@/utils/storage";
@@ -203,7 +204,7 @@ export default function Dashboard() {
       { key: "phone", label: "Phone Number", valid: Boolean(user.phone && user.phone.length >= 10) },
       { key: "city", label: "City & Region", valid: Boolean(user.city) },
       { key: "address", label: "Delivery Address", valid: Boolean(user.address) },
-      { key: "avatar", label: "Profile Photo", valid: Boolean(user.avatar || user.profilePhotoUrl) },
+      { key: "avatar", label: "Profile Photo", valid: isRealProfilePhoto(user.profilePhotoUrl || user.avatar) },
     ];
     const completed = checks.filter((c) => c.valid).length;
     const percentage = Math.round((completed / checks.length) * 100);
@@ -247,9 +248,13 @@ export default function Dashboard() {
         <div className="rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#10151B] p-6 sm:p-8 shadow-sm">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="flex items-center gap-4">
-              <div className="h-14 w-14 sm:h-16 sm:w-16 rounded-2xl bg-neutral-900 dark:bg-[#050709] text-white flex items-center justify-center font-bold text-xl sm:text-2xl shadow-md border border-black/10 dark:border-[#A1A1AA]/25 shrink-0">
-                {user?.fullName?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || "P"}
-              </div>
+              <ProfilePhoto
+                src={user?.profilePhotoUrl || user?.avatar}
+                alt={user?.fullName || "User"}
+                size="xl"
+                shape="rounded"
+                className="shadow-md border border-black/10 dark:border-[#A1A1AA]/25 shrink-0"
+              />
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <h1 className="text-2xl sm:text-3xl font-black text-neutral-950 dark:text-[#F5F5F5] tracking-tight">

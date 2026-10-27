@@ -19,6 +19,7 @@ import {
 import { reviewsApi, type ReviewItem } from "@/services/api";
 import { formatRelativeTime } from "@/utils/formatters";
 import { getOptimizedImageUrl } from "@/utils/images";
+import { ProfilePhoto } from "@/components/common/ProfilePhoto";
 
 export default function Reviews() {
   const queryClient = useQueryClient();
@@ -450,7 +451,6 @@ export default function Reviews() {
         {!isReviewsLoading && !isError && reviewsList.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {reviewsList.map((r: ReviewItem) => {
-              const userInitial = (r.userName || "C").charAt(0).toUpperCase();
               const metaSubtitle = [r.userRole, r.userLocation].filter(Boolean).join(" • ");
               const isAuthor = currentUser?.email && r.userId?.toLowerCase() === currentUser.email.toLowerCase();
               const isAdmin = currentUser?.role === "admin";
@@ -463,26 +463,13 @@ export default function Reviews() {
                   {/* Top Creator Header */}
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
-                      {r.userAvatar ? (
-                        <img
-                          src={getOptimizedImageUrl(r.userAvatar, 'thumb')}
-                          alt={r.userName}
-                          loading="lazy"
-                          decoding="async"
-                          className="h-11 w-11 rounded-xl object-cover border border-black/10 dark:border-white/10 bg-neutral-200 dark:bg-neutral-800 shrink-0"
-                          onError={(e) => {
-                            e.currentTarget.style.display = "none";
-                            e.currentTarget.nextElementSibling?.classList.remove("hidden");
-                          }}
-                        />
-                      ) : null}
-                      <div
-                        className={`h-11 w-11 rounded-xl bg-neutral-900 text-white dark:bg-neutral-800 dark:text-white flex items-center justify-center font-bold text-sm border border-black/10 dark:border-white/10 shrink-0 ${
-                          r.userAvatar ? "hidden" : ""
-                        }`}
-                      >
-                        {userInitial}
-                      </div>
+                      <ProfilePhoto
+                        src={r.userAvatar}
+                        alt={r.userName}
+                        size="md"
+                        shape="rounded"
+                        className="h-11 w-11 rounded-xl shrink-0"
+                      />
 
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">

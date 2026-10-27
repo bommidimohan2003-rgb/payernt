@@ -58,9 +58,7 @@ const mapToAdminProduct = (p: any): AdminProduct => ({
   owner: {
     id: p.ownerId || p.owner?.id || "bommidimohan2003@gmail.com",
     name: p.owner?.name || p.owner?.fullName || p.verificationDocs?.ownerFullName || "Mohan Bommidi",
-    avatar:
-      p.owner?.avatar ||
-      "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80",
+    avatar: p.owner?.avatar || "",
     rating: 5.0,
     email: p.owner?.email || p.verificationDocs?.ownerEmail || "bommidimohan2003@gmail.com",
     phone: p.owner?.phone || p.verificationDocs?.ownerPhone || "",

@@ -43,6 +43,7 @@ import { api } from "@/utils/api";
 import { storage, STORAGE_KEYS } from "@/utils/storage";
 import type { RealtimeConversation, RealtimeMessage, DeliveryStatus } from "@/types";
 import { cn } from "@/lib/utils";
+import { ProfilePhoto } from "@/components/common/ProfilePhoto";
 import { toast } from "sonner";
 
 function formatTimeAgo(isoString?: string): string {
@@ -882,17 +883,13 @@ export default function Messages() {
                       <ArrowLeft className="h-4 w-4" />
                     </button>
 
-                    {/* Counterparty Avatar */}
+                    {/* Counterparty Photo */}
                     <div className="relative shrink-0">
-                      <img
-                        src={
-                          activeConversation.counterparty?.avatar ||
-                          `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                            activeConversation.counterparty?.name || "User",
-                          )}&background=161616&color=ffffff`
-                        }
-                        alt=""
-                        className="h-10 w-10 rounded-full object-cover border border-border shadow-xs"
+                      <ProfilePhoto
+                        src={activeConversation.counterparty?.avatar}
+                        alt={activeConversation.counterparty?.name || "User"}
+                        size="md"
+                        shape="circle"
                       />
                       <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-card" />
                     </div>

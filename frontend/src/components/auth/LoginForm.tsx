@@ -183,8 +183,8 @@ export function LoginForm() {
           email: loggedInUser.email,
           role: "admin",
           status: "active",
-          verified: true,
-          avatar: loggedInUser.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(loggedInUser.fullName)}&background=10b981&color=fff`,
+          avatar: loggedInUser.avatar || "",
+          profilePhotoUrl: (loggedInUser as any).profilePhotoUrl || loggedInUser.avatar || "",
           createdAt: new Date().toISOString(),
         }),
       );
