@@ -1511,12 +1511,18 @@ def login(data: LoginRequestSchema, request: Request, response: Response):
         )
 
     user = get_user(clean_email)
-    if not user or not verify_password(data.password, user["password_hash"]):
-        # Increment attempt counter and record failure only when password verification fails
+    if not user:
         record_failed_auth_attempt(ip_key, max_attempts=10, lock_duration_secs=900)
         record_failed_auth_attempt(user_key, max_attempts=5, lock_duration_secs=900)
-        logger.warning(f"Failed login attempt for {clean_email} from IP {client_ip}")
-        # Uniform failure message to prevent enumeration
+        logger.warning(f"Failed login attempt for {clean_email} from IP {client_ip} (reason: account not found)")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password."
+        )
+    if not verify_password(data.password, user.get("password_hash") or ""):
+        record_failed_auth_attempt(ip_key, max_attempts=10, lock_duration_secs=900)
+        record_failed_auth_attempt(user_key, max_attempts=5, lock_duration_secs=900)
+        logger.warning(f"Failed login attempt for {clean_email} from IP {client_ip} (reason: password mismatch)")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password."
@@ -6710,10 +6716,18 @@ def admin_login(data: LoginRequestSchema, request: Request, response: Response):
         )
 
     user = get_user(clean_email)
-    if not user or not verify_password(data.password, user["password_hash"]):
+    if not user:
         record_failed_auth_attempt(ip_key, max_attempts=10, lock_duration_secs=900)
         record_failed_auth_attempt(user_key, max_attempts=5, lock_duration_secs=900)
-        logger.warning(f"Failed admin login attempt for {clean_email} from IP {client_ip}")
+        logger.warning(f"Failed admin login attempt for {clean_email} from IP {client_ip} (reason: account not found)")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password."
+        )
+    if not verify_password(data.password, user.get("password_hash") or ""):
+        record_failed_auth_attempt(ip_key, max_attempts=10, lock_duration_secs=900)
+        record_failed_auth_attempt(user_key, max_attempts=5, lock_duration_secs=900)
+        logger.warning(f"Failed admin login attempt for {clean_email} from IP {client_ip} (reason: password mismatch)")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password."

@@ -1296,52 +1296,32 @@ def get_user(email: str):
         if now - t < 30.0:
             return cached
 
-    # Fast unified lookup: check admin_accounts, payrent_accounts, and users in 1 single round trip
+    # 1. Search admin_accounts
     try:
-        user = fetch_one("""
-            SELECT id, email, password_hash, role, status, full_name, avatar,
-                   profile_photo_url, phone, address, city, state, country, pincode, person_id,
-                   pan_number, verified, created_at, last_login_at
-            FROM admin_accounts WHERE LOWER(email) = %s
-            UNION ALL
-            SELECT email AS id, email, password_hash, role, status, full_name, avatar,
-                   profile_photo_url, phone, address, city, state, country, pincode, person_id,
-                   pan_number, verified, created_at, last_login_at
-            FROM payrent_accounts WHERE LOWER(email) = %s
-            UNION ALL
-            SELECT email AS id, email, password_hash, role, status, full_name, avatar,
-                   profile_photo_url, phone, address, city, state, country, pincode, person_id,
-                   pan_number, verified, created_at, last_login_at
-            FROM users WHERE LOWER(email) = %s
-            LIMIT 1
-        """, (clean_email, clean_email, clean_email))
+        admin = fetch_one("SELECT * FROM admin_accounts WHERE email = %s", (clean_email,))
+        if admin:
+            _user_cache[clean_email] = (now, admin)
+            return admin
+    except Exception as e:
+        logger.warning("DB read error in get_user (admin_accounts): %s", e)
+
+    # 2. Search payrent_accounts
+    try:
+        payrent = fetch_one("SELECT * FROM payrent_accounts WHERE email = %s", (clean_email,))
+        if payrent:
+            _user_cache[clean_email] = (now, payrent)
+            return payrent
+    except Exception as e:
+        logger.warning("DB read error in get_user (payrent_accounts): %s", e)
+
+    # 3. Fallback to users table
+    try:
+        user = fetch_one("SELECT * FROM users WHERE email = %s", (clean_email,))
         if user:
             _user_cache[clean_email] = (now, user)
             return user
     except Exception as e:
-        logger.warning("Notice: Unified get_user fallback notice: %s", e)
-        # Resilient individual check fallbacks
-        try:
-            admin = fetch_one("SELECT * FROM admin_accounts WHERE email = %s", (clean_email,))
-            if admin:
-                _user_cache[clean_email] = (now, admin)
-                return admin
-        except Exception:
-            pass
-        try:
-            payrent = fetch_one("SELECT * FROM payrent_accounts WHERE email = %s", (clean_email,))
-            if payrent:
-                _user_cache[clean_email] = (now, payrent)
-                return payrent
-        except Exception:
-            pass
-        try:
-            user = fetch_one("SELECT * FROM users WHERE email = %s", (clean_email,))
-            if user:
-                _user_cache[clean_email] = (now, user)
-                return user
-        except Exception:
-            pass
+        logger.warning("DB read error in get_user for %s — falling back to MOCK_USERS: %s", clean_email, e)
 
     res = MOCK_USERS.get(clean_email)
     if res:
