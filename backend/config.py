@@ -183,6 +183,9 @@ else:
     IS_MOCK_OTP_MODE = (OTP_PROVIDER == "mock")
     ENABLE_TEST_OTP_RESPONSE = (os.getenv("ENABLE_TEST_OTP_RESPONSE", "true" if IS_MOCK_OTP_MODE else "false").lower() == "true") and not IS_PRODUCTION
 
-
-
-
+# Cloudinary Storage Configuration
+CLOUDINARY_CLOUD_NAME = os.getenv("CLOUDINARY_CLOUD_NAME", os.getenv("VITE_CLOUDINARY_CLOUD_NAME", "dvyendk6j"))
+CLOUDINARY_API_KEY = os.getenv("CLOUDINARY_API_KEY", "")
+CLOUDINARY_API_SECRET = os.getenv("CLOUDINARY_API_SECRET", "")
+CLOUDINARY_URL = os.getenv("CLOUDINARY_URL", "")
+CLOUDINARY_UPLOAD_PRESET = os.getenv("CLOUDINARY_UPLOAD_PRESET", os.getenv("VITE_CLOUDINARY_UPLOAD_PRESET", "payernt_uploads."))

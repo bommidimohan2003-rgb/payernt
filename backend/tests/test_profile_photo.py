@@ -45,7 +45,8 @@ class TestProfilePhotoSystem(unittest.TestCase):
             "status": "active",
             "verified": True,
             "profile_photo_url": None,
-            "avatar": None
+            "avatar": None,
+            "profile_photo_public_id": None
         }
 
     def test_01_upload_valid_jpeg_profile_photo(self):
@@ -54,8 +55,12 @@ class TestProfilePhotoSystem(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         data = res.json()
         self.assertTrue(data.get("success"))
-        self.assertEqual(data["user"]["profilePhotoUrl"], jpeg_uri)
-        self.assertEqual(data["user"]["avatar"], jpeg_uri)
+        # Verify Cloudinary URL returned instead of base64
+        photo_url = data["user"]["profilePhotoUrl"]
+        self.assertTrue(photo_url.startswith("http://") or photo_url.startswith("https://"))
+        self.assertFalse(photo_url.startswith("data:image/"))
+        self.assertEqual(data["user"]["avatar"], photo_url)
+        self.assertTrue(data.get("public_id"))
 
     def test_02_upload_valid_png_profile_photo(self):
         png_uri = create_test_image_data_uri("PNG")
@@ -63,7 +68,8 @@ class TestProfilePhotoSystem(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         data = res.json()
         self.assertTrue(data.get("success"))
-        self.assertEqual(data["user"]["profilePhotoUrl"], png_uri)
+        photo_url = data["user"]["profilePhotoUrl"]
+        self.assertTrue(photo_url.startswith("http://") or photo_url.startswith("https://"))
 
     def test_03_upload_valid_webp_profile_photo(self):
         webp_uri = create_test_image_data_uri("WEBP")
@@ -71,7 +77,8 @@ class TestProfilePhotoSystem(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         data = res.json()
         self.assertTrue(data.get("success"))
-        self.assertEqual(data["user"]["profilePhotoUrl"], webp_uri)
+        photo_url = data["user"]["profilePhotoUrl"]
+        self.assertTrue(photo_url.startswith("http://") or photo_url.startswith("https://"))
 
     def test_04_reject_generated_avatar_services(self):
         fake_urls = [
@@ -127,12 +134,13 @@ class TestProfilePhotoSystem(unittest.TestCase):
         token_a = create_access_token({"sub": user_a_email, "email": user_a_email, "role": "customer"})
         token_b = create_access_token({"sub": user_b_email, "email": user_b_email, "role": "customer"})
 
-        MOCK_USERS[user_a_email] = {"email": user_a_email, "full_name": "User A", "avatar": None, "profile_photo_url": None}
-        MOCK_USERS[user_b_email] = {"email": user_b_email, "full_name": "User B", "avatar": None, "profile_photo_url": None}
+        MOCK_USERS[user_a_email] = {"email": user_a_email, "full_name": "User A", "avatar": None, "profile_photo_url": None, "profile_photo_public_id": None}
+        MOCK_USERS[user_b_email] = {"email": user_b_email, "full_name": "User B", "avatar": None, "profile_photo_url": None, "profile_photo_public_id": None}
 
         photo_a = create_test_image_data_uri("JPEG", color=(10, 20, 30))
         res_a = self.client.post("/api/users/profile/photo", json={"profilePhotoUrl": photo_a}, headers={"Authorization": f"Bearer {token_a}"})
         self.assertEqual(res_a.status_code, 200)
+        url_a = res_a.json()["user"]["profilePhotoUrl"]
 
         # Verify User B has NOT been affected
         self.assertIsNone(MOCK_USERS[user_b_email].get("profile_photo_url"))
@@ -141,7 +149,7 @@ class TestProfilePhotoSystem(unittest.TestCase):
         # User B removing photo does not remove User A's photo
         res_del_b = self.client.delete("/api/users/profile/photo", headers={"Authorization": f"Bearer {token_b}"})
         self.assertEqual(res_del_b.status_code, 200)
-        self.assertEqual(MOCK_USERS[user_a_email]["profile_photo_url"], photo_a)
+        self.assertEqual(MOCK_USERS[user_a_email]["profile_photo_url"], url_a)
 
     def test_09_google_user_sync_photo_mapping(self):
         from database import save_google_user

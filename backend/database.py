@@ -348,6 +348,7 @@ def init_db(force: bool = False):
     add_column_safely("users", "last_login_at VARCHAR(100)")
     add_column_safely("users", "aadhaar_number VARCHAR(20) NULL")
     add_column_safely("users", "profile_photo_url LONGTEXT NULL")
+    add_column_safely("users", "profile_photo_public_id VARCHAR(255) NULL")
     add_column_safely("users", "person_id VARCHAR(255) NULL")
     add_column_safely("users", "kyc_status VARCHAR(50) DEFAULT 'NOT_STARTED'")
     add_column_safely("users", "kyc_document_type VARCHAR(50) NULL")

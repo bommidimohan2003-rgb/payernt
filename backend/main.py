@@ -2220,13 +2220,28 @@ class ProfilePhotoUploadSchema(BaseModel):
     avatar: Optional[str] = None
 
 @app.post("/api/users/profile/photo")
+@app.put("/api/users/profile/photo")
 @app.post("/api/profile/photo")
+@app.put("/api/profile/photo")
 @app.patch("/api/profile/photo")
+@app.post("/api/profile-photo")
+@app.put("/api/profile-photo")
 def update_profile_photo_route(
     data: ProfilePhotoUploadSchema,
     current_user_email: str = Depends(get_current_user_email)
 ):
+    import hashlib
+    from PIL import Image
+    from cloudinary_service import (
+        upload_profile_photo_to_cloudinary,
+        delete_profile_photo_from_cloudinary,
+    )
+
+    t_start = time.perf_counter()
     clean_email = current_user_email.strip().lower()
+    user_hash = hashlib.sha256(clean_email.encode("utf-8")).hexdigest()[:12]
+    logger.info("[ProfilePhotoMetrics] Request received for user_hash=%s", user_hash)
+
     photo_url = data.profile_photo_url or data.profilePhotoUrl or data.avatar
     if not photo_url or not photo_url.strip():
         raise HTTPException(
@@ -2237,7 +2252,7 @@ def update_profile_photo_route(
     clean_photo = photo_url.strip()
 
     # Reject generated avatars or placeholder domains
-    if any(fake in clean_photo.lower() for fake in ["ui-avatars.com", "dicebear", "pravatar"]):
+    if any(fake in clean_photo.lower() for fake in ["ui-avatars.com", "dicebear", "pravatar", "robohash", "gravatar"]):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Generated avatars are not allowed. Please upload a real user photo."
@@ -2280,7 +2295,6 @@ def update_profile_photo_route(
                 )
             # Verify actual image content with PIL
             try:
-                from PIL import Image
                 with Image.open(io.BytesIO(raw_bytes)) as img:
                     img.verify()
                     fmt = (img.format or "").upper()
@@ -2288,6 +2302,19 @@ def update_profile_photo_route(
                         raise HTTPException(
                             status_code=status.HTTP_400_BAD_REQUEST,
                             detail=f"Invalid image content: detected format {fmt}. Allowed: JPEG, PNG, WebP."
+                        )
+                # Re-check dimensions
+                with Image.open(io.BytesIO(raw_bytes)) as img:
+                    w, h = img.size
+                    if w < 20 or h < 20:
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="Image dimensions too small (minimum 20x20px required)."
+                        )
+                    if w > 4096 or h > 4096:
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="Image dimensions too large (maximum 4096x4096px allowed)."
                         )
             except HTTPException:
                 raise
@@ -2304,57 +2331,79 @@ def update_profile_photo_route(
                 detail=f"Invalid image encoding or format: {str(e)}"
             )
 
-    # Ensure table columns support LONGTEXT for base64 photo storage
+    t_val = time.perf_counter()
+    val_ms = (t_val - t_start) * 1000.0
+
+    # Stage 3: Upload to Cloudinary
+    t_upload_start = time.perf_counter()
+    stored_url = clean_photo
+    new_public_id = None
+
+    if clean_photo.startswith("data:image/"):
+        try:
+            cloud_res = upload_profile_photo_to_cloudinary(
+                clean_photo,
+                user_id_or_hash=user_hash,
+                folder="payent/profile_photos"
+            )
+            stored_url = cloud_res["secure_url"]
+            new_public_id = cloud_res.get("public_id")
+        except Exception as up_err:
+            logger.error("[ProfilePhoto] Cloudinary upload failed for user_hash=%s: %s", user_hash, up_err)
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Image upload to storage service failed: {str(up_err)}"
+            )
+
+    t_upload_end = time.perf_counter()
+    upload_ms = (t_upload_end - t_upload_start) * 1000.0
+
+    # Stage 4: Fetch existing public_id and safely update database
+    t_db_start = time.perf_counter()
+    old_public_id = None
     try:
-        execute_query("ALTER TABLE users MODIFY COLUMN avatar LONGTEXT NULL")
-    except Exception:
-        pass
-    try:
-        execute_query("ALTER TABLE users MODIFY COLUMN profile_photo_url LONGTEXT NULL")
+        old_user = fetch_one("SELECT profile_photo_public_id FROM users WHERE LOWER(email) = LOWER(%s)", (clean_email,))
+        if old_user:
+            old_public_id = old_user.get("profile_photo_public_id")
     except Exception:
         pass
 
-    # Update MySQL users table for current authenticated user
     try:
         execute_query(
-            "UPDATE users SET profile_photo_url = %s, avatar = %s WHERE LOWER(email) = LOWER(%s)",
-            (clean_photo, clean_photo, clean_email)
+            "UPDATE users SET profile_photo_url = %s, avatar = %s, profile_photo_public_id = %s WHERE LOWER(email) = LOWER(%s)",
+            (stored_url, stored_url, new_public_id, clean_email)
         )
-    except Exception as e:
-        logger.warning(f"Error in combined profile photo update for {clean_email}: {e}")
-        try:
-            execute_query(
-                "UPDATE users SET profile_photo_url = %s WHERE LOWER(email) = LOWER(%s)",
-                (clean_photo, clean_email)
-            )
-        except Exception as ex1:
-            logger.warning(f"Error updating profile_photo_url in MySQL for {clean_email}: {ex1}")
-        try:
-            execute_query(
-                "UPDATE users SET avatar = %s WHERE LOWER(email) = LOWER(%s)",
-                (clean_photo, clean_email)
-            )
-        except Exception as ex2:
-            logger.warning(f"Error updating avatar in MySQL for {clean_email}: {ex2}")
+    except Exception as db_err:
+        logger.error("[ProfilePhoto] Database update failed for user_hash=%s: %s", user_hash, db_err)
+        # Orphan asset cleanup if DB persistence fails
+        if new_public_id:
+            try:
+                delete_profile_photo_from_cloudinary(new_public_id)
+            except Exception as cl_err:
+                logger.warning("[ProfilePhoto] Failed to cleanup orphaned asset %s: %s", new_public_id, cl_err)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update user profile photo in database."
+        )
 
-    # Update MOCK_USERS if active
+    # Sync compatibility mock and subsidiary tables without heavy DDL locks
     if clean_email in MOCK_USERS:
-        MOCK_USERS[clean_email]["profile_photo_url"] = clean_photo
-        MOCK_USERS[clean_email]["avatar"] = clean_photo
+        MOCK_USERS[clean_email]["profile_photo_url"] = stored_url
+        MOCK_USERS[clean_email]["avatar"] = stored_url
+        MOCK_USERS[clean_email]["profile_photo_public_id"] = new_public_id
 
-    # If user is an agent/lender, sync photo to custom_products owner_avatar
     try:
         execute_query(
             "UPDATE custom_products SET owner_avatar = %s WHERE LOWER(user_email) = LOWER(%s)",
-            (clean_photo, clean_email)
+            (stored_url, clean_email)
         )
-    except Exception as e:
-        logger.warning(f"Notice: Agent product owner avatar sync notice for {clean_email}: {e}")
+    except Exception:
+        pass
 
     try:
         execute_query(
             "UPDATE payernt_accounts SET avatar = %s WHERE LOWER(email) = LOWER(%s)",
-            (clean_photo, clean_email)
+            (stored_url, clean_email)
         )
     except Exception:
         pass
@@ -2362,26 +2411,47 @@ def update_profile_photo_route(
     try:
         execute_query(
             "UPDATE payrent_accounts SET avatar = %s WHERE LOWER(email) = LOWER(%s)",
-            (clean_photo, clean_email)
+            (stored_url, clean_email)
         )
     except Exception:
         pass
 
     invalidate_user_cache(clean_email)
+
+    # Delete previous Cloudinary asset after successful replacement
+    if old_public_id and old_public_id != new_public_id:
+        try:
+            delete_profile_photo_from_cloudinary(old_public_id)
+        except Exception as del_err:
+            logger.warning("[ProfilePhoto] Non-fatal: failed to remove replaced asset %s: %s", old_public_id, del_err)
+
+    t_db_end = time.perf_counter()
+    db_ms = (t_db_end - t_db_start) * 1000.0
+    total_ms = (t_db_end - t_start) * 1000.0
+
+    logger.info(
+        "[ProfilePhotoMetrics] user_hash=%s validation_ms=%.1f upload_ms=%.1f db_ms=%.1f total_ms=%.1f status=success",
+        user_hash, val_ms, upload_ms, db_ms, total_ms
+    )
+
     user = get_user(clean_email)
     display_name = user.get("full_name") if user else clean_email.split("@")[0]
     aadhaar_num = user.get("aadhaar_number") if user else None
 
     return {
         "success": True,
-        "message": "Profile photo updated successfully.",
+        "message": "Profile photo updated successfully via Cloudinary.",
+        "profile_photo_url": stored_url,
+        "profilePhotoUrl": stored_url,
+        "avatar": stored_url,
+        "public_id": new_public_id,
         "user": {
             "id": clean_email,
             "email": clean_email,
             "fullName": display_name,
-            "profilePhotoUrl": clean_photo,
-            "profile_photo_url": clean_photo,
-            "avatar": clean_photo,
+            "profilePhotoUrl": stored_url,
+            "profile_photo_url": stored_url,
+            "avatar": stored_url,
             "aadhaarMasked": mask_aadhaar(aadhaar_num),
             "aadhaar_masked": mask_aadhaar(aadhaar_num)
         }
@@ -2389,38 +2459,40 @@ def update_profile_photo_route(
 
 @app.delete("/api/users/profile/photo")
 @app.delete("/api/profile/photo")
+@app.delete("/api/profile-photo")
 def delete_profile_photo_route(
     current_user_email: str = Depends(get_current_user_email)
 ):
+    import hashlib
+    from cloudinary_service import delete_profile_photo_from_cloudinary
+
+    t_start = time.perf_counter()
     clean_email = current_user_email.strip().lower()
+    user_hash = hashlib.sha256(clean_email.encode("utf-8")).hexdigest()[:12]
+
+    # Look up old public ID to remove from Cloudinary
+    old_public_id = None
+    try:
+        user_row = fetch_one("SELECT profile_photo_public_id FROM users WHERE LOWER(email) = LOWER(%s)", (clean_email,))
+        if user_row:
+            old_public_id = user_row.get("profile_photo_public_id")
+    except Exception:
+        pass
 
     # Reset in MySQL users table
     try:
         execute_query(
-            "UPDATE users SET profile_photo_url = NULL, avatar = NULL WHERE LOWER(email) = LOWER(%s)",
+            "UPDATE users SET profile_photo_url = NULL, avatar = NULL, profile_photo_public_id = NULL WHERE LOWER(email) = LOWER(%s)",
             (clean_email,)
         )
     except Exception as e:
-        logger.warning(f"Error deleting profile photo in MySQL for {clean_email}: {e}")
-        try:
-            execute_query(
-                "UPDATE users SET profile_photo_url = NULL WHERE LOWER(email) = LOWER(%s)",
-                (clean_email,)
-            )
-        except Exception:
-            pass
-        try:
-            execute_query(
-                "UPDATE users SET avatar = NULL WHERE LOWER(email) = LOWER(%s)",
-                (clean_email,)
-            )
-        except Exception:
-            pass
+        logger.warning(f"Error deleting profile photo in MySQL for {user_hash}: {e}")
 
     # Update MOCK_USERS if active
     if clean_email in MOCK_USERS:
         MOCK_USERS[clean_email]["profile_photo_url"] = None
         MOCK_USERS[clean_email]["avatar"] = None
+        MOCK_USERS[clean_email]["profile_photo_public_id"] = None
 
     # Clear from custom_products owner_avatar
     try:
@@ -2448,6 +2520,17 @@ def delete_profile_photo_route(
         pass
 
     invalidate_user_cache(clean_email)
+
+    # Safely delete asset from Cloudinary if stored public_id exists
+    if old_public_id:
+        try:
+            delete_profile_photo_from_cloudinary(old_public_id)
+        except Exception as del_err:
+            logger.warning("[ProfilePhoto] Non-fatal asset deletion notice for %s: %s", old_public_id, del_err)
+
+    total_ms = (time.perf_counter() - t_start) * 1000.0
+    logger.info("[ProfilePhotoMetrics] user_hash=%s action=delete total_ms=%.1f status=success", user_hash, total_ms)
+
     user = get_user(clean_email)
     display_name = user.get("full_name") if user else clean_email.split("@")[0]
     aadhaar_num = user.get("aadhaar_number") if user else None

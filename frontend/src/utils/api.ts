@@ -736,7 +736,12 @@ export const api = {
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ profile_photo_url: photoUrl }),
+        body: JSON.stringify({
+          profile_photo_url: photoUrl,
+          profilePhotoUrl: photoUrl,
+          avatar: photoUrl,
+        }),
+        timeoutMs: 30000,
       },
     );
     if (!res.ok) {
