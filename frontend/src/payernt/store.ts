@@ -17,6 +17,7 @@ import type {
 } from "./types";
 import { payerntApi } from "./payerntApiService";
 import { isFakeOrDeletedProduct } from "@/utils/productFilters";
+import { normalizePayerntProduct } from "./productUtils";
 
 
 export const STORAGE_KEY_PRODUCTS = "paye₹nt_products";
@@ -413,7 +414,7 @@ export function usePayerntStore() {
         if (stored) {
           const parsed = JSON.parse(stored);
           if (Array.isArray(parsed)) {
-            setProducts(parsed.filter((p: any) => !isMockItem(p.id)));
+            setProducts(parsed.filter((p: any) => !isMockItem(p.id)).map(normalizePayerntProduct));
           }
         }
       } catch {}
@@ -537,7 +538,7 @@ export function usePayerntStore() {
         const prodRes = await payerntApi.getProducts();
         lastProductsFetchRef.current = Date.now();
         if (prodRes.success && Array.isArray(prodRes.products)) {
-          setProducts(prodRes.products.filter((p) => !isMockItem(p.id)));
+          setProducts(prodRes.products.filter((p) => !isMockItem(p.id)).map(normalizePayerntProduct));
         }
       } catch (err) {
         console.warn("[paye₹nt Store] fetchProducts error:", err);
@@ -680,7 +681,7 @@ export function usePayerntStore() {
           // Update products preview if returned
           if (Array.isArray(d.products) && d.products.length > 0) {
             setProducts((prev) => {
-              const fetched = d.products.filter((p: any) => !isMockItem(p.id));
+              const fetched = d.products.filter((p: any) => !isMockItem(p.id)).map(normalizePayerntProduct);
               const map = new Map<string, PayerntProduct>();
               prev.forEach((p) => map.set(p.id, p));
               fetched.forEach((p: any) => map.set(p.id, { ...map.get(p.id), ...p }));

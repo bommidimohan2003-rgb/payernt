@@ -326,23 +326,52 @@ def _sanitize_payernt_product(product: Dict[str, Any], include_pin: bool = False
         "minimumRentalDays": int(p.get("min_rental_days") or 1)
     }
 
-    # Photos and images
+    # Photos and images normalization
     images_raw = p.get("images") or "[]"
     if isinstance(images_raw, str):
         try:
             images_list = json.loads(images_raw)
         except Exception:
-            images_list = [images_raw] if images_raw else []
-    else:
+            images_list = [images_raw.strip()] if images_raw.strip() and not images_raw.strip().startswith("[") else []
+    elif isinstance(images_raw, (list, tuple)):
         images_list = list(images_raw)
+    else:
+        images_list = []
 
-    primary_img = p.get("primary_image") or p.get("primaryImage") or (images_list[0] if images_list else "")
+    clean_images = []
+    for item in images_list:
+        if isinstance(item, str) and item.strip() and not item.strip().startswith("[") and not item.strip().startswith("{"):
+            clean_images.append(item.strip())
+        elif isinstance(item, dict) and item.get("url"):
+            clean_images.append(item["url"].strip())
+
+    primary_img = (
+        p.get("primary_image")
+        or p.get("primaryImage")
+        or p.get("image")
+        or p.get("imageUrl")
+        or p.get("image_url")
+        or (clean_images[0] if clean_images else "")
+    )
+    if isinstance(primary_img, str):
+        primary_img = primary_img.strip()
+        if primary_img.startswith("[") or primary_img.startswith("{"):
+            primary_img = ""
+    else:
+        primary_img = ""
+
+    if primary_img and not clean_images:
+        clean_images = [primary_img]
+    elif not primary_img and clean_images:
+        primary_img = clean_images[0]
+
     p["primaryImage"] = primary_img
     p["primary_image"] = primary_img
-    p["images"] = images_list
+    p["image"] = primary_img
+    p["images"] = clean_images
     p["photos"] = [
-        {"id": f"photo-{i}", "url": url, "tag": "Front View", "isPrimary": (i == 0 or url == primary_img)}
-        for i, url in enumerate(images_list)
+        {"id": f"photo-{i}", "url": url, "tag": "Front View" if i == 0 else f"Angle {i+1}", "isPrimary": (i == 0 or url == primary_img)}
+        for i, url in enumerate(clean_images)
     ]
 
     # Location
@@ -420,19 +449,42 @@ class PayerntProductUpdateSchema(BaseModel):
     specifications: Optional[str] = None
     features: Optional[List[str]] = None
     condition_grade: Optional[str] = None
+    conditionGrade: Optional[str] = None
+    condition_details: Optional[Union[str, Dict[str, Any]]] = None
+    condition: Optional[Dict[str, Any]] = None
+    damageDetails: Optional[str] = None
+    damage_details: Optional[str] = None
     accessories: Optional[str] = None
     city: Optional[str] = None
     area: Optional[str] = None
     pincode: Optional[str] = None
+    postalCode: Optional[str] = None
+    location: Optional[Dict[str, Any]] = None
     pickup_instructions: Optional[str] = None
+    pickupInstructions: Optional[str] = None
     daily_rate: Optional[int] = None
+    dailyRate: Optional[int] = None
+    price: Optional[int] = None
+    pricePerDay: Optional[int] = None
     weekly_rate: Optional[int] = None
+    weeklyRate: Optional[int] = None
     monthly_rate: Optional[int] = None
+    monthlyRate: Optional[int] = None
+    pricing: Optional[Dict[str, Any]] = None
     available: Optional[bool] = None
     availability_status: Optional[str] = None
+    availabilityStatus: Optional[str] = None
     primary_image: Optional[str] = None
+    primaryImage: Optional[str] = None
+    image: Optional[str] = None
+    imageUrl: Optional[str] = None
     images: Optional[List[str]] = None
+    photos: Optional[List[Any]] = None
     status: Optional[str] = None
+    specs: Optional[Dict[str, Any]] = None
+
+    class Config:
+        extra = "allow"
 
 
 class ProductStatusUpdateSchema(BaseModel):
@@ -1303,7 +1355,36 @@ def update_vendor_product_endpoint(
 ):
     """Updates vendor product specifications without modifying Vendor Secret PIN."""
     try:
-        updated = update_payernt_product(product_id, account["id"], data.dict(exclude_unset=True))
+        raw_dict = data.dict(exclude_unset=True)
+        # Normalize incoming camelCase fields
+        if "primaryImage" in raw_dict and "primary_image" not in raw_dict:
+            raw_dict["primary_image"] = raw_dict["primaryImage"]
+        if "image" in raw_dict and "primary_image" not in raw_dict:
+            raw_dict["primary_image"] = raw_dict["image"]
+        if "imageUrl" in raw_dict and "primary_image" not in raw_dict:
+            raw_dict["primary_image"] = raw_dict["imageUrl"]
+        if "dailyRate" in raw_dict and "daily_rate" not in raw_dict:
+            raw_dict["daily_rate"] = raw_dict["dailyRate"]
+        if "price" in raw_dict and "daily_rate" not in raw_dict:
+            raw_dict["daily_rate"] = raw_dict["price"]
+        if "pricePerDay" in raw_dict and "daily_rate" not in raw_dict:
+            raw_dict["daily_rate"] = raw_dict["pricePerDay"]
+        if "weeklyRate" in raw_dict and "weekly_rate" not in raw_dict:
+            raw_dict["weekly_rate"] = raw_dict["weeklyRate"]
+        if "monthlyRate" in raw_dict and "monthly_rate" not in raw_dict:
+            raw_dict["monthly_rate"] = raw_dict["monthlyRate"]
+        if "conditionGrade" in raw_dict and "condition_grade" not in raw_dict:
+            raw_dict["condition_grade"] = raw_dict["conditionGrade"]
+        if "availabilityStatus" in raw_dict and "availability_status" not in raw_dict:
+            raw_dict["availability_status"] = raw_dict["availabilityStatus"]
+        if "postalCode" in raw_dict and "pincode" not in raw_dict:
+            raw_dict["pincode"] = raw_dict["postalCode"]
+        if "pickupInstructions" in raw_dict and "pickup_instructions" not in raw_dict:
+            raw_dict["pickup_instructions"] = raw_dict["pickupInstructions"]
+        if "damageDetails" in raw_dict and "damage_details" not in raw_dict:
+            raw_dict["damage_details"] = raw_dict["damageDetails"]
+
+        updated = update_payernt_product(product_id, account["id"], raw_dict)
         if not updated:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found.")
         sanitized = _sanitize_payernt_product(updated, include_pin=True)

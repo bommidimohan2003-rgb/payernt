@@ -32,6 +32,7 @@ import { getOptimizedImageUrl } from "@/utils/images";
 import type { PayerntProduct } from "../types";
 import payerntApi from "../payerntApiService";
 import { VendorAvailabilityCalendar } from "./VendorAvailabilityCalendar";
+import { resolveProductImageUrl, resolveAllProductImages } from "../productUtils";
 
 export function LenderProductDetails({ productId: propId }: { productId?: string }) {
   const navigate = useNavigate();
@@ -43,6 +44,7 @@ export function LenderProductDetails({ productId: propId }: { productId?: string
   const [isEditingPrice, setIsEditingPrice] = useState(false);
   const [newPrice, setNewPrice] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [activePhotoIdx, setActivePhotoIdx] = useState(0);
 
   // Time-Slot & Availability Settings
   const [allowHalfDay, setAllowHalfDay] = useState(true);
@@ -236,32 +238,71 @@ export function LenderProductDetails({ productId: propId }: { productId?: string
       {/* Main Product Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Column: Image Gallery & Specs */}
-        <div className="lg:col-span-7 space-y-5">
-          <div className="relative aspect-video sm:aspect-4/3 rounded-2xl overflow-hidden bg-muted border border-border">
-            <img
-              src={getOptimizedImageUrl(product.images?.[0] || product.image || "/brand/placeholder.png")}
-              alt={product.title}
-              className="w-full h-full object-cover"
-            />
-            <div className="absolute top-3 left-3 flex flex-wrap gap-2">
-              {isApproved && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500 text-white text-[11px] font-extrabold shadow-md">
-                  <CheckCircle2 className="w-3 h-3" />
-                  Verified & Live
-                </span>
-              )}
-              {isUnderReview && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500 text-white text-[11px] font-extrabold shadow-md">
-                  <Clock className="w-3 h-3" />
-                  Under Admin Review
-                </span>
-              )}
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md text-white text-[11px] font-bold">
-                <Tag className="w-3 h-3" />
-                {product.category || "Gear"}
-              </span>
-            </div>
-          </div>
+        <div className="lg:col-span-7 space-y-4">
+          {(() => {
+            const allImgs = resolveAllProductImages(product);
+            const mainImg = allImgs[activePhotoIdx] || resolveProductImageUrl(product);
+
+            return (
+              <div className="space-y-2.5">
+                <div className="relative aspect-video sm:aspect-4/3 rounded-2xl overflow-hidden bg-secondary/60 border border-border flex items-center justify-center">
+                  {mainImg ? (
+                    <img
+                      src={getOptimizedImageUrl(mainImg) || mainImg}
+                      alt={product.title}
+                      className="w-full h-full object-cover object-center"
+                      onError={(e) => {
+                        (e.target as HTMLElement).style.display = "none";
+                      }}
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center text-muted-foreground p-6 text-center">
+                      <Package className="w-10 h-10 opacity-60 mb-1" />
+                      <span className="text-xs font-semibold">{product.category || "Gear"}</span>
+                    </div>
+                  )}
+                  <div className="absolute top-3 left-3 flex flex-wrap gap-2">
+                    {isApproved && (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500 text-white text-[11px] font-extrabold shadow-md">
+                        <CheckCircle2 className="w-3 h-3" />
+                        Verified & Live
+                      </span>
+                    )}
+                    {isUnderReview && (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500 text-white text-[11px] font-extrabold shadow-md">
+                        <Clock className="w-3 h-3" />
+                        Under Admin Review
+                      </span>
+                    )}
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md text-white text-[11px] font-bold">
+                      <Tag className="w-3 h-3" />
+                      {product.category || "Gear"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Thumbnails if multiple images exist */}
+                {allImgs.length > 1 && (
+                  <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+                    {allImgs.map((url, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setActivePhotoIdx(idx)}
+                        className={`h-14 w-14 rounded-xl overflow-hidden border-2 shrink-0 cursor-pointer transition-all ${
+                          activePhotoIdx === idx
+                            ? "border-foreground scale-102"
+                            : "border-border/60 opacity-70 hover:opacity-100"
+                        }`}
+                      >
+                        <img src={url} alt={`Photo ${idx + 1}`} className="w-full h-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Details Card */}
           <div className="p-5 rounded-2xl border border-border bg-card space-y-4">

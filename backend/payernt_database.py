@@ -1291,6 +1291,53 @@ def _normalize_payernt_product_dict(row: Dict[str, Any], include_pin: bool = Fal
         avail["blockedDates"] = clean_b
         clean["availability"] = avail
 
+    # Normalize image fields safely
+    images_raw = clean.get("images") or "[]"
+    images_list = []
+    if isinstance(images_raw, str):
+        try:
+            images_list = json.loads(images_raw)
+        except Exception:
+            images_list = [images_raw.strip()] if images_raw.strip() and not images_raw.strip().startswith("[") else []
+    elif isinstance(images_raw, (list, tuple)):
+        images_list = list(images_raw)
+
+    clean_images = []
+    for item in images_list:
+        if isinstance(item, str) and item.strip() and not item.strip().startswith("[") and not item.strip().startswith("{"):
+            clean_images.append(item.strip())
+        elif isinstance(item, dict) and item.get("url"):
+            clean_images.append(item["url"].strip())
+
+    prim = (
+        clean.get("primary_image")
+        or clean.get("primaryImage")
+        or clean.get("image")
+        or clean.get("imageUrl")
+        or clean.get("image_url")
+        or (clean_images[0] if clean_images else "")
+    )
+    if isinstance(prim, str):
+        prim = prim.strip()
+        if prim.startswith("[") or prim.startswith("{"):
+            prim = ""
+    else:
+        prim = ""
+
+    if prim and not clean_images:
+        clean_images = [prim]
+    elif not prim and clean_images:
+        prim = clean_images[0]
+
+    clean["primary_image"] = prim
+    clean["primaryImage"] = prim
+    clean["image"] = prim
+    clean["images"] = clean_images
+    clean["photos"] = [
+        {"id": f"photo-{i}", "url": url, "tag": "Front View" if i == 0 else f"Angle {i+1}", "isPrimary": (i == 0 or url == prim)}
+        for i, url in enumerate(clean_images)
+    ]
+
     return clean
 
 
@@ -1376,6 +1423,53 @@ def update_payernt_product(product_id: str, owner_id: str, updates: Dict[str, An
         "full_day_slot_enabled", "half_day_rate", "buffer_minutes"
     ]
 
+    # Normalize camelCase and alias fields
+    primary_candidate = (
+        updates.get("primary_image")
+        or updates.get("primaryImage")
+        or updates.get("image")
+        or updates.get("imageUrl")
+        or updates.get("image_url")
+    )
+    if primary_candidate and isinstance(primary_candidate, str) and primary_candidate.strip():
+        updates["primary_image"] = primary_candidate.strip()
+
+    if "conditionGrade" in updates and updates["conditionGrade"] is not None:
+        updates["condition_grade"] = updates["conditionGrade"]
+
+    if "availabilityStatus" in updates and updates["availabilityStatus"] is not None:
+        updates["availability_status"] = updates["availabilityStatus"]
+
+    if "dailyRate" in updates and updates["dailyRate"] is not None:
+        updates["daily_rate"] = int(updates["dailyRate"])
+    if "price" in updates and updates["price"] is not None:
+        updates["daily_rate"] = int(updates["price"])
+    if "pricePerDay" in updates and updates["pricePerDay"] is not None:
+        updates["daily_rate"] = int(updates["pricePerDay"])
+    if "weeklyRate" in updates and updates["weeklyRate"] is not None:
+        updates["weekly_rate"] = int(updates["weeklyRate"])
+    if "monthlyRate" in updates and updates["monthlyRate"] is not None:
+        updates["monthly_rate"] = int(updates["monthlyRate"])
+    if "postalCode" in updates and updates["postalCode"] is not None:
+        updates["pincode"] = str(updates["postalCode"])
+    if "pickupInstructions" in updates and updates["pickupInstructions"] is not None:
+        updates["pickup_instructions"] = str(updates["pickupInstructions"])
+
+    # Nested location object handling
+    if "location" in updates and isinstance(updates["location"], dict):
+        loc = updates["location"]
+        if loc.get("city"): updates["city"] = loc["city"]
+        if loc.get("area"): updates["area"] = loc["area"]
+        if loc.get("pincode") or loc.get("postalCode"): updates["pincode"] = loc.get("pincode") or loc.get("postalCode")
+        if loc.get("pickupInstructions"): updates["pickup_instructions"] = loc["pickupInstructions"]
+
+    # Nested condition object handling
+    if "condition" in updates and isinstance(updates["condition"], dict):
+        cond = updates["condition"]
+        if cond.get("grade"): updates["condition_grade"] = cond["grade"]
+        if cond.get("damageDetails") or cond.get("damageDescription"):
+            updates["damage_details"] = cond.get("damageDetails") or cond.get("damageDescription")
+
     # Normalize nested pricing if provided
     if "pricing" in updates and isinstance(updates["pricing"], dict):
         if "daily" in updates["pricing"]:
@@ -1386,11 +1480,6 @@ def update_payernt_product(product_id: str, owner_id: str, updates: Dict[str, An
             updates["weekly_rate"] = int(updates["pricing"]["weekly"])
         if "monthly" in updates["pricing"]:
             updates["monthly_rate"] = int(updates["pricing"]["monthly"])
-
-    if "dailyRate" in updates and updates["dailyRate"] is not None:
-        updates["daily_rate"] = int(updates["dailyRate"])
-    if "price" in updates and updates["price"] is not None:
-        updates["daily_rate"] = int(updates["price"])
 
     set_clauses = ["updated_at = %s"]
     params = [dt.now(timezone.utc).isoformat()]
@@ -1425,38 +1514,86 @@ def update_payernt_product(product_id: str, owner_id: str, updates: Dict[str, An
         params.append(feat_json)
 
     if "images" in updates:
-        img_json = json.dumps(updates["images"]) if isinstance(updates["images"], list) else str(updates["images"])
+        img_raw = updates["images"]
+        if isinstance(img_raw, list):
+            clean_imgs = [i.strip() for i in img_raw if isinstance(i, str) and i.strip() and not i.strip().startswith("[")]
+        elif isinstance(img_raw, str):
+            try:
+                parsed_imgs = json.loads(img_raw)
+                clean_imgs = [i.strip() for i in parsed_imgs if isinstance(i, str) and i.strip() and not i.strip().startswith("[")]
+            except Exception:
+                clean_imgs = [img_raw.strip()] if img_raw.strip() and not img_raw.strip().startswith("[") else []
+        else:
+            clean_imgs = []
+
+        img_json = json.dumps(clean_imgs)
         existing["images"] = img_json
         set_clauses.append("images = %s")
         params.append(img_json)
 
+        # If primary_image not explicitly updated but images was updated, set primary_image to first image
+        if "primary_image" not in updates and clean_imgs:
+            existing["primary_image"] = clean_imgs[0]
+            existing["primaryImage"] = clean_imgs[0]
+            set_clauses.append("primary_image = %s")
+            params.append(clean_imgs[0])
+
     params.extend([product_id, owner_id])
     try:
         execute_query(f"UPDATE payernt_products SET {', '.join(set_clauses)} WHERE id = %s AND owner_id = %s", tuple(params))
-        # Keep custom_products in sync
+        # Keep custom_products cleanly synchronized
         try:
-            execute_query(f"UPDATE custom_products SET {', '.join(set_clauses)} WHERE id = %s", tuple(params[:-1]))
-        except Exception:
-            pass
+            execute_query("""
+                UPDATE custom_products
+                SET title = %s, description = %s, price = %s, image = %s, category = %s,
+                    available = %s, status = %s
+                WHERE id = %s
+            """, (
+                existing.get("title") or existing.get("name"),
+                existing.get("description", ""),
+                existing.get("daily_rate", 500),
+                existing.get("primary_image", ""),
+                existing.get("category", "tech"),
+                1 if existing.get("available") else 0,
+                existing.get("status", "under_review"),
+                product_id,
+            ))
+        except Exception as sync_e:
+            logger.warning(f"Notice: custom_products sync: {sync_e}")
     except Exception as e:
         logger.warning(f"DB update error for payernt_product: {e}")
 
     MOCK_PAYERNT_PRODUCTS[product_id] = existing
     log_payernt_audit_event("PRODUCT_UPDATE", owner_id, {"productId": product_id, "fields": list(updates.keys())})
     invalidate_vendor_dashboard_cache(owner_id)
-    return existing
+    return _normalize_payernt_product_dict(existing, include_pin=True)
 
 
 def delete_payernt_product(product_id: str, owner_id: str) -> bool:
-    """Deletes or archives a vendor product listing."""
+    """Deletes or archives a vendor product listing with active booking protection."""
     existing = get_payernt_product_by_id(product_id, include_pin=True)
     if not existing:
         return False
     if existing.get("owner_id") != owner_id:
         raise PermissionError("You do not have permission to delete this product listing.")
 
+    # Guard: Prevent deletion if there is an active rental order
+    try:
+        active_booking = fetch_one("""
+            SELECT id FROM rental_security
+            WHERE product_id = %s AND status NOT IN ('completed', 'cancelled', 'rejected')
+            LIMIT 1
+        """, (product_id,))
+        if active_booking:
+            raise PermissionError("Cannot delete listing: An active rental order is currently in progress for this equipment.")
+    except PermissionError:
+        raise
+    except Exception as e:
+        logger.warning(f"Notice: active booking check during delete: {e}")
+
     try:
         execute_query("DELETE FROM payernt_products WHERE id = %s AND owner_id = %s", (product_id, owner_id))
+        execute_query("DELETE FROM custom_products WHERE id = %s", (product_id,))
     except Exception as e:
         logger.warning(f"DB delete error for payernt_product: {e}")
 
