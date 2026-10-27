@@ -566,6 +566,27 @@ def init_db(force: bool = False):
     add_index_safely("booking_cancellations", "idx_bc_lender", "lender_id")
     add_index_safely("booking_cancellations", "idx_bc_renter", "renter_id")
 
+    # Create rental_queue_actions table (Role-Based Milestone Progress Audit Trail)
+    execute_query("""
+        CREATE TABLE IF NOT EXISTS rental_queue_actions (
+            id VARCHAR(255) PRIMARY KEY,
+            booking_id VARCHAR(255) NOT NULL,
+            user_id VARCHAR(255) NOT NULL,
+            user_email VARCHAR(255) NOT NULL,
+            role VARCHAR(50) NOT NULL,
+            action VARCHAR(100) NOT NULL,
+            previous_status VARCHAR(50) NOT NULL,
+            new_status VARCHAR(50) NOT NULL,
+            timestamp VARCHAR(100) NOT NULL,
+            notes TEXT NULL,
+            details TEXT NULL
+        )
+    """)
+    add_index_safely("rental_queue_actions", "idx_rqa_booking", "booking_id")
+    add_index_safely("rental_queue_actions", "idx_rqa_user", "user_id")
+    add_index_safely("rental_queue_actions", "idx_rqa_role", "role")
+    add_index_safely("rental_queue_actions", "idx_rqa_timestamp", "timestamp")
+
     # Create cart_items table
     execute_query("""
         CREATE TABLE IF NOT EXISTS cart_items (
@@ -1237,6 +1258,7 @@ MOCK_USERS = {
 MOCK_OTPS = {}
 MOCK_ORDERS: Dict[str, Dict[str, Any]] = {}
 MOCK_BOOKING_CANCELLATIONS: Dict[str, Dict[str, Any]] = {}
+MOCK_RENTAL_QUEUE_ACTIONS: Dict[str, List[Dict[str, Any]]] = {}
 MOCK_CARTS = {}
 MOCK_WISHLISTS = {}
 MOCK_NOTIFICATIONS = {}
@@ -2266,6 +2288,8 @@ def broadcast_admin_event_safe(event_type: str, data: dict):
     except Exception:
         pass
 
+broadcast_admin_event = broadcast_admin_event_safe
+
 def update_order_booking_location(order_id: str, caller_email: str, location_data: dict) -> dict:
     """
     Updates booking location.
@@ -2808,6 +2832,103 @@ def update_order_queue_milestone(
 
     # Fetch and return updated record
     return fetch_one("SELECT * FROM orders WHERE id = %s", (b_id,)) or mock_order
+
+def record_rental_queue_action(
+    booking_id: str,
+    user_id: str,
+    user_email: str,
+    role: str,
+    action: str,
+    previous_status: str,
+    new_status: str,
+    timestamp: Optional[str] = None,
+    notes: Optional[str] = None,
+    details: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """
+    Saves an authoritative, auditable record of a role-authorized queue milestone action.
+    Stores responsible user ID, email, role, action, previous & new status, and ISO timestamp.
+    """
+    action_id = f"rqa_{uuid.uuid4().hex[:12]}"
+    now_iso = timestamp or dt.now(timezone.utc).isoformat()
+    dt_str = json.dumps(details) if isinstance(details, dict) else (str(details) if details else "")
+    rec = {
+        "id": action_id,
+        "booking_id": str(booking_id),
+        "user_id": str(user_id),
+        "user_email": str(user_email).strip().lower(),
+        "role": str(role).strip().lower(),
+        "action": str(action).strip().lower(),
+        "previous_status": str(previous_status),
+        "new_status": str(new_status),
+        "timestamp": now_iso,
+        "notes": notes or "",
+        "details": dt_str
+    }
+    b_id = str(booking_id).strip()
+    if b_id not in MOCK_RENTAL_QUEUE_ACTIONS:
+        MOCK_RENTAL_QUEUE_ACTIONS[b_id] = []
+    MOCK_RENTAL_QUEUE_ACTIONS[b_id].append(rec)
+
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    INSERT INTO rental_queue_actions (
+                        id, booking_id, user_id, user_email, role, action, previous_status, new_status, timestamp, notes, details
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    action_id, b_id, str(user_id), str(user_email).strip().lower(),
+                    str(role).strip().lower(), str(action).strip().lower(),
+                    str(previous_status), str(new_status), now_iso, notes or "", dt_str
+                ))
+            conn.commit()
+        except Exception as e:
+            logger.warning(f"Database error writing rental_queue_action: {e}")
+            if conn:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+        finally:
+            conn.close()
+
+    try:
+        from payernt_database import record_payernt_audit_log
+        record_payernt_audit_log(
+            user_id=str(user_id),
+            action=f"QUEUE_{str(action).upper()}",
+            details=f"Booking #{b_id} transitioned from '{previous_status}' to '{new_status}' by role '{role}' ({user_email})",
+            account_type="paye₹nt" if role in ("lender", "vendor") else "customer"
+        )
+    except Exception:
+        pass
+
+    return rec
+
+def get_rental_queue_actions(booking_id: str) -> List[Dict[str, Any]]:
+    """Retrieves all historical queue actions and milestone completions for a booking."""
+    if not booking_id:
+        return []
+    b_id = str(booking_id).strip()
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT * FROM rental_queue_actions
+                    WHERE booking_id = %s
+                    ORDER BY timestamp ASC
+                """, (b_id,))
+                rows = cursor.fetchall()
+                if rows:
+                    return rows
+        except Exception as e:
+            logger.warning(f"Database error reading rental_queue_actions: {e}")
+        finally:
+            conn.close()
+    return MOCK_RENTAL_QUEUE_ACTIONS.get(b_id, [])
 
 def get_booking_cancellation(booking_id: str) -> Optional[Dict[str, Any]]:
     """Retrieves the cancellation record for a given booking ID."""

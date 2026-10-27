@@ -1843,8 +1843,8 @@ def process_lender_booking_cancellation(
     )
     
     human_reason = VALID_CANCELLATION_REASONS.get(code, code)
-    if feedback:
-        human_reason = f"{human_reason} (Feedback: {feedback})"
+    if clean_fb:
+        human_reason = f"{human_reason} (Feedback: {clean_fb})"
     try:
         notify_booking_event(
             booking_id=booking_id,
@@ -2566,19 +2566,8 @@ def vendor_advance_queue_endpoint(
     """
     Vendor / Lender Live Rental Queue advance endpoint:
     Guarantees atomic transition between the 8 milestones and persists timestamps.
-    Enforces JWT authentication, role/owner authorization, and robust error logging.
+    Delegates to the authoritative _execute_queue_milestone_transition engine.
     """
-    from database import (
-        update_order_queue_milestone,
-        MOCK_ORDERS,
-        MOCK_CUSTOM_PRODUCTS,
-        fetch_one,
-        create_notification,
-        get_user,
-    )
-    from payernt_database import get_payernt_account_by_email, get_payernt_product_by_id
-
-    # 1. Authenticate caller
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -2594,185 +2583,47 @@ def vendor_advance_queue_endpoint(
         )
 
     caller_email = payload["sub"].strip().lower()
-    caller_role = str(payload.get("role") or "").strip().lower()
-    is_admin = caller_role in ("admin", "superadmin")
-    if not is_admin:
-        u_rec = get_user(caller_email) or {}
-        if str(u_rec.get("role") or "").lower() in ("admin", "superadmin"):
-            is_admin = True
 
-    # 2. Retrieve order / booking
-    order = fetch_one("SELECT * FROM orders WHERE id = %s", (booking_id,))
-    if not order:
-        order = MOCK_ORDERS.get(booking_id)
-    if not order:
-        for mo in MOCK_ORDERS.values():
-            if mo.get("id") == booking_id or mo.get("productId") == booking_id:
-                order = mo
-                break
-
-    if not order:
-        logger.warning(f"[QueueAdvance] Booking #{booking_id} not found (requested by {caller_email})")
-        raise HTTPException(status_code=404, detail=f"Booking #{booking_id} not found.")
-
-    curr_status = str(order.get("status") or "").strip().lower()
-    if curr_status in ("cancelled", "canceled"):
-        logger.warning(f"[QueueAdvance] Cannot advance cancelled booking #{booking_id} (requested by {caller_email})")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Booking #{booking_id} is cancelled. Active rental queue workflows and milestone transitions are stopped."
-        )
-
-    cust_email = str(order.get("user_email") or order.get("userEmail") or "").strip().lower()
-    pid = str(order.get("product_id") or order.get("productId") or "").strip()
-
-    # Resolve lender email
-    lender_email = ""
-    if pid:
-        try:
-            pprod = get_payernt_product_by_id(pid)
-            if pprod:
-                lender_email = str(pprod.get("owner_id") or pprod.get("user_email") or "").strip().lower()
-        except Exception:
-            pass
-        if not lender_email:
-            try:
-                cprod = fetch_one("SELECT * FROM custom_products WHERE id = %s", (pid,))
-                if not cprod:
-                    cprod = MOCK_CUSTOM_PRODUCTS.get(pid)
-                if cprod:
-                    lender_email = str(cprod.get("user_email") or cprod.get("owner_id") or "").strip().lower()
-            except Exception:
-                pass
-    if not lender_email:
-        lender_email = str(order.get("lender_email") or order.get("vendor_id") or order.get("vendor_email") or "").strip().lower()
-
-    is_renter = (caller_email == cust_email)
-    is_lender = (caller_email == lender_email) if lender_email else False
-    if not is_lender and caller_email:
-        if lender_email and (caller_email in lender_email or lender_email in caller_email):
-            is_lender = True
-        elif not lender_email:
-            # If product lender is not explicitly set, check if caller is registered vendor
-            vendor_acc = get_payernt_account_by_email(caller_email)
-            if vendor_acc:
-                is_lender = True
-
-    if not is_renter and not is_lender and not is_admin:
-        logger.warning(f"[QueueAdvance] Unauthorized access attempt on booking #{booking_id} by {caller_email}")
-        raise HTTPException(status_code=403, detail="Forbidden: You are not authorized for this booking.")
-
-    milestone = data.milestone.strip().lower()
-    now_iso = datetime.now(timezone.utc).isoformat()
-    ts_updates = {}
+    # Delegate to unified authoritative engine in main.py
+    from main import _execute_queue_milestone_transition
+    res = _execute_queue_milestone_transition(
+        order_id=booking_id,
+        milestone=data.milestone,
+        caller_email=caller_email,
+        notes=data.notes,
+        checklist=data.checklist
+    )
 
     try:
-        if milestone in ("order_confirmed", "confirmed", "accepted"):
-            new_status = "order_confirmed"
-            if not order.get("confirmed_at") and not order.get("confirmedAt"):
-                ts_updates["confirmed_at"] = now_iso
-            notify_booking_event(booking_id, "booking_confirmed", actor_email=caller_email)
-
-        elif milestone in ("ready_for_pickup", "ready"):
-            if not is_lender and not is_admin:
-                raise HTTPException(status_code=403, detail="Forbidden: Only the lender or admin can mark gear as ready for pickup.")
-            new_status = "ready_for_pickup"
-            if not order.get("ready_for_pickup_at") and not order.get("readyForPickupAt"):
-                ts_updates["ready_for_pickup_at"] = now_iso
-            notify_booking_event(booking_id, "ready_for_pickup", actor_email=caller_email)
-
-        elif milestone in ("picked_up", "rental_in_progress", "active"):
-            new_status = "rental_in_progress"
-            existing_pu = order.get("picked_up_at") or order.get("pickedUpAt")
-            if not existing_pu:
-                ts_updates["picked_up_at"] = now_iso
-                ts_updates["rental_started_at"] = now_iso
-            if not order.get("ready_for_pickup_at") and not order.get("readyForPickupAt"):
-                ts_updates["ready_for_pickup_at"] = now_iso
-            notify_booking_event(booking_id, "picked_up", actor_email=caller_email)
-
-        elif milestone in ("return_initiated",):
-            if not is_renter and not is_admin:
-                raise HTTPException(status_code=403, detail="Forbidden: Only the renter or admin can initiate gear return.")
-            new_status = "return_initiated"
-            if not order.get("return_initiated_at") and not order.get("returnInitiatedAt"):
-                ts_updates["return_initiated_at"] = now_iso
-            notify_booking_event(booking_id, "return_initiated", actor_email=caller_email)
-
-        elif milestone in ("handed_back", "returned"):
-            new_status = "handed_back"
-            existing_hb = order.get("handed_back_at") or order.get("handedBackAt")
-            if not existing_hb:
-                ts_updates["handed_back_at"] = now_iso
-            if not order.get("awaiting_inspection_at") and not order.get("awaitingInspectionAt"):
-                ts_updates["awaiting_inspection_at"] = now_iso
-            if not order.get("return_initiated_at") and not order.get("returnInitiatedAt"):
-                ts_updates["return_initiated_at"] = now_iso
-            notify_booking_event(booking_id, "handed_back", actor_email=caller_email)
-
-        elif milestone in ("awaiting_inspection", "inspection"):
-            if not is_lender and not is_admin:
-                raise HTTPException(status_code=403, detail="Forbidden: Only the lender or admin can manage inspection.")
-            new_status = "awaiting_inspection"
-            if not order.get("awaiting_inspection_at") and not order.get("awaitingInspectionAt"):
-                ts_updates["awaiting_inspection_at"] = now_iso
-            if not order.get("handed_back_at") and not order.get("handedBackAt"):
-                ts_updates["handed_back_at"] = now_iso
-            notify_booking_event(booking_id, "awaiting_inspection", actor_email=caller_email)
-
-        elif milestone in ("completed",):
-            if not is_lender and not is_admin:
-                raise HTTPException(status_code=403, detail="Forbidden: Only the lender or admin can finalize and complete the rental.")
-            new_status = "completed"
-            if not order.get("completed_at") and not order.get("completedAt"):
-                ts_updates["completed_at"] = now_iso
-            if not order.get("handed_back_at") and not order.get("handedBackAt"):
-                ts_updates["handed_back_at"] = now_iso
-            if not order.get("awaiting_inspection_at") and not order.get("awaitingInspectionAt"):
-                ts_updates["awaiting_inspection_at"] = now_iso
-            try:
-                from payernt_database import complete_rental_and_credit_vendor
-                complete_rental_and_credit_vendor(booking_id)
-            except Exception as w_err:
-                logger.info(f"Wallet settlement notice for order {booking_id}: {w_err}")
-            notify_booking_event(booking_id, "completed", actor_email=caller_email)
-        else:
-            raise HTTPException(status_code=400, detail=f"Unrecognized milestone: '{milestone}'.")
-
-        updated = update_order_queue_milestone(booking_id, new_status, ts_updates, data.notes) or {}
-        all_timestamps = {
-            "confirmed_at": updated.get("confirmed_at") or updated.get("confirmedAt"),
-            "ready_for_pickup_at": updated.get("ready_for_pickup_at") or updated.get("readyForPickupAt"),
-            "picked_up_at": updated.get("picked_up_at") or updated.get("pickedUpAt"),
-            "return_initiated_at": updated.get("return_initiated_at") or updated.get("returnInitiatedAt"),
-            "handed_back_at": updated.get("handed_back_at") or updated.get("handedBackAt"),
-            "awaiting_inspection_at": updated.get("awaiting_inspection_at") or updated.get("awaitingInspectionAt"),
-            "completed_at": updated.get("completed_at") or updated.get("completedAt"),
-        }
-
-        logger.info(f"[QueueAdvance] Successfully advanced booking #{booking_id} to '{new_status}' by {caller_email}")
         invalidate_vendor_dashboard_cache()
+    except Exception:
+        pass
 
-        return {
-            "success": True,
-            "message": f"Queue advanced to {new_status}",
-            "status": new_status,
-            "milestone": milestone,
-            "bookingId": booking_id,
-            "id": booking_id,
-            "timestamps": all_timestamps,
-            "all_timestamps": all_timestamps,
-            "order": updated
-        }
+    return res
 
-    except HTTPException:
-        raise
-    except Exception as exc:
-        logger.error(f"[QueueAdvance] Error advancing booking #{booking_id} to '{milestone}': {exc}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to advance rental queue: {str(exc)}"
-        )
+
+@payernt_router.get("/bookings/{booking_id}/queue-actions")
+@payernt_router.get("/paye₹nt/bookings/{booking_id}/queue-actions")
+@payernt_router.get("/payernt/bookings/{booking_id}/queue-actions")
+def get_payernt_queue_actions_endpoint(
+    booking_id: str,
+    authorization: Optional[str] = Header(None)
+):
+    """Returns the persistent audit log of all milestone completions for a booking."""
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Authentication required.")
+    token = authorization.split(" ")[1].strip()
+    payload = decode_access_token(token, expected_type="access")
+    if not payload or "sub" not in payload:
+        raise HTTPException(status_code=401, detail="Invalid token.")
+
+    from database import get_rental_queue_actions
+    actions = get_rental_queue_actions(booking_id)
+    return {
+        "success": True,
+        "bookingId": booking_id,
+        "actions": actions
+    }
 
 
 @payernt_router.post("/bookings/{booking_id}/ready-for-pickup")

@@ -1254,3 +1254,46 @@ Safely migrated `orders` and `deliveries` tables in `backend/database.py` with b
 4. **Behavior Preservation**:
    - Kept authoritative booking creation timestamp display ("Booked On: DD-MM-YYYY, HH:MM AM/PM") intact in both collapsed header and expanded details.
    - Maintained all existing cancellation safeguards and timer freeze logic.
+
+---
+
+## 21. Live Rental Queue Unified Role-Aware Milestone Engine & Audit Trail
+
+**Status**: COMPLETED & VERIFIED  
+**Date**: October 27, 2026  
+**Test Suite**: `backend/tests/test_live_rental_queue.py` (3/3 passed, 100% pass rate)  
+**Frontend Compilation**: `npm run build` (0 errors, 100% clean)
+
+### 1. Unified Transition Engine & Authorization
+- **Single Source of Truth (`_execute_queue_milestone_transition`)**: Unified customer (`/api/orders/{id}/advance-queue`) and lender/vendor (`/api/payernt/bookings/{id}/queue-advance`) endpoints into one authoritative transition engine in `backend/main.py`.
+- **Role-Aware Milestone Enforcement**:
+  - `ready_for_pickup`: Strictly lender or admin only. Reconciled with Payent's initial booking status (`active` before pickup) so newly created bookings smoothly transition to `ready_for_pickup`.
+  - `picked_up` / `rental_in_progress`: Direct pickup or delivery partner verification; starts the live rental timer only upon confirmed pickup.
+  - `return_initiated`: Renter or admin only.
+  - `handed_back`: Lender or delivery partner only; freezes and stops the live timer at the authoritative handover timestamp.
+  - `awaiting_inspection`: Lender or owner only; requires previous status to be `handed_back`.
+  - `completed`: Lender or owner only; idempotent completion, credits vendor wallet, and marks rental finalized.
+  - Cancelled bookings strictly reject queue progression with `400 Bad Request`.
+
+### 2. Role-Based Milestone Action Audit Trail
+- **Database Table (`rental_queue_actions`)**:
+  - `id`: VARCHAR(255) PRIMARY KEY
+  - `booking_id`: VARCHAR(255) indexed
+  - `user_id`: VARCHAR(255) indexed
+  - `user_email`: VARCHAR(255)
+  - `role`: VARCHAR(50) indexed
+  - `action`: VARCHAR(100)
+  - `previous_status`: VARCHAR(50)
+  - `new_status`: VARCHAR(50)
+  - `timestamp`: VARCHAR(100) indexed
+  - `notes`: TEXT NULL
+  - `details`: TEXT NULL (checklist items, serial inspection notes)
+- **Memory Fallback**: Added `MOCK_RENTAL_QUEUE_ACTIONS` dictionary in `backend/database.py` with seamless persistence.
+- **Audit Query Endpoints**:
+  - `GET /api/orders/{id}/queue-actions` & `GET /api/bookings/{id}/queue-actions`
+  - `GET /api/payernt/bookings/{id}/queue-actions`
+  - Returns chronological list of all actor transitions and verification logs.
+
+### 3. Stability & Import Hardening
+- Replaced invalid import of `broadcast_admin_event` from `database` in `backend/main.py` and provided defensive `broadcast_admin_event_safe` alias in `backend/database.py`.
+- Idempotent finalization handling for `completed` milestones allowing subsequent audit notes and admin verifications without `400 Bad Request` conflicts.
