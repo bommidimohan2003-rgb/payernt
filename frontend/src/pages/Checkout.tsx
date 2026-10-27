@@ -306,17 +306,9 @@ export default function Checkout() {
     return user?.address ? `${user.address}${user.city ? `, ${user.city}` : ""}` : "";
   }, [fulfillmentMethod, selectedAddress, customLocation, user]);
 
-  // Address validation
+  // Address validation (Full Name and Mobile Number are automatically taken from user account)
   const validateAddressForm = () => {
     const errs: Record<string, string> = {};
-    if (!fullName.trim() || fullName.trim().length < 2) {
-      errs.fullName = "Full name is required (at least 2 characters).";
-    }
-    const cleanPh = phone.replace(/\D/g, "");
-    const normalizedPh = (cleanPh.length === 12 && cleanPh.startsWith("91")) ? cleanPh.slice(2) : cleanPh;
-    if (!normalizedPh || normalizedPh.length !== 10) {
-      errs.phone = "Valid 10-digit mobile number is required.";
-    }
     if (!flatHouse.trim()) {
       errs.flatHouse = "House / Flat / Block number is required.";
     }
@@ -351,11 +343,17 @@ export default function Checkout() {
       return;
     }
 
+    const effectiveFullName = (fullName.trim() || user?.fullName || (user as any)?.name || "Valued Customer").trim();
+    const rawPhone = (phone || user?.phone || (user as any)?.phoneNumber || "").replace(/\D/g, "");
+    const effectivePhone = (rawPhone.length === 12 && rawPhone.startsWith("91"))
+      ? rawPhone.slice(2)
+      : (rawPhone.slice(-10) || "9876543210");
+
     setIsSavingAddress(true);
     try {
       const saved = await api.saveUserAddress({
-        fullName: fullName.trim(),
-        phone: phone.replace(/\D/g, "").slice(-10),
+        fullName: effectiveFullName,
+        phone: effectivePhone,
         flatHouse: flatHouse.trim(),
         streetArea: streetArea.trim(),
         landmark: landmark.trim(),
@@ -961,47 +959,22 @@ export default function Checkout() {
                 {/* Address Form */}
                 {(showAddressForm || savedAddresses.length === 0) && (
                   <form onSubmit={handleSaveAddress} className="space-y-4">
-                    <div className="grid sm:grid-cols-2 gap-4">
-                      <div>
-                        <Input
-                          label="Full Name *"
-                          placeholder="Recipient Full Name"
-                          value={fullName}
-                          onChange={(e) => {
-                            setFullName(e.target.value);
-                            if (addressErrors.fullName) {
-                              setAddressErrors((prev) => ({ ...prev, fullName: "" }));
-                            }
-                          }}
-                          required
-                        />
-                        {addressErrors.fullName && (
-                          <p className="text-[11px] text-destructive font-medium mt-1">
-                            {addressErrors.fullName}
-                          </p>
+                    {/* Account Contact Information Summary */}
+                    <div className="flex items-center justify-between text-xs bg-secondary/50 border border-border/70 rounded-xl px-3.5 py-2.5 text-muted-foreground">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-foreground">
+                          {user?.fullName || (user as any)?.name || "Recipient"}
+                        </span>
+                        {(user?.phone || phone) && (
+                          <>
+                            <span>•</span>
+                            <span className="font-mono">{user?.phone || phone}</span>
+                          </>
                         )}
                       </div>
-
-                      <div>
-                        <Input
-                          label="Mobile Number (10 digits) *"
-                          placeholder="e.g. 9876543210"
-                          value={phone}
-                          onChange={(e) => {
-                            const val = e.target.value.replace(/\D/g, "").slice(0, 10);
-                            setPhone(val);
-                            if (addressErrors.phone) {
-                              setAddressErrors((prev) => ({ ...prev, phone: "" }));
-                            }
-                          }}
-                          required
-                        />
-                        {addressErrors.phone && (
-                          <p className="text-[11px] text-destructive font-medium mt-1">
-                            {addressErrors.phone}
-                          </p>
-                        )}
-                      </div>
+                      <span className="text-[11px] text-muted-foreground">
+                        Linked from account
+                      </span>
                     </div>
 
                     <div className="grid sm:grid-cols-2 gap-4">

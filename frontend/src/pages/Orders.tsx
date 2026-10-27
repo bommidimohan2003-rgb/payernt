@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { toast } from "sonner";
 import {
   Package,
@@ -193,6 +193,7 @@ export default function Orders() {
   // Filter & Selected Booking View State (Expanded Booking Card in History)
   const [activeFilter, setActiveFilter] = useState<BookingFilter>("all");
   const [expandedBookingId, setExpandedBookingId] = useState<string | null>(null);
+  const isFetchingOrdersRef = useRef<boolean>(false);
 
   const toggleBookingDetails = useCallback((orderId: string | number) => {
     const idStr = String(orderId);
@@ -288,6 +289,7 @@ export default function Orders() {
   };
 
   const loadOrders = useCallback(() => {
+    if (isFetchingOrdersRef.current) return;
     const currentToken = storage.get<string | null>(STORAGE_KEYS.token, null);
     if (!currentToken) {
       const localOrders = storage.get<Order[]>(STORAGE_KEYS.orders, [INITIAL_SAMPLE_ORDER]);
@@ -295,6 +297,7 @@ export default function Orders() {
       setLoading(false);
       return;
     }
+    isFetchingOrdersRef.current = true;
     setErrorState(null);
     api
       .getOrders(currentToken)
@@ -309,7 +312,10 @@ export default function Orders() {
         const localOrders = storage.get<Order[]>(STORAGE_KEYS.orders, [INITIAL_SAMPLE_ORDER]);
         setOrders(localOrders.length > 0 ? localOrders : [INITIAL_SAMPLE_ORDER]);
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        isFetchingOrdersRef.current = false;
+        setLoading(false);
+      });
   }, []);
 
   useEffect(() => {
@@ -331,10 +337,12 @@ export default function Orders() {
     window.addEventListener("payent_orders_updated", handleUpdate);
     window.addEventListener("payent_queue_updated", handleUpdate);
 
-    // Periodic live sync for active rentals across renter/lender tabs
+    // Periodic live sync for active rentals across renter/lender tabs (only when page is active)
     const pollTimer = setInterval(() => {
-      loadOrders();
-    }, 6000);
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        loadOrders();
+      }
+    }, 20000);
 
     return () => {
       window.removeEventListener("payent_orders_updated", handleUpdate);

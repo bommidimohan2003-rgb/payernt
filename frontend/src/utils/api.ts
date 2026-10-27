@@ -63,7 +63,7 @@ function parseApiError(data: unknown, fallback: string): string {
 export async function fetchWithTimeout(
   url: string,
   options: RequestInit & { timeoutMs?: number } = {},
-  defaultTimeoutMs = 8000
+  defaultTimeoutMs = 15000
 ): Promise<Response> {
   const timeoutMs = options.timeoutMs ?? defaultTimeoutMs;
   const controller = new AbortController();
@@ -862,7 +862,7 @@ export const api = {
     }
     options.headers = headers;
 
-    const timeout = options.timeoutMs ?? 8000;
+    const timeout = options.timeoutMs ?? 15000;
     let res = await fetchWithTimeout(url, options, timeout);
 
     if (
@@ -991,55 +991,63 @@ export const api = {
     return getCachedOrFetch<Order[]>(
       "user_orders",
       async () => {
-        const res = await this.fetchWithAuth(`${API_BASE}/api/orders`, {
-          method: "GET",
-        });
-        if (!res.ok) return [];
-        const data = await res.json();
-        const rawOrders = Array.isArray(data) ? data : [];
-        const normalized = rawOrders.map((o: Record<string, unknown>) => {
-          const pid = String(o.productId || o.product_id || "");
-          const title = String(o.productTitle || o.product_title || "Gear Rental");
-          const img = String(
-            o.productImage ||
-              o.product_image ||
-              "",
-          );
-          const start = String(o.startDate || o.start_date || "Today");
-          const end = String(o.endDate || o.end_date || "Tomorrow");
-          const created = String(
-            o.createdAt || o.created_at || (o as any).requestDate || (o as any).request_date || "",
-          );
-          return {
-            id: String(o.id || ""),
-            productId: pid,
-            product_id: pid,
-            productTitle: title,
-            product_title: title,
-            productImage: img,
-            product_image: img,
-            startDate: start,
-            start_date: start,
-            endDate: end,
-            end_date: end,
-            total: Number(o.total || 0),
-            status: (o.status as Order["status"]) || "active",
-            category: String(o.category || ""),
-            createdAt: created,
-            created_at: created,
-            deliveryMethod: (o.deliveryMethod || o.delivery_method || "delivery") as string,
-            deliveryAddress: (o.deliveryAddress || o.delivery_address || "") as string,
-            pickupLocation: (o.pickupLocation || o.pickup_location || "") as string,
-            customLocation: (o.customLocation || o.custom_location || "") as string,
-            locationDirections: (o.locationDirections || o.location_directions || "") as string,
-            latitude: (o.latitude ?? o.location_latitude ?? null) as number | null,
-            longitude: (o.longitude ?? o.location_longitude ?? null) as number | null,
-            mapUrl: (o.mapUrl || o.map_url || "") as string,
-            locationChangeRequest: (o.locationChangeRequest || o.location_change_request || null) as any,
-          };
-        }) as Order[];
-        storage.set(STORAGE_KEYS.orders, normalized);
-        return normalized;
+        try {
+          const res = await this.fetchWithAuth(`${API_BASE}/api/orders`, {
+            method: "GET",
+            timeoutMs: 15000,
+          });
+          if (!res.ok) {
+            return storage.get<Order[]>(STORAGE_KEYS.orders, []);
+          }
+          const data = await res.json();
+          const rawOrders = Array.isArray(data) ? data : [];
+          const normalized = rawOrders.map((o: Record<string, unknown>) => {
+            const pid = String(o.productId || o.product_id || "");
+            const title = String(o.productTitle || o.product_title || "Gear Rental");
+            const img = String(
+              o.productImage ||
+                o.product_image ||
+                "",
+            );
+            const start = String(o.startDate || o.start_date || "Today");
+            const end = String(o.endDate || o.end_date || "Tomorrow");
+            const created = String(
+              o.createdAt || o.created_at || (o as any).requestDate || (o as any).request_date || "",
+            );
+            return {
+              id: String(o.id || ""),
+              productId: pid,
+              product_id: pid,
+              productTitle: title,
+              product_title: title,
+              productImage: img,
+              product_image: img,
+              startDate: start,
+              start_date: start,
+              endDate: end,
+              end_date: end,
+              total: Number(o.total || 0),
+              status: (o.status as Order["status"]) || "active",
+              category: String(o.category || ""),
+              createdAt: created,
+              created_at: created,
+              deliveryMethod: (o.deliveryMethod || o.delivery_method || "delivery") as string,
+              deliveryAddress: (o.deliveryAddress || o.delivery_address || "") as string,
+              pickupLocation: (o.pickupLocation || o.pickup_location || "") as string,
+              customLocation: (o.customLocation || o.custom_location || "") as string,
+              locationDirections: (o.locationDirections || o.location_directions || "") as string,
+              latitude: (o.latitude ?? o.location_latitude ?? null) as number | null,
+              longitude: (o.longitude ?? o.location_longitude ?? null) as number | null,
+              mapUrl: (o.mapUrl || o.map_url || "") as string,
+              locationChangeRequest: (o.locationChangeRequest || o.location_change_request || null) as any,
+            };
+          }) as Order[];
+          storage.set(STORAGE_KEYS.orders, normalized);
+          return normalized;
+        } catch (err) {
+          console.warn("[API] getOrders request notice, falling back to local storage:", err);
+          return storage.get<Order[]>(STORAGE_KEYS.orders, []);
+        }
       },
       { ttlMs: 15000, userIsolated: true, staleWhileRevalidate: true }
     );
@@ -1179,6 +1187,7 @@ export const api = {
         "Content-Type": "application/json",
       },
       body: JSON.stringify(payload),
+      timeoutMs: 30000,
     });
 
     if (!res.ok) {
