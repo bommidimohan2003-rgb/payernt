@@ -84,10 +84,10 @@ function Nav4DockItem({
         onFocus={() => setIsHovered(true)}
         onBlur={() => setIsHovered(false)}
         onClick={handleClick}
-        className={`relative flex items-center justify-center rounded-2xl transition-all duration-200 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary shrink-0 ${
+        className={`relative flex items-center justify-center rounded-2xl transition-all duration-200 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring shrink-0 ${
           item.isActive
-            ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-950 shadow-md"
-            : "hover:bg-black/5 dark:hover:bg-white/10 text-neutral-700 hover:text-neutral-950 dark:text-neutral-300 dark:hover:text-white"
+            ? "bg-accent-primary text-white shadow-md font-bold"
+            : "hover:bg-secondary text-text-secondary hover:text-text-primary"
         }`}
         aria-label={item.label}
         aria-current={item.isActive ? "page" : undefined}
@@ -96,7 +96,7 @@ function Nav4DockItem({
         {item.isActive && (
           <motion.span
             layoutId="nav4-active-pill"
-            className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-4 sm:w-5 h-1 sm:h-1 rounded-full bg-neutral-900 dark:bg-white"
+            className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-4 sm:w-5 h-1 sm:h-1 rounded-full bg-accent-primary"
             transition={{ type: "spring", stiffness: 350, damping: 30 }}
           />
         )}
@@ -105,7 +105,7 @@ function Nav4DockItem({
           {item.icon}
 
           {item.badge !== undefined && item.badge !== 0 && (
-            <span className="absolute -top-1.5 -right-1.5 px-1.5 min-w-[16px] h-[16px] rounded-full bg-neutral-900 text-white dark:bg-white dark:text-neutral-950 text-[9px] font-bold flex items-center justify-center shadow-md pointer-events-none z-20">
+            <span className="absolute -top-1.5 -right-1.5 px-1.5 min-w-[16px] h-[16px] rounded-full bg-destructive text-white text-[9px] font-bold flex items-center justify-center shadow-md pointer-events-none z-20">
               {item.badge}
             </span>
           )}
@@ -290,7 +290,7 @@ export function Navigation4({
           isHovered.set(0);
           mouseX.set(Infinity);
         }}
-        className="pointer-events-auto py-1.5 sm:py-2 px-3 sm:px-5 md:px-7 rounded-2xl bg-white/92 dark:bg-[#0D151D]/95 backdrop-blur-2xl border-2 border-neutral-300 dark:border-neutral-700 shadow-xl shadow-black/20 dark:shadow-black/80 flex items-center justify-center gap-1 sm:gap-2.5 md:gap-3.5 w-auto min-w-[290px] sm:min-w-[360px] md:min-w-[420px] max-w-[calc(100vw-1rem)] overflow-visible"
+        className="pointer-events-auto py-1.5 sm:py-2 px-3 sm:px-5 md:px-7 rounded-2xl bg-surface-navigation/95 backdrop-blur-2xl border border-border shadow-elevation-2 flex items-center justify-center gap-1 sm:gap-2.5 md:gap-3.5 w-auto min-w-[290px] sm:min-w-[360px] md:min-w-[420px] max-w-[calc(100vw-1rem)] overflow-visible transition-colors duration-200"
       >
         {/* The 5 Main Items in exact required order */}
         <div className="flex items-center justify-between sm:justify-around w-full gap-1.5 sm:gap-2.5 md:gap-4 shrink-0">

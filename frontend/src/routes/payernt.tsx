@@ -62,7 +62,7 @@ function PayerntLayout() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f8f9fa] dark:bg-[#07090e] text-neutral-900 dark:text-foreground flex flex-col font-sans selection:bg-neutral-200 dark:selection:bg-neutral-800 selection:text-neutral-900 dark:selection:text-white transition-colors duration-200">
+    <div className="min-h-screen bg-background text-foreground flex flex-col font-sans selection:bg-primary/20 selection:text-foreground transition-colors duration-200">
       {/* Sticky Minimal Payernt Navbar */}
       <PayerntNavbar
         pendingRequestsCount={stats.pendingRequestsCount}

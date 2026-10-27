@@ -66,10 +66,10 @@ export function Navbar() {
           "sticky top-0 z-40 w-full transition-all duration-300",
           pathname === "/" && "-mb-16 sm:-mb-[68px]",
           scrolled
-            ? "bg-white/90 dark:bg-[#05090D]/90 backdrop-blur-xl shadow-xs"
+            ? "bg-surface-navigation/90 backdrop-blur-xl shadow-elevation-1 border-b border-border"
             : pathname === "/"
               ? "bg-transparent shadow-none"
-              : "bg-white/80 dark:bg-[#05090D]/80 backdrop-blur-xl"
+              : "bg-surface-navigation/80 backdrop-blur-xl border-b border-border/80"
         )}
       >
         <div className="mx-auto flex h-16 sm:h-[68px] w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
@@ -95,7 +95,7 @@ export function Navbar() {
                 onClick={toggle}
                 aria-label="Toggle Color Theme"
                 title={theme === "dark" ? tCommon.switchToLight : tCommon.switchToDark}
-                className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10 text-neutral-700 hover:text-neutral-950 dark:text-neutral-300 dark:hover:text-white border border-black/5 dark:border-white/10 flex items-center justify-center transition-all cursor-pointer shrink-0 active:scale-96"
+                className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-secondary/80 hover:bg-secondary text-text-secondary hover:text-text-primary border border-border flex items-center justify-center transition-all cursor-pointer shrink-0 active:scale-96 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 {theme === "dark" ? (
                   <Sun className="h-4 w-4 sm:h-[17px] sm:w-[17px] stroke-[1.6]" />

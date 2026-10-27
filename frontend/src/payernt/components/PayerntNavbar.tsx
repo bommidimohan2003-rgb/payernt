@@ -79,7 +79,7 @@ export function PayerntNavbar({
 
   return (
     <>
-      <header className="sticky top-0 z-40 w-full border-b border-neutral-200/60 dark:border-white/[0.06] bg-white/70 dark:bg-[#07090e]/75 backdrop-blur-2xl transition-colors duration-200">
+      <header className="sticky top-0 z-40 w-full border-b border-border bg-surface-navigation/85 backdrop-blur-2xl shadow-elevation-1 transition-colors duration-200">
         <div className="w-full px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           {/* Left: Brand Name Only (No Logo, No Online Pill) */}
           <div className="flex items-center">
@@ -90,7 +90,7 @@ export function PayerntNavbar({
               title={isHome ? "Return to Gateway (Choose Experience)" : "Payernt Home"}
               aria-label={isHome ? "Return to Gateway (Choose Experience)" : "Payernt Home"}
             >
-              <span className="font-extrabold tracking-tight text-xl sm:text-2xl text-neutral-900 dark:text-white font-display">
+              <span className="font-extrabold tracking-tight text-xl sm:text-2xl text-foreground font-display">
                 paye₹nt
               </span>
             </button>
@@ -103,14 +103,14 @@ export function PayerntNavbar({
             <button
               type="button"
               onClick={toggleTheme}
-              className="flex h-9 w-9 items-center justify-center rounded-xl text-neutral-700 dark:text-neutral-300 hover:text-black dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
+              className="flex h-9 w-9 items-center justify-center rounded-xl text-text-secondary hover:text-text-primary hover:bg-secondary transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               aria-label={`Switch to ${theme === "dark" ? "Light" : "Dark"} Mode`}
               title={`Switch to ${theme === "dark" ? "Light" : "Dark"} Mode`}
             >
               {theme === "dark" ? (
-                <Sun className="h-4 w-4 text-neutral-300 hover:text-white transition-transform" />
+                <Sun className="h-4 w-4 text-text-secondary hover:text-text-primary transition-transform" />
               ) : (
-                <Moon className="h-4 w-4 text-neutral-700 hover:text-black transition-transform" />
+                <Moon className="h-4 w-4 text-text-secondary hover:text-text-primary transition-transform" />
               )}
             </button>
 
@@ -119,13 +119,13 @@ export function PayerntNavbar({
               <button
                 type="button"
                 onClick={() => setIsNotifOpen(!isNotifOpen)}
-                className="relative flex h-9 w-9 items-center justify-center rounded-xl text-neutral-700 dark:text-neutral-300 hover:text-black dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
+                className="relative flex h-9 w-9 items-center justify-center rounded-xl text-text-secondary hover:text-text-primary hover:bg-secondary transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 aria-label={tCommon.notifications}
                 title={tCommon.notifications}
               >
                 <Bell className="h-4 w-4" />
                 {unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 flex h-4 min-w-4 px-1 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white shadow-xs">
+                  <span className="absolute -top-1 -right-1 flex h-4 min-w-4 px-1 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-white shadow-xs">
                     {unreadCount > 9 ? "9+" : unreadCount}
                   </span>
                 )}
@@ -138,15 +138,15 @@ export function PayerntNavbar({
                     initial={{ opacity: 0, y: 6, scale: 0.95 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 6, scale: 0.95 }}
-                    className="absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-[#0d1017] shadow-2xl p-4 z-50 text-left space-y-3"
+                    className="absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl border border-border bg-surface-modal shadow-elevation-3 p-4 z-50 text-left space-y-3"
                   >
-                    <div className="flex items-center justify-between border-b border-neutral-200/80 dark:border-white/10 pb-2">
-                      <span className="font-bold text-xs text-neutral-900 dark:text-white">{tCommon.notifications}</span>
+                    <div className="flex items-center justify-between border-b border-border pb-2">
+                      <span className="font-bold text-xs text-foreground">{tCommon.notifications}</span>
                       {unreadCount > 0 && (
                         <button
                           type="button"
                           onClick={onMarkAllNotificationsRead}
-                          className="text-[11px] text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white font-medium cursor-pointer"
+                          className="text-[11px] text-text-secondary hover:text-foreground font-medium cursor-pointer"
                         >
                           {tCommon.markAllAsRead}
                         </button>
@@ -155,7 +155,7 @@ export function PayerntNavbar({
 
                     <div className="max-h-64 overflow-y-auto space-y-2 pr-1">
                       {notifications.length === 0 ? (
-                        <p className="text-xs text-neutral-500 dark:text-neutral-400 text-center py-4">
+                        <p className="text-xs text-text-secondary text-center py-4">
                           {tCommon.noNotifications}
                         </p>
                       ) : (
@@ -173,8 +173,8 @@ export function PayerntNavbar({
                             }}
                             className={`p-2.5 rounded-xl border text-xs transition-colors cursor-pointer ${
                               n.read
-                                ? "border-neutral-200/60 dark:border-white/5 bg-neutral-50 dark:bg-white/[0.02] text-neutral-500 dark:text-neutral-400"
-                                : "border-neutral-300 dark:border-white/15 bg-neutral-100/70 dark:bg-white/[0.06] text-neutral-900 dark:text-white font-medium"
+                                ? "border-border bg-secondary/50 text-text-secondary"
+                                : "border-border bg-secondary text-foreground font-medium"
                             }`}
                           >
                             <div className="flex items-center justify-between">

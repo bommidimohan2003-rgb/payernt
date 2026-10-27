@@ -414,7 +414,7 @@ export function MyProducts({
 
         <button
           onClick={onAddNewGear}
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-foreground text-background text-xs font-bold shadow-xs hover:opacity-95 active:scale-[0.98] transition-all cursor-pointer shrink-0"
+          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-accent-primary hover:bg-accent-hover text-white text-xs font-bold shadow-xs active:scale-[0.98] transition-all cursor-pointer shrink-0"
         >
           <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
           <span>Add New Product</span>
@@ -469,7 +469,7 @@ export function MyProducts({
             onClick={() => setFilterTab(tab.id as any)}
             className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer border active:scale-[0.98] ${
               filterTab === tab.id
-                ? "bg-foreground text-background border-foreground shadow-2xs font-bold"
+                ? "bg-accent-primary text-white border-accent-primary shadow-2xs font-bold"
                 : "bg-card hover:bg-secondary text-muted-foreground hover:text-foreground border-border"
             }`}
           >
@@ -490,7 +490,7 @@ export function MyProducts({
           </p>
           <button
             onClick={onAddNewGear}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-foreground text-background text-xs font-bold hover:opacity-90 active:scale-[0.98] transition-all cursor-pointer mt-1"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-accent-primary hover:bg-accent-hover text-white text-xs font-bold active:scale-[0.98] transition-all cursor-pointer mt-1"
           >
             <Plus className="h-3.5 w-3.5" />
             <span>List a Product</span>
@@ -635,7 +635,7 @@ export function MyProducts({
       {/* ============================================================ */}
       {selectedProduct && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
-          <div className="bg-card border border-border rounded-3xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-5 sm:p-7 space-y-5 shadow-2xl animate-in zoom-in-95 duration-200 text-left my-auto">
+          <div className="bg-surface-modal border border-border rounded-3xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-5 sm:p-7 space-y-5 shadow-elevation-3 animate-in zoom-in-95 duration-200 text-left my-auto">
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-border/80 pb-3.5">
               <div className="flex items-center gap-2">
@@ -876,7 +876,7 @@ export function MyProducts({
       {/* ============================================================ */}
       {editingProduct && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
-          <div className="bg-card border border-border rounded-3xl max-w-2xl w-full max-h-[92vh] overflow-y-auto p-5 sm:p-7 space-y-5 shadow-2xl animate-in zoom-in-95 duration-200 text-left my-auto">
+          <div className="bg-surface-modal border border-border rounded-3xl max-w-2xl w-full max-h-[92vh] overflow-y-auto p-5 sm:p-7 space-y-5 shadow-elevation-3 animate-in zoom-in-95 duration-200 text-left my-auto">
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-border/80 pb-3.5">
               <div>
@@ -1126,11 +1126,11 @@ export function MyProducts({
                 <button
                   type="submit"
                   disabled={isSavingEdit}
-                  className="px-5 py-2 rounded-xl bg-foreground text-background text-xs font-bold active:scale-[0.98] cursor-pointer shadow-xs hover:opacity-90 transition-all flex items-center gap-1.5 disabled:opacity-50"
+                  className="px-5 py-2 rounded-xl bg-accent-primary hover:bg-accent-hover text-white text-xs font-bold active:scale-[0.98] cursor-pointer shadow-xs transition-all flex items-center gap-1.5 disabled:opacity-50"
                 >
                   {isSavingEdit ? (
                     <>
-                      <div className="h-3 w-3 border-2 border-background border-t-transparent rounded-full animate-spin" />
+                      <div className="h-3 w-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
                       <span>Saving Changes...</span>
                     </>
                   ) : (
@@ -1148,7 +1148,7 @@ export function MyProducts({
       {/* ============================================================ */}
       {productToDelete && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-card border border-border rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl animate-in zoom-in-95 duration-200 text-left">
+          <div className="bg-surface-modal border border-border rounded-3xl max-w-md w-full p-6 space-y-4 shadow-elevation-3 animate-in zoom-in-95 duration-200 text-left">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-2xl bg-destructive/10 text-destructive flex items-center justify-center border border-destructive/20 shrink-0">
                 <AlertTriangle className="h-5 w-5" />

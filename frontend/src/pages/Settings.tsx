@@ -32,12 +32,14 @@ function Toggle({ on, onChange }: { on: boolean; onChange: () => void }) {
     <button
       type="button"
       onClick={onChange}
-      className={`relative h-6 w-11 rounded-full transition-colors cursor-pointer ${
-        on ? "bg-neutral-900 dark:bg-white" : "bg-neutral-200 dark:bg-neutral-700"
+      aria-checked={on}
+      role="switch"
+      className={`relative h-6 w-11 rounded-full transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+        on ? "bg-accent-primary" : "bg-secondary border border-border"
       }`}
     >
       <span
-        className={`absolute top-0.5 h-5 w-5 rounded-full bg-white dark:bg-black shadow transition-all ${
+        className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-xs transition-all ${
           on ? "left-5" : "left-0.5"
         }`}
       />
