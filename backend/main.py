@@ -3322,6 +3322,7 @@ def cancel_user_order(
         logger.warning(f"Could not dispatch cancel notification for order {target_id}: {e}")
 
     logger.info(f"Order {target_id} cancelled by {clean_email}")
+    invalidate_cache()
     broadcast_admin_event("booking.cancelled", {"id": target_id, "status": "cancelled"})
     return {
         "success": True,
@@ -4385,6 +4386,7 @@ def check_single_product_availability(
     # Evaluate per-date slot availability and conflicts
     morning_booked_dates = set()
     afternoon_booked_dates = set()
+    dates_conflicting_full_day = set()
     full_day_booked_dates = set()
     session_availability_map = {}
 
@@ -4404,7 +4406,7 @@ def check_single_product_availability(
             id, a_s, a_e, buffer_minutes=buffer_min, exclude_order_id=exclude_order_id
         )
 
-        # Full day slot interval: [08:00, 08:00 next day)
+        # Full day slot interval: [08:00, 17:00)
         f_s, f_e = normalize_slot_interval(d_str, "full_day")
         f_conf, _ = check_product_interval_conflicts(
             id, f_s, f_e, buffer_minutes=buffer_min, exclude_order_id=exclude_order_id
@@ -4420,12 +4422,16 @@ def check_single_product_availability(
         if a_conf and not a_is_blocked:
             afternoon_booked_dates.add(d_str)
         if f_conf and not f_is_blocked:
+            dates_conflicting_full_day.add(d_str)
+
+        # Entire date is unavailable if BOTH morning and afternoon are unavailable (booked or blocked)
+        if (m_conf or m_is_blocked) and (a_conf or a_is_blocked):
             full_day_booked_dates.add(d_str)
 
         session_availability_map[d_str] = {
-            "morning": not m_conf,
-            "afternoon": not a_conf,
-            "full_day": not f_conf
+            "morning": not (m_conf or m_is_blocked),
+            "afternoon": not (a_conf or a_is_blocked),
+            "full_day": not (f_conf or f_is_blocked)
         }
         curr_d += datetime.timedelta(days=1)
 
@@ -4437,8 +4443,8 @@ def check_single_product_availability(
         booked_result = afternoon_booked_dates
         blocked_result = full_day_blocked_dates | afternoon_blocked_dates
     else:
-        # Full day / multi-day custom rental
-        booked_result = full_day_booked_dates
+        # Full day / multi-day custom rental: any date that conflicts with full day
+        booked_result = dates_conflicting_full_day
         blocked_result = full_day_blocked_dates | morning_blocked_dates | afternoon_blocked_dates
 
     # 4. Evaluate requested date range if start_date and end_date are provided
@@ -4484,6 +4490,26 @@ def check_single_product_availability(
                 status_str = base_status
                 reason_str = base_reason
 
+    # Build per-date breakdown for requested date range or view window
+    dates_list = []
+    range_start = parse_date_safely(start_date) if start_date else view_start
+    range_end = parse_date_safely(end_date) if end_date else view_end
+    if range_start and range_end and range_start <= range_end:
+        cur_dt = range_start
+        while cur_dt <= range_end:
+            ds = cur_dt.strftime("%Y-%m-%d")
+            s_map = session_availability_map.get(ds, {"morning": True, "afternoon": True, "full_day": True})
+            dates_list.append({
+                "date": ds,
+                "is_available": s_map["morning"] or s_map["afternoon"] or s_map["full_day"],
+                "sessions": [
+                    {"session": "morning", "available": s_map["morning"]},
+                    {"session": "afternoon", "available": s_map["afternoon"]},
+                    {"session": "full_day", "available": s_map["full_day"]},
+                ]
+            })
+            cur_dt += datetime.timedelta(days=1)
+
     return {
         "success": True,
         "product_id": id,
@@ -4501,7 +4527,10 @@ def check_single_product_availability(
         "booked_dates": sorted(list(booked_result)),
         "bookedDates": sorted(list(booked_result)),
         "all_blocked_dates": sorted(list(all_blocked_date_strings)),
+        "full_day_booked_dates": sorted(list(full_day_booked_dates)),
+        "fullDayBookedDates": sorted(list(full_day_booked_dates)),
         "session_availability": session_availability_map,
+        "dates": dates_list,
         "allowHalfDay": bool(prod.get("allow_half_day", True)),
         "dailyRate": daily_val,
         "halfDayRate": half_day_val,

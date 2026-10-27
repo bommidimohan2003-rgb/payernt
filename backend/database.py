@@ -5711,26 +5711,29 @@ def calculate_booking_interval(
         end_dt = datetime.datetime(s_date.year, s_date.month, s_date.day, 17, 0, 0, tzinfo=timezone.utc)
         return start_dt, end_dt
 
-    # Full Day / Multi-Day:
-    s_hour, s_min = 8, 0
+    # If explicit start_time is provided:
     if start_time:
         try:
             parts = [int(x) for x in start_time.split(":")[:2]]
-            s_hour, s_min = parts[0], parts[1]
+            sh, sm = parts[0], parts[1]
         except Exception:
-            s_hour, s_min = 8, 0
+            sh, sm = 8, 0
+        start_dt = datetime.datetime(s_date.year, s_date.month, s_date.day, sh, sm, 0, tzinfo=timezone.utc)
+        if end_time:
+            try:
+                parts = [int(x) for x in end_time.split(":")[:2]]
+                eh, em = parts[0], parts[1]
+            except Exception:
+                eh, em = 17, 0
+            end_dt = datetime.datetime(e_date.year, e_date.month, e_date.day, eh, em, 0, tzinfo=timezone.utc)
+        else:
+            days = max(1, (e_date - s_date).days)
+            end_dt = start_dt + datetime.timedelta(hours=24 * days)
+        return start_dt, end_dt
 
-    start_dt = datetime.datetime(s_date.year, s_date.month, s_date.day, s_hour, s_min, 0, tzinfo=timezone.utc)
-
-    # Number of 24h rental days:
-    if s_date == e_date and dur != "multi_day" and dur != "custom":
-        rental_days = 1
-    else:
-        rental_days = max(1, (e_date - s_date).days)
-        if s_date == e_date:
-            rental_days = 1
-
-    end_dt = start_dt + datetime.timedelta(hours=24 * rental_days)
+    # Full Day / Multi-Day standard: 08:00 on start date to 17:00 on end date
+    start_dt = datetime.datetime(s_date.year, s_date.month, s_date.day, 8, 0, 0, tzinfo=timezone.utc)
+    end_dt = datetime.datetime(e_date.year, e_date.month, e_date.day, 17, 0, 0, tzinfo=timezone.utc)
     return start_dt, end_dt
 
 def normalize_slot_interval(
@@ -5754,38 +5757,44 @@ def normalize_slot_interval(
         end_dt = datetime.datetime(d.year, d.month, d.day, 17, 0, 0, tzinfo=timezone.utc)
         return start_dt, end_dt
     else:
-        # Full day = exactly 24 elapsed hours
-        sh, sm = 8, 0
-        if start_time:
-            try:
-                parts = [int(x) for x in start_time.split(":")[:2]]
-                sh, sm = parts[0], parts[1]
-            except Exception:
-                sh, sm = 8, 0
-        start_dt = datetime.datetime(d.year, d.month, d.day, sh, sm, 0, tzinfo=timezone.utc)
-        end_dt = start_dt + datetime.timedelta(hours=24)
+        # Full day = operating rental day 08:00 to 17:00
+        start_dt = datetime.datetime(d.year, d.month, d.day, 8, 0, 0, tzinfo=timezone.utc)
+        end_dt = datetime.datetime(d.year, d.month, d.day, 17, 0, 0, tzinfo=timezone.utc)
         return start_dt, end_dt
 
 def _extract_order_interval(order: dict) -> Tuple[Optional[datetime.datetime], Optional[datetime.datetime]]:
-    """Extracts UTC start and end datetimes from an order record."""
-    s_dt = parse_datetime_safely(order.get("start_datetime"))
-    e_dt = parse_datetime_safely(order.get("end_datetime"))
-    if s_dt and e_dt and e_dt > s_dt:
-        return s_dt, e_dt
-
+    """Extracts UTC start and end datetimes from an order record for conflict evaluation."""
     s_date_str = str(order.get("start_date") or order.get("startDate") or "")
-    e_date_str = str(order.get("end_date") or order.get("endDate") or "")
+    e_date_str = str(order.get("end_date") or order.get("endDate") or s_date_str)
     if not s_date_str:
         return None, None
 
-    t_slot = str(order.get("time_slot") or order.get("timeSlot") or "").lower()
-    dur_type = str(order.get("duration_type") or order.get("durationType") or "").lower()
-    s_time = order.get("start_time") or order.get("startTime")
-    e_time = order.get("end_time") or order.get("endTime")
+    t_slot = str(order.get("time_slot") or order.get("timeSlot") or "").lower().strip()
+    dur_type = str(order.get("duration_type") or order.get("durationType") or "").lower().strip()
 
-    return calculate_booking_interval(
-        s_date_str, e_date_str, t_slot, dur_type, s_time, e_time
-    )
+    s_d = parse_date_safely(s_date_str)
+    if not s_d:
+        return None, None
+    e_d = parse_date_safely(e_date_str) or s_d
+    if s_d > e_d:
+        s_d, e_d = e_d, s_d
+
+    if t_slot == "morning" or dur_type == "half_day_morning":
+        return (
+            datetime.datetime(s_d.year, s_d.month, s_d.day, 8, 0, 0, tzinfo=timezone.utc),
+            datetime.datetime(s_d.year, s_d.month, s_d.day, 12, 0, 0, tzinfo=timezone.utc)
+        )
+    elif t_slot == "afternoon" or dur_type == "half_day_afternoon":
+        return (
+            datetime.datetime(s_d.year, s_d.month, s_d.day, 13, 0, 0, tzinfo=timezone.utc),
+            datetime.datetime(s_d.year, s_d.month, s_d.day, 17, 0, 0, tzinfo=timezone.utc)
+        )
+    else:
+        # Full Day / Multi-Day: spans from 08:00 on start date to 17:00 on end date
+        return (
+            datetime.datetime(s_d.year, s_d.month, s_d.day, 8, 0, 0, tzinfo=timezone.utc),
+            datetime.datetime(e_d.year, e_d.month, e_d.day, 17, 0, 0, tzinfo=timezone.utc)
+        )
 
 def check_product_interval_conflicts(
     product_id: str,
@@ -5875,12 +5884,8 @@ def check_product_interval_conflicts(
                 rows = cursor.fetchall()
                 for row in rows:
                     ord_status = str(row.get("status") or "").lower()
-                    if ord_status in ('refunded', 'rejected'):
+                    if ord_status in ('cancelled', 'canceled', 'refunded', 'rejected', 'failed', 'expired'):
                         continue
-                    if ord_status == 'cancelled':
-                        # Cancelled bookings release availability UNLESS return is required and gear is still in transit!
-                        if not (row.get("policy_outcome") == "return_required" and not row.get("handed_back_at")):
-                            continue
 
                     ord_start, ord_end = _extract_order_interval(row)
                     if ord_start and ord_end:
@@ -5907,11 +5912,8 @@ def check_product_interval_conflicts(
         pid = str(order.get("product_id") or order.get("productId") or "").strip()
         if pid == str(product_id).strip():
             status = str(order.get("status") or "active").lower()
-            if status in ('refunded', 'rejected'):
+            if status in ('cancelled', 'canceled', 'refunded', 'rejected', 'failed', 'expired'):
                 continue
-            if status == 'cancelled':
-                if not (order.get("policy_outcome") == "return_required" and not order.get("handed_back_at")):
-                    continue
 
             ord_start, ord_end = _extract_order_interval(order)
             if ord_start and ord_end:

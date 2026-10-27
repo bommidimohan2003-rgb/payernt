@@ -1193,6 +1193,10 @@ export const api = {
 
     this.invalidateCache("user_orders");
     this.invalidateCache("public_stats");
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("payent_orders_updated"));
+      window.dispatchEvent(new CustomEvent("payent_booking_updated"));
+    }
     return res.json();
   },
 
@@ -1303,6 +1307,10 @@ export const api = {
     storage.set(STORAGE_KEYS.orders, updatedOrders);
     this.invalidateCache("user_orders");
     this.invalidateCache("public_stats");
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("payent_orders_updated"));
+      window.dispatchEvent(new CustomEvent("payent_booking_updated"));
+    }
     return res ? res.json() : { success: true };
   },
 

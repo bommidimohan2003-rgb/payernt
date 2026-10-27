@@ -120,8 +120,20 @@ def setup_test_calendar_data():
 
 
 def _get_headers(email: str):
+    if email not in MOCK_USERS:
+        MOCK_USERS[email] = {
+            "id": f"usr_{email.replace('@', '_').replace('.', '_')}",
+            "email": email,
+            "full_name": "Test User",
+            "role": "customer",
+            "verified": True,
+            "status": "active",
+            "is_approved": True,
+            "isApproved": True,
+        }
     token = create_access_token(data={"sub": email, "email": email, "role": "customer"})
     return {"Authorization": f"Bearer {token}"}
+
 
 
 # =========================================================================
@@ -681,3 +693,275 @@ def test_12_boundary_times_and_exact_intervals():
     # 3-day rental
     s_dt3, e_dt3 = calculate_booking_interval("2026-12-26", "2026-12-29", "full_day", "custom", "10:00")
     assert (e_dt3 - s_dt3).total_seconds() / 3600 == 72.0
+
+
+# =========================================================================
+# 13. TWO SEPARATE SESSIONS MAKE ENTIRE DATE UNAVAILABLE
+# =========================================================================
+
+def test_13_two_separate_sessions_make_entire_date_unavailable():
+    """
+    If Morning is booked by Renter 1, Afternoon remains available.
+    If Afternoon is subsequently booked by Renter 2, the entire date becomes unavailable.
+    Both sessions and full day must show unavailable, and full_day_booked_dates must include the date.
+    """
+    headers1 = _get_headers(RENTER_1_EMAIL)
+    headers2 = _get_headers(RENTER_2_EMAIL)
+    test_date = "2026-12-30"
+
+    # 1. Renter 1 books Morning
+    res1 = client.post("/api/orders", headers=headers1, json={
+        "id": "ord_sep_morning_30",
+        "productId": TEST_PROD_A,
+        "startDate": test_date,
+        "endDate": test_date,
+        "timeSlot": "morning",
+        "durationType": "half_day",
+        "total": 3000,
+        "status": "pending",
+    })
+    assert res1.status_code == 200
+
+    # Availability check: morning unavailable, afternoon available, date not yet in full_day_booked_dates
+    cal_half = client.get(f"/api/products/{TEST_PROD_A}/availability?start_date={test_date}&end_date={test_date}")
+    assert cal_half.status_code == 200
+    data_half = cal_half.json()
+    assert test_date in data_half["bookedDates"]
+    assert test_date not in data_half.get("full_day_booked_dates", [])
+    sess_half = {s["session"]: s["available"] for s in data_half["dates"][0]["sessions"]}
+    assert sess_half["morning"] is False
+    assert sess_half["afternoon"] is True
+    assert sess_half["full_day"] is False
+
+    # 2. Renter 2 books Afternoon
+    res2 = client.post("/api/orders", headers=headers2, json={
+        "id": "ord_sep_afternoon_30",
+        "productId": TEST_PROD_A,
+        "startDate": test_date,
+        "endDate": test_date,
+        "timeSlot": "afternoon",
+        "durationType": "half_day",
+        "total": 3000,
+        "status": "pending",
+    })
+    assert res2.status_code == 200
+
+    # Availability check: BOTH sessions unavailable -> entire date is fully booked
+    cal_full = client.get(f"/api/products/{TEST_PROD_A}/availability?start_date={test_date}&end_date={test_date}")
+    assert cal_full.status_code == 200
+    data_full = cal_full.json()
+    assert test_date in data_full["bookedDates"]
+    assert test_date in data_full.get("full_day_booked_dates", [])
+    sess_full = {s["session"]: s["available"] for s in data_full["dates"][0]["sessions"]}
+    assert sess_full["morning"] is False
+    assert sess_full["afternoon"] is False
+    assert sess_full["full_day"] is False
+
+    # Attempting to book any session or full day fails with 409
+    headers3 = _get_headers("renter3_conflict_test@payent.test")
+    res_fail = client.post("/api/orders", headers=headers3, json={
+        "id": "ord_fail_on_full_date",
+        "productId": TEST_PROD_A,
+        "startDate": test_date,
+        "endDate": test_date,
+        "timeSlot": "morning",
+        "durationType": "half_day",
+        "total": 3000,
+        "status": "pending",
+    })
+    assert res_fail.status_code == 409
+
+
+# =========================================================================
+# 14. CANCELLED FULL-DAY RELEASES BOTH MORNING AND AFTERNOON SESSIONS
+# =========================================================================
+
+def test_14_cancelled_full_day_releases_both_morning_and_afternoon():
+    """
+    Cancelling a full-day booking immediately releases both morning and afternoon sessions.
+    The date is removed from bookedDates and full_day_booked_dates.
+    """
+    headers = _get_headers(RENTER_1_EMAIL)
+    test_date = "2026-12-31"
+
+    # Book full day
+    res = client.post("/api/orders", headers=headers, json={
+        "id": "ord_fd_to_cancel_31",
+        "productId": TEST_PROD_A,
+        "startDate": test_date,
+        "endDate": test_date,
+        "timeSlot": "full_day",
+        "durationType": "full_day",
+        "total": 5000,
+        "status": "pending",
+    })
+    assert res.status_code == 200
+
+    cal_before = client.get(f"/api/products/{TEST_PROD_A}/availability?start_date={test_date}&end_date={test_date}")
+    assert test_date in cal_before.json()["full_day_booked_dates"]
+
+    # Cancel the booking
+    cancel_res = client.post("/api/orders/ord_fd_to_cancel_31/cancel", headers=headers, json={
+        "reason": "Change of plans"
+    })
+    assert cancel_res.status_code == 200
+
+    # Date must be completely available now: morning=True, afternoon=True, full_day=True
+    cal_after = client.get(f"/api/products/{TEST_PROD_A}/availability?start_date={test_date}&end_date={test_date}")
+    assert cal_after.status_code == 200
+    data_after = cal_after.json()
+    assert test_date not in data_after.get("bookedDates", [])
+    assert test_date not in data_after.get("full_day_booked_dates", [])
+    sess_after = {s["session"]: s["available"] for s in data_after["dates"][0]["sessions"]}
+    assert sess_after["morning"] is True
+    assert sess_after["afternoon"] is True
+    assert sess_after["full_day"] is True
+
+    # Renter 2 can immediately book full day on this released date
+    headers2 = _get_headers(RENTER_2_EMAIL)
+    res_rebook = client.post("/api/orders", headers=headers2, json={
+        "id": "ord_rebook_fd_31",
+        "productId": TEST_PROD_A,
+        "startDate": test_date,
+        "endDate": test_date,
+        "timeSlot": "full_day",
+        "durationType": "full_day",
+        "total": 5000,
+        "status": "pending",
+    })
+    assert res_rebook.status_code == 200
+
+
+# =========================================================================
+# 15. CANCELLED PARTIAL-DAY RELEASES ONLY THAT SESSION & PRESERVES BLOCKED DATES
+# =========================================================================
+
+def test_15_cancelled_partial_day_releases_only_that_session_and_keeps_blocked_dates():
+    """
+    When Morning and Afternoon are both booked, cancelling Morning releases ONLY Morning.
+    Afternoon remains booked.
+    Owner-blocked dates remain strictly unavailable even when other bookings are cancelled.
+    """
+    headers1 = _get_headers(RENTER_1_EMAIL)
+    headers2 = _get_headers(RENTER_2_EMAIL)
+    test_date = "2027-01-05"
+
+    # Book Morning (Renter 1) and Afternoon (Renter 2)
+    res_m = client.post("/api/orders", headers=headers1, json={
+        "id": "ord_part_m_05",
+        "productId": TEST_PROD_A,
+        "startDate": test_date,
+        "endDate": test_date,
+        "timeSlot": "morning",
+        "durationType": "half_day",
+        "total": 3000,
+        "status": "pending",
+    })
+    assert res_m.status_code == 200
+
+    res_a = client.post("/api/orders", headers=headers2, json={
+        "id": "ord_part_a_05",
+        "productId": TEST_PROD_A,
+        "startDate": test_date,
+        "endDate": test_date,
+        "timeSlot": "afternoon",
+        "durationType": "half_day",
+        "total": 3000,
+        "status": "pending",
+    })
+    assert res_a.status_code == 200
+
+    # Cancel Morning booking only
+    cancel_m = client.post("/api/orders/ord_part_m_05/cancel", headers=headers1, json={
+        "reason": "Cancelled morning shoot"
+    })
+    assert cancel_m.status_code == 200
+
+    # Availability check: Morning is released (True), Afternoon is STILL BOOKED (False)
+    cal_res = client.get(f"/api/products/{TEST_PROD_A}/availability?start_date={test_date}&end_date={test_date}")
+    sess = {s["session"]: s["available"] for s in cal_res.json()["dates"][0]["sessions"]}
+    assert sess["morning"] is True, "Morning session should be released"
+    assert sess["afternoon"] is False, "Afternoon session must remain booked"
+    assert sess["full_day"] is False, "Full day cannot be available if afternoon is booked"
+    # Date should no longer be in full_day_booked_dates since morning is available
+    assert test_date not in cal_res.json().get("full_day_booked_dates", [])
+
+    # Also test owner-blocked date preservation:
+    owner_blocked_date = "2027-01-06"
+    MOCK_CUSTOM_PRODUCTS[TEST_PROD_A]["blocked_dates"] = [owner_blocked_date]
+
+    # Create and cancel an unrelated order on another date
+    client.post("/api/orders", headers=headers1, json={
+        "id": "ord_temp_07",
+        "productId": TEST_PROD_A,
+        "startDate": "2027-01-07",
+        "endDate": "2027-01-07",
+        "timeSlot": "full_day",
+        "durationType": "full_day",
+        "total": 5000,
+        "status": "pending",
+    })
+    client.post("/api/orders/ord_temp_07/cancel", headers=headers1, json={"reason": "Test"})
+
+    # Owner-blocked date must strictly remain unavailable
+    cal_blocked = client.get(f"/api/products/{TEST_PROD_A}/availability?start_date={owner_blocked_date}&end_date={owner_blocked_date}")
+    assert cal_blocked.json()["is_available"] is False
+    assert cal_blocked.json()["status"] == "blocked"
+    assert owner_blocked_date in cal_blocked.json()["blockedDates"]
+
+    # Clean up blocked dates
+    MOCK_CUSTOM_PRODUCTS[TEST_PROD_A].pop("blocked_dates", None)
+
+
+# =========================================================================
+# 16. FULL-DAY BOOKING BEHAVIOR IDENTICAL ACROSS MULTIPLE PRODUCTS AND DATES
+# =========================================================================
+
+def test_16_full_day_booking_behavior_identical_across_multiple_products_and_dates():
+    """
+    Validates that full-day bookings across multiple dates and products:
+    1. Consistently block morning, afternoon, and full day on the booked date.
+    2. Crucially DO NOT bleed into the next day (Day D+1 remains 100% available).
+    """
+    headers = _get_headers(RENTER_1_EMAIL)
+
+    test_cases = [
+        (TEST_PROD_A, "2027-01-10", "2027-01-11"),
+        (TEST_PROD_A, "2027-01-14", "2027-01-15"),
+        (TEST_PROD_B, "2027-01-20", "2027-01-21"),
+        (TEST_PROD_B, "2027-01-25", "2027-01-26"),
+    ]
+
+    for idx, (prod_id, booked_date, next_date) in enumerate(test_cases):
+        case_headers = _get_headers(f"renter_bleed_case_{idx}@payent.test")
+        # Book full day on booked_date
+        res = client.post("/api/orders", headers=case_headers, json={
+            "id": f"ord_bleed_test_{prod_id}_{booked_date}",
+            "productId": prod_id,
+            "startDate": booked_date,
+            "endDate": booked_date,
+            "timeSlot": "full_day",
+            "durationType": "full_day",
+            "total": 5000,
+            "status": "pending",
+        })
+        assert res.status_code == 200, f"Booking failed for {prod_id} on {booked_date}"
+
+        # Check booked_date: both sessions and full_day are unavailable
+        cal_booked = client.get(f"/api/products/{prod_id}/availability?start_date={booked_date}&end_date={booked_date}")
+        sess_booked = {s["session"]: s["available"] for s in cal_booked.json()["dates"][0]["sessions"]}
+        assert sess_booked["morning"] is False, f"Morning should be booked on {booked_date}"
+        assert sess_booked["afternoon"] is False, f"Afternoon should be booked on {booked_date}"
+        assert sess_booked["full_day"] is False, f"Full day should be booked on {booked_date}"
+        assert booked_date in cal_booked.json()["full_day_booked_dates"]
+
+        # CRITICAL TEST: Check next_date (Day D+1) - MUST BE 100% AVAILABLE (NO NEXT-DAY BLEEDING!)
+        cal_next = client.get(f"/api/products/{prod_id}/availability?start_date={next_date}&end_date={next_date}")
+        assert cal_next.status_code == 200
+        sess_next = {s["session"]: s["available"] for s in cal_next.json()["dates"][0]["sessions"]}
+        assert sess_next["morning"] is True, f"Next day morning ({next_date}) must be available, but was blocked by bleeding!"
+        assert sess_next["afternoon"] is True, f"Next day afternoon ({next_date}) must be available!"
+        assert sess_next["full_day"] is True, f"Next day full-day ({next_date}) must be available!"
+        assert next_date not in cal_next.json().get("bookedDates", [])
+        assert next_date not in cal_next.json().get("full_day_booked_dates", [])
+

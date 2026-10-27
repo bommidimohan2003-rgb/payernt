@@ -324,6 +324,35 @@ export default function ProductDetails() {
     };
   }, [id, startDate]);
 
+  // Live slot availability synchronization on booking creation, cancellation, or local storage change
+  useEffect(() => {
+    const handleUpdate = () => {
+      if (startDate && id) {
+        const apiBase = getApiBase();
+        fetch(`${apiBase}/api/products/${encodeURIComponent(id)}/slots?date=${encodeURIComponent(startDate)}`)
+          .then((r) => (r.ok ? r.json() : null))
+          .then((data) => {
+            if (data && Array.isArray(data.slots)) {
+              setDaySlots(data.slots);
+            }
+          })
+          .catch(() => {});
+      }
+    };
+    if (typeof window !== "undefined") {
+      window.addEventListener("payent_orders_updated", handleUpdate);
+      window.addEventListener("payent_booking_updated", handleUpdate);
+      window.addEventListener("storage", handleUpdate);
+    }
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("payent_orders_updated", handleUpdate);
+        window.removeEventListener("payent_booking_updated", handleUpdate);
+        window.removeEventListener("storage", handleUpdate);
+      }
+    };
+  }, [id, startDate]);
+
   const handleDurationModeChange = (mode: DurationMode) => {
     setDurationMode(mode);
     setAvailabilityChecked(false);

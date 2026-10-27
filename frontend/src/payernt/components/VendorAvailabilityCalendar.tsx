@@ -477,7 +477,7 @@ export const VendorAvailabilityCalendar: React.FC<VendorAvailabilityCalendarProp
                   isPast
                     ? "opacity-25 bg-muted/20 text-muted-foreground cursor-not-allowed border border-transparent"
                     : isBooked
-                    ? "bg-muted/80 text-muted-foreground/60 line-through cursor-not-allowed border border-border/40"
+                    ? "bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/40 line-through cursor-not-allowed"
                     : isRangeSelected
                     ? "bg-primary text-primary-foreground shadow-md ring-2 ring-primary scale-105 z-10"
                     : isBlocked
@@ -505,8 +505,8 @@ export const VendorAvailabilityCalendar: React.FC<VendorAvailabilityCalendarProp
                 {/* Date Number */}
                 <span
                   className={`relative z-10 leading-none ${
-                    isBooked
-                      ? "line-through decoration-rose-600 dark:decoration-rose-400 decoration-2 font-medium text-muted-foreground/70"
+                    isBooked || isBlocked
+                      ? "line-through decoration-red-600 dark:decoration-red-400 decoration-2 font-medium text-red-600 dark:text-red-400"
                       : ""
                   }`}
                 >

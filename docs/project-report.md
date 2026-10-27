@@ -1450,5 +1450,10 @@ All 8 verification criteria were systematically validated using automated pytest
   10. `test_10_concurrent_renter_booking_race_condition`: **PASSED** (Simultaneous concurrent booking threads for same product/session: exactly 1 succeeds, 1 gets 409).
   11. `test_11_month_change_and_product_switching_freshness`: **PASSED** (Changing month and product ID returns isolated, fresh availability).
   12. `test_12_boundary_times_and_exact_intervals`: **PASSED** (24-hour elapsed rentals and session boundary times enforced accurately).
-- Test Regression Suite: **40 passed** in `test_calendar_availability_and_conflicts.py`, `test_blocked_dates_and_calendar.py`, `test_cancellation_and_return_edge_cases.py`, `test_category_booking_restriction.py`, and `test_cart_and_availability.py`.
-- Frontend Build: **100% clean production build** (`npm run build` in `frontend/`, 0 errors).
+  13. `test_13_two_separate_sessions_make_entire_date_unavailable`: **PASSED** (Booking morning and afternoon separately causes entire date to become unavailable and listed in `full_day_booked_dates`).
+  14. `test_14_cancelled_full_day_releases_both_morning_and_afternoon`: **PASSED** (Cancelling full-day booking immediately frees both morning and afternoon sessions and removes date from `bookedDates` and `full_day_booked_dates`).
+  15. `test_15_cancelled_partial_day_releases_only_that_session_and_keeps_blocked_dates`: **PASSED** (Cancelling morning booking releases morning while keeping afternoon booked; owner-blocked dates remain protected upon cancellation).
+  16. `test_16_full_day_booking_behavior_identical_across_multiple_products_and_dates`: **PASSED** (Full-day bookings consistently block morning and afternoon on that date across multiple products and dates, without any next-day bleeding into Day D+1).
+- Test Regression Suite: **44 passed** across `test_calendar_availability_and_conflicts.py` (16 passed), `test_blocked_dates_and_calendar.py` (12 passed), and `test_cancellation_and_time_slots.py` (16 passed).
+- Frontend Build: **100% clean production build** (`npm run build` in `frontend/`, 0 errors, built in 6.59s).
+

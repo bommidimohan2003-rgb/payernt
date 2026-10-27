@@ -150,6 +150,25 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
     fetchAvailability();
   }, [fetchAvailability]);
 
+  // Live availability synchronization on booking creation, cancellation, or local storage change
+  useEffect(() => {
+    const handleSync = () => {
+      fetchAvailability();
+    };
+    if (typeof window !== "undefined") {
+      window.addEventListener("payent_orders_updated", handleSync);
+      window.addEventListener("payent_booking_updated", handleSync);
+      window.addEventListener("storage", handleSync);
+    }
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("payent_orders_updated", handleSync);
+        window.removeEventListener("payent_booking_updated", handleSync);
+        window.removeEventListener("storage", handleSync);
+      }
+    };
+  }, [fetchAvailability]);
+
   // Previous month navigation guard (cannot go before current month)
   const isPrevDisabled = useMemo(() => {
     const curYear = new Date().getFullYear();
@@ -524,12 +543,9 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
                 // Past Disabled
                 isPast &&
                   "opacity-30 text-muted-foreground bg-muted/20 border border-transparent cursor-not-allowed",
-                // Vendor Blocked (RED - High Contrast, Strict Requirement)
-                isBlocked &&
+                // Unavailable (Blocked or Booked) - RED + High Contrast Strikethrough
+                (isBlocked || isBooked) &&
                   "bg-red-500/15 dark:bg-red-950/40 border border-red-500/50 text-red-600 dark:text-red-400 font-bold cursor-not-allowed shadow-inner",
-                // Already Booked (Muted Gray / Strikethrough)
-                isBooked &&
-                  "bg-muted/70 text-muted-foreground/60 border border-border/50 cursor-not-allowed opacity-80",
                 // Selected Single
                 isSingle &&
                   "bg-primary text-primary-foreground font-black shadow-md border border-primary ring-2 ring-primary/30 z-10 scale-[1.03]",
@@ -550,24 +566,18 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
               <span
                 className={cn(
                   "relative z-10 leading-none",
-                  isBooked &&
-                    "line-through decoration-rose-600 dark:decoration-rose-400 decoration-2 font-medium text-muted-foreground/70"
+                  (isBooked || isBlocked) &&
+                    "line-through decoration-red-600 dark:decoration-red-400 decoration-2 font-medium text-red-600 dark:text-red-400"
                 )}
               >
                 {cell.dayNumber}
               </span>
 
               {/* Status indicator pin/dot */}
-              {isBlocked && (
+              {(isBlocked || isBooked) && (
                 <span
                   className="w-1.5 h-1.5 rounded-full bg-red-600 dark:bg-red-400 absolute bottom-1"
-                  aria-label="Blocked by owner"
-                />
-              )}
-              {isBooked && !isBlocked && (
-                <span
-                  className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60 absolute bottom-1"
-                  aria-label="Already booked"
+                  aria-label={isBlocked ? "Blocked by owner" : "Already booked"}
                 />
               )}
               {(isSingle || isStart || isEnd) && (
@@ -626,18 +636,18 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
           <span>Available</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <div className="w-3 h-3 rounded-md bg-rose-500/20 border border-rose-500/50 flex items-center justify-center">
-            <div className="w-1.5 h-1.5 rounded-full bg-rose-600 dark:bg-rose-400" />
+          <div className="w-3 h-3 rounded-md bg-red-500/20 border border-red-500/50 flex items-center justify-center">
+            <span className="text-[8px] font-bold line-through text-red-600 dark:text-red-400">12</span>
           </div>
-          <span className="text-rose-600 dark:text-rose-400 font-semibold">
-            Blocked (Owner)
+          <span className="text-red-600 dark:text-red-400 font-semibold">
+            Unavailable / Booked
           </span>
         </div>
         <div className="flex items-center gap-1.5">
-          <div className="w-3 h-3 rounded-md bg-muted/80 border border-border/70 flex items-center justify-center">
-            <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60" />
+          <div className="w-3 h-3 rounded-md bg-red-500/15 border border-red-500/40 flex items-center justify-center">
+            <div className="w-1.5 h-1.5 rounded-full bg-red-600 dark:bg-red-400" />
           </div>
-          <span>Already Booked</span>
+          <span className="text-red-600 dark:text-red-400 font-semibold">Blocked (Owner)</span>
         </div>
         <div className="flex items-center gap-1.5">
           <div className="w-3 h-3 rounded-md bg-primary text-primary-foreground font-bold flex items-center justify-center text-[8px]">
