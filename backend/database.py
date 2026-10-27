@@ -590,6 +590,7 @@ def init_db(force: bool = False):
     add_column_safely("cart_items", "start_datetime VARCHAR(100) NULL")
     add_column_safely("cart_items", "end_datetime VARCHAR(100) NULL")
     add_index_safely("cart_items", "uq_cart_user_product", "user_email, product_id", unique=True)
+    add_index_safely("cart_items", "idx_cart_user_created", "user_email, created_at")
 
     # Create custom_products table
     execute_query("""
@@ -1273,32 +1274,52 @@ def get_user(email: str):
         if now - t < 30.0:
             return cached
 
-    # 1. Search admin_accounts
+    # Fast unified lookup: check admin_accounts, payrent_accounts, and users in 1 single round trip
     try:
-        admin = fetch_one("SELECT * FROM admin_accounts WHERE email = %s", (clean_email,))
-        if admin:
-            _user_cache[clean_email] = (now, admin)
-            return admin
-    except Exception as e:
-        logger.warning("DB read error in get_user (admin_accounts): %s", e)
-
-    # 2. Search payrent_accounts
-    try:
-        payrent = fetch_one("SELECT * FROM payrent_accounts WHERE email = %s", (clean_email,))
-        if payrent:
-            _user_cache[clean_email] = (now, payrent)
-            return payrent
-    except Exception as e:
-        logger.warning("DB read error in get_user (payrent_accounts): %s", e)
-
-    # 3. Fallback to users table
-    try:
-        user = fetch_one("SELECT * FROM users WHERE email = %s", (clean_email,))
+        user = fetch_one("""
+            SELECT id, email, password_hash, role, status, full_name, avatar,
+                   profile_photo_url, phone, address, city, state, country, pincode, person_id,
+                   pan_number, verified, created_at, last_login_at
+            FROM admin_accounts WHERE LOWER(email) = %s
+            UNION ALL
+            SELECT email AS id, email, password_hash, role, status, full_name, avatar,
+                   profile_photo_url, phone, address, city, state, country, pincode, person_id,
+                   pan_number, verified, created_at, last_login_at
+            FROM payrent_accounts WHERE LOWER(email) = %s
+            UNION ALL
+            SELECT email AS id, email, password_hash, role, status, full_name, avatar,
+                   profile_photo_url, phone, address, city, state, country, pincode, person_id,
+                   pan_number, verified, created_at, last_login_at
+            FROM users WHERE LOWER(email) = %s
+            LIMIT 1
+        """, (clean_email, clean_email, clean_email))
         if user:
             _user_cache[clean_email] = (now, user)
             return user
     except Exception as e:
-        logger.warning("DB read error in get_user for %s — falling back to MOCK_USERS: %s", clean_email, e)
+        logger.warning("Notice: Unified get_user fallback notice: %s", e)
+        # Resilient individual check fallbacks
+        try:
+            admin = fetch_one("SELECT * FROM admin_accounts WHERE email = %s", (clean_email,))
+            if admin:
+                _user_cache[clean_email] = (now, admin)
+                return admin
+        except Exception:
+            pass
+        try:
+            payrent = fetch_one("SELECT * FROM payrent_accounts WHERE email = %s", (clean_email,))
+            if payrent:
+                _user_cache[clean_email] = (now, payrent)
+                return payrent
+        except Exception:
+            pass
+        try:
+            user = fetch_one("SELECT * FROM users WHERE email = %s", (clean_email,))
+            if user:
+                _user_cache[clean_email] = (now, user)
+                return user
+        except Exception:
+            pass
 
     res = MOCK_USERS.get(clean_email)
     if res:
@@ -1860,15 +1881,17 @@ def get_orders(email: str):
             try:
                 with conn.cursor() as cursor:
                     cursor.execute("""
-                        SELECT id, user_email, product_id, product_title, product_image,
-                               start_date, end_date, total, status, created_at,
-                               razorpay_order_id, razorpay_payment_id, payment_status, refund_id, refund_status,
-                               confirmed_at, ready_for_pickup_at, picked_up_at, return_initiated_at, handed_back_at, awaiting_inspection_at, completed_at, queue_notes,
-                               cancelled_at, cancellation_reason, cancellation_id,
-                               category
-                        FROM orders
-                        WHERE user_email = %s
-                        ORDER BY created_at DESC
+                        SELECT o.id, o.user_email, o.product_id, o.product_title, o.product_image,
+                               o.start_date, o.end_date, o.total, o.status, o.created_at,
+                               o.razorpay_order_id, o.razorpay_payment_id, o.payment_status, o.refund_id, o.refund_status,
+                               o.confirmed_at, o.ready_for_pickup_at, o.picked_up_at, o.return_initiated_at, o.handed_back_at, o.awaiting_inspection_at, o.completed_at, o.queue_notes,
+                               o.cancelled_at, o.cancellation_reason, o.cancellation_id,
+                               COALESCE(NULLIF(o.category, ''), cp.category, pp.category, 'gear') as category
+                        FROM orders o
+                        LEFT JOIN custom_products cp ON o.product_id = cp.id
+                        LEFT JOIN payernt_products pp ON o.product_id = pp.id
+                        WHERE o.user_email = %s
+                        ORDER BY o.created_at DESC
                         LIMIT 100
                     """, (clean_email,))
                     rows = cursor.fetchall()
@@ -2829,15 +2852,16 @@ def get_custom_products(email: str):
                         SELECT cp.id, cp.user_email, cp.title, cp.description, cp.price, cp.image,
                                cp.category, cp.rating, cp.reviews, cp.available, cp.status,
                                cp.owner_name, cp.owner_avatar, cp.owner_rating, cp.featured, cp.created_at,
-                               u.address AS owner_address, 
-                               u.city AS owner_city, 
+                               COALESCE(u.address, pa.address, '') AS owner_address, 
+                               COALESCE(u.city, pa.address, '') AS owner_city, 
                                u.state AS owner_state, 
-                               u.pincode AS owner_pincode,
-                               u.status AS owner_status,
-                               u.verified AS owner_verified,
+                               COALESCE(u.pincode, pa.pincode, '') AS owner_pincode,
+                               COALESCE(u.status, pa.status, 'active') AS owner_status,
+                               COALESCE(u.verified, 1) AS owner_verified,
                                a.status AS agent_status
                         FROM custom_products cp
                         LEFT JOIN users u ON cp.user_email = u.email
+                        LEFT JOIN payernt_accounts pa ON cp.user_email = pa.email
                         LEFT JOIN agents a ON cp.user_email = a.user_email
                         WHERE cp.user_email = %s 
                         ORDER BY cp.created_at DESC
@@ -2962,15 +2986,16 @@ def get_all_approved_custom_products(limit: Optional[int] = None, offset: int = 
                                    cp.images, cp.video_url,
                                    cp.category, cp.rating, cp.reviews, cp.available, cp.status,
                                    cp.owner_name, cp.owner_avatar, cp.owner_rating, cp.featured, cp.created_at,
-                                   u.address AS owner_address, 
-                                   u.city AS owner_city, 
+                                   COALESCE(u.address, pa.address, '') AS owner_address, 
+                                   COALESCE(u.city, pa.address, '') AS owner_city, 
                                    u.state AS owner_state, 
-                                   u.pincode AS owner_pincode,
-                                   u.status AS owner_status,
-                                   u.verified AS owner_verified,
+                                   COALESCE(u.pincode, pa.pincode, '') AS owner_pincode,
+                                   COALESCE(u.status, pa.status, 'active') AS owner_status,
+                                   COALESCE(u.verified, 1) AS owner_verified,
                                    a.status AS agent_status
                             FROM custom_products cp
                             LEFT JOIN users u ON cp.user_email = u.email
+                            LEFT JOIN payernt_accounts pa ON cp.user_email = pa.email
                             LEFT JOIN agents a ON cp.user_email = a.user_email
                             WHERE (cp.status = 'approved' OR cp.status IS NULL) 
                               AND (cp.hidden = 0 OR cp.hidden IS NULL) 
@@ -2983,15 +3008,16 @@ def get_all_approved_custom_products(limit: Optional[int] = None, offset: int = 
                                    cp.images, cp.video_url,
                                    cp.category, cp.rating, cp.reviews, cp.available, cp.status,
                                    cp.owner_name, cp.owner_avatar, cp.owner_rating, cp.featured, cp.created_at,
-                                   u.address AS owner_address, 
-                                   u.city AS owner_city, 
+                                   COALESCE(u.address, pa.address, '') AS owner_address, 
+                                   COALESCE(u.city, pa.address, '') AS owner_city, 
                                    u.state AS owner_state, 
-                                   u.pincode AS owner_pincode,
-                                   u.status AS owner_status,
-                                   u.verified AS owner_verified,
+                                   COALESCE(u.pincode, pa.pincode, '') AS owner_pincode,
+                                   COALESCE(u.status, pa.status, 'active') AS owner_status,
+                                   COALESCE(u.verified, 1) AS owner_verified,
                                    a.status AS agent_status
                             FROM custom_products cp
                             LEFT JOIN users u ON cp.user_email = u.email
+                            LEFT JOIN payernt_accounts pa ON cp.user_email = pa.email
                             LEFT JOIN agents a ON cp.user_email = a.user_email
                             WHERE (cp.status = 'approved' OR cp.status IS NULL) 
                               AND (cp.hidden = 0 OR cp.hidden IS NULL) 
@@ -3148,6 +3174,25 @@ def update_custom_product(product_id: str, email: str, patch: dict):
     return MOCK_CUSTOM_PRODUCTS.get(product_id)
 
 # Notifications CRUD & Event Orchestrator
+_user_payernt_id_cache: Dict[str, Tuple[float, Optional[str]]] = {}
+
+def get_payernt_account_id(email: str) -> Optional[str]:
+    clean_email = (email or "").strip().lower()
+    if not clean_email:
+        return None
+    now = time.monotonic()
+    if clean_email in _user_payernt_id_cache:
+        t, v = _user_payernt_id_cache[clean_email]
+        if now - t < 120.0:
+            return v
+    try:
+        row = fetch_one("SELECT id FROM payernt_accounts WHERE LOWER(email) = %s LIMIT 1", (clean_email,))
+        v = row.get("id") if row else None
+        _user_payernt_id_cache[clean_email] = (now, v)
+        return v
+    except Exception:
+        return None
+
 def get_notifications(email: str):
     clean_email = (email or "").strip().lower()
     if not clean_email:
@@ -3157,15 +3202,25 @@ def get_notifications(email: str):
         if conn:
             try:
                 with conn.cursor() as cursor:
-                    cursor.execute("""
-                        SELECT id, user_email, title, message, type, is_read, created_at,
-                               product_name, booking_id, link, event_key
-                        FROM notifications
-                        WHERE user_email = %s
-                           OR user_email IN (SELECT id FROM payernt_accounts WHERE LOWER(email) = %s)
-                        ORDER BY created_at DESC
-                        LIMIT 50
-                    """, (clean_email, clean_email))
+                    vendor_id = get_payernt_account_id(clean_email)
+                    if vendor_id and vendor_id != clean_email:
+                        cursor.execute("""
+                            SELECT id, user_email, title, message, type, is_read, created_at,
+                                   product_name, booking_id, link, event_key
+                            FROM notifications
+                            WHERE user_email IN (%s, %s)
+                            ORDER BY created_at DESC
+                            LIMIT 50
+                        """, (clean_email, vendor_id))
+                    else:
+                        cursor.execute("""
+                            SELECT id, user_email, title, message, type, is_read, created_at,
+                                   product_name, booking_id, link, event_key
+                            FROM notifications
+                            WHERE user_email = %s
+                            ORDER BY created_at DESC
+                            LIMIT 50
+                        """, (clean_email,))
                     rows = cursor.fetchall()
                     if rows:
                         return rows
@@ -3855,6 +3910,30 @@ def is_token_revoked(jti: str) -> bool:
 # Rate-Limiting and OTP Attempt Helpers
 RATE_LIMIT_STORE = {}
 
+def check_auth_lockout(key: str) -> tuple[bool, int]:
+    """
+    Fast, read-only lockout check. Returns (is_locked, seconds_remaining).
+    Uses in-memory cache first to avoid unnecessary remote database round trips on valid logins.
+    """
+    now = int(dt.now(timezone.utc).timestamp())
+    mem_rec = RATE_LIMIT_STORE.get(key)
+    if mem_rec:
+        locked_until = mem_rec.get("locked_until", 0)
+        if locked_until > now:
+            return True, locked_until - now
+        return False, 0
+
+    try:
+        row = fetch_one("SELECT locked_until FROM auth_rate_limits WHERE key_id = %s", (key,))
+        if row:
+            locked_until = int(row.get("locked_until") or 0)
+            if locked_until > now:
+                RATE_LIMIT_STORE[key] = {"attempts": 5, "last_attempt": now, "locked_until": locked_until}
+                return True, locked_until - now
+    except Exception:
+        pass
+    return False, 0
+
 def record_failed_auth_attempt(key: str, max_attempts: int = 5, lock_duration_secs: int = 900) -> tuple[bool, int]:
     """
     Record a failed login attempt for a key (IP or email) with DB-backed persistence for serverless scaling.
@@ -3919,11 +3998,12 @@ def record_failed_auth_attempt(key: str, max_attempts: int = 5, lock_duration_se
     return is_locked, secs_remaining
 
 def clear_failed_auth_attempts(key: str):
-    RATE_LIMIT_STORE.pop(key, None)
-    try:
-        execute_query("DELETE FROM auth_rate_limits WHERE key_id = %s", (key,))
-    except Exception:
-        pass
+    had_entry = RATE_LIMIT_STORE.pop(key, None)
+    if had_entry:
+        try:
+            execute_query("DELETE FROM auth_rate_limits WHERE key_id = %s", (key,))
+        except Exception:
+            pass
 
 def increment_otp_attempt(email: str) -> int:
     clean_email = email.strip().lower()
@@ -4654,75 +4734,46 @@ def revoke_all_user_sessions(user_email: str) -> bool:
 
 def revoke_cross_side_user_sessions(user_email: str, person_id: Optional[str] = None, logging_in_account_type: str = "payrent") -> bool:
     """
-    Enforces the single active user-side session rule.
+    Enforces the single active user-side session rule with minimal database overhead.
     When logging into Payrent, revokes any active Payernt sessions for this person/identity.
     When logging into Payernt, revokes any active Payrent sessions for this person/identity.
     Admin sessions remain independent.
     """
-    VALID_SESSIONS.clear()
     clean_email = user_email.strip().lower()
     now_str = dt.now(timezone.utc).isoformat()
+    norm_target = "payrent" if logging_in_account_type.lower() in ("payrent", "pay₹ent", "customer") else "payernt"
+    target_accounts = ("'payernt', 'paye₹nt', 'vendor'" if norm_target == "payrent" else "'payrent', 'pay₹ent', 'customer'")
 
-    # Collect associated emails for this person
-    target_emails = {clean_email}
     try:
         if person_id:
-            rows_payrent = fetch_all("SELECT email FROM payrent_accounts WHERE person_id = %s", (person_id,)) or []
-            rows_users = fetch_all("SELECT email FROM users WHERE person_id = %s", (person_id,)) or []
-            rows_payernt = fetch_all("SELECT email FROM payernt_accounts WHERE person_id = %s", (person_id,)) or []
-            for r in rows_payrent + rows_users + rows_payernt:
-                if r and r.get("email"):
-                    target_emails.add(r["email"].strip().lower())
-        else:
-            p_user = fetch_one("SELECT person_id, phone FROM users WHERE email = %s", (clean_email,))
-            p_payernt = fetch_one("SELECT person_id, phone FROM payernt_accounts WHERE email = %s", (clean_email,))
-            pid = (p_user and p_user.get("person_id")) or (p_payernt and p_payernt.get("person_id"))
-            if pid:
-                rows_payrent = fetch_all("SELECT email FROM payrent_accounts WHERE person_id = %s", (pid,)) or []
-                rows_users = fetch_all("SELECT email FROM users WHERE person_id = %s", (pid,)) or []
-                rows_payernt = fetch_all("SELECT email FROM payernt_accounts WHERE person_id = %s", (pid,)) or []
-                for r in rows_payrent + rows_users + rows_payernt:
-                    if r and r.get("email"):
-                        target_emails.add(r["email"].strip().lower())
-            phone = (p_user and p_user.get("phone")) or (p_payernt and p_payernt.get("phone"))
-            if phone:
-                rows_u = fetch_all("SELECT email FROM users WHERE phone = %s", (phone,)) or []
-                rows_p = fetch_all("SELECT email FROM payernt_accounts WHERE phone = %s", (phone,)) or []
-                for r in rows_u + rows_p:
-                    if r and r.get("email"):
-                        target_emails.add(r["email"].strip().lower())
-    except Exception as e:
-        logger.warning(f"Notice: cross-side email discovery error: {e}")
-
-    norm_target = "payrent" if logging_in_account_type.lower() in ("payrent", "pay₹ent", "customer") else "payernt"
-    for em in target_emails:
-        try:
-            if norm_target == "payrent":
-                # Revoke payernt sessions
-                execute_query("""
-                    UPDATE sessions 
-                    SET revoked_at = %s 
-                    WHERE LOWER(user_email) = LOWER(%s) 
-                      AND (account_type IN ('payernt', 'paye₹nt', 'vendor') OR account_type IS NULL)
-                      AND account_type NOT IN ('admin')
-                      AND revoked_at IS NULL
-                """, (now_str, em))
-            else:
-                # Revoke payrent sessions
-                execute_query("""
-                    UPDATE sessions 
-                    SET revoked_at = %s 
-                    WHERE LOWER(user_email) = LOWER(%s) 
-                      AND (account_type IN ('payrent', 'pay₹ent', 'customer') OR account_type IS NULL)
-                      AND account_type NOT IN ('admin')
-                      AND revoked_at IS NULL
-                """, (now_str, em))
-        except Exception:
-            execute_query("""
+            execute_query(f"""
                 UPDATE sessions 
                 SET revoked_at = %s 
-                WHERE LOWER(user_email) = LOWER(%s) AND revoked_at IS NULL
-            """, (now_str, em))
+                WHERE (account_type IN ({target_accounts}) OR account_type IS NULL)
+                  AND account_type NOT IN ('admin')
+                  AND revoked_at IS NULL
+                  AND (
+                    LOWER(user_email) = LOWER(%s)
+                    OR user_email IN (SELECT email FROM users WHERE person_id = %s)
+                    OR user_email IN (SELECT email FROM payernt_accounts WHERE person_id = %s)
+                  )
+            """, (now_str, clean_email, person_id, person_id))
+        else:
+            execute_query(f"""
+                UPDATE sessions 
+                SET revoked_at = %s 
+                WHERE (account_type IN ({target_accounts}) OR account_type IS NULL)
+                  AND account_type NOT IN ('admin')
+                  AND revoked_at IS NULL
+                  AND LOWER(user_email) = LOWER(%s)
+            """, (now_str, clean_email))
+    except Exception as e:
+        logger.warning(f"Notice: revoke_cross_side_user_sessions notice: {e}")
+
+    # Evict only affected email's sessions from in-memory cache without flushing global session cache
+    for sid in list(VALID_SESSIONS.keys()):
+        if clean_email in sid.lower():
+            VALID_SESSIONS.pop(sid, None)
 
     return True
 
@@ -5763,20 +5814,29 @@ CATEGORY_BOOKING_RESTRICTION_MESSAGE = (
 _CATEGORY_RESTRICTION_LOCK = threading.RLock()
 
 
+_product_category_cache: Dict[str, Tuple[float, str]] = {}
+
 def get_product_category(product_id: Optional[str]) -> str:
     """
     Authoritative product category resolver across MySQL custom_products,
-    payernt_products, in-memory catalogs, and fallback mocks.
+    payernt_products, in-memory catalogs, and fallback mocks with fast in-memory caching.
     """
     if not product_id:
         return ""
     pid = str(product_id).strip()
+    now = time.monotonic()
+    if pid in _product_category_cache:
+        t, cat = _product_category_cache[pid]
+        if now - t < 120.0:
+            return cat
 
     # 1. custom_products table
     try:
         row = fetch_one("SELECT category FROM custom_products WHERE id = %s", (pid,))
         if row and row.get("category"):
-            return str(row["category"]).strip()
+            resolved = str(row["category"]).strip()
+            _product_category_cache[pid] = (now, resolved)
+            return resolved
     except Exception:
         pass
 
@@ -5784,7 +5844,9 @@ def get_product_category(product_id: Optional[str]) -> str:
     try:
         row = fetch_one("SELECT category FROM payernt_products WHERE id = %s", (pid,))
         if row and row.get("category"):
-            return str(row["category"]).strip()
+            resolved = str(row["category"]).strip()
+            _product_category_cache[pid] = (now, resolved)
+            return resolved
     except Exception:
         pass
 
@@ -5792,7 +5854,9 @@ def get_product_category(product_id: Optional[str]) -> str:
     if pid in MOCK_CUSTOM_PRODUCTS:
         cat = MOCK_CUSTOM_PRODUCTS[pid].get("category")
         if cat:
-            return str(cat).strip()
+            resolved = str(cat).strip()
+            _product_category_cache[pid] = (now, resolved)
+            return resolved
 
     # 4. MOCK_PAYERNT_PRODUCTS
     try:
@@ -5800,10 +5864,13 @@ def get_product_category(product_id: Optional[str]) -> str:
         if pid in MOCK_PAYERNT_PRODUCTS:
             cat = MOCK_PAYERNT_PRODUCTS[pid].get("category")
             if cat:
-                return str(cat).strip()
+                resolved = str(cat).strip()
+                _product_category_cache[pid] = (now, resolved)
+                return resolved
     except Exception:
         pass
 
+    _product_category_cache[pid] = (now, "")
     return ""
 
 
@@ -6171,6 +6238,27 @@ def fetch_cart_validation_bundle(
         "existing_cart_item_id": existing_cid
     }
 
+_owner_status_cache: Dict[str, Tuple[float, str]] = {}
+
+def get_cached_owner_status(owner_email: str) -> str:
+    clean_email = (owner_email or "").strip().lower()
+    if not clean_email:
+        return "active"
+    now = time.monotonic()
+    if clean_email in _owner_status_cache:
+        t, st = _owner_status_cache[clean_email]
+        if now - t < 120.0:
+            return st
+    u = get_user(clean_email)
+    if not u:
+        try:
+            u = fetch_one("SELECT status FROM payernt_accounts WHERE email = %s LIMIT 1", (clean_email,))
+        except Exception:
+            pass
+    st = str(u.get("status") or "active").lower().strip() if u else "deleted"
+    _owner_status_cache[clean_email] = (now, st)
+    return st
+
 def evaluate_product_availability(product: dict, booked_pids_set: Optional[Set[str]] = None) -> Tuple[bool, str, Optional[str]]:
     """
     Authoritatively calculates product availability based on:
@@ -6203,16 +6291,7 @@ def evaluate_product_availability(product: dict, booked_pids_set: Optional[Set[s
     ).strip().lower()
 
     if not owner_status and owner_email:
-        u = get_user(owner_email)
-        if not u:
-            try:
-                u = fetch_one("SELECT status FROM payernt_accounts WHERE email = %s", (owner_email,))
-            except Exception:
-                pass
-        if u:
-            owner_status = str(u.get("status") or "active").lower().strip()
-        else:
-            owner_status = "deleted"
+        owner_status = get_cached_owner_status(owner_email)
 
     # If owner account exists and is pending, rejected, suspended, or deleted => unavailable
     if owner_status in ("pending", "rejected", "suspended", "deleted"):
@@ -7415,6 +7494,12 @@ def add_message(conversation_id: str, sender_email: str, sender_name: str,
 
     return msg_record
 
+_unread_count_cache: Dict[str, Tuple[float, int]] = {}
+
+def invalidate_unread_count(user_email: str):
+    if user_email:
+        _unread_count_cache.pop(user_email.strip().lower(), None)
+
 def mark_conversation_read(conversation_id: str, user_email: str) -> bool:
     """
     Marks all messages in conversation as read for the specified user.
@@ -7422,6 +7507,7 @@ def mark_conversation_read(conversation_id: str, user_email: str) -> bool:
     clean_user = (user_email or "").strip().lower()
     clean_cid = (conversation_id or "").strip()
     now_iso = dt.now(timezone.utc).isoformat()
+    invalidate_unread_count(clean_user)
 
     execute_query("""
         UPDATE conversation_members
@@ -7439,11 +7525,16 @@ def mark_conversation_read(conversation_id: str, user_email: str) -> bool:
 
 def get_total_unread_messages_count(user_email: str) -> int:
     """
-    Returns total unread customer-lender messages across all conversations for the user.
+    Returns total unread customer-lender messages across all conversations for the user with 10s caching.
     """
     clean_user = (user_email or "").strip().lower()
     if not clean_user:
         return 0
+    now = time.monotonic()
+    if clean_user in _unread_count_cache:
+        t, cnt = _unread_count_cache[clean_user]
+        if now - t < 10.0:
+            return cnt
     try:
         row = fetch_one("""
             SELECT COUNT(m.id) as unread_count
@@ -7456,13 +7547,17 @@ def get_total_unread_messages_count(user_email: str) -> int:
               AND m.deleted_at IS NULL
         """, (clean_user, clean_user, clean_user, clean_user))
         if row and "unread_count" in row and row["unread_count"] is not None:
-            return int(row["unread_count"])
+            cnt = int(row["unread_count"])
+            _unread_count_cache[clean_user] = (now, cnt)
+            return cnt
     except Exception as e:
         logger.warning(f"get_total_unread_messages_count DB error: {e}")
 
     # Fallback to counting in-memory
     convs = get_user_conversations(clean_user)
-    return sum(c.get("unreadCount", 0) for c in convs)
+    cnt = sum(c.get("unreadCount", 0) for c in convs)
+    _unread_count_cache[clean_user] = (now, cnt)
+    return cnt
 
 # =========================================================================
 # SECURE DEVICE IDENTITY & MY SECURITY QR FUNCTIONS

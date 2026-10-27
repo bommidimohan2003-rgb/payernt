@@ -417,11 +417,15 @@ export const api = {
   async login(email: string, password: string) {
     try {
       if (API_BASE) {
-        const res = await fetch(`${API_BASE}/api/login`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password }),
-        });
+        const res = await fetchWithTimeout(
+          `${API_BASE}/api/login`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password }),
+          },
+          12000
+        );
         if (res.ok) {
           const data = await res.json();
           if (data && data.refreshToken) {

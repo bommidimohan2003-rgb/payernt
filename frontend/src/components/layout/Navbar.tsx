@@ -45,7 +45,7 @@ export function Navbar() {
     };
 
     checkNotifs();
-    const interval = setInterval(checkNotifs, 15000);
+    const interval = setInterval(checkNotifs, 30000);
     window.addEventListener("payent_orders_updated", checkNotifs);
     window.addEventListener("payent_notifications_updated", checkNotifs);
 

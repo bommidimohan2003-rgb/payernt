@@ -114,6 +114,7 @@ from database import (
     resubmit_payrent_account,
     revoke_token,
     is_token_revoked,
+    check_auth_lockout,
     record_failed_auth_attempt,
     clear_failed_auth_attempts,
     increment_otp_attempt,
@@ -372,7 +373,7 @@ def is_origin_allowed(origin: Optional[str]) -> bool:
 # Custom Universal CORS, Structured Access Logging & Security Headers Middleware
 @app.middleware("http")
 async def custom_cors_and_security_middleware(request: Request, call_next):
-    start_time = time.time()
+    start_time = time.perf_counter()
     req_id = request.headers.get("x-request-id") or f"req_{uuid.uuid4().hex[:12]}"
     origin = request.headers.get("origin")
     allowed = is_origin_allowed(origin)
@@ -398,10 +399,12 @@ async def custom_cors_and_security_middleware(request: Request, call_next):
         return res
 
     response = await call_next(request)
-    duration_ms = round((time.time() - start_time) * 1000, 2)
+    duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
     
-    # Structured Request Correlation Header
+    # Structured Request Correlation and High-Precision Server Timing Header
     response.headers["X-Request-ID"] = req_id
+    response.headers["Server-Timing"] = f"total;dur={duration_ms}"
+    response.headers["X-Response-Time"] = f"{duration_ms}ms"
 
     # Attach CORS headers to response if origin is allowed
     if allowed and origin:
@@ -1492,15 +1495,15 @@ def login(data: LoginRequestSchema, request: Request, response: Response):
     ip_key = f"login_ip:{client_ip}"
     user_key = f"login_user:{clean_email}"
 
-    # Rate Limiting Check
-    is_locked_ip, secs_ip = record_failed_auth_attempt(ip_key, max_attempts=10, lock_duration_secs=900)
+    # Fast read-only lockout check (zero DB queries on legitimate logins)
+    is_locked_ip, secs_ip = check_auth_lockout(ip_key)
     if is_locked_ip:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=f"Too many failed login attempts from this IP. Please try again in {secs_ip // 60} minutes."
         )
         
-    is_locked_user, secs_user = record_failed_auth_attempt(user_key, max_attempts=5, lock_duration_secs=900)
+    is_locked_user, secs_user = check_auth_lockout(user_key)
     if is_locked_user:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -1509,6 +1512,9 @@ def login(data: LoginRequestSchema, request: Request, response: Response):
 
     user = get_user(clean_email)
     if not user or not verify_password(data.password, user["password_hash"]):
+        # Increment attempt counter and record failure only when password verification fails
+        record_failed_auth_attempt(ip_key, max_attempts=10, lock_duration_secs=900)
+        record_failed_auth_attempt(user_key, max_attempts=5, lock_duration_secs=900)
         logger.warning(f"Failed login attempt for {clean_email} from IP {client_ip}")
         # Uniform failure message to prevent enumeration
         raise HTTPException(
@@ -2626,7 +2632,7 @@ def fetch_orders(email: str = Depends(get_current_user_email)):
                 "awaitingInspectionAt": o.get("awaiting_inspection_at") or o.get("awaitingInspectionAt"),
                 "completedAt": o.get("completed_at") or o.get("completedAt"),
                 "queueNotes": o.get("queue_notes") or o.get("queueNotes"),
-                "category": o.get("category") or get_product_category(pid),
+                "category": o.get("category") or get_product_category(pid) or "gear",
                 "deliveryMethod": del_method,
                 "delivery_method": del_method,
                 "deliveryAddress": del_addr,
@@ -5179,10 +5185,19 @@ def check_due_and_overdue_bookings_for_user(user_email: str):
     except Exception as e:
         logger.debug(f"Check due notice: {e}")
 
+_last_due_check_timestamps: Dict[str, float] = {}
+
 @app.get("/api/notifications")
 def fetch_notifications(email: str = Depends(get_current_any_user_email)):
     clean_email = email.strip().lower()
-    check_due_and_overdue_bookings_for_user(clean_email)
+    now_mono = time.monotonic()
+    last_check = _last_due_check_timestamps.get(clean_email, 0.0)
+    # Run lifecycle due-check asynchronously in background daemon thread at most once per 10 minutes
+    if now_mono - last_check > 600.0:
+        _last_due_check_timestamps[clean_email] = now_mono
+        import threading
+        threading.Thread(target=check_due_and_overdue_bookings_for_user, args=(clean_email,), daemon=True).start()
+
     notifications = get_notifications(clean_email)
     if not notifications:
         return []
@@ -6416,14 +6431,14 @@ def admin_login(data: LoginRequestSchema, request: Request, response: Response):
     ip_key = f"admin_login_ip:{client_ip}"
     user_key = f"admin_login_user:{clean_email}"
 
-    is_locked_ip, secs_ip = record_failed_auth_attempt(ip_key, max_attempts=10, lock_duration_secs=900)
+    is_locked_ip, secs_ip = check_auth_lockout(ip_key, max_attempts=10, lock_duration_secs=900)
     if is_locked_ip:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=f"Too many admin login attempts from this IP. Locked out for {secs_ip // 60} minutes."
         )
 
-    is_locked_user, secs_user = record_failed_auth_attempt(user_key, max_attempts=5, lock_duration_secs=900)
+    is_locked_user, secs_user = check_auth_lockout(user_key, max_attempts=5, lock_duration_secs=900)
     if is_locked_user:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -6432,6 +6447,8 @@ def admin_login(data: LoginRequestSchema, request: Request, response: Response):
 
     user = get_user(clean_email)
     if not user or not verify_password(data.password, user["password_hash"]):
+        record_failed_auth_attempt(ip_key, max_attempts=10, lock_duration_secs=900)
+        record_failed_auth_attempt(user_key, max_attempts=5, lock_duration_secs=900)
         logger.warning(f"Failed admin login attempt for {clean_email} from IP {client_ip}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -6439,6 +6456,8 @@ def admin_login(data: LoginRequestSchema, request: Request, response: Response):
         )
 
     if user["role"] != "admin":
+        record_failed_auth_attempt(ip_key, max_attempts=10, lock_duration_secs=900)
+        record_failed_auth_attempt(user_key, max_attempts=5, lock_duration_secs=900)
         logger.warning(f"Non-admin user {clean_email} attempted admin login from IP {client_ip}")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
