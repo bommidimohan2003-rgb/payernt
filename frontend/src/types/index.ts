@@ -184,6 +184,34 @@ export interface Order {
     rejectionReason?: string;
   } | null;
   location_change_request?: any;
+  deliveryAddressId?: string;
+  delivery_address_id?: string;
+  deliveryAddressSnapshot?: any;
+  delivery_address_snapshot?: any;
+}
+
+export interface UserAddress {
+  id: string;
+  user_email?: string;
+  userEmail?: string;
+  full_name: string;
+  fullName?: string;
+  phone: string;
+  flat_house: string;
+  flatHouse?: string;
+  street_area: string;
+  streetArea?: string;
+  landmark?: string;
+  city: string;
+  state: string;
+  pincode: string;
+  pinCode?: string;
+  delivery_instructions?: string;
+  deliveryInstructions?: string;
+  is_default?: boolean;
+  isDefault?: boolean;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface Notification {

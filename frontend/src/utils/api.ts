@@ -17,6 +17,7 @@ import type {
   DeliveryLocationUpdate,
   RealtimeConversation,
   RealtimeMessage,
+  UserAddress,
 } from "@/types";
 
 export const getApiBase = () => {
@@ -1163,6 +1164,8 @@ export const api = {
         orderData.createdAt || orderData.created_at || new Date().toISOString(),
       deliveryMethod: orderData.deliveryMethod || (orderData as any).delivery_method || "delivery",
       deliveryAddress: orderData.deliveryAddress || (orderData as any).delivery_address || "",
+      deliveryAddressId: orderData.deliveryAddressId || (orderData as any).delivery_address_id || undefined,
+      deliveryAddressSnapshot: orderData.deliveryAddressSnapshot || (orderData as any).delivery_address_snapshot || undefined,
       pickupLocation: orderData.pickupLocation || (orderData as any).pickup_location || "",
       customLocation: orderData.customLocation || (orderData as any).custom_location || "",
       locationDirections: orderData.locationDirections || (orderData as any).location_directions || "",
@@ -1198,6 +1201,54 @@ export const api = {
       window.dispatchEvent(new CustomEvent("payent_booking_updated"));
     }
     return res.json();
+  },
+
+  async getUserAddresses(): Promise<UserAddress[]> {
+    const res = await this.fetchWithAuth(`${API_BASE}/api/user/addresses`, {
+      method: "GET",
+    });
+    if (!res.ok) {
+      if (res.status === 401) return [];
+      const data = await res.json().catch(() => ({}));
+      throw new Error(parseApiError(data, "Failed to load saved addresses"));
+    }
+    const data = await res.json();
+    return data.addresses || [];
+  },
+
+  async saveUserAddress(addressData: Partial<UserAddress>): Promise<UserAddress> {
+    const res = await this.fetchWithAuth(`${API_BASE}/api/user/addresses`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(addressData),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(parseApiError(data, "Failed to save delivery address"));
+    }
+    const data = await res.json();
+    return data.address;
+  },
+
+  async updateUserAddress(id: string, addressData: Partial<UserAddress>): Promise<UserAddress> {
+    const res = await this.fetchWithAuth(`${API_BASE}/api/user/addresses/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(addressData),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(parseApiError(data, "Failed to update delivery address"));
+    }
+    const data = await res.json();
+    return data.address;
+  },
+
+  async deleteUserAddress(id: string): Promise<boolean> {
+    const res = await this.fetchWithAuth(`${API_BASE}/api/user/addresses/${id}`, {
+      method: "DELETE",
+    });
+    return res.ok;
   },
 
   async getOrderLocation(token: string, orderId: string) {

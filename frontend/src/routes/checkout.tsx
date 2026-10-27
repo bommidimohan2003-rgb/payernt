@@ -13,6 +13,10 @@ export const Route = createFileRoute("/checkout")({
     }),
   validateSearch: (s: Record<string, unknown>) => ({
     id: (s.id as string) ?? undefined,
+    start: (s.start as string) ?? undefined,
+    end: (s.end as string) ?? undefined,
+    slot: (s.slot as string) ?? undefined,
+    mode: (s.mode as string) ?? undefined,
   }),
   component: () => (
     <ProtectedRoute>

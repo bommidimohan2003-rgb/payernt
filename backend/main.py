@@ -145,6 +145,12 @@ from database import (
     MOCK_CONVERSATIONS,
     MOCK_MESSAGES,
     MOCK_PASSWORD_RESET_TOKENS,
+    MOCK_USER_ADDRESSES,
+    save_user_address,
+    get_user_addresses,
+    get_user_address_by_id,
+    update_user_address,
+    delete_user_address,
     create_password_reset_token,
     get_password_reset_token_record,
     consume_password_reset_token,
@@ -2884,6 +2890,29 @@ class OrderSchema(BaseModel):
     start_time: Optional[str] = None
     endTime: Optional[str] = None
     end_time: Optional[str] = None
+    deliveryAddressId: Optional[str] = None
+    delivery_address_id: Optional[str] = None
+    deliveryAddressSnapshot: Optional[Any] = None
+    delivery_address_snapshot: Optional[Any] = None
+
+class AddressCreateSchema(BaseModel):
+    fullName: Optional[str] = None
+    full_name: Optional[str] = None
+    phone: Optional[str] = None
+    phoneNumber: Optional[str] = None
+    flatHouse: Optional[str] = None
+    flat_house: Optional[str] = None
+    streetArea: Optional[str] = None
+    street_area: Optional[str] = None
+    landmark: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    pincode: Optional[str] = None
+    pinCode: Optional[str] = None
+    deliveryInstructions: Optional[str] = None
+    delivery_instructions: Optional[str] = None
+    isDefault: Optional[bool] = False
+    is_default: Optional[bool] = False
 
 class ProductOwnerSchema(BaseModel):
     name: Optional[str] = "Verified Lender"
@@ -2919,6 +2948,70 @@ def fetch_wishlist(email: str = Depends(get_current_user_email)):
 def toggle_wishlist_item(data: WishlistToggleSchema, email: str = Depends(get_current_user_email)):
     toggle_wishlist(email, data.product_id)
     return {"success": True}
+
+# ============================================================================
+# USER DELIVERY ADDRESSES (Payrent Customer Address Workflow)
+# ============================================================================
+
+@app.get("/api/user/addresses")
+def fetch_user_addresses(current_user: dict = Depends(get_approved_user)):
+    clean_email = current_user["email"].strip().lower()
+    addresses = get_user_addresses(clean_email)
+    return {"success": True, "addresses": addresses}
+
+@app.post("/api/user/addresses")
+def add_user_address(data: AddressCreateSchema, current_user: dict = Depends(get_approved_user)):
+    clean_email = current_user["email"].strip().lower()
+    addr_dict = getattr(data, "model_dump", data.dict)()
+    try:
+        saved = save_user_address(clean_email, addr_dict)
+        return {
+            "success": True,
+            "message": "Delivery address saved successfully.",
+            "address": saved
+        }
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+
+@app.get("/api/user/addresses/{addr_id}")
+def fetch_single_user_address(addr_id: str, current_user: dict = Depends(get_approved_user)):
+    clean_email = current_user["email"].strip().lower()
+    addr = get_user_address_by_id(addr_id)
+    if not addr:
+        raise HTTPException(status_code=404, detail="Address not found.")
+    if addr.get("user_email") != clean_email:
+        raise HTTPException(status_code=403, detail="Forbidden: You do not have permission to access this address.")
+    return {"success": True, "address": addr}
+
+@app.put("/api/user/addresses/{addr_id}")
+def modify_user_address(addr_id: str, data: AddressCreateSchema, current_user: dict = Depends(get_approved_user)):
+    clean_email = current_user["email"].strip().lower()
+    existing = get_user_address_by_id(addr_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Address not found.")
+    if existing.get("user_email") != clean_email:
+        raise HTTPException(status_code=403, detail="Forbidden: You do not have permission to modify this address.")
+    addr_dict = getattr(data, "model_dump", data.dict)()
+    try:
+        updated = update_user_address(addr_id, clean_email, addr_dict)
+        return {
+            "success": True,
+            "message": "Delivery address updated successfully.",
+            "address": updated
+        }
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+
+@app.delete("/api/user/addresses/{addr_id}")
+def remove_user_address(addr_id: str, current_user: dict = Depends(get_approved_user)):
+    clean_email = current_user["email"].strip().lower()
+    existing = get_user_address_by_id(addr_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Address not found.")
+    if existing.get("user_email") != clean_email:
+        raise HTTPException(status_code=403, detail="Forbidden: You do not have permission to delete this address.")
+    success = delete_user_address(addr_id, clean_email)
+    return {"success": success, "message": "Delivery address deleted successfully."}
 
 @app.get("/api/orders")
 def fetch_orders(email: str = Depends(get_current_user_email)):
@@ -3120,6 +3213,10 @@ def add_order(data: OrderSchema, current_user: dict = Depends(get_approved_user)
         "deliveryMethod": data.deliveryMethod or data.delivery_method or "delivery",
         "delivery_address": data.deliveryAddress or data.delivery_address or "",
         "deliveryAddress": data.deliveryAddress or data.delivery_address or "",
+        "delivery_address_id": data.deliveryAddressId or data.delivery_address_id or "",
+        "deliveryAddressId": data.deliveryAddressId or data.delivery_address_id or "",
+        "delivery_address_snapshot": data.deliveryAddressSnapshot or data.delivery_address_snapshot,
+        "deliveryAddressSnapshot": data.deliveryAddressSnapshot or data.delivery_address_snapshot,
         "pickup_location": data.pickupLocation or data.pickup_location or "",
         "pickupLocation": data.pickupLocation or data.pickup_location or "",
         "custom_location": data.customLocation or data.custom_location or "",
@@ -3135,6 +3232,11 @@ def add_order(data: OrderSchema, current_user: dict = Depends(get_approved_user)
         create_order(clean_email, normalized_order)
     except ValueError as ve:
         err_msg = str(ve)
+        if "Unauthorized" in err_msg or "permission" in err_msg.lower():
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=err_msg
+            )
         if "awaiting delivery" in err_msg:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

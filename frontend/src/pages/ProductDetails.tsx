@@ -593,13 +593,18 @@ export default function ProductDetails() {
     }
   };
 
-  // CONFIRM BOOKING LOGIC
-  const handleConfirmBooking = async () => {
+  // PROCEED TO CHECKOUT & DELIVERY FLOW
+  const handleProceedToCheckout = () => {
     if (!product) return;
 
     if (!user) {
-      toast.info("Please log in to confirm your rental booking.");
-      navigate({ to: "/login", search: { redirect: `/product/${id}` } as any });
+      toast.info("Please log in to proceed with your gear booking.");
+      navigate({
+        to: "/login",
+        search: {
+          redirect: `/checkout?id=${id}&start=${startDate}&end=${durationMode === "custom" ? endDate : startDate}&mode=${durationMode}&slot=${selectedSlot}`
+        } as any,
+      });
       return;
     }
 
@@ -609,7 +614,7 @@ export default function ProductDetails() {
     }
 
     if (!isAvailableForDates || rentalDays <= 0) {
-      toast.error("Please check and confirm date availability before booking.");
+      toast.error("Please check and confirm date availability before proceeding.");
       return;
     }
 
@@ -621,70 +626,17 @@ export default function ProductDetails() {
       return;
     }
 
-    setIsCreatingBooking(true);
-
-    const token = storage.get<string | null>(STORAGE_KEYS.token, null);
-    const renterId = user.accountId || user.id || user.email;
-    const bookingId = `ord_${Date.now()}`;
-    const newOrder: Order = {
-      id: bookingId,
-      productId: product.id,
-      product_id: product.id,
-      productTitle: product.title,
-      product_title: product.title,
-      productImage: product.image,
-      product_image: product.image,
-      startDate: startDate,
-      start_date: startDate,
-      endDate: durationMode === "custom" ? endDate : startDate,
-      end_date: durationMode === "custom" ? endDate : startDate,
-      total: estimatedTotal,
-      status: "pending", // Booking requested
-      category: product.category || "",
-      createdAt: new Date().toISOString(),
-      created_at: new Date().toISOString(),
-      user_email: user.email,
-      userEmail: user.email,
-      ...({
-        renterId,
-        ownerId: ownerId || product.owner?.email || "PAYERNT_USER_001",
-        rentalDuration: rentalDays,
-        rentalRate: Number(product.price) || 0,
-        estimatedAmount: estimatedTotal,
-        time_slot: selectedSlot,
-        timeSlot: selectedSlot,
-        duration_type: durationMode.startsWith("half_day") ? "half_day" : (durationMode === "full_day" ? "full_day" : "custom"),
-        durationType: durationMode.startsWith("half_day") ? "half_day" : (durationMode === "full_day" ? "full_day" : "custom"),
-        start_time: selectedSlot === "morning" ? "08:00" : (selectedSlot === "afternoon" ? "13:00" : "08:00"),
-        startTime: selectedSlot === "morning" ? "08:00" : (selectedSlot === "afternoon" ? "13:00" : "08:00"),
-        end_time: selectedSlot === "morning" ? "12:00" : (selectedSlot === "afternoon" ? "17:00" : "17:00"),
-        endTime: selectedSlot === "morning" ? "12:00" : (selectedSlot === "afternoon" ? "17:00" : "17:00"),
-        start_datetime: `${startDate}T${selectedSlot === "morning" ? "08:00:00" : (selectedSlot === "afternoon" ? "13:00:00" : "08:00:00")}Z`,
-        end_datetime: `${durationMode === "custom" ? endDate : startDate}T${selectedSlot === "morning" ? "12:00:00" : (selectedSlot === "afternoon" ? "17:00:00" : "17:00:00")}Z`,
-      } as any),
-    };
-
-    try {
-      if (token) {
-        await api.createOrder(token, newOrder);
-      } else {
-        const allOrders = storage.get<Order[]>(STORAGE_KEYS.orders, []);
-        storage.set(STORAGE_KEYS.orders, [newOrder, ...allOrders]);
-      }
-
-      api.invalidateCache("user_orders");
-      window.dispatchEvent(new CustomEvent("payent_orders_updated"));
-
-      toast.success("Rental booking confirmed successfully!");
-      setIsCreatingBooking(false);
-      navigate({ to: "/dashboard" });
-    } catch (err: any) {
-      console.error("Booking creation failed:", err);
-      const errMsg = err?.message || "Failed to confirm booking reservation.";
-      toast.error(errMsg);
-      setIsCreatingBooking(false);
-      return;
-    }
+    const checkEnd = durationMode === "custom" ? endDate : startDate;
+    navigate({
+      to: "/checkout",
+      search: {
+        id: product.id,
+        start: startDate,
+        end: checkEnd,
+        mode: durationMode,
+        slot: selectedSlot,
+      } as any,
+    });
   };
 
   const handleAddToCart = async () => {
@@ -1626,29 +1578,27 @@ export default function ProductDetails() {
                           </div>
                         )}
 
-                        {/* Confirm Booking Button */}
+                        {/* Proceed to Delivery Address & Order Review Button */}
                         <button
                           type="button"
-                          disabled={isCreatingBooking || categoryRestriction?.restricted}
-                          onClick={handleConfirmBooking}
-                          id="confirm-booking-btn"
+                          disabled={categoryRestriction?.restricted}
+                          onClick={handleProceedToCheckout}
+                          id="proceed-to-checkout-btn"
                           className={`w-full py-4 px-4 rounded-2xl font-extrabold text-xs sm:text-sm shadow-lg transition-all flex items-center justify-center gap-2 ${
                             categoryRestriction?.restricted
                               ? "bg-amber-900/40 text-amber-300/80 border border-amber-500/30 cursor-not-allowed opacity-80"
                               : "bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer active:scale-98"
                           }`}
                         >
-                          {isCreatingBooking ? (
-                            <span>Creating Booking Request...</span>
-                          ) : categoryRestriction?.restricted ? (
+                          {categoryRestriction?.restricted ? (
                             <>
                               <AlertCircle className="h-4 w-4" />
                               <span>Awaiting Delivery (Category Locked)</span>
                             </>
                           ) : (
                             <>
-                              <CheckCircle2 className="h-4 w-4" />
-                              <span>Confirm Booking Request (₹{estimatedTotal.toLocaleString("en-IN")})</span>
+                              <ArrowRight className="h-4 w-4" />
+                              <span>Proceed to Delivery & Confirmation (₹{estimatedTotal.toLocaleString("en-IN")})</span>
                             </>
                           )}
                         </button>

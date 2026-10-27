@@ -583,12 +583,35 @@ def init_db(force: bool = False):
     add_column_safely("orders", "dispute_reported_at VARCHAR(100) NULL")
     add_column_safely("orders", "cancellation_request_status VARCHAR(50) NULL")
     add_column_safely("orders", "cancellation_request_data LONGTEXT NULL")
+    add_column_safely("orders", "delivery_address_id VARCHAR(255) NULL")
+    add_column_safely("orders", "delivery_address_snapshot LONGTEXT NULL")
     add_index_safely("orders", "idx_orders_user_cat", "user_email, category")
     add_index_safely("orders", "idx_orders_user_email", "user_email")
     add_index_safely("orders", "idx_orders_status", "status")
     add_index_safely("orders", "idx_orders_created_at", "created_at")
     add_index_safely("orders", "idx_orders_product_status", "product_id, status")
     add_index_safely("orders", "idx_orders_user_created", "user_email, created_at")
+
+    # Create user_addresses table for renter delivery address book
+    execute_query("""
+        CREATE TABLE IF NOT EXISTS user_addresses (
+            id VARCHAR(255) PRIMARY KEY,
+            user_email VARCHAR(255) NOT NULL,
+            full_name VARCHAR(255) NOT NULL,
+            phone VARCHAR(50) NOT NULL,
+            flat_house VARCHAR(255) NOT NULL,
+            street_area VARCHAR(255) NOT NULL,
+            landmark VARCHAR(255) NULL,
+            city VARCHAR(100) NOT NULL,
+            state VARCHAR(100) NOT NULL,
+            pincode VARCHAR(20) NOT NULL,
+            delivery_instructions TEXT NULL,
+            is_default BOOLEAN DEFAULT FALSE,
+            created_at VARCHAR(100) NOT NULL,
+            updated_at VARCHAR(100) NOT NULL
+        )
+    """)
+    add_index_safely("user_addresses", "idx_user_addr_email", "user_email")
 
     # Create booking_cancellations table
     execute_query("""
@@ -1323,6 +1346,7 @@ MOCK_PASSWORD_RESET_TOKENS = {}
 MOCK_DEVICES = {}
 MOCK_DEVICE_SECURITY_HISTORY = []
 MOCK_DEVICE_TRANSFERS = []
+MOCK_USER_ADDRESSES: Dict[str, Dict[str, Any]] = {}
 
 
 _user_cache = {}
@@ -1938,6 +1962,7 @@ def get_orders(email: str):
                                o.inspection_condition, o.inspection_notes, o.dispute_status, o.dispute_reason, o.dispute_evidence,
                                o.cancellation_request_status, o.cancellation_request_data,
                                o.cancelled_at, o.cancellation_reason, o.cancellation_id,
+                               o.delivery_method, o.delivery_address, o.pickup_location, o.custom_location, o.location_directions,
                                COALESCE(NULLIF(o.category, ''), cp.category, pp.category, 'gear') as category
                         FROM orders o
                         LEFT JOIN custom_products cp ON o.product_id = cp.id
@@ -1954,6 +1979,193 @@ def get_orders(email: str):
     except Exception as e:
         print(f"Notice: Database read error in get_orders: {e}")
     return [o for o in MOCK_ORDERS.values() if (o.get("user_email") or o.get("userEmail")) == clean_email]
+
+
+# ============================================================================
+# USER DELIVERY ADDRESSES (Payrent Customer Address Book)
+# ============================================================================
+
+def save_user_address(email: str, addr: dict) -> dict:
+    clean_email = (email or "").strip().lower()
+    if not clean_email:
+        raise ValueError("User email is required to save an address.")
+
+    full_name = str(addr.get("full_name") or addr.get("fullName") or "").strip()
+    phone = str(addr.get("phone") or addr.get("phoneNumber") or addr.get("mobile") or "").strip()
+    flat_house = str(addr.get("flat_house") or addr.get("flatHouse") or addr.get("house_flat") or "").strip()
+    street_area = str(addr.get("street_area") or addr.get("streetArea") or addr.get("street") or "").strip()
+    landmark = str(addr.get("landmark") or "").strip()
+    city = str(addr.get("city") or "").strip()
+    state = str(addr.get("state") or "").strip()
+    pincode = str(addr.get("pincode") or addr.get("pinCode") or addr.get("pin_code") or "").strip()
+    instructions = str(addr.get("delivery_instructions") or addr.get("deliveryInstructions") or "").strip()
+    is_default = bool(addr.get("is_default") or addr.get("isDefault") or False)
+
+    # Required field validation
+    if not full_name or len(full_name) < 2:
+        raise ValueError("Full name is required (at least 2 characters).")
+
+    clean_phone = re.sub(r"[^\d]", "", phone)
+    if len(clean_phone) == 12 and clean_phone.startswith("91"):
+        clean_phone = clean_phone[2:]
+    if len(clean_phone) != 10 or not clean_phone.isdigit():
+        raise ValueError("Please provide a valid 10-digit mobile number.")
+
+    if not flat_house:
+        raise ValueError("House / Flat number is required.")
+    if not street_area:
+        raise ValueError("Street / Area is required.")
+    if not city:
+        raise ValueError("City is required.")
+    if not state:
+        raise ValueError("State is required.")
+
+    clean_pin = pincode.replace(" ", "")
+    if len(clean_pin) != 6 or not clean_pin.isdigit():
+        raise ValueError("Please provide a valid 6-digit PIN code.")
+
+    addr_id = str(addr.get("id") or "").strip() or f"addr_{int(time.time() * 1000)}_{secrets.token_hex(4)}"
+    now_iso = dt.now(timezone.utc).isoformat()
+
+    record = {
+        "id": addr_id,
+        "user_email": clean_email,
+        "full_name": full_name,
+        "phone": clean_phone,
+        "flat_house": flat_house,
+        "street_area": street_area,
+        "landmark": landmark,
+        "city": city,
+        "state": state,
+        "pincode": clean_pin,
+        "delivery_instructions": instructions,
+        "is_default": is_default,
+        "created_at": addr.get("created_at") or now_iso,
+        "updated_at": now_iso
+    }
+
+    # If is_default is True, reset other addresses for this user
+    if is_default:
+        for a in MOCK_USER_ADDRESSES.values():
+            if a.get("user_email") == clean_email:
+                a["is_default"] = False
+        execute_query("UPDATE user_addresses SET is_default = FALSE WHERE user_email = %s", (clean_email,))
+
+    MOCK_USER_ADDRESSES[addr_id] = record
+
+    execute_query("""
+        INSERT INTO user_addresses (
+            id, user_email, full_name, phone, flat_house, street_area, landmark,
+            city, state, pincode, delivery_instructions, is_default, created_at, updated_at
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON DUPLICATE KEY UPDATE
+            full_name = VALUES(full_name),
+            phone = VALUES(phone),
+            flat_house = VALUES(flat_house),
+            street_area = VALUES(street_area),
+            landmark = VALUES(landmark),
+            city = VALUES(city),
+            state = VALUES(state),
+            pincode = VALUES(pincode),
+            delivery_instructions = VALUES(delivery_instructions),
+            is_default = VALUES(is_default),
+            updated_at = VALUES(updated_at)
+    """, (
+        addr_id, clean_email, full_name, clean_phone, flat_house, street_area, landmark,
+        city, state, clean_pin, instructions, is_default, record["created_at"], now_iso
+    ))
+
+    return record
+
+def get_user_addresses(email: str) -> list:
+    clean_email = (email or "").strip().lower()
+    if not clean_email:
+        return []
+    try:
+        conn = get_db_connection()
+        if conn:
+            try:
+                with conn.cursor() as cursor:
+                    cursor.execute("""
+                        SELECT id, user_email, full_name, phone, flat_house, street_area,
+                               landmark, city, state, pincode, delivery_instructions,
+                               is_default, created_at, updated_at
+                        FROM user_addresses
+                        WHERE user_email = %s
+                        ORDER BY is_default DESC, created_at DESC
+                    """, (clean_email,))
+                    rows = cursor.fetchall()
+                    if rows:
+                        return rows
+            finally:
+                conn.close()
+    except Exception as e:
+        print(f"Notice: Database read error in get_user_addresses: {e}")
+
+    user_addrs = [a for a in MOCK_USER_ADDRESSES.values() if a.get("user_email") == clean_email]
+    user_addrs.sort(key=lambda x: (not x.get("is_default", False), x.get("created_at", "")), reverse=True)
+    return user_addrs
+
+def get_user_address_by_id(addr_id: str, email: str = None) -> dict | None:
+    if not addr_id:
+        return None
+    clean_email = email.strip().lower() if email else None
+    try:
+        conn = get_db_connection()
+        if conn:
+            try:
+                with conn.cursor() as cursor:
+                    if clean_email:
+                        cursor.execute("""
+                            SELECT id, user_email, full_name, phone, flat_house, street_area,
+                                   landmark, city, state, pincode, delivery_instructions,
+                                   is_default, created_at, updated_at
+                            FROM user_addresses
+                            WHERE id = %s AND user_email = %s
+                        """, (addr_id, clean_email))
+                    else:
+                        cursor.execute("""
+                            SELECT id, user_email, full_name, phone, flat_house, street_area,
+                                   landmark, city, state, pincode, delivery_instructions,
+                                   is_default, created_at, updated_at
+                            FROM user_addresses
+                            WHERE id = %s
+                        """, (addr_id,))
+                    row = cursor.fetchone()
+                    if row:
+                        return row
+            finally:
+                conn.close()
+    except Exception as e:
+        print(f"Notice: Database read error in get_user_address_by_id: {e}")
+
+    rec = MOCK_USER_ADDRESSES.get(addr_id)
+    if rec:
+        if clean_email and rec.get("user_email") != clean_email:
+            return None
+        return rec
+    return None
+
+def update_user_address(addr_id: str, email: str, addr: dict) -> dict | None:
+    clean_email = (email or "").strip().lower()
+    if not addr_id or not clean_email:
+        return None
+    existing = get_user_address_by_id(addr_id, clean_email)
+    if not existing:
+        return None
+    merged = {**existing, **addr, "id": addr_id}
+    return save_user_address(clean_email, merged)
+
+def delete_user_address(addr_id: str, email: str) -> bool:
+    clean_email = (email or "").strip().lower()
+    if not addr_id or not clean_email:
+        return False
+    rec = get_user_address_by_id(addr_id)
+    if not rec or rec.get("user_email") != clean_email:
+        return False
+    MOCK_USER_ADDRESSES.pop(addr_id, None)
+    execute_query("DELETE FROM user_addresses WHERE id = %s AND user_email = %s", (addr_id, clean_email))
+    return True
 
 def create_order(email: str, order: dict):
     with _BOOKING_CONCURRENCY_LOCK:
@@ -2041,6 +2253,24 @@ def create_order(email: str, order: dict):
 
         delivery_method = str(order.get("delivery_method") or order.get("deliveryMethod") or "delivery").strip().lower()
         delivery_address = order.get("delivery_address") or order.get("deliveryAddress") or ""
+        delivery_address_id = order.get("delivery_address_id") or order.get("deliveryAddressId") or ""
+        delivery_address_snapshot = order.get("delivery_address_snapshot") or order.get("deliveryAddressSnapshot") or ""
+
+        # Validate delivery address ownership if address ID is provided
+        if delivery_address_id:
+            addr_rec = get_user_address_by_id(delivery_address_id)
+            if addr_rec and addr_rec.get("user_email") != clean_email:
+                raise ValueError("Unauthorized: Selected delivery address does not belong to the authenticated user.")
+            if addr_rec and not delivery_address:
+                landmark_str = f", Near {addr_rec['landmark']}" if addr_rec.get("landmark") else ""
+                delivery_address = f"{addr_rec['full_name']}, {addr_rec['flat_house']}, {addr_rec['street_area']}{landmark_str}, {addr_rec['city']}, {addr_rec['state']} - {addr_rec['pincode']} (Phone: {addr_rec['phone']})"
+            if addr_rec and not delivery_address_snapshot:
+                import json
+                delivery_address_snapshot = json.dumps(addr_rec)
+        elif delivery_address and not delivery_address_snapshot:
+            import json
+            delivery_address_snapshot = json.dumps({"formatted_address": delivery_address})
+
         pickup_location = order.get("pickup_location") or order.get("pickupLocation") or ""
         custom_location = order.get("custom_location") or order.get("customLocation") or ""
         location_directions = order.get("location_directions") or order.get("locationDirections") or ""
@@ -2108,6 +2338,10 @@ def create_order(email: str, order: dict):
             "deliveryMethod": delivery_method,
             "delivery_address": delivery_address,
             "deliveryAddress": delivery_address,
+            "delivery_address_id": delivery_address_id,
+            "deliveryAddressId": delivery_address_id,
+            "delivery_address_snapshot": delivery_address_snapshot,
+            "deliveryAddressSnapshot": delivery_address_snapshot,
             "pickup_location": pickup_location,
             "pickupLocation": pickup_location,
             "custom_location": custom_location,
@@ -2123,40 +2357,36 @@ def create_order(email: str, order: dict):
         }
         MOCK_ORDERS[order_id] = normalized
 
-        execute_query("""
-            INSERT INTO orders (
-                id, user_email, product_id, product_title, product_image, start_date, end_date, total, status, created_at,
-                time_slot, duration_type, start_time, end_time, start_datetime, end_datetime, confirmed_at, category,
-                delivery_method, delivery_address, pickup_location, custom_location, location_directions, location_latitude, location_longitude
-            )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """, (
-            order_id,
-            clean_email,
-            pid,
-            title,
-            img,
-            start,
-            end,
-            total,
-            status,
-            created,
-            time_slot,
-            duration_type,
-            start_time,
-            end_time,
-            start_datetime,
-            end_datetime,
-            confirmed_at,
-            prod_category,
-            delivery_method,
-            delivery_address,
-            pickup_location,
-            custom_location,
-            location_directions,
-            lat,
-            lng
-        ))
+        try:
+            execute_query("""
+                INSERT INTO orders (
+                    id, user_email, product_id, product_title, product_image, start_date, end_date, total, status, created_at,
+                    time_slot, duration_type, start_time, end_time, start_datetime, end_datetime, confirmed_at, category,
+                    delivery_method, delivery_address, pickup_location, custom_location, location_directions, location_latitude, location_longitude,
+                    delivery_address_id, delivery_address_snapshot
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                order_id, clean_email, pid, title, img, start, end, total, status, created,
+                time_slot, duration_type, start_time, end_time, start_datetime, end_datetime,
+                confirmed_at, prod_category, delivery_method, delivery_address, pickup_location,
+                custom_location, location_directions, lat, lng, delivery_address_id,
+                delivery_address_snapshot if isinstance(delivery_address_snapshot, str) else json.dumps(delivery_address_snapshot)
+            ))
+        except Exception:
+            execute_query("""
+                INSERT INTO orders (
+                    id, user_email, product_id, product_title, product_image, start_date, end_date, total, status, created_at,
+                    time_slot, duration_type, start_time, end_time, start_datetime, end_datetime, confirmed_at, category,
+                    delivery_method, delivery_address, pickup_location, custom_location, location_directions, location_latitude, location_longitude
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                order_id, clean_email, pid, title, img, start, end, total, status, created,
+                time_slot, duration_type, start_time, end_time, start_datetime, end_datetime,
+                confirmed_at, prod_category, delivery_method, delivery_address, pickup_location,
+                custom_location, location_directions, lat, lng
+            ))
 
     # Synchronize initial delivery record
     try:
