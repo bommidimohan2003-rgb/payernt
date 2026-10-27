@@ -1390,3 +1390,65 @@ All 8 verification criteria were systematically validated using automated pytest
 6. **Persistence Across Refreshes**: Repeated page reloads and database queries maintain all milestone timestamps, inspection reports, and dispute states.
 7. **Consistency Across Payments & History**: Payments, cancellation reasons, and refund statuses remain consistent and uncorrupted.
 8. **Backend Persistence & Validation**: All state mutations are validated against business rules and persisted to MySQL/TiDB and memory fallbacks.
+
+---
+
+## 23. Rental Calendar Availability and Booking Conflicts Engine
+
+### 1. Architectural Overview & Backend Source of Truth
+- **Unified Availability Engine**:
+  - Replaced ad-hoc frontend-only date math and calendar date sets with an authoritative backend availability and interval validation engine in `backend/database.py` (`check_product_interval_conflicts`, `calculate_booking_interval`, `normalize_slot_interval`) and `backend/main.py` (`GET /api/products/{id}/availability`, `POST /api/orders`, `POST /api/bookings`).
+  - Availability endpoint evaluates 120-day calendar date intervals across morning (`08:00 - 12:00`), afternoon (`13:00 - 17:00`), and full-day (`08:00 - 08:00+1d`) rental sessions against active reservations, custom bookings, and vendor-blocked maintenance dates.
+  - Returns structured `session_availability` map (`{ date: { morning: bool, afternoon: bool, full_day: bool } }`), `bufferMinutes`, and detailed conflict reasons.
+- **Session Conflict Rules Matrix**:
+  | Existing Booking | New Booking Attempt | Result | Enforcement Rule |
+  |---|---|---|---|
+  | Full-day booked | Morning session | **Unavailable** | Full-day spans entire elapsed interval, blocking all sub-sessions. |
+  | Full-day booked | Afternoon session | **Unavailable** | Full-day spans entire elapsed interval, blocking all sub-sessions. |
+  | Full-day booked | Another full-day booking | **Unavailable** | Overlapping full-day intervals are strictly rejected. |
+  | Morning booked | Another morning booking | **Unavailable** | Identical session overlap rejected. |
+  | Morning booked | Full-day booking | **Unavailable** | Attempting full-day spans over morning, rejected. |
+  | Afternoon booked | Another afternoon booking | **Unavailable** | Identical session overlap rejected. |
+  | Afternoon booked | Full-day booking | **Unavailable** | Attempting full-day spans over afternoon, rejected. |
+  | Morning booked | Afternoon booking | **Allowed only if buffer satisfied** | Morning (ends 12:00) and Afternoon (starts 13:00) have a 60-minute window. Allowed when buffer <= 60 mins; rejected if buffer > 60 mins. |
+  | Afternoon booked | Morning booking | **Allowed only if buffer satisfied** | Allowed if buffer window is respected. |
+  | Product A booked | Product B (same category) | **Product B available** | Availability is strictly per-product, verified independently. |
+- **Buffer and Grace-Period Validation**:
+  - Buffer periods (`bufferMinutes`, default 60 mins) are enforced on both boundaries of every booking interval: `[req_start, req_end]` conflicts if `req_start < (ord_end + buffer) and (ord_start - buffer) < req_end`.
+  - Half-day session gap (12:00 to 13:00 = 60 mins) permits morning + afternoon bookings under default 60m buffer, but blocks overlapping sessions if a custom equipment buffer (e.g. 90 mins for cinema camera recalibration) is specified.
+- **Cancellation Policy Release Reconciliation**:
+  - Pre-pickup cancelled bookings release availability immediately.
+  - Post-pickup cancellations with `policy_outcome == 'return_required'` and `handed_back_at is None` continue to hold equipment unavailable on the calendar until physical handover is confirmed by courier or lender, preventing double-renting equipment currently in-transit.
+- **Concurrency & Double-Booking Protection**:
+  - Implemented transactional double-check locking (`_BOOKING_CONCURRENCY_LOCK`) in `POST /api/orders` and `POST /api/bookings`. If two renters attempt to book the same product for the same dates/session concurrently, the second transaction fails immediately with `HTTP 409 Conflict` (`"Product is already booked or conflicting with another reservation for the selected dates/session"`).
+
+### 2. Calendar Visual Indicators & UX Enhancements
+- **Blocked or Unavailable Dates**:
+  - Rendered with distinct high-contrast red indicator badge (`bg-red-500/15`, `border-red-500/50`, `text-red-600 font-bold`).
+  - Hover tooltip indicates "Blocked by Owner / Maintenance".
+  - Click feedback displays a polite, actionable alert: *"The date [Date] is blocked by the owner for personal maintenance and cannot be selected."*
+- **Already-Booked Dates**:
+  - Rendered with a clear strikethrough across the date number (`line-through decoration-rose-600 decoration-2 font-medium text-muted-foreground/70`).
+  - Distinguishable from available dates and blocked dates.
+  - Click feedback displays: *"The date [Date] is already booked for the selected session ([Session]). Please choose another date or session."*
+- **Dynamic Reactive Updates**:
+  - When the renter changes the rental session (`morning`, `afternoon`, `full_day`) or switches between custom date range and single-day slot mode, the calendar immediately queries the backend with the new `session` parameter, recalculating exact strikethrough and blocked indicators without page reload.
+  - Product switches and month navigations invalidate cached availability and fetch fresh authoritative state.
+  - Shared calendar contract applied across customer rental calendar (`RenterBookingCalendar.tsx`), custom rental flow (`ProductDetails.tsx`), and vendor portal (`VendorAvailabilityCalendar.tsx`).
+
+### 3. Empirical Test Results
+- Automated Pytest Suite (`backend/tests/test_calendar_availability_and_conflicts.py`):
+  1. `test_01_full_day_booking_blocks_morning_and_afternoon`: **PASSED** (Full day blocks morning, afternoon, and full day).
+  2. `test_02_morning_booking_blocks_another_morning`: **PASSED** (Morning booking rejects concurrent morning attempt with 409).
+  3. `test_03_afternoon_booking_blocks_another_afternoon`: **PASSED** (Afternoon booking rejects concurrent afternoon attempt with 409).
+  4. `test_04_morning_and_afternoon_buffer_rules`: **PASSED** (Morning + afternoon on same day allowed under 60m buffer; rejected under 90m buffer).
+  5. `test_05_half_day_blocks_full_day`: **PASSED** (Morning booking rejects full-day booking with 409).
+  6. `test_06_cancelled_bookings_update_availability`: **PASSED** (Pre-pickup cancellation frees dates; post-pickup cancellation holds dates until return).
+  7. `test_07_different_products_in_same_category_independent_availability`: **PASSED** (Booking Product A does not block Product B in same category).
+  8. `test_08_vendor_blocked_dates_contract`: **PASSED** (Vendor blocked dates appear in blockedDates and reject booking attempts).
+  9. `test_09_multi_day_custom_rental_rejects_spanned_conflict`: **PASSED** (Multi-day rental spanning conflicting session/blocked date is rejected).
+  10. `test_10_concurrent_renter_booking_race_condition`: **PASSED** (Simultaneous concurrent booking threads for same product/session: exactly 1 succeeds, 1 gets 409).
+  11. `test_11_month_change_and_product_switching_freshness`: **PASSED** (Changing month and product ID returns isolated, fresh availability).
+  12. `test_12_boundary_times_and_exact_intervals`: **PASSED** (24-hour elapsed rentals and session boundary times enforced accurately).
+- Test Regression Suite: **40 passed** in `test_calendar_availability_and_conflicts.py`, `test_blocked_dates_and_calendar.py`, `test_cancellation_and_return_edge_cases.py`, `test_category_booking_restriction.py`, and `test_cart_and_availability.py`.
+- Frontend Build: **100% clean production build** (`npm run build` in `frontend/`, 0 errors).

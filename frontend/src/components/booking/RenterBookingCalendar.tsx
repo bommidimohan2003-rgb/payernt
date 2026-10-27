@@ -22,6 +22,7 @@ export interface RenterBookingCalendarProps {
   minDate?: string; // YYYY-MM-DD, defaults to today
   disabled?: boolean;
   className?: string;
+  session?: "morning" | "afternoon" | "full_day" | string;
 }
 
 const MONTH_NAMES = [
@@ -63,6 +64,7 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
   minDate,
   disabled = false,
   className,
+  session = "full_day",
 }) => {
   const todayKey = useMemo(() => getTodayKey(), []);
   const effectiveMinDate = minDate || todayKey;
@@ -115,9 +117,11 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
         threeMonthsLater.getDate()
       );
 
+      const effectiveSession = durationMode === "custom" ? "full_day" : (session || "full_day");
+      const sessionQuery = `&session=${encodeURIComponent(effectiveSession)}`;
       const apiBase = getApiBase();
       const res = await fetch(
-        `${apiBase}/api/products/${encodeURIComponent(productId)}/availability?start_date=${viewStartDateStr}&end_date=${lookaheadEndStr}`
+        `${apiBase}/api/products/${encodeURIComponent(productId)}/availability?start_date=${viewStartDateStr}&end_date=${lookaheadEndStr}${sessionQuery}`
       );
 
       if (!res.ok) {
@@ -140,7 +144,7 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
     } finally {
       setIsLoadingAvailability(false);
     }
-  }, [productId, viewStartDateStr, viewYear, viewMonth]);
+  }, [productId, viewStartDateStr, viewYear, viewMonth, session, durationMode]);
 
   useEffect(() => {
     fetchAvailability();
@@ -247,13 +251,14 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
 
     // Direct click on blocked date
     if (isBlocked) {
-      setConflictMessage(`Date ${dateKey} is BLOCKED by the owner for maintenance or personal use.`);
+      setConflictMessage(`Date ${dateKey} is BLOCKED by the owner for maintenance or personal use. Please select an available date.`);
       return;
     }
 
     // Direct click on booked date
     if (isBooked) {
-      setConflictMessage(`Date ${dateKey} is ALREADY BOOKED by another renter.`);
+      const sessionLabel = durationMode === "custom" ? "Full Day rentals" : session === "morning" ? "Morning session" : session === "afternoon" ? "Afternoon session" : "Full Day session";
+      setConflictMessage(`Date ${dateKey} is ALREADY BOOKED for the ${sessionLabel}. Please select another date or session.`);
       return;
     }
 
@@ -521,10 +526,10 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
                   "opacity-30 text-muted-foreground bg-muted/20 border border-transparent cursor-not-allowed",
                 // Vendor Blocked (RED - High Contrast, Strict Requirement)
                 isBlocked &&
-                  "bg-rose-500/15 dark:bg-rose-950/40 border border-rose-500/40 text-rose-600 dark:text-rose-400 font-bold line-through cursor-not-allowed shadow-inner",
-                // Already Booked (Muted Gray / Crossed)
+                  "bg-red-500/15 dark:bg-red-950/40 border border-red-500/50 text-red-600 dark:text-red-400 font-bold cursor-not-allowed shadow-inner",
+                // Already Booked (Muted Gray / Strikethrough)
                 isBooked &&
-                  "bg-muted/70 text-muted-foreground/60 border border-border/50 line-through cursor-not-allowed opacity-80",
+                  "bg-muted/70 text-muted-foreground/60 border border-border/50 cursor-not-allowed opacity-80",
                 // Selected Single
                 isSingle &&
                   "bg-primary text-primary-foreground font-black shadow-md border border-primary ring-2 ring-primary/30 z-10 scale-[1.03]",
@@ -542,12 +547,20 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
                   "bg-primary/10 text-primary rounded-none border-y border-dashed border-primary/40"
               )}
             >
-              <span>{cell.dayNumber}</span>
+              <span
+                className={cn(
+                  "relative z-10 leading-none",
+                  isBooked &&
+                    "line-through decoration-rose-600 dark:decoration-rose-400 decoration-2 font-medium text-muted-foreground/70"
+                )}
+              >
+                {cell.dayNumber}
+              </span>
 
               {/* Status indicator pin/dot */}
               {isBlocked && (
                 <span
-                  className="w-1.5 h-1.5 rounded-full bg-rose-600 dark:bg-rose-400 absolute bottom-1"
+                  className="w-1.5 h-1.5 rounded-full bg-red-600 dark:bg-red-400 absolute bottom-1"
                   aria-label="Blocked by owner"
                 />
               )}

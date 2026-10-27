@@ -5830,15 +5830,22 @@ def check_product_interval_conflicts(
                     exclude_clause = " AND id != %s"
                     params.append(exclude_order_id)
                 query = f"""
-                    SELECT id, start_date, end_date, start_time, end_time, start_datetime, end_datetime, time_slot, duration_type, status, completed_at
+                    SELECT id, start_date, end_date, start_time, end_time, start_datetime, end_datetime,
+                           time_slot, duration_type, status, policy_outcome, handed_back_at, completed_at
                     FROM orders
-                    WHERE status NOT IN ('cancelled', 'refunded', 'rejected')
-                      AND product_id = %s{exclude_clause}
+                    WHERE product_id = %s{exclude_clause}
                 """
                 cursor.execute(query, tuple(params))
                 rows = cursor.fetchall()
                 for row in rows:
                     ord_status = str(row.get("status") or "").lower()
+                    if ord_status in ('refunded', 'rejected'):
+                        continue
+                    if ord_status == 'cancelled':
+                        # Cancelled bookings release availability UNLESS return is required and gear is still in transit!
+                        if not (row.get("policy_outcome") == "return_required" and not row.get("handed_back_at")):
+                            continue
+
                     ord_start, ord_end = _extract_order_interval(row)
                     if ord_start and ord_end:
                         # If order is completed and its rental period + buffer has elapsed, it no longer conflicts
@@ -5864,14 +5871,19 @@ def check_product_interval_conflicts(
         pid = str(order.get("product_id") or order.get("productId") or "").strip()
         if pid == str(product_id).strip():
             status = str(order.get("status") or "active").lower()
-            if status not in ('cancelled', 'refunded', 'rejected'):
-                ord_start, ord_end = _extract_order_interval(order)
-                if ord_start and ord_end:
-                    if status in ("completed", "returned") and (ord_end + buf_delta) <= now_utc:
-                        continue
-                    if req_start_dt < (ord_end + buf_delta) and (ord_start - buf_delta) < req_end_dt:
-                        slot_name = order.get("time_slot") or "rental"
-                        return True, f"Conflict with existing {slot_name} booking #{order.get('id')}"
+            if status in ('refunded', 'rejected'):
+                continue
+            if status == 'cancelled':
+                if not (order.get("policy_outcome") == "return_required" and not order.get("handed_back_at")):
+                    continue
+
+            ord_start, ord_end = _extract_order_interval(order)
+            if ord_start and ord_end:
+                if status in ("completed", "returned") and (ord_end + buf_delta) <= now_utc:
+                    continue
+                if req_start_dt < (ord_end + buf_delta) and (ord_start - buf_delta) < req_end_dt:
+                    slot_name = order.get("time_slot") or "rental"
+                    return True, f"Conflict with existing {slot_name} booking #{order.get('id')}"
 
     return False, None
 

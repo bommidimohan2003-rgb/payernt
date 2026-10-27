@@ -503,7 +503,15 @@ export const VendorAvailabilityCalendar: React.FC<VendorAvailabilityCalendarProp
                 }
               >
                 {/* Date Number */}
-                <span className="relative z-10 leading-none">{dayNum}</span>
+                <span
+                  className={`relative z-10 leading-none ${
+                    isBooked
+                      ? "line-through decoration-rose-600 dark:decoration-rose-400 decoration-2 font-medium text-muted-foreground/70"
+                      : ""
+                  }`}
+                >
+                  {dayNum}
+                </span>
 
                 {/* Sub-icons & Badges */}
                 <div className="absolute bottom-1 flex items-center justify-center">

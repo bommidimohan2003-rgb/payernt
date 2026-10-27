@@ -3941,18 +3941,28 @@ def check_availability_batch(data: BatchAvailabilitySchema):
 def check_single_product_availability(
     id: str,
     start_date: Optional[str] = Query(None),
-    end_date: Optional[str] = Query(None)
+    end_date: Optional[str] = Query(None),
+    session: Optional[str] = Query(None),
+    time_slot: Optional[str] = Query(None),
+    duration_type: Optional[str] = Query(None),
+    exclude_order_id: Optional[str] = Query(None),
 ):
     """
     Returns authoritative product availability and full blocked/booked date lists
     for rendering interactive booking calendars and validating reservation requests.
+    Supports session-aware conflicts (morning, afternoon, full-day) and buffer rules.
     """
     from database import (
         fetch_one,
         get_db_connection,
         parse_date_safely,
+        parse_datetime_safely,
         evaluate_product_availability,
         find_authoritative_product,
+        normalize_slot_interval,
+        calculate_booking_interval,
+        check_product_interval_conflicts,
+        DEFAULT_BUFFER_MINUTES,
         MOCK_ORDERS,
         MOCK_CUSTOM_PRODUCTS,
     )
@@ -3961,7 +3971,15 @@ def check_single_product_availability(
     if not prod:
         raise HTTPException(status_code=404, detail=f"Product '{id}' not found.")
 
-    # 1. Extract and sanitize vendor blocked dates
+    req_slot = (session or time_slot or "full_day").strip().lower()
+    if req_slot not in ("morning", "afternoon", "full_day", "custom", "multi_day"):
+        req_slot = "full_day"
+
+    buffer_min = int(prod.get("buffer_minutes") or DEFAULT_BUFFER_MINUTES)
+    daily_val = int(float(prod.get("daily_rate") or prod.get("price") or 2499))
+    half_day_val = int(float(prod.get("half_day_rate") or round(daily_val * 0.6)))
+
+    # 1. Extract and sanitize vendor blocked dates & session blocks
     b_raw = prod.get("blocked_dates") or prod.get("blockedDates")
     blocked_dates_list = []
     if isinstance(b_raw, str):
@@ -3972,85 +3990,141 @@ def check_single_product_availability(
     elif isinstance(b_raw, list):
         blocked_dates_list = b_raw
 
-    clean_blocked_dates = []
-    for d_str in blocked_dates_list:
-        pd = parse_date_safely(d_str)
-        if pd:
-            clean_blocked_dates.append(pd.strftime("%Y-%m-%d"))
-    clean_blocked_dates = sorted(list(set(clean_blocked_dates)))
+    full_day_blocked_dates = set()
+    morning_blocked_dates = set()
+    afternoon_blocked_dates = set()
+    all_blocked_date_strings = set()
 
-    # 2. Extract active reservation dates from orders
-    booked_dates_set = set()
-    conn = get_db_connection()
-    if conn:
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute("""
-                    SELECT start_date, end_date FROM orders
-                    WHERE product_id = %s AND status NOT IN ('cancelled', 'refunded', 'rejected')
-                """, (id,))
-                for row in cursor.fetchall():
-                    s_ord = parse_date_safely(row.get("start_date"))
-                    e_ord = parse_date_safely(row.get("end_date"))
-                    if s_ord and e_ord:
-                        curr = s_ord
-                        while curr <= e_ord:
-                            booked_dates_set.add(curr.strftime("%Y-%m-%d"))
-                            curr += datetime.timedelta(days=1)
-        except Exception as e:
-            logger.warning(f"Error fetching booked dates for product {id}: {e}")
-        finally:
-            try:
-                conn.close()
-            except Exception:
-                pass
+    for item in blocked_dates_list:
+        if isinstance(item, str):
+            pd = parse_date_safely(item)
+            if pd:
+                d_str = pd.strftime("%Y-%m-%d")
+                full_day_blocked_dates.add(d_str)
+                all_blocked_date_strings.add(d_str)
+        elif isinstance(item, dict):
+            b_d_str = item.get("date")
+            b_sess = (item.get("session") or item.get("time_slot") or "full_day").strip().lower()
+            pd = parse_date_safely(b_d_str)
+            if pd:
+                d_str = pd.strftime("%Y-%m-%d")
+                all_blocked_date_strings.add(d_str)
+                if b_sess == "morning":
+                    morning_blocked_dates.add(d_str)
+                elif b_sess == "afternoon":
+                    afternoon_blocked_dates.add(d_str)
+                else:
+                    full_day_blocked_dates.add(d_str)
 
-    for order in MOCK_ORDERS.values():
-        pid = str(order.get("product_id") or order.get("productId") or "")
-        if pid == id:
-            st = str(order.get("status") or "active").lower()
-            if st not in ('cancelled', 'refunded', 'rejected'):
-                s_ord = parse_date_safely(order.get("start_date") or order.get("startDate"))
-                e_ord = parse_date_safely(order.get("end_date") or order.get("endDate"))
-                if s_ord and e_ord:
-                    curr = s_ord
-                    while curr <= e_ord:
-                        booked_dates_set.add(curr.strftime("%Y-%m-%d"))
-                        curr += datetime.timedelta(days=1)
+    # 2. Determine evaluation calendar window (lookahead 120 days)
+    today_dt = datetime.datetime.now(datetime.timezone.utc).date()
+    view_start = today_dt
+    if start_date:
+        p_sd = parse_date_safely(start_date)
+        if p_sd:
+            view_start = min(view_start, p_sd)
+    view_end = view_start + datetime.timedelta(days=120)
+    if end_date:
+        p_ed = parse_date_safely(end_date)
+        if p_ed:
+            view_end = max(view_end, p_ed + datetime.timedelta(days=60))
 
-    daily_val = int(float(prod.get("daily_rate") or prod.get("price") or 2499))
-    half_day_val = int(float(prod.get("half_day_rate") or round(daily_val * 0.6)))
+    # Evaluate per-date slot availability and conflicts
+    morning_booked_dates = set()
+    afternoon_booked_dates = set()
+    full_day_booked_dates = set()
+    session_availability_map = {}
 
-    # 3. Evaluate requested range if provided
+    curr_d = view_start
+    while curr_d <= view_end:
+        d_str = curr_d.strftime("%Y-%m-%d")
+
+        # Morning slot interval: [08:00, 12:00)
+        m_s, m_e = normalize_slot_interval(d_str, "morning")
+        m_conf, _ = check_product_interval_conflicts(
+            id, m_s, m_e, buffer_minutes=buffer_min, exclude_order_id=exclude_order_id
+        )
+
+        # Afternoon slot interval: [13:00, 17:00)
+        a_s, a_e = normalize_slot_interval(d_str, "afternoon")
+        a_conf, _ = check_product_interval_conflicts(
+            id, a_s, a_e, buffer_minutes=buffer_min, exclude_order_id=exclude_order_id
+        )
+
+        # Full day slot interval: [08:00, 08:00 next day)
+        f_s, f_e = normalize_slot_interval(d_str, "full_day")
+        f_conf, _ = check_product_interval_conflicts(
+            id, f_s, f_e, buffer_minutes=buffer_min, exclude_order_id=exclude_order_id
+        )
+
+        # Separate vendor blocks from real reservation bookings
+        m_is_blocked = d_str in full_day_blocked_dates or d_str in morning_blocked_dates
+        a_is_blocked = d_str in full_day_blocked_dates or d_str in afternoon_blocked_dates
+        f_is_blocked = d_str in full_day_blocked_dates or d_str in morning_blocked_dates or d_str in afternoon_blocked_dates
+
+        if m_conf and not m_is_blocked:
+            morning_booked_dates.add(d_str)
+        if a_conf and not a_is_blocked:
+            afternoon_booked_dates.add(d_str)
+        if f_conf and not f_is_blocked:
+            full_day_booked_dates.add(d_str)
+
+        session_availability_map[d_str] = {
+            "morning": not m_conf,
+            "afternoon": not a_conf,
+            "full_day": not f_conf
+        }
+        curr_d += datetime.timedelta(days=1)
+
+    # 3. Resolve session-specific booked and blocked dates for caller
+    if req_slot == "morning":
+        booked_result = morning_booked_dates
+        blocked_result = full_day_blocked_dates | morning_blocked_dates
+    elif req_slot == "afternoon":
+        booked_result = afternoon_booked_dates
+        blocked_result = full_day_blocked_dates | afternoon_blocked_dates
+    else:
+        # Full day / multi-day custom rental
+        booked_result = full_day_booked_dates
+        blocked_result = full_day_blocked_dates | morning_blocked_dates | afternoon_blocked_dates
+
+    # 4. Evaluate requested date range if start_date and end_date are provided
     is_avail = bool(prod.get("available", True))
     status_str = "available" if is_avail else "unavailable"
     reason_str = None
+    conflicts_list = []
 
     if start_date and end_date:
-        start_dt = parse_date_safely(start_date)
-        end_dt = parse_date_safely(end_date)
-        if not start_dt or not end_dt:
+        start_dt_val = parse_date_safely(start_date)
+        end_dt_val = parse_date_safely(end_date)
+        if not start_dt_val or not end_dt_val:
             raise HTTPException(status_code=400, detail="Invalid start_date or end_date format.")
-        if start_dt > end_dt:
+        if start_dt_val > end_dt_val:
             raise HTTPException(status_code=400, detail="start_date cannot be after end_date.")
 
-        # Check blocked dates overlap
-        curr = start_dt
-        while curr <= end_dt:
-            curr_s = curr.strftime("%Y-%m-%d")
-            if curr_s in clean_blocked_dates:
-                is_avail = False
-                status_str = "blocked"
-                reason_str = f"Date {curr_s} has been blocked by the owner for personal use or maintenance."
-                break
-            if curr_s in booked_dates_set:
-                is_avail = False
-                status_str = "booked"
-                reason_str = f"Date {curr_s} is already booked by another customer."
-                break
-            curr += datetime.timedelta(days=1)
+        # Calculate exact requested timestamp interval
+        req_start_dt, req_end_dt = calculate_booking_interval(
+            start_date, end_date, req_slot, duration_type or "full_day"
+        )
 
-        if is_avail:
+        has_conf, conf_reason = check_product_interval_conflicts(
+            id, req_start_dt, req_end_dt, buffer_minutes=buffer_min, exclude_order_id=exclude_order_id
+        )
+
+        if has_conf:
+            is_avail = False
+            is_block_reason = bool(
+                conf_reason and ("personal use" in conf_reason.lower() or "blocked" in conf_reason.lower() or "unavailable period" in conf_reason.lower())
+            )
+            status_str = "blocked" if is_block_reason else "booked"
+            reason_str = conf_reason
+            conflicts_list.append({
+                "date": start_date,
+                "session": req_slot,
+                "reason": status_str,
+                "detail": conf_reason
+            })
+        else:
             base_avail, base_status, base_reason = evaluate_product_availability(prod)
             if not base_avail:
                 is_avail = False
@@ -4063,17 +4137,22 @@ def check_single_product_availability(
         "productId": id,
         "start_date": start_date,
         "end_date": end_date,
+        "session": req_slot,
         "is_available": is_avail,
         "isAvailable": is_avail,
         "status": status_str,
         "reason": reason_str,
-        "blocked_dates": clean_blocked_dates,
-        "blockedDates": clean_blocked_dates,
-        "booked_dates": sorted(list(booked_dates_set)),
-        "bookedDates": sorted(list(booked_dates_set)),
+        "conflicts": conflicts_list,
+        "blocked_dates": sorted(list(blocked_result)),
+        "blockedDates": sorted(list(blocked_result)),
+        "booked_dates": sorted(list(booked_result)),
+        "bookedDates": sorted(list(booked_result)),
+        "all_blocked_dates": sorted(list(all_blocked_date_strings)),
+        "session_availability": session_availability_map,
         "allowHalfDay": bool(prod.get("allow_half_day", True)),
         "dailyRate": daily_val,
         "halfDayRate": half_day_val,
+        "bufferMinutes": buffer_min,
     }
 
 @app.get("/api/products/{id}/slots")

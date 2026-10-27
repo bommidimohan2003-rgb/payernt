@@ -509,12 +509,13 @@ export default function ProductDetails() {
       }
     }
 
-    // Backend authoritative availability verification for requested date span
+    // Backend authoritative availability verification for requested date span and session
     try {
       const checkEnd = durationMode === "custom" ? endDate : startDate;
+      const effectiveSession = durationMode === "custom" ? "full_day" : selectedSlot;
       const apiBase = getApiBase();
       const res = await fetch(
-        `${apiBase}/api/products/${encodeURIComponent(id)}/availability?start_date=${startDate}&end_date=${checkEnd}`
+        `${apiBase}/api/products/${encodeURIComponent(id)}/availability?start_date=${startDate}&end_date=${checkEnd}&session=${encodeURIComponent(effectiveSession)}`
       );
       if (!res.ok) {
         setIsAvailableForDates(false);
@@ -549,47 +550,17 @@ export default function ProductDetails() {
         );
         return;
       }
+
+      setIsAvailableForDates(true);
+      setAvailabilityMessage("✓ Product and time slot available for selected dates!");
+      setAvailabilityChecked(true);
+      toast.success("Gear is available! Review booking summary below.");
     } catch (e) {
       console.debug("Backend availability check error:", e);
       setIsAvailableForDates(false);
       setAvailabilityMessage("Network error during availability check. Please check connection.");
       setAvailabilityChecked(true);
       return;
-    }
-
-    // Check overlap with existing confirmed bookings
-    const hasOverlap = existingProductBookings.some((booking) => {
-      const bStart = booking.startDate || (booking as any).start_date;
-      const bEnd = booking.endDate || (booking as any).end_date;
-      if (!bStart || !bEnd) return false;
-
-      const existingStart = new Date(bStart);
-      const existingEnd = new Date(bEnd);
-
-      // Half-day interval differentiation if booking has slot metadata
-      const bSlot = (booking as any).timeSlot || (booking as any).time_slot;
-      if (bSlot && (durationMode === "half_day_morning" || durationMode === "half_day_afternoon")) {
-        if (bStart === startDate && bEnd === startDate) {
-          if (bSlot === "morning" && selectedSlot === "afternoon") return false;
-          if (bSlot === "afternoon" && selectedSlot === "morning") return false;
-        }
-      }
-
-      return start <= existingEnd && end >= existingStart;
-    });
-
-    if (hasOverlap) {
-      setIsAvailableForDates(false);
-      setAvailabilityMessage(
-        "Product is not available for the selected dates/slot (overlaps with an existing booking). Please pick alternative dates."
-      );
-      setAvailabilityChecked(true);
-      toast.error("Gear is booked for the selected schedule.");
-    } else {
-      setIsAvailableForDates(true);
-      setAvailabilityMessage("✓ Product and time slot available for selected dates!");
-      setAvailabilityChecked(true);
-      toast.success("Gear is available! Review booking summary below.");
     }
   };
 
@@ -1329,6 +1300,7 @@ export default function ProductDetails() {
                           setAvailabilityMessage("");
                         }}
                         durationMode={durationMode}
+                        session={durationMode === "custom" ? "full_day" : selectedSlot}
                         minDate={todayStr}
                       />
                     </div>
