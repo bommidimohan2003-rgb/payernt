@@ -38,12 +38,7 @@ const schema = z
       .min(1, "Email address is required")
       .email("Enter a valid email address")
       .max(255),
-    panNumber: z
-      .string()
-      .trim()
-      .toUpperCase()
-      .min(1, "PAN Number is required")
-      .regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, "Enter a valid 10-character PAN number (e.g. ABCDE1234F)"),
+    panNumber: z.string().optional(),
     phone: z
       .string()
       .trim()
@@ -211,11 +206,11 @@ export function RegisterForm() {
     try {
       const adminCode =
         showAdminOption && data.isAdmin ? data.adminCode : undefined;
-      const panUpper = data.panNumber.toUpperCase().trim();
+      const panUpper = data.panNumber ? data.panNumber.toUpperCase().trim() : undefined;
       const cleanPhone = data.phone.replace(/\D/g, "");
 
-      // Address and Pincode are deliberately omitted from customer registration payload
-      // per specification (collected in checkout booking workflow).
+      // Address, Pincode and KYC documents are omitted from initial customer registration
+      // (completed in dedicated PAN KYC flow post-registration).
       const res = await api.registerVerify(
         data.email,
         cleanPhone,
@@ -237,7 +232,7 @@ export function RegisterForm() {
           setError("email", { type: "server", message: errorMsg });
         } else if (lower.includes("phone") || lower.includes("mobile")) {
           setError("phone", { type: "server", message: errorMsg });
-        } else if (lower.includes("pan")) {
+        } else if (lower.includes("pan") && data.panNumber) {
           setError("panNumber", { type: "server", message: errorMsg });
         } else if (
           lower.includes("password") ||
@@ -258,7 +253,7 @@ export function RegisterForm() {
 
       const userObj = res.user || res.account || {};
       const accountId = userObj.accountId || `PAYRENT_USER_${data.email}`;
-      const panMasked = userObj.panMasked || `XXXXX${panUpper.slice(5)}`;
+      const panMasked = userObj.panMasked || (panUpper ? `XXXXX${panUpper.slice(5)}` : undefined);
       const createdRole = userObj.role || (data.isAdmin ? "admin" : "customer");
 
       if (createdRole === "admin" && res.token) {
@@ -370,22 +365,7 @@ export function RegisterForm() {
         {...register("email")}
       />
 
-      {/* 4. PAN Number (Required KYC format: ABCDE1234F) */}
-      <Input
-        label="PAN Number"
-        placeholder="ABCDE1234F"
-        icon={<ShieldCheck className="h-4 w-4" />}
-        error={errors.panNumber?.message}
-        maxLength={10}
-        style={{ textTransform: "uppercase" }}
-        {...register("panNumber", {
-          onChange: (e) => {
-            e.target.value = e.target.value.toUpperCase().replace(/\s+/g, "");
-          },
-        })}
-      />
-
-      {/* 5. Password & 6. Confirm Password */}
+      {/* Password & Confirm Password */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Input
           label="Password"

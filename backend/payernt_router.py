@@ -644,10 +644,10 @@ def register_payernt_vendor(data: PayerntRegisterSchema):
             detail="Password and confirm password do not match.",
         )
 
-    # Validate Aadhaar format: exactly 12 digits
+    # Aadhaar is optional during registration (completed in dedicated Aadhaar KYC flow)
     raw_aadhaar = data.aadhaarNumber or data.aadhaar_number or ""
-    clean_aadhaar = re.sub(r"\s+", "", raw_aadhaar)
-    if not re.match(r"^\d{12}$", clean_aadhaar):
+    clean_aadhaar = re.sub(r"\s+", "", raw_aadhaar) if raw_aadhaar else ""
+    if clean_aadhaar and not re.match(r"^\d{12}$", clean_aadhaar):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Aadhaar number must contain exactly 12 numeric digits.",

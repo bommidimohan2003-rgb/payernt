@@ -54,3 +54,5 @@ backend/backups/*.sql
 .venv/
 **/.tanstack/
 frontend/.tanstack/
+backend/storage/secure_kyc_documents/*
+!backend/storage/secure_kyc_documents/.gitkeep

@@ -1,5 +1,6 @@
 import os
 import sys
+import re
 
 if sys.platform == "win32":
     try:
@@ -348,12 +349,47 @@ def init_db(force: bool = False):
     add_column_safely("users", "aadhaar_number VARCHAR(20) NULL")
     add_column_safely("users", "profile_photo_url LONGTEXT NULL")
     add_column_safely("users", "person_id VARCHAR(255) NULL")
+    add_column_safely("users", "kyc_status VARCHAR(50) DEFAULT 'NOT_STARTED'")
+    add_column_safely("users", "kyc_document_type VARCHAR(50) NULL")
+    add_column_safely("users", "kyc_submitted_at VARCHAR(100) NULL")
+    add_column_safely("users", "kyc_verified_at VARCHAR(100) NULL")
+    add_column_safely("users", "kyc_rejection_reason TEXT NULL")
     add_index_safely("users", "idx_users_pan_number", "pan_number")
     add_index_safely("users", "idx_users_account_type", "account_type")
     add_index_safely("users", "idx_users_aadhaar_number", "aadhaar_number")
     add_index_safely("users", "idx_users_phone", "phone")
     add_index_safely("users", "idx_users_city", "city")
     add_index_safely("users", "idx_users_person_id", "person_id")
+
+    # Dedicated User KYC Verifications Table
+    execute_query("""
+        CREATE TABLE IF NOT EXISTS user_kyc_verifications (
+            id VARCHAR(255) PRIMARY KEY,
+            user_id VARCHAR(255) NOT NULL,
+            email VARCHAR(255) NOT NULL,
+            account_type VARCHAR(50) NOT NULL,
+            document_type VARCHAR(50) NOT NULL,
+            document_number_masked VARCHAR(50) NOT NULL,
+            document_number_hash VARCHAR(255) NOT NULL,
+            document_file_name VARCHAR(255) NULL,
+            document_mime_type VARCHAR(100) NULL,
+            document_file_size INT NULL,
+            document_storage_path VARCHAR(500) NULL,
+            document_data_encrypted LONGTEXT NULL,
+            status VARCHAR(50) DEFAULT 'PENDING',
+            verification_source VARCHAR(100) DEFAULT 'MANUAL_PENDING',
+            rejection_reason TEXT NULL,
+            submitted_at VARCHAR(100) NULL,
+            reviewed_by VARCHAR(255) NULL,
+            reviewed_at VARCHAR(100) NULL,
+            created_at VARCHAR(100) NULL,
+            updated_at VARCHAR(100) NULL
+        )
+    """)
+    add_index_safely("user_kyc_verifications", "idx_kyc_email", "email")
+    add_index_safely("user_kyc_verifications", "idx_kyc_account_type", "account_type")
+    add_index_safely("user_kyc_verifications", "idx_kyc_status", "status")
+    add_index_safely("user_kyc_verifications", "idx_kyc_user_id", "user_id")
 
     # 1. Dedicated Admin Accounts Table
     execute_query("""
@@ -4219,7 +4255,7 @@ def is_token_revoked(jti: str) -> bool:
 # Rate-Limiting and OTP Attempt Helpers
 RATE_LIMIT_STORE = {}
 
-def check_auth_lockout(key: str) -> tuple[bool, int]:
+def check_auth_lockout(key: str, max_attempts: int = 5, lock_duration_secs: int = 900, *args, **kwargs) -> tuple[bool, int]:
     """
     Fast, read-only lockout check. Returns (is_locked, seconds_remaining).
     Uses in-memory cache first to avoid unnecessary remote database round trips on valid logins.
@@ -8392,6 +8428,282 @@ def get_all_devices_admin_db() -> List[dict]:
         safe_copy.pop("qr_token", None)
         safe_copy.pop("qr_token_hash", None)
         safe_list.append(safe_copy)
+    return safe_list
+
+
+# ============================================================
+# SEPARATE AADHAAR & PAN KYC VERIFICATION SYSTEM
+# ============================================================
+
+MOCK_KYC_VERIFICATIONS: Dict[str, Dict[str, Any]] = {}
+
+def mask_identity_number(doc_type: str, raw_number: str) -> str:
+    """Masks Aadhaar or PAN number safely. Never returns raw number."""
+    clean = re.sub(r"\s+", "", str(raw_number)).upper()
+    if doc_type.upper() == "AADHAAR":
+        digits = re.sub(r"\D", "", clean)
+        last4 = digits[-4:] if len(digits) >= 4 else "XXXX"
+        return f"XXXX-XXXX-{last4}"
+    elif doc_type.upper() == "PAN":
+        if len(clean) >= 5:
+            return f"XXXXX{clean[5:]}"
+        return f"XXXXX{clean}"
+    return "XXXX-MASKED"
+
+def hash_identity_number(raw_number: str) -> str:
+    """SHA-256 hash of normalized identity number for uniqueness verification."""
+    clean = re.sub(r"\s+", "", str(raw_number)).upper()
+    return hashlib.sha256(clean.encode("utf-8")).hexdigest()
+
+def get_user_kyc_status(email: str, account_type: str) -> Dict[str, Any]:
+    """Retrieves current KYC status for the authenticated user and account type."""
+    clean_email = email.strip().lower()
+    norm_acc_type = "payernt" if account_type.lower() in ("paye₹nt", "payernt", "vendor", "lender") else "payrent"
+    expected_doc = "AADHAAR" if norm_acc_type == "payernt" else "PAN"
+
+    # Try DB lookup
+    try:
+        row = fetch_one("""
+            SELECT * FROM user_kyc_verifications 
+            WHERE LOWER(email) = LOWER(%s) AND account_type = %s 
+            ORDER BY created_at DESC LIMIT 1
+        """, (clean_email, norm_acc_type))
+        if row:
+            st = row.get("status", "NOT_STARTED")
+            return {
+                "id": row["id"],
+                "userId": row.get("user_id"),
+                "email": clean_email,
+                "accountType": norm_acc_type,
+                "expectedDocumentType": expected_doc,
+                "documentType": row.get("document_type"),
+                "status": st,
+                "maskedNumber": row.get("document_number_masked"),
+                "documentFileName": row.get("document_file_name"),
+                "documentMimeType": row.get("document_mime_type"),
+                "submittedAt": row.get("submitted_at"),
+                "reviewedAt": row.get("reviewed_at"),
+                "rejectionReason": row.get("rejection_reason"),
+                "allowResubmission": st in ("NOT_STARTED", "REJECTED"),
+                "providerConfigured": False,
+                "providerStatus": "VERIFICATION_UNAVAILABLE" if st == "PENDING" else st
+            }
+    except Exception as e:
+        logger.warning(f"DB read error in get_user_kyc_status: {e}")
+
+    # Fallback to mock dictionary
+    for kyc in sorted(MOCK_KYC_VERIFICATIONS.values(), key=lambda x: x.get("created_at", ""), reverse=True):
+        if kyc.get("email") == clean_email and kyc.get("account_type") == norm_acc_type:
+            st = kyc.get("status", "NOT_STARTED")
+            return {
+                "id": kyc["id"],
+                "userId": kyc.get("user_id"),
+                "email": clean_email,
+                "accountType": norm_acc_type,
+                "expectedDocumentType": expected_doc,
+                "documentType": kyc.get("document_type"),
+                "status": st,
+                "maskedNumber": kyc.get("document_number_masked"),
+                "documentFileName": kyc.get("document_file_name"),
+                "documentMimeType": kyc.get("document_mime_type"),
+                "submittedAt": kyc.get("submitted_at"),
+                "reviewedAt": kyc.get("reviewed_at"),
+                "rejectionReason": kyc.get("rejection_reason"),
+                "allowResubmission": st in ("NOT_STARTED", "REJECTED"),
+                "providerConfigured": False,
+                "providerStatus": "VERIFICATION_UNAVAILABLE" if st == "PENDING" else st
+            }
+
+    # Default: Not started
+    return {
+        "id": None,
+        "userId": None,
+        "email": clean_email,
+        "accountType": norm_acc_type,
+        "expectedDocumentType": expected_doc,
+        "documentType": None,
+        "status": "NOT_STARTED",
+        "maskedNumber": None,
+        "documentFileName": None,
+        "documentMimeType": None,
+        "submittedAt": None,
+        "reviewedAt": None,
+        "rejectionReason": None,
+        "allowResubmission": True,
+        "providerConfigured": False,
+        "providerStatus": "NOT_STARTED"
+    }
+
+def record_kyc_submission(
+    user_id: str,
+    email: str,
+    account_type: str,
+    document_type: str,
+    raw_document_number: str,
+    file_name: str,
+    mime_type: str,
+    file_size: int,
+    file_data: str,
+    storage_path: Optional[str] = None
+) -> Dict[str, Any]:
+    """Records a new KYC submission with masked numbers and private document storage."""
+    clean_email = email.strip().lower()
+    norm_acc_type = "payernt" if account_type.lower() in ("paye₹nt", "payernt", "vendor", "lender") else "payrent"
+    masked_num = mask_identity_number(document_type, raw_document_number)
+    num_hash = hash_identity_number(raw_document_number)
+    now_iso = dt.now(timezone.utc).isoformat()
+    verification_id = f"KYC_{int(time.time() * 1000)}_{uuid.uuid4().hex[:6]}"
+
+    record = {
+        "id": verification_id,
+        "user_id": user_id,
+        "email": clean_email,
+        "account_type": norm_acc_type,
+        "document_type": document_type.upper(),
+        "document_number_masked": masked_num,
+        "document_number_hash": num_hash,
+        "document_file_name": file_name,
+        "document_mime_type": mime_type,
+        "document_file_size": file_size,
+        "document_storage_path": storage_path,
+        "document_data_encrypted": file_data,
+        "status": "PENDING",
+        "verification_source": "MANUAL_PENDING",
+        "rejection_reason": None,
+        "submitted_at": now_iso,
+        "reviewed_by": None,
+        "reviewed_at": None,
+        "created_at": now_iso,
+        "updated_at": now_iso,
+    }
+
+    try:
+        execute_query("""
+            INSERT INTO user_kyc_verifications (
+                id, user_id, email, account_type, document_type,
+                document_number_masked, document_number_hash,
+                document_file_name, document_mime_type, document_file_size,
+                document_storage_path, document_data_encrypted,
+                status, verification_source, rejection_reason,
+                submitted_at, created_at, updated_at
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (
+            record["id"], record["user_id"], record["email"], record["account_type"], record["document_type"],
+            record["document_number_masked"], record["document_number_hash"],
+            record["document_file_name"], record["document_mime_type"], record["document_file_size"],
+            record["document_storage_path"], record["document_data_encrypted"],
+            record["status"], record["verification_source"], record["rejection_reason"],
+            record["submitted_at"], record["created_at"], record["updated_at"]
+        ))
+        if norm_acc_type == "payernt":
+            execute_query("""
+                UPDATE payernt_accounts SET 
+                    aadhaar_number = %s, kyc_status = 'PENDING', kyc_document_type = 'AADHAAR',
+                    kyc_submitted_at = %s, updated_at = %s 
+                WHERE LOWER(email) = LOWER(%s)
+            """, (masked_num, now_iso, now_iso, clean_email))
+        else:
+            execute_query("""
+                UPDATE users SET 
+                    pan_number = %s, kyc_status = 'PENDING', kyc_document_type = 'PAN',
+                    kyc_submitted_at = %s 
+                WHERE LOWER(email) = LOWER(%s)
+            """, (masked_num, now_iso, clean_email))
+    except Exception as e:
+        logger.warning(f"DB write error in record_kyc_submission: {e}")
+
+    MOCK_KYC_VERIFICATIONS[verification_id] = record
+    return record
+
+def get_kyc_verification_by_id(verification_id: str) -> Optional[Dict[str, Any]]:
+    """Fetches a KYC verification record by verification ID."""
+    clean_id = (verification_id or "").strip()
+    try:
+        row = fetch_one("SELECT * FROM user_kyc_verifications WHERE id = %s", (clean_id,))
+        if row:
+            return row
+    except Exception as e:
+        logger.warning(f"DB read error in get_kyc_verification_by_id: {e}")
+    return MOCK_KYC_VERIFICATIONS.get(clean_id)
+
+def review_kyc_verification(
+    verification_id: str,
+    new_status: str,
+    reviewer_email: str,
+    rejection_reason: Optional[str] = None
+) -> Dict[str, Any]:
+    """Admin review of KYC verification (APPROVE or REJECT)."""
+    norm_status = new_status.strip().upper()
+    if norm_status not in ("APPROVED", "REJECTED", "PENDING"):
+        raise ValueError(f"Invalid KYC status: {new_status}")
+    now_iso = dt.now(timezone.utc).isoformat()
+    clean_reason = (rejection_reason or "").strip() if norm_status == "REJECTED" else None
+
+    try:
+        execute_query("""
+            UPDATE user_kyc_verifications SET 
+                status = %s, rejection_reason = %s, reviewed_by = %s, reviewed_at = %s, updated_at = %s 
+            WHERE id = %s
+        """, (norm_status, clean_reason, reviewer_email, now_iso, now_iso, verification_id))
+    except Exception as e:
+        logger.warning(f"DB error in review_kyc_verification: {e}")
+
+    rec = MOCK_KYC_VERIFICATIONS.get(verification_id)
+    if rec:
+        rec["status"] = norm_status
+        rec["rejection_reason"] = clean_reason
+        rec["reviewed_by"] = reviewer_email
+        rec["reviewed_at"] = now_iso
+        rec["updated_at"] = now_iso
+
+    email = rec.get("email") if rec else None
+    acc_type = rec.get("account_type") if rec else None
+    if email and acc_type:
+        if acc_type == "payernt":
+            try:
+                execute_query("""
+                    UPDATE payernt_accounts SET 
+                        kyc_status = %s, 
+                        kyc_verified_at = %s,
+                        kyc_rejection_reason = %s,
+                        updated_at = %s 
+                    WHERE LOWER(email) = LOWER(%s)
+                """, (norm_status, now_iso if norm_status == "APPROVED" else None, clean_reason, now_iso, email))
+            except Exception:
+                pass
+        else:
+            try:
+                execute_query("""
+                    UPDATE users SET 
+                        kyc_status = %s, 
+                        kyc_verified_at = %s,
+                        kyc_rejection_reason = %s 
+                    WHERE LOWER(email) = LOWER(%s)
+                """, (norm_status, now_iso if norm_status == "APPROVED" else None, clean_reason, email))
+            except Exception:
+                pass
+    return rec or {"id": verification_id, "status": norm_status}
+
+def get_all_kyc_verifications_admin() -> List[Dict[str, Any]]:
+    """Admin listing of all KYC verifications."""
+    try:
+        rows = fetch_all("""
+            SELECT id, user_id, email, account_type, document_type, document_number_masked,
+                   document_file_name, document_mime_type, document_file_size, status,
+                   verification_source, rejection_reason, submitted_at, reviewed_by, reviewed_at, created_at
+            FROM user_kyc_verifications ORDER BY created_at DESC
+        """)
+        if rows:
+            return rows
+    except Exception as e:
+        logger.warning(f"DB error in get_all_kyc_verifications_admin: {e}")
+
+    safe_list = []
+    for k in sorted(MOCK_KYC_VERIFICATIONS.values(), key=lambda x: x.get("created_at", ""), reverse=True):
+        copy = dict(k)
+        copy.pop("document_data_encrypted", None)
+        copy.pop("document_number_hash", None)
+        safe_list.append(copy)
     return safe_list
 
 

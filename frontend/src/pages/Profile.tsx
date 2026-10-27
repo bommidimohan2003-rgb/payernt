@@ -32,6 +32,7 @@ import {
   ChevronDown,
   Eye,
   EyeOff,
+  ExternalLink,
 } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
@@ -83,6 +84,37 @@ export default function Profile() {
       })
       .finally(() => {
         if (isMounted) setLoadingStats(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.email]);
+
+  const [kycData, setKycData] = useState<{
+    status: "NOT_STARTED" | "PENDING" | "APPROVED" | "REJECTED";
+    documentType: string;
+    maskedNumber: string | null;
+    submittedAt?: string | null;
+    verifiedAt?: string | null;
+    rejectionReason?: string | null;
+    providerStatus?: string | null;
+  } | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    const token = storage.get<string | null>(STORAGE_KEYS.token, null);
+    if (!token) return;
+
+    api
+      .getKycStatus(token)
+      .then((res) => {
+        if (isMounted && res.success && res.data) {
+          setKycData(res.data);
+        }
+      })
+      .catch((err) => {
+        console.warn("[Profile] KYC status load notice:", err);
       });
 
     return () => {
@@ -565,7 +597,7 @@ export default function Profile() {
                 <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-2">
                   <div className="px-3 py-1 rounded-xl bg-secondary/80 border border-border text-xs font-medium text-foreground flex items-center gap-1.5">
                     <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
-                    <span>PAN: <strong className="font-mono text-foreground font-bold">{user?.panMasked || (user?.panNumber ? `XXXXX${user.panNumber.slice(-5)}` : "Not linked")}</strong></span>
+                    <span>PAN: <strong className="font-mono text-foreground font-bold">{kycData?.maskedNumber || user?.panMasked || (user?.panNumber ? `XXXXX${user.panNumber.slice(-5)}` : "Not linked")}</strong></span>
                   </div>
                   <div className="px-3 py-1 rounded-xl bg-secondary/80 border border-border text-xs font-medium text-foreground flex items-center gap-1.5">
                     <Mail className="h-3.5 w-3.5 text-primary" />
@@ -1104,27 +1136,75 @@ export default function Profile() {
           <div className="space-y-6">
             {/* Verification Status Card */}
             <div className="card-premium p-6 border border-border/80 space-y-5">
-              <h3 className="font-extrabold text-base text-foreground flex items-center gap-2 border-b border-border pb-3">
-                <ShieldCheck className="h-5 w-5 text-emerald-500" />
-                <span>Verification & Trust Status</span>
-              </h3>
+              <div className="flex items-center justify-between border-b border-border pb-3">
+                <h3 className="font-extrabold text-base text-foreground flex items-center gap-2">
+                  <ShieldCheck className="h-5 w-5 text-emerald-500" />
+                  <span>Verification & Trust Status</span>
+                </h3>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate({ to: "/payent/kyc" })}
+                  className="gap-1.5 text-xs font-bold py-1.5 px-3 border-primary/30 text-primary hover:bg-primary/10"
+                >
+                  <span>{kycData?.status === "APPROVED" ? "View PAN KYC" : "Manage PAN KYC"}</span>
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </Button>
+              </div>
 
               <div className="space-y-3">
-                <div className="flex items-center justify-between p-3.5 rounded-2xl bg-secondary/40 border border-border/60">
-                  <div className="flex items-center gap-3">
-                    <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
-                    <div>
-                      <p className="text-xs font-bold text-foreground">
-                        Govt PAN Card Verification
-                      </p>
-                      <p className="text-[10px] text-muted-foreground font-medium font-mono">
-                        PAN: {user?.panMasked || (user?.panNumber ? `XXXXX${user.panNumber.slice(-5)}` : "XXXXX1234F")} (Verified)
-                      </p>
+                <div className="p-3.5 rounded-2xl bg-secondary/40 border border-border/60 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      {kycData?.status === "APPROVED" ? (
+                        <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
+                      ) : kycData?.status === "REJECTED" ? (
+                        <X className="h-5 w-5 text-destructive shrink-0" />
+                      ) : kycData?.status === "PENDING" ? (
+                        <Clock className="h-5 w-5 text-amber-500 shrink-0" />
+                      ) : (
+                        <ShieldCheck className="h-5 w-5 text-muted-foreground shrink-0" />
+                      )}
+                      <div>
+                        <p className="text-xs font-bold text-foreground">
+                          Govt PAN Card Verification
+                        </p>
+                        <p className="text-[10px] text-muted-foreground font-medium font-mono">
+                          PAN: {kycData?.maskedNumber || user?.panMasked || (user?.panNumber ? `XXXXX${user.panNumber.slice(-5)}` : "Not linked")}
+                        </p>
+                      </div>
                     </div>
+                    <span className={cn(
+                      "text-[10px] font-black uppercase px-2 py-0.5 rounded-full border",
+                      kycData?.status === "APPROVED"
+                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
+                        : kycData?.status === "REJECTED"
+                        ? "bg-destructive/10 text-destructive border-destructive/30"
+                        : kycData?.status === "PENDING"
+                        ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
+                        : "bg-secondary text-muted-foreground border-border"
+                    )}>
+                      {kycData?.status || (user?.kycStatus ?? "NOT_STARTED")}
+                    </span>
                   </div>
-                  <span className="text-[10px] font-black text-emerald-500 uppercase">
-                    Verified
-                  </span>
+
+                  {kycData?.status === "REJECTED" && kycData.rejectionReason && (
+                    <div className="text-[11px] text-destructive bg-destructive/10 rounded-xl p-2 font-medium">
+                      Rejection Reason: {kycData.rejectionReason}
+                    </div>
+                  )}
+
+                  {kycData?.status !== "APPROVED" && (
+                    <div className="pt-1">
+                      <Button
+                        size="sm"
+                        onClick={() => navigate({ to: "/payent/kyc" })}
+                        className="w-full text-xs font-bold btn-gradient py-1.5"
+                      >
+                        {kycData?.status === "PENDING" ? "Check PAN Verification Status" : "Verify PAN Card Now"}
+                      </Button>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center justify-between p-3.5 rounded-2xl bg-secondary/40 border border-border/60">

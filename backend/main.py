@@ -1145,7 +1145,8 @@ def register_verify(data: RegisterVerifySchema, request: Request):
             detail=f"Too many verification attempts. Please try again in {secs // 60} minutes."
         )
 
-    # Identity validation: PAN Number (for pay₹ent renter side) or Aadhaar Number (if supplied)
+    # Identity validation: PAN / Aadhaar are optional during initial registration
+    # Dedicated KYC verification is performed post-registration per account type
     raw_pan = data.pan_number or data.panNumber
     raw_aadhaar = data.aadhaar_number or data.aadhaarNumber
     clean_pan = str(raw_pan).strip().upper() if raw_pan else None
@@ -1157,17 +1158,12 @@ def register_verify(data: RegisterVerifySchema, request: Request):
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Enter a valid PAN number format (e.g. ABCDE1234F)."
             )
-    elif clean_aadhaar:
+    if clean_aadhaar:
         if not re.match(r"^\d{12}$", clean_aadhaar):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Aadhaar number must consist of exactly 12 numeric digits."
             )
-    else:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Identity verification number (PAN Number) is required."
-        )
 
     clean_email = data.email.lower().strip()
     clean_phone = normalize_phone(data.phone)
@@ -1386,10 +1382,8 @@ def cross_side_register_endpoint(data: CrossSideRegisterSchema):
 
     if norm_target in ("pay₹ent", "customer", "renter"):
         raw_pan = data.pan_number or data.panNumber
-        if not raw_pan:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="PAN number is required for pay₹ent account registration.")
-        clean_pan = str(raw_pan).strip().upper()
-        if not re.match(r"^[A-Z]{5}[0-9]{4}[A-Z]{1}$", clean_pan):
+        clean_pan = str(raw_pan).strip().upper() if raw_pan else None
+        if clean_pan and not re.match(r"^[A-Z]{5}[0-9]{4}[A-Z]{1}$", clean_pan):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Enter a valid PAN number format (e.g. ABCDE1234F).")
 
         existing_u = get_user(clean_email)
@@ -1445,10 +1439,8 @@ def cross_side_register_endpoint(data: CrossSideRegisterSchema):
 
     elif norm_target in ("paye₹nt", "vendor", "lender"):
         raw_aadhaar = data.aadhaar_number or data.aadhaarNumber
-        if not raw_aadhaar:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Aadhaar number is required for paye₹nt account registration.")
-        clean_aadhaar = "".join(c for c in str(raw_aadhaar) if c.isdigit())
-        if len(clean_aadhaar) != 12:
+        clean_aadhaar = "".join(c for c in str(raw_aadhaar) if c.isdigit()) if raw_aadhaar else ""
+        if clean_aadhaar and len(clean_aadhaar) != 12:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Aadhaar number must consist of exactly 12 numeric digits.")
 
         existing_payernt = get_payernt_account_by_email(clean_email)
@@ -2014,8 +2006,8 @@ def get_me(current_user_email: str = Depends(get_current_user_email)):
         "fullName": display_name,
         "role": user.get("role", "customer"),
         "phone": user.get("phone", ""),
-        "panNumber": pan_num,
-        "pan_number": pan_num,
+        "panNumber": pan_masked,
+        "pan_number": pan_masked,
         "panMasked": pan_masked,
         "pan_masked": pan_masked,
         "aadhaarMasked": aadhaar_masked,
@@ -2034,6 +2026,7 @@ def get_me(current_user_email: str = Depends(get_current_user_email)):
         "bio": user.get("bio", ""),
         "avatar": photo_url,
         "status": user.get("status", "active"),
+        "kycStatus": user.get("kyc_status", "NOT_STARTED"),
         "verified": True
     }
 
@@ -2408,6 +2401,366 @@ def update_user_profile_route(data: UserProfileUpdateSchema, current_user_email:
 
     # Re-fetch updated profile
     return get_me(current_user_email=clean_email)
+
+# ============================================================
+# SEPARATE AADHAAR & PAN KYC VERIFICATION SYSTEM
+# ============================================================
+
+SECURE_KYC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "storage", "secure_kyc_documents")
+os.makedirs(SECURE_KYC_DIR, exist_ok=True)
+
+class KycSubmitSchema(BaseModel):
+    document_type: str = Field(..., alias="documentType")
+    document_number: str = Field(..., alias="documentNumber")
+    file_name: Optional[str] = Field("document.jpg", alias="fileName")
+    file_type: Optional[str] = Field("image/jpeg", alias="fileType")
+    file_data: str = Field(..., alias="fileData")
+    file_size: Optional[int] = Field(0, alias="fileSize")
+
+    model_config = {"populate_by_name": True}
+
+class KycReviewSchema(BaseModel):
+    action: str  # "approve" or "reject"
+    rejection_reason: Optional[str] = Field(None, alias="rejectionReason")
+
+    model_config = {"populate_by_name": True}
+
+def get_authenticated_account_context(authorization: Optional[str] = Header(None)) -> Dict[str, Any]:
+    """
+    Extracts authenticated user context for both pay₹ent (Customer) and paye₹nt (Vendor) tokens.
+    Verifies JWT signature, expiration, and session revocation.
+    """
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing or invalid Authorization header. Must start with 'Bearer '"
+        )
+    token = authorization.split(" ")[1]
+
+    # Try Firebase verify if available
+    if HAS_FIREBASE and firebase_admin and firebase_admin._apps:
+        try:
+            decoded = firebase_auth.verify_id_token(token)
+            email = decoded.get("email")
+            if email:
+                return {
+                    "email": email.strip().lower(),
+                    "account_type": "payrent",
+                    "role": "customer",
+                    "user_id": email.strip().lower(),
+                }
+        except Exception:
+            pass
+
+    payload = decode_access_token(token, expected_type="access")
+    if not payload or "sub" not in payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials or Token expired"
+        )
+
+    jti = payload.get("jti")
+    if jti and is_token_revoked(jti):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has been revoked or logged out."
+        )
+
+    sid = payload.get("sid")
+    if sid and is_session_revoked(sid):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session has been revoked or expired."
+        )
+
+    email = payload["sub"].strip().lower()
+    raw_acc_type = (payload.get("account_type") or payload.get("accountType") or "").strip().lower()
+    role = str(payload.get("role") or "").strip().lower()
+
+    if raw_acc_type in ("paye₹nt", "payernt", "vendor", "lender") or role in ("vendor", "lender", "owner"):
+        norm_type = "payernt"
+    else:
+        norm_type = "payrent"
+
+    user_id = payload.get("user_id") or email
+    return {
+        "email": email,
+        "account_type": norm_type,
+        "role": role,
+        "user_id": user_id,
+        "person_id": payload.get("person_id")
+    }
+
+@app.get("/api/kyc/status")
+@app.get("/api/payernt/kyc/status")
+@app.get("/api/paye₹nt/kyc/status")
+def get_kyc_status_route(authorization: Optional[str] = Header(None)):
+    """Retrieves current KYC verification status for the authenticated user and account type."""
+    from database import get_user_kyc_status
+    ctx = get_authenticated_account_context(authorization)
+    status_info = get_user_kyc_status(ctx["email"], ctx["account_type"])
+    return {
+        "success": True,
+        **status_info
+    }
+
+@app.post("/api/kyc/submit")
+@app.post("/api/payernt/kyc/submit")
+@app.post("/api/paye₹nt/kyc/submit")
+def submit_kyc_route(data: KycSubmitSchema, authorization: Optional[str] = Header(None)):
+    """
+    Submits identity document for KYC verification.
+    Enforces strict separation:
+      - Payernt (Lender) accounts accept Aadhaar only.
+      - Payrent (Renter) accounts accept PAN only.
+    """
+    from database import get_user_kyc_status, record_kyc_submission
+    ctx = get_authenticated_account_context(authorization)
+    email = ctx["email"]
+    account_type = ctx["account_type"]
+    user_id = ctx["user_id"]
+
+    doc_type = (data.document_type or "").strip().upper()
+    raw_number = (data.document_number or "").strip()
+
+    # 1. Enforce strict account-type & document-type mapping
+    if account_type == "payernt":
+        if doc_type == "PAN":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Payernt lender accounts require Aadhaar KYC verification. PAN cards are not accepted for this account type."
+            )
+        if doc_type != "AADHAAR":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid document type for Payernt account. Expected AADHAAR."
+            )
+        # Validate 12-digit Aadhaar format
+        clean_aadhaar = re.sub(r"\s+", "", raw_number)
+        if not re.match(r"^\d{12}$", clean_aadhaar):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Aadhaar number must contain exactly 12 numeric digits."
+            )
+        normalized_number = clean_aadhaar
+    else:
+        # Payrent account
+        if doc_type == "AADHAAR":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Payrent customer accounts require PAN card KYC verification. Aadhaar cards are not accepted for this account type."
+            )
+        if doc_type != "PAN":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid document type for Payrent account. Expected PAN."
+            )
+        # Validate 10-character PAN format
+        clean_pan = re.sub(r"\s+", "", raw_number).upper()
+        if not re.match(r"^[A-Z]{5}[0-9]{4}[A-Z]{1}$", clean_pan):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid PAN number format. Expected format: ABCDE1234F."
+            )
+        normalized_number = clean_pan
+
+    # 2. Check current status to prevent duplicate submissions or resubmission of approved accounts
+    current_kyc = get_user_kyc_status(email, account_type)
+    if current_kyc.get("status") == "PENDING":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A KYC verification request is already pending administrative review."
+        )
+    if current_kyc.get("status") == "APPROVED":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="KYC verification has already been approved for this account."
+        )
+
+    # 3. Validate file upload (size, MIME type, payload presence)
+    file_data = (data.file_data or "").strip()
+    if not file_data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Document photo is required."
+        )
+
+    # 5MB file size limit (base64 string is ~7MB maximum)
+    if (data.file_size and data.file_size > 5 * 1024 * 1024) or len(file_data) > 7 * 1024 * 1024:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="Document file exceeds maximum size limit (5MB)."
+        )
+
+    # Allowed MIME types
+    raw_mime = (data.file_type or "").strip().lower()
+    if file_data.startswith("data:"):
+        header_mime = file_data.split(";")[0].replace("data:", "").lower()
+        if header_mime:
+            raw_mime = header_mime
+
+    allowed_mimes = {"image/jpeg", "image/jpg", "image/png", "application/pdf"}
+    if raw_mime not in allowed_mimes:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail=f"Unsupported document format '{raw_mime}'. Supported formats are JPG, JPEG, PNG, and PDF."
+        )
+
+    # Sanitize file name
+    safe_name = re.sub(r"[^a-zA-Z0-9._-]", "_", os.path.basename(data.file_name or "document.jpg"))
+    if not safe_name:
+        safe_name = "document.jpg"
+
+    # 4. Save to secure private directory (never public)
+    storage_path = None
+    try:
+        doc_hash = hashlib.sha256(normalized_number.encode()).hexdigest()[:12]
+        storage_filename = f"KYC_{account_type}_{doc_hash}_{int(time.time())}_{safe_name}"
+        storage_path = os.path.join(SECURE_KYC_DIR, storage_filename)
+        with open(storage_path, "w", encoding="utf-8") as f:
+            f.write(file_data)
+    except Exception as e:
+        logger.warning(f"Failed to write KYC private file to disk: {e}")
+
+    # 5. Record submission in database
+    rec = record_kyc_submission(
+        user_id=user_id,
+        email=email,
+        account_type=account_type,
+        document_type=doc_type,
+        raw_document_number=normalized_number,
+        file_name=safe_name,
+        mime_type=raw_mime,
+        file_size=data.file_size or len(file_data),
+        file_data=file_data,
+        storage_path=storage_path
+    )
+
+    return {
+        "success": True,
+        "status": "PENDING",
+        "message": f"{doc_type} document uploaded successfully and submitted for verification review.",
+        "verificationId": rec["id"],
+        "maskedNumber": rec["document_number_masked"],
+        "documentType": rec["document_type"],
+        "documentFileName": safe_name,
+        "submittedAt": rec["submitted_at"],
+        "providerConfigured": False,
+        "providerStatus": "VERIFICATION_UNAVAILABLE"
+    }
+
+@app.get("/api/kyc/document/{verification_id}")
+def get_kyc_document_route(verification_id: str, authorization: Optional[str] = Header(None)):
+    """
+    Secure endpoint to retrieve KYC document.
+    Enforces strict access control: accessible ONLY by document owner or platform admin.
+    """
+    from database import get_kyc_verification_by_id
+    ctx = get_authenticated_account_context(authorization)
+    clean_id = verification_id.strip()
+
+    rec = get_kyc_verification_by_id(clean_id)
+    if not rec:
+        raise HTTPException(status_code=404, detail="KYC verification record not found.")
+
+    doc_owner = (rec.get("email") or "").strip().lower()
+    is_owner = ctx["email"] == doc_owner
+    is_admin = ctx.get("role") in ("admin", "superadmin")
+
+    if not is_owner and not is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: You are not authorized to view this identity document."
+        )
+
+    file_data = rec.get("document_data_encrypted") or ""
+    if not file_data and rec.get("document_storage_path") and os.path.exists(rec["document_storage_path"]):
+        try:
+            with open(rec["document_storage_path"], "r", encoding="utf-8") as f:
+                file_data = f.read()
+        except Exception:
+            pass
+
+    return {
+        "success": True,
+        "id": rec["id"],
+        "fileName": rec.get("document_file_name"),
+        "fileType": rec.get("document_mime_type"),
+        "fileData": file_data,
+        "maskedNumber": rec.get("document_number_masked"),
+        "status": rec.get("status")
+    }
+
+@app.get("/api/admin/kyc/list")
+def list_admin_kyc_verifications(
+    current_user_email: str = Depends(get_current_user_email),
+    authorization: Optional[str] = Header(None)
+):
+    """Lists all KYC verification submissions for administrative review."""
+    from database import get_all_kyc_verifications_admin
+    user_rec = get_user(current_user_email) or {}
+    token_role = None
+    if authorization and authorization.startswith("Bearer "):
+        try:
+            payload = decode_access_token(authorization.split(" ")[1])
+            if payload:
+                token_role = payload.get("role")
+        except Exception:
+            pass
+
+    if user_rec.get("role") not in ("admin", "superadmin") and token_role not in ("admin", "superadmin"):
+        raise HTTPException(status_code=403, detail="Forbidden: Admin access required.")
+    
+    rows = get_all_kyc_verifications_admin()
+    return {
+        "success": True,
+        "verifications": rows
+    }
+
+@app.post("/api/admin/kyc/{verification_id}/review")
+def review_kyc_verification_route(
+    verification_id: str,
+    data: KycReviewSchema,
+    current_user_email: str = Depends(get_current_user_email),
+    authorization: Optional[str] = Header(None)
+):
+    """Admin review of KYC verification (approve or reject with reason)."""
+    from database import review_kyc_verification, get_kyc_verification_by_id
+    user_rec = get_user(current_user_email) or {}
+    token_role = None
+    if authorization and authorization.startswith("Bearer "):
+        try:
+            payload = decode_access_token(authorization.split(" ")[1])
+            if payload:
+                token_role = payload.get("role")
+        except Exception:
+            pass
+
+    if user_rec.get("role") not in ("admin", "superadmin") and token_role not in ("admin", "superadmin"):
+        raise HTTPException(status_code=403, detail="Forbidden: Admin access required.")
+
+    rec = get_kyc_verification_by_id(verification_id)
+    if not rec:
+        raise HTTPException(status_code=404, detail="KYC verification record not found.")
+
+    action = (data.action or "").strip().lower()
+    if action not in ("approve", "reject"):
+        raise HTTPException(status_code=400, detail="Invalid action. Must be 'approve' or 'reject'.")
+
+    new_status = "APPROVED" if action == "approve" else "REJECTED"
+    updated = review_kyc_verification(
+        verification_id=verification_id,
+        new_status=new_status,
+        reviewer_email=current_user_email,
+        rejection_reason=data.rejection_reason
+    )
+
+    return {
+        "success": True,
+        "status": new_status,
+        "message": f"KYC verification {new_status.lower()} successfully.",
+        "verification": updated
+    }
 
 class LocationGeocodeSchema(BaseModel):
     latitude: float
@@ -7089,14 +7442,14 @@ def admin_login(data: LoginRequestSchema, request: Request, response: Response):
         "refreshToken": refresh_token,
         "user": {
             "id": user["email"],
-            "fullName": user["full_name"],
+            "fullName": user.get("full_name") or user.get("name") or "Admin",
             "email": user["email"],
-            "phone": user["phone"],
-            "role": user["role"],
-            "status": user["status"] or "active",
-            "verified": bool(user["verified"]),
-            "avatar": user["avatar"] or "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150",
-            "createdAt": user["created_at"]
+            "phone": user.get("phone", ""),
+            "role": user.get("role", "admin"),
+            "status": user.get("status") or "active",
+            "verified": bool(user.get("verified", True)),
+            "avatar": user.get("avatar") or "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150",
+            "createdAt": user.get("created_at")
         }
     }
 
@@ -7115,14 +7468,14 @@ def admin_logout(request: Request, response: Response, authorization: Optional[s
 def admin_get_me(current_admin: dict = Depends(check_admin_user)):
     return {
         "id": current_admin["email"],
-        "fullName": current_admin["full_name"],
+        "fullName": current_admin.get("full_name") or current_admin.get("name") or "Admin",
         "email": current_admin["email"],
-        "phone": current_admin["phone"],
-        "role": current_admin["role"],
-        "status": current_admin["status"] or "active",
-        "verified": bool(current_admin["verified"]),
-        "avatar": current_admin["avatar"] or "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150",
-        "createdAt": current_admin["created_at"]
+        "phone": current_admin.get("phone", ""),
+        "role": current_admin.get("role", "admin"),
+        "status": current_admin.get("status") or "active",
+        "verified": bool(current_admin.get("verified", True)),
+        "avatar": current_admin.get("avatar") or "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150",
+        "createdAt": current_admin.get("created_at")
     }
 
 @app.post("/api/admin/profile")

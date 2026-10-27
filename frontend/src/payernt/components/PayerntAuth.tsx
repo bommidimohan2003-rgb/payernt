@@ -50,7 +50,6 @@ export function PayerntAuth({
   // --- REGISTER STATES (Address & Pincode omitted per requirement) ---
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [aadhaar, setAadhaar] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -60,7 +59,6 @@ export function PayerntAuth({
   const [registerErrors, setRegisterErrors] = useState<{
     name?: string;
     email?: string;
-    aadhaar?: string;
     phone?: string;
     password?: string;
     confirmPassword?: string;
@@ -238,15 +236,7 @@ export function PayerntAuth({
       errors.email = "Please enter a valid email address.";
     }
 
-    // 3. Aadhaar validation (12 digits numbers only)
-    const cleanAadhaar = aadhaar.replace(/\s+/g, "");
-    if (!cleanAadhaar) {
-      errors.aadhaar = "Aadhaar Number is required.";
-    } else if (!/^\d{12}$/.test(cleanAadhaar)) {
-      errors.aadhaar = "Aadhaar Number must be exactly 12 numeric digits.";
-    }
-
-    // 4. Phone validation (10 digits Indian mobile)
+    // Phone validation (10 digits Indian mobile)
     const cleanPhone = phone.replace(/\D/g, "");
     if (!cleanPhone) {
       errors.phone = "Mobile Number is required.";
@@ -254,21 +244,21 @@ export function PayerntAuth({
       errors.phone = "Mobile Number must be exactly 10 digits.";
     }
 
-    // 5. Password validation
+    // Password validation
     if (!password) {
       errors.password = "Password is required.";
     } else if (!isPasswordValid) {
       errors.password = "Password must meet all requirements.";
     }
 
-    // 6. Confirm Password validation
+    // Confirm Password validation
     if (!confirmPassword) {
       errors.confirmPassword = "Confirm Password is required.";
     } else if (confirmPassword !== password) {
       errors.confirmPassword = "Passwords do not match.";
     }
 
-    // 7. Terms validation
+    // Terms validation
     if (!termsAccepted) {
       errors.terms = "Please accept the Terms of Service & Privacy Policy.";
     }
@@ -282,12 +272,12 @@ export function PayerntAuth({
     setRegisterErrors({});
     setIsRegistering(true);
 
-    // Note: address and pincode are omitted from UI per requirement (collected later during product listing and booking)
+    // Note: address, pincode and KYC documents are omitted during account registration per specification
+    // (Aadhaar KYC is completed in dedicated host verification flow post-registration).
     payerntApi
       .register({
         name: cleanName,
         email: cleanEmail,
-        aadhaarNumber: cleanAadhaar,
         phoneNumber: cleanPhone,
         address: "Not Provided",
         pincode: "000000",
@@ -733,42 +723,7 @@ export function PayerntAuth({
                         )}
                       </div>
 
-                      {/* 4. Aadhaar Number (12 numeric digits) */}
-                      <div className="w-full">
-                        <label
-                          htmlFor="payernt-register-aadhaar"
-                          className="mb-1.5 block text-sm font-medium text-foreground"
-                        >
-                          Aadhaar Number <span className="text-destructive">*</span>
-                        </label>
-                        <div
-                          className={`flex items-center gap-2 rounded-xl border bg-card px-4 h-12 transition-colors border-border focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/40 ${
-                            registerErrors.aadhaar ? "border-destructive focus-within:ring-destructive/30" : ""
-                          }`}
-                        >
-                          <span className="text-muted-foreground">
-                            <FileText className="h-4 w-4" />
-                          </span>
-                          <input
-                            id="payernt-register-aadhaar"
-                            type="text"
-                            maxLength={12}
-                            value={aadhaar}
-                            onChange={(e) => {
-                              const val = e.target.value.replace(/\D/g, "").slice(0, 12);
-                              setAadhaar(val);
-                              if (registerErrors.aadhaar) setRegisterErrors((prev) => ({ ...prev, aadhaar: undefined }));
-                            }}
-                            placeholder="12-digit Aadhaar Number"
-                            className="flex-1 bg-transparent outline-none text-sm font-mono placeholder:text-muted-foreground text-foreground"
-                          />
-                        </div>
-                        {registerErrors.aadhaar && (
-                          <p className="mt-1.5 text-xs text-destructive">{registerErrors.aadhaar}</p>
-                        )}
-                      </div>
-
-                      {/* 5. Password & 6. Confirm Password */}
+                      {/* Password & Confirm Password */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {/* Password */}
                         <div className="w-full">

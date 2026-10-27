@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import {
   User,
   ShieldCheck,
@@ -50,6 +51,7 @@ export function LenderProfileView({
   onLogout,
   onBack,
 }: LenderProfileProps) {
+  const navigate = useNavigate();
   const { theme, toggle: toggleTheme } = useTheme();
   const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState(activeAccount?.name || profile.name || "");
@@ -300,6 +302,35 @@ export function LenderProfileView({
             </div>
             <p className="text-[10px] text-muted-foreground">Total earned to date</p>
           </div>
+        </div>
+      </div>
+
+      {/* Aadhaar KYC Verification Section */}
+      <div className="rounded-3xl border border-border/80 bg-card p-6 sm:p-7 space-y-4 shadow-sm text-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 font-bold text-foreground text-sm">
+            <ShieldCheck className="h-5 w-5 text-primary" />
+            <span>Aadhaar Identity Verification (KYC)</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate({ to: "/payernt/kyc" })}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-foreground text-background font-bold text-xs hover:opacity-90 active:scale-98 transition-all cursor-pointer shadow-sm self-start sm:self-auto"
+          >
+            <span>Manage Aadhaar KYC</span>
+            <ExternalLink className="h-3.5 w-3.5" />
+          </button>
+        </div>
+        <p className="text-muted-foreground leading-relaxed">
+          Payernt equipment hosts undergo strict Aadhaar card verification. Complete your Aadhaar KYC to unlock full equipment coverage protection, verified host trust badges, and instantaneous payouts.
+        </p>
+        <div className="flex flex-wrap items-center gap-4 text-xs font-mono pt-1">
+          <span className="flex items-center gap-1.5 text-foreground">
+            <span className="text-muted-foreground">Document Type:</span> Aadhaar Card
+          </span>
+          <span className="flex items-center gap-1.5 text-foreground">
+            <span className="text-muted-foreground">Aadhaar Status:</span> {maskedAadhaar || "Pending Aadhaar Verification"}
+          </span>
         </div>
       </div>
 

@@ -22,6 +22,7 @@ import { Route as ContactRouteImport } from './routes/contact'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as FaqRouteImport } from './routes/faq'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
+import { Route as KycRouteImport } from './routes/kyc'
 import { Route as LenderPortalRouteImport } from './routes/lender-portal'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as MessagesRouteImport } from './routes/messages'
@@ -71,6 +72,7 @@ import { Route as PayentBookingsRouteImport } from './routes/payent/bookings'
 import { Route as PayentCartRouteImport } from './routes/payent/cart'
 import { Route as PayentExploreRouteImport } from './routes/payent/explore'
 import { Route as PayentHelpRouteImport } from './routes/payent/help'
+import { Route as PayentKycRouteImport } from './routes/payent/kyc'
 import { Route as PayentMessagesRouteImport } from './routes/payent/messages'
 import { Route as PayentNotificationsRouteImport } from './routes/payent/notifications'
 import { Route as PayentProfileRouteImport } from './routes/payent/profile'
@@ -82,6 +84,7 @@ import { Route as PayerntAnalyticsRouteImport } from './routes/payernt/analytics
 import { Route as PayerntBookingsRouteImport } from './routes/payernt/bookings'
 import { Route as PayerntEarningsRouteImport } from './routes/payernt/earnings'
 import { Route as PayerntHelpRouteImport } from './routes/payernt/help'
+import { Route as PayerntKycRouteImport } from './routes/payernt/kyc'
 import { Route as PayerntListRouteImport } from './routes/payernt/list'
 import { Route as PayerntMessagesRouteImport } from './routes/payernt/messages'
 import { Route as PayerntNotificationsRouteImport } from './routes/payernt/notifications'
@@ -162,6 +165,11 @@ const FaqRoute = FaqRouteImport.update({
 const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
   id: '/forgot-password',
   path: '/forgot-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const KycRoute = KycRouteImport.update({
+  id: '/kyc',
+  path: '/kyc',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LenderPortalRoute = LenderPortalRouteImport.update({
@@ -409,6 +417,11 @@ const PayentHelpRoute = PayentHelpRouteImport.update({
   path: '/help',
   getParentRoute: () => PayentRoute,
 } as any)
+const PayentKycRoute = PayentKycRouteImport.update({
+  id: '/kyc',
+  path: '/kyc',
+  getParentRoute: () => PayentRoute,
+} as any)
 const PayentMessagesRoute = PayentMessagesRouteImport.update({
   id: '/messages',
   path: '/messages',
@@ -462,6 +475,11 @@ const PayerntEarningsRoute = PayerntEarningsRouteImport.update({
 const PayerntHelpRoute = PayerntHelpRouteImport.update({
   id: '/help',
   path: '/help',
+  getParentRoute: () => PayerntRoute,
+} as any)
+const PayerntKycRoute = PayerntKycRouteImport.update({
+  id: '/kyc',
+  path: '/kyc',
   getParentRoute: () => PayerntRoute,
 } as any)
 const PayerntListRoute = PayerntListRouteImport.update({
@@ -559,6 +577,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRoute
   '/faq': typeof FaqRoute
   '/forgot-password': typeof ForgotPasswordRoute
+  '/kyc': typeof KycRoute
   '/lender-portal': typeof LenderPortalRoute
   '/login': typeof LoginRoute
   '/messages': typeof MessagesRoute
@@ -606,6 +625,7 @@ export interface FileRoutesByFullPath {
   '/payent/cart': typeof PayentCartRoute
   '/payent/explore': typeof PayentExploreRoute
   '/payent/help': typeof PayentHelpRoute
+  '/payent/kyc': typeof PayentKycRoute
   '/payent/messages': typeof PayentMessagesRoute
   '/payent/notifications': typeof PayentNotificationsRoute
   '/payent/profile': typeof PayentProfileRoute
@@ -616,6 +636,7 @@ export interface FileRoutesByFullPath {
   '/payernt/bookings': typeof PayerntBookingsRoute
   '/payernt/earnings': typeof PayerntEarningsRoute
   '/payernt/help': typeof PayerntHelpRoute
+  '/payernt/kyc': typeof PayerntKycRoute
   '/payernt/list': typeof PayerntListRoute
   '/payernt/messages': typeof PayerntMessagesRoute
   '/payernt/notifications': typeof PayerntNotificationsRoute
@@ -649,6 +670,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardRoute
   '/faq': typeof FaqRoute
   '/forgot-password': typeof ForgotPasswordRoute
+  '/kyc': typeof KycRoute
   '/lender-portal': typeof LenderPortalRoute
   '/login': typeof LoginRoute
   '/messages': typeof MessagesRoute
@@ -694,6 +716,7 @@ export interface FileRoutesByTo {
   '/payent/cart': typeof PayentCartRoute
   '/payent/explore': typeof PayentExploreRoute
   '/payent/help': typeof PayentHelpRoute
+  '/payent/kyc': typeof PayentKycRoute
   '/payent/messages': typeof PayentMessagesRoute
   '/payent/notifications': typeof PayentNotificationsRoute
   '/payent/profile': typeof PayentProfileRoute
@@ -704,6 +727,7 @@ export interface FileRoutesByTo {
   '/payernt/bookings': typeof PayerntBookingsRoute
   '/payernt/earnings': typeof PayerntEarningsRoute
   '/payernt/help': typeof PayerntHelpRoute
+  '/payernt/kyc': typeof PayerntKycRoute
   '/payernt/list': typeof PayerntListRoute
   '/payernt/messages': typeof PayerntMessagesRoute
   '/payernt/notifications': typeof PayerntNotificationsRoute
@@ -739,6 +763,7 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRoute
   '/faq': typeof FaqRoute
   '/forgot-password': typeof ForgotPasswordRoute
+  '/kyc': typeof KycRoute
   '/lender-portal': typeof LenderPortalRoute
   '/login': typeof LoginRoute
   '/messages': typeof MessagesRoute
@@ -786,6 +811,7 @@ export interface FileRoutesById {
   '/payent/cart': typeof PayentCartRoute
   '/payent/explore': typeof PayentExploreRoute
   '/payent/help': typeof PayentHelpRoute
+  '/payent/kyc': typeof PayentKycRoute
   '/payent/messages': typeof PayentMessagesRoute
   '/payent/notifications': typeof PayentNotificationsRoute
   '/payent/profile': typeof PayentProfileRoute
@@ -796,6 +822,7 @@ export interface FileRoutesById {
   '/payernt/bookings': typeof PayerntBookingsRoute
   '/payernt/earnings': typeof PayerntEarningsRoute
   '/payernt/help': typeof PayerntHelpRoute
+  '/payernt/kyc': typeof PayerntKycRoute
   '/payernt/list': typeof PayerntListRoute
   '/payernt/messages': typeof PayerntMessagesRoute
   '/payernt/notifications': typeof PayerntNotificationsRoute
@@ -832,6 +859,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/faq'
     | '/forgot-password'
+    | '/kyc'
     | '/lender-portal'
     | '/login'
     | '/messages'
@@ -879,6 +907,7 @@ export interface FileRouteTypes {
     | '/payent/cart'
     | '/payent/explore'
     | '/payent/help'
+    | '/payent/kyc'
     | '/payent/messages'
     | '/payent/notifications'
     | '/payent/profile'
@@ -889,6 +918,7 @@ export interface FileRouteTypes {
     | '/payernt/bookings'
     | '/payernt/earnings'
     | '/payernt/help'
+    | '/payernt/kyc'
     | '/payernt/list'
     | '/payernt/messages'
     | '/payernt/notifications'
@@ -922,6 +952,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/faq'
     | '/forgot-password'
+    | '/kyc'
     | '/lender-portal'
     | '/login'
     | '/messages'
@@ -967,6 +998,7 @@ export interface FileRouteTypes {
     | '/payent/cart'
     | '/payent/explore'
     | '/payent/help'
+    | '/payent/kyc'
     | '/payent/messages'
     | '/payent/notifications'
     | '/payent/profile'
@@ -977,6 +1009,7 @@ export interface FileRouteTypes {
     | '/payernt/bookings'
     | '/payernt/earnings'
     | '/payernt/help'
+    | '/payernt/kyc'
     | '/payernt/list'
     | '/payernt/messages'
     | '/payernt/notifications'
@@ -1011,6 +1044,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/faq'
     | '/forgot-password'
+    | '/kyc'
     | '/lender-portal'
     | '/login'
     | '/messages'
@@ -1058,6 +1092,7 @@ export interface FileRouteTypes {
     | '/payent/cart'
     | '/payent/explore'
     | '/payent/help'
+    | '/payent/kyc'
     | '/payent/messages'
     | '/payent/notifications'
     | '/payent/profile'
@@ -1068,6 +1103,7 @@ export interface FileRouteTypes {
     | '/payernt/bookings'
     | '/payernt/earnings'
     | '/payernt/help'
+    | '/payernt/kyc'
     | '/payernt/list'
     | '/payernt/messages'
     | '/payernt/notifications'
@@ -1103,6 +1139,7 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRoute
   FaqRoute: typeof FaqRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
+  KycRoute: typeof KycRoute
   LenderPortalRoute: typeof LenderPortalRoute
   LoginRoute: typeof LoginRoute
   MessagesRoute: typeof MessagesRoute
@@ -1219,6 +1256,13 @@ declare module '@tanstack/react-router' {
       path: '/forgot-password'
       fullPath: '/forgot-password'
       preLoaderRoute: typeof ForgotPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/kyc': {
+      id: '/kyc'
+      path: '/kyc'
+      fullPath: '/kyc'
+      preLoaderRoute: typeof KycRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/lender-portal': {
@@ -1564,6 +1608,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PayentHelpRouteImport
       parentRoute: typeof PayentRoute
     }
+    '/payent/kyc': {
+      id: '/payent/kyc'
+      path: '/kyc'
+      fullPath: '/payent/kyc'
+      preLoaderRoute: typeof PayentKycRouteImport
+      parentRoute: typeof PayentRoute
+    }
     '/payent/messages': {
       id: '/payent/messages'
       path: '/messages'
@@ -1639,6 +1690,13 @@ declare module '@tanstack/react-router' {
       path: '/help'
       fullPath: '/payernt/help'
       preLoaderRoute: typeof PayerntHelpRouteImport
+      parentRoute: typeof PayerntRoute
+    }
+    '/payernt/kyc': {
+      id: '/payernt/kyc'
+      path: '/kyc'
+      fullPath: '/payernt/kyc'
+      preLoaderRoute: typeof PayerntKycRouteImport
       parentRoute: typeof PayerntRoute
     }
     '/payernt/list': {
@@ -1840,6 +1898,7 @@ interface PayentRouteChildren {
   PayentCartRoute: typeof PayentCartRoute
   PayentExploreRoute: typeof PayentExploreRoute
   PayentHelpRoute: typeof PayentHelpRoute
+  PayentKycRoute: typeof PayentKycRoute
   PayentMessagesRoute: typeof PayentMessagesRoute
   PayentNotificationsRoute: typeof PayentNotificationsRoute
   PayentProfileRoute: typeof PayentProfileRoute
@@ -1855,6 +1914,7 @@ const PayentRouteChildren: PayentRouteChildren = {
   PayentCartRoute: PayentCartRoute,
   PayentExploreRoute: PayentExploreRoute,
   PayentHelpRoute: PayentHelpRoute,
+  PayentKycRoute: PayentKycRoute,
   PayentMessagesRoute: PayentMessagesRoute,
   PayentNotificationsRoute: PayentNotificationsRoute,
   PayentProfileRoute: PayentProfileRoute,
@@ -1887,6 +1947,7 @@ interface PayerntRouteChildren {
   PayerntBookingsRoute: typeof PayerntBookingsRoute
   PayerntEarningsRoute: typeof PayerntEarningsRoute
   PayerntHelpRoute: typeof PayerntHelpRoute
+  PayerntKycRoute: typeof PayerntKycRoute
   PayerntListRoute: typeof PayerntListRoute
   PayerntMessagesRoute: typeof PayerntMessagesRoute
   PayerntNotificationsRoute: typeof PayerntNotificationsRoute
@@ -1904,6 +1965,7 @@ const PayerntRouteChildren: PayerntRouteChildren = {
   PayerntBookingsRoute: PayerntBookingsRoute,
   PayerntEarningsRoute: PayerntEarningsRoute,
   PayerntHelpRoute: PayerntHelpRoute,
+  PayerntKycRoute: PayerntKycRoute,
   PayerntListRoute: PayerntListRoute,
   PayerntMessagesRoute: PayerntMessagesRoute,
   PayerntNotificationsRoute: PayerntNotificationsRoute,
@@ -1932,6 +1994,7 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRoute,
   FaqRoute: FaqRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
+  KycRoute: KycRoute,
   LenderPortalRoute: LenderPortalRoute,
   LoginRoute: LoginRoute,
   MessagesRoute: MessagesRoute,

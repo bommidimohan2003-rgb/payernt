@@ -2772,4 +2772,74 @@ export const api = {
     this.invalidateCache("user_unread_conversations_count");
     return await res.json();
   },
+
+  async getKycStatus(token?: string): Promise<{
+    success: boolean;
+    accountType: "payernt" | "payrent";
+    expectedDocumentType: "AADHAAR" | "PAN";
+    status: "NOT_STARTED" | "PENDING" | "APPROVED" | "REJECTED";
+    documentType: "AADHAAR" | "PAN" | null;
+    maskedNumber: string | null;
+    documentFileName: string | null;
+    submittedAt: string | null;
+    rejectionReason: string | null;
+    allowResubmission: boolean;
+    providerConfigured: boolean;
+    providerStatus: string;
+  }> {
+    const res = await this.fetchWithAuth(`${API_BASE}/api/kyc/status`);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(parseApiError(data, "Failed to load KYC verification status."));
+    }
+    return await res.json();
+  },
+
+  async submitKyc(
+    payload: {
+      documentType: "AADHAAR" | "PAN";
+      documentNumber: string;
+      fileName: string;
+      fileType: string;
+      fileData: string;
+      fileSize: number;
+    },
+    token?: string,
+  ): Promise<{
+    success: boolean;
+    status: "PENDING" | "APPROVED" | "REJECTED";
+    message: string;
+    verificationId: string;
+    maskedNumber: string;
+    documentType: string;
+    providerStatus: string;
+  }> {
+    const res = await this.fetchWithAuth(`${API_BASE}/api/kyc/submit`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.success === false) {
+      throw new Error(parseApiError(data, "Failed to submit KYC verification."));
+    }
+    return data;
+  },
+
+  async getKycDocument(verificationId: string): Promise<{
+    success: boolean;
+    id: string;
+    fileName: string;
+    fileType: string;
+    fileData: string;
+    maskedNumber: string;
+    status: string;
+  }> {
+    const res = await this.fetchWithAuth(`${API_BASE}/api/kyc/document/${verificationId}`);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(parseApiError(data, "Failed to fetch identity document."));
+    }
+    return await res.json();
+  },
 };

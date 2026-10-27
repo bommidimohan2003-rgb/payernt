@@ -185,7 +185,7 @@ export const payerntApi = {
   async register(params: {
     name: string;
     email: string;
-    aadhaarNumber: string;
+    aadhaarNumber?: string;
     phoneNumber: string;
     address?: string;
     pincode?: string;
@@ -1231,6 +1231,59 @@ export const payerntApi = {
     } catch (e: any) {
       return { success: false, message: e?.message || "Network error while rejecting location change." };
     }
+  },
+
+  async getKycStatus(): Promise<{
+    success: boolean;
+    accountType: "payernt" | "payrent";
+    expectedDocumentType: "AADHAAR" | "PAN";
+    status: "NOT_STARTED" | "PENDING" | "APPROVED" | "REJECTED";
+    documentType: "AADHAAR" | "PAN" | null;
+    maskedNumber: string | null;
+    documentFileName: string | null;
+    submittedAt: string | null;
+    rejectionReason: string | null;
+    allowResubmission: boolean;
+    providerConfigured: boolean;
+    providerStatus: string;
+  }> {
+    const res = await fetch(`${API_BASE}/api/payernt/kyc/status`, {
+      method: "GET",
+      headers: getAuthHeaders(),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.success === false) {
+      throw new Error(data.detail || data.message || "Failed to load KYC verification status.");
+    }
+    return data;
+  },
+
+  async submitKyc(payload: {
+    documentType: "AADHAAR";
+    documentNumber: string;
+    fileName: string;
+    fileType: string;
+    fileData: string;
+    fileSize: number;
+  }): Promise<{
+    success: boolean;
+    status: "PENDING" | "APPROVED" | "REJECTED";
+    message: string;
+    verificationId: string;
+    maskedNumber: string;
+    documentType: string;
+    providerStatus: string;
+  }> {
+    const res = await fetch(`${API_BASE}/api/payernt/kyc/submit`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.success === false) {
+      throw new Error(data.detail || data.message || "Failed to submit Aadhaar KYC verification.");
+    }
+    return data;
   },
 };
 

@@ -480,8 +480,8 @@ def get_payernt_audit_logs(user_id: Optional[str] = None, limit: int = 50) -> Li
 def create_payernt_account(
     name: str,
     email: str,
-    aadhaar_number: str,
-    phone: str,
+    aadhaar_number: str = "",
+    phone: str = "",
     address: str = "",
     pincode: str = "",
     password: str = "",
@@ -489,7 +489,8 @@ def create_payernt_account(
     """Creates a new paye₹nt (Vendor/Lender) account."""
     clean_email = email.strip().lower()
     clean_phone = phone.strip()
-    clean_aadhaar = re.sub(r"\D", "", aadhaar_number.strip())
+    raw_aadhaar = (aadhaar_number or "").strip()
+    clean_aadhaar = re.sub(r"\D", "", raw_aadhaar)
 
     # Check if account already exists in paye₹nt
     existing = get_payernt_account_by_email(clean_email)
@@ -498,7 +499,7 @@ def create_payernt_account(
 
     account_id = f"PAYERNT_USER_{int(time.time() * 1000)}"
     pwd_hash = hash_password(password)
-    masked_aadhaar = f"XXXX-XXXX-{clean_aadhaar[-4:]}" if len(clean_aadhaar) >= 4 else f"XXXX-XXXX-{clean_aadhaar}"
+    masked_aadhaar = f"XXXX-XXXX-{clean_aadhaar[-4:]}" if len(clean_aadhaar) >= 4 else (f"XXXX-XXXX-{clean_aadhaar}" if clean_aadhaar else None)
     now_iso = dt.now(timezone.utc).isoformat()
 
     person_id = get_or_create_person(name.strip(), clean_phone)

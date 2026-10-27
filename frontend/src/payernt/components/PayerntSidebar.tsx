@@ -10,6 +10,7 @@ import {
   Settings,
   Globe,
   LogOut,
+  ShieldCheck,
 } from "lucide-react";
 import { useLanguage, LanguageModal } from "@/i18n";
 
@@ -44,6 +45,7 @@ export function PayerntSidebar({
     if (pathname.startsWith("/payernt/wallet")) return "wallet";
     if (pathname.startsWith("/payernt/messages")) return "messages";
     if (pathname.startsWith("/payernt/analytics") || pathname.startsWith("/payernt/earnings")) return "analytics";
+    if (pathname.startsWith("/payernt/kyc")) return "kyc";
     if (pathname.startsWith("/payernt/settings") || pathname.startsWith("/payernt/profile")) return "settings";
     return "home";
   })();
@@ -76,6 +78,7 @@ export function PayerntSidebar({
       badge: unreadMessagesCount > 0 ? unreadMessagesCount : undefined,
     },
     { id: "analytics", label: tCommon.analytics, icon: BarChart3, path: "/payernt/analytics" },
+    { id: "kyc", label: "Aadhaar KYC", icon: ShieldCheck, path: "/payernt/kyc" },
   ];
 
   const getLanguageLabel = () => {
