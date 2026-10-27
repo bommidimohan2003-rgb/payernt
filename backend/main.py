@@ -4418,6 +4418,7 @@ def check_single_product_availability(
         normalize_slot_interval,
         calculate_booking_interval,
         check_product_interval_conflicts,
+        get_product_active_orders,
         DEFAULT_BUFFER_MINUTES,
         MOCK_ORDERS,
         MOCK_CUSTOM_PRODUCTS,
@@ -4434,6 +4435,9 @@ def check_single_product_availability(
     buffer_min = int(prod.get("buffer_minutes") or DEFAULT_BUFFER_MINUTES)
     daily_val = int(float(prod.get("daily_rate") or prod.get("price") or 2499))
     half_day_val = int(float(prod.get("half_day_rate") or round(daily_val * 0.6)))
+
+    # Pre-fetch all active orders once in a single database query
+    active_orders = get_product_active_orders(id, exclude_order_id=exclude_order_id)
 
     # 1. Extract and sanitize vendor blocked dates & session blocks
     b_raw = prod.get("blocked_dates") or prod.get("blockedDates")
@@ -4472,20 +4476,29 @@ def check_single_product_availability(
                 else:
                     full_day_blocked_dates.add(d_str)
 
-    # 2. Determine evaluation calendar window (lookahead 120 days)
+    # 2. Determine evaluation calendar window (bounded to requested dates or lookahead 90 days)
     today_dt = datetime.datetime.now(datetime.timezone.utc).date()
-    view_start = today_dt
-    if start_date:
-        p_sd = parse_date_safely(start_date)
-        if p_sd:
-            view_start = min(view_start, p_sd)
-    view_end = view_start + datetime.timedelta(days=120)
-    if end_date:
-        p_ed = parse_date_safely(end_date)
-        if p_ed:
-            view_end = max(view_end, p_ed + datetime.timedelta(days=60))
+    p_sd = parse_date_safely(start_date) if start_date else None
+    p_ed = parse_date_safely(end_date) if end_date else None
 
-    # Evaluate per-date slot availability and conflicts
+    if p_sd and p_ed:
+        view_start = min(p_sd, p_ed)
+        view_end = max(p_sd, p_ed)
+    elif p_sd:
+        view_start = p_sd
+        view_end = p_sd + datetime.timedelta(days=90)
+    elif p_ed:
+        view_start = min(today_dt, p_ed)
+        view_end = max(today_dt, p_ed)
+    else:
+        view_start = today_dt
+        view_end = today_dt + datetime.timedelta(days=90)
+
+    # Bound maximum scan window to 180 days to guard against unbounded evaluation
+    if (view_end - view_start).days > 180:
+        view_end = view_start + datetime.timedelta(days=180)
+
+    # Evaluate per-date slot availability and conflicts in-memory
     morning_booked_dates = set()
     afternoon_booked_dates = set()
     dates_conflicting_full_day = set()
@@ -4499,19 +4512,22 @@ def check_single_product_availability(
         # Morning slot interval: [08:00, 12:00)
         m_s, m_e = normalize_slot_interval(d_str, "morning")
         m_conf, _ = check_product_interval_conflicts(
-            id, m_s, m_e, buffer_minutes=buffer_min, exclude_order_id=exclude_order_id
+            id, m_s, m_e, buffer_minutes=buffer_min, exclude_order_id=exclude_order_id,
+            product=prod, pre_fetched_orders=active_orders
         )
 
         # Afternoon slot interval: [13:00, 17:00)
         a_s, a_e = normalize_slot_interval(d_str, "afternoon")
         a_conf, _ = check_product_interval_conflicts(
-            id, a_s, a_e, buffer_minutes=buffer_min, exclude_order_id=exclude_order_id
+            id, a_s, a_e, buffer_minutes=buffer_min, exclude_order_id=exclude_order_id,
+            product=prod, pre_fetched_orders=active_orders
         )
 
         # Full day slot interval: [08:00, 17:00)
         f_s, f_e = normalize_slot_interval(d_str, "full_day")
         f_conf, _ = check_product_interval_conflicts(
-            id, f_s, f_e, buffer_minutes=buffer_min, exclude_order_id=exclude_order_id
+            id, f_s, f_e, buffer_minutes=buffer_min, exclude_order_id=exclude_order_id,
+            product=prod, pre_fetched_orders=active_orders
         )
 
         # Separate vendor blocks from real reservation bookings
@@ -4569,7 +4585,8 @@ def check_single_product_availability(
         )
 
         has_conf, conf_reason = check_product_interval_conflicts(
-            id, req_start_dt, req_end_dt, buffer_minutes=buffer_min, exclude_order_id=exclude_order_id
+            id, req_start_dt, req_end_dt, buffer_minutes=buffer_min, exclude_order_id=exclude_order_id,
+            product=prod, pre_fetched_orders=active_orders
         )
 
         if has_conf:
@@ -4648,7 +4665,12 @@ def get_product_slots_endpoint(
     Returns time-slot availability (morning, afternoon, full-day) for a given date,
     evaluating lender configuration, existing reservations, buffer rules, and duration rates.
     """
-    from database import get_product_slots_for_date, parse_date_safely, find_authoritative_product
+    from database import (
+        get_product_slots_for_date,
+        parse_date_safely,
+        find_authoritative_product,
+        get_product_active_orders
+    )
 
     prod = find_authoritative_product(id)
     if not prod:
@@ -4662,7 +4684,8 @@ def get_product_slots_endpoint(
     else:
         date_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
 
-    result = get_product_slots_for_date(id, date_str)
+    orders = get_product_active_orders(id)
+    result = get_product_slots_for_date(id, date_str, product=prod, pre_fetched_orders=orders)
     return result
 
 # ============================================================

@@ -27,7 +27,7 @@ import {
   Share2,
   ChevronRight,
 } from "lucide-react";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MainLayout } from "@/layouts/MainLayout";
 import { Button } from "@/components/common/Button";
@@ -102,6 +102,26 @@ function calculateInclusiveDays(startStr: string, endStr: string): number {
 import { rentalSecurityService } from "@/services/rentalSecurityService";
 import type { RentalSecurity } from "@/types";
 
+// Short-lived client cache for day slots (30-second TTL)
+interface CachedSlots {
+  slots: any[];
+  timestamp: number;
+}
+const slotsCache = new Map<string, CachedSlots>();
+const inFlightSlotsRequests = new Map<string, Promise<any[]>>();
+
+export const invalidateSlotsCache = (productId?: string) => {
+  if (productId) {
+    for (const key of slotsCache.keys()) {
+      if (key.startsWith(`${productId}:`)) {
+        slotsCache.delete(key);
+      }
+    }
+  } else {
+    slotsCache.clear();
+  }
+};
+
 export default function ProductDetails() {
   const params = useParams({ strict: false }) as { id?: string };
   const routeParamId = params?.id || (typeof window !== "undefined" ? window.location.pathname.split("/").filter(Boolean).pop() || "" : "");
@@ -167,6 +187,7 @@ export default function ProductDetails() {
   }>>([]);
   const [loadingSlots, setLoadingSlots] = useState<boolean>(false);
   const [slotsError, setSlotsError] = useState<string | null>(null);
+  const slotsAbortControllerRef = useRef<AbortController | null>(null);
 
 
 
@@ -284,55 +305,101 @@ export default function ProductDetails() {
     product && cartItems.some((item) => item.product_id === product.id),
   );
 
-  // Slot Availability Fetch Effect
+  // Slot Availability Fetch Effect with deduplication, short-lived cache, cancellation and timeout
   useEffect(() => {
     if (!startDate || !id) return;
-    let isMounted = true;
+    const cacheKey = `${id}:${startDate}`;
+
+    // 1. Check short-lived client cache (30s)
+    const cached = slotsCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < 30000) {
+      setDaySlots(cached.slots);
+      setSlotsError(null);
+      setLoadingSlots(false);
+      return;
+    }
+
+    // 2. Abort prior in-flight request
+    if (slotsAbortControllerRef.current) {
+      slotsAbortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    slotsAbortControllerRef.current = controller;
+
     setLoadingSlots(true);
     setSlotsError(null);
 
-    const apiBase = getApiBase();
-    fetch(`${apiBase}/api/products/${encodeURIComponent(id)}/slots?date=${encodeURIComponent(startDate)}`)
-      .then(async (r) => {
+    const timeoutId = setTimeout(() => {
+      controller.abort("TIMEOUT");
+    }, 8000);
+
+    // 3. Deduplicate concurrent requests
+    let reqPromise = inFlightSlotsRequests.get(cacheKey);
+    if (!reqPromise) {
+      reqPromise = (async () => {
+        const apiBase = getApiBase();
+        const r = await fetch(
+          `${apiBase}/api/products/${encodeURIComponent(id)}/slots?date=${encodeURIComponent(startDate)}`,
+          { signal: controller.signal }
+        );
         if (!r.ok) {
           const errData = await r.json().catch(() => null);
           throw new Error(errData?.detail || `Failed to fetch slots (HTTP ${r.status})`);
         }
-        return r.json();
-      })
-      .then((data) => {
-        if (!isMounted) return;
-        if (data && Array.isArray(data.slots)) {
-          setDaySlots(data.slots);
-          setSlotsError(null);
-        } else {
-          setDaySlots([]);
-        }
+        const data = await r.json();
+        return Array.isArray(data?.slots) ? data.slots : [];
+      })();
+      inFlightSlotsRequests.set(cacheKey, reqPromise);
+    }
+
+    reqPromise
+      .then((slots) => {
+        if (slotsAbortControllerRef.current !== controller) return;
+        slotsCache.set(cacheKey, { slots, timestamp: Date.now() });
+        setDaySlots(slots);
+        setSlotsError(null);
       })
       .catch((err: any) => {
-        if (!isMounted) return;
+        if (slotsAbortControllerRef.current !== controller) return;
+        if (err.name === "AbortError" || controller.signal.aborted) {
+          if (controller.signal.reason === "TIMEOUT") {
+            setSlotsError("Slot availability check timed out. Please retry.");
+          }
+          return;
+        }
         console.warn("Could not fetch slots:", err);
         setDaySlots([]);
         setSlotsError(err?.message || "Failed to load real-time slot availability from server.");
       })
       .finally(() => {
-        if (isMounted) setLoadingSlots(false);
+        clearTimeout(timeoutId);
+        inFlightSlotsRequests.delete(cacheKey);
+        if (slotsAbortControllerRef.current === controller) {
+          setLoadingSlots(false);
+        }
       });
 
     return () => {
-      isMounted = false;
+      clearTimeout(timeoutId);
+      if (slotsAbortControllerRef.current === controller) {
+        controller.abort();
+      }
     };
   }, [id, startDate]);
 
   // Live slot availability synchronization on booking creation, cancellation, or local storage change
   useEffect(() => {
     const handleUpdate = () => {
+      if (id) {
+        invalidateSlotsCache(id);
+      }
       if (startDate && id) {
         const apiBase = getApiBase();
         fetch(`${apiBase}/api/products/${encodeURIComponent(id)}/slots?date=${encodeURIComponent(startDate)}`)
           .then((r) => (r.ok ? r.json() : null))
           .then((data) => {
             if (data && Array.isArray(data.slots)) {
+              slotsCache.set(`${id}:${startDate}`, { slots: data.slots, timestamp: Date.now() });
               setDaySlots(data.slots);
             }
           })
@@ -543,9 +610,19 @@ export default function ProductDetails() {
       const checkEnd = durationMode === "custom" ? endDate : startDate;
       const effectiveSession = durationMode === "custom" ? "full_day" : selectedSlot;
       const apiBase = getApiBase();
-      const res = await fetch(
-        `${apiBase}/api/products/${encodeURIComponent(id)}/availability?start_date=${startDate}&end_date=${checkEnd}&session=${encodeURIComponent(effectiveSession)}`
-      );
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort("TIMEOUT"), 8000);
+
+      let res: Response;
+      try {
+        res = await fetch(
+          `${apiBase}/api/products/${encodeURIComponent(id)}/availability?start_date=${startDate}&end_date=${checkEnd}&session=${encodeURIComponent(effectiveSession)}`,
+          { signal: controller.signal }
+        );
+      } finally {
+        clearTimeout(timeoutId);
+      }
+
       if (!res.ok) {
         setIsAvailableForDates(false);
         setAvailabilityMessage("Could not verify real-time availability with server. Please retry.");
@@ -584,10 +661,15 @@ export default function ProductDetails() {
       setAvailabilityMessage("✓ Product and time slot available for selected dates!");
       setAvailabilityChecked(true);
       toast.success("Gear is available! Review booking summary below.");
-    } catch (e) {
+    } catch (e: any) {
       console.debug("Backend availability check error:", e);
       setIsAvailableForDates(false);
-      setAvailabilityMessage("Network error during availability check. Please check connection.");
+      const isTimeout = e?.name === "AbortError" || e?.message?.includes?.("timeout");
+      setAvailabilityMessage(
+        isTimeout
+          ? "Availability check timed out. Please check connection and retry."
+          : "Network error during availability check. Please check connection."
+      );
       setAvailabilityChecked(true);
       return;
     }

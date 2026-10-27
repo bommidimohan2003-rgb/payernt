@@ -5996,6 +5996,14 @@ def _extract_order_interval(order: dict) -> Tuple[Optional[datetime.datetime], O
     """Extracts UTC start and end datetimes from an order record for conflict evaluation."""
     s_date_str = str(order.get("start_date") or order.get("startDate") or "")
     e_date_str = str(order.get("end_date") or order.get("endDate") or s_date_str)
+
+    s_dt_raw = order.get("start_datetime") or order.get("startDatetime")
+    e_dt_raw = order.get("end_datetime") or order.get("endDatetime")
+
+    if not s_date_str and s_dt_raw:
+        s_date_str = str(s_dt_raw)[:10]
+        e_date_str = str(e_dt_raw)[:10] if e_dt_raw else s_date_str
+
     if not s_date_str:
         return None, None
 
@@ -6026,32 +6034,87 @@ def _extract_order_interval(order: dict) -> Tuple[Optional[datetime.datetime], O
             datetime.datetime(e_d.year, e_d.month, e_d.day, 17, 0, 0, tzinfo=timezone.utc)
         )
 
+def get_product_active_orders(
+    product_id: str,
+    exclude_order_id: Optional[str] = None
+) -> List[Dict[str, Any]]:
+    """
+    Fetches all active orders for a product across the database and in-memory mock store
+    in a single high-efficiency query.
+    """
+    orders: List[Dict[str, Any]] = []
+    if not product_id:
+        return orders
+
+    clean_pid = str(product_id).strip()
+
+    # 1. Fetch from database in one query
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cursor:
+                params = [clean_pid]
+                exclude_clause = ""
+                if exclude_order_id:
+                    exclude_clause = " AND id != %s"
+                    params.append(str(exclude_order_id))
+                query = f"""
+                    SELECT id, start_date, end_date, start_time, end_time, start_datetime, end_datetime,
+                           time_slot, duration_type, status, policy_outcome, handed_back_at, completed_at
+                    FROM orders
+                    WHERE product_id = %s{exclude_clause}
+                """
+                cursor.execute(query, tuple(params))
+                rows = cursor.fetchall()
+                if rows:
+                    orders.extend(rows)
+        except Exception as e:
+            logger.warning(f"Notice: Error fetching product orders for availability: {e}")
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+    # 2. Check in-memory MOCK_ORDERS
+    for order in list(MOCK_ORDERS.values()):
+        if exclude_order_id and (order.get("id") == exclude_order_id or str(order.get("id")) == str(exclude_order_id)):
+            continue
+        pid = str(order.get("product_id") or order.get("productId") or "").strip()
+        if pid == clean_pid:
+            orders.append(order)
+
+    return orders
+
 def check_product_interval_conflicts(
     product_id: str,
     req_start_dt: datetime.datetime,
     req_end_dt: datetime.datetime,
     buffer_minutes: int = 60,
-    exclude_order_id: Optional[str] = None
+    exclude_order_id: Optional[str] = None,
+    product: Optional[Dict[str, Any]] = None,
+    pre_fetched_orders: Optional[List[Dict[str, Any]]] = None
 ) -> Tuple[bool, Optional[str]]:
     """
     Authoritative availability validator implementing half-open time interval logic:
     [req_start, req_end) conflicts with [ord_start, ord_end) when:
         req_start < (ord_end + buffer) AND (ord_start - buffer) < req_end
     Also evaluates vendor blocked dates, session blocks, listing pause state, and active reservations.
+    Supports optional pre-fetched product and orders to eliminate N+1 database queries.
     """
     if not product_id or not req_start_dt or not req_end_dt:
         return False, None
 
     buf_delta = datetime.timedelta(minutes=max(0, buffer_minutes))
-    product = find_authoritative_product(product_id)
+    prod = product if product is not None else find_authoritative_product(product_id)
 
     # 1. Product Availability Toggle Check
-    if product and not product.get("available", True):
+    if prod and not prod.get("available", True):
         return True, "Product listing is currently paused by owner"
 
     # 2. Check Product Blocked Dates / Personal Use Periods / Sessions
-    if product:
-        blocked_raw = product.get("blocked_dates") or product.get("blockedDates")
+    if prod:
+        blocked_raw = prod.get("blocked_dates") or prod.get("blockedDates")
         if blocked_raw:
             try:
                 blocked_list = json.loads(blocked_raw) if isinstance(blocked_raw, str) else blocked_raw
@@ -6094,73 +6157,40 @@ def check_product_interval_conflicts(
 
     now_utc = dt.now(timezone.utc)
 
-    # 3. Check Database Orders
-    conn = get_db_connection()
-    if conn:
-        try:
-            with conn.cursor() as cursor:
-                params = [str(product_id).strip()]
-                exclude_clause = ""
-                if exclude_order_id:
-                    exclude_clause = " AND id != %s"
-                    params.append(exclude_order_id)
-                query = f"""
-                    SELECT id, start_date, end_date, start_time, end_time, start_datetime, end_datetime,
-                           time_slot, duration_type, status, policy_outcome, handed_back_at, completed_at
-                    FROM orders
-                    WHERE product_id = %s{exclude_clause}
-                """
-                cursor.execute(query, tuple(params))
-                rows = cursor.fetchall()
-                for row in rows:
-                    ord_status = str(row.get("status") or "").lower()
-                    if ord_status in ('cancelled', 'canceled', 'refunded', 'rejected', 'failed', 'expired'):
-                        continue
-
-                    ord_start, ord_end = _extract_order_interval(row)
-                    if ord_start and ord_end:
-                        # If order is completed and its rental period + buffer has elapsed, it no longer conflicts
-                        if ord_status in ("completed", "returned") and (ord_end + buf_delta) <= now_utc:
-                            continue
-
-                        # Half-open interval conflict with turnaround buffer:
-                        if req_start_dt < (ord_end + buf_delta) and (ord_start - buf_delta) < req_end_dt:
-                            slot_name = row.get("time_slot") or "rental"
-                            return True, f"Conflict with existing {slot_name} booking #{row.get('id')}"
-        except Exception as e:
-            logger.warning(f"Error checking order interval conflicts in database: {e}")
-        finally:
-            try:
-                conn.close()
-            except Exception:
-                pass
-
-    # 4. Check in-memory MOCK_ORDERS
-    for order in list(MOCK_ORDERS.values()):
-        if exclude_order_id and (order.get("id") == exclude_order_id or str(order.get("id")) == str(exclude_order_id)):
+    # 3. Check Orders (pre-fetched or single query)
+    orders = pre_fetched_orders if pre_fetched_orders is not None else get_product_active_orders(product_id, exclude_order_id)
+    for ord_row in orders:
+        if exclude_order_id and (ord_row.get("id") == exclude_order_id or str(ord_row.get("id")) == str(exclude_order_id)):
             continue
-        pid = str(order.get("product_id") or order.get("productId") or "").strip()
-        if pid == str(product_id).strip():
-            status = str(order.get("status") or "active").lower()
-            if status in ('cancelled', 'canceled', 'refunded', 'rejected', 'failed', 'expired'):
+        ord_status = str(ord_row.get("status") or "").lower()
+        if ord_status in ('cancelled', 'canceled', 'refunded', 'rejected', 'failed', 'expired'):
+            continue
+
+        ord_start, ord_end = _extract_order_interval(ord_row)
+        if ord_start and ord_end:
+            # If order is completed and its rental period + buffer has elapsed, it no longer conflicts
+            if ord_status in ("completed", "returned") and (ord_end + buf_delta) <= now_utc:
                 continue
 
-            ord_start, ord_end = _extract_order_interval(order)
-            if ord_start and ord_end:
-                if status in ("completed", "returned") and (ord_end + buf_delta) <= now_utc:
-                    continue
-                if req_start_dt < (ord_end + buf_delta) and (ord_start - buf_delta) < req_end_dt:
-                    slot_name = order.get("time_slot") or "rental"
-                    return True, f"Conflict with existing {slot_name} booking #{order.get('id')}"
+            # Half-open interval conflict with turnaround buffer:
+            if req_start_dt < (ord_end + buf_delta) and (ord_start - buf_delta) < req_end_dt:
+                slot_name = ord_row.get("time_slot") or ord_row.get("timeSlot") or "rental"
+                return True, f"Conflict with existing {slot_name} booking #{ord_row.get('id')}"
 
     return False, None
 
-def get_product_slots_for_date(product_id: str, date_str: str) -> Dict[str, Any]:
+def get_product_slots_for_date(
+    product_id: str,
+    date_str: str,
+    product: Optional[Dict[str, Any]] = None,
+    pre_fetched_orders: Optional[List[Dict[str, Any]]] = None
+) -> Dict[str, Any]:
     """
     Returns slot availability (morning, afternoon, full_day) for a given date,
     evaluating buffer, slot enablement, existing reservations, vendor blocks, and pricing.
+    Reuses pre-fetched product and orders to ensure high performance without redundant DB round trips.
     """
-    product = find_authoritative_product(product_id)
+    prod = product if product is not None else find_authoritative_product(product_id)
 
     daily_rate = 2499
     half_day_rate = None
@@ -6170,14 +6200,14 @@ def get_product_slots_for_date(product_id: str, date_str: str) -> Dict[str, Any]
     afternoon_enabled = True
     full_day_enabled = True
 
-    if product:
-        daily_rate = int(float(product.get("daily_rate") or product.get("price") or 2499))
-        half_day_rate = product.get("half_day_rate")
-        buffer_min = int(product.get("buffer_minutes") or DEFAULT_BUFFER_MINUTES)
-        allow_half_day = bool(product.get("allow_half_day", True))
-        morning_enabled = bool(product.get("morning_slot_enabled", True)) and allow_half_day
-        afternoon_enabled = bool(product.get("afternoon_slot_enabled", True)) and allow_half_day
-        full_day_enabled = bool(product.get("full_day_slot_enabled", True))
+    if prod:
+        daily_rate = int(float(prod.get("daily_rate") or prod.get("price") or 2499))
+        half_day_rate = prod.get("half_day_rate")
+        buffer_min = int(prod.get("buffer_minutes") or DEFAULT_BUFFER_MINUTES)
+        allow_half_day = bool(prod.get("allow_half_day", True))
+        morning_enabled = bool(prod.get("morning_slot_enabled", True)) and allow_half_day
+        afternoon_enabled = bool(prod.get("afternoon_slot_enabled", True)) and allow_half_day
+        full_day_enabled = bool(prod.get("full_day_slot_enabled", True))
 
     if not half_day_rate:
         half_day_rate = int(round(daily_rate * 0.6))
@@ -6189,6 +6219,9 @@ def get_product_slots_for_date(product_id: str, date_str: str) -> Dict[str, Any]
         d = dt.now(timezone.utc).date()
     today_dt = dt.now(timezone.utc).date()
     is_past = d < today_dt
+
+    # Pre-fetch orders once for this product if not supplied
+    orders = pre_fetched_orders if pre_fetched_orders is not None else get_product_active_orders(product_id)
 
     slots_out = []
 
@@ -6207,12 +6240,12 @@ def get_product_slots_for_date(product_id: str, date_str: str) -> Dict[str, Any]
         elif not enabled:
             status = "not_available"
             status_label = "Not Offered by Lender"
-        elif product and not product.get("available", True):
+        elif prod and not prod.get("available", True):
             status = "not_available"
             status_label = "Listing Paused"
         else:
             has_conflict, reason = check_product_interval_conflicts(
-                product_id, start_dt, end_dt, buffer_minutes=buffer_min
+                product_id, start_dt, end_dt, buffer_minutes=buffer_min, product=prod, pre_fetched_orders=orders
             )
             if has_conflict:
                 if reason and ("personal use" in reason.lower() or "blocked" in reason.lower() or "unavailable period" in reason.lower()):

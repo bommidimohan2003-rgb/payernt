@@ -55,6 +55,29 @@ function getTodayKey(): string {
   return formatDateKey(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
+interface CachedAvailability {
+  blockedDates: Set<string>;
+  bookedDates: Set<string>;
+  timestamp: number;
+}
+
+const AVAILABILITY_CACHE_TTL_MS = 30_000; // 30 seconds fresh cache
+const availabilityCache = new Map<string, CachedAvailability>();
+const inFlightRequests = new Map<string, Promise<{ blocked: Set<string>; booked: Set<string> }>>();
+
+export function invalidateCalendarAvailabilityCache(productId?: string | number) {
+  if (!productId) {
+    availabilityCache.clear();
+  } else {
+    const prefix = `${productId}:`;
+    for (const key of availabilityCache.keys()) {
+      if (key.startsWith(prefix)) {
+        availabilityCache.delete(key);
+      }
+    }
+  }
+}
+
 export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
   productId,
   selectedStartDate,
@@ -87,12 +110,17 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
   const [blockedDates, setBlockedDates] = useState<Set<string>>(new Set());
   const [bookedDates, setBookedDates] = useState<Set<string>>(new Set());
   const [isLoadingAvailability, setIsLoadingAvailability] = useState(false);
+  const [isProvisional, setIsProvisional] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
   // Range selection UX state
   const [hoveredDate, setHoveredDate] = useState<string | null>(null);
   const [conflictMessage, setConflictMessage] = useState<string | null>(null);
   const [isPickingEnd, setIsPickingEnd] = useState(false);
+
+  // Controller and debounce references
+  const abortControllerRef = React.useRef<AbortController | null>(null);
+  const debounceTimerRef = React.useRef<any>(null);
 
   // Determine date bounds for current calendar view to fetch availability
   const { viewStartDateStr, viewEndDateStr } = useMemo(() => {
@@ -102,58 +130,146 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
     return { viewStartDateStr: start, viewEndDateStr: end };
   }, [viewYear, viewMonth]);
 
-  // Fetch availability from backend
-  const fetchAvailability = useCallback(async () => {
+  // Fetch availability from backend with caching, deduplication, and abort handling
+  const fetchAvailability = useCallback(async (forceRefresh = false) => {
     if (!productId) return;
+
+    // Lookahead 3 months for smooth navigation
+    const threeMonthsLater = new Date(viewYear, viewMonth + 3, 0);
+    const lookaheadEndStr = formatDateKey(
+      threeMonthsLater.getFullYear(),
+      threeMonthsLater.getMonth(),
+      threeMonthsLater.getDate()
+    );
+
+    const effectiveSession = durationMode === "custom" ? "full_day" : (session || "full_day");
+    const sessionQuery = `&session=${encodeURIComponent(effectiveSession)}`;
+    const cacheKey = `${productId}:${viewStartDateStr}:${lookaheadEndStr}:${effectiveSession}`;
+
+    // 1. Check client-side short-lived cache
+    if (!forceRefresh) {
+      const cached = availabilityCache.get(cacheKey);
+      if (cached) {
+        const isFresh = Date.now() - cached.timestamp < AVAILABILITY_CACHE_TTL_MS;
+        setBlockedDates(cached.blockedDates);
+        setBookedDates(cached.bookedDates);
+        setFetchError(null);
+        if (isFresh) {
+          setIsLoadingAvailability(false);
+          setIsProvisional(false);
+          return;
+        } else {
+          // Display cached data immediately while refreshing in background
+          setIsProvisional(true);
+        }
+      }
+    }
+
+    // 2. Abort any previous pending request for this component
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setIsLoadingAvailability(true);
     setFetchError(null);
 
+    // Timeout guard (8s) to prevent endless synchronization spinner
+    const timeoutId = setTimeout(() => {
+      controller.abort("TIMEOUT");
+    }, 8000);
+
     try {
-      // Lookahead 3 months for smooth navigation
-      const threeMonthsLater = new Date(viewYear, viewMonth + 3, 0);
-      const lookaheadEndStr = formatDateKey(
-        threeMonthsLater.getFullYear(),
-        threeMonthsLater.getMonth(),
-        threeMonthsLater.getDate()
-      );
+      // 3. Deduplicate concurrent identical requests
+      let reqPromise = inFlightRequests.get(cacheKey);
+      if (!reqPromise) {
+        reqPromise = (async () => {
+          const apiBase = getApiBase();
+          const res = await fetch(
+            `${apiBase}/api/products/${encodeURIComponent(productId)}/availability?start_date=${viewStartDateStr}&end_date=${lookaheadEndStr}${sessionQuery}`,
+            { signal: controller.signal }
+          );
 
-      const effectiveSession = durationMode === "custom" ? "full_day" : (session || "full_day");
-      const sessionQuery = `&session=${encodeURIComponent(effectiveSession)}`;
-      const apiBase = getApiBase();
-      const res = await fetch(
-        `${apiBase}/api/products/${encodeURIComponent(productId)}/availability?start_date=${viewStartDateStr}&end_date=${lookaheadEndStr}${sessionQuery}`
-      );
+          if (!res.ok) {
+            throw new Error(`Availability check failed with status ${res.status}`);
+          }
 
-      if (!res.ok) {
-        throw new Error(`Availability check failed with status ${res.status}`);
+          const data = await res.json();
+          const blocked = new Set<string>(
+            Array.isArray(data.blockedDates) ? data.blockedDates : []
+          );
+          const booked = new Set<string>(
+            Array.isArray(data.bookedDates) ? data.bookedDates : []
+          );
+
+          return { blocked, booked };
+        })();
+
+        inFlightRequests.set(cacheKey, reqPromise);
       }
 
-      const data = await res.json();
-      const blocked = new Set<string>(
-        Array.isArray(data.blockedDates) ? data.blockedDates : []
-      );
-      const booked = new Set<string>(
-        Array.isArray(data.bookedDates) ? data.bookedDates : []
-      );
+      const { blocked, booked } = await reqPromise;
+
+      // Update short-lived cache
+      availabilityCache.set(cacheKey, {
+        blockedDates: blocked,
+        bookedDates: booked,
+        timestamp: Date.now(),
+      });
 
       setBlockedDates(blocked);
       setBookedDates(booked);
+      setIsProvisional(false);
+      setFetchError(null);
     } catch (err: any) {
+      if (err.name === "AbortError" || controller.signal.aborted) {
+        if (controller.signal.reason === "TIMEOUT") {
+          setFetchError("Availability check timed out. Please retry.");
+        }
+        return;
+      }
       console.error("Failed to fetch product calendar availability:", err);
-      setFetchError("Could not load real-time availability. Please refresh.");
+      setFetchError("Could not load real-time availability. Please retry.");
     } finally {
-      setIsLoadingAvailability(false);
+      clearTimeout(timeoutId);
+      inFlightRequests.delete(cacheKey);
+      if (abortControllerRef.current === controller) {
+        setIsLoadingAvailability(false);
+      }
     }
   }, [productId, viewStartDateStr, viewYear, viewMonth, session, durationMode]);
 
+  // Debounced fetch on calendar parameter changes
   useEffect(() => {
-    fetchAvailability();
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      fetchAvailability();
+    }, 120);
+
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
   }, [fetchAvailability]);
+
+  // Cleanup abort controller on unmount
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   // Live availability synchronization on booking creation, cancellation, or local storage change
   useEffect(() => {
     const handleSync = () => {
-      fetchAvailability();
+      invalidateCalendarAvailabilityCache(productId);
+      fetchAvailability(true);
     };
     if (typeof window !== "undefined") {
       window.addEventListener("payent_orders_updated", handleSync);
@@ -167,7 +283,7 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
         window.removeEventListener("storage", handleSync);
       }
     };
-  }, [fetchAvailability]);
+  }, [productId, fetchAvailability]);
 
   // Previous month navigation guard (cannot go before current month)
   const isPrevDisabled = useMemo(() => {
@@ -267,6 +383,12 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
   // Cell Click Handler
   const handleDateClick = (dateKey: string, isBlocked: boolean, isBooked: boolean, isPast: boolean) => {
     if (disabled || isPast) return;
+
+    // Prevent selecting unverified dates if availability check failed completely
+    if (fetchError && blockedDates.size === 0 && bookedDates.size === 0) {
+      setConflictMessage("Availability could not be verified from the server. Please click Retry to verify dates before selecting.");
+      return;
+    }
 
     // Direct click on blocked date
     if (isBlocked) {
@@ -425,22 +547,32 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
 
       {/* Real-time sync / fetch status indicator */}
       {isLoadingAvailability && (
-        <div className="flex items-center gap-1.5 text-[11px] text-primary animate-pulse bg-primary/5 px-2.5 py-1.5 rounded-lg border border-primary/20">
-          <RefreshCw className="w-3 h-3 animate-spin" />
-          <span>Synchronizing live product availability...</span>
+        <div className="flex items-center justify-between text-[11px] text-primary bg-primary/5 px-2.5 py-1.5 rounded-lg border border-primary/20">
+          <div className="flex items-center gap-1.5">
+            <RefreshCw className="w-3 h-3 animate-spin text-primary shrink-0" />
+            <span>Synchronizing live product availability...</span>
+          </div>
+          {isProvisional && (
+            <span className="text-[10px] font-medium text-muted-foreground bg-secondary/80 px-1.5 py-0.5 rounded shrink-0">
+              Cached (revalidating)
+            </span>
+          )}
         </div>
       )}
 
       {fetchError && (
         <div className="flex items-center justify-between text-[11px] text-amber-700 dark:text-amber-300 bg-amber-500/10 px-2.5 py-1.5 rounded-lg border border-amber-500/20">
           <div className="flex items-center gap-1.5">
-            <AlertCircle className="w-3.5 h-3.5" />
+            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
             <span>{fetchError}</span>
           </div>
           <button
             type="button"
-            onClick={fetchAvailability}
-            className="text-xs underline font-bold cursor-pointer hover:opacity-80"
+            onClick={() => {
+              invalidateCalendarAvailabilityCache(productId);
+              fetchAvailability(true);
+            }}
+            className="text-xs underline font-bold cursor-pointer hover:opacity-80 ml-2 shrink-0"
           >
             Retry
           </button>

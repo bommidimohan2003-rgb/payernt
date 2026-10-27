@@ -573,6 +573,9 @@ export function LenderProductDetails({ productId: propId }: { productId?: string
                     blockedDates: newDates,
                   });
                   if (res.success) {
+                    if (typeof window !== "undefined") {
+                      window.dispatchEvent(new CustomEvent("payent_booking_updated"));
+                    }
                     toast.success("Blocked dates updated and saved to database!");
                   } else {
                     toast.error(res.error || "Failed to update blocked dates.");
