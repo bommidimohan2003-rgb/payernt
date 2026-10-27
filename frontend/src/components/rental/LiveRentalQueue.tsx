@@ -20,6 +20,7 @@ import {
   Ban,
   Calendar,
   ChevronDown,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/utils/api";
@@ -61,11 +62,16 @@ export interface LiveRentalQueueProps {
   readyForPickupAt?: string | null;
   pickedUpAt?: string | null;
   returnInitiatedAt?: string | null;
+  returnCollectedAt?: string | null;
   handedBackAt?: string | null;
   awaitingInspectionAt?: string | null;
   completedAt?: string | null;
   cancelledAt?: string | null;
   cancellationReason?: string | null;
+  disputeStatus?: string | null;
+  disputeReason?: string | null;
+  inspectionCondition?: string | null;
+  inspectionNotes?: string | null;
   queueNotes?: string;
   onStatusUpdated?: (newStatus: string, timestamps?: Record<string, string>) => void;
   compact?: boolean;
@@ -323,11 +329,16 @@ export function LiveRentalQueue({
   readyForPickupAt: propReadyForPickupAt,
   pickedUpAt: propPickedUpAt,
   returnInitiatedAt: propReturnInitiatedAt,
+  returnCollectedAt: propReturnCollectedAt,
   handedBackAt: propHandedBackAt,
   awaitingInspectionAt: propAwaitingInspectionAt,
   completedAt: propCompletedAt,
   cancelledAt: propCancelledAt,
   cancellationReason: propCancellationReason,
+  disputeStatus: propDisputeStatus,
+  disputeReason: propDisputeReason,
+  inspectionCondition: propInspectionCondition,
+  inspectionNotes: propInspectionNotes,
   queueNotes: propQueueNotes,
   onStatusUpdated,
   compact = false,
@@ -335,11 +346,18 @@ export function LiveRentalQueue({
   const [status, setStatus] = useState<string>(currentStatus);
   const [cancelledAt, setCancelledAt] = useState<string | null>(propCancelledAt || null);
   const [cancellationReason, setCancellationReason] = useState<string | null>(propCancellationReason || null);
+  const [currentDisputeStatus, setCurrentDisputeStatus] = useState<string | null>(propDisputeStatus || null);
+  const [currentDisputeReason, setCurrentDisputeReason] = useState<string | null>(propDisputeReason || null);
+  const [rebuttalInput, setRebuttalInput] = useState<string>("");
+  const [isSubmittingRebuttal, setIsSubmittingRebuttal] = useState<boolean>(false);
+  const [showRebuttalForm, setShowRebuttalForm] = useState<boolean>(false);
+
   const [timestamps, setTimestamps] = useState<Record<string, string | null>>({
     confirmed_at: propConfirmedAt || null,
     ready_for_pickup_at: propReadyForPickupAt || null,
     picked_up_at: propPickedUpAt || null,
     return_initiated_at: propReturnInitiatedAt || null,
+    return_collected_at: propReturnCollectedAt || null,
     handed_back_at: propHandedBackAt || null,
     awaiting_inspection_at: propAwaitingInspectionAt || null,
     completed_at: propCompletedAt || null,
@@ -384,11 +402,24 @@ export function LiveRentalQueue({
   }, [propCancellationReason]);
 
   useEffect(() => {
+    if (propDisputeStatus !== undefined) {
+      setCurrentDisputeStatus(propDisputeStatus || null);
+    }
+  }, [propDisputeStatus]);
+
+  useEffect(() => {
+    if (propDisputeReason !== undefined) {
+      setCurrentDisputeReason(propDisputeReason || null);
+    }
+  }, [propDisputeReason]);
+
+  useEffect(() => {
     setTimestamps({
       confirmed_at: propConfirmedAt || null,
       ready_for_pickup_at: propReadyForPickupAt || null,
       picked_up_at: propPickedUpAt || null,
       return_initiated_at: propReturnInitiatedAt || null,
+      return_collected_at: propReturnCollectedAt || null,
       handed_back_at: propHandedBackAt || null,
       awaiting_inspection_at: propAwaitingInspectionAt || null,
       completed_at: propCompletedAt || null,
@@ -398,6 +429,7 @@ export function LiveRentalQueue({
     propReadyForPickupAt,
     propPickedUpAt,
     propReturnInitiatedAt,
+    propReturnCollectedAt,
     propHandedBackAt,
     propAwaitingInspectionAt,
     propCompletedAt,
@@ -407,6 +439,9 @@ export function LiveRentalQueue({
     const s = (status || "").toLowerCase().trim();
     return s === "cancelled" || s === "canceled";
   }, [status]);
+
+  const hasPickedUp = Boolean(timestamps.picked_up_at && !isNaN(Date.parse(timestamps.picked_up_at)));
+  const requiresReturnAfterCancellation = isCancelled && hasPickedUp;
 
   // Current milestone index (-1 if cancelled without historical steps)
   const currentIndex = useMemo(() => getMilestoneIndex(status, timestamps), [status, timestamps]);
@@ -575,10 +610,18 @@ export function LiveRentalQueue({
 
   // Advance milestone handler
   const handleAdvanceMilestone = async (targetMilestone: string, actionLabel: string) => {
-    // If booking is cancelled, disallow any queue transitions
-    if (isCancelled) {
-      toast.error("This booking has been cancelled. Active rental queue workflows are stopped.");
+    // If booking is cancelled before pickup, disallow any queue transitions
+    if (isCancelled && !hasPickedUp) {
+      toast.error("This booking has been cancelled before pickup. Active rental queue workflows are stopped.");
       return;
+    }
+
+    // If booking was cancelled after pickup, only allow return-to-owner milestones
+    if (isCancelled && hasPickedUp) {
+      if (!["return_initiated", "return_collected", "handed_back", "awaiting_inspection", "completed"].includes(targetMilestone)) {
+        toast.error("Booking is cancelled. Only equipment return to owner is permitted.");
+        return;
+      }
     }
 
     // Prevent duplicate clicks while request is processing
@@ -757,10 +800,14 @@ export function LiveRentalQueue({
             </div>
             <div>
               <p className="text-xs font-bold text-red-700 dark:text-red-300">
-                Booking Cancelled — Active Live Rental Queue Stopped
+                {hasPickedUp
+                  ? "Booking Cancelled — Equipment Return to Owner Required"
+                  : "Booking Cancelled — Active Live Rental Queue Stopped"}
               </p>
               <p className="text-[11px] text-red-600/80 dark:text-red-400/80">
-                {cancellationReason
+                {hasPickedUp
+                  ? "Equipment was picked up before cancellation. Please complete the physical return handover to the owner."
+                  : cancellationReason
                   ? `Reason: ${cancellationReason}`
                   : "All subsequent milestones and transitions are disabled. Historical milestones are retained for audit."}
               </p>
@@ -774,6 +821,82 @@ export function LiveRentalQueue({
           )}
         </div>
       )}
+
+          {/* Condition Dispute Alert Banner */}
+          {(currentDisputeStatus === "OPEN" || currentDisputeStatus === "UNDER_REVIEW") && (
+            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3.5 space-y-2.5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                  <span className="text-xs font-bold text-amber-800 dark:text-amber-300">
+                    Equipment Condition Dispute ({currentDisputeStatus === "OPEN" ? "Under Investigation" : "Review in Progress"})
+                  </span>
+                </div>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold">
+                  {currentDisputeStatus}
+                </span>
+              </div>
+              <p className="text-xs text-amber-900/80 dark:text-amber-200/80">
+                {currentDisputeReason || "Lender recorded equipment condition discrepancies upon return."}
+              </p>
+              {role === "renter" && currentDisputeStatus === "OPEN" && !showRebuttalForm && (
+                <button
+                  type="button"
+                  onClick={() => setShowRebuttalForm(true)}
+                  className="px-3 py-1 text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-colors cursor-pointer"
+                >
+                  Submit Dispute Rebuttal & Evidence
+                </button>
+              )}
+              {role === "renter" && showRebuttalForm && (
+                <div className="space-y-2 pt-1">
+                  <textarea
+                    value={rebuttalInput}
+                    onChange={(e) => setRebuttalInput(e.target.value)}
+                    placeholder="Enter your counter-evidence, condition details, or rebuttal explanation..."
+                    className="w-full text-xs p-2 rounded-lg border border-amber-500/30 bg-white dark:bg-black/40 text-neutral-900 dark:text-white"
+                    rows={2}
+                  />
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={isSubmittingRebuttal || !rebuttalInput.trim()}
+                      onClick={async () => {
+                        const token = storage.get<string | null>(STORAGE_KEYS.token, null) ||
+                          (typeof localStorage !== "undefined"
+                            ? localStorage.getItem("paye₹nt_token") ||
+                              localStorage.getItem("payernt_token") ||
+                              localStorage.getItem("payent_auth_token")
+                            : null);
+                        if (!token) return toast.error("Please log in to submit rebuttal.");
+                        setIsSubmittingRebuttal(true);
+                        try {
+                          await api.submitOrderDispute(token, orderId, rebuttalInput.trim());
+                          toast.success("Dispute rebuttal submitted. Under review by support.");
+                          setCurrentDisputeStatus("UNDER_REVIEW");
+                          setShowRebuttalForm(false);
+                        } catch (err: any) {
+                          toast.error(err?.message || "Failed to submit dispute rebuttal.");
+                        } finally {
+                          setIsSubmittingRebuttal(false);
+                        }
+                      }}
+                      className="px-3 py-1 text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      {isSubmittingRebuttal ? "Submitting..." : "Submit Rebuttal"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowRebuttalForm(false)}
+                      className="px-3 py-1 text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:underline cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
       {/* 2. PERSISTENT RENTAL TIMER HUD */}
       <div className="rounded-xl border border-black/5 dark:border-white/10 bg-neutral-50 dark:bg-[#050709]/80 p-4 sm:p-5 relative overflow-hidden">
@@ -896,12 +1019,69 @@ export function LiveRentalQueue({
           {/* Box C: Role-Aware Quick Milestone Action */}
           <div className="sm:col-span-2 lg:col-span-1 flex flex-col justify-center sm:items-end">
             {isCancelled ? (
-              <div className="w-full sm:w-auto">
-                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-neutral-100 dark:bg-white/5 text-neutral-500 dark:text-[#A1A1AA] text-xs font-semibold border border-black/5 dark:border-white/5">
-                  <XCircle className="h-3.5 w-3.5 text-red-500 shrink-0" />
-                  <span>Actions Disabled (Booking Cancelled)</span>
+              requiresReturnAfterCancellation ? (
+                <div className="w-full sm:w-auto space-y-2 text-left sm:text-right">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs font-bold border border-amber-500/25">
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                    <span>Return to Owner Required</span>
+                  </div>
+                  {role === "renter" && !timestamps.return_initiated_at && (
+                    <div>
+                      <button
+                        onClick={() => handleAdvanceMilestone("return_initiated", "Return Initiated")}
+                        disabled={isAdvancing}
+                        className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-sm disabled:opacity-50 transition-all cursor-pointer"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" />
+                        <span>{isAdvancing ? "Updating..." : "Initiate Return to Owner"}</span>
+                      </button>
+                    </div>
+                  )}
+                  {role === "lender" && !timestamps.handed_back_at && (
+                    <div>
+                      <button
+                        onClick={() => handleAdvanceMilestone("handed_back", "Return Handover Received")}
+                        disabled={isAdvancing}
+                        className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-sm disabled:opacity-50 transition-all cursor-pointer"
+                      >
+                        <Pause className="h-3.5 w-3.5 fill-current" />
+                        <span>{isAdvancing ? "Updating..." : "Confirm Return Handover"}</span>
+                      </button>
+                    </div>
+                  )}
+                  {role === "lender" && timestamps.handed_back_at && !timestamps.awaiting_inspection_at && (
+                    <div>
+                      <button
+                        onClick={() => handleAdvanceMilestone("awaiting_inspection", "Gear Inspection Started")}
+                        disabled={isAdvancing}
+                        className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs shadow-sm disabled:opacity-50 transition-all cursor-pointer"
+                      >
+                        <SearchCheck className="h-3.5 w-3.5" />
+                        <span>{isAdvancing ? "Updating..." : "Inspect Equipment Condition"}</span>
+                      </button>
+                    </div>
+                  )}
+                  {role === "lender" && timestamps.awaiting_inspection_at && !timestamps.completed_at && currentDisputeStatus !== "OPEN" && (
+                    <div>
+                      <button
+                        onClick={() => handleAdvanceMilestone("completed", "Rental Finalized")}
+                        disabled={isAdvancing}
+                        className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm disabled:opacity-50 transition-all cursor-pointer"
+                      >
+                        <Award className="h-3.5 w-3.5" />
+                        <span>{isAdvancing ? "Finalizing..." : "Finalize Equipment Return"}</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
-              </div>
+              ) : (
+                <div className="w-full sm:w-auto">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-neutral-100 dark:bg-white/5 text-neutral-500 dark:text-[#A1A1AA] text-xs font-semibold border border-black/5 dark:border-white/5">
+                    <XCircle className="h-3.5 w-3.5 text-red-500 shrink-0" />
+                    <span>Actions Disabled (Booking Cancelled)</span>
+                  </div>
+                </div>
+              )
             ) : (
               <>
                 {role === "lender" && (

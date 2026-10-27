@@ -536,6 +536,17 @@ def init_db(force: bool = False):
     add_column_safely("orders", "location_latitude DECIMAL(10, 8) NULL")
     add_column_safely("orders", "location_longitude DECIMAL(11, 8) NULL")
     add_column_safely("orders", "location_change_data TEXT NULL")
+    add_column_safely("orders", "return_collected_at VARCHAR(100) NULL")
+    add_column_safely("orders", "return_delivery_boy_id VARCHAR(255) NULL")
+    add_column_safely("orders", "inspection_condition VARCHAR(100) NULL")
+    add_column_safely("orders", "inspection_notes TEXT NULL")
+    add_column_safely("orders", "inspection_checklist LONGTEXT NULL")
+    add_column_safely("orders", "dispute_status VARCHAR(50) DEFAULT 'NONE'")
+    add_column_safely("orders", "dispute_reason TEXT NULL")
+    add_column_safely("orders", "dispute_evidence LONGTEXT NULL")
+    add_column_safely("orders", "dispute_reported_at VARCHAR(100) NULL")
+    add_column_safely("orders", "cancellation_request_status VARCHAR(50) NULL")
+    add_column_safely("orders", "cancellation_request_data LONGTEXT NULL")
     add_index_safely("orders", "idx_orders_user_cat", "user_email, category")
     add_index_safely("orders", "idx_orders_user_email", "user_email")
     add_index_safely("orders", "idx_orders_status", "status")
@@ -1886,7 +1897,10 @@ def get_orders(email: str):
                         SELECT o.id, o.user_email, o.product_id, o.product_title, o.product_image,
                                o.start_date, o.end_date, o.total, o.status, o.created_at,
                                o.razorpay_order_id, o.razorpay_payment_id, o.payment_status, o.refund_id, o.refund_status,
-                               o.confirmed_at, o.ready_for_pickup_at, o.picked_up_at, o.return_initiated_at, o.handed_back_at, o.awaiting_inspection_at, o.completed_at, o.queue_notes,
+                               o.confirmed_at, o.ready_for_pickup_at, o.picked_up_at, o.return_initiated_at, o.return_collected_at, o.return_delivery_boy_id,
+                               o.handed_back_at, o.awaiting_inspection_at, o.completed_at, o.queue_notes,
+                               o.inspection_condition, o.inspection_notes, o.dispute_status, o.dispute_reason, o.dispute_evidence,
+                               o.cancellation_request_status, o.cancellation_request_data,
                                o.cancelled_at, o.cancellation_reason, o.cancellation_id,
                                COALESCE(NULLIF(o.category, ''), cp.category, pp.category, 'gear') as category
                         FROM orders o
@@ -2728,6 +2742,7 @@ def update_order_queue_milestone(
     Authoritative transactional update for live rental queue milestones.
     Synchronizes orders table, MOCK_ORDERS, and rental_security.
     Guarantees timestamps are persisted and never reset on page refreshes.
+    Supports return workflows post-cancellation if gear was already physically picked up.
     """
     if not order_id:
         return None
@@ -2735,23 +2750,36 @@ def update_order_queue_milestone(
     now_iso = dt.now(timezone.utc).isoformat()
     ts = timestamps or {}
 
-    # Reject advance if booking is already cancelled
-    conn_chk = fetch_one("SELECT status FROM orders WHERE id = %s", (b_id,)) or MOCK_ORDERS.get(b_id)
+    # Check cancellation status
+    conn_chk = fetch_one("SELECT status, picked_up_at FROM orders WHERE id = %s", (b_id,)) or MOCK_ORDERS.get(b_id)
+    is_cancelled_order = False
     if conn_chk and str(conn_chk.get("status") or "").strip().lower() in ("cancelled", "canceled"):
-        logger.warning(f"[QueueMilestone] Refusing to advance cancelled order #{b_id}")
-        return fetch_one("SELECT * FROM orders WHERE id = %s", (b_id,)) or MOCK_ORDERS.get(b_id)
+        is_cancelled_order = True
+        has_pu = bool(conn_chk.get("picked_up_at") or (MOCK_ORDERS.get(b_id) and MOCK_ORDERS[b_id].get("picked_up_at")))
+        is_return_milestone = new_status in (
+            "return_initiated", "return_in_transit", "return_collected",
+            "handed_back", "awaiting_inspection", "completed"
+        )
+        if not (has_pu and is_return_milestone):
+            logger.warning(f"[QueueMilestone] Refusing to advance cancelled order #{b_id} (picked_up={has_pu}, target={new_status})")
+            return fetch_one("SELECT * FROM orders WHERE id = %s", (b_id,)) or MOCK_ORDERS.get(b_id)
 
     # Update in-memory MOCK_ORDERS
     mock_order = None
     for key, o in list(MOCK_ORDERS.items()):
         if key == b_id or o.get("id") == b_id or o.get("productId") == b_id:
             mock_order = MOCK_ORDERS[key]
-            mock_order["status"] = new_status
+            if not is_cancelled_order:
+                mock_order["status"] = new_status
+            else:
+                mock_order["return_status"] = new_status
+            mock_order["queue_milestone"] = new_status
+            mock_order["queueMilestone"] = new_status
             if notes is not None:
                 mock_order["queue_notes"] = notes
                 mock_order["queueNotes"] = notes
             for field, val in ts.items():
-                if val:
+                if val is not None:
                     mock_order[field] = val
                     # CamelCase alias
                     parts = field.split("_")
@@ -2765,27 +2793,38 @@ def update_order_queue_milestone(
         try:
             with conn.cursor() as cursor:
                 # Build dynamic update query
-                set_clauses = ["status = %s"]
-                params = [new_status]
+                set_clauses = []
+                params = []
+                if not is_cancelled_order:
+                    set_clauses.append("status = %s")
+                    params.append(new_status)
                 if notes is not None:
                     set_clauses.append("queue_notes = %s")
                     params.append(notes)
-                for field, val in ts.items():
-                    if val and field in (
-                        "confirmed_at", "ready_for_pickup_at", "picked_up_at",
-                        "return_initiated_at", "handed_back_at", "awaiting_inspection_at",
-                        "completed_at"
-                    ):
-                        set_clauses.append(f"{field} = %s")
-                        params.append(val)
-                params.append(b_id)
 
-                sql = f"UPDATE orders SET {', '.join(set_clauses)} WHERE id = %s"
-                cursor.execute(sql, tuple(params))
+                allowed_fields = {
+                    "confirmed_at", "ready_for_pickup_at", "picked_up_at",
+                    "return_initiated_at", "return_collected_at", "return_delivery_boy_id",
+                    "handed_back_at", "awaiting_inspection_at", "completed_at",
+                    "inspection_condition", "inspection_notes", "inspection_checklist",
+                    "dispute_status", "dispute_reason", "dispute_evidence", "dispute_reported_at",
+                    "cancellation_request_status", "cancellation_request_data"
+                }
+
+                for field, val in ts.items():
+                    if val is not None and field in allowed_fields:
+                        set_clauses.append(f"{field} = %s")
+                        val_str = val if isinstance(val, str) else json.dumps(val)
+                        params.append(val_str)
+
+                if set_clauses:
+                    params.append(b_id)
+                    sql = f"UPDATE orders SET {', '.join(set_clauses)} WHERE id = %s"
+                    cursor.execute(sql, tuple(params))
 
                 # Also synchronize rental_security if it exists
                 sec_sets = ["status = %s", "updated_at = %s"]
-                sec_params = [new_status, now_iso]
+                sec_params = [new_status if not is_cancelled_order else "cancelled", now_iso]
                 if "picked_up_at" in ts and ts["picked_up_at"]:
                     sec_sets.append("rental_started = TRUE")
                     sec_sets.append("rental_started_at = %s")
@@ -2812,6 +2851,175 @@ def update_order_queue_milestone(
 
     # Fetch and return updated record
     return fetch_one("SELECT * FROM orders WHERE id = %s", (b_id,)) or mock_order
+
+
+def record_cancellation_request(
+    order_id: str,
+    initiated_by: str,
+    reason: str,
+    notes: Optional[str] = None,
+    data: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """
+    Records a cancellation request on an order without mutating its active status.
+    Keeps the booking in its existing valid state until approved.
+    """
+    b_id = str(order_id).strip()
+    now_iso = dt.now(timezone.utc).isoformat()
+    req_data = {
+        "initiated_by": initiated_by,
+        "reason": reason,
+        "notes": notes,
+        "requested_at": now_iso,
+        "status": "PENDING",
+        "extra": data or {}
+    }
+    req_json = json.dumps(req_data)
+
+    for key, o in list(MOCK_ORDERS.items()):
+        if key == b_id or o.get("id") == b_id:
+            MOCK_ORDERS[key]["cancellation_request_status"] = "PENDING"
+            MOCK_ORDERS[key]["cancellation_request_data"] = req_data
+            MOCK_ORDERS[key]["cancellationRequestStatus"] = "PENDING"
+            MOCK_ORDERS[key]["cancellationRequestData"] = req_data
+
+    execute_query("""
+        UPDATE orders
+        SET cancellation_request_status = 'PENDING',
+            cancellation_request_data = %s
+        WHERE id = %s
+    """, (req_json, b_id))
+
+    return req_data
+
+
+def approve_cancellation_request(
+    order_id: str,
+    approver_email: str,
+    approver_role: str
+) -> Dict[str, Any]:
+    """
+    Approves a pending cancellation request and cancels the booking.
+    """
+    b_id = str(order_id).strip()
+    order = get_order_by_id(b_id) or MOCK_ORDERS.get(b_id) or {}
+    req_raw = order.get("cancellation_request_data") or {}
+    if isinstance(req_raw, str):
+        try:
+            req_data = json.loads(req_raw)
+        except Exception:
+            req_data = {}
+    else:
+        req_data = req_raw
+
+    reason = req_data.get("reason") or "MUTUAL_AGREEMENT"
+    feedback = req_data.get("notes") or f"Approved by {approver_role} ({approver_email})"
+    initiated_by = req_data.get("initiated_by") or "RENTER"
+
+    canc_record = record_booking_cancellation(
+        booking_id=b_id,
+        product_id=order.get("product_id") or order.get("productId") or "",
+        lender_id=order.get("owner_id") or order.get("lender_email") or "lender",
+        renter_id=order.get("user_email") or "renter",
+        reason_code=reason,
+        feedback=feedback,
+        previous_status=order.get("status") or "active",
+        new_status="cancelled",
+        initiated_by=initiated_by,
+        policy_outcome="approved_request",
+        notification_sent=True
+    )
+
+    execute_query("""
+        UPDATE orders
+        SET cancellation_request_status = 'APPROVED'
+        WHERE id = %s
+    """, (b_id,))
+
+    for key, o in list(MOCK_ORDERS.items()):
+        if key == b_id or o.get("id") == b_id:
+            MOCK_ORDERS[key]["cancellation_request_status"] = "APPROVED"
+            MOCK_ORDERS[key]["cancellationRequestStatus"] = "APPROVED"
+
+    return canc_record
+
+
+def reject_cancellation_request(
+    order_id: str,
+    rejector_email: str,
+    reason: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Rejects a pending cancellation request. Booking maintains its current valid status.
+    """
+    b_id = str(order_id).strip()
+    execute_query("""
+        UPDATE orders
+        SET cancellation_request_status = 'REJECTED'
+        WHERE id = %s
+    """, (b_id,))
+
+    for key, o in list(MOCK_ORDERS.items()):
+        if key == b_id or o.get("id") == b_id:
+            MOCK_ORDERS[key]["cancellation_request_status"] = "REJECTED"
+            MOCK_ORDERS[key]["cancellationRequestStatus"] = "REJECTED"
+
+    return {"status": "REJECTED", "order_id": b_id, "rejector": rejector_email, "reason": reason}
+
+
+def record_booking_dispute(
+    order_id: str,
+    submitter_email: str,
+    rebuttal_notes: str,
+    evidence: Optional[Any] = None
+) -> Dict[str, Any]:
+    """
+    Records renter condition dispute rebuttal without overwriting lender inspection evidence.
+    Transitions dispute_status to UNDER_REVIEW.
+    """
+    b_id = str(order_id).strip()
+    now_iso = dt.now(timezone.utc).isoformat()
+    order = get_order_by_id(b_id) or MOCK_ORDERS.get(b_id) or {}
+
+    existing_evidence = order.get("dispute_evidence") or []
+    if isinstance(existing_evidence, str):
+        try:
+            existing_evidence = json.loads(existing_evidence)
+        except Exception:
+            existing_evidence = [existing_evidence] if existing_evidence else []
+    elif not isinstance(existing_evidence, list):
+        existing_evidence = [existing_evidence]
+
+    new_evidence_entry = {
+        "submitted_by": submitter_email,
+        "submitted_at": now_iso,
+        "rebuttal_notes": rebuttal_notes,
+        "attachments": evidence or []
+    }
+    existing_evidence.append(new_evidence_entry)
+    ev_json = json.dumps(existing_evidence)
+
+    execute_query("""
+        UPDATE orders
+        SET dispute_status = 'UNDER_REVIEW',
+            dispute_evidence = %s
+        WHERE id = %s
+    """, (ev_json, b_id))
+
+    for key, o in list(MOCK_ORDERS.items()):
+        if key == b_id or o.get("id") == b_id:
+            MOCK_ORDERS[key]["dispute_status"] = "UNDER_REVIEW"
+            MOCK_ORDERS[key]["disputeStatus"] = "UNDER_REVIEW"
+            MOCK_ORDERS[key]["dispute_evidence"] = existing_evidence
+            MOCK_ORDERS[key]["disputeEvidence"] = existing_evidence
+
+    return {
+        "success": True,
+        "order_id": b_id,
+        "dispute_status": "UNDER_REVIEW",
+        "evidence_count": len(existing_evidence),
+        "last_entry": new_evidence_entry
+    }
 
 def record_rental_queue_action(
     booking_id: str,
@@ -6897,6 +7105,12 @@ def confirm_delivery_receipt(delivery_id: str, user_email: str) -> dict:
 
     if delivery.get("status") not in ("DELIVERED", "OUT_FOR_DELIVERY", "NEAR_DESTINATION"):
         raise ValueError("Cannot confirm receipt until product is in transit or delivered")
+
+    bid = delivery.get("booking_id")
+    if bid:
+        ord_chk = fetch_one("SELECT status FROM orders WHERE id = %s", (bid,)) or MOCK_ORDERS.get(bid)
+        if ord_chk and str(ord_chk.get("status") or "").lower() in ("cancelled", "canceled"):
+            raise ValueError("Cannot confirm delivery receipt for a cancelled booking.")
 
     now_iso = dt.now(timezone.utc).isoformat()
     delivery["status"] = "DELIVERED"

@@ -1406,6 +1406,19 @@ export const api = {
     return this.advanceRentalQueue(token, orderId, "completed");
   },
 
+  async submitOrderDispute(token: string, orderId: string, rebuttalNotes: string, evidence?: any) {
+    const res = await this.fetchWithAuth(`${API_BASE}/api/orders/${orderId}/dispute`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rebuttal_notes: rebuttalNotes, evidence }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(parseApiError(data, "Failed to submit dispute rebuttal"));
+    }
+    return res.json();
+  },
+
   async getCustomProducts(token: string) {
     if (!token) return [];
     return getCachedOrFetch<Product[]>(

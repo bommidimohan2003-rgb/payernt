@@ -2907,7 +2907,11 @@ def get_authorized_renter_pin(
     }
 
 @app.post("/api/orders/{id}/cancel")
-def cancel_user_order(id: str, email: str = Depends(get_current_user_email)):
+def cancel_user_order(
+    id: str,
+    data: Optional[Dict[str, Any]] = None,
+    email: str = Depends(get_current_user_email)
+):
     clean_email = email.strip().lower()
     order = fetch_one("SELECT * FROM orders WHERE id = %s OR product_id = %s", (id, id))
     if not order and id in MOCK_ORDERS:
@@ -2920,18 +2924,43 @@ def cancel_user_order(id: str, email: str = Depends(get_current_user_email)):
                 order = uo
                 break
 
-    if order:
-        order_owner = (order.get("user_email") or order.get("userEmail") or "").strip().lower()
-        user = get_user(clean_email)
-        is_admin = (user.get("role") == "admin") if (user and isinstance(user, dict)) else False
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found.")
 
-        if order_owner and order_owner != clean_email and not is_admin:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden. You do not have permission to cancel this order.")
+    order_owner = (order.get("user_email") or order.get("userEmail") or "").strip().lower()
+    user = get_user(clean_email)
+    is_admin = (user.get("role") == "admin") if (user and isinstance(user, dict)) else False
+
+    if order_owner and order_owner != clean_email and not is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden. You do not have permission to cancel this order.")
+
+    curr_st = str(order.get("status") or "").lower()
+    if curr_st in ("cancelled", "canceled"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This booking has already been cancelled.")
+
+    if curr_st in ("completed", "returned"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot cancel a completed booking.")
 
     target_id = str(order.get("id")) if (order and order.get("id")) else id
-    cancel_order(id)
-    if order and order.get("id"):
-        cancel_order(str(order.get("id")))
+    reason_code = (data or {}).get("reason") or "RENTER_REQUESTED"
+    feedback = (data or {}).get("notes") or (data or {}).get("feedback")
+
+    has_pu = bool(order.get("picked_up_at") or order.get("pickedUpAt"))
+
+    from database import record_booking_cancellation
+    canc_record = record_booking_cancellation(
+        booking_id=target_id,
+        product_id=order.get("product_id") or order.get("productId") or "",
+        lender_id=order.get("owner_id") or order.get("lender_email") or "lender",
+        renter_id=order_owner or clean_email,
+        reason_code=reason_code,
+        feedback=feedback,
+        previous_status=curr_st,
+        new_status="cancelled",
+        initiated_by="ADMIN" if is_admin else "RENTER",
+        policy_outcome="released" if not has_pu else "return_required",
+        notification_sent=True
+    )
 
     # Dispatch authoritative cancellation notifications to both renter and lender
     try:
@@ -2941,7 +2970,12 @@ def cancel_user_order(id: str, email: str = Depends(get_current_user_email)):
 
     logger.info(f"Order {target_id} cancelled by {clean_email}")
     broadcast_admin_event("booking.cancelled", {"id": target_id, "status": "cancelled"})
-    return {"success": True, "message": "Order cancelled successfully."}
+    return {
+        "success": True,
+        "message": "Order cancelled successfully.",
+        "bookingId": target_id,
+        "cancellation": canc_record
+    }
 
 @app.post("/api/orders/{id}/reject")
 def reject_user_order(id: str, email: str = Depends(get_current_any_user_email)):
@@ -3183,6 +3217,15 @@ class QueueAdvanceSchema(BaseModel):
     notes: Optional[str] = None
     checklist: Optional[Dict[str, Any]] = None
 
+class CancellationRequestSchema(BaseModel):
+    reason: Optional[str] = "RENTER_REQUESTED"
+    notes: Optional[str] = None
+    data: Optional[Dict[str, Any]] = None
+
+class RenterDisputeSchema(BaseModel):
+    rebuttal_notes: str
+    evidence: Optional[Any] = None
+
 def _get_order_and_check_access(order_id: str, email: str):
     clean_user = (email or "").strip().lower()
     order = fetch_one("SELECT * FROM orders WHERE id = %s", (order_id,))
@@ -3297,11 +3340,22 @@ def _execute_queue_milestone_transition(
     order, cust_email, lender_email, is_renter, is_lender, is_admin, is_delivery_boy, actor_role, actor_user_id = _get_order_and_check_access(order_id, caller_email)
     
     current_status = str(order.get("status") or "").lower()
-    if current_status in ("cancelled", "canceled"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Booking #{order_id} is cancelled. Active rental queue workflows and milestone transitions are stopped."
-        )
+    has_pu = bool(order.get("picked_up_at") or order.get("pickedUpAt"))
+    is_cancelled = current_status in ("cancelled", "canceled")
+
+    # Cancellation Edge Cases
+    if is_cancelled:
+        if not has_pu:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Booking #{order_id} is cancelled before pickup. Live queue is stopped and no further actions are permitted."
+            )
+        # Cancelled after pickup: forward pickup/delivery is blocked, but return milestones are permitted
+        if norm_m in ("order_confirmed", "confirmed", "ready_for_pickup", "ready", "picked_up", "rental_in_progress", "active", "picked_up_from_lender", "delivered_to_renter", "confirm_receipt"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Booking #{order_id} was cancelled. Forward pickup and delivery actions are blocked. You must follow the return-to-owner procedure."
+            )
 
     now_iso = dt.now(timezone.utc).isoformat()
     ts_updates = {}
@@ -3332,8 +3386,7 @@ def _execute_queue_milestone_transition(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Booking #{order_id} is already marked as ready for pickup."
             )
-        has_pu = bool(order.get("picked_up_at") or order.get("pickedUpAt"))
-        if current_status in ("rental_in_progress", "picked_up", "return_initiated", "handed_back", "awaiting_inspection", "completed") or (current_status == "active" and has_pu):
+        if current_status in ("rental_in_progress", "picked_up", "return_initiated", "return_in_transit", "handed_back", "awaiting_inspection", "completed") or (current_status == "active" and has_pu):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Cannot mark ready for pickup: booking has already progressed to '{current_status}'."
@@ -3370,13 +3423,12 @@ def _execute_queue_milestone_transition(
                     detail="Forbidden: Only the lender or renter can confirm direct equipment handover."
                 )
 
-        has_pu = bool(order.get("picked_up_at") or order.get("pickedUpAt"))
         if current_status in ("rental_in_progress", "picked_up") or (current_status == "active" and has_pu):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Booking #{order_id} is already picked up and rental timer is active."
             )
-        if current_status in ("return_initiated", "handed_back", "awaiting_inspection", "completed"):
+        if current_status in ("return_initiated", "return_in_transit", "handed_back", "awaiting_inspection", "completed"):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Cannot confirm pickup: booking is already at '{current_status}'."
@@ -3403,8 +3455,7 @@ def _execute_queue_milestone_transition(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Forbidden: Only the renter can initiate gear return."
             )
-        has_pu = bool(order.get("picked_up_at") or order.get("pickedUpAt"))
-        if current_status in ("order_confirmed", "confirmed", "ready_for_pickup") or (current_status == "active" and not has_pu):
+        if not has_pu:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Cannot initiate return before equipment has been picked up (current status: '{current_status}')."
@@ -3419,7 +3470,7 @@ def _execute_queue_milestone_transition(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Cannot initiate return: equipment has already been handed back (current status: '{current_status}')."
             )
-        if current_status not in ("rental_in_progress", "picked_up", "active"):
+        if current_status not in ("rental_in_progress", "picked_up", "active", "cancelled", "canceled"):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Cannot initiate return from current status '{current_status}'. Expected 'rental_in_progress'."
@@ -3428,6 +3479,41 @@ def _execute_queue_milestone_transition(
         if not order.get("return_initiated_at") and not order.get("returnInitiatedAt"):
             ts_updates["return_initiated_at"] = now_iso
         notify_booking_event(order_id, "return_initiated", actor_email=caller_email)
+
+    # Milestone 5.5: return_collected / return_in_transit (Delivery Partner in delivery mode)
+    elif norm_m in ("return_collected", "return_in_transit", "collected_for_return"):
+        if is_delivery:
+            if not is_delivery_boy and not is_admin:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Forbidden: Only the authorized delivery partner or admin can confirm equipment return collection."
+                )
+        else:
+            if not is_lender and not is_admin:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Forbidden: Only the lender or admin can confirm direct return collection."
+                )
+
+        if not has_pu:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot collect item for return before it has been picked up."
+            )
+        if current_status in ("handed_back", "awaiting_inspection", "completed"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Cannot collect item: equipment has already been handed back to lender (current status: '{current_status}')."
+            )
+
+        new_status = "return_in_transit"
+        existing_rc = order.get("return_collected_at") or order.get("returnCollectedAt")
+        if not existing_rc:
+            ts_updates["return_collected_at"] = now_iso
+        ts_updates["return_delivery_boy_id"] = actor_user_id
+        if not order.get("return_initiated_at") and not order.get("returnInitiatedAt"):
+            ts_updates["return_initiated_at"] = now_iso
+        notify_booking_event(order_id, "return_collected", actor_email=caller_email)
 
     # Milestone 6: handed_back (Timer Stop — Delivery Partner, Lender)
     elif norm_m in ("handed_back", "returned", "item_handed_back_to_owner", "item_handed_back"):
@@ -3456,35 +3542,28 @@ def _execute_queue_milestone_transition(
                     detail="Forbidden: Only the lender can confirm gear physical return handover."
                 )
 
-        has_pu = bool(order.get("picked_up_at") or order.get("pickedUpAt"))
-        if current_status in ("order_confirmed", "confirmed", "ready_for_pickup") or (current_status == "active" and not has_pu):
+        if not has_pu:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Cannot confirm return before gear has been picked up (current status: '{current_status}')."
             )
-        if current_status == "handed_back":
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Equipment return has already been confirmed for booking #{order_id}."
-            )
-        if current_status in ("awaiting_inspection", "completed"):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Equipment has already been handed back (current status: '{current_status}')."
-            )
-        if current_status not in ("return_initiated", "rental_in_progress", "picked_up", "active"):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Cannot confirm return from current status '{current_status}'. Expected 'return_initiated'."
-            )
 
-        new_status = "handed_back"
-        existing_hb = order.get("handed_back_at") or order.get("handedBackAt")
-        if not existing_hb:
-            ts_updates["handed_back_at"] = now_iso
-        if not order.get("return_initiated_at") and not order.get("returnInitiatedAt"):
-            ts_updates["return_initiated_at"] = now_iso
-        notify_booking_event(order_id, "handed_back", actor_email=caller_email)
+        # Idempotency check: if already handed back or beyond, do not re-trigger notifications
+        if current_status in ("handed_back", "awaiting_inspection", "completed"):
+            new_status = current_status
+        else:
+            if current_status not in ("return_initiated", "return_in_transit", "rental_in_progress", "picked_up", "active", "cancelled", "canceled"):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Cannot confirm return from current status '{current_status}'. Expected 'return_initiated' or 'return_in_transit'."
+                )
+            new_status = "handed_back"
+            existing_hb = order.get("handed_back_at") or order.get("handedBackAt")
+            if not existing_hb:
+                ts_updates["handed_back_at"] = now_iso
+            if not order.get("return_initiated_at") and not order.get("returnInitiatedAt"):
+                ts_updates["return_initiated_at"] = now_iso
+            notify_booking_event(order_id, "handed_back", actor_email=caller_email)
 
     # Milestone 7: awaiting_inspection (Lender / Owner ONLY)
     elif norm_m in ("awaiting_inspection", "inspection", "start_inspection"):
@@ -3493,26 +3572,30 @@ def _execute_queue_milestone_transition(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Forbidden: Only the lender or owner can start equipment inspection."
             )
-        if current_status in ("order_confirmed", "confirmed", "ready_for_pickup", "rental_in_progress", "picked_up", "return_initiated"):
+        if not has_pu or not (order.get("handed_back_at") or order.get("handedBackAt") or current_status in ("handed_back", "awaiting_inspection", "completed")):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Cannot inspect gear before it is handed back to owner (current status: '{current_status}')."
             )
-        if current_status == "awaiting_inspection":
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Equipment is already under inspection for booking #{order_id}."
-            )
-        if current_status == "completed":
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Inspection is already completed and booking #{order_id} is finalized."
-            )
-        if current_status != "handed_back":
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Cannot start inspection from current status '{current_status}'. Expected 'handed_back'."
-            )
+
+        checklist_data = checklist or {}
+        raw_cond = str(checklist_data.get("condition") or checklist_data.get("inspection_condition") or "GOOD").strip().upper()
+        if raw_cond not in ("GOOD", "DAMAGED", "INCOMPLETE", "DIFFERENT"):
+            raw_cond = "GOOD"
+
+        ts_updates["inspection_condition"] = raw_cond
+        clean_inspection_notes = notes or checklist_data.get("notes") or ""
+        ts_updates["inspection_notes"] = clean_inspection_notes
+        ts_updates["inspection_checklist"] = checklist_data
+
+        if raw_cond != "GOOD":
+            ts_updates["dispute_status"] = "OPEN"
+            ts_updates["dispute_reason"] = f"Lender reported gear condition as {raw_cond}: {clean_inspection_notes}"
+            ts_updates["dispute_reported_at"] = now_iso
+            notify_booking_event(order_id, "damage_dispute_opened", actor_email=caller_email)
+        else:
+            if order.get("dispute_status") != "UNDER_REVIEW":
+                ts_updates["dispute_status"] = "NONE"
 
         new_status = "awaiting_inspection"
         if not order.get("awaiting_inspection_at") and not order.get("awaitingInspectionAt"):
@@ -3528,12 +3611,21 @@ def _execute_queue_milestone_transition(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Forbidden: Only the lender or owner can approve gear condition and complete the rental."
             )
-        if current_status in ("order_confirmed", "confirmed", "ready_for_pickup", "rental_in_progress", "picked_up", "return_initiated"):
+        if current_status in ("order_confirmed", "confirmed", "ready_for_pickup", "rental_in_progress", "picked_up", "return_initiated", "return_in_transit", "handed_back"):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Cannot complete rental before return and inspection are completed (current status: '{current_status}')."
+                detail=f"Cannot complete rental before inspection is performed (current status: '{current_status}'). Expected 'awaiting_inspection'."
             )
-        if current_status not in ("awaiting_inspection", "handed_back", "completed"):
+
+        # Condition Dispute Guard
+        dispute_st = str(order.get("dispute_status") or order.get("disputeStatus") or "NONE").upper()
+        if dispute_st in ("OPEN", "UNDER_REVIEW") and not is_admin:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot complete rental while an equipment condition dispute is open. Platform dispute resolution must be completed by admin."
+            )
+
+        if current_status not in ("awaiting_inspection", "completed"):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Cannot complete rental from current status '{current_status}'. Expected 'awaiting_inspection'."
@@ -3547,13 +3639,14 @@ def _execute_queue_milestone_transition(
         if not order.get("awaiting_inspection_at") and not order.get("awaitingInspectionAt"):
             ts_updates["awaiting_inspection_at"] = now_iso
 
-        try:
-            from payernt_database import complete_rental_and_credit_vendor
-            complete_rental_and_credit_vendor(order_id)
-        except Exception as cw_err:
-            logger.info(f"Wallet settlement notice for order {order_id}: {cw_err}")
+        if current_status != "completed":
+            try:
+                from payernt_database import complete_rental_and_credit_vendor
+                complete_rental_and_credit_vendor(order_id)
+            except Exception as cw_err:
+                logger.info(f"Wallet settlement notice for order {order_id}: {cw_err}")
 
-        notify_booking_event(order_id, "completed", actor_email=caller_email)
+            notify_booking_event(order_id, "completed", actor_email=caller_email)
     else:
         raise HTTPException(status_code=400, detail=f"Unrecognized milestone: '{milestone}'.")
 
@@ -3579,6 +3672,7 @@ def _execute_queue_milestone_transition(
         "ready_for_pickup_at": updated.get("ready_for_pickup_at") or updated.get("readyForPickupAt"),
         "picked_up_at": updated.get("picked_up_at") or updated.get("pickedUpAt"),
         "return_initiated_at": updated.get("return_initiated_at") or updated.get("returnInitiatedAt"),
+        "return_collected_at": updated.get("return_collected_at") or updated.get("returnCollectedAt"),
         "handed_back_at": updated.get("handed_back_at") or updated.get("handedBackAt"),
         "awaiting_inspection_at": updated.get("awaiting_inspection_at") or updated.get("awaitingInspectionAt"),
         "completed_at": updated.get("completed_at") or updated.get("completedAt"),
@@ -3635,6 +3729,11 @@ def initiate_order_return_endpoint(id: str, current_user_email: str = Depends(ge
 def confirm_order_return_handover(id: str, current_user_email: str = Depends(get_current_any_user_email)):
     return _execute_queue_milestone_transition(id, "handed_back", current_user_email)
 
+@app.post("/api/orders/{id}/return-collected")
+@app.post("/api/bookings/{id}/return-collected")
+def confirm_order_return_collected(id: str, current_user_email: str = Depends(get_current_any_user_email)):
+    return _execute_queue_milestone_transition(id, "return_collected", current_user_email)
+
 @app.post("/api/orders/{id}/awaiting-inspection")
 @app.post("/api/bookings/{id}/awaiting-inspection")
 def mark_order_awaiting_inspection(id: str, current_user_email: str = Depends(get_current_any_user_email)):
@@ -3659,6 +3758,132 @@ def advance_order_queue_endpoint(
         notes=data.notes,
         checklist=data.checklist
     )
+
+@app.post("/api/orders/{id}/cancellation-request")
+@app.post("/api/bookings/{id}/cancellation-request")
+def create_order_cancellation_request(
+    id: str,
+    data: Optional[CancellationRequestSchema] = None,
+    current_user_email: str = Depends(get_current_any_user_email)
+):
+    from database import record_cancellation_request
+    order, cust_email, lender_email, is_renter, is_lender, is_admin, is_delivery_boy, actor_role, actor_user_id = _get_order_and_check_access(id, current_user_email)
+
+    curr_st = str(order.get("status") or "").lower()
+    if curr_st in ("cancelled", "canceled"):
+        raise HTTPException(status_code=400, detail="This booking has already been cancelled.")
+    if curr_st in ("completed", "returned"):
+        raise HTTPException(status_code=400, detail="Cannot request cancellation for a completed booking.")
+
+    if order.get("cancellation_request_status") == "PENDING":
+        raise HTTPException(status_code=400, detail="A cancellation request is already pending for this booking.")
+
+    reason = data.reason if data and data.reason else "RENTER_REQUESTED"
+    notes = data.notes if data else None
+    extra = data.data if data else None
+    initiated_by = "LENDER" if is_lender else "RENTER"
+
+    req_record = record_cancellation_request(
+        order_id=id,
+        initiated_by=initiated_by,
+        reason=reason,
+        notes=notes,
+        data=extra
+    )
+    return {
+        "success": True,
+        "message": "Cancellation request submitted. Booking remains in active state pending approval.",
+        "orderId": id,
+        "cancellationRequest": req_record
+    }
+
+@app.post("/api/orders/{id}/cancellation-request/approve")
+@app.post("/api/bookings/{id}/cancellation-request/approve")
+def approve_order_cancellation_request(id: str, current_user_email: str = Depends(get_current_any_user_email)):
+    from database import approve_cancellation_request
+    order, cust_email, lender_email, is_renter, is_lender, is_admin, is_delivery_boy, actor_role, actor_user_id = _get_order_and_check_access(id, current_user_email)
+
+    if order.get("cancellation_request_status") != "PENDING":
+        raise HTTPException(status_code=400, detail="No pending cancellation request found to approve.")
+
+    req_data = order.get("cancellation_request_data") or {}
+    if isinstance(req_data, str):
+        try:
+            req_data = json.loads(req_data)
+        except Exception:
+            req_data = {}
+    init_by = req_data.get("initiated_by") or "RENTER"
+
+    if init_by == "RENTER" and not is_lender and not is_admin:
+        raise HTTPException(status_code=403, detail="Forbidden: Only the lender or admin can approve renter cancellation request.")
+    if init_by == "LENDER" and not is_renter and not is_admin:
+        raise HTTPException(status_code=403, detail="Forbidden: Only the renter or admin can approve lender cancellation request.")
+
+    canc_record = approve_cancellation_request(id, current_user_email, actor_role)
+    return {
+        "success": True,
+        "message": "Cancellation request approved. Booking has been cancelled.",
+        "orderId": id,
+        "cancellation": canc_record
+    }
+
+@app.post("/api/orders/{id}/cancellation-request/reject")
+@app.post("/api/bookings/{id}/cancellation-request/reject")
+def reject_order_cancellation_request(
+    id: str,
+    data: Optional[Dict[str, Any]] = None,
+    current_user_email: str = Depends(get_current_any_user_email)
+):
+    from database import reject_cancellation_request
+    order, cust_email, lender_email, is_renter, is_lender, is_admin, is_delivery_boy, actor_role, actor_user_id = _get_order_and_check_access(id, current_user_email)
+
+    if order.get("cancellation_request_status") != "PENDING":
+        raise HTTPException(status_code=400, detail="No pending cancellation request found to reject.")
+
+    req_data = order.get("cancellation_request_data") or {}
+    if isinstance(req_data, str):
+        try:
+            req_data = json.loads(req_data)
+        except Exception:
+            req_data = {}
+    init_by = req_data.get("initiated_by") or "RENTER"
+
+    if init_by == "RENTER" and not is_lender and not is_admin:
+        raise HTTPException(status_code=403, detail="Forbidden: Only the lender or admin can reject renter cancellation request.")
+    if init_by == "LENDER" and not is_renter and not is_admin:
+        raise HTTPException(status_code=403, detail="Forbidden: Only the renter or admin can reject lender cancellation request.")
+
+    rej_reason = (data or {}).get("reason")
+    res = reject_cancellation_request(id, current_user_email, rej_reason)
+    return {
+        "success": True,
+        "message": "Cancellation request rejected. Booking remains in active state.",
+        "orderId": id,
+        "result": res
+    }
+
+@app.post("/api/orders/{id}/dispute")
+@app.post("/api/bookings/{id}/dispute")
+def submit_order_dispute_rebuttal(
+    id: str,
+    data: RenterDisputeSchema,
+    current_user_email: str = Depends(get_current_any_user_email)
+):
+    from database import record_booking_dispute
+    order, cust_email, lender_email, is_renter, is_lender, is_admin, is_delivery_boy, actor_role, actor_user_id = _get_order_and_check_access(id, current_user_email)
+
+    if not is_renter and not is_admin:
+        raise HTTPException(status_code=403, detail="Forbidden: Only the renter or admin can submit condition dispute rebuttal.")
+
+    dispute_st = str(order.get("dispute_status") or order.get("disputeStatus") or "NONE").upper()
+    if dispute_st not in ("OPEN", "UNDER_REVIEW"):
+        raise HTTPException(status_code=400, detail="No active condition dispute open for this booking.")
+
+    if not data.rebuttal_notes or len(data.rebuttal_notes.strip()) < 3:
+        raise HTTPException(status_code=400, detail="Rebuttal explanation is required (minimum 3 characters).")
+
+    res = record_booking_dispute(id, current_user_email, data.rebuttal_notes.strip(), data.evidence)
+    return res
 
 @app.get("/api/orders/{id}/queue-actions")
 @app.get("/api/bookings/{id}/queue-actions")
@@ -5977,6 +6202,13 @@ def update_delivery_status_endpoint(delivery_id: str, data: DeliveryStatusUpdate
 
     if clean_user != lender_email and not is_admin:
         raise HTTPException(status_code=403, detail="Forbidden. Only the verified lender can update delivery status.")
+
+    if order and str(order.get("status") or "").lower() in ("cancelled", "canceled"):
+        if target_status in ("OUT_FOR_DELIVERY", "ARRIVED_AT_RENTER", "NEAR_DESTINATION", "DELIVERED", "COMPLETED", "RENTER_VERIFIED", "RENTAL_ACTIVATED"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot advance delivery: This booking has been cancelled and cannot be delivered to the renter."
+            )
 
     try:
         updated_del = update_delivery_status(clean_did, target_status, clean_user)

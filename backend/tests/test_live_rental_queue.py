@@ -572,6 +572,10 @@ def test_cancelled_booking_queue_lifecycle_and_rejection():
     assert act_handover.json()["status"] == "handed_back"
     assert act_handover.json()["timestamps"]["handed_back_at"] is not None
 
+    act_inspect = client.post(f"/api/orders/{order_active}/awaiting-inspection", headers=lender_headers)
+    assert act_inspect.status_code == 200
+    assert act_inspect.json()["status"] == "awaiting_inspection"
+
     act_complete = client.post(f"/api/orders/{order_active}/complete", headers=lender_headers)
     assert act_complete.status_code == 200
     assert act_complete.json()["status"] == "completed"

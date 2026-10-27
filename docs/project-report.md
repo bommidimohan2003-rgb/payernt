@@ -1297,3 +1297,96 @@ Safely migrated `orders` and `deliveries` tables in `backend/database.py` with b
 ### 3. Stability & Import Hardening
 - Replaced invalid import of `broadcast_admin_event` from `database` in `backend/main.py` and provided defensive `broadcast_admin_event_safe` alias in `backend/database.py`.
 - Idempotent finalization handling for `completed` milestones allowing subsequent audit notes and admin verifications without `400 Bad Request` conflicts.
+
+---
+
+## 22. Cancellation and Returned-Item Edge Case Handling Engine (Sections 5, 6, & 7)
+
+**Status**: COMPLETED & EMPIRICALLY VALIDATED  
+**Date**: October 27, 2026  
+**Test Suites**:
+- `backend/tests/test_cancellation_and_return_edge_cases.py` (10/10 passed, 100% pass rate)
+- `backend/tests/test_live_rental_queue.py` (3/3 passed, 100% pass rate)
+- **Total Automated Pytest Suite**: 13/13 passed (100% pass rate)
+**Frontend Compilation**: `npm run build` in `frontend/` (0 errors, 100% clean, built in 7.11s)
+
+### 1. Section 5 — Cancellation Edge Cases
+- **Cancelled Before Pickup**:
+  - Automatically cancels the booking with `status = 'cancelled'` and records `policy_outcome = 'cancelled_before_pickup'`.
+  - Live Queue is stopped immediately: blocks all future queue progression (`/queue-advance`, `/ready-for-pickup`, `/pickup-confirm`) with `HTTP 400 Bad Request`.
+  - Guarantees the rental timer never starts (`picked_up_at` remains `None`).
+  - Guards courier delivery status: attempts to advance delivery status (`OUT_FOR_DELIVERY`, `DELIVERED`) are rejected with `HTTP 400 Bad Request`.
+- **Cancelled After Pickup but Before Delivery**:
+  - Item cannot be marked as delivered: forward delivery progression is blocked (`HTTP 400 Bad Request`).
+  - Booking is marked with `status = 'cancelled'` and `policy_outcome = 'return_required'`.
+  - Authoritative return-to-owner procedure is activated: return milestones (`return_initiated`, `return_collected`, `handed_back`, `awaiting_inspection`, `completed`) remain accessible to ensure the physical item is tracked back to the lender.
+- **Cancelled After Delivery / During Rental**:
+  - Preserves entire booking history and metadata: records are never deleted or reset.
+  - Retains authoritative pickup timestamp (`picked_up_at`) and live timer state until physical return handover is confirmed by lender or courier.
+- **Cancellation Request Workflow**:
+  - Added dedicated endpoints:
+    - `POST /api/orders/{id}/cancellation-request` & `POST /api/bookings/{id}/cancellation-request`: records request with reason and notes under `cancellation_request_status = 'PENDING'`; keeps booking in valid active state.
+    - `POST /api/orders/{id}/cancellation-request/approve`: authorized counterparty approves request, triggering `record_booking_cancellation`.
+    - `POST /api/orders/{id}/cancellation-request/reject`: counterparty rejects request; booking remains in active state with `cancellation_request_status = 'REJECTED'`.
+- **Requester and Audit Persistence**:
+  - Records requester identity (`cancelled_by`), exact timestamp (`cancelled_at`), and reason (`cancellation_reason`) in both `orders` table and `booking_cancellations` table.
+- **Duplicate Cancellation Idempotency**:
+  - Successive cancellation attempts on an already-cancelled booking return `HTTP 400 Bad Request` (`"This booking has already been cancelled."`) without duplicate cancellation events, refund triggers, or status corruption.
+- **Race Condition & Active Action Prevention**:
+  - Atomic validation in `_execute_queue_milestone_transition` verifies current database status before applying state mutations. If a cancellation is processed while a pickup or delivery action is in-flight, conflicting updates are rejected.
+- **Cancelled Booking Visibility**:
+  - Both renter and lender portals display cancelled bookings in Booking History with full cancellation timestamps and reasons.
+  - In `LiveRentalQueue`, cancelled bookings render contextual alerts:
+    - Pre-pickup: "Booking Cancelled — Active Live Rental Queue Stopped".
+    - Post-pickup: "Booking Cancelled — Equipment Return to Owner Required".
+  - Invalid action controls are disabled; valid return actions remain available for items in-transit.
+- **Payments and Refunds Decoupling**:
+  - Cancellation never automatically sets `refund_status` to `'completed'`. Real gateway refund lifecycle is preserved (`'initiated'`, `'pending'`, or gateway-confirmed), maintaining transactional integrity.
+
+### 2. Section 6 — Returned-Item Edge Cases
+- **Return Initiated vs Collected**:
+  - `return_initiated` indicates renter intent. Item is not marked as returned until authorized courier (or lender in direct mode) confirms physical collection.
+- **Delivery Person Collection Milestone**:
+  - Milestone 5.5: `return_collected` (`return_in_transit`).
+  - Endpoints: `POST /api/orders/{id}/return-collected` & `POST /api/bookings/{id}/return-collected`.
+  - Records `return_collected_at` timestamp and responsible courier's ID (`return_delivery_boy_id`). Transitions booking status to `return_in_transit`.
+- **Item In-Transit Guard**:
+  - Booking remains in `return_in_transit`; cannot skip prematurely to `handed_back` or `completed` without explicit physical handover.
+- **Handover to Lender**:
+  - Milestone 6: `handed_back`.
+  - Endpoint: `POST /api/orders/{id}/handed-back`.
+  - Confirmed by authorized courier or lender. Records `handed_back_at`, which freezes the rental countdown and definitively stops the rental timer.
+  - Idempotent: repeated calls return `HTTP 200 OK` with existing handover timestamp.
+- **Inspection Gate Before Completion**:
+  - Lender has not inspected returned item: booking remains in `handed_back` / `awaiting_inspection`.
+  - Premature completion attempts directly from `handed_back` are strictly rejected with `HTTP 400 Bad Request` (`"Cannot complete rental before inspection is performed. Expected 'awaiting_inspection'."`).
+- **Damaged / Incomplete / Different Condition Handling**:
+  - Milestone 7: `awaiting_inspection`.
+  - Records `inspection_condition` (`GOOD`, `DAMAGED`, `INCOMPLETE`, `DIFFERENT`), `inspection_notes`, and structured `inspection_checklist`.
+  - If condition is not `GOOD`, sets `dispute_status = 'OPEN'` and notifies parties without arbitrarily auto-charging the renter or deducting deposits.
+  - Completion is blocked while `dispute_status` is `OPEN` or `UNDER_REVIEW`.
+- **Renter Dispute & Rebuttal Workflow**:
+  - Endpoint: `POST /api/orders/{id}/dispute` & `POST /api/bookings/{id}/dispute`.
+  - Allows renter to submit dispute reason, notes, and photo evidence.
+  - Preserves both lender report and renter rebuttal by appending to `dispute_evidence` list.
+  - Sets `dispute_status = 'UNDER_REVIEW'`, requiring platform admin resolution before booking completion can occur.
+- **Duplicate Return Idempotency**:
+  - Both `handed_back` and `completed` milestones are idempotent, preventing duplicate wallet credits, duplicate notifications, or status corruption.
+- **Return After Cancellation**:
+  - Physical items picked up before cancellation are tracked continuously through `return_initiated`, `return_collected`, `handed_back`, and `awaiting_inspection` to finalization.
+- **Authoritative Backend-Driven Timer**:
+  - Live timer calculation relies exclusively on backend timestamps (`picked_up_at` and `handed_back_at`). Frontend-only timers are strictly prohibited from declaring items returned or completed.
+- **Booking Completion**:
+  - Milestone 8: `completed`.
+  - Allowed only after physical handover is confirmed, inspection is completed, and open disputes are resolved. Idempotently credits vendor wallet and finalizes booking.
+
+### 3. Section 7 — Final Validation Results
+All 8 verification criteria were systematically validated using automated pytest integration tests across separate renter, lender, courier, and admin tokens:
+1. **Strict Role Authorization**: Only authorized personas can perform each milestone (e.g., couriers cannot complete rentals, lenders cannot confirm courier pickup in delivery mode, renters cannot perform lender inspection).
+2. **No Automatic Milestone Advances**: Every stage requires explicit backend confirmation.
+3. **Cancelled Booking Guards**: Pre-pickup cancellations cannot progress forward through pickup or delivery.
+4. **Physical Item Return Tracking**: In-transit cancelled items are trackable and returnable to owner.
+5. **Portal Synchronization**: Renter and lender portals retrieve identical backend state.
+6. **Persistence Across Refreshes**: Repeated page reloads and database queries maintain all milestone timestamps, inspection reports, and dispute states.
+7. **Consistency Across Payments & History**: Payments, cancellation reasons, and refund statuses remain consistent and uncorrupted.
+8. **Backend Persistence & Validation**: All state mutations are validated against business rules and persisted to MySQL/TiDB and memory fallbacks.
