@@ -20,6 +20,7 @@ import {
   ArrowLeft,
   Video,
   AlertTriangle,
+  ArrowRight,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "@tanstack/react-router";
@@ -176,7 +177,7 @@ export function MyProducts({
         <div>
           <button
             onClick={onBack}
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-border/80 bg-card hover:bg-secondary text-xs font-semibold text-foreground transition-all cursor-pointer shadow-2xs group"
+            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl border border-border/80 bg-card hover:bg-secondary text-xs font-semibold text-foreground transition-all cursor-pointer shadow-2xs group"
           >
             <ArrowLeft className="h-3.5 w-3.5 group-hover:-translate-x-0.5 transition-transform" />
             <span>Back to Dashboard</span>
@@ -197,7 +198,7 @@ export function MyProducts({
 
         <button
           onClick={onAddNewGear}
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-accent-primary hover:bg-accent-hover text-white text-xs font-bold shadow-xs active:scale-[0.98] transition-all cursor-pointer shrink-0"
+          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-accent-primary hover:bg-accent-hover text-white text-xs font-bold shadow-xs active:scale-[0.98] transition-all cursor-pointer shrink-0"
         >
           <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
           <span>Add New Product</span>
@@ -280,7 +281,7 @@ export function MyProducts({
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {filteredProducts.map((product) => {
             const dailyRate =
               product.pricing?.daily ??
@@ -292,6 +293,8 @@ export function MyProducts({
               typeof product.location === "object"
                 ? product.location?.city || product.location?.area || "Visakhapatnam"
                 : product.location || "Visakhapatnam";
+            const brandLabel =
+              product.brand || (product as any).specs?.brand || product.category || "Pro Gear";
             const hasVideo = Boolean(product.videoUrl || (product as any).video_url);
             const imgUrl = resolveProductImageUrl(product);
             const allImages = resolveAllProductImages(product);
@@ -301,174 +304,171 @@ export function MyProducts({
             return (
               <motion.div
                 key={product.id}
-                whileHover={{ y: -4 }}
-                transition={{ duration: 0.2 }}
+                whileHover={{ y: -5 }}
+                transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
                 onClick={() => handleInspect(product)}
-                className="group relative w-full aspect-[4/5] sm:aspect-[3/4] min-h-[380px] sm:min-h-[400px] flex flex-col justify-between rounded-[24px] overflow-hidden bg-neutral-950 border border-black/10 dark:border-white/15 shadow-md hover:shadow-2xl transition-all duration-300 cursor-pointer p-4 select-none"
+                className="group relative w-full rounded-[32px] overflow-hidden bg-[#0c0d10] border border-white/[0.09] shadow-xl hover:shadow-2xl hover:border-white/20 transition-all duration-300 cursor-pointer flex flex-col justify-between p-5 select-none text-left"
               >
-                {/* FULL-BLEED HERO BACKGROUND IMAGE */}
-                <div className="absolute inset-0 w-full h-full overflow-hidden bg-neutral-900 pointer-events-none">
+                {/* 1. DOMINANT PRODUCT VISUAL (Apple Style "1 Big Element") */}
+                <div className="relative w-full aspect-[16/11] rounded-[24px] overflow-hidden bg-[#16171c] border border-white/[0.06] mb-4">
                   {imgUrl ? (
                     <img
                       src={imgUrl}
                       alt={product.title || product.name || "Equipment"}
-                      className="w-full h-full object-cover object-center transition-transform duration-700 ease-out group-hover:scale-108 pointer-events-none"
+                      className="w-full h-full object-cover object-center transition-transform duration-700 ease-out group-hover:scale-106 pointer-events-none"
                       loading="lazy"
                     />
                   ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground/40 p-6 text-center bg-neutral-900">
-                      <Package className="h-12 w-12 mb-2 opacity-40 text-neutral-500" />
-                      <span className="text-xs font-semibold text-neutral-400">No image uploaded</span>
+                    <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground/40 p-6 text-center bg-[#15161a]">
+                      <Package className="h-12 w-12 mb-2 opacity-30 text-neutral-400" />
+                      <span className="text-xs font-semibold text-neutral-500">No image uploaded</span>
                     </div>
                   )}
 
-                  {/* Multi-stop dark gradient overlay for optimal legibility */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/50 to-black/25 pointer-events-none" />
-                </div>
+                  {/* Subtle dark gradient overlay near bottom of image */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#0c0d10] via-transparent to-transparent opacity-80 pointer-events-none" />
 
-                {/* TOP ROW: Badges & Isolated Actions */}
-                <div className="relative z-10 flex items-center justify-between gap-2 pointer-events-auto">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    {/* Status badge */}
-                    {getStatusBadge(product.verificationStatus, product.status)}
+                  {/* FLOATING TOP BADGES & ACTIONS */}
+                  <div className="absolute top-3 inset-x-3 flex items-center justify-between gap-2 pointer-events-auto z-10">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {/* Status badge */}
+                      {getStatusBadge(product.verificationStatus, product.status)}
 
-                    {/* Availability pill */}
-                    {isPaused ? (
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-black/70 backdrop-blur-md px-2.5 py-0.5 text-[10px] font-bold text-amber-400 border border-amber-500/30 shadow-md">
-                        <Clock className="h-3 w-3 text-amber-400" />
-                        <span>Paused</span>
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-black/60 backdrop-blur-md px-2.5 py-0.5 text-[10px] font-bold text-emerald-400 border border-emerald-500/30 shadow-md">
-                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        <span>Available</span>
-                      </span>
-                    )}
-
-                    {/* Genuine rating badge (only if exists) */}
-                    {product.rating && (
-                      <div className="flex items-center gap-1 bg-black/60 backdrop-blur-md text-white text-[10px] font-bold px-2 py-0.5 rounded-full border border-white/15 shadow-sm">
-                        <Sparkles className="h-3 w-3 fill-amber-400 text-amber-400" />
-                        <span>{Number(product.rating).toFixed(1)}</span>
-                      </div>
-                    )}
-
-                    {/* Inspection Video badge */}
-                    {hasVideo && (
-                      <div
-                        className="flex items-center gap-1 bg-sky-500/25 backdrop-blur-md text-sky-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-sky-400/40 shadow-sm"
-                        title="10s Inspection Video Stored"
-                      >
-                        <Video className="h-3 w-3 text-sky-400" />
-                        <span>Video</span>
-                      </div>
-                    )}
-
-                    {/* Multiple Photos count badge */}
-                    {galleryCount > 1 && (
-                      <div
-                        className="flex items-center gap-1 bg-black/60 backdrop-blur-md text-neutral-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-white/15 shadow-sm"
-                        title={`${galleryCount} Photos Available`}
-                      >
-                        <Layers className="h-3 w-3 text-neutral-300" />
-                        <span>{galleryCount}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Top-Right Delete Action Button (isolated) */}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      e.preventDefault();
-                      setProductToDelete(product);
-                    }}
-                    className="h-8 w-8 rounded-full bg-red-500/20 hover:bg-red-500 text-red-400 hover:text-white border border-red-500/30 flex items-center justify-center transition-all cursor-pointer shadow-md shrink-0 active:scale-95"
-                    title="Delete Equipment Listing"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-
-                {/* BOTTOM ROW: Details & Vendor Action Controls */}
-                <div className="relative z-10 space-y-2 mt-auto text-left pointer-events-auto">
-                  {/* Category & Location Pills */}
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/20 backdrop-blur-md text-white text-[10px] font-bold uppercase tracking-wider border border-white/15">
-                      <Tag className="h-2.5 w-2.5 text-emerald-400" />
-                      <span>{product.category || "Equipment"}</span>
-                    </span>
-                    {locCity && (
-                      <span
-                        title={locCity}
-                        className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-black/50 backdrop-blur-md text-white text-[11px] font-medium border border-white/15 truncate max-w-[150px]"
-                      >
-                        <MapPin className="h-3 w-3 text-emerald-400 shrink-0" />
-                        <span className="truncate">{locCity}</span>
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Product Title */}
-                  <h3
-                    className="font-extrabold text-base sm:text-lg leading-snug line-clamp-1 text-white drop-shadow-md font-display group-hover:text-emerald-400 transition-colors"
-                    title={product.title || product.name}
-                  >
-                    {product.title || product.name || "Untitled Equipment"}
-                  </h3>
-
-                  {/* Description Snippet */}
-                  <p className="text-xs text-white/80 line-clamp-1 leading-relaxed">
-                    {product.description || `High-performance ${product.title || "gear"} available for peer-to-peer rental.`}
-                  </p>
-
-                  {/* Price & Vendor Action Buttons */}
-                  <div className="pt-2 border-t border-white/15 flex items-center justify-between gap-2">
-                    <div>
-                      <span className="text-[9px] uppercase font-bold tracking-wider text-white/70 block">
-                        Daily Rate
-                      </span>
-                      <div className="text-lg sm:text-xl font-black tracking-tight font-mono leading-none mt-0.5 text-white">
-                        ₹{Number(dailyRate).toLocaleString("en-IN")}
-                        <span className="text-[11px] font-normal text-white/70 ml-0.5">
-                          /day
+                      {/* Availability pill */}
+                      {isPaused ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-black/70 backdrop-blur-md px-2.5 py-0.5 text-[10px] font-bold text-amber-400 border border-amber-500/30 shadow-md">
+                          <Clock className="h-3 w-3 text-amber-400" />
+                          <span>Paused</span>
                         </span>
-                      </div>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-black/60 backdrop-blur-md px-2.5 py-0.5 text-[10px] font-bold text-emerald-400 border border-emerald-500/30 shadow-md">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          <span>Available</span>
+                        </span>
+                      )}
+
+                      {/* Genuine rating badge (only if exists) */}
+                      {product.rating && (
+                        <div className="flex items-center gap-1 bg-black/60 backdrop-blur-md text-white text-[10px] font-bold px-2 py-0.5 rounded-full border border-white/15 shadow-sm">
+                          <Sparkles className="h-3 w-3 fill-amber-400 text-amber-400" />
+                          <span>{Number(product.rating).toFixed(1)}</span>
+                        </div>
+                      )}
+
+                      {/* Inspection Video badge */}
+                      {hasVideo && (
+                        <div
+                          className="flex items-center gap-1 bg-sky-500/25 backdrop-blur-md text-sky-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-sky-400/40 shadow-sm"
+                          title="10s Inspection Video Stored"
+                        >
+                          <Video className="h-3 w-3 text-sky-400" />
+                          <span>Video</span>
+                        </div>
+                      )}
+
+                      {/* Multiple Photos count badge */}
+                      {galleryCount > 1 && (
+                        <div
+                          className="flex items-center gap-1 bg-black/60 backdrop-blur-md text-neutral-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-white/15 shadow-sm"
+                          title={`${galleryCount} Photos Available`}
+                        >
+                          <Layers className="h-3 w-3 text-neutral-300" />
+                          <span>{galleryCount}</span>
+                        </div>
+                      )}
                     </div>
 
-                    {/* Dedicated Full-Page Action Buttons: Inspect & Edit */}
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {/* Inspect Button -> Full Page */}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          e.preventDefault();
-                          handleInspect(product);
-                        }}
-                        className="rounded-full py-1.5 px-3 bg-white/20 hover:bg-white/30 text-white text-xs font-bold inline-flex items-center gap-1.5 border border-white/25 shadow-md backdrop-blur-md transition-all cursor-pointer active:scale-95"
-                        title="Open full Product Details page"
-                      >
-                        <Eye className="h-3.5 w-3.5 text-emerald-400" />
-                        <span>Inspect</span>
-                      </button>
+                    {/* Isolated Delete Button */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        setProductToDelete(product);
+                      }}
+                      className="h-8 w-8 rounded-full bg-black/60 hover:bg-destructive text-neutral-400 hover:text-white border border-white/15 flex items-center justify-center transition-all cursor-pointer shadow-md shrink-0 active:scale-95"
+                      title="Delete Equipment Listing"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
 
-                      {/* Edit Button -> Full Page */}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          e.preventDefault();
-                          handleEdit(product);
-                        }}
-                        className="rounded-full py-1.5 px-3 bg-emerald-500 hover:bg-emerald-600 text-black text-xs font-bold inline-flex items-center gap-1.5 border border-emerald-400 shadow-md backdrop-blur-md transition-all cursor-pointer active:scale-95"
-                        title="Open full Edit Product page"
-                      >
-                        <Edit3 className="h-3.5 w-3.5 text-black" />
-                        <span>Edit</span>
-                      </button>
+                {/* 2. EDITORIAL TYPOGRAPHY & DETAILS (Apple Presentation Style) */}
+                <div className="space-y-2.5 flex-1 flex flex-col justify-between">
+                  <div>
+                    {/* Eyebrow: Brand & Category + Location */}
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-semibold uppercase tracking-widest text-neutral-400 font-sans truncate">
+                        {brandLabel}
+                      </span>
+                      {locCity && (
+                        <span
+                          title={locCity}
+                          className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/[0.07] text-neutral-300 text-[10px] font-medium border border-white/[0.08] truncate max-w-[140px]"
+                        >
+                          <MapPin className="h-2.5 w-2.5 text-sky-400 shrink-0" />
+                          <span className="truncate">{locCity}</span>
+                        </span>
+                      )}
                     </div>
+
+                    {/* Bold Title */}
+                    <h3
+                      className="font-extrabold text-xl sm:text-2xl text-white tracking-tight leading-tight line-clamp-1 font-display group-hover:text-sky-300 transition-colors mt-0.5"
+                      title={product.title || product.name}
+                    >
+                      {product.title || product.name || "Untitled Equipment"}
+                    </h3>
+
+                    {/* Accent Daily Price */}
+                    <div className="mt-1 flex items-baseline gap-1">
+                      <span className="text-sky-400 font-mono font-black text-xl tracking-tight">
+                        ₹{Number(dailyRate).toLocaleString("en-IN")}
+                      </span>
+                      <span className="text-xs text-neutral-400 font-normal font-sans">
+                        /day
+                      </span>
+                    </div>
+
+                    {/* Editorial Description Paragraph */}
+                    <p className="text-xs text-neutral-300/80 leading-relaxed line-clamp-2 mt-1.5 min-h-[2.25rem]">
+                      {product.description ||
+                        `Professional-grade ${product.title || "equipment"} prepared and maintained for high-performance rental handovers.`}
+                    </p>
+                  </div>
+
+                  {/* 3. PROMINENT APPLE-STYLE ACTION CONTROLS */}
+                  <div className="pt-3 border-t border-white/[0.08] flex items-center gap-2 mt-2 pointer-events-auto">
+                    {/* Primary Button: Apple-style bold blue pill ("Add to Bag" equivalent) */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        handleInspect(product);
+                      }}
+                      className="flex-1 bg-[#0071e3] hover:bg-[#0077ed] text-white font-bold text-xs py-2.5 px-4 rounded-full shadow-lg shadow-blue-500/20 active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                      title="Inspect full equipment details"
+                    >
+                      <Eye className="h-3.5 w-3.5 text-white" />
+                      <span>Inspect Details</span>
+                    </button>
+
+                    {/* Secondary Button: Sleek frosted glass pill ("Edit") */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        handleEdit(product);
+                      }}
+                      className="bg-white/10 hover:bg-white/20 text-white font-semibold text-xs py-2.5 px-4 rounded-full border border-white/15 active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
+                      title="Edit equipment specifications"
+                    >
+                      <Edit3 className="h-3.5 w-3.5 text-neutral-300" />
+                      <span>Edit</span>
+                    </button>
                   </div>
                 </div>
               </motion.div>

@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/common/Button";
 
-interface CameraCaptureModalProps {
+export interface CameraCaptureModalProps {
   isOpen: boolean;
   onClose: () => void;
   onCapture: (imageDataUrl: string, angleTag?: string) => Promise<void> | void;
@@ -45,7 +45,10 @@ export function CameraCaptureModal({
   const streamRef = useRef<MediaStream | null>(null);
   const nativeCameraInputRef = useRef<HTMLInputElement | null>(null);
 
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  // Camera operational states
+  const [cameraState, setCameraState] = useState<
+    "idle" | "initializing" | "streaming" | "captured" | "error"
+  >("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [facingMode, setFacingMode] = useState<"environment" | "user">(
     "environment"
@@ -53,12 +56,13 @@ export function CameraCaptureModal({
   const [selectedAngle, setSelectedAngle] = useState<string>(initialAngleTag);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [isShuttering, setIsShuttering] = useState(false);
+  const [activeStream, setActiveStream] = useState<MediaStream | null>(null);
 
   useEffect(() => {
     setSelectedAngle(initialAngleTag);
   }, [initialAngleTag]);
 
-  // Play shutter sound via Web Audio API
+  // Audio shutter feedback via Web Audio API
   const playShutterSound = useCallback(() => {
     try {
       const audioCtx = new (window.AudioContext ||
@@ -76,19 +80,29 @@ export function CameraCaptureModal({
       osc.start();
       osc.stop(audioCtx.currentTime + 0.08);
     } catch {
-      // Audio fallback silent ignore
+      // Audio optional, fail silently
     }
   }, []);
 
-  // Stop camera stream tracks
+  // Safe track cleanup to release hardware resources and turn off camera LED
   const stopStream = useCallback(() => {
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
+      try {
+        streamRef.current.getTracks().forEach((track) => {
+          track.stop();
+        });
+      } catch (err) {
+        console.warn("[CameraCaptureModal] error stopping tracks:", err);
+      }
       streamRef.current = null;
+    }
+    setActiveStream(null);
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
     }
   }, []);
 
-  // Trigger native phone camera app via HTML5 file input
+  // Trigger native phone camera app fallback via HTML5 capture file input
   const triggerNativeCamera = useCallback(() => {
     if (nativeCameraInputRef.current) {
       nativeCameraInputRef.current.click();
@@ -103,109 +117,145 @@ export function CameraCaptureModal({
         const result = event.target?.result as string;
         if (result) {
           setCapturedImage(result);
+          setCameraState("captured");
         }
       };
       reader.readAsDataURL(file);
     }
   };
 
-  // Start camera stream with automated progressive retries
-  const startCamera = useCallback(async () => {
-    stopStream();
-    setHasPermission(null);
-    setErrorMsg(null);
+  // Start live WebRTC camera stream with progressive fallback constraints
+  const startCamera = useCallback(
+    async (targetFacingMode?: "environment" | "user") => {
+      const mode = targetFacingMode || facingMode;
+      stopStream();
+      setCameraState("initializing");
+      setErrorMsg(null);
 
-    if (!navigator.mediaDevices?.getUserMedia) {
-      setHasPermission(false);
-      setErrorMsg("WebRTC stream unavailable. Launching native phone camera...");
-      return;
-    }
-
-    const constraintConfigs: MediaStreamConstraints[] = [
-      {
-        video: {
-          facingMode: facingMode === "environment" ? { ideal: "environment" } : { ideal: "user" },
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
-        audio: false,
-      },
-      {
-        video: {
-          facingMode: facingMode === "environment" ? "environment" : "user",
-        },
-        audio: false,
-      },
-      {
-        video: true,
-        audio: false,
-      },
-    ];
-
-    let stream: MediaStream | null = null;
-    let lastErr: unknown = null;
-
-    for (const config of constraintConfigs) {
-      try {
-        stream = await navigator.mediaDevices.getUserMedia(config);
-        if (stream) break;
-      } catch (err) {
-        lastErr = err;
+      // Check browser WebRTC availability & secure context
+      if (!navigator?.mediaDevices?.getUserMedia) {
+        setCameraState("error");
+        setErrorMsg(
+          "Direct camera access is unavailable in this environment. Camera access requires a secure context (HTTPS) or a supported browser."
+        );
+        return;
       }
-    }
 
-    if (stream) {
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
+      const constraintConfigs: MediaStreamConstraints[] = [
+        {
+          video: {
+            facingMode: mode === "environment" ? { ideal: "environment" } : { ideal: "user" },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+          audio: false,
+        },
+        {
+          video: {
+            facingMode: mode === "environment" ? "environment" : "user",
+          },
+          audio: false,
+        },
+        {
+          video: true,
+          audio: false,
+        },
+      ];
+
+      let stream: MediaStream | null = null;
+      let lastErr: unknown = null;
+
+      for (const config of constraintConfigs) {
         try {
-          await videoRef.current.play();
-        } catch {
-          // Play fallback
+          stream = await navigator.mediaDevices.getUserMedia(config);
+          if (stream) break;
+        } catch (err) {
+          lastErr = err;
         }
       }
-      setHasPermission(true);
-    } else {
-      console.warn("[CameraCaptureModal] WebRTC Camera permission error:", lastErr);
-      setHasPermission(false);
-      const message =
-        lastErr instanceof Error
-          ? lastErr.message
-          : "Camera permission denied or blocked by browser settings.";
-      setErrorMsg(message);
-    }
-  }, [facingMode, stopStream]);
 
-  // Automated action for "Turn On Camera & Allow Access" button
-  const handleTurnOnCameraClick = async () => {
-    await startCamera();
-    // If WebRTC remains blocked or denied, automatically trigger native camera app
-    setTimeout(() => {
-      if (!streamRef.current) {
-        triggerNativeCamera();
+      if (stream) {
+        streamRef.current = stream;
+        setActiveStream(stream);
+
+        // Bind stream to the video element
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          try {
+            await videoRef.current.play();
+          } catch (playErr) {
+            console.warn("[CameraCaptureModal] video play error:", playErr);
+          }
+        }
+
+        setCameraState("streaming");
+      } else {
+        console.warn("[CameraCaptureModal] getUserMedia error:", lastErr);
+        setCameraState("error");
+
+        let friendlyMsg = "Unable to access camera.";
+        if (lastErr instanceof DOMException) {
+          if (
+            lastErr.name === "NotAllowedError" ||
+            lastErr.name === "PermissionDeniedError"
+          ) {
+            friendlyMsg =
+              "Camera permission was denied. Please allow camera permissions in your browser address bar settings.";
+          } else if (
+            lastErr.name === "NotFoundError" ||
+            lastErr.name === "DevicesNotFoundError"
+          ) {
+            friendlyMsg = "No camera hardware detected on this device.";
+          } else if (
+            lastErr.name === "NotReadableError" ||
+            lastErr.name === "TrackStartError"
+          ) {
+            friendlyMsg = "Camera is currently in use by another application.";
+          } else {
+            friendlyMsg = lastErr.message || friendlyMsg;
+          }
+        } else if (lastErr instanceof Error) {
+          friendlyMsg = lastErr.message;
+        }
+        setErrorMsg(friendlyMsg);
       }
-    }, 400);
-  };
+    },
+    [facingMode, stopStream]
+  );
 
-  // Manage camera open state
+  // Manage modal open/close lifecycle and guarantee clean track teardown
   useEffect(() => {
-    if (isOpen && !capturedImage) {
+    if (isOpen) {
+      setCapturedImage(null);
       startCamera();
     } else {
       stopStream();
+      setCameraState("idle");
     }
 
     return () => {
       stopStream();
     };
-  }, [isOpen, capturedImage, startCamera, stopStream]);
+  }, [isOpen]); // Only run on modal open/close toggle to prevent premature stream teardown
 
-  // Toggle camera direction between Back ("environment") and Front ("user")
+  // Guarantee that when activeStream is set, videoRef receives it even if DOM just finished updating
+  useEffect(() => {
+    if (videoRef.current && activeStream && cameraState === "streaming") {
+      if (videoRef.current.srcObject !== activeStream) {
+        videoRef.current.srcObject = activeStream;
+        videoRef.current.play().catch(() => {});
+      }
+    }
+  }, [activeStream, cameraState]);
+
+  // Toggle between Rear camera and Front camera
   const handleToggleCamera = () => {
-    setFacingMode((prev) => (prev === "environment" ? "user" : "environment"));
+    const nextMode = facingMode === "environment" ? "user" : "environment";
+    setFacingMode(nextMode);
+    startCamera(nextMode);
   };
 
-  // Capture photo snapshot onto canvas
+  // Capture current video frame onto canvas
   const handleTakeSnapshot = () => {
     if (!videoRef.current) return;
     const video = videoRef.current;
@@ -216,23 +266,28 @@ export function CameraCaptureModal({
     setTimeout(() => {
       setIsShuttering(false);
 
-      const canvas = document.createElement("canvas");
-      canvas.width = video.videoWidth || 1280;
-      canvas.height = video.videoHeight || 720;
-      const ctx = canvas.getContext("2d");
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth || 1280;
+        canvas.height = video.videoHeight || 720;
+        const ctx = canvas.getContext("2d");
 
-      if (ctx) {
-        // If front camera, mirror horizontally for natural preview
-        if (facingMode === "user") {
-          ctx.translate(canvas.width, 0);
-          ctx.scale(-1, 1);
+        if (ctx) {
+          // If front-facing camera, mirror horizontally for natural preview
+          if (facingMode === "user") {
+            ctx.translate(canvas.width, 0);
+            ctx.scale(-1, 1);
+          }
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+          setCapturedImage(dataUrl);
+          setCameraState("captured");
+          stopStream();
         }
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
-        setCapturedImage(dataUrl);
-        stopStream();
+      } catch (err) {
+        console.error("[CameraCaptureModal] snapshot failed:", err);
       }
-    }, 150);
+    }, 120);
   };
 
   const handleRetake = () => {
@@ -244,15 +299,25 @@ export function CameraCaptureModal({
     if (capturedImage) {
       const img = capturedImage;
       const angle = selectedAngle;
-      setCapturedImage(null);
+
       if (shouldClose) {
         stopStream();
         onClose();
+        await onCapture(img, angle);
       } else {
+        // Sequential capture mode (gallery): reset preview & re-start camera for next angle
+        setCapturedImage(null);
         startCamera();
+        await onCapture(img, angle);
       }
-      await onCapture(img, angle);
     }
+  };
+
+  const handleCloseModal = () => {
+    stopStream();
+    setCapturedImage(null);
+    setCameraState("idle");
+    onClose();
   };
 
   if (!isOpen) return null;
@@ -281,7 +346,7 @@ export function CameraCaptureModal({
                 <h3 className="text-base font-bold text-white flex items-center gap-2">
                   Snap Product Photo
                   <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/20 text-primary border border-primary/30">
-                    {facingMode === "environment" ? "Back Camera" : "Front Camera"}
+                    {facingMode === "environment" ? "Rear Camera" : "Front Camera"}
                   </span>
                 </h3>
                 <p className="text-xs text-zinc-400">
@@ -290,12 +355,9 @@ export function CameraCaptureModal({
               </div>
             </div>
             <button
-              onClick={() => {
-                stopStream();
-                setCapturedImage(null);
-                onClose();
-              }}
-              className="rounded-full p-2 text-zinc-400 hover:bg-zinc-800 hover:text-white transition-colors"
+              onClick={handleCloseModal}
+              className="rounded-full p-2 text-zinc-400 hover:bg-zinc-800 hover:text-white transition-colors cursor-pointer"
+              title="Close Camera"
             >
               <X className="h-5 w-5" />
             </button>
@@ -308,7 +370,7 @@ export function CameraCaptureModal({
                 key={angle}
                 type="button"
                 onClick={() => setSelectedAngle(angle)}
-                className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-colors ${
+                className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
                   selectedAngle === angle
                     ? "bg-primary text-primary-foreground shadow-sm"
                     : "bg-zinc-800/80 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800"
@@ -333,93 +395,29 @@ export function CameraCaptureModal({
           </div>
         )}
 
-        {/* Viewfinder / Preview Body */}
-        <div className="relative aspect-[4/3] w-full bg-black flex items-center justify-center overflow-hidden flex-1 min-h-[280px]">
-          {/* Visual Camera Shutter Flash */}
-          {isShuttering && (
-            <div className="absolute inset-0 z-40 bg-white animate-in fade-in fade-out duration-150" />
-          )}
+        {/* Viewfinder Body — The video element is ALWAYS mounted to guarantee ref binding */}
+        <div className="relative aspect-[4/3] w-full bg-black flex items-center justify-center overflow-hidden flex-1 min-h-[300px]">
+          {/* Permanent Video Element */}
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            className={`h-full w-full object-cover transition-opacity duration-300 ${
+              facingMode === "user" ? "scale-x-[-1]" : ""
+            } ${cameraState === "streaming" && !capturedImage ? "opacity-100" : "opacity-0 absolute pointer-events-none"}`}
+          />
 
-          {capturedImage ? (
-            /* Review Captured Photo */
-            <div className="relative h-full w-full">
-              <img
-                src={capturedImage}
-                alt="Captured product snapshot"
-                className="h-full w-full object-cover"
-              />
-              <div className="absolute top-3 left-3 bg-black/70 backdrop-blur-md text-white text-xs px-3.5 py-1.5 rounded-full border border-white/10 flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-emerald-400" />
-                <span>{selectedAngle} Snapshot Ready</span>
-              </div>
-            </div>
-          ) : hasPermission === false || hasPermission === null ? (
-            /* Permission / Turn On Camera Prompt State */
-            <div className="p-6 text-center max-w-md mx-auto space-y-4 my-auto">
-              <div className="h-16 w-16 rounded-full bg-primary/20 text-primary grid place-items-center mx-auto border border-primary/30 shadow-lg">
-                <Camera className="h-8 w-8 animate-bounce" />
-              </div>
-              <div>
-                <h4 className="text-lg font-bold text-white">
-                  Turn On Camera Access
-                </h4>
-                <p className="mt-1.5 text-xs text-zinc-300 leading-relaxed">
-                  {errorMsg ||
-                    "Tap below to turn on device camera. If browser permissions are restricted, your phone's native camera app will open automatically."}
-                </p>
-              </div>
-              <div className="pt-2 flex flex-col gap-2.5 items-center w-full">
-                <Button
-                  onClick={handleTurnOnCameraClick}
-                  className="w-full bg-primary text-primary-foreground font-bold text-sm py-3.5 rounded-xl shadow-lg hover:bg-primary/90 flex items-center justify-center gap-2"
-                >
-                  <Camera className="h-5 w-5" />
-                  Turn On Camera & Allow Access
-                </Button>
-
-                <Button
-                  onClick={triggerNativeCamera}
-                  variant="outline"
-                  className="w-full border-primary/40 bg-primary/10 text-primary hover:bg-primary/20 text-xs font-semibold"
-                >
-                  <Smartphone className="h-4 w-4 mr-2" />
-                  Open Phone Camera App Directly
-                </Button>
-
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    onClose();
-                    onFallbackUpload();
-                  }}
-                  className="w-full border-zinc-700 text-zinc-300 hover:bg-zinc-800 text-xs"
-                >
-                  <Upload className="h-4 w-4 mr-2" />
-                  Upload Image File From Gallery
-                </Button>
-              </div>
-            </div>
-          ) : (
-            /* Live Camera Stream */
-            <div className="relative h-full w-full flex items-center justify-center">
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                className={`h-full w-full object-cover ${
-                  facingMode === "user" ? "scale-x-[-1]" : ""
-                }`}
-              />
-
-              {/* Viewfinder Target Framing Guidelines */}
-              <div className="pointer-events-none absolute inset-6 sm:inset-10 border-2 border-dashed border-white/40 rounded-2xl flex flex-col justify-between p-4">
+          {/* Viewfinder Target Framing Guidelines (visible only during active live stream) */}
+          {cameraState === "streaming" && !capturedImage && (
+            <>
+              <div className="pointer-events-none absolute inset-6 sm:inset-10 border-2 border-dashed border-white/40 rounded-2xl flex flex-col justify-between p-4 z-10">
                 <div className="flex justify-between">
                   <div className="w-4 h-4 border-t-2 border-l-2 border-primary" />
                   <div className="w-4 h-4 border-t-2 border-r-2 border-primary" />
                 </div>
                 <div className="text-center bg-black/60 backdrop-blur-md self-center px-3.5 py-1.5 rounded-full text-xs text-white font-medium border border-white/10">
-                  Framing: {selectedAngle} ({facingMode === "environment" ? "Back Camera" : "Front Camera"})
+                  Framing: {selectedAngle} ({facingMode === "environment" ? "Rear Camera" : "Front Camera"})
                 </div>
                 <div className="flex justify-between">
                   <div className="w-4 h-4 border-b-2 border-l-2 border-primary" />
@@ -427,16 +425,101 @@ export function CameraCaptureModal({
                 </div>
               </div>
 
-              {/* Flip Camera Button (Always Visible) */}
+              {/* Flip Camera Button */}
               <button
                 type="button"
                 onClick={handleToggleCamera}
-                className="absolute top-4 right-4 bg-black/70 backdrop-blur-md text-white text-xs px-3.5 py-2 rounded-full border border-white/20 hover:bg-black/90 active:scale-95 transition-all flex items-center gap-2 shadow-lg"
-                title="Switch between back camera and front camera"
+                className="absolute top-4 right-4 z-20 bg-black/70 backdrop-blur-md text-white text-xs px-3.5 py-2 rounded-full border border-white/20 hover:bg-black/90 active:scale-95 transition-all flex items-center gap-2 shadow-lg cursor-pointer"
+                title="Switch between rear and front camera"
               >
                 <FlipHorizontal className="h-4 w-4 text-primary" />
-                <span>Switch to {facingMode === "environment" ? "Front" : "Back"} Camera</span>
+                <span>Switch to {facingMode === "environment" ? "Front" : "Rear"} Camera</span>
               </button>
+            </>
+          )}
+
+          {/* Visual Camera Shutter Flash */}
+          {isShuttering && (
+            <div className="absolute inset-0 z-40 bg-white animate-in fade-in fade-out duration-150" />
+          )}
+
+          {/* STATE 1: Captured Photo Review */}
+          {capturedImage && (
+            <div className="absolute inset-0 z-20 h-full w-full bg-black">
+              <img
+                src={capturedImage}
+                alt="Captured product snapshot"
+                className="h-full w-full object-contain bg-black"
+              />
+              <div className="absolute top-3 left-3 bg-black/70 backdrop-blur-md text-white text-xs px-3.5 py-1.5 rounded-full border border-white/10 flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-emerald-400" />
+                <span>{selectedAngle} Snapshot Captured</span>
+              </div>
+            </div>
+          )}
+
+          {/* STATE 2: Initializing / Requesting Camera Access */}
+          {cameraState === "initializing" && !capturedImage && (
+            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/90 p-6 text-center space-y-3">
+              <div className="h-14 w-14 rounded-2xl bg-primary/20 text-primary flex items-center justify-center border border-primary/30 animate-pulse">
+                <Camera className="h-7 w-7 animate-bounce" />
+              </div>
+              <h4 className="text-base font-bold text-white">Connecting Camera...</h4>
+              <p className="text-xs text-zinc-400 max-w-sm leading-relaxed">
+                Starting live camera stream. If prompted, please allow camera permission in your browser.
+              </p>
+              <div className="pt-2">
+                <RefreshCw className="h-4 w-4 text-primary animate-spin mx-auto" />
+              </div>
+            </div>
+          )}
+
+          {/* STATE 3: Error / Fallback State */}
+          {cameraState === "error" && !capturedImage && (
+            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-zinc-950 p-6 text-center space-y-4 overflow-y-auto">
+              <div className="h-14 w-14 rounded-2xl bg-destructive/15 text-destructive flex items-center justify-center border border-destructive/30 shadow-lg">
+                <AlertCircle className="h-7 w-7" />
+              </div>
+              <div>
+                <h4 className="text-base font-bold text-white">
+                  Camera Access Required
+                </h4>
+                <p className="mt-1.5 text-xs text-zinc-300 max-w-md mx-auto leading-relaxed">
+                  {errorMsg ||
+                    "Direct camera access is currently unavailable. You can retry with permission or use your device's camera app."}
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-2.5 items-center w-full max-w-xs pt-1">
+                <Button
+                  onClick={() => startCamera()}
+                  className="w-full bg-primary text-primary-foreground font-bold text-xs py-3 rounded-xl shadow-lg hover:bg-primary/90 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Try Turning On Camera Again
+                </Button>
+
+                <Button
+                  onClick={triggerNativeCamera}
+                  variant="outline"
+                  className="w-full border-primary/40 bg-primary/10 text-primary hover:bg-primary/20 text-xs font-semibold cursor-pointer"
+                >
+                  <Smartphone className="h-4 w-4 mr-2" />
+                  Open Device Camera App
+                </Button>
+
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    handleCloseModal();
+                    onFallbackUpload();
+                  }}
+                  className="w-full border-zinc-700 text-zinc-300 hover:bg-zinc-800 text-xs cursor-pointer"
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload Photo From Files
+                </Button>
+              </div>
             </div>
           )}
         </div>
@@ -448,18 +531,20 @@ export function CameraCaptureModal({
               <Button
                 variant="outline"
                 onClick={handleRetake}
-                className="border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                disabled={isUploading}
+                className="border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:text-white cursor-pointer"
               >
                 <RefreshCw className="h-4 w-4 mr-2" />
-                Retake Photo
+                Retake
               </Button>
+
               <div className="flex items-center gap-2">
                 {!closeOnConfirm ? (
                   <>
                     <Button
                       onClick={() => handleConfirm(false)}
                       disabled={isUploading}
-                      className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 font-medium text-xs disabled:opacity-50"
+                      className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 font-medium text-xs disabled:opacity-50 cursor-pointer"
                     >
                       {isUploading ? (
                         <>
@@ -469,14 +554,14 @@ export function CameraCaptureModal({
                       ) : (
                         <>
                           <Check className="h-4 w-4 mr-1.5" />
-                          Add & Snap Next
+                          Add & Snap Next Angle
                         </>
                       )}
                     </Button>
                     <Button
                       onClick={() => handleConfirm(true)}
                       disabled={isUploading}
-                      className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 font-medium text-xs disabled:opacity-50"
+                      className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 font-medium text-xs disabled:opacity-50 cursor-pointer"
                     >
                       Use & Done
                     </Button>
@@ -485,7 +570,7 @@ export function CameraCaptureModal({
                   <Button
                     onClick={() => handleConfirm(true)}
                     disabled={isUploading}
-                    className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 font-medium disabled:opacity-50"
+                    className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 font-medium disabled:opacity-50 cursor-pointer"
                   >
                     {isUploading ? (
                       <>
@@ -507,10 +592,10 @@ export function CameraCaptureModal({
               <button
                 type="button"
                 onClick={() => {
-                  onClose();
+                  handleCloseModal();
                   onFallbackUpload();
                 }}
-                className="text-xs text-zinc-400 hover:text-white flex items-center gap-1.5 px-2 py-1"
+                className="text-xs text-zinc-400 hover:text-white flex items-center gap-1.5 px-2 py-1 cursor-pointer"
               >
                 <Upload className="h-3.5 w-3.5" />
                 Or pick from gallery
@@ -519,9 +604,10 @@ export function CameraCaptureModal({
               <div className="flex items-center gap-3">
                 <button
                   type="button"
-                  disabled={!hasPermission || isUploading}
+                  disabled={cameraState !== "streaming" || isUploading}
                   onClick={handleTakeSnapshot}
-                  className="relative group disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="relative group disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                  title="Snap Photo"
                 >
                   <div className="h-14 w-14 rounded-full border-4 border-white bg-transparent p-1 transition-transform group-active:scale-95">
                     <div className="h-full w-full rounded-full bg-white group-hover:bg-primary transition-colors grid place-items-center">
@@ -543,3 +629,5 @@ export function CameraCaptureModal({
     </div>
   );
 }
+
+export default CameraCaptureModal;
