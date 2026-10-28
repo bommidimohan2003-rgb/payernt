@@ -12,6 +12,7 @@ import {
   IndianRupee,
   Layers,
   Sparkles,
+  Star,
   ShieldCheck,
   Filter,
   X,
@@ -86,7 +87,7 @@ export function MyProducts({
 
     if (effStatus === "draft") {
       return (
-        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-black/60 backdrop-blur-md text-neutral-300 border border-white/15 shadow-sm">
+        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-black/60 backdrop-blur-md text-neutral-300 border border-white/15 shadow-sm">
           DRAFT
         </span>
       );
@@ -99,34 +100,34 @@ export function MyProducts({
       effStatus === "pending_confirmation"
     ) {
       return (
-        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/25 backdrop-blur-md text-amber-300 border border-amber-400/40 flex items-center gap-1 shadow-sm">
+        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/25 backdrop-blur-md text-amber-300 border border-amber-400/40 flex items-center gap-1 shadow-sm">
           <Clock className="h-3 w-3" /> PENDING REVIEW
         </span>
       );
     }
     if (effStatus === "needs_correction" || effStatus === "revision_required") {
       return (
-        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-orange-500/25 backdrop-blur-md text-orange-300 border border-orange-400/40 flex items-center gap-1 shadow-sm">
+        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-500/25 backdrop-blur-md text-orange-300 border border-orange-400/40 flex items-center gap-1 shadow-sm">
           <AlertCircle className="h-3 w-3" /> NEEDS CORRECTION
         </span>
       );
     }
     if (effStatus === "rejected") {
       return (
-        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-destructive/30 backdrop-blur-md text-red-300 border border-destructive/40 flex items-center gap-1 shadow-sm">
+        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-destructive/30 backdrop-blur-md text-red-300 border border-destructive/40 flex items-center gap-1 shadow-sm">
           <X className="h-3 w-3" /> REJECTED
         </span>
       );
     }
     if (effStatus === "approved" || effStatus === "verified" || effStatus === "active") {
       return (
-        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/25 backdrop-blur-md text-emerald-300 border border-emerald-400/40 flex items-center gap-1 shadow-sm">
+        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/25 backdrop-blur-md text-emerald-300 border border-emerald-400/40 flex items-center gap-1 shadow-sm">
           <CheckCircle2 className="h-3 w-3" /> APPROVED & LIVE
         </span>
       );
     }
     return (
-      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-black/60 backdrop-blur-md text-neutral-300 border border-white/15 shadow-sm">
+      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-black/60 backdrop-blur-md text-neutral-300 border border-white/15 shadow-sm">
         LISTED
       </span>
     );
@@ -177,7 +178,7 @@ export function MyProducts({
         <div>
           <button
             onClick={onBack}
-            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl border border-border/80 bg-card hover:bg-secondary text-xs font-semibold text-foreground transition-all cursor-pointer shadow-2xs group"
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-border/80 bg-card hover:bg-secondary text-xs font-semibold text-foreground transition-all cursor-pointer shadow-2xs group"
           >
             <ArrowLeft className="h-3.5 w-3.5 group-hover:-translate-x-0.5 transition-transform" />
             <span>Back to Dashboard</span>
@@ -198,7 +199,7 @@ export function MyProducts({
 
         <button
           onClick={onAddNewGear}
-          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-accent-primary hover:bg-accent-hover text-white text-xs font-bold shadow-xs active:scale-[0.98] transition-all cursor-pointer shrink-0"
+          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-accent-primary hover:bg-accent-hover text-white text-xs font-bold shadow-xs active:scale-[0.98] transition-all cursor-pointer shrink-0"
         >
           <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
           <span>Add New Product</span>
@@ -281,7 +282,7 @@ export function MyProducts({
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
           {filteredProducts.map((product) => {
             const dailyRate =
               product.pricing?.daily ??
@@ -293,8 +294,6 @@ export function MyProducts({
               typeof product.location === "object"
                 ? product.location?.city || product.location?.area || "Visakhapatnam"
                 : product.location || "Visakhapatnam";
-            const brandLabel =
-              product.brand || (product as any).specs?.brand || product.category || "Pro Gear";
             const hasVideo = Boolean(product.videoUrl || (product as any).video_url);
             const imgUrl = resolveProductImageUrl(product);
             const allImages = resolveAllProductImages(product);
@@ -304,53 +303,53 @@ export function MyProducts({
             return (
               <motion.div
                 key={product.id}
-                whileHover={{ y: -5 }}
-                transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                whileHover={{ y: -4 }}
+                transition={{ duration: 0.2 }}
                 onClick={() => handleInspect(product)}
-                className="group relative w-full rounded-[32px] overflow-hidden bg-[#0c0d10] border border-white/[0.09] shadow-xl hover:shadow-2xl hover:border-white/20 transition-all duration-300 cursor-pointer flex flex-col justify-between p-5 select-none text-left"
+                className="group relative w-full aspect-[4/5] sm:aspect-[3/4] min-h-[380px] sm:min-h-[400px] flex flex-col justify-between rounded-[24px] overflow-hidden bg-neutral-950 border border-black/10 dark:border-white/15 shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer p-4 select-none"
               >
-                {/* 1. DOMINANT PRODUCT VISUAL (Apple Style "1 Big Element") */}
-                <div className="relative w-full aspect-[16/11] rounded-[24px] overflow-hidden bg-[#16171c] border border-white/[0.06] mb-4">
+                {/* 1. LARGE PRODUCT PHOTO COVERING MOST OF THE CARD */}
+                <div className="absolute inset-0 w-full h-full overflow-hidden bg-neutral-900 pointer-events-none">
                   {imgUrl ? (
                     <img
                       src={imgUrl}
                       alt={product.title || product.name || "Equipment"}
-                      className="w-full h-full object-cover object-center transition-transform duration-700 ease-out group-hover:scale-106 pointer-events-none"
+                      className="w-full h-full object-cover object-center transition-transform duration-500 ease-out group-hover:scale-104 pointer-events-none"
                       loading="lazy"
                     />
                   ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground/40 p-6 text-center bg-[#15161a]">
-                      <Package className="h-12 w-12 mb-2 opacity-30 text-neutral-400" />
-                      <span className="text-xs font-semibold text-neutral-500">No image uploaded</span>
+                    <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground/40 p-6 text-center bg-neutral-900">
+                      <Package className="h-10 w-10 mb-2 opacity-40 text-neutral-400" />
+                      <span className="text-xs font-semibold text-neutral-400">No image uploaded</span>
                     </div>
                   )}
 
-                  {/* Subtle dark gradient overlay near bottom of image */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#0c0d10] via-transparent to-transparent opacity-80 pointer-events-none" />
+                  {/* Dark gradient overlay near the bottom of the image for text readability */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/55 via-45% to-transparent pointer-events-none" />
+                </div>
 
-                  {/* FLOATING TOP BADGES & ACTIONS */}
-                  <div className="absolute top-3 inset-x-3 flex items-center justify-between gap-2 pointer-events-auto z-10">
+                {/* 2. TOP METADATA & ACTIONS */}
+                <div className="relative z-10 flex items-start justify-between gap-2 pointer-events-auto">
+                  <div className="flex flex-col gap-1.5">
+                    {/* Top-left row: Availability + Rating + Video */}
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      {/* Status badge */}
-                      {getStatusBadge(product.verificationStatus, product.status)}
-
-                      {/* Availability pill */}
+                      {/* Availability badge at top-left */}
                       {isPaused ? (
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-black/70 backdrop-blur-md px-2.5 py-0.5 text-[10px] font-bold text-amber-400 border border-amber-500/30 shadow-md">
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-black/60 backdrop-blur-md px-2.5 py-0.5 text-[10px] font-bold text-amber-400 border border-amber-500/30 shadow-sm">
                           <Clock className="h-3 w-3 text-amber-400" />
                           <span>Paused</span>
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-black/60 backdrop-blur-md px-2.5 py-0.5 text-[10px] font-bold text-emerald-400 border border-emerald-500/30 shadow-md">
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-black/60 backdrop-blur-md px-2.5 py-0.5 text-[10px] font-bold text-emerald-400 border border-emerald-500/30 shadow-sm">
                           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
                           <span>Available</span>
                         </span>
                       )}
 
-                      {/* Genuine rating badge (only if exists) */}
-                      {product.rating && (
+                      {/* Genuine rating badge beside availability (only if genuine rating exists) */}
+                      {product.rating && Number(product.rating) > 0 && (
                         <div className="flex items-center gap-1 bg-black/60 backdrop-blur-md text-white text-[10px] font-bold px-2 py-0.5 rounded-full border border-white/15 shadow-sm">
-                          <Sparkles className="h-3 w-3 fill-amber-400 text-amber-400" />
+                          <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
                           <span>{Number(product.rating).toFixed(1)}</span>
                         </div>
                       )}
@@ -359,103 +358,28 @@ export function MyProducts({
                       {hasVideo && (
                         <div
                           className="flex items-center gap-1 bg-sky-500/25 backdrop-blur-md text-sky-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-sky-400/40 shadow-sm"
-                          title="10s Inspection Video Stored"
+                          title="10s Inspection Video Available"
                         >
                           <Video className="h-3 w-3 text-sky-400" />
                           <span>Video</span>
                         </div>
                       )}
-
-                      {/* Multiple Photos count badge */}
-                      {galleryCount > 1 && (
-                        <div
-                          className="flex items-center gap-1 bg-black/60 backdrop-blur-md text-neutral-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-white/15 shadow-sm"
-                          title={`${galleryCount} Photos Available`}
-                        >
-                          <Layers className="h-3 w-3 text-neutral-300" />
-                          <span>{galleryCount}</span>
-                        </div>
-                      )}
                     </div>
 
-                    {/* Isolated Delete Button */}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        setProductToDelete(product);
-                      }}
-                      className="h-8 w-8 rounded-full bg-black/60 hover:bg-destructive text-neutral-400 hover:text-white border border-white/15 flex items-center justify-center transition-all cursor-pointer shadow-md shrink-0 active:scale-95"
-                      title="Delete Equipment Listing"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* 2. EDITORIAL TYPOGRAPHY & DETAILS (Apple Presentation Style) */}
-                <div className="space-y-2.5 flex-1 flex flex-col justify-between">
-                  <div>
-                    {/* Eyebrow: Brand & Category + Location */}
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-[11px] font-semibold uppercase tracking-widest text-neutral-400 font-sans truncate">
-                        {brandLabel}
-                      </span>
-                      {locCity && (
-                        <span
-                          title={locCity}
-                          className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/[0.07] text-neutral-300 text-[10px] font-medium border border-white/[0.08] truncate max-w-[140px]"
-                        >
-                          <MapPin className="h-2.5 w-2.5 text-sky-400 shrink-0" />
-                          <span className="truncate">{locCity}</span>
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Bold Title */}
-                    <h3
-                      className="font-extrabold text-xl sm:text-2xl text-white tracking-tight leading-tight line-clamp-1 font-display group-hover:text-sky-300 transition-colors mt-0.5"
-                      title={product.title || product.name}
-                    >
-                      {product.title || product.name || "Untitled Equipment"}
-                    </h3>
-
-                    {/* Accent Daily Price */}
-                    <div className="mt-1 flex items-baseline gap-1">
-                      <span className="text-sky-400 font-mono font-black text-xl tracking-tight">
-                        ₹{Number(dailyRate).toLocaleString("en-IN")}
-                      </span>
-                      <span className="text-xs text-neutral-400 font-normal font-sans">
-                        /day
-                      </span>
-                    </div>
-
-                    {/* Editorial Description Paragraph */}
-                    <p className="text-xs text-neutral-300/80 leading-relaxed line-clamp-2 mt-1.5 min-h-[2.25rem]">
-                      {product.description ||
-                        `Professional-grade ${product.title || "equipment"} prepared and maintained for high-performance rental handovers.`}
-                    </p>
+                    {/* Gallery count badge below the top badges */}
+                    {galleryCount > 1 && (
+                      <div
+                        className="inline-flex items-center gap-1 bg-black/60 backdrop-blur-md text-neutral-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-white/15 shadow-sm w-fit"
+                        title={`${galleryCount} Photos Available`}
+                      >
+                        <Layers className="h-3 w-3 text-neutral-300" />
+                        <span>{galleryCount} photos</span>
+                      </div>
+                    )}
                   </div>
 
-                  {/* 3. PROMINENT APPLE-STYLE ACTION CONTROLS */}
-                  <div className="pt-3 border-t border-white/[0.08] flex items-center gap-2 mt-2 pointer-events-auto">
-                    {/* Primary Button: Apple-style bold blue pill ("Add to Bag" equivalent) */}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        handleInspect(product);
-                      }}
-                      className="flex-1 bg-[#0071e3] hover:bg-[#0077ed] text-white font-bold text-xs py-2.5 px-4 rounded-full shadow-lg shadow-blue-500/20 active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                      title="Inspect full equipment details"
-                    >
-                      <Eye className="h-3.5 w-3.5 text-white" />
-                      <span>Inspect Details</span>
-                    </button>
-
-                    {/* Secondary Button: Sleek frosted glass pill ("Edit") */}
+                  {/* Top-right vendor management buttons (Edit & Delete) */}
+                  <div className="flex items-center gap-1.5">
                     <button
                       type="button"
                       onClick={(e) => {
@@ -463,11 +387,84 @@ export function MyProducts({
                         e.preventDefault();
                         handleEdit(product);
                       }}
-                      className="bg-white/10 hover:bg-white/20 text-white font-semibold text-xs py-2.5 px-4 rounded-full border border-white/15 active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
-                      title="Edit equipment specifications"
+                      className="h-8 w-8 rounded-full bg-black/60 hover:bg-black/90 backdrop-blur-md text-white/90 hover:text-white transition-all shadow-md border border-white/15 flex items-center justify-center cursor-pointer active:scale-95"
+                      title="Edit Equipment Listing"
                     >
-                      <Edit3 className="h-3.5 w-3.5 text-neutral-300" />
-                      <span>Edit</span>
+                      <Edit3 className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        setProductToDelete(product);
+                      }}
+                      className="h-8 w-8 rounded-full bg-black/60 hover:bg-destructive text-neutral-300 hover:text-white backdrop-blur-md transition-all shadow-md border border-white/15 flex items-center justify-center cursor-pointer active:scale-95"
+                      title="Delete Equipment Listing"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* 3. BOTTOM OVERLAY: CATEGORY, LOCATION, TITLE, DESCRIPTION, PRICE & ACTION */}
+                <div className="relative z-10 space-y-1.5 mt-auto text-left pointer-events-auto">
+                  {/* Category badge and location badge near bottom of image */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/20 backdrop-blur-md text-white text-[10px] font-bold uppercase tracking-wider border border-white/15">
+                      <Tag className="h-2.5 w-2.5 text-emerald-400" />
+                      <span>{product.category || "Gear"}</span>
+                    </span>
+                    {locCity && (
+                      <span
+                        title={locCity}
+                        className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-black/50 backdrop-blur-md text-white text-[11px] font-medium border border-white/15 truncate max-w-[150px]"
+                      >
+                        <MapPin className="h-2.5 w-2.5 text-sky-400 shrink-0" />
+                        <span className="truncate">{locCity}</span>
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Product title immediately below category/location row */}
+                  <h3
+                    className="font-bold text-base sm:text-lg leading-snug line-clamp-1 text-white drop-shadow-sm font-display group-hover:text-primary transition-colors mt-1"
+                    title={product.title || product.name}
+                  >
+                    {product.title || product.name || "Untitled Equipment"}
+                  </h3>
+
+                  {/* Short description below title (max 2 lines) */}
+                  <p className="text-xs text-white/75 line-clamp-2 leading-relaxed">
+                    {product.description || `High-performance ${product.title || "gear"} available for peer-to-peer rental.`}
+                  </p>
+
+                  {/* Daily rental price and action button in a clearly organized bottom row */}
+                  <div className="pt-2.5 border-t border-white/15 flex items-center justify-between gap-3 mt-1">
+                    <div>
+                      <span className="text-[9px] uppercase font-bold tracking-wider text-white/60 block">
+                        Daily Rate
+                      </span>
+                      <div className="text-base sm:text-lg font-black tracking-tight font-mono text-white leading-none mt-0.5">
+                        ₹{Number(dailyRate).toLocaleString("en-IN")}
+                        <span className="text-[11px] font-normal text-white/70 ml-0.5 font-sans">/day</span>
+                      </div>
+                    </div>
+
+                    {/* Single, well-aligned primary action button */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        handleInspect(product);
+                      }}
+                      className="rounded-full py-1.5 px-4 text-xs font-bold inline-flex items-center justify-center gap-1.5 shadow-md backdrop-blur-md bg-blue-600 hover:bg-blue-500 text-white border border-blue-400/30 transition-all cursor-pointer active:scale-95 shrink-0"
+                      title="Inspect full equipment details"
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                      <span>Inspect</span>
+                      <ArrowRight className="h-3 w-3 text-white/70" />
                     </button>
                   </div>
                 </div>
