@@ -77,7 +77,7 @@ class TestVendorProductEdit(unittest.TestCase):
         except Exception:
             pass
 
-    def _create_test_product(self, prod_id: str, owner_id: str, owner_email: str, status="under_review", security_deposit=1200):
+    def _create_test_product(self, prod_id: str, owner_id: str, owner_email: str, status="under_review", security_deposit=1200, daily_rate=1500):
         initial_images = ["https://images.unsplash.com/photo-1516035069371-29a1b244cc32", "https://images.unsplash.com/photo-1502920917128-1aa500764cbd"]
         try:
             execute_query("""
@@ -89,11 +89,11 @@ class TestVendorProductEdit(unittest.TestCase):
                 ) VALUES (
                     %s, %s, %s, 'Authorized Vendor One', 'Cameras', 'Canon EOS R5', 'Canon EOS R5 Mirrorless Camera', 'Canon', 'EOS R5',
                     'Original test description for Canon R5.', '8K Raw Video', 'Like New', '{\"grade\":\"Like New\"}', 'Visakhapatnam', 'MVP Colony', '530017',
-                    'Pickup at studio lobby with ID', 1500, %s, 1, 'available',
+                    'Pickup at studio lobby with ID', %s, %s, 1, 'available',
                     %s, %s, '889900', %s, NOW(), NOW()
                 )
             """, (
-                prod_id, owner_id, owner_email, security_deposit,
+                prod_id, owner_id, owner_email, daily_rate, security_deposit,
                 initial_images[0], json.dumps(initial_images), status
             ))
 
@@ -101,10 +101,10 @@ class TestVendorProductEdit(unittest.TestCase):
                 INSERT INTO custom_products (
                     id, user_email, title, description, price, image, category, available, status, images, created_at
                 ) VALUES (
-                    %s, %s, 'Canon EOS R5 Mirrorless Camera', 'Original test description for Canon R5.', 1500, %s, 'Cameras', 1, %s, %s, NOW()
+                    %s, %s, 'Canon EOS R5 Mirrorless Camera', 'Original test description for Canon R5.', %s, %s, 'Cameras', 1, %s, %s, NOW()
                 )
             """, (
-                prod_id, owner_email, initial_images[0], status, json.dumps(initial_images)
+                prod_id, owner_email, daily_rate, initial_images[0], status, json.dumps(initial_images)
             ))
         except Exception:
             pass
@@ -120,7 +120,7 @@ class TestVendorProductEdit(unittest.TestCase):
             "brand": "Canon",
             "model": "EOS R5",
             "description": "Original test description for Canon R5.",
-            "daily_rate": 1500,
+            "daily_rate": daily_rate,
             "security_deposit": security_deposit,
             "available": True,
             "availability_status": "available",
@@ -550,6 +550,114 @@ class TestVendorProductEdit(unittest.TestCase):
             self.assertEqual(res.status_code, 500)
             self.assertIn("persistence failed", res.json()["detail"].lower())
             fake_conn.rollback.assert_called_once()
+
+    # 21. Daily rate response mapping and canonical aliases
+    def test_21_daily_rate_response_mapping_and_aliases(self):
+        prod_id = f"p_rate_{uuid.uuid4().hex[:6]}"
+        self._create_test_product(prod_id, self.vendor1_id, self.vendor1_email)
+
+        res = self.client.get(
+            f"/api/payernt/products/{prod_id}",
+            headers=self.vendor1_headers
+        )
+        self.assertEqual(res.status_code, 200)
+        prod = res.json()["product"]
+
+        # Canonical aliases must all match the actual saved daily rate (1500)
+        self.assertEqual(prod["daily_rate"], 1500)
+        self.assertEqual(prod["dailyRate"], 1500)
+        self.assertEqual(prod["price"], 1500)
+        self.assertEqual(prod["pricePerDay"], 1500)
+        self.assertIsNotNone(prod.get("pricing"))
+        self.assertEqual(prod["pricing"]["daily"], 1500)
+        self.assertEqual(prod["pricing"]["dailyRate"], 1500)
+        self.assertEqual(prod["pricing"]["weekly"], round(1500 * 7 * 0.85))
+        self.assertEqual(prod["pricing"]["monthly"], round(1500 * 30 * 0.70))
+
+    # 22. Daily rate persists across edits and reloads
+    def test_22_daily_rate_persists_across_edits(self):
+        prod_id = f"p_rate_{uuid.uuid4().hex[:6]}"
+        self._create_test_product(prod_id, self.vendor1_id, self.vendor1_email)
+
+        # Update using pricePerDay alias (as sent by frontend rental rate edit)
+        patch_res = self.client.patch(
+            f"/api/payernt/products/{prod_id}",
+            json={
+                "price": 2400,
+                "daily_rate": 2400,
+                "dailyRate": 2400,
+                "pricePerDay": 2400,
+                "pricing": {"daily": 2400}
+            },
+            headers=self.vendor1_headers
+        )
+        self.assertEqual(patch_res.status_code, 200)
+        updated = patch_res.json()["product"]
+        self.assertEqual(updated["daily_rate"], 2400)
+        self.assertEqual(updated["dailyRate"], 2400)
+        self.assertEqual(updated["pricePerDay"], 2400)
+        self.assertEqual(updated["price"], 2400)
+        self.assertEqual(updated["pricing"]["daily"], 2400)
+
+        # Verify DB reload matches persisted value
+        reloaded = get_payernt_product_by_id(prod_id, include_pin=False)
+        self.assertIsNotNone(reloaded)
+        self.assertEqual(reloaded["daily_rate"], 2400)
+        self.assertEqual(reloaded["dailyRate"], 2400)
+        self.assertEqual(reloaded["pricePerDay"], 2400)
+        self.assertEqual(reloaded["price"], 2400)
+        self.assertEqual(reloaded["pricing"]["daily"], 2400)
+
+    # 23. Daily rate of zero is handled honestly when zero is genuinely stored
+    def test_23_daily_rate_zero_handled_honestly(self):
+        prod_id = f"p_zero_{uuid.uuid4().hex[:6]}"
+        # Product genuinely created with daily_rate = 0 in database
+        self._create_test_product(prod_id, self.vendor1_id, self.vendor1_email, daily_rate=0)
+
+        # Direct database fetch
+        db_prod = get_payernt_product_by_id(prod_id, include_pin=False)
+        self.assertIsNotNone(db_prod)
+        self.assertEqual(db_prod["daily_rate"], 0)
+        self.assertEqual(db_prod["dailyRate"], 0)
+        self.assertEqual(db_prod["pricePerDay"], 0)
+        self.assertEqual(db_prod["pricing"]["daily"], 0)
+
+        # GET API endpoint
+        get_res = self.client.get(
+            f"/api/payernt/products/{prod_id}",
+            headers=self.vendor1_headers
+        )
+        self.assertEqual(get_res.status_code, 200)
+        fetched = get_res.json()["product"]
+        self.assertEqual(fetched["daily_rate"], 0)
+        self.assertEqual(fetched["dailyRate"], 0)
+        self.assertEqual(fetched["pricePerDay"], 0)
+        self.assertEqual(fetched["price"], 0)
+        self.assertEqual(fetched["pricing"]["daily"], 0)
+
+    # 24. Missing daily-rate data is not confused with a valid zero
+    def test_24_missing_daily_rate_not_confused_with_zero(self):
+        from payernt_database import _normalize_payernt_product_dict
+        from payernt_router import _sanitize_payernt_product
+
+        # A raw product dictionary missing daily rate
+        raw_missing = {
+            "id": "p_raw_missing",
+            "name": "Lens Cap",
+            "title": "Lens Cap",
+            "category": "Accessories",
+            "daily_rate": None,
+            "dailyRate": None,
+            "price": None,
+            "pricing": None
+        }
+
+        normalized = _normalize_payernt_product_dict(raw_missing)
+        # Should not falsely claim 0 when missing
+        self.assertNotEqual(normalized.get("daily_rate"), 0)
+
+        sanitized = _sanitize_payernt_product(raw_missing)
+        self.assertNotEqual(sanitized.get("daily_rate"), 0)
 
 if __name__ == "__main__":
     unittest.main()

@@ -141,7 +141,37 @@ export function resolveAllProductImages(product: any): string[] {
 }
 
 /**
- * Normalizes a raw product object into a well-formed PayerntProduct with guaranteed image fields.
+ * Safely resolves the numeric daily rental rate from any product shape.
+ * Honors valid zero when genuinely present, while falling back across
+ * canonical aliases (pricing.daily, pricing.dailyRate, daily_rate, dailyRate, price, pricePerDay).
+ */
+export function resolveProductDailyRate(product: any, fallback: number = 0): number {
+  if (!product) return fallback;
+
+  const candidates = [
+    product.pricing?.daily,
+    product.pricing?.dailyRate,
+    product.daily_rate,
+    product.dailyRate,
+    product.price,
+    product.pricePerDay,
+    product.fairMarketPrice,
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate !== undefined && candidate !== null && candidate !== "") {
+      const num = Number(candidate);
+      if (!isNaN(num)) {
+        return num;
+      }
+    }
+  }
+
+  return fallback;
+}
+
+/**
+ * Normalizes a raw product object into a well-formed PayerntProduct with guaranteed image and pricing fields.
  */
 export function normalizePayerntProduct(raw: any): PayerntProduct {
   if (!raw) return raw;
@@ -156,14 +186,31 @@ export function normalizePayerntProduct(raw: any): PayerntProduct {
     isPrimary: idx === 0 || url === primaryImage,
   }));
 
-  const dailyPrice = Number(
-    raw.pricing?.daily ??
-    raw.daily_rate ??
-    raw.dailyRate ??
-    raw.price ??
-    raw.pricePerDay ??
-    raw.fairMarketPrice ??
-    500
+  const dailyPrice = resolveProductDailyRate(raw, 0);
+
+  const weeklyPrice =
+    raw.pricing?.weekly !== undefined && raw.pricing?.weekly !== null
+      ? Number(raw.pricing.weekly)
+      : raw.weekly_rate !== undefined && raw.weekly_rate !== null
+      ? Number(raw.weekly_rate)
+      : raw.weeklyRate !== undefined && raw.weeklyRate !== null
+      ? Number(raw.weeklyRate)
+      : Math.round(dailyPrice * 7 * 0.85);
+
+  const monthlyPrice =
+    raw.pricing?.monthly !== undefined && raw.pricing?.monthly !== null
+      ? Number(raw.pricing.monthly)
+      : raw.monthly_rate !== undefined && raw.monthly_rate !== null
+      ? Number(raw.monthly_rate)
+      : raw.monthlyRate !== undefined && raw.monthlyRate !== null
+      ? Number(raw.monthlyRate)
+      : Math.round(dailyPrice * 30 * 0.7);
+
+  const deposit = Number(
+    raw.pricing?.securityDeposit ??
+    raw.security_deposit ??
+    raw.securityDeposit ??
+    0
   );
 
   return {
@@ -174,15 +221,18 @@ export function normalizePayerntProduct(raw: any): PayerntProduct {
     images: allImages,
     photos: photos.length > 0 ? photos : (raw.photos || []),
     pricing: {
-      daily: dailyPrice,
-      weekly: raw.pricing?.weekly ?? (raw.weekly_rate ? Number(raw.weekly_rate) : Math.round(dailyPrice * 7 * 0.85)),
-      monthly: raw.pricing?.monthly ?? (raw.monthly_rate ? Number(raw.monthly_rate) : Math.round(dailyPrice * 30 * 0.7)),
-      securityDeposit: 0,
-      minimumRentalDays: raw.pricing?.minimumRentalDays ?? raw.min_rental_days ?? 1,
       ...raw.pricing,
+      daily: dailyPrice,
+      weekly: weeklyPrice,
+      monthly: monthlyPrice,
+      securityDeposit: deposit,
+      minimumRentalDays: raw.pricing?.minimumRentalDays ?? raw.min_rental_days ?? 1,
     },
     price: dailyPrice,
     daily_rate: dailyPrice,
     dailyRate: dailyPrice,
+    pricePerDay: dailyPrice,
+    security_deposit: deposit,
+    securityDeposit: deposit,
   };
 }

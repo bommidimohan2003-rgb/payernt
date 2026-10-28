@@ -1298,13 +1298,32 @@ def _normalize_payernt_product_dict(row: Dict[str, Any], include_pin: bool = Fal
     clean["full_day_slot_enabled"] = bool(clean.get("full_day_slot_enabled", True))
     clean["fullDaySlotEnabled"] = clean["full_day_slot_enabled"]
 
-    daily = int(float(clean.get("daily_rate") or clean.get("price") or 2499))
-    half_day = clean.get("half_day_rate") or round(daily * 0.6)
+    raw_daily = clean.get("daily_rate") if clean.get("daily_rate") is not None else clean.get("dailyRate") if clean.get("dailyRate") is not None else clean.get("price") if clean.get("price") is not None else clean.get("pricePerDay")
+    daily = int(float(raw_daily)) if raw_daily is not None else 2499
+    half_day = clean.get("half_day_rate") if clean.get("half_day_rate") is not None else clean.get("halfDayRate") if clean.get("halfDayRate") is not None else round(daily * 0.6)
     clean["daily_rate"] = daily
+    clean["dailyRate"] = daily
+    clean["price"] = daily
+    clean["pricePerDay"] = daily
     clean["half_day_rate"] = int(half_day)
     clean["halfDayRate"] = int(half_day)
-    clean["buffer_minutes"] = int(clean.get("buffer_minutes") or 60)
+    clean["buffer_minutes"] = int(clean.get("buffer_minutes") if clean.get("buffer_minutes") is not None else 60)
     clean["bufferMinutes"] = clean["buffer_minutes"]
+
+    pricing_dict = clean.get("pricing") if isinstance(clean.get("pricing"), dict) else {}
+    weekly = int(clean.get("weekly_rate") if clean.get("weekly_rate") is not None else clean.get("weeklyRate") if clean.get("weeklyRate") is not None else pricing_dict.get("weekly") if pricing_dict.get("weekly") is not None else round(daily * 7 * 0.85))
+    monthly = int(clean.get("monthly_rate") if clean.get("monthly_rate") is not None else clean.get("monthlyRate") if clean.get("monthlyRate") is not None else pricing_dict.get("monthly") if pricing_dict.get("monthly") is not None else round(daily * 30 * 0.7))
+    deposit = int(clean.get("security_deposit") if clean.get("security_deposit") is not None else clean.get("securityDeposit") if clean.get("securityDeposit") is not None else pricing_dict.get("securityDeposit") if pricing_dict.get("securityDeposit") is not None else 0)
+    clean["security_deposit"] = deposit
+    clean["securityDeposit"] = deposit
+    clean["pricing"] = {
+        "daily": daily,
+        "dailyRate": daily,
+        "weekly": weekly,
+        "monthly": monthly,
+        "securityDeposit": deposit,
+        "minimumRentalDays": int(clean.get("min_rental_days") or 1)
+    }
 
     if not clean.get("availability") or not isinstance(clean.get("availability"), dict):
         clean["availability"] = {

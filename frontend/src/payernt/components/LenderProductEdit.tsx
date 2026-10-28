@@ -23,7 +23,7 @@ import {
 import { toast } from "sonner";
 import { usePayernt } from "../context";
 import type { PayerntProduct, VerificationStatus } from "../types";
-import { resolveProductImageUrl } from "../productUtils";
+import { resolveProductImageUrl, resolveProductDailyRate } from "../productUtils";
 import { uploadImageToCloudinary } from "@/utils/cloudinary";
 import { CameraCaptureModal } from "@/components/lender/CameraCaptureModal";
 import payerntApi from "../payerntApiService";
@@ -108,7 +108,7 @@ export function LenderProductEdit({ productId: propId }: { productId?: string })
 
   // Populate form from product
   const populateForm = (p: PayerntProduct) => {
-    const daily = p.pricing?.daily ?? (p as any).daily_rate ?? (p as any).dailyRate ?? p.price ?? 500;
+    const daily = resolveProductDailyRate(p, 500);
     const weekly = p.pricing?.weekly ?? (p as any).weekly_rate ?? (p as any).weeklyRate ?? "";
     const depositVal = p.pricing?.securityDeposit ?? (p as any).security_deposit ?? 0;
     const condGrade = typeof p.condition === "object" ? p.condition?.grade || "Like New" : p.condition || "Like New";
@@ -317,6 +317,7 @@ export function LenderProductEdit({ productId: propId }: { productId?: string })
         price: priceNum,
         daily_rate: priceNum,
         dailyRate: priceNum,
+        pricePerDay: priceNum,
         pricing: {
           ...product.pricing,
           daily: priceNum,

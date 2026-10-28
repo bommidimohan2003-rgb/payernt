@@ -22,6 +22,7 @@ import type {
   DemoUser,
   PayerntMessage,
 } from "../types";
+import { resolveProductDailyRate } from "../productUtils";
 
 export interface PayerntHomeProps {
   stats: {
@@ -416,7 +417,7 @@ export function PayerntHome({
                     </div>
                   </div>
                   <span className="text-xs font-bold text-neutral-900 dark:text-white shrink-0">
-                    ₹{(p.dailyRate ?? p.daily_rate ?? (p as any).pricePerDay ?? p.price ?? p.pricing?.daily ?? 0)}/d
+                    ₹{resolveProductDailyRate(p, 0).toLocaleString("en-IN")}/d
                   </span>
                 </div>
               ))}
@@ -905,7 +906,7 @@ export function PayerntHome({
                           {p.title}
                         </span>
                         <span className="text-xs font-bold text-neutral-600 dark:text-neutral-300">
-                          ₹{(p.dailyRate ?? p.daily_rate ?? (p as any).pricePerDay ?? p.price ?? p.pricing?.daily ?? 0)}/d
+                          ₹{resolveProductDailyRate(p, 0).toLocaleString("en-IN")}/d
                         </span>
                       </div>
                     ))}

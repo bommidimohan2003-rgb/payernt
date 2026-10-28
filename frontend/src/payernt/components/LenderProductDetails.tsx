@@ -31,7 +31,7 @@ import { getOptimizedImageUrl } from "@/utils/images";
 import type { PayerntProduct } from "../types";
 import payerntApi from "../payerntApiService";
 import { VendorAvailabilityCalendar } from "./VendorAvailabilityCalendar";
-import { resolveProductImageUrl } from "../productUtils";
+import { resolveProductImageUrl, resolveProductDailyRate, normalizePayerntProduct } from "../productUtils";
 
 export function LenderProductDetails({ productId: propId }: { productId?: string }) {
   const navigate = useNavigate();
@@ -82,8 +82,9 @@ export function LenderProductDetails({ productId: propId }: { productId?: string
     );
 
     if (found) {
-      setProduct(found);
-      const rate = found.pricing?.daily ?? (found as any).daily_rate ?? found.pricePerDay ?? found.fairMarketPrice ?? 500;
+      const canonical = normalizePayerntProduct(found);
+      setProduct(canonical);
+      const rate = resolveProductDailyRate(canonical, 0);
       setNewPrice(String(rate));
       setIsLoadingProduct(false);
     } else {
@@ -92,8 +93,9 @@ export function LenderProductDetails({ productId: propId }: { productId?: string
         .getProductById(productId)
         .then((res) => {
           if (res.success && res.product) {
-            setProduct(res.product);
-            const rate = res.product.pricing?.daily ?? (res.product as any).daily_rate ?? res.product.pricePerDay ?? res.product.fairMarketPrice ?? 500;
+            const canonical = normalizePayerntProduct(res.product);
+            setProduct(canonical);
+            const rate = resolveProductDailyRate(canonical, 0);
             setNewPrice(String(rate));
           }
         })
@@ -154,18 +156,32 @@ export function LenderProductDetails({ productId: propId }: { productId?: string
     Boolean(product.isAvailable);
 
   const handlePriceSave = async () => {
+    if (!product) return;
     const val = Number(newPrice);
     if (isNaN(val) || val <= 0) {
-      toast.error("Please enter a valid price amount.");
+      toast.error("Please enter a valid price amount greater than 0.");
       return;
     }
-    const res = await updateProduct(product.id, { pricePerDay: val, fairMarketPrice: val });
-    if (res && !res.success) {
-      toast.error(res.error || "Failed to update daily rate.");
-      return;
+    const updates = {
+      price: val,
+      daily_rate: val,
+      dailyRate: val,
+      pricePerDay: val,
+      pricing: {
+        ...product.pricing,
+        daily: val,
+      },
+    };
+    const res = await updateProduct(product.id, updates);
+    if (res && res.success) {
+      const nextProduct = res.product ? normalizePayerntProduct(res.product) : { ...product, ...updates };
+      setProduct(nextProduct);
+      setNewPrice(String(resolveProductDailyRate(nextProduct, val)));
+      setIsEditingPrice(false);
+      toast.success(`Updated daily rental rate to ₹${val.toLocaleString("en-IN")}`);
+    } else {
+      toast.error(res?.error || "Failed to update daily rate.");
     }
-    setIsEditingPrice(false);
-    toast.success(`Updated daily rental rate to ₹${val.toLocaleString("en-IN")}`);
   };
 
   const handleDelete = () => {
@@ -492,7 +508,7 @@ export function LenderProductDetails({ productId: propId }: { productId?: string
             {!isEditingPrice ? (
               <div className="flex items-baseline gap-1.5">
                 <span className="text-3xl font-black text-foreground font-display">
-                  ₹{Number(product.pricePerDay || product.fairMarketPrice || 0).toLocaleString("en-IN")}
+                  ₹{resolveProductDailyRate(product, 0).toLocaleString("en-IN")}
                 </span>
                 <span className="text-xs text-muted-foreground font-semibold">/ day</span>
               </div>
@@ -523,25 +539,25 @@ export function LenderProductDetails({ productId: propId }: { productId?: string
               <div className="flex justify-between">
                 <span>Weekly Rate</span>
                 <span className="font-bold text-foreground">
-                  ₹{Number(product.pricing?.weekly || (product as any).weekly_rate || Math.round(Number(product.pricing?.daily || (product as any).daily_rate || product.price || 500) * 7 * 0.85)).toLocaleString("en-IN")}
+                  ₹{Number(product.pricing?.weekly ?? (product as any).weekly_rate ?? (product as any).weeklyRate ?? Math.round(resolveProductDailyRate(product, 0) * 7 * 0.85)).toLocaleString("en-IN")}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span>Monthly Rate</span>
                 <span className="font-bold text-foreground">
-                  ₹{Number(product.pricing?.monthly || (product as any).monthly_rate || Math.round(Number(product.pricing?.daily || (product as any).daily_rate || product.price || 500) * 30 * 0.7)).toLocaleString("en-IN")}
+                  ₹{Number(product.pricing?.monthly ?? (product as any).monthly_rate ?? (product as any).monthlyRate ?? Math.round(resolveProductDailyRate(product, 0) * 30 * 0.7)).toLocaleString("en-IN")}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span>Security Deposit</span>
                 <span className="font-bold text-foreground">
-                  ₹{Number(product.securityDeposit || 0).toLocaleString("en-IN")}
+                  ₹{Number(product.pricing?.securityDeposit ?? product.securityDeposit ?? (product as any).security_deposit ?? 0).toLocaleString("en-IN")}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span>Replacement Value</span>
                 <span className="font-bold text-foreground">
-                  ₹{Number(product.fairMarketPrice || product.replacementValue || 0).toLocaleString("en-IN")}
+                  ₹{Number(product.replacementValue ?? product.fairMarketPrice ?? 0).toLocaleString("en-IN")}
                 </span>
               </div>
               <div className="flex justify-between">
@@ -613,7 +629,7 @@ export function LenderProductDetails({ productId: propId }: { productId?: string
                       </span>
                       <input
                         type="number"
-                        placeholder={String(Math.round(Number(product.pricePerDay || product.fairMarketPrice || 0) * 0.6))}
+                        placeholder={String(Math.round(resolveProductDailyRate(product, 0) * 0.6))}
                         value={halfDayRate}
                         onChange={(e) => setHalfDayRate(e.target.value)}
                         className="w-full pl-6 pr-3 py-1.5 rounded-lg border border-border bg-background text-xs font-bold text-foreground focus:outline-none focus:ring-1 focus:ring-primary"

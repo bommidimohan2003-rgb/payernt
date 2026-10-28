@@ -26,7 +26,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import type { PayerntProduct, VerificationStatus } from "../types";
-import { resolveProductImageUrl } from "../productUtils";
+import { resolveProductImageUrl, resolveProductDailyRate } from "../productUtils";
 
 export interface MyProductsProps {
   products: PayerntProduct[];
@@ -283,12 +283,7 @@ export function MyProducts({
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
           {filteredProducts.map((product) => {
-            const dailyRate =
-              product.pricing?.daily ??
-              (product as any).daily_rate ??
-              (product as any).dailyRate ??
-              product.price ??
-              500;
+            const dailyRate = resolveProductDailyRate(product, 0);
             const locCity =
               typeof product.location === "object"
                 ? product.location?.city || product.location?.area || "Visakhapatnam"
@@ -498,7 +493,7 @@ export function MyProducts({
                   {productToDelete.title || productToDelete.name}
                 </span>
                 <span className="text-[11px] font-mono text-muted-foreground block">
-                  ₹{productToDelete.pricing?.daily ?? (productToDelete as any).daily_rate ?? productToDelete.price ?? 500}/day
+                  ₹{resolveProductDailyRate(productToDelete, 0).toLocaleString("en-IN")}/day
                 </span>
               </div>
             </div>

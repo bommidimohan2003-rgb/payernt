@@ -290,6 +290,8 @@ def _sanitize_payernt_product(product: Dict[str, Any], include_pin: bool = False
         if pricing_dict.get("dailyRate") is not None
         else p.get("price")
         if p.get("price") is not None
+        else p.get("pricePerDay")
+        if p.get("pricePerDay") is not None
         else 500
     )
     weekly = int(
@@ -330,10 +332,12 @@ def _sanitize_payernt_product(product: Dict[str, Any], include_pin: bool = False
     p["daily_rate"] = daily
     p["dailyRate"] = daily
     p["price"] = daily
+    p["pricePerDay"] = daily
     p["security_deposit"] = deposit
     p["securityDeposit"] = deposit
     p["pricing"] = {
         "daily": daily,
+        "dailyRate": daily,
         "weekly": weekly,
         "monthly": monthly,
         "securityDeposit": deposit,
