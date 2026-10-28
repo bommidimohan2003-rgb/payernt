@@ -182,9 +182,9 @@ export function LoginForm() {
           fullName: loggedInUser.fullName,
           email: loggedInUser.email,
           role: "admin",
-          status: "active",
-          avatar: loggedInUser.avatar || "",
-          profilePhotoUrl: (loggedInUser as any).profilePhotoUrl || loggedInUser.avatar || "",
+          avatar: loggedInUser.profilePhotoUrl || loggedInUser.profile_photo_url || loggedInUser.avatar || "",
+          profilePhotoUrl: loggedInUser.profilePhotoUrl || loggedInUser.profile_photo_url || loggedInUser.avatar || "",
+          profile_photo_url: loggedInUser.profilePhotoUrl || loggedInUser.profile_photo_url || loggedInUser.avatar || "",
           createdAt: new Date().toISOString(),
         }),
       );

@@ -101,9 +101,11 @@ export async function searchWithML(
                 ? (raw.owner as {
                   name: string;
                   avatar: string;
+                  profilePhotoUrl?: string;
+                  profile_photo_url?: string;
                   rating: number;
                 })
-                : { name: "Payent Lender", avatar: "", rating: 4.9 },
+                : { name: "Payent Lender", avatar: "", profilePhotoUrl: "", profile_photo_url: "", rating: 4.9 },
           };
         });
 

@@ -139,7 +139,7 @@ export default function Agents() {
       render: (row) => (
         <div className="flex items-center gap-3">
           <ProfilePhoto
-            src={row.avatar}
+            src={(row as any).profilePhotoUrl || (row as any).profile_photo_url || row.avatar}
             alt={row.fullName}
             size="sm"
             shape="circle"
@@ -392,7 +392,7 @@ export default function Agents() {
             <div className="flex items-center justify-between border-b border-border/40 pb-4">
               <div className="flex items-center gap-3">
                 <ProfilePhoto
-                  src={selectedAgent.avatar}
+                  src={(selectedAgent as any).profilePhotoUrl || (selectedAgent as any).profile_photo_url || selectedAgent.avatar}
                   alt={selectedAgent.fullName}
                   size="md"
                   shape="circle"

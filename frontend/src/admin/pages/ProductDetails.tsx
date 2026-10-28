@@ -392,7 +392,7 @@ export default function ProductDetails() {
             className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border/80 bg-card hover:bg-muted/60 transition-colors text-xs text-foreground cursor-pointer shadow-2xs"
           >
             <ProfilePhoto
-              src={product.owner?.avatar}
+              src={product.owner?.profilePhotoUrl || (product.owner as any)?.profile_photo_url || product.owner?.avatar}
               alt={product.owner?.name || "Lender"}
               size="xs"
               shape="circle"
@@ -1176,7 +1176,7 @@ export default function ProductDetails() {
             <div className="flex items-center justify-between pb-3 border-b border-border/70">
               <div className="flex items-center gap-3">
                 <ProfilePhoto
-                  src={product.owner?.avatar}
+                  src={product.owner?.profilePhotoUrl || (product.owner as any)?.profile_photo_url || product.owner?.avatar}
                   alt={product.owner?.name || "Lender Profile"}
                   size="md"
                   shape="circle"

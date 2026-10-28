@@ -1196,7 +1196,7 @@ export default function ProductDetails() {
 
                   <div className="flex items-center gap-4 flex-wrap sm:flex-nowrap">
                     <ProfilePhoto
-                      src={product.owner?.avatar}
+                      src={product.owner?.profilePhotoUrl || (product.owner as any)?.profile_photo_url || product.owner?.avatar}
                       alt={product.owner?.name || "Host"}
                       size="xl"
                       shape="circle"

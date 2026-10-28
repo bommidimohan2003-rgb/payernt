@@ -134,6 +134,8 @@ export interface ReviewItem {
   userId: string;
   userName: string;
   userAvatar?: string;
+  userProfilePhotoUrl?: string;
+  user_profile_photo_url?: string;
   userLocation?: string;
   userRole?: string;
   rating: number;

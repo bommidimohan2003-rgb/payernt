@@ -61,6 +61,8 @@ export interface Product {
   owner: {
     name: string;
     avatar: string;
+    profilePhotoUrl?: string;
+    profile_photo_url?: string;
     rating: number;
     email?: string;
     city?: string;
@@ -255,6 +257,8 @@ export interface Conversation {
   updatedAt?: string;
   partner?: string;
   partnerAvatar?: string;
+  partnerProfilePhotoUrl?: string;
+  partner_profile_photo_url?: string;
   lastMessage?: string;
   lastMessageAt?: string;
   unread?: boolean;
@@ -267,6 +271,8 @@ export interface Message {
   id: string;
   from: string;
   avatar: string;
+  profilePhotoUrl?: string;
+  profile_photo_url?: string;
   preview: string;
   time: string;
   unread: boolean;
@@ -276,6 +282,10 @@ export interface Review {
   id: string;
   user: string;
   avatar: string;
+  profilePhotoUrl?: string;
+  profile_photo_url?: string;
+  userProfilePhotoUrl?: string;
+  user_profile_photo_url?: string;
   rating: number;
   comment: string;
   date: string;

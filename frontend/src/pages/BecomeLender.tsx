@@ -288,6 +288,8 @@ export default function BecomeLender() {
         name: user?.fullName || user?.email || "Verified Lender",
         email: user?.email || "",
         avatar: user?.profilePhotoUrl || user?.profile_photo_url || user?.avatar || "",
+        profilePhotoUrl: user?.profilePhotoUrl || user?.profile_photo_url || user?.avatar || "",
+        profile_photo_url: user?.profilePhotoUrl || user?.profile_photo_url || user?.avatar || "",
         rating: 5.0,
         city: ownerCity,
       },

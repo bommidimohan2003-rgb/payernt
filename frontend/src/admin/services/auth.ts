@@ -17,6 +17,8 @@ export const authService = {
         status: "active",
         verified: true,
         avatar: "",
+        profilePhotoUrl: "",
+        profile_photo_url: "",
         createdAt: new Date().toISOString(),
       };
 
@@ -150,9 +152,11 @@ export const authService = {
           status: response.data.status || "active",
           verified: true,
           avatar:
-            response.data.avatar || response.data.profilePhotoUrl || "",
+            response.data.profilePhotoUrl || response.data.profile_photo_url || response.data.avatar || "",
           profilePhotoUrl:
-            response.data.profilePhotoUrl || response.data.avatar || "",
+            response.data.profilePhotoUrl || response.data.profile_photo_url || response.data.avatar || "",
+          profile_photo_url:
+            response.data.profilePhotoUrl || response.data.profile_photo_url || response.data.avatar || "",
           createdAt: response.data.createdAt || response.data.created_at || new Date().toISOString(),
         };
 
@@ -201,7 +205,9 @@ export const authService = {
             role: "admin",
             status: u.status || "active",
             verified: true,
-            avatar: u.profilePhotoUrl || u.avatar || "",
+            avatar: u.profilePhotoUrl || u.profile_photo_url || u.avatar || "",
+            profilePhotoUrl: u.profilePhotoUrl || u.profile_photo_url || u.avatar || "",
+            profile_photo_url: u.profilePhotoUrl || u.profile_photo_url || u.avatar || "",
             createdAt: u.createdAt || new Date().toISOString(),
           };
         }
@@ -224,7 +230,9 @@ export const authService = {
             role: "admin",
             status: u.status || "active",
             verified: true,
-            avatar: u.profilePhotoUrl || u.avatar || "",
+            avatar: u.profilePhotoUrl || u.profile_photo_url || u.avatar || "",
+            profilePhotoUrl: u.profilePhotoUrl || u.profile_photo_url || u.avatar || "",
+            profile_photo_url: u.profilePhotoUrl || u.profile_photo_url || u.avatar || "",
             createdAt: u.createdAt || new Date().toISOString(),
           };
           localStorage.setItem("payent:admin:current_user", JSON.stringify(adminPayload));
@@ -249,7 +257,9 @@ export const authService = {
             role: "admin",
             status: u.status || "active",
             verified: true,
-            avatar: u.profilePhotoUrl || u.avatar || "",
+            avatar: u.profilePhotoUrl || u.profile_photo_url || u.avatar || "",
+            profilePhotoUrl: u.profilePhotoUrl || u.profile_photo_url || u.avatar || "",
+            profile_photo_url: u.profilePhotoUrl || u.profile_photo_url || u.avatar || "",
             createdAt: u.createdAt || new Date().toISOString(),
           };
           localStorage.setItem("payent:admin:current_user", JSON.stringify(adminPayload));

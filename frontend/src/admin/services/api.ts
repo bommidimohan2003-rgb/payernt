@@ -16,6 +16,7 @@ export interface AdminUser {
   verified: boolean;
   avatar: string;
   profilePhotoUrl?: string;
+  profile_photo_url?: string;
   address?: string;
   city?: string;
   state?: string;
@@ -47,6 +48,8 @@ export interface AdminUser {
     city: string;
     pincode: string;
     avatar: string;
+    profilePhotoUrl?: string;
+    profile_photo_url?: string;
     createdAt: string;
   } | null;
   payrentAccount?: {
@@ -62,6 +65,8 @@ export interface AdminUser {
     address: string;
     pincode: string;
     avatar: string;
+    profilePhotoUrl?: string;
+    profile_photo_url?: string;
     createdAt: string;
   } | null;
   products?: Array<{
@@ -99,6 +104,8 @@ export interface AdminAgent {
   fullName: string;
   email: string;
   avatar: string;
+  profilePhotoUrl?: string;
+  profile_photo_url?: string;
   productsCount: number;
   bookingsCount: number;
   revenue: number;
@@ -176,6 +183,8 @@ export interface AdminProduct {
     id: string;
     name: string;
     avatar: string;
+    profilePhotoUrl?: string;
+    profile_photo_url?: string;
     rating: number;
     email: string;
     phone?: string;
@@ -268,6 +277,10 @@ export interface AdminReview {
   productTitle: string;
   userName: string;
   userAvatar: string;
+  userProfilePhotoUrl?: string;
+  user_profile_photo_url?: string;
+  profilePhotoUrl?: string;
+  profile_photo_url?: string;
   rating: number;
   comment: string;
   hidden: boolean;

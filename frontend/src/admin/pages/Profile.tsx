@@ -174,7 +174,7 @@ export default function Profile() {
           {/* Profile Photo Area */}
           <div className="flex items-center gap-4">
             <ProfilePhoto
-              src={profile?.avatar || (profile as any)?.profilePhotoUrl}
+              src={(profile as any)?.profilePhotoUrl || (profile as any)?.profile_photo_url || profile?.avatar}
               alt={profile?.fullName || "Admin"}
               size="xl"
               shape="circle"

@@ -464,7 +464,7 @@ export default function Reviews() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
                       <ProfilePhoto
-                        src={r.userAvatar}
+                        src={r.userProfilePhotoUrl || r.user_profile_photo_url || r.userAvatar}
                         alt={r.userName}
                         size="md"
                         shape="rounded"

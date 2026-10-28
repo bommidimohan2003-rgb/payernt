@@ -48,6 +48,8 @@ export const INITIAL_REQUESTS: RentalRequest[] = [
     renter: {
       name: "Arjun Verma",
       avatar: "",
+      profilePhotoUrl: "",
+      profile_photo_url: "",
       rating: 4.9,
       completedRentals: 6,
       phone: "+91 98765 43210",
@@ -89,6 +91,8 @@ export const INITIAL_PROFILE: LenderProfile = {
   email: "",
   phone: "",
   avatar: "",
+  profilePhotoUrl: "",
+  profile_photo_url: "",
   city: "",
   area: "",
   address: "",
@@ -233,7 +237,9 @@ export function usePayerntStore() {
         fullName: activeAccount.name,
         email: activeAccount.email,
         phone: activeAccount.phone || "",
-        avatar: activeAccount.avatar || "",
+        avatar: activeAccount.profilePhotoUrl || activeAccount.avatar || "",
+        profilePhotoUrl: activeAccount.profilePhotoUrl || activeAccount.profile_photo_url || activeAccount.avatar || "",
+        profile_photo_url: activeAccount.profilePhotoUrl || activeAccount.profile_photo_url || activeAccount.avatar || "",
         city: activeAccount.address?.split(",")[0]?.trim() || "India",
         role: "Vendor",
       }
@@ -244,6 +250,8 @@ export function usePayerntStore() {
         email: "",
         phone: "",
         avatar: "",
+        profilePhotoUrl: "",
+        profile_photo_url: "",
         city: "",
         role: "Guest",
       };
@@ -308,7 +316,9 @@ export function usePayerntStore() {
       address: account.address,
       pincode: account.pincode,
       aadhaarMasked: aadhaarVal,
-      avatar: account.avatar || prev.avatar,
+      avatar: account.profilePhotoUrl || account.avatar || prev.avatar,
+      profilePhotoUrl: account.profilePhotoUrl || account.profile_photo_url || account.avatar || prev.profilePhotoUrl || "",
+      profile_photo_url: account.profilePhotoUrl || account.profile_photo_url || account.avatar || prev.profile_photo_url || "",
     }));
     window.dispatchEvent(new CustomEvent("paye₹nt_auth_change", { detail: account }));
 
@@ -468,6 +478,8 @@ export function usePayerntStore() {
       renter: {
         name: b.renterName || (b.renterEmail ? b.renterEmail.split("@")[0] : "Verified Renter"),
         avatar: "",
+        profilePhotoUrl: "",
+        profile_photo_url: "",
         rating: 5.0,
         completedRentals: 1,
         phone: "",
@@ -800,7 +812,9 @@ export function usePayerntStore() {
       name: found.fullName || found.name,
       email: found.email,
       phone: found.phone,
-      avatar: found.avatar,
+      avatar: found.profilePhotoUrl || found.avatar || "",
+      profilePhotoUrl: found.profilePhotoUrl || found.profile_photo_url || found.avatar || "",
+      profile_photo_url: found.profilePhotoUrl || found.profile_photo_url || found.avatar || "",
       city: found.city,
     }));
     window.dispatchEvent(new CustomEvent("payent_user_changed", { detail: found }));
@@ -812,7 +826,7 @@ export function usePayerntStore() {
     const ownerId = activeAccount?.accountId || activeUser.id;
     const ownerName = activeAccount?.name || activeUser.fullName || activeUser.name;
     const ownerEmail = activeAccount?.email || activeUser.email;
-    const ownerAvatar = activeAccount?.avatar || activeUser.avatar;
+    const ownerAvatar = activeAccount?.profilePhotoUrl || activeAccount?.profile_photo_url || activeAccount?.avatar || activeUser.profilePhotoUrl || activeUser.profile_photo_url || activeUser.avatar || "";
 
     const finalized: PayerntProduct = {
       ...newProduct,
@@ -825,6 +839,8 @@ export function usePayerntStore() {
         fullName: ownerName,
         email: ownerEmail,
         avatar: ownerAvatar,
+        profilePhotoUrl: ownerAvatar,
+        profile_photo_url: ownerAvatar,
         rating: 5.0,
       },
       verificationStatus: "under_review",

@@ -222,7 +222,8 @@ export function PayerntNavbar({
                   activeAccount?.profilePhotoUrl ||
                   activeAccount?.profile_photo_url ||
                   activeAccount?.avatar ||
-                  (activeUser as any)?.profilePhotoUrl ||
+                  activeUser?.profilePhotoUrl ||
+                  activeUser?.profile_photo_url ||
                   activeUser?.avatar
                 }
                 alt={displayName}

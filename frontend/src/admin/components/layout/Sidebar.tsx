@@ -268,7 +268,7 @@ export function Sidebar() {
                 className="group relative h-9 w-9 rounded-xl overflow-hidden border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-center hover:border-[#3B82F6]/50 transition-colors"
               >
                 <ProfilePhoto
-                  src={currentUser?.avatar}
+                  src={currentUser?.profilePhotoUrl || (currentUser as any)?.profile_photo_url || currentUser?.avatar}
                   alt={currentUser?.fullName || "Admin"}
                   size="sm"
                   shape="rounded"

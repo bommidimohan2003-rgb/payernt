@@ -35,6 +35,8 @@ export interface DemoUser {
   email: string;
   phone: string;
   avatar: string;
+  profilePhotoUrl?: string;
+  profile_photo_url?: string;
   city: string;
   role?: string;
 }
@@ -141,6 +143,8 @@ export interface PayerntProduct {
     name?: string;
     fullName?: string;
     avatar?: string;
+    profilePhotoUrl?: string;
+    profile_photo_url?: string;
     rating?: number;
     email?: string;
   };
@@ -246,6 +250,8 @@ export interface RentalRequest {
   renter: {
     name: string;
     avatar: string;
+    profilePhotoUrl?: string;
+    profile_photo_url?: string;
     rating: number;
     completedRentals: number;
     phone: string;
@@ -409,6 +415,8 @@ export interface PayerntAccount {
   is_approved?: boolean;
   verified?: boolean;
   avatar?: string;
+  profilePhotoUrl?: string;
+  profile_photo_url?: string;
   createdAt: string;
   passwordHash?: string; // Mock password hash for frontend demo
 }
@@ -422,6 +430,8 @@ export interface LenderProfile {
   email: string;
   phone: string;
   avatar: string;
+  profilePhotoUrl?: string;
+  profile_photo_url?: string;
   city: string;
   area: string;
   state?: string;

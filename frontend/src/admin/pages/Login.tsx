@@ -300,6 +300,8 @@ export default function Login() {
                       role: "admin",
                       status: "active",
                       verified: true,
+                      profilePhotoUrl: "",
+                      profile_photo_url: "",
                       avatar: "",
                       createdAt: new Date().toISOString(),
                     };

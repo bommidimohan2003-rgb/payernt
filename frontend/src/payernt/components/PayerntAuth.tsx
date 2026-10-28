@@ -172,8 +172,9 @@ export function PayerntAuth({
                 email: res.account.email,
                 role: "admin",
                 status: "active",
-                verified: true,
-                avatar: res.account.avatar,
+                avatar: res.account.profilePhotoUrl || res.account.profile_photo_url || res.account.avatar || "",
+                profilePhotoUrl: res.account.profilePhotoUrl || res.account.profile_photo_url || res.account.avatar || "",
+                profile_photo_url: res.account.profilePhotoUrl || res.account.profile_photo_url || res.account.avatar || "",
                 createdAt: res.account.createdAt || (res.account as any).created_at || new Date().toISOString(),
               })
             );

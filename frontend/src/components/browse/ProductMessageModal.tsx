@@ -57,7 +57,11 @@ export function ProductMessageModal({
     (product as any)?.user_id ||
     "gear_owner";
   const ownerName = product?.owner?.name || "Equipment Owner";
-  const ownerAvatar = product?.owner?.avatar || "";
+  const ownerPhoto =
+    product?.owner?.profilePhotoUrl ||
+    product?.owner?.profile_photo_url ||
+    product?.owner?.avatar ||
+    "";
 
   const [messageText, setMessageText] = useState("");
   const [messages, setMessages] = useState<ProductMessage[]>([]);
@@ -189,7 +193,7 @@ export function ProductMessageModal({
             <div className="flex items-center gap-3">
               <div className="relative">
                 <ProfilePhoto
-                  src={ownerAvatar}
+                  src={ownerPhoto}
                   alt={ownerName}
                   size="md"
                   shape="circle"

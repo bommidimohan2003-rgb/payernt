@@ -128,7 +128,7 @@ export default function Reviews() {
       render: (row) => (
         <div className="flex items-center gap-2.5">
           <ProfilePhoto
-            src={row.userAvatar}
+            src={(row as any).userProfilePhotoUrl || (row as any).profilePhotoUrl || (row as any).profile_photo_url || row.userAvatar}
             alt={row.userName}
             size="sm"
             shape="circle"

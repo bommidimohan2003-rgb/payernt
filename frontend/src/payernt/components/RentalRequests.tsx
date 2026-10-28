@@ -962,7 +962,11 @@ export function RentalRequests({
 
                         <div className="flex items-center gap-3">
                           <ProfilePhoto
-                            src={req.renter.avatar}
+                            src={
+                              (req.renter as any).profilePhotoUrl ||
+                              (req.renter as any).profile_photo_url ||
+                              req.renter.avatar
+                            }
                             alt={req.renter.name}
                             size="md"
                             shape="circle"

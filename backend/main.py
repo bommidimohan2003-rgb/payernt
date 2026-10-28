@@ -434,7 +434,7 @@ async def custom_cors_and_security_middleware(request: Request, call_next):
         "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com https://cdn.jsdelivr.net https://apis.google.com; "
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com; "
         "font-src 'self' https://fonts.gstatic.com data:; "
-        "img-src 'self' data: blob: https://images.unsplash.com https://ui-avatars.com https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com https://*.razorpay.com; "
+        "img-src 'self' data: blob: https://images.unsplash.com https://res.cloudinary.com https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com https://*.razorpay.com; "
         "connect-src 'self' http://127.0.0.1:* http://localhost:* ws://127.0.0.1:* ws://localhost:* wss://* https://*.razorpay.com https://api.pwnedpasswords.com https://*.googleapis.com; "
         "frame-src 'self' https://api.razorpay.com https://checkout.razorpay.com;"
     )
@@ -565,6 +565,8 @@ class GoogleUserSyncSchema(BaseModel):
     fullName: Optional[str] = None
     full_name: Optional[str] = None
     phone: Optional[str] = ""
+    profile_photo_url: Optional[str] = None
+    profilePhotoUrl: Optional[str] = None
     avatar: Optional[str] = ""
     address: Optional[str] = ""
     city: Optional[str] = ""
@@ -684,7 +686,7 @@ def sync_google_user_to_mysql(data: GoogleUserSyncSchema):
         full_name=name,
         firebase_uid=verified_claims.get("sub") or data.id_token or "",
         phone=data.phone or "",
-        avatar=verified_claims.get("picture") or data.avatar or "",
+        avatar=verified_claims.get("picture") or data.profile_photo_url or data.profilePhotoUrl or data.avatar or "",
         address=data.address or "",
         city=data.city or "",
         pincode=data.pincode or "",

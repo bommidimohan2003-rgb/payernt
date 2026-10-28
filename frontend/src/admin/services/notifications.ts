@@ -194,6 +194,8 @@ export const notificationsService = {
     fullName?: string;
     email?: string;
     phone?: string;
+    profilePhotoUrl?: string;
+    profile_photo_url?: string;
     avatar?: string;
   }): Promise<unknown> {
     const response = await adminApi.post("/profile", data);

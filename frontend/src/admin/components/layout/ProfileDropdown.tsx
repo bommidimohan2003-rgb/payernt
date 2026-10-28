@@ -48,7 +48,7 @@ export function ProfileDropdown() {
         className="flex items-center gap-2.5 p-1 rounded-full hover:bg-secondary transition-colors"
       >
         <ProfilePhoto
-          src={currentUser.avatar || (currentUser as any).profilePhotoUrl}
+          src={(currentUser as any).profilePhotoUrl || (currentUser as any).profile_photo_url || currentUser.avatar}
           alt={currentUser.fullName}
           size="sm"
           shape="circle"

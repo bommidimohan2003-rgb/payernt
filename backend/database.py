@@ -3633,7 +3633,14 @@ def create_custom_product(email: str, product: dict):
     owner_info = product.get("owner") if isinstance(product.get("owner"), dict) else {}
     owner_name = owner_info.get("name") or product.get("owner_name") or clean_email.split("@")[0]
     owner_email = clean_email
-    owner_avatar = owner_info.get("avatar") or product.get("owner_avatar") or ""
+    owner_avatar = (
+        owner_info.get("profilePhotoUrl")
+        or owner_info.get("profile_photo_url")
+        or owner_info.get("avatar")
+        or product.get("owner_profile_photo_url")
+        or product.get("owner_avatar")
+        or ""
+    )
     owner_rating = float(owner_info.get("rating") or product.get("owner_rating") or 5.0)
 
     prod_id = str(product.get("id") or f"p-custom-{int(time.time() * 1000)}")
@@ -3661,6 +3668,8 @@ def create_custom_product(email: str, product: dict):
             "name": owner_name,
             "email": owner_email,
             "avatar": owner_avatar,
+            "profilePhotoUrl": owner_avatar,
+            "profile_photo_url": owner_avatar,
             "rating": owner_rating
         },
         "created_at": created_at
@@ -5518,6 +5527,7 @@ def get_reviews_from_db(
                        r.rating, r.comment, r.is_verified, r.created_at, r.updated_at,
                        u.full_name AS db_user_name, 
                        u.avatar AS db_user_avatar, 
+                       u.profile_photo_url AS db_user_photo, 
                        u.city AS db_user_city, 
                        u.occupation AS db_user_role
                 FROM reviews r
@@ -5532,7 +5542,7 @@ def get_reviews_from_db(
             reviews = []
             for r in rows:
                 user_display = r.get("db_user_name") or r.get("user_name") or "Creator"
-                avatar_url = r.get("db_user_avatar") or r.get("user_avatar") or ""
+                avatar_url = r.get("db_user_photo") or r.get("db_user_avatar") or r.get("user_avatar") or ""
                 reviews.append({
                     "id": r["id"],
                     "productId": r.get("product_id"),
@@ -5549,6 +5559,9 @@ def get_reviews_from_db(
                     "user_name": user_display,
                     "userAvatar": avatar_url,
                     "user_avatar": avatar_url,
+                    "userProfilePhotoUrl": avatar_url,
+                    "user_profile_photo_url": avatar_url,
+                    "profilePhotoUrl": avatar_url,
                     "userLocation": r.get("db_user_city") or r.get("user_location") or "",
                     "userRole": r.get("db_user_role") or r.get("user_role") or "",
                     "rating": int(r.get("rating", 5)),
@@ -7947,6 +7960,8 @@ def get_user_conversations(user_email: str, search: Optional[str] = None) -> Lis
                 "name": counterparty_name,
                 "email": counterparty_email,
                 "avatar": counterparty_avatar,
+                "profilePhotoUrl": counterparty_avatar,
+                "profile_photo_url": counterparty_avatar,
                 "verified": counterparty_verified,
                 "role": "lender" if is_customer else "customer"
             },
@@ -8058,6 +8073,8 @@ def get_conversation_detail(conversation_id: str, current_user_email: str) -> Op
             "name": counterparty_name,
             "email": counterparty_email,
             "avatar": counterparty_avatar,
+            "profilePhotoUrl": counterparty_avatar,
+            "profile_photo_url": counterparty_avatar,
             "phone": counterparty_user.get("phone"),
             "verified": counterparty_verified,
             "role": "lender" if is_customer else "customer"

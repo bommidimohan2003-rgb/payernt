@@ -353,7 +353,7 @@ export default function Users() {
       render: (row) => (
         <div className="flex items-center gap-3">
           <ProfilePhoto
-            src={row.avatar || row.profilePhotoUrl}
+            src={row.profilePhotoUrl || (row as any).profile_photo_url || row.avatar}
             alt={row.fullName}
             size="sm"
             shape="circle"
@@ -691,7 +691,7 @@ export default function Users() {
             <div className="p-5 border-b border-border/60 flex items-center justify-between bg-secondary/30">
               <div className="flex items-center gap-3">
                 <ProfilePhoto
-                  src={selectedUser.avatar || selectedUser.profilePhotoUrl}
+                  src={selectedUser.profilePhotoUrl || (selectedUser as any).profile_photo_url || selectedUser.avatar}
                   alt={selectedUser.fullName}
                   size="md"
                   shape="circle"

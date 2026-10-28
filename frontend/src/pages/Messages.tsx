@@ -886,7 +886,11 @@ export default function Messages() {
                     {/* Counterparty Photo */}
                     <div className="relative shrink-0">
                       <ProfilePhoto
-                        src={activeConversation.counterparty?.avatar}
+                        src={
+                          activeConversation.counterparty?.profilePhotoUrl ||
+                          (activeConversation.counterparty as any)?.profile_photo_url ||
+                          activeConversation.counterparty?.avatar
+                        }
                         alt={activeConversation.counterparty?.name || "User"}
                         size="md"
                         shape="circle"

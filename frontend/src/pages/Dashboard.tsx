@@ -204,7 +204,7 @@ export default function Dashboard() {
       { key: "phone", label: "Phone Number", valid: Boolean(user.phone && user.phone.length >= 10) },
       { key: "city", label: "City & Region", valid: Boolean(user.city) },
       { key: "address", label: "Delivery Address", valid: Boolean(user.address) },
-      { key: "avatar", label: "Profile Photo", valid: isRealProfilePhoto(user.profilePhotoUrl || user.avatar) },
+      { key: "profilePhoto", label: "Profile Photo", valid: isRealProfilePhoto(user.profilePhotoUrl || user.profile_photo_url || user.avatar) },
     ];
     const completed = checks.filter((c) => c.valid).length;
     const percentage = Math.round((completed / checks.length) * 100);
@@ -249,7 +249,7 @@ export default function Dashboard() {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="flex items-center gap-4">
               <ProfilePhoto
-                src={user?.profilePhotoUrl || user?.avatar}
+                src={user?.profilePhotoUrl || user?.profile_photo_url || user?.avatar}
                 alt={user?.fullName || "User"}
                 size="xl"
                 shape="rounded"
