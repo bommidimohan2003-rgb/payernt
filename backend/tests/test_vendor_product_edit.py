@@ -444,5 +444,112 @@ class TestVendorProductEdit(unittest.TestCase):
         if rows:
             self.assertEqual(len(rows), 1)
 
+    # 16. Primary image replacement and gallery persistence
+    def test_16_primary_image_replacement_and_gallery_persistence(self):
+        prod_id = f"p_edit_{uuid.uuid4().hex[:6]}"
+        self._create_test_product(prod_id, self.vendor1_id, self.vendor1_email)
+
+        new_primary = "https://res.cloudinary.com/payernt/image/upload/v1710000001/primary_gear_snap.jpg"
+        new_gallery = [
+            "https://res.cloudinary.com/payernt/image/upload/v1710000002/angle_front.jpg",
+            "https://res.cloudinary.com/payernt/image/upload/v1710000003/angle_side.jpg",
+            "https://res.cloudinary.com/payernt/image/upload/v1710000004/angle_accessories.jpg",
+        ]
+
+        res = self.client.patch(
+            f"/api/payernt/products/{prod_id}",
+            json={
+                "primaryImage": new_primary,
+                "images": new_gallery
+            },
+            headers=self.vendor1_headers
+        )
+        self.assertEqual(res.status_code, 200)
+        prod = res.json()["product"]
+        self.assertEqual(prod["primaryImage"], new_primary)
+        self.assertEqual(len(prod["images"]), 3)
+        self.assertIn(new_gallery[0], prod["images"])
+        self.assertIn(new_gallery[1], prod["images"])
+        self.assertIn(new_gallery[2], prod["images"])
+
+    # 17. PyMySQL list serialization regression test (verifies operand 1241 fix)
+    def test_17_images_passed_as_list_does_not_fail_pymysql_serialization(self):
+        prod_id = f"p_edit_{uuid.uuid4().hex[:6]}"
+        self._create_test_product(prod_id, self.vendor1_id, self.vendor1_email)
+
+        # Multiple URLs in list format
+        gallery_list = [
+            "https://res.cloudinary.com/payernt/image/upload/snap1.jpg",
+            "https://res.cloudinary.com/payernt/image/upload/snap2.jpg"
+        ]
+
+        # Call update_payernt_product directly and via API
+        updated = update_payernt_product(prod_id, self.vendor1_id, {
+            "images": gallery_list,
+            "blocked_dates": ["2026-11-01", "2026-11-02"]
+        })
+        self.assertIsNotNone(updated)
+        self.assertIn("snap1.jpg", str(updated.get("images", "")))
+
+    # 18. Partial image update preserves gallery when only primary changed
+    def test_18_partial_image_update_preserves_gallery_when_only_primary_changed(self):
+        prod_id = f"p_edit_{uuid.uuid4().hex[:6]}"
+        self._create_test_product(prod_id, self.vendor1_id, self.vendor1_email)
+
+        initial = get_payernt_product_by_id(prod_id, include_pin=False)
+        initial_gallery = initial.get("images")
+
+        new_primary = "https://res.cloudinary.com/payernt/image/upload/new_primary_only.jpg"
+        res = self.client.patch(
+            f"/api/payernt/products/{prod_id}",
+            json={"primaryImage": new_primary},
+            headers=self.vendor1_headers
+        )
+        self.assertEqual(res.status_code, 200)
+        prod = res.json()["product"]
+        self.assertEqual(prod["primaryImage"], new_primary)
+        # Existing gallery should be preserved
+        self.assertIsNotNone(prod.get("images"))
+        self.assertGreaterEqual(len(prod.get("images", [])), 1)
+
+    # 19. Gallery update preserves primary image
+    def test_19_gallery_update_preserves_primary_image(self):
+        prod_id = f"p_edit_{uuid.uuid4().hex[:6]}"
+        self._create_test_product(prod_id, self.vendor1_id, self.vendor1_email)
+
+        initial = get_payernt_product_by_id(prod_id, include_pin=False)
+        initial_primary = initial.get("primary_image") or initial.get("image")
+
+        new_gallery = ["https://res.cloudinary.com/payernt/image/upload/extra_lens.jpg"]
+        res = self.client.patch(
+            f"/api/payernt/products/{prod_id}",
+            json={"images": new_gallery},
+            headers=self.vendor1_headers
+        )
+        self.assertEqual(res.status_code, 200)
+        prod = res.json()["product"]
+        self.assertEqual(prod["primaryImage"], initial_primary)
+
+    # 20. Database write failure returns error and does not mutate product
+    def test_20_database_write_failure_returns_error(self):
+        prod_id = f"p_edit_{uuid.uuid4().hex[:6]}"
+        self._create_test_product(prod_id, self.vendor1_id, self.vendor1_email)
+
+        with patch("payernt_database.get_db_connection") as mock_conn:
+            fake_conn = MagicMock()
+            fake_cursor = MagicMock()
+            fake_cursor.execute.side_effect = Exception("Simulated fatal database connection drop")
+            fake_conn.cursor.return_value.__enter__.return_value = fake_cursor
+            mock_conn.return_value = fake_conn
+
+            res = self.client.patch(
+                f"/api/payernt/products/{prod_id}",
+                json={"title": "This Title Should Fail Persistence"},
+                headers=self.vendor1_headers
+            )
+            self.assertEqual(res.status_code, 500)
+            self.assertIn("persistence failed", res.json()["detail"].lower())
+            fake_conn.rollback.assert_called_once()
+
 if __name__ == "__main__":
     unittest.main()

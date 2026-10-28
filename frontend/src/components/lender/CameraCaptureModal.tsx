@@ -16,9 +16,12 @@ import { Button } from "@/components/common/Button";
 interface CameraCaptureModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onCapture: (imageDataUrl: string, angleTag?: string) => void;
+  onCapture: (imageDataUrl: string, angleTag?: string) => Promise<void> | void;
   onFallbackUpload: () => void;
   angleTag?: string;
+  closeOnConfirm?: boolean;
+  isUploading?: boolean;
+  uploadProgress?: number | null;
 }
 
 const AVAILABLE_ANGLES = [
@@ -34,6 +37,9 @@ export function CameraCaptureModal({
   onCapture,
   onFallbackUpload,
   angleTag: initialAngleTag = "Front View",
+  closeOnConfirm = true,
+  isUploading = false,
+  uploadProgress = null,
 }: CameraCaptureModalProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -234,11 +240,18 @@ export function CameraCaptureModal({
     startCamera();
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = async (shouldClose = closeOnConfirm) => {
     if (capturedImage) {
-      onCapture(capturedImage, selectedAngle);
+      const img = capturedImage;
+      const angle = selectedAngle;
       setCapturedImage(null);
-      onClose();
+      if (shouldClose) {
+        stopStream();
+        onClose();
+      } else {
+        startCamera();
+      }
+      await onCapture(img, angle);
     }
   };
 
@@ -306,6 +319,19 @@ export function CameraCaptureModal({
             ))}
           </div>
         </div>
+
+        {/* Upload Progress Banner */}
+        {isUploading && (
+          <div className="bg-primary/20 border-b border-primary/30 px-5 py-2 flex items-center justify-between text-xs text-primary font-medium animate-pulse">
+            <div className="flex items-center gap-2">
+              <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+              <span>Uploading photo to cloud storage...</span>
+            </div>
+            {uploadProgress !== null && uploadProgress !== undefined && (
+              <span className="font-mono font-bold">{uploadProgress}%</span>
+            )}
+          </div>
+        )}
 
         {/* Viewfinder / Preview Body */}
         <div className="relative aspect-[4/3] w-full bg-black flex items-center justify-center overflow-hidden flex-1 min-h-[280px]">
@@ -427,13 +453,54 @@ export function CameraCaptureModal({
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Retake Photo
               </Button>
-              <Button
-                onClick={handleConfirm}
-                className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 font-medium"
-              >
-                <Check className="h-4 w-4 mr-2" />
-                Use {selectedAngle} Photo
-              </Button>
+              <div className="flex items-center gap-2">
+                {!closeOnConfirm ? (
+                  <>
+                    <Button
+                      onClick={() => handleConfirm(false)}
+                      disabled={isUploading}
+                      className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 font-medium text-xs disabled:opacity-50"
+                    >
+                      {isUploading ? (
+                        <>
+                          <RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                          Uploading...
+                        </>
+                      ) : (
+                        <>
+                          <Check className="h-4 w-4 mr-1.5" />
+                          Add & Snap Next
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      onClick={() => handleConfirm(true)}
+                      disabled={isUploading}
+                      className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 font-medium text-xs disabled:opacity-50"
+                    >
+                      Use & Done
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    onClick={() => handleConfirm(true)}
+                    disabled={isUploading}
+                    className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 font-medium disabled:opacity-50"
+                  >
+                    {isUploading ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                        Uploading...
+                      </>
+                    ) : (
+                      <>
+                        <Check className="h-4 w-4 mr-2" />
+                        Use {selectedAngle} Photo
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
             </>
           ) : (
             <>
@@ -452,7 +519,7 @@ export function CameraCaptureModal({
               <div className="flex items-center gap-3">
                 <button
                   type="button"
-                  disabled={!hasPermission}
+                  disabled={!hasPermission || isUploading}
                   onClick={handleTakeSnapshot}
                   className="relative group disabled:opacity-50 disabled:cursor-not-allowed"
                 >

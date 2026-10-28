@@ -36,6 +36,7 @@ import { toast } from "sonner";
 import type { PayerntProduct, VerificationStatus } from "../types";
 import { resolveProductImageUrl, resolveAllProductImages } from "../productUtils";
 import { uploadImageToCloudinary } from "@/utils/cloudinary";
+import { CameraCaptureModal } from "@/components/lender/CameraCaptureModal";
 
 interface MyProductsProps {
   products: PayerntProduct[];
@@ -180,6 +181,80 @@ export function MyProducts({
     availabilityStatus: "available",
   });
   const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  // Camera Modal State & Handlers
+  const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
+  const [cameraTarget, setCameraTarget] = useState<"primary" | "gallery">("primary");
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+
+  const handleCameraCapture = async (imageDataUrl: string, _angleTag?: string) => {
+    if (isUploadingMedia) {
+      toast.error("An image upload is already in progress.");
+      return;
+    }
+
+    if (!imageDataUrl || (!imageDataUrl.startsWith("data:image/") && !imageDataUrl.startsWith("blob:"))) {
+      toast.error("Invalid image capture format.");
+      return;
+    }
+
+    // Size validation (20MB limit)
+    const base64Length = imageDataUrl.length - (imageDataUrl.indexOf(",") + 1);
+    const approximateSizeBytes = (base64Length * 3) / 4;
+    if (approximateSizeBytes > 20 * 1024 * 1024) {
+      toast.error("Captured image is too large (exceeds 20MB limit).");
+      return;
+    }
+
+    setIsUploadingMedia(true);
+    setUploadProgress(0);
+    const target = cameraTarget;
+    const loadingToastId = toast.loading(
+      `Uploading ${target === "primary" ? "primary" : "gallery"} photo to storage...`
+    );
+
+    try {
+      const hostedUrl = await uploadImageToCloudinary(imageDataUrl, (percent) => {
+        setUploadProgress(percent);
+      });
+
+      if (!hostedUrl || !hostedUrl.startsWith("http")) {
+        throw new Error("Invalid URL returned from storage provider.");
+      }
+
+      if (target === "primary") {
+        setEditFormData((prev) => ({
+          ...prev,
+          primaryImage: hostedUrl,
+        }));
+        toast.success("Primary photo updated successfully!", { id: loadingToastId });
+      } else {
+        setEditFormData((prev) => {
+          if (prev.images.includes(hostedUrl)) {
+            return prev;
+          }
+          return {
+            ...prev,
+            images: [...prev.images, hostedUrl],
+          };
+        });
+        toast.success("Gallery photo added successfully!", { id: loadingToastId });
+      }
+    } catch (err: any) {
+      console.error("[MyProducts] Camera upload error:", err);
+      toast.error(err?.message || "Failed to upload photo. Please check your connection and try again.", {
+        id: loadingToastId,
+      });
+    } finally {
+      if (imageDataUrl.startsWith("blob:")) {
+        try {
+          URL.revokeObjectURL(imageDataUrl);
+        } catch {}
+      }
+      setIsUploadingMedia(false);
+      setUploadProgress(null);
+    }
+  };
 
   // File upload handlers for editing product media
   const handlePrimaryImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1153,12 +1228,15 @@ export function MyProducts({
                   </label>
                   <button
                     type="button"
-                    onClick={() => primaryFileInputRef.current?.click()}
+                    onClick={() => {
+                      setCameraTarget("primary");
+                      setIsCameraModalOpen(true);
+                    }}
                     disabled={isUploadingMedia}
                     className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-secondary hover:bg-secondary/80 border border-border text-[11px] font-semibold text-foreground cursor-pointer disabled:opacity-50 transition-colors"
                   >
                     <Camera className="h-3 w-3 text-muted-foreground" />
-                    <span>Upload from Device</span>
+                    <span>Take Photo</span>
                   </button>
                 </div>
                 <div className="flex gap-2">
@@ -1166,7 +1244,7 @@ export function MyProducts({
                     type="url"
                     value={editFormData.primaryImage}
                     onChange={(e) => setEditFormData({ ...editFormData, primaryImage: e.target.value })}
-                    placeholder="https://images.unsplash.com/... or upload via button"
+                    placeholder="https://images.unsplash.com/... or take photo via button"
                     className="w-full px-3 py-2 rounded-xl border border-border bg-background text-foreground text-xs font-mono focus:outline-hidden focus:ring-1 focus:ring-foreground"
                   />
                   {editFormData.primaryImage && (
@@ -1183,7 +1261,7 @@ export function MyProducts({
                   )}
                 </div>
                 <p className="text-[10px] text-muted-foreground">
-                  Provide a direct hosted image URL or upload directly to cloud storage from your device.
+                  Provide a direct hosted image URL or capture live product photos with your camera.
                 </p>
               </div>
 
@@ -1200,12 +1278,15 @@ export function MyProducts({
                   </div>
                   <button
                     type="button"
-                    onClick={() => galleryFileInputRef.current?.click()}
+                    onClick={() => {
+                      setCameraTarget("gallery");
+                      setIsCameraModalOpen(true);
+                    }}
                     disabled={isUploadingMedia}
                     className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-secondary hover:bg-secondary/80 border border-border text-[11px] font-semibold text-foreground cursor-pointer disabled:opacity-50 transition-colors"
                   >
-                    <Upload className="h-3 w-3 text-muted-foreground" />
-                    <span>Add Gallery Photos</span>
+                    <Camera className="h-3 w-3 text-muted-foreground" />
+                    <span>Take Gallery Photos</span>
                   </button>
                 </div>
 
@@ -1377,6 +1458,28 @@ export function MyProducts({
             </form>
           </div>
         </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* 2.5 WEBRTC CAMERA CAPTURE MODAL */}
+      {/* ============================================================ */}
+      {isCameraModalOpen && (
+        <CameraCaptureModal
+          isOpen={isCameraModalOpen}
+          onClose={() => setIsCameraModalOpen(false)}
+          onCapture={handleCameraCapture}
+          onFallbackUpload={() => {
+            if (cameraTarget === "primary") {
+              primaryFileInputRef.current?.click();
+            } else {
+              galleryFileInputRef.current?.click();
+            }
+          }}
+          angleTag={cameraTarget === "primary" ? "Front View" : "Side View"}
+          closeOnConfirm={cameraTarget === "primary"}
+          isUploading={isUploadingMedia}
+          uploadProgress={uploadProgress}
+        />
       )}
 
       {/* ============================================================ */}

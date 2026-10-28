@@ -146,6 +146,25 @@ def init_payernt_tables():
     _add_pp_col("half_day_rate INT NULL")
     _add_pp_col("buffer_minutes INT DEFAULT 60")
     _add_pp_col("blocked_dates LONGTEXT NULL")
+    _add_pp_col("security_deposit INT DEFAULT 0")
+    _add_pp_col("pickup_instructions TEXT NULL")
+    _add_pp_col("condition_details LONGTEXT NULL")
+    _add_pp_col("condition_grade VARCHAR(50) NULL")
+
+    def _add_cp_col(col_def: str):
+        try:
+            execute_query(f"ALTER TABLE custom_products ADD COLUMN {col_def}")
+        except Exception:
+            pass
+
+    _add_cp_col("images LONGTEXT NULL")
+    _add_cp_col("allow_half_day BOOLEAN DEFAULT TRUE")
+    _add_cp_col("morning_slot_enabled BOOLEAN DEFAULT TRUE")
+    _add_cp_col("afternoon_slot_enabled BOOLEAN DEFAULT TRUE")
+    _add_cp_col("full_day_slot_enabled BOOLEAN DEFAULT TRUE")
+    _add_cp_col("half_day_rate INT NULL")
+    _add_cp_col("buffer_minutes INT DEFAULT 60")
+    _add_cp_col("blocked_dates LONGTEXT NULL")
 
     # 3. Rental Security Table (Links Vendor PIN + Renter PIN in ONE canonical record)
     execute_query("""
@@ -1578,49 +1597,108 @@ def update_payernt_product(product_id: str, owner_id: str, updates: Dict[str, An
         set_clauses.append("images = %s")
         params.append(img_json)
 
-        # If primary_image not explicitly updated but images was updated, set primary_image to first image
-        if "primary_image" not in updates and clean_imgs:
+        # Only fallback primary_image to clean_imgs[0] if product has no existing primary image
+        if "primary_image" not in updates and not existing.get("primary_image") and not existing.get("image") and clean_imgs:
             existing["primary_image"] = clean_imgs[0]
             existing["primaryImage"] = clean_imgs[0]
             set_clauses.append("primary_image = %s")
             params.append(clean_imgs[0])
 
+    # Specifications JSON serialization guard
+    if "specifications" in updates and isinstance(updates["specifications"], (dict, list)):
+        updates["specifications"] = json.dumps(updates["specifications"])
+        existing["specifications"] = updates["specifications"]
+
+    # Condition details serialization
+    if "condition" in updates and isinstance(updates["condition"], dict):
+        cond_json = json.dumps(updates["condition"])
+        existing["condition_details"] = cond_json
+        existing["condition"] = updates["condition"]
+        set_clauses.append("condition_details = %s")
+        params.append(cond_json)
+
     params.extend([product_id, owner_id])
     conn = get_db_connection()
-    if conn:
+    if not conn:
+        if IS_PRODUCTION:
+            logger.error(f"[update_payernt_product] Database connection unavailable for product {product_id}.")
+            raise RuntimeError("Database connection unavailable. Product update could not be persisted.")
+        logger.warning(f"[update_payernt_product] Operating in offline/test fallback mode for product {product_id}.")
+    else:
         try:
             with conn.cursor() as cursor:
                 cursor.execute(f"UPDATE payernt_products SET {', '.join(set_clauses)} WHERE id = %s AND owner_id = %s", tuple(params))
+                
+                # Normalize images to a safe JSON string for SQL parameterization (prevents PyMySQL tuple conversion error 1241)
+                cp_imgs = existing.get("images")
+                if isinstance(cp_imgs, list):
+                    cp_images_json = json.dumps([str(u).strip() for u in cp_imgs if str(u).strip()])
+                elif isinstance(cp_imgs, str) and cp_imgs.strip():
+                    cp_images_json = cp_imgs.strip()
+                else:
+                    cp_images_json = "[]"
+
+                # Normalize blocked_dates to a safe JSON string or None for SQL parameterization
+                cp_b = existing.get("blocked_dates")
+                if isinstance(cp_b, list):
+                    cp_blocked_json = json.dumps(cp_b) if cp_b else None
+                elif isinstance(cp_b, str) and cp_b.strip():
+                    cp_blocked_json = cp_b.strip()
+                else:
+                    cp_blocked_json = None
+
                 # Keep custom_products cleanly synchronized across all shared columns
-                cursor.execute("""
-                    UPDATE custom_products
-                    SET title = %s, description = %s, price = %s, image = %s, images = %s,
-                        category = %s, available = %s,
-                        allow_half_day = %s, morning_slot_enabled = %s,
-                        afternoon_slot_enabled = %s, full_day_slot_enabled = %s,
-                        half_day_rate = %s, buffer_minutes = %s, blocked_dates = %s
-                    WHERE id = %s
-                """, (
-                    existing.get("title") or existing.get("name"),
-                    existing.get("description", ""),
-                    existing.get("daily_rate", 500),
-                    existing.get("primary_image", ""),
-                    existing.get("images", "[]"),
-                    existing.get("category", "tech"),
-                    1 if existing.get("available") else 0,
-                    1 if existing.get("allow_half_day", True) else 0,
-                    1 if existing.get("morning_slot_enabled", True) else 0,
-                    1 if existing.get("afternoon_slot_enabled", True) else 0,
-                    1 if existing.get("full_day_slot_enabled", True) else 0,
-                    existing.get("half_day_rate"),
-                    existing.get("buffer_minutes", 60),
-                    existing.get("blocked_dates"),
-                    product_id,
-                ))
+                try:
+                    cursor.execute("""
+                        UPDATE custom_products
+                        SET title = %s, description = %s, price = %s, image = %s, images = %s,
+                            category = %s, available = %s,
+                            allow_half_day = %s, morning_slot_enabled = %s,
+                            afternoon_slot_enabled = %s, full_day_slot_enabled = %s,
+                            half_day_rate = %s, buffer_minutes = %s, blocked_dates = %s
+                        WHERE id = %s
+                    """, (
+                        existing.get("title") or existing.get("name"),
+                        existing.get("description", ""),
+                        existing.get("daily_rate", 500),
+                        existing.get("primary_image", ""),
+                        cp_images_json,
+                        existing.get("category", "tech"),
+                        1 if existing.get("available") else 0,
+                        1 if existing.get("allow_half_day", True) else 0,
+                        1 if existing.get("morning_slot_enabled", True) else 0,
+                        1 if existing.get("afternoon_slot_enabled", True) else 0,
+                        1 if existing.get("full_day_slot_enabled", True) else 0,
+                        existing.get("half_day_rate"),
+                        existing.get("buffer_minutes", 60),
+                        cp_blocked_json,
+                        product_id,
+                    ))
+                except pymysql.err.OperationalError as op_err:
+                    # If older schema lacks slot/scheduling columns (error 1054), fallback to core catalog columns
+                    if op_err.args and op_err.args[0] == 1054:
+                        logger.warning(f"custom_products schema discrepancy (1054): {op_err}. Updating core columns.")
+                        cursor.execute("""
+                            UPDATE custom_products
+                            SET title = %s, description = %s, price = %s, image = %s, images = %s,
+                                category = %s, available = %s
+                            WHERE id = %s
+                        """, (
+                            existing.get("title") or existing.get("name"),
+                            existing.get("description", ""),
+                            existing.get("daily_rate", 500),
+                            existing.get("primary_image", ""),
+                            cp_images_json,
+                            existing.get("category", "tech"),
+                            1 if existing.get("available") else 0,
+                            product_id,
+                        ))
+                    else:
+                        raise
             conn.commit()
         except Exception as db_err:
             conn.rollback()
-            logger.error(f"Database update failed for payernt_product {product_id}: {db_err}")
+            logger.exception(f"Database update failed for payernt_product {product_id}: {db_err}")
             raise RuntimeError(f"Database update failed: {db_err}")
         finally:
             conn.close()

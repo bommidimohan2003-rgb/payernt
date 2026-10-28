@@ -1448,7 +1448,7 @@ def update_vendor_product_endpoint(
     except ValueError as err:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(err))
     except RuntimeError as err:
-        logger.error(f"Persistence error for product {product_id}: {err}")
+        logger.exception(f"Persistence error for product {product_id}: {err}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database persistence failed. Please try again.")
     except Exception as err:
         if isinstance(err, HTTPException):
