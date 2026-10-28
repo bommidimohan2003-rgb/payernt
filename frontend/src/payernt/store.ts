@@ -895,20 +895,30 @@ export function usePayerntStore() {
     setDraftProduct(null);
   };
 
-  const updateProduct = (id: string, updates: Partial<PayerntProduct>) => {
-    setProducts((prev) => {
-      const nextList = prev.map((p) =>
-        p.id === id ? { ...p, ...updates, updatedAt: new Date().toISOString() } : p
-      );
-      try {
-        localStorage.setItem(STORAGE_KEY_PRODUCTS, JSON.stringify(nextList));
-      } catch {}
-      return nextList;
-    });
-    lastProductsFetchRef.current = 0;
-    lastDashboardFetchRef.current = 0;
-    payerntApi.updateProduct(id, updates).catch((e) => console.warn("[paye₹nt Backend] updateProduct sync:", e));
-    window.dispatchEvent(new CustomEvent("payent_products_updated"));
+  const updateProduct = async (
+    id: string,
+    updates: Partial<PayerntProduct>
+  ): Promise<{ success: boolean; product?: PayerntProduct; error?: string }> => {
+    try {
+      const res = await payerntApi.updateProduct(id, updates);
+      if (res.success && res.product) {
+        const canonical = normalizePayerntProduct(res.product);
+        setProducts((prev) => {
+          const nextList = prev.map((p) => (p.id === id ? canonical : p));
+          try {
+            localStorage.setItem(STORAGE_KEY_PRODUCTS, JSON.stringify(nextList));
+          } catch {}
+          return nextList;
+        });
+        lastProductsFetchRef.current = 0;
+        lastDashboardFetchRef.current = 0;
+        window.dispatchEvent(new CustomEvent("payent_products_updated"));
+        return { success: true, product: canonical };
+      }
+      return { success: false, error: res.error || "Failed to update product." };
+    } catch (e: any) {
+      return { success: false, error: e?.message || "Network error while updating product." };
+    }
   };
 
   const deleteProduct = (id: string) => {

@@ -475,11 +475,16 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     req_id = request.headers.get("x-request-id") or f"req_{uuid.uuid4().hex[:12]}"
     errors = exc.errors()
     messages = []
+    json_safe_errors = []
     for err in errors:
         loc_parts = [str(l) for l in err.get("loc", []) if l not in ("body", "query", "path")]
         loc = ".".join(loc_parts)
         msg = err.get("msg", "Validation error")
         messages.append(f"{loc}: {msg}" if loc else msg)
+        safe_e = dict(err)
+        if "ctx" in safe_e and isinstance(safe_e["ctx"], dict):
+            safe_e["ctx"] = {k: str(v) if isinstance(v, (Exception, BaseException)) else v for k, v in safe_e["ctx"].items()}
+        json_safe_errors.append(safe_e)
     clean_message = "; ".join(messages) if messages else "Invalid request data."
     logger.warning(f"[{req_id}] Validation Error on {request.method} {request.url.path}: {clean_message}")
 
@@ -501,7 +506,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
             "error": clean_message,
             "message": clean_message,
             "detail": clean_message,
-            "validation_errors": errors,
+            "validation_errors": json_safe_errors,
         },
         headers=headers,
     )

@@ -14,6 +14,7 @@ export type RentalRequestStatus =
   | "pending"
   | "approved"
   | "accepted"
+  | "confirmed"
   | "order_confirmed"
   | "ready_for_pickup"
   | "picked_up"
@@ -162,15 +163,20 @@ export interface PayerntProduct {
   images?: string[];
   image?: string;
   primaryImage: string;
+  primary_image?: string;
   videoUrl?: string;
   specs: ProductSpecs;
   condition: ProductCondition;
+  condition_grade?: string;
   damageDetails?: string;
   accessories?: string | string[];
   location: ProductLocation;
   city?: string;
   area?: string;
+  pincode?: string;
   postalCode?: string;
+  pickup_instructions?: string;
+  pickupInstructions?: string;
   pickupDetails?: string;
   pricing: RentalPricing;
   price?: number;

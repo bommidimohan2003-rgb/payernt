@@ -1418,7 +1418,7 @@ def get_all_active_payernt_products() -> List[Dict[str, Any]]:
 def update_payernt_product(product_id: str, owner_id: str, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """
     Updates product specifications, pricing, or availability.
-    NEVER regenerates or updates vendor_secret_pin.
+    NEVER regenerates or updates vendor_secret_pin, status, or ownership.
     """
     existing = get_payernt_product_by_id(product_id, include_pin=True)
     if not existing:
@@ -1426,11 +1426,40 @@ def update_payernt_product(product_id: str, owner_id: str, updates: Dict[str, An
     if existing.get("owner_id") != owner_id:
         raise PermissionError("You do not have permission to update this product listing.")
 
+    # Defense-in-depth: Block any attempt to update privileged fields
+    for forbidden in ("status", "verification_status", "owner_id", "owner_email", "vendor_secret_pin", "id"):
+        if forbidden in updates:
+            raise ValueError(f"Field '{forbidden}' is privileged and cannot be modified by vendor.")
+
+    # Guard against unsafe modifications during active rental orders
+    try:
+        active_order = fetch_one("""
+            SELECT id FROM rental_security
+            WHERE product_id = %s AND status NOT IN ('completed', 'cancelled', 'rejected')
+            LIMIT 1
+        """, (product_id,))
+        if not active_order:
+            active_order = fetch_one("""
+                SELECT id FROM orders
+                WHERE product_id = %s AND status IN ('confirmed', 'ready_for_pickup', 'picked_up', 'return_initiated', 'active')
+                LIMIT 1
+            """, (product_id,))
+        if active_order:
+            if updates.get("availability_status") == "paused" or updates.get("available") is False:
+                raise ValueError("Cannot pause product availability while an active rental booking is in progress.")
+            loc_keys = ("city", "area", "pincode", "pickup_instructions")
+            if any(k in updates and updates[k] is not None and str(updates[k]).strip() != str(existing.get(k) or "").strip() for k in loc_keys):
+                raise ValueError("Cannot modify pickup location or instructions while an active rental booking is in progress.")
+    except (ValueError, PermissionError):
+        raise
+    except Exception as e:
+        logger.warning(f"Active booking check notice: {e}")
+
     allowed_fields = [
         "name", "title", "category", "brand", "model", "year", "description",
         "specifications", "condition_grade", "accessories", "city", "area", "pincode",
         "pickup_instructions", "daily_rate", "weekly_rate", "monthly_rate",
-        "available", "availability_status", "primary_image", "status",
+        "security_deposit", "available", "availability_status", "primary_image",
         "allow_half_day", "morning_slot_enabled", "afternoon_slot_enabled",
         "full_day_slot_enabled", "half_day_rate", "buffer_minutes"
     ]
@@ -1466,6 +1495,10 @@ def update_payernt_product(product_id: str, owner_id: str, updates: Dict[str, An
         updates["pincode"] = str(updates["postalCode"])
     if "pickupInstructions" in updates and updates["pickupInstructions"] is not None:
         updates["pickup_instructions"] = str(updates["pickupInstructions"])
+    if "securityDeposit" in updates and updates["securityDeposit"] is not None:
+        updates["security_deposit"] = int(updates["securityDeposit"])
+    if "security_deposit" in updates and updates["security_deposit"] is not None:
+        updates["security_deposit"] = int(updates["security_deposit"])
 
     # Nested location object handling
     if "location" in updates and isinstance(updates["location"], dict):
@@ -1492,6 +1525,8 @@ def update_payernt_product(product_id: str, owner_id: str, updates: Dict[str, An
             updates["weekly_rate"] = int(updates["pricing"]["weekly"])
         if "monthly" in updates["pricing"]:
             updates["monthly_rate"] = int(updates["pricing"]["monthly"])
+        if "securityDeposit" in updates["pricing"]:
+            updates["security_deposit"] = int(updates["pricing"]["securityDeposit"])
 
     set_clauses = ["updated_at = %s"]
     params = [dt.now(timezone.utc).isoformat()]
@@ -1551,29 +1586,44 @@ def update_payernt_product(product_id: str, owner_id: str, updates: Dict[str, An
             params.append(clean_imgs[0])
 
     params.extend([product_id, owner_id])
-    try:
-        execute_query(f"UPDATE payernt_products SET {', '.join(set_clauses)} WHERE id = %s AND owner_id = %s", tuple(params))
-        # Keep custom_products cleanly synchronized
+    conn = get_db_connection()
+    if conn:
         try:
-            execute_query("""
-                UPDATE custom_products
-                SET title = %s, description = %s, price = %s, image = %s, category = %s,
-                    available = %s, status = %s
-                WHERE id = %s
-            """, (
-                existing.get("title") or existing.get("name"),
-                existing.get("description", ""),
-                existing.get("daily_rate", 500),
-                existing.get("primary_image", ""),
-                existing.get("category", "tech"),
-                1 if existing.get("available") else 0,
-                existing.get("status", "under_review"),
-                product_id,
-            ))
-        except Exception as sync_e:
-            logger.warning(f"Notice: custom_products sync: {sync_e}")
-    except Exception as e:
-        logger.warning(f"DB update error for payernt_product: {e}")
+            with conn.cursor() as cursor:
+                cursor.execute(f"UPDATE payernt_products SET {', '.join(set_clauses)} WHERE id = %s AND owner_id = %s", tuple(params))
+                # Keep custom_products cleanly synchronized across all shared columns
+                cursor.execute("""
+                    UPDATE custom_products
+                    SET title = %s, description = %s, price = %s, image = %s, images = %s,
+                        category = %s, available = %s,
+                        allow_half_day = %s, morning_slot_enabled = %s,
+                        afternoon_slot_enabled = %s, full_day_slot_enabled = %s,
+                        half_day_rate = %s, buffer_minutes = %s, blocked_dates = %s
+                    WHERE id = %s
+                """, (
+                    existing.get("title") or existing.get("name"),
+                    existing.get("description", ""),
+                    existing.get("daily_rate", 500),
+                    existing.get("primary_image", ""),
+                    existing.get("images", "[]"),
+                    existing.get("category", "tech"),
+                    1 if existing.get("available") else 0,
+                    1 if existing.get("allow_half_day", True) else 0,
+                    1 if existing.get("morning_slot_enabled", True) else 0,
+                    1 if existing.get("afternoon_slot_enabled", True) else 0,
+                    1 if existing.get("full_day_slot_enabled", True) else 0,
+                    existing.get("half_day_rate"),
+                    existing.get("buffer_minutes", 60),
+                    existing.get("blocked_dates"),
+                    product_id,
+                ))
+            conn.commit()
+        except Exception as db_err:
+            conn.rollback()
+            logger.error(f"Database update failed for payernt_product {product_id}: {db_err}")
+            raise RuntimeError(f"Database update failed: {db_err}")
+        finally:
+            conn.close()
 
     MOCK_PAYERNT_PRODUCTS[product_id] = existing
     log_payernt_audit_event("PRODUCT_UPDATE", owner_id, {"productId": product_id, "fields": list(updates.keys())})

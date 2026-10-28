@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef } from "react";
 import {
   Package,
   Plus,
@@ -35,12 +35,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import type { PayerntProduct, VerificationStatus } from "../types";
 import { resolveProductImageUrl, resolveAllProductImages } from "../productUtils";
+import { uploadImageToCloudinary } from "@/utils/cloudinary";
 
 interface MyProductsProps {
   products: PayerntProduct[];
   onToggleAvailability: (productId: string) => void;
   onDeleteProduct: (productId: string) => void;
-  onUpdateProduct: (productId: string, updates: Partial<PayerntProduct>) => void;
+  onUpdateProduct: (productId: string, updates: Partial<PayerntProduct>) => Promise<{ success: boolean; product?: PayerntProduct; error?: string }> | void;
   onAddNewGear: () => void;
   onNavigateToRequests: () => void;
   onBack?: () => void;
@@ -134,6 +135,9 @@ export function MyProducts({
 
   // Edit Product Modal State
   const [editingProduct, setEditingProduct] = useState<PayerntProduct | null>(null);
+  const primaryFileInputRef = useRef<HTMLInputElement>(null);
+  const galleryFileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingMedia, setIsUploadingMedia] = useState(false);
   const [editFormData, setEditFormData] = useState<{
     title: string;
     category: string;
@@ -142,6 +146,7 @@ export function MyProducts({
     description: string;
     dailyPrice: string;
     weeklyPrice: string;
+    securityDeposit: string;
     conditionGrade: string;
     conditionNotes: string;
     visibleDamage: boolean;
@@ -151,6 +156,7 @@ export function MyProducts({
     pincode: string;
     pickupInstructions: string;
     primaryImage: string;
+    images: string[];
     availabilityStatus: "available" | "paused";
   }>({
     title: "",
@@ -160,6 +166,7 @@ export function MyProducts({
     description: "",
     dailyPrice: "500",
     weeklyPrice: "",
+    securityDeposit: "0",
     conditionGrade: "Like New",
     conditionNotes: "",
     visibleDamage: false,
@@ -169,9 +176,69 @@ export function MyProducts({
     pincode: "",
     pickupInstructions: "",
     primaryImage: "",
+    images: [],
     availabilityStatus: "available",
   });
   const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  // File upload handlers for editing product media
+  const handlePrimaryImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select a valid image file.");
+      return;
+    }
+    if (file.size > 20 * 1024 * 1024) {
+      toast.error("Image file is too large (max 20MB).");
+      return;
+    }
+    setIsUploadingMedia(true);
+    try {
+      const url = await uploadImageToCloudinary(file);
+      setEditFormData((prev) => ({ ...prev, primaryImage: url }));
+      toast.success("Primary photo uploaded successfully.");
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to upload photo to storage.");
+    } finally {
+      setIsUploadingMedia(false);
+      if (e.target) e.target.value = "";
+    }
+  };
+
+  const handleGalleryImagesSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    setIsUploadingMedia(true);
+    try {
+      const uploadedUrls: string[] = [];
+      for (const file of files) {
+        if (!file.type.startsWith("image/")) continue;
+        if (file.size > 20 * 1024 * 1024) continue;
+        const url = await uploadImageToCloudinary(file);
+        if (url) uploadedUrls.push(url);
+      }
+      if (uploadedUrls.length > 0) {
+        setEditFormData((prev) => ({
+          ...prev,
+          images: [...prev.images, ...uploadedUrls],
+        }));
+        toast.success(`Uploaded ${uploadedUrls.length} gallery photo(s).`);
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to upload gallery photos.");
+    } finally {
+      setIsUploadingMedia(false);
+      if (e.target) e.target.value = "";
+    }
+  };
+
+  const handleRemoveGalleryImage = (idxToRemove: number) => {
+    setEditFormData((prev) => ({
+      ...prev,
+      images: prev.images.filter((_, idx) => idx !== idxToRemove),
+    }));
+  };
 
   // Delete Confirmation Dialog State
   const [productToDelete, setProductToDelete] = useState<PayerntProduct | null>(null);
@@ -255,6 +322,7 @@ export function MyProducts({
   const handleOpenEdit = (p: PayerntProduct) => {
     const daily = p.pricing?.daily ?? (p as any).daily_rate ?? (p as any).dailyRate ?? p.price ?? 500;
     const weekly = p.pricing?.weekly ?? (p as any).weekly_rate ?? (p as any).weeklyRate ?? "";
+    const depositVal = p.pricing?.securityDeposit ?? (p as any).security_deposit ?? 0;
     const condGrade = typeof p.condition === "object" ? p.condition?.grade || "Like New" : p.condition || "Like New";
     const condNotes = typeof p.condition === "object" ? p.condition?.additionalNotes || p.condition?.notes || "" : "";
     const visDmg = typeof p.condition === "object" ? Boolean(p.condition?.visibleDamage) : false;
@@ -265,6 +333,12 @@ export function MyProducts({
     const pickupInst = typeof p.location === "object" ? p.location?.pickupInstructions || "" : (p as any).pickup_instructions || "";
     const resolvedImg = resolveProductImageUrl(p);
 
+    const existingImgs = Array.isArray(p.images)
+      ? p.images.filter(Boolean)
+      : typeof p.images === "string"
+      ? (() => { try { const parsed = JSON.parse(p.images); return Array.isArray(parsed) ? parsed : []; } catch { return []; } })()
+      : [];
+
     setEditFormData({
       title: p.title || p.name || "",
       category: p.category || "Cameras",
@@ -273,6 +347,7 @@ export function MyProducts({
       description: p.description || "",
       dailyPrice: String(daily),
       weeklyPrice: weekly ? String(weekly) : "",
+      securityDeposit: depositVal ? String(depositVal) : "0",
       conditionGrade: condGrade,
       conditionNotes: condNotes,
       visibleDamage: visDmg,
@@ -282,6 +357,7 @@ export function MyProducts({
       pincode: pinVal,
       pickupInstructions: pickupInst,
       primaryImage: resolvedImg,
+      images: existingImgs,
       availabilityStatus: p.availabilityStatus === "paused" ? "paused" : "available",
     });
 
@@ -306,6 +382,7 @@ export function MyProducts({
     }
 
     const weeklyNum = editFormData.weeklyPrice ? Number(editFormData.weeklyPrice) : Math.round(priceNum * 7 * 0.85);
+    const depositNum = editFormData.securityDeposit !== "" ? Math.max(0, Number(editFormData.securityDeposit)) : (editingProduct.pricing?.securityDeposit ?? 0);
 
     setIsSavingEdit(true);
     try {
@@ -319,6 +396,7 @@ export function MyProducts({
         primaryImage: editFormData.primaryImage.trim() || editingProduct.primaryImage,
         primary_image: editFormData.primaryImage.trim() || editingProduct.primaryImage,
         image: editFormData.primaryImage.trim() || editingProduct.primaryImage,
+        images: editFormData.images,
         price: priceNum,
         daily_rate: priceNum,
         dailyRate: priceNum,
@@ -327,14 +405,19 @@ export function MyProducts({
           daily: priceNum,
           weekly: weeklyNum,
           monthly: Math.round(priceNum * 30 * 0.7),
-          securityDeposit: 0,
+          securityDeposit: depositNum,
         },
         condition: {
           ...((editingProduct.condition && typeof editingProduct.condition === "object") ? editingProduct.condition : {}),
           grade: editFormData.conditionGrade as any,
           visibleDamage: editFormData.visibleDamage,
           damageDetails: editFormData.visibleDamage ? editFormData.damageDetails.trim() : "None",
+          damageDescription: editFormData.visibleDamage ? editFormData.damageDetails.trim() : "None",
           additionalNotes: editFormData.conditionNotes.trim() || undefined,
+          scratches: (editingProduct.condition as any)?.scratches || "None",
+          accessoriesIncluded: (editingProduct.condition as any)?.accessoriesIncluded || [],
+          functionalIssues: (editingProduct.condition as any)?.functionalIssues || false,
+          previousRepairs: (editingProduct.condition as any)?.previousRepairs || false,
         },
         condition_grade: editFormData.conditionGrade,
         damageDetails: editFormData.visibleDamage ? editFormData.damageDetails.trim() : "None",
@@ -344,19 +427,26 @@ export function MyProducts({
           area: editFormData.area.trim(),
           pincode: editFormData.pincode.trim(),
           pickupInstructions: editFormData.pickupInstructions.trim(),
+          pickupAvailable: (editingProduct.location as any)?.pickupAvailable ?? true,
+          doorstepDeliveryAvailable: (editingProduct.location as any)?.doorstepDeliveryAvailable ?? false,
         },
         city: editFormData.city.trim(),
         area: editFormData.area.trim(),
         pincode: editFormData.pincode.trim(),
         pickup_instructions: editFormData.pickupInstructions.trim(),
+        pickupInstructions: editFormData.pickupInstructions.trim(),
         availabilityStatus: editFormData.availabilityStatus,
       };
 
-      onUpdateProduct(editingProduct.id, updates);
+      const res = await onUpdateProduct(editingProduct.id, updates);
+      if (res && !res.success) {
+        toast.error(res.error || "Failed to save product changes.");
+        return;
+      }
 
       // If Inspect modal was open for this product, sync it
       if (selectedProduct && selectedProduct.id === editingProduct.id) {
-        setSelectedProduct({ ...selectedProduct, ...updates } as PayerntProduct);
+        setSelectedProduct({ ...selectedProduct, ...(res?.product || updates) } as PayerntProduct);
       }
 
       toast.success("Product listing updated successfully!");
@@ -957,7 +1047,25 @@ export function MyProducts({
               </div>
 
               {/* Rental Rates & Availability Status */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 rounded-2xl bg-secondary/30 border border-border">
+              {/* Hidden file pickers for Cloudinary image uploads */}
+              <input
+                ref={primaryFileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handlePrimaryImageSelect}
+              />
+              <input
+                ref={galleryFileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={handleGalleryImagesSelect}
+              />
+
+              {/* Rental Rates, Deposit & Availability Status */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-3 rounded-2xl bg-secondary/30 border border-border">
                 <div>
                   <label className="block text-xs font-bold text-foreground mb-1">
                     Daily Rate (₹) <span className="text-destructive">*</span>
@@ -993,6 +1101,23 @@ export function MyProducts({
                 </div>
 
                 <div>
+                  <label className="block text-xs font-bold text-foreground mb-1">
+                    Security Deposit (₹) <span className="text-[10px] font-normal text-muted-foreground">(Refundable)</span>
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-2.5 top-2 text-xs font-mono text-muted-foreground">₹</span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={editFormData.securityDeposit}
+                      onChange={(e) => setEditFormData({ ...editFormData, securityDeposit: e.target.value })}
+                      placeholder="0"
+                      className="w-full pl-6 pr-3 py-1.5 rounded-xl border border-border bg-background text-foreground text-xs font-mono focus:outline-hidden focus:ring-1 focus:ring-foreground"
+                    />
+                  </div>
+                </div>
+
+                <div>
                   <label className="block text-xs font-bold text-foreground mb-1">Listing Status</label>
                   <select
                     value={editFormData.availabilityStatus}
@@ -1020,24 +1145,35 @@ export function MyProducts({
                 />
               </div>
 
-              {/* Image URL / Replacement */}
-              <div>
-                <label className="block text-xs font-bold text-foreground mb-1">
-                  Product Primary Image URL
-                </label>
+              {/* Product Primary Image & Cloudinary Device Upload */}
+              <div className="p-3 rounded-2xl bg-secondary/20 border border-border space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-foreground">
+                    Primary Product Photo
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => primaryFileInputRef.current?.click()}
+                    disabled={isUploadingMedia}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-secondary hover:bg-secondary/80 border border-border text-[11px] font-semibold text-foreground cursor-pointer disabled:opacity-50 transition-colors"
+                  >
+                    <Camera className="h-3 w-3 text-muted-foreground" />
+                    <span>Upload from Device</span>
+                  </button>
+                </div>
                 <div className="flex gap-2">
                   <input
                     type="url"
                     value={editFormData.primaryImage}
                     onChange={(e) => setEditFormData({ ...editFormData, primaryImage: e.target.value })}
-                    placeholder="https://images.unsplash.com/... or hosted image URL"
+                    placeholder="https://images.unsplash.com/... or upload via button"
                     className="w-full px-3 py-2 rounded-xl border border-border bg-background text-foreground text-xs font-mono focus:outline-hidden focus:ring-1 focus:ring-foreground"
                   />
                   {editFormData.primaryImage && (
                     <div className="h-9 w-9 rounded-xl overflow-hidden border border-border shrink-0 bg-secondary">
                       <img
                         src={editFormData.primaryImage}
-                        alt="Preview"
+                        alt="Primary Preview"
                         className="w-full h-full object-cover"
                         onError={(e) => {
                           (e.target as HTMLElement).style.display = "none";
@@ -1046,9 +1182,61 @@ export function MyProducts({
                     </div>
                   )}
                 </div>
-                <p className="text-[10px] text-muted-foreground mt-1">
-                  Provide a direct image URL or leave unchanged to preserve the current uploaded photo.
+                <p className="text-[10px] text-muted-foreground">
+                  Provide a direct hosted image URL or upload directly to cloud storage from your device.
                 </p>
+              </div>
+
+              {/* Gallery Photos Management */}
+              <div className="p-3 rounded-2xl bg-secondary/20 border border-border space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="block text-xs font-bold text-foreground">
+                      Gallery Photos ({editFormData.images.length})
+                    </label>
+                    <p className="text-[10px] text-muted-foreground">
+                      Additional angles, accessories, and serial number shots visible to renters.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => galleryFileInputRef.current?.click()}
+                    disabled={isUploadingMedia}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-secondary hover:bg-secondary/80 border border-border text-[11px] font-semibold text-foreground cursor-pointer disabled:opacity-50 transition-colors"
+                  >
+                    <Upload className="h-3 w-3 text-muted-foreground" />
+                    <span>Add Gallery Photos</span>
+                  </button>
+                </div>
+
+                {editFormData.images.length > 0 ? (
+                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 pt-1">
+                    {editFormData.images.map((imgUrl, idx) => (
+                      <div key={idx} className="relative group aspect-square rounded-xl overflow-hidden border border-border bg-card">
+                        <img
+                          src={imgUrl}
+                          alt={`Gallery ${idx + 1}`}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLElement).style.opacity = "0.3";
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveGalleryImage(idx)}
+                          className="absolute top-1 right-1 p-1 rounded-full bg-black/70 hover:bg-destructive text-white opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+                          title="Remove photo"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-3 rounded-xl border border-dashed border-border/80 text-center">
+                    <p className="text-xs text-muted-foreground">No extra gallery photos added yet.</p>
+                  </div>
+                )}
               </div>
 
               {/* Condition Grade & Details */}
@@ -1078,6 +1266,35 @@ export function MyProducts({
                     className="w-full px-3 py-2 rounded-xl border border-border bg-background text-foreground text-xs focus:outline-hidden focus:ring-1 focus:ring-foreground"
                   />
                 </div>
+              </div>
+
+              {/* Visible Cosmetic Wear / Damage Section */}
+              <div className="p-3 rounded-2xl bg-secondary/20 border border-border space-y-2">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editFormData.visibleDamage}
+                    onChange={(e) => setEditFormData({ ...editFormData, visibleDamage: e.target.checked })}
+                    className="rounded border-border text-foreground focus:ring-foreground h-4 w-4"
+                  />
+                  <span className="text-xs font-bold text-foreground">
+                    Equipment has visible wear, scuffs, or minor damage
+                  </span>
+                </label>
+                {editFormData.visibleDamage && (
+                  <div className="pt-1">
+                    <label className="block text-xs font-bold text-foreground mb-1">
+                      Damage Details & Locations <span className="text-destructive">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={editFormData.damageDetails}
+                      onChange={(e) => setEditFormData({ ...editFormData, damageDetails: e.target.value })}
+                      placeholder="e.g. Scuff mark on lens hood, minor rub mark near battery compartment"
+                      className="w-full px-3 py-2 rounded-xl border border-border bg-background text-foreground text-xs focus:outline-hidden focus:ring-1 focus:ring-foreground"
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Location Details */}
@@ -1114,6 +1331,20 @@ export function MyProducts({
                 </div>
               </div>
 
+              {/* Pickup Instructions */}
+              <div>
+                <label className="block text-xs font-bold text-foreground mb-1">
+                  Pickup Instructions & Landmarks
+                </label>
+                <input
+                  type="text"
+                  value={editFormData.pickupInstructions}
+                  onChange={(e) => setEditFormData({ ...editFormData, pickupInstructions: e.target.value })}
+                  placeholder="e.g. Gate 2, near HDFC Bank ATM, please bring original Govt ID for physical verification"
+                  className="w-full px-3 py-2 rounded-xl border border-border bg-background text-foreground text-xs focus:outline-hidden focus:ring-1 focus:ring-foreground"
+                />
+              </div>
+
               {/* Form Action Buttons */}
               <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-border">
                 <button
@@ -1125,10 +1356,15 @@ export function MyProducts({
                 </button>
                 <button
                   type="submit"
-                  disabled={isSavingEdit}
+                  disabled={isSavingEdit || isUploadingMedia}
                   className="px-5 py-2 rounded-xl bg-accent-primary hover:bg-accent-hover text-white text-xs font-bold active:scale-[0.98] cursor-pointer shadow-xs transition-all flex items-center gap-1.5 disabled:opacity-50"
                 >
-                  {isSavingEdit ? (
+                  {isUploadingMedia ? (
+                    <>
+                      <div className="h-3 w-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Uploading Media...</span>
+                    </>
+                  ) : isSavingEdit ? (
                     <>
                       <div className="h-3 w-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
                       <span>Saving Changes...</span>

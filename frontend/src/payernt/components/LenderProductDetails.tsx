@@ -118,13 +118,17 @@ export function LenderProductDetails({ productId: propId }: { productId?: string
     (typeof product.availability === "string" && product.availability === "available") ||
     Boolean(product.isAvailable);
 
-  const handlePriceSave = () => {
+  const handlePriceSave = async () => {
     const val = Number(newPrice);
     if (isNaN(val) || val <= 0) {
       toast.error("Please enter a valid price amount.");
       return;
     }
-    updateProduct(product.id, { pricePerDay: val, fairMarketPrice: val });
+    const res = await updateProduct(product.id, { pricePerDay: val, fairMarketPrice: val });
+    if (res && !res.success) {
+      toast.error(res.error || "Failed to update daily rate.");
+      return;
+    }
     setIsEditingPrice(false);
     toast.success(`Updated daily rental rate to ₹${val.toLocaleString("en-IN")}`);
   };

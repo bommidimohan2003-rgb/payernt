@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict, Any, Union, Tuple
 from fastapi import APIRouter, HTTPException, Depends, Header, status, Query, Request, Response
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field, EmailStr, validator
 from auth import (
     hash_password,
     verify_password,
@@ -315,14 +315,28 @@ def _sanitize_payernt_product(product: Dict[str, Any], include_pin: bool = False
         else 0
     )
 
+    deposit = int(
+        p.get("security_deposit")
+        if p.get("security_deposit") is not None
+        else p.get("securityDeposit")
+        if p.get("securityDeposit") is not None
+        else pricing_dict.get("securityDeposit")
+        if pricing_dict.get("securityDeposit") is not None
+        else pricing_dict.get("security_deposit")
+        if pricing_dict.get("security_deposit") is not None
+        else 0
+    )
+
     p["daily_rate"] = daily
     p["dailyRate"] = daily
     p["price"] = daily
+    p["security_deposit"] = deposit
+    p["securityDeposit"] = deposit
     p["pricing"] = {
         "daily": daily,
         "weekly": weekly,
         "monthly": monthly,
-        "securityDeposit": 0,
+        "securityDeposit": deposit,
         "minimumRentalDays": int(p.get("min_rental_days") or 1)
     }
 
@@ -471,6 +485,8 @@ class PayerntProductUpdateSchema(BaseModel):
     monthly_rate: Optional[int] = None
     monthlyRate: Optional[int] = None
     pricing: Optional[Dict[str, Any]] = None
+    security_deposit: Optional[int] = None
+    securityDeposit: Optional[int] = None
     available: Optional[bool] = None
     availability_status: Optional[str] = None
     availabilityStatus: Optional[str] = None
@@ -480,11 +496,39 @@ class PayerntProductUpdateSchema(BaseModel):
     imageUrl: Optional[str] = None
     images: Optional[List[str]] = None
     photos: Optional[List[Any]] = None
-    status: Optional[str] = None
     specs: Optional[Dict[str, Any]] = None
 
     class Config:
-        extra = "allow"
+        extra = "forbid"
+
+    @validator("title", "name", pre=True)
+    def validate_title(cls, v):
+        if v is not None:
+            if not isinstance(v, str) or len(v.strip()) < 3:
+                raise ValueError("Product title must be at least 3 characters long.")
+            return v.strip()
+        return v
+
+    @validator("daily_rate", "dailyRate", "price", "pricePerDay", pre=True)
+    def validate_rate(cls, v):
+        if v is not None:
+            try:
+                val = int(v)
+                if val <= 0:
+                    raise ValueError("Rental rate must be greater than 0.")
+                return val
+            except (ValueError, TypeError):
+                raise ValueError("Rental rate must be a valid positive integer.")
+        return v
+
+    @validator("availability_status", "availabilityStatus", pre=True)
+    def validate_availability(cls, v):
+        if v is not None:
+            val = str(v).lower().strip()
+            if val not in ("available", "paused"):
+                raise ValueError("Availability status must be either 'available' or 'paused'.")
+            return val
+        return v
 
 
 class ProductStatusUpdateSchema(BaseModel):
@@ -1357,9 +1401,13 @@ def update_vendor_product_endpoint(
     data: PayerntProductUpdateSchema,
     account: Dict[str, Any] = Depends(get_current_payernt_account),
 ):
-    """Updates vendor product specifications without modifying Vendor Secret PIN."""
+    """Updates vendor product specifications without modifying Vendor Secret PIN, ownership, or moderation status."""
     try:
         raw_dict = data.dict(exclude_unset=True)
+        # Defense-in-depth: explicitly strip any forbidden/privileged keys if present
+        for forbidden in ("status", "verification_status", "owner_id", "owner_email", "vendor_secret_pin", "vendorSecretPin", "id"):
+            raw_dict.pop(forbidden, None)
+
         # Normalize incoming camelCase fields
         if "primaryImage" in raw_dict and "primary_image" not in raw_dict:
             raw_dict["primary_image"] = raw_dict["primaryImage"]
@@ -1387,6 +1435,8 @@ def update_vendor_product_endpoint(
             raw_dict["pickup_instructions"] = raw_dict["pickupInstructions"]
         if "damageDetails" in raw_dict and "damage_details" not in raw_dict:
             raw_dict["damage_details"] = raw_dict["damageDetails"]
+        if "securityDeposit" in raw_dict and "security_deposit" not in raw_dict:
+            raw_dict["security_deposit"] = raw_dict["securityDeposit"]
 
         updated = update_payernt_product(product_id, account["id"], raw_dict)
         if not updated:
@@ -1395,6 +1445,16 @@ def update_vendor_product_endpoint(
         return {"success": True, "message": "Product updated successfully.", "product": sanitized}
     except PermissionError as err:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(err))
+    except ValueError as err:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(err))
+    except RuntimeError as err:
+        logger.error(f"Persistence error for product {product_id}: {err}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database persistence failed. Please try again.")
+    except Exception as err:
+        if isinstance(err, HTTPException):
+            raise err
+        logger.error(f"Unexpected error updating product {product_id}: {err}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update product.")
 
 
 @payernt_router.delete("/products/{product_id}")
@@ -1419,8 +1479,22 @@ def update_product_status_endpoint(
     account: Dict[str, Any] = Depends(get_current_payernt_account),
 ):
     """Updates status or availability status of a vendor's product."""
-    updates = {"status": data.status}
+    # Enforce that vendors cannot change moderation status to approved/verified
+    if data.status in ("approved", "verified"):
+        existing = get_payernt_product_by_id(product_id, include_pin=False)
+        if not existing or existing.get("owner_id") != account["id"]:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied.")
+        current_status = str(existing.get("status", "")).lower()
+        if current_status not in ("approved", "active"):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Vendors cannot self-approve unapproved listings.")
+
+    updates = {}
+    # Only update status if it is an allowed vendor state or preserving existing
+    if data.status:
+        updates["status"] = data.status
     if data.availability_status:
+        if data.availability_status not in ("available", "paused"):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid availability_status. Must be 'available' or 'paused'.")
         updates["availability_status"] = data.availability_status
     try:
         updated = update_payernt_product(product_id, account["id"], updates)
@@ -1429,6 +1503,11 @@ def update_product_status_endpoint(
         return {"success": True, "message": "Status updated successfully.", "product": updated}
     except PermissionError as err:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(err))
+    except ValueError as err:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(err))
+    except RuntimeError as err:
+        logger.error(f"Persistence error for product {product_id}/status: {err}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database persistence failed.")
 
 
 @payernt_router.post("/products/{product_id}/images")
