@@ -161,3 +161,55 @@ class TestProfilePhotoSystem(unittest.TestCase):
         )
         self.assertEqual(sync_res["profile_photo_url"], google_pic)
         self.assertEqual(sync_res["avatar"], google_pic)
+
+    def test_10_multi_table_photo_sync_and_get_me(self):
+        jpeg_uri = create_test_image_data_uri("JPEG")
+        res = self.client.post("/api/users/profile/photo", json={"profilePhotoUrl": jpeg_uri}, headers=self.headers)
+        self.assertEqual(res.status_code, 200)
+        uploaded_url = res.json()["profile_photo_url"]
+
+        # Call GET /api/auth/me immediately to verify persistence and retrieval
+        me_res = self.client.get("/api/auth/me", headers=self.headers)
+        self.assertEqual(me_res.status_code, 200)
+        me_data = me_res.json()
+        self.assertEqual(me_data["profilePhotoUrl"], uploaded_url)
+        self.assertEqual(me_data["avatar"], uploaded_url)
+
+        # Remove photo and verify GET /api/auth/me resets to empty string
+        del_res = self.client.delete("/api/users/profile/photo", headers=self.headers)
+        self.assertEqual(del_res.status_code, 200)
+        me_after_del = self.client.get("/api/auth/me", headers=self.headers)
+        self.assertEqual(me_after_del.status_code, 200)
+        self.assertEqual(me_after_del.json()["profilePhotoUrl"], "")
+
+    def test_11_admin_get_me_photo_neutrality(self):
+        admin_email = "admin_photo_test@payent.com"
+        admin_token = create_access_token({"sub": admin_email, "email": admin_email, "role": "admin"})
+        admin_headers = {"Authorization": f"Bearer {admin_token}"}
+        MOCK_USERS[admin_email] = {
+            "email": admin_email,
+            "full_name": "Admin Tester",
+            "role": "admin",
+            "status": "active",
+            "verified": True,
+            "avatar": None,
+            "profile_photo_url": None,
+        }
+
+        # Verify no fake unsplash default is returned when photo is absent
+        me_res = self.client.get("/api/admin/auth/me", headers=admin_headers)
+        self.assertEqual(me_res.status_code, 200)
+        self.assertNotIn("unsplash.com", me_res.json().get("avatar", ""))
+        self.assertEqual(me_res.json().get("profilePhotoUrl"), "")
+
+        # Upload admin photo
+        jpeg_uri = create_test_image_data_uri("JPEG")
+        up_res = self.client.post("/api/users/profile/photo", json={"profilePhotoUrl": jpeg_uri}, headers=admin_headers)
+        self.assertEqual(up_res.status_code, 200)
+        admin_photo = up_res.json()["profile_photo_url"]
+
+        # Verify /api/admin/auth/me reflects the new photo
+        me_updated = self.client.get("/api/admin/auth/me", headers=admin_headers)
+        self.assertEqual(me_updated.status_code, 200)
+        self.assertEqual(me_updated.json()["profilePhotoUrl"], admin_photo)
+        self.assertEqual(me_updated.json()["avatar"], admin_photo)

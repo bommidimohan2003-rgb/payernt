@@ -63,12 +63,23 @@ def init_payernt_tables():
             password_hash VARCHAR(255) NOT NULL,
             status VARCHAR(50) DEFAULT 'active',
             avatar LONGTEXT NULL,
+            profile_photo_url LONGTEXT NULL,
+            profile_photo_public_id VARCHAR(255) NULL,
             created_at VARCHAR(100) NOT NULL,
             last_login_at VARCHAR(100) NULL,
             INDEX idx_payernt_acc_email (email),
             INDEX idx_payernt_acc_phone (phone)
         )
     """)
+
+    try:
+        execute_query("ALTER TABLE payernt_accounts ADD COLUMN profile_photo_url LONGTEXT NULL")
+    except Exception:
+        pass
+    try:
+        execute_query("ALTER TABLE payernt_accounts ADD COLUMN profile_photo_public_id VARCHAR(255) NULL")
+    except Exception:
+        pass
 
     # 2. Products Table for paye₹nt
     execute_query("""

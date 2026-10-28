@@ -351,11 +351,20 @@ export default function Profile() {
     try {
       if (token) {
         const res = await api.uploadProfilePhoto(token, photoDataUrl);
-        if (res && res.user) {
-          updateUser(res.user);
-        } else {
-          updateUser({ avatar: photoDataUrl, profilePhotoUrl: photoDataUrl, profile_photo_url: photoDataUrl });
-        }
+        const savedUrl =
+          res?.profile_photo_url ||
+          res?.profilePhotoUrl ||
+          res?.avatar ||
+          res?.user?.profilePhotoUrl ||
+          res?.user?.profile_photo_url ||
+          res?.user?.avatar ||
+          photoDataUrl;
+        updateUser({
+          ...(res?.user || {}),
+          avatar: savedUrl,
+          profilePhotoUrl: savedUrl,
+          profile_photo_url: savedUrl,
+        });
       } else {
         updateUser({ avatar: photoDataUrl, profilePhotoUrl: photoDataUrl, profile_photo_url: photoDataUrl });
       }

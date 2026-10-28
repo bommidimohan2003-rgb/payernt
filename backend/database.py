@@ -362,6 +362,14 @@ def init_db(force: bool = False):
     add_index_safely("users", "idx_users_city", "city")
     add_index_safely("users", "idx_users_person_id", "person_id")
 
+    # Ensure profile photo columns exist across all account tables
+    add_column_safely("admin_accounts", "profile_photo_url LONGTEXT NULL")
+    add_column_safely("admin_accounts", "profile_photo_public_id VARCHAR(255) NULL")
+    add_column_safely("payrent_accounts", "profile_photo_url LONGTEXT NULL")
+    add_column_safely("payrent_accounts", "profile_photo_public_id VARCHAR(255) NULL")
+    add_column_safely("payernt_accounts", "profile_photo_url LONGTEXT NULL")
+    add_column_safely("payernt_accounts", "profile_photo_public_id VARCHAR(255) NULL")
+
     # Dedicated User KYC Verifications Table
     execute_query("""
         CREATE TABLE IF NOT EXISTS user_kyc_verifications (

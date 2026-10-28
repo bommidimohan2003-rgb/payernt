@@ -218,7 +218,13 @@ export function PayerntNavbar({
               aria-label={`${tCommon.profile}: ${displayName}`}
             >
               <ProfilePhoto
-                src={activeAccount?.avatar || activeUser?.avatar}
+                src={
+                  activeAccount?.profilePhotoUrl ||
+                  activeAccount?.profile_photo_url ||
+                  activeAccount?.avatar ||
+                  (activeUser as any)?.profilePhotoUrl ||
+                  activeUser?.avatar
+                }
                 alt={displayName}
                 size="sm"
                 shape="circle"

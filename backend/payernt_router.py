@@ -608,6 +608,10 @@ def _sanitize_payernt_account(account: Dict[str, Any]) -> Dict[str, Any]:
     aadhaar = sanitized.get("aadhaar_number") or ""
     sanitized["aadhaarNumber"] = aadhaar
     sanitized["aadhaarMasked"] = aadhaar
+    photo = account.get("profile_photo_url") or account.get("avatar") or ""
+    sanitized["profilePhotoUrl"] = photo
+    sanitized["profile_photo_url"] = photo
+    sanitized["avatar"] = photo
     sanitized["createdAt"] = sanitized.get("created_at")
     return sanitized
 

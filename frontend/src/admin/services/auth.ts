@@ -151,6 +151,8 @@ export const authService = {
           verified: true,
           avatar:
             response.data.avatar || response.data.profilePhotoUrl || "",
+          profilePhotoUrl:
+            response.data.profilePhotoUrl || response.data.avatar || "",
           createdAt: response.data.createdAt || response.data.created_at || new Date().toISOString(),
         };
 

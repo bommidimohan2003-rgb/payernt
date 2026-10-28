@@ -2402,16 +2402,24 @@ def update_profile_photo_route(
 
     try:
         execute_query(
-            "UPDATE payernt_accounts SET avatar = %s WHERE LOWER(email) = LOWER(%s)",
-            (stored_url, clean_email)
+            "UPDATE admin_accounts SET profile_photo_url = %s, avatar = %s, profile_photo_public_id = %s WHERE LOWER(email) = LOWER(%s)",
+            (stored_url, stored_url, new_public_id, clean_email)
         )
     except Exception:
         pass
 
     try:
         execute_query(
-            "UPDATE payrent_accounts SET avatar = %s WHERE LOWER(email) = LOWER(%s)",
-            (stored_url, clean_email)
+            "UPDATE payrent_accounts SET profile_photo_url = %s, avatar = %s, profile_photo_public_id = %s WHERE LOWER(email) = LOWER(%s)",
+            (stored_url, stored_url, new_public_id, clean_email)
+        )
+    except Exception:
+        pass
+
+    try:
+        execute_query(
+            "UPDATE payernt_accounts SET profile_photo_url = %s, avatar = %s, profile_photo_public_id = %s WHERE LOWER(email) = LOWER(%s)",
+            (stored_url, stored_url, new_public_id, clean_email)
         )
     except Exception:
         pass
@@ -2505,7 +2513,7 @@ def delete_profile_photo_route(
 
     try:
         execute_query(
-            "UPDATE payernt_accounts SET avatar = NULL WHERE LOWER(email) = LOWER(%s)",
+            "UPDATE admin_accounts SET profile_photo_url = NULL, avatar = NULL, profile_photo_public_id = NULL WHERE LOWER(email) = LOWER(%s)",
             (clean_email,)
         )
     except Exception:
@@ -2513,7 +2521,15 @@ def delete_profile_photo_route(
 
     try:
         execute_query(
-            "UPDATE payrent_accounts SET avatar = NULL WHERE LOWER(email) = LOWER(%s)",
+            "UPDATE payrent_accounts SET profile_photo_url = NULL, avatar = NULL, profile_photo_public_id = NULL WHERE LOWER(email) = LOWER(%s)",
+            (clean_email,)
+        )
+    except Exception:
+        pass
+
+    try:
+        execute_query(
+            "UPDATE payernt_accounts SET profile_photo_url = NULL, avatar = NULL, profile_photo_public_id = NULL WHERE LOWER(email) = LOWER(%s)",
             (clean_email,)
         )
     except Exception:
@@ -7859,6 +7875,7 @@ def admin_logout(request: Request, response: Response, authorization: Optional[s
 
 @app.get("/api/admin/auth/me")
 def admin_get_me(current_admin: dict = Depends(check_admin_user)):
+    photo = current_admin.get("profile_photo_url") or current_admin.get("avatar") or ""
     return {
         "id": current_admin["email"],
         "fullName": current_admin.get("full_name") or current_admin.get("name") or "Admin",
@@ -7867,7 +7884,9 @@ def admin_get_me(current_admin: dict = Depends(check_admin_user)):
         "role": current_admin.get("role", "admin"),
         "status": current_admin.get("status") or "active",
         "verified": bool(current_admin.get("verified", True)),
-        "avatar": current_admin.get("avatar") or "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150",
+        "profilePhotoUrl": photo,
+        "profile_photo_url": photo,
+        "avatar": photo,
         "createdAt": current_admin.get("created_at")
     }
 

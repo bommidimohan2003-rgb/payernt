@@ -133,13 +133,23 @@ export function useAuth() {
       setUser(null);
     };
 
+    const onProfilePhotoUpdated = () => {
+      _lastAuthFetchTime = 0;
+      const updated = storage.get<User | null>(STORAGE_KEYS.currentUser, null);
+      if (updated) {
+        setUser(updated);
+      }
+    };
+
     window.addEventListener("storage", onStorage);
     window.addEventListener("payent:storage_change", onStorage);
+    window.addEventListener("payent:profile_photo_updated", onProfilePhotoUpdated);
     window.addEventListener("payent-session-expired", onSessionExpired);
     return () => {
       isMounted = false;
       window.removeEventListener("storage", onStorage);
       window.removeEventListener("payent:storage_change", onStorage);
+      window.removeEventListener("payent:profile_photo_updated", onProfilePhotoUpdated);
       window.removeEventListener("payent-session-expired", onSessionExpired);
     };
   }, []);
@@ -351,9 +361,28 @@ export function useAuth() {
   }, []);
 
   const updateUser = useCallback((patch: Partial<User>) => {
+    _lastAuthFetchTime = 0;
     setUser((prev) => {
       if (!prev) return prev;
-      const merged = { ...prev, ...patch };
+      const photo =
+        patch.profilePhotoUrl !== undefined
+          ? patch.profilePhotoUrl
+          : (patch as any).profile_photo_url !== undefined
+          ? (patch as any).profile_photo_url
+          : patch.avatar !== undefined
+          ? patch.avatar
+          : prev.profilePhotoUrl || prev.avatar;
+      const merged: User = {
+        ...prev,
+        ...patch,
+        ...(photo !== undefined
+          ? {
+              profilePhotoUrl: photo || "",
+              avatar: photo || "",
+              profile_photo_url: photo || "",
+            } as any
+          : {}),
+      };
       storage.set(STORAGE_KEYS.currentUser, merged);
       return merged;
     });

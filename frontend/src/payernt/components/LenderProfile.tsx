@@ -67,15 +67,37 @@ export function LenderProfileView({
   const [address, setAddress] = useState(activeAccount?.address || profile.address || "");
   const [pincode, setPincode] = useState(activeAccount?.pincode || profile.pincode || "");
 
-  const activePhoto = activeAccount?.avatar || profile.avatar || "";
+  const activePhoto =
+    activeAccount?.profilePhotoUrl ||
+    activeAccount?.profile_photo_url ||
+    activeAccount?.avatar ||
+    profile.profilePhotoUrl ||
+    profile.profile_photo_url ||
+    profile.avatar ||
+    "";
 
   const handleUploadPhoto = async (photoDataUrl: string) => {
-    onUpdateProfile({ avatar: photoDataUrl });
     const token = storage.get<string | null>(STORAGE_KEYS.token, null) ||
                   (typeof window !== "undefined" ? localStorage.getItem("paye₹nt_token") : null);
+    let savedUrl = photoDataUrl;
     if (token) {
-      await api.uploadProfilePhoto(token, photoDataUrl).catch(() => {});
+      const res = await api.uploadProfilePhoto(token, photoDataUrl).catch(() => null);
+      if (res) {
+        savedUrl =
+          res.profile_photo_url ||
+          res.profilePhotoUrl ||
+          res.avatar ||
+          res.user?.profilePhotoUrl ||
+          res.user?.profile_photo_url ||
+          res.user?.avatar ||
+          photoDataUrl;
+      }
     }
+    onUpdateProfile({
+      avatar: savedUrl,
+      profilePhotoUrl: savedUrl,
+      profile_photo_url: savedUrl,
+    });
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("payent:profile_photo_updated"));
       window.dispatchEvent(new CustomEvent("payent:storage_change"));
@@ -84,7 +106,7 @@ export function LenderProfileView({
   };
 
   const handleRemovePhoto = async () => {
-    onUpdateProfile({ avatar: "" });
+    onUpdateProfile({ avatar: "", profilePhotoUrl: "", profile_photo_url: "" });
     const token = storage.get<string | null>(STORAGE_KEYS.token, null) ||
                   (typeof window !== "undefined" ? localStorage.getItem("paye₹nt_token") : null);
     if (token) {

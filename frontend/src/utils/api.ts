@@ -243,7 +243,13 @@ export const api = {
 
   clearUserCache() {
     for (const [k, v] of Array.from(_clientCache.entries())) {
-      if (v.userEmail || k.startsWith("user_")) {
+      if (
+        v.userEmail ||
+        k.startsWith("user_") ||
+        k.startsWith("auth_profile_") ||
+        k.includes("profile") ||
+        k.includes("auth_")
+      ) {
         _clientCache.delete(k);
       }
     }
@@ -748,7 +754,25 @@ export const api = {
       const data = await res.json().catch(() => ({}));
       throw new Error(parseApiError(data, "Failed to upload profile photo."));
     }
-    return await res.json();
+    const result = await res.json();
+    this.invalidateCache("auth_profile_");
+    this.clearUserCache();
+    const savedUrl =
+      result?.profile_photo_url ||
+      result?.profilePhotoUrl ||
+      result?.avatar ||
+      result?.user?.profilePhotoUrl ||
+      result?.user?.profile_photo_url ||
+      result?.user?.avatar ||
+      photoUrl;
+    const cached = storage.get<User | null>(STORAGE_KEYS.currentUser, null);
+    if (cached) {
+      cached.avatar = savedUrl;
+      cached.profilePhotoUrl = savedUrl;
+      cached.profile_photo_url = savedUrl;
+      storage.set(STORAGE_KEYS.currentUser, cached);
+    }
+    return result;
   },
 
   async deleteProfilePhoto(token: string) {
@@ -772,7 +796,17 @@ export const api = {
       const data = await res.json().catch(() => ({}));
       throw new Error(parseApiError(data, "Failed to remove profile photo."));
     }
-    return await res.json();
+    const result = await res.json();
+    this.invalidateCache("auth_profile_");
+    this.clearUserCache();
+    const cached = storage.get<User | null>(STORAGE_KEYS.currentUser, null);
+    if (cached) {
+      cached.avatar = "";
+      cached.profilePhotoUrl = "";
+      cached.profile_photo_url = "";
+      storage.set(STORAGE_KEYS.currentUser, cached);
+    }
+    return result;
   },
 
   async reverseGeocode(
