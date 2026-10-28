@@ -101,6 +101,7 @@ import { Route as PayerntProductsIdRouteImport } from './routes/payernt/products
 import { Route as PayerntProductsCreateRouteImport } from './routes/payernt/products.create'
 import { Route as VerifyDeviceTokenRouteImport } from './routes/verify.device.$token'
 import { Route as AdminProductsIdReviewRouteImport } from './routes/admin/products.$id.review'
+import { Route as PayerntProductsIdEditRouteImport } from './routes/payernt/products.$id.edit'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -562,6 +563,11 @@ const AdminProductsIdReviewRoute = AdminProductsIdReviewRouteImport.update({
   path: '/review',
   getParentRoute: () => AdminProductsIdRoute,
 } as any)
+const PayerntProductsIdEditRoute = PayerntProductsIdEditRouteImport.update({
+  id: '/edit',
+  path: '/edit',
+  getParentRoute: () => PayerntProductsIdRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -652,10 +658,11 @@ export interface FileRoutesByFullPath {
   '/payernt/': typeof PayerntIndexRoute
   '/admin/products/$id': typeof AdminProductsIdRouteWithChildren
   '/payent/products/$id': typeof PayentProductsIdRoute
-  '/payernt/products/$id': typeof PayerntProductsIdRoute
+  '/payernt/products/$id': typeof PayerntProductsIdRouteWithChildren
   '/payernt/products/create': typeof PayerntProductsCreateRoute
   '/verify/device/$token': typeof VerifyDeviceTokenRoute
   '/admin/products/$id/review': typeof AdminProductsIdReviewRoute
+  '/payernt/products/$id/edit': typeof PayerntProductsIdEditRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -743,10 +750,11 @@ export interface FileRoutesByTo {
   '/payernt': typeof PayerntIndexRoute
   '/admin/products/$id': typeof AdminProductsIdRouteWithChildren
   '/payent/products/$id': typeof PayentProductsIdRoute
-  '/payernt/products/$id': typeof PayerntProductsIdRoute
+  '/payernt/products/$id': typeof PayerntProductsIdRouteWithChildren
   '/payernt/products/create': typeof PayerntProductsCreateRoute
   '/verify/device/$token': typeof VerifyDeviceTokenRoute
   '/admin/products/$id/review': typeof AdminProductsIdReviewRoute
+  '/payernt/products/$id/edit': typeof PayerntProductsIdEditRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -838,10 +846,11 @@ export interface FileRoutesById {
   '/payernt/': typeof PayerntIndexRoute
   '/admin/products/$id': typeof AdminProductsIdRouteWithChildren
   '/payent/products/$id': typeof PayentProductsIdRoute
-  '/payernt/products/$id': typeof PayerntProductsIdRoute
+  '/payernt/products/$id': typeof PayerntProductsIdRouteWithChildren
   '/payernt/products/create': typeof PayerntProductsCreateRoute
   '/verify/device/$token': typeof VerifyDeviceTokenRoute
   '/admin/products/$id/review': typeof AdminProductsIdReviewRoute
+  '/payernt/products/$id/edit': typeof PayerntProductsIdEditRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -938,6 +947,7 @@ export interface FileRouteTypes {
     | '/payernt/products/create'
     | '/verify/device/$token'
     | '/admin/products/$id/review'
+    | '/payernt/products/$id/edit'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -1029,6 +1039,7 @@ export interface FileRouteTypes {
     | '/payernt/products/create'
     | '/verify/device/$token'
     | '/admin/products/$id/review'
+    | '/payernt/products/$id/edit'
   id:
     | '__root__'
     | '/'
@@ -1123,6 +1134,7 @@ export interface FileRouteTypes {
     | '/payernt/products/create'
     | '/verify/device/$token'
     | '/admin/products/$id/review'
+    | '/payernt/products/$id/edit'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -1811,6 +1823,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminProductsIdReviewRouteImport
       parentRoute: typeof AdminProductsIdRoute
     }
+    '/payernt/products/$id/edit': {
+      id: '/payernt/products/$id/edit'
+      path: '/edit'
+      fullPath: '/payernt/products/$id/edit'
+      preLoaderRoute: typeof PayerntProductsIdEditRouteImport
+      parentRoute: typeof PayerntProductsIdRoute
+    }
   }
 }
 
@@ -1927,13 +1946,24 @@ const PayentRouteChildren: PayentRouteChildren = {
 const PayentRouteWithChildren =
   PayentRoute._addFileChildren(PayentRouteChildren)
 
+interface PayerntProductsIdRouteChildren {
+  PayerntProductsIdEditRoute: typeof PayerntProductsIdEditRoute
+}
+
+const PayerntProductsIdRouteChildren: PayerntProductsIdRouteChildren = {
+  PayerntProductsIdEditRoute: PayerntProductsIdEditRoute,
+}
+
+const PayerntProductsIdRouteWithChildren =
+  PayerntProductsIdRoute._addFileChildren(PayerntProductsIdRouteChildren)
+
 interface PayerntProductsRouteChildren {
-  PayerntProductsIdRoute: typeof PayerntProductsIdRoute
+  PayerntProductsIdRoute: typeof PayerntProductsIdRouteWithChildren
   PayerntProductsCreateRoute: typeof PayerntProductsCreateRoute
 }
 
 const PayerntProductsRouteChildren: PayerntProductsRouteChildren = {
-  PayerntProductsIdRoute: PayerntProductsIdRoute,
+  PayerntProductsIdRoute: PayerntProductsIdRouteWithChildren,
   PayerntProductsCreateRoute: PayerntProductsCreateRoute,
 }
 

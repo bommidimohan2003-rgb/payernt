@@ -41,6 +41,7 @@ export function LenderProductDetails({ productId: propId }: { productId?: string
   const { userProducts, toggleAvailability, deleteProduct, updateProduct } = usePayernt();
 
   const [product, setProduct] = useState<PayerntProduct | null>(null);
+  const [isLoadingProduct, setIsLoadingProduct] = useState(true);
   const [isEditingPrice, setIsEditingPrice] = useState(false);
   const [newPrice, setNewPrice] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -73,14 +74,50 @@ export function LenderProductDetails({ productId: propId }: { productId?: string
   }, [productId]);
 
   useEffect(() => {
+    if (!productId) {
+      setIsLoadingProduct(false);
+      return;
+    }
+
     const found = userProducts.find(
       (p) => String(p.id) === String(productId) || String(p.title).toLowerCase().replace(/\s+/g, "-") === productId
     );
+
     if (found) {
       setProduct(found);
-      setNewPrice(String(found.pricePerDay || found.fairMarketPrice || ""));
+      const rate = found.pricing?.daily ?? (found as any).daily_rate ?? found.pricePerDay ?? found.fairMarketPrice ?? 500;
+      setNewPrice(String(rate));
+      setIsLoadingProduct(false);
+    } else {
+      setIsLoadingProduct(true);
+      payerntApi
+        .getProductById(productId)
+        .then((res) => {
+          if (res.success && res.product) {
+            setProduct(res.product);
+            const rate = res.product.pricing?.daily ?? (res.product as any).daily_rate ?? res.product.pricePerDay ?? res.product.fairMarketPrice ?? 500;
+            setNewPrice(String(rate));
+          }
+        })
+        .catch((e) => {
+          console.warn("[LenderProductDetails] Error fetching product:", e);
+        })
+        .finally(() => {
+          setIsLoadingProduct(false);
+        });
     }
   }, [productId, userProducts]);
+
+  if (isLoadingProduct) {
+    return (
+      <div className="min-h-[50vh] flex flex-col items-center justify-center text-center p-8 space-y-4 max-w-4xl mx-auto">
+        <div className="w-12 h-12 rounded-2xl bg-secondary/80 border border-border flex items-center justify-center animate-pulse">
+          <Clock className="w-6 h-6 text-muted-foreground animate-spin" />
+        </div>
+        <p className="text-sm font-semibold text-muted-foreground">Loading product inspection details...</p>
+      </div>
+    );
+  }
 
   if (!product) {
     return (
@@ -187,15 +224,30 @@ export function LenderProductDetails({ productId: propId }: { productId?: string
     <div className="space-y-6 max-w-5xl mx-auto">
       {/* Top Breadcrumb & Action Bar */}
       <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-border/80">
-        <button
-          onClick={() => navigate({ to: "/payernt/products" })}
-          className="inline-flex items-center gap-2 text-xs font-bold text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to My Products
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => navigate({ to: "/payernt/products" })}
+            className="inline-flex items-center gap-2 text-xs font-bold text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to My Products
+          </button>
+          <div className="h-4 w-px bg-border" />
+          <span className="text-xs font-mono text-muted-foreground">
+            Listing ID: #{product.id}
+          </span>
+        </div>
 
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => navigate({ to: "/payernt/products/$id/edit", params: { id: product.id } })}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-primary text-primary-foreground hover:bg-primary/90 transition-all cursor-pointer shadow-xs active:scale-98"
+          >
+            <Edit3 className="w-3.5 h-3.5" />
+            <span>Edit Listing</span>
+          </button>
+
           <button
             onClick={() => {
               toggleAvailability(product.id);
@@ -356,6 +408,62 @@ export function LenderProductDetails({ productId: propId }: { productId?: string
                 </div>
               </div>
             )}
+
+            {/* Condition & Damage Disclosure */}
+            <div className="pt-3 border-t border-border/70 space-y-2">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Condition & Physical Wear
+                </h3>
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-secondary text-foreground border border-border">
+                  {typeof product.condition === "object" ? product.condition?.grade || "Good" : product.condition || "Good"}
+                </span>
+              </div>
+              {(typeof product.condition === "object" && (product.condition?.additionalNotes || product.condition?.notes)) && (
+                <p className="text-xs text-foreground/80 leading-relaxed">
+                  {product.condition?.additionalNotes || product.condition?.notes}
+                </p>
+              )}
+              {(product.damageDetails || (typeof product.condition === "object" && product.condition?.visibleDamage)) ? (
+                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-700 dark:text-amber-400 space-y-1">
+                  <span className="font-bold flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    Disclosed Cosmetic Wear / Scuffs:
+                  </span>
+                  <p className="text-[11px] leading-relaxed">
+                    {product.damageDetails || (typeof product.condition === "object" ? product.condition?.damageDetails || product.condition?.damageDescription : "") || "Disclosed cosmetic markings."}
+                  </p>
+                </div>
+              ) : (
+                <div className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                  <span>No visible cosmetic wear or physical defects reported.</span>
+                </div>
+              )}
+            </div>
+
+            {/* Handover Location & Pickup Instructions */}
+            <div className="pt-3 border-t border-border/70 space-y-2">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Handover & Pickup Instructions
+              </h3>
+              <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
+                <MapPin className="w-3.5 h-3.5 text-primary shrink-0" />
+                <span>
+                  {[
+                    typeof product.location === "object" ? product.location?.area : (product as any).area,
+                    typeof product.location === "object" ? product.location?.city : (product.city || ""),
+                    typeof product.location === "object" ? product.location?.pincode : ((product as any).pincode || ""),
+                  ].filter(Boolean).join(", ") || "Visakhapatnam, Andhra Pradesh"}
+                </span>
+              </div>
+              {(product.pickupInstructions || (product as any).pickup_instructions || (typeof product.location === "object" && product.location?.pickupInstructions)) && (
+                <div className="p-3 rounded-xl bg-secondary/50 border border-border/70 text-xs text-muted-foreground leading-relaxed">
+                  <span className="font-bold text-foreground block mb-0.5">Instructions for Renter:</span>
+                  {product.pickupInstructions || (product as any).pickup_instructions || (typeof product.location === "object" ? product.location?.pickupInstructions : "")}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* 10-Second Equipment Inspection Video */}
@@ -435,6 +543,18 @@ export function LenderProductDetails({ productId: propId }: { productId?: string
             )}
 
             <div className="pt-3 border-t border-border/70 text-xs space-y-2 text-muted-foreground">
+              <div className="flex justify-between">
+                <span>Weekly Rate</span>
+                <span className="font-bold text-foreground">
+                  ₹{Number(product.pricing?.weekly || (product as any).weekly_rate || Math.round(Number(product.pricing?.daily || (product as any).daily_rate || product.price || 500) * 7 * 0.85)).toLocaleString("en-IN")}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Monthly Rate</span>
+                <span className="font-bold text-foreground">
+                  ₹{Number(product.pricing?.monthly || (product as any).monthly_rate || Math.round(Number(product.pricing?.daily || (product as any).daily_rate || product.price || 500) * 30 * 0.7)).toLocaleString("en-IN")}
+                </span>
+              </div>
               <div className="flex justify-between">
                 <span>Security Deposit</span>
                 <span className="font-bold text-foreground">

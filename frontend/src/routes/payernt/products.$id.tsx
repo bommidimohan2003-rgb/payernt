@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Outlet, useLocation } from "@tanstack/react-router";
 import { LenderProductDetails } from "@/payernt/components/LenderProductDetails";
 import { getSeoMetadata } from "@/utils/seo";
 
@@ -14,6 +14,16 @@ export const Route = createFileRoute("/payernt/products/$id")({
 
 function LenderProductDetailsRoute() {
   const { id } = Route.useParams();
+  const location = useLocation();
+
+  const isExactDetails =
+    location.pathname === `/payernt/products/${id}` ||
+    location.pathname === `/payernt/products/${id}/`;
+
+  if (!isExactDetails) {
+    return <Outlet />;
+  }
+
   return <LenderProductDetails productId={id} />;
 }
 
