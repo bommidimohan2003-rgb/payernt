@@ -10,7 +10,6 @@ import {
   AlertCircle,
   Clock,
   IndianRupee,
-  Layers,
   Sparkles,
   Star,
   ShieldCheck,
@@ -27,7 +26,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import type { PayerntProduct, VerificationStatus } from "../types";
-import { resolveProductImageUrl, resolveAllProductImages } from "../productUtils";
+import { resolveProductImageUrl } from "../productUtils";
 
 export interface MyProductsProps {
   products: PayerntProduct[];
@@ -296,8 +295,6 @@ export function MyProducts({
                 : product.location || "Visakhapatnam";
             const hasVideo = Boolean(product.videoUrl || (product as any).video_url);
             const imgUrl = resolveProductImageUrl(product);
-            const allImages = resolveAllProductImages(product);
-            const galleryCount = allImages.length;
             const isPaused = product.availabilityStatus === "paused";
 
             return (
@@ -365,17 +362,6 @@ export function MyProducts({
                         </div>
                       )}
                     </div>
-
-                    {/* Gallery count badge below the top badges */}
-                    {galleryCount > 1 && (
-                      <div
-                        className="inline-flex items-center gap-1 bg-black/60 backdrop-blur-md text-neutral-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-white/15 shadow-sm w-fit"
-                        title={`${galleryCount} Photos Available`}
-                      >
-                        <Layers className="h-3 w-3 text-neutral-300" />
-                        <span>{galleryCount} photos</span>
-                      </div>
-                    )}
                   </div>
 
                   {/* Top-right vendor management buttons (Edit & Delete) */}

@@ -73,13 +73,6 @@ const perks = [
   },
 ];
 
-interface GearPhoto {
-  id: string;
-  url: string;
-  tag: string;
-  isPrimary: boolean;
-}
-
 const CATEGORIES = [
   {
     id: "cameras",
@@ -161,89 +154,42 @@ export default function BecomeLender() {
   const [price, setPrice] = useState(search.price || "");
   const [description, setDescription] = useState(search.description || "");
 
-  // Photos State
-  const [photos, setPhotos] = useState<GearPhoto[]>([]);
+  // Photo State
+  const [primaryImage, setPrimaryImage] = useState<string>("");
   const [isCameraOpen, setIsCameraOpen] = useState(false);
-  const [activeAngleTag, setActiveAngleTag] = useState("Front View");
 
   // File input ref for fallbacks
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
 
   // Handlers for Camera Capture
-  const handleCameraCapture = async (imageDataUrl: string, angleTag?: string) => {
+  const handleCameraCapture = async (imageDataUrl: string) => {
     try {
       const compressedUrl = await compressImage(imageDataUrl, 1200, 0.82);
-      const newPhoto: GearPhoto = {
-        id: `photo-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-        url: compressedUrl,
-        tag: angleTag || "Front View",
-        isPrimary: photos.length === 0,
-      };
-      setPhotos((prev) => [...prev, newPhoto]);
-      toast.success(`Photo added (${newPhoto.tag})`);
+      setPrimaryImage(compressedUrl);
+      toast.success("Product photo captured successfully!");
     } catch {
-      const newPhoto: GearPhoto = {
-        id: `photo-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-        url: imageDataUrl,
-        tag: angleTag || "Front View",
-        isPrimary: photos.length === 0,
-      };
-      setPhotos((prev) => [...prev, newPhoto]);
-      toast.success(`Photo added (${newPhoto.tag})`);
+      setPrimaryImage(imageDataUrl);
+      toast.success("Product photo captured successfully!");
     }
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-    for (const file of Array.from(files)) {
-      if (file.size > 20 * 1024 * 1024) {
-        toast.error(`${file.name} is too large (> 20MB).`);
-        continue;
-      }
-      try {
-        const compressedUrl = await compressImage(file, 1200, 0.82);
-        setPhotos((prev) => [
-          ...prev,
-          {
-            id: `photo-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-            url: compressedUrl,
-            tag: prev.length === 0 ? "Front View" : "Gear Angle",
-            isPrimary: prev.length === 0,
-          },
-        ]);
-      } catch {
-        toast.error(`Failed to process image: ${file.name}`);
-      }
+    if (file.size > 20 * 1024 * 1024) {
+      toast.error(`${file.name} is too large (> 20MB).`);
+      return;
+    }
+    try {
+      const compressedUrl = await compressImage(file, 1200, 0.82);
+      setPrimaryImage(compressedUrl);
+      toast.success("Product photo selected successfully!");
+    } catch {
+      toast.error(`Failed to process image: ${file.name}`);
     }
     e.target.value = "";
   };
-
-  const handleRemovePhoto = (id: string) => {
-    setPhotos((prev) => {
-      const filtered = prev.filter((p) => p.id !== id);
-      if (filtered.length > 0 && !filtered.some((p) => p.isPrimary)) {
-        filtered[0].isPrimary = true;
-      }
-      return filtered;
-    });
-  };
-
-  const handleSetPrimaryPhoto = (id: string) => {
-    setPhotos((prev) =>
-      prev.map((p) => ({
-        ...p,
-        isPrimary: p.id === id,
-      }))
-    );
-  };
-
-  // Primary image preview
-  const primaryImage =
-    photos.find((p) => p.isPrimary)?.url ||
-    photos[0]?.url ||
-    "";
 
   // Form Submit Handler
   const onSubmit = async (e: React.FormEvent) => {
@@ -323,12 +269,11 @@ export default function BecomeLender() {
 
   return (
     <MainLayout>
-      {/* Hidden File Input for Gallery Selection */}
+      {/* Hidden File Input for fallback upload */}
       <input
         ref={fileInputRef}
         type="file"
         accept="image/*"
-        multiple
         onChange={handleFileChange}
         className="hidden"
       />
@@ -340,7 +285,6 @@ export default function BecomeLender() {
           onClose={() => setIsCameraOpen(false)}
           onCapture={handleCameraCapture}
           onFallbackUpload={() => fileInputRef.current?.click()}
-          angleTag={activeAngleTag}
         />
       )}
 
@@ -752,116 +696,103 @@ export default function BecomeLender() {
                       </div>
                     )}
 
-                    {/* STEP 2: DIRECT CAMERA CAPTURE & PHOTO UPLOAD */}
+                    {/* STEP 2: DIRECT CAMERA CAPTURE & PRIMARY PHOTO */}
                     {currentStep === 2 && (
                       <div className="space-y-6 animate-in fade-in duration-200">
                         <div>
-                          <label className="text-xs font-bold text-foreground block mb-3">
-                            Snap Photos with Camera or Upload
+                          <label className="text-xs font-bold text-foreground block mb-1">
+                            Product Photography
                           </label>
-
-                          <div className="grid sm:grid-cols-2 gap-4">
-                            {/* DIRECT CAMERA ACTION BUTTON */}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setActiveAngleTag(
-                                  photos.length === 0
-                                    ? "Front View"
-                                    : photos.length === 1
-                                    ? "Side Angle"
-                                    : "Accessories/Serial"
-                                );
-                                setIsCameraOpen(true);
-                              }}
-                              className="p-5 rounded-3xl border-2 border-primary/50 bg-gradient-to-br from-primary/20 via-rose-500/10 to-primary/5 text-left flex items-center gap-4 shadow-md cursor-pointer hover:border-primary transition-all"
-                            >
-                              <div className="h-14 w-14 rounded-2xl bg-primary text-primary-foreground grid place-items-center shadow-lg">
-                                <Camera className="h-7 w-7" />
-                              </div>
-                              <div>
-                                <h4 className="font-bold text-sm text-foreground flex items-center gap-1.5 font-display">
-                                  Take Photo with Camera
-                                  <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-                                </h4>
-                                <p className="text-xs text-muted-foreground mt-0.5">
-                                  Snap product photos directly from device camera
-                                </p>
-                              </div>
-                            </button>
-
-                            {/* FILE UPLOAD DROPZONE BUTTON */}
-                            <button
-                              type="button"
-                              onClick={() => fileInputRef.current?.click()}
-                              className="p-5 rounded-3xl border-2 border-dashed border-border bg-card text-left flex items-center gap-4 cursor-pointer hover:border-primary/50 transition-all"
-                            >
-                              <div className="h-14 w-14 rounded-2xl bg-secondary text-foreground grid place-items-center">
-                                <Upload className="h-6 w-6" />
-                              </div>
-                              <div>
-                                <h4 className="font-bold text-sm text-foreground font-display">
-                                  Upload Image File
-                                </h4>
-                                <p className="text-xs text-muted-foreground mt-0.5">
-                                  Select existing photos from gallery
-                                </p>
-                              </div>
-                            </button>
-                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Capture your primary product photo using your real phone camera.
+                          </p>
                         </div>
 
-                        {/* Photo Gallery Thumbnails */}
-                        {photos.length > 0 && (
-                          <div className="space-y-3">
-                            <div className="flex items-center justify-between text-xs font-bold text-foreground">
-                              <span>Captured Gallery ({photos.length})</span>
-                              <span className="text-xs text-muted-foreground font-normal">
-                                Tap thumbnail to select primary image
+                        {/* Primary Image Preview if available */}
+                        {primaryImage ? (
+                          <div className="relative aspect-video sm:aspect-[16/9] max-h-72 rounded-3xl overflow-hidden border border-border bg-neutral-900 shadow-md">
+                            <img
+                              src={primaryImage}
+                              alt="Primary Product Photo"
+                              className="w-full h-full object-cover object-center"
+                            />
+                            <div className="absolute top-3 left-3">
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/70 backdrop-blur-md text-[11px] font-bold text-white border border-white/15 shadow-sm">
+                                <Sparkles className="w-3 h-3 text-amber-400" />
+                                Primary Photo
                               </span>
                             </div>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5">
-                              {photos.map((photo) => (
-                                <div
-                                  key={photo.id}
-                                  onClick={() => handleSetPrimaryPhoto(photo.id)}
-                                  className={`relative aspect-square rounded-2xl overflow-hidden border-2 cursor-pointer bg-black/40 shadow-sm ${
-                                    photo.isPrimary
-                                      ? "border-primary ring-2 ring-primary/40"
-                                      : "border-border"
-                                  }`}
-                                >
-                                  <img
-                                    src={photo.url}
-                                    alt="Gear angle"
-                                    className="h-full w-full object-cover"
-                                  />
-                                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-90" />
-                                  <span className="absolute bottom-2 left-2 text-xs font-bold text-white bg-black/70 px-2 py-0.5 rounded-md backdrop-blur-md">
-                                    {photo.tag}
-                                  </span>
-
-                                  {photo.isPrimary && (
-                                    <span className="absolute top-2 left-2 text-[10px] font-bold text-black bg-primary px-2 py-0.5 rounded-full flex items-center gap-1 shadow-md">
-                                      <Check className="h-2.5 w-2.5" /> Primary
-                                    </span>
-                                  )}
-
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleRemovePhoto(photo.id);
-                                    }}
-                                    className="absolute top-2 right-2 h-7 w-7 rounded-full bg-black/80 text-red-400 grid place-items-center"
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </button>
-                                </div>
-                              ))}
+                            <button
+                              type="button"
+                              onClick={() => setIsCameraOpen(true)}
+                              className="absolute bottom-3 right-3 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-black/75 hover:bg-black/90 backdrop-blur-md text-white text-xs font-bold border border-white/20 transition-all cursor-pointer shadow-md"
+                            >
+                              <Camera className="h-3.5 w-3.5" />
+                              <span>Retake Photo</span>
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="p-8 rounded-3xl border-2 border-dashed border-border bg-card text-center flex flex-col items-center justify-center gap-3">
+                            <div className="h-14 w-14 rounded-2xl bg-secondary text-foreground grid place-items-center">
+                              <Camera className="h-7 w-7 text-primary" />
                             </div>
+                            <div>
+                              <h4 className="font-bold text-sm text-foreground">No Photo Captured</h4>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                Click &ldquo;Take Photo&rdquo; to launch your device camera.
+                              </p>
+                            </div>
+                            <Button
+                              type="button"
+                              onClick={() => setIsCameraOpen(true)}
+                              className="mt-2 bg-primary text-primary-foreground px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 cursor-pointer shadow-md"
+                            >
+                              <Camera className="h-4 w-4" />
+                              <span>Take Photo</span>
+                            </Button>
                           </div>
                         )}
+
+                        <div className="grid sm:grid-cols-2 gap-4">
+                          {/* DIRECT CAMERA ACTION BUTTON */}
+                          <button
+                            type="button"
+                            onClick={() => setIsCameraOpen(true)}
+                            className="p-5 rounded-3xl border-2 border-primary/50 bg-gradient-to-br from-primary/20 via-rose-500/10 to-primary/5 text-left flex items-center gap-4 shadow-md cursor-pointer hover:border-primary transition-all"
+                          >
+                            <div className="h-12 w-12 rounded-2xl bg-primary text-primary-foreground grid place-items-center shadow-lg">
+                              <Camera className="h-6 w-6" />
+                            </div>
+                            <div>
+                              <h4 className="font-bold text-sm text-foreground flex items-center gap-1.5 font-display">
+                                Take Photo with Camera
+                                <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+                              </h4>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                Snap directly from device camera
+                              </p>
+                            </div>
+                          </button>
+
+                          {/* FALLBACK FILE UPLOAD BUTTON */}
+                          <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            className="p-5 rounded-3xl border-2 border-dashed border-border bg-card text-left flex items-center gap-4 cursor-pointer hover:border-primary/50 transition-all"
+                          >
+                            <div className="h-12 w-12 rounded-2xl bg-secondary text-foreground grid place-items-center">
+                              <Upload className="h-5 w-5" />
+                            </div>
+                            <div>
+                              <h4 className="font-bold text-sm text-foreground font-display">
+                                Upload Photo File
+                              </h4>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                Fallback upload from device storage
+                              </p>
+                            </div>
+                          </button>
+                        </div>
 
                         <div className="pt-2 flex justify-between">
                           <Button
@@ -874,7 +805,13 @@ export default function BecomeLender() {
                           </Button>
                           <Button
                             type="button"
-                            onClick={() => setCurrentStep(3)}
+                            onClick={() => {
+                              if (!primaryImage) {
+                                toast.error("Please take a photo of your equipment before continuing.");
+                                return;
+                              }
+                              setCurrentStep(3);
+                            }}
                             className="bg-primary text-primary-foreground px-8 rounded-2xl font-bold"
                           >
                             Continue to Pricing

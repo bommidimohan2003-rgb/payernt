@@ -54,13 +54,11 @@ export function LenderProductEdit({ productId: propId }: { productId?: string })
   const [product, setProduct] = useState<PayerntProduct | null>(null);
   const [isLoadingProduct, setIsLoadingProduct] = useState(true);
 
-  // File picker refs for fallback upload
+  // File picker ref for fallback upload
   const primaryFileInputRef = useRef<HTMLInputElement>(null);
-  const galleryFileInputRef = useRef<HTMLInputElement>(null);
 
   // Camera modal state
   const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
-  const [cameraTarget, setCameraTarget] = useState<"primary" | "gallery">("primary");
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [isUploadingMedia, setIsUploadingMedia] = useState(false);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
@@ -193,8 +191,8 @@ export function LenderProductEdit({ productId: propId }: { productId?: string })
     }
   }, [productId, userProducts]);
 
-  // Handle Camera Capture
-  const handleCameraCapture = async (imageDataUrl: string, _angleTag?: string) => {
+  // Handle Camera Capture for Primary Product Photo
+  const handleCameraCapture = async (imageDataUrl: string) => {
     if (isUploadingMedia) {
       toast.error("An image upload is already in progress.");
       return;
@@ -215,10 +213,7 @@ export function LenderProductEdit({ productId: propId }: { productId?: string })
 
     setIsUploadingMedia(true);
     setUploadProgress(0);
-    const target = cameraTarget;
-    const loadingToastId = toast.loading(
-      `Uploading ${target === "primary" ? "primary" : "gallery"} photo to storage...`
-    );
+    const loadingToastId = toast.loading("Uploading product photo to storage...");
 
     try {
       const hostedUrl = await uploadImageToCloudinary(imageDataUrl, (percent) => {
@@ -229,24 +224,11 @@ export function LenderProductEdit({ productId: propId }: { productId?: string })
         throw new Error("Invalid URL returned from storage provider.");
       }
 
-      if (target === "primary") {
-        setEditFormData((prev) => ({
-          ...prev,
-          primaryImage: hostedUrl,
-        }));
-        toast.success("Primary photo updated successfully!", { id: loadingToastId });
-      } else {
-        setEditFormData((prev) => {
-          if (prev.images.includes(hostedUrl)) {
-            return prev;
-          }
-          return {
-            ...prev,
-            images: [...prev.images, hostedUrl],
-          };
-        });
-        toast.success("Gallery photo added successfully!", { id: loadingToastId });
-      }
+      setEditFormData((prev) => ({
+        ...prev,
+        primaryImage: hostedUrl,
+      }));
+      toast.success("Primary product photo updated successfully!", { id: loadingToastId });
     } catch (err: any) {
       console.error("[LenderProductEdit] Camera photo upload failed:", err);
       toast.error(err?.message || "Failed to upload photo. Please check your connection and try again.", {
@@ -263,7 +245,7 @@ export function LenderProductEdit({ productId: propId }: { productId?: string })
     }
   };
 
-  // Fallback File Upload Handlers
+  // Fallback File Upload Handler for Primary Photo
   const handlePrimaryFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -287,40 +269,6 @@ export function LenderProductEdit({ productId: propId }: { productId?: string })
       setIsUploadingMedia(false);
       if (e.target) e.target.value = "";
     }
-  };
-
-  const handleGalleryFilesSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    if (!files.length) return;
-    setIsUploadingMedia(true);
-    try {
-      const uploadedUrls: string[] = [];
-      for (const file of files) {
-        if (!file.type.startsWith("image/")) continue;
-        if (file.size > 20 * 1024 * 1024) continue;
-        const url = await uploadImageToCloudinary(file);
-        if (url && !uploadedUrls.includes(url)) uploadedUrls.push(url);
-      }
-      if (uploadedUrls.length > 0) {
-        setEditFormData((prev) => ({
-          ...prev,
-          images: Array.from(new Set([...prev.images, ...uploadedUrls])),
-        }));
-        toast.success(`Uploaded ${uploadedUrls.length} gallery photo(s).`);
-      }
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to upload gallery photos.");
-    } finally {
-      setIsUploadingMedia(false);
-      if (e.target) e.target.value = "";
-    }
-  };
-
-  const handleRemoveGalleryImage = (idxToRemove: number) => {
-    setEditFormData((prev) => ({
-      ...prev,
-      images: prev.images.filter((_, idx) => idx !== idxToRemove),
-    }));
   };
 
   // Handle Form Submit
@@ -489,21 +437,13 @@ export function LenderProductEdit({ productId: propId }: { productId?: string })
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-16">
-      {/* Hidden File Inputs for fallback upload */}
+      {/* Hidden File Input for fallback upload */}
       <input
         ref={primaryFileInputRef}
         type="file"
         accept="image/*"
         className="hidden"
         onChange={handlePrimaryFileSelect}
-      />
-      <input
-        ref={galleryFileInputRef}
-        type="file"
-        accept="image/*"
-        multiple
-        className="hidden"
-        onChange={handleGalleryFilesSelect}
       />
 
       {/* Camera Capture Modal */}
@@ -512,15 +452,7 @@ export function LenderProductEdit({ productId: propId }: { productId?: string })
           isOpen={isCameraModalOpen}
           onClose={() => setIsCameraModalOpen(false)}
           onCapture={handleCameraCapture}
-          onFallbackUpload={() => {
-            if (cameraTarget === "primary") {
-              primaryFileInputRef.current?.click();
-            } else {
-              galleryFileInputRef.current?.click();
-            }
-          }}
-          angleTag={cameraTarget === "primary" ? "Front View" : "Side View"}
-          closeOnConfirm={cameraTarget === "primary"}
+          onFallbackUpload={() => primaryFileInputRef.current?.click()}
           isUploading={isUploadingMedia}
           uploadProgress={uploadProgress}
         />
@@ -751,112 +683,94 @@ export function LenderProductEdit({ productId: propId }: { productId?: string })
           <div className="flex items-center justify-between border-b border-border/70 pb-3">
             <div>
               <h2 className="text-sm sm:text-base font-bold text-foreground">3. Product Photography</h2>
-              <p className="text-xs text-muted-foreground">Take high-resolution photos using your camera or provide hosted URLs.</p>
+              <p className="text-xs text-muted-foreground">Capture your primary product photo using your real phone camera.</p>
             </div>
             <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-secondary px-2.5 py-1 rounded-full border border-border">
-              Live Camera
+              Phone Camera
             </span>
           </div>
 
           {/* Primary Product Photo */}
-          <div className="p-4 rounded-2xl bg-secondary/20 border border-border space-y-3">
-            <div className="flex items-center justify-between">
+          <div className="p-4 sm:p-5 rounded-2xl bg-secondary/20 border border-border space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <label className="block text-xs font-bold text-foreground">
                   Primary Product Photo
                 </label>
-                <p className="text-[11px] text-muted-foreground">The hero cover photo shown on catalog cards and search listings.</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setCameraTarget("primary");
-                  setIsCameraModalOpen(true);
-                }}
-                disabled={isUploadingMedia}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition-all cursor-pointer shadow-xs disabled:opacity-50"
-              >
-                <Camera className="h-3.5 w-3.5" />
-                <span>Take Photo</span>
-              </button>
-            </div>
-
-            <div className="flex gap-3 items-center">
-              <input
-                type="url"
-                value={editFormData.primaryImage}
-                onChange={(e) => setEditFormData({ ...editFormData, primaryImage: e.target.value })}
-                placeholder="https://images.unsplash.com/... or take photo with button"
-                className="w-full px-3.5 py-2 rounded-xl border border-border bg-background text-foreground text-xs font-mono focus:outline-hidden focus:ring-1 focus:ring-foreground"
-              />
-              {editFormData.primaryImage && (
-                <div className="h-12 w-12 rounded-xl overflow-hidden border border-border shrink-0 bg-secondary shadow-2xs">
-                  <img
-                    src={editFormData.primaryImage}
-                    alt="Primary Preview"
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLElement).style.display = "none";
-                    }}
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Gallery Photos */}
-          <div className="p-4 rounded-2xl bg-secondary/20 border border-border space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <label className="block text-xs font-bold text-foreground">
-                  Gallery Photos ({editFormData.images.length})
-                </label>
                 <p className="text-[11px] text-muted-foreground">
-                  Additional angles, accessories, physical ports, and serial numbers.
+                  The hero cover photo shown on catalog cards and search listings.
                 </p>
               </div>
               <button
                 type="button"
-                onClick={() => {
-                  setCameraTarget("gallery");
-                  setIsCameraModalOpen(true);
-                }}
+                onClick={() => setIsCameraModalOpen(true)}
                 disabled={isUploadingMedia}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-secondary hover:bg-secondary/80 border border-border text-xs font-bold text-foreground transition-all cursor-pointer disabled:opacity-50"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition-all cursor-pointer shadow-xs disabled:opacity-50"
               >
-                <Camera className="h-3.5 w-3.5 text-primary" />
-                <span>Take Gallery Photos</span>
+                <Camera className="h-4 w-4" />
+                <span>Take Photo</span>
               </button>
             </div>
 
-            {editFormData.images.length > 0 ? (
-              <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 pt-1">
-                {editFormData.images.map((imgUrl, idx) => (
-                  <div key={idx} className="relative group aspect-square rounded-2xl overflow-hidden border border-border bg-card shadow-2xs">
-                    <img
-                      src={imgUrl}
-                      alt={`Gallery ${idx + 1}`}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        (e.target as HTMLElement).style.opacity = "0.3";
-                      }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveGalleryImage(idx)}
-                      className="absolute top-1.5 right-1.5 p-1 rounded-full bg-black/70 hover:bg-destructive text-white opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
-                      title="Remove photo"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
+            {/* Single Primary Image Preview */}
+            <div className="relative rounded-2xl overflow-hidden border border-border bg-neutral-900 aspect-video sm:aspect-[16/9] max-h-72 w-full flex items-center justify-center shadow-inner group">
+              {editFormData.primaryImage ? (
+                <>
+                  <img
+                    src={editFormData.primaryImage}
+                    alt="Primary Product Photo"
+                    className="w-full h-full object-cover object-center"
+                    onError={(e) => {
+                      (e.target as HTMLElement).style.display = "none";
+                    }}
+                  />
+                  <div className="absolute top-3 left-3">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/70 backdrop-blur-md text-[11px] font-bold text-white border border-white/15 shadow-sm">
+                      <Sparkles className="w-3 h-3 text-amber-400" />
+                      Cover Photo
+                    </span>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="p-5 rounded-2xl border border-dashed border-border text-center">
-                <p className="text-xs text-muted-foreground">No extra gallery photos captured yet. Click "Take Gallery Photos" to add angles.</p>
-              </div>
-            )}
+                </>
+              ) : (
+                <div className="flex flex-col items-center justify-center text-center p-6 text-muted-foreground">
+                  <div className="h-12 w-12 rounded-2xl bg-secondary/60 grid place-items-center mb-2">
+                    <Camera className="h-6 w-6 text-muted-foreground" />
+                  </div>
+                  <p className="text-xs font-semibold text-foreground">No product photo yet</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">Click &ldquo;Take Photo&rdquo; to launch your phone camera</p>
+                </div>
+              )}
+
+              {/* Uploading overlay */}
+              {isUploadingMedia && (
+                <div className="absolute inset-0 bg-black/75 backdrop-blur-xs flex flex-col items-center justify-center p-4 z-20">
+                  <div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin mb-2" />
+                  <p className="text-xs font-bold text-white">Uploading photo to secure storage...</p>
+                  {uploadProgress !== null && (
+                    <div className="w-48 bg-white/20 rounded-full h-1.5 mt-2 overflow-hidden">
+                      <div
+                        className="bg-primary h-full transition-all duration-300 rounded-full"
+                        style={{ width: `${uploadProgress}%` }}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Hosted image URL fallback / inspection */}
+            <div>
+              <label className="block text-[11px] font-semibold text-muted-foreground mb-1">
+                Hosted Image URL
+              </label>
+              <input
+                type="url"
+                value={editFormData.primaryImage}
+                onChange={(e) => setEditFormData({ ...editFormData, primaryImage: e.target.value })}
+                placeholder="https://... (auto-filled on camera capture)"
+                className="w-full px-3.5 py-2 rounded-xl border border-border bg-background text-foreground text-xs font-mono focus:outline-hidden focus:ring-1 focus:ring-foreground"
+              />
+            </div>
           </div>
         </div>
 

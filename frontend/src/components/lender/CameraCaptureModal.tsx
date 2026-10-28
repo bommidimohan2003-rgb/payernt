@@ -7,7 +7,6 @@ import {
   Upload,
   AlertCircle,
   Sparkles,
-  Layers,
   FlipHorizontal,
   Smartphone,
 } from "lucide-react";
@@ -16,28 +15,17 @@ import { Button } from "@/components/common/Button";
 export interface CameraCaptureModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onCapture: (imageDataUrl: string, angleTag?: string) => Promise<void> | void;
-  onFallbackUpload: () => void;
-  angleTag?: string;
-  closeOnConfirm?: boolean;
+  onCapture: (imageDataUrl: string) => Promise<void> | void;
+  onFallbackUpload?: () => void;
   isUploading?: boolean;
   uploadProgress?: number | null;
 }
-
-const AVAILABLE_ANGLES = [
-  "Front View",
-  "Back View",
-  "Side View",
-  "Top/Detail View",
-];
 
 export function CameraCaptureModal({
   isOpen,
   onClose,
   onCapture,
   onFallbackUpload,
-  angleTag: initialAngleTag = "Front View",
-  closeOnConfirm = true,
   isUploading = false,
   uploadProgress = null,
 }: CameraCaptureModalProps) {
@@ -53,14 +41,9 @@ export function CameraCaptureModal({
   const [facingMode, setFacingMode] = useState<"environment" | "user">(
     "environment"
   );
-  const [selectedAngle, setSelectedAngle] = useState<string>(initialAngleTag);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [isShuttering, setIsShuttering] = useState(false);
   const [activeStream, setActiveStream] = useState<MediaStream | null>(null);
-
-  useEffect(() => {
-    setSelectedAngle(initialAngleTag);
-  }, [initialAngleTag]);
 
   // Audio shutter feedback via Web Audio API
   const playShutterSound = useCallback(() => {
@@ -136,7 +119,7 @@ export function CameraCaptureModal({
       if (!navigator?.mediaDevices?.getUserMedia) {
         setCameraState("error");
         setErrorMsg(
-          "Direct camera access is unavailable in this environment. Camera access requires a secure context (HTTPS) or a supported browser."
+          "Direct camera access is unavailable in this environment. Camera access requires a secure context (HTTPS) or a supported mobile browser."
         );
         return;
       }
@@ -178,7 +161,7 @@ export function CameraCaptureModal({
         streamRef.current = stream;
         setActiveStream(stream);
 
-        // Bind stream to the video element
+        // Bind stream to the permanently mounted video element
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           try {
@@ -200,7 +183,7 @@ export function CameraCaptureModal({
             lastErr.name === "PermissionDeniedError"
           ) {
             friendlyMsg =
-              "Camera permission was denied. Please allow camera permissions in your browser address bar settings.";
+              "Camera permission was denied. Please allow camera permissions in your browser address bar settings to snap product photos.";
           } else if (
             lastErr.name === "NotFoundError" ||
             lastErr.name === "DevicesNotFoundError"
@@ -236,9 +219,9 @@ export function CameraCaptureModal({
     return () => {
       stopStream();
     };
-  }, [isOpen]); // Only run on modal open/close toggle to prevent premature stream teardown
+  }, [isOpen]);
 
-  // Guarantee that when activeStream is set, videoRef receives it even if DOM just finished updating
+  // Guarantee that when activeStream is set, videoRef receives it
   useEffect(() => {
     if (videoRef.current && activeStream && cameraState === "streaming") {
       if (videoRef.current.srcObject !== activeStream) {
@@ -295,21 +278,12 @@ export function CameraCaptureModal({
     startCamera();
   };
 
-  const handleConfirm = async (shouldClose = closeOnConfirm) => {
+  const handleConfirm = async () => {
     if (capturedImage) {
       const img = capturedImage;
-      const angle = selectedAngle;
-
-      if (shouldClose) {
-        stopStream();
-        onClose();
-        await onCapture(img, angle);
-      } else {
-        // Sequential capture mode (gallery): reset preview & re-start camera for next angle
-        setCapturedImage(null);
-        startCamera();
-        await onCapture(img, angle);
-      }
+      stopStream();
+      onClose();
+      await onCapture(img);
     }
   };
 
@@ -336,50 +310,30 @@ export function CameraCaptureModal({
 
       <div className="relative w-full max-w-2xl overflow-hidden rounded-3xl bg-zinc-900 border border-zinc-800 shadow-2xl text-white flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="flex flex-col border-b border-zinc-800 px-5 py-3.5 space-y-3 bg-zinc-900/90">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="h-9 w-9 rounded-xl bg-primary/20 grid place-items-center text-primary border border-primary/30">
-                <Camera className="h-5 w-5" />
-              </div>
-              <div>
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  Snap Product Photo
-                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/20 text-primary border border-primary/30">
-                    {facingMode === "environment" ? "Rear Camera" : "Front Camera"}
-                  </span>
-                </h3>
-                <p className="text-xs text-zinc-400">
-                  Tag: <span className="text-primary font-medium">{selectedAngle}</span>
-                </p>
-              </div>
+        <div className="flex items-center justify-between border-b border-zinc-800 px-5 py-3.5 bg-zinc-900/90">
+          <div className="flex items-center gap-2.5">
+            <div className="h-9 w-9 rounded-xl bg-primary/20 grid place-items-center text-primary border border-primary/30">
+              <Camera className="h-5 w-5" />
             </div>
-            <button
-              onClick={handleCloseModal}
-              className="rounded-full p-2 text-zinc-400 hover:bg-zinc-800 hover:text-white transition-colors cursor-pointer"
-              title="Close Camera"
-            >
-              <X className="h-5 w-5" />
-            </button>
+            <div>
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                Snap Product Photo
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/20 text-primary border border-primary/30">
+                  {facingMode === "environment" ? "Rear Camera" : "Front Camera"}
+                </span>
+              </h3>
+              <p className="text-xs text-zinc-400">
+                Single Primary Product Photo
+              </p>
+            </div>
           </div>
-
-          {/* Photo Angle Selector Tabs */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
-            {AVAILABLE_ANGLES.map((angle) => (
-              <button
-                key={angle}
-                type="button"
-                onClick={() => setSelectedAngle(angle)}
-                className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
-                  selectedAngle === angle
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "bg-zinc-800/80 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800"
-                }`}
-              >
-                {angle}
-              </button>
-            ))}
-          </div>
+          <button
+            onClick={handleCloseModal}
+            className="rounded-full p-2 text-zinc-400 hover:bg-zinc-800 hover:text-white transition-colors cursor-pointer"
+            title="Close Camera"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
 
         {/* Upload Progress Banner */}
@@ -408,7 +362,7 @@ export function CameraCaptureModal({
             } ${cameraState === "streaming" && !capturedImage ? "opacity-100" : "opacity-0 absolute pointer-events-none"}`}
           />
 
-          {/* Viewfinder Target Framing Guidelines (visible only during active live stream) */}
+          {/* Viewfinder Target Framing Guidelines */}
           {cameraState === "streaming" && !capturedImage && (
             <>
               <div className="pointer-events-none absolute inset-6 sm:inset-10 border-2 border-dashed border-white/40 rounded-2xl flex flex-col justify-between p-4 z-10">
@@ -417,7 +371,7 @@ export function CameraCaptureModal({
                   <div className="w-4 h-4 border-t-2 border-r-2 border-primary" />
                 </div>
                 <div className="text-center bg-black/60 backdrop-blur-md self-center px-3.5 py-1.5 rounded-full text-xs text-white font-medium border border-white/10">
-                  Framing: {selectedAngle} ({facingMode === "environment" ? "Rear Camera" : "Front Camera"})
+                  Frame Product Photo ({facingMode === "environment" ? "Rear Camera" : "Front Camera"})
                 </div>
                 <div className="flex justify-between">
                   <div className="w-4 h-4 border-b-2 border-l-2 border-primary" />
@@ -453,7 +407,7 @@ export function CameraCaptureModal({
               />
               <div className="absolute top-3 left-3 bg-black/70 backdrop-blur-md text-white text-xs px-3.5 py-1.5 rounded-full border border-white/10 flex items-center gap-2">
                 <Sparkles className="h-4 w-4 text-emerald-400" />
-                <span>{selectedAngle} Snapshot Captured</span>
+                <span>Product Photo Captured</span>
               </div>
             </div>
           )}
@@ -508,17 +462,19 @@ export function CameraCaptureModal({
                   Open Device Camera App
                 </Button>
 
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    handleCloseModal();
-                    onFallbackUpload();
-                  }}
-                  className="w-full border-zinc-700 text-zinc-300 hover:bg-zinc-800 text-xs cursor-pointer"
-                >
-                  <Upload className="h-4 w-4 mr-2" />
-                  Upload Photo From Files
-                </Button>
+                {onFallbackUpload && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      handleCloseModal();
+                      onFallbackUpload();
+                    }}
+                    className="w-full border-zinc-700 text-zinc-300 hover:bg-zinc-800 text-xs cursor-pointer"
+                  >
+                    <Upload className="h-4 w-4 mr-2" />
+                    Upload Photo From Files
+                  </Button>
+                )}
               </div>
             </div>
           )}
@@ -535,71 +491,44 @@ export function CameraCaptureModal({
                 className="border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:text-white cursor-pointer"
               >
                 <RefreshCw className="h-4 w-4 mr-2" />
-                Retake
+                Retake Photo
               </Button>
 
-              <div className="flex items-center gap-2">
-                {!closeOnConfirm ? (
+              <Button
+                onClick={handleConfirm}
+                disabled={isUploading}
+                className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 font-medium disabled:opacity-50 cursor-pointer flex items-center gap-2"
+              >
+                {isUploading ? (
                   <>
-                    <Button
-                      onClick={() => handleConfirm(false)}
-                      disabled={isUploading}
-                      className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 font-medium text-xs disabled:opacity-50 cursor-pointer"
-                    >
-                      {isUploading ? (
-                        <>
-                          <RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                          Uploading...
-                        </>
-                      ) : (
-                        <>
-                          <Check className="h-4 w-4 mr-1.5" />
-                          Add & Snap Next Angle
-                        </>
-                      )}
-                    </Button>
-                    <Button
-                      onClick={() => handleConfirm(true)}
-                      disabled={isUploading}
-                      className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 font-medium text-xs disabled:opacity-50 cursor-pointer"
-                    >
-                      Use & Done
-                    </Button>
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    Uploading...
                   </>
                 ) : (
-                  <Button
-                    onClick={() => handleConfirm(true)}
-                    disabled={isUploading}
-                    className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 font-medium disabled:opacity-50 cursor-pointer"
-                  >
-                    {isUploading ? (
-                      <>
-                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                        Uploading...
-                      </>
-                    ) : (
-                      <>
-                        <Check className="h-4 w-4 mr-2" />
-                        Use {selectedAngle} Photo
-                      </>
-                    )}
-                  </Button>
+                  <>
+                    <Check className="h-4 w-4 mr-1.5" />
+                    Use Product Photo
+                  </>
                 )}
-              </div>
+              </Button>
             </>
           ) : (
             <>
-              <button
-                type="button"
-                onClick={() => {
-                  handleCloseModal();
-                  onFallbackUpload();
-                }}
-                className="text-xs text-zinc-400 hover:text-white flex items-center gap-1.5 px-2 py-1 cursor-pointer"
-              >
-                <Upload className="h-3.5 w-3.5" />
-                Or pick from gallery
-              </button>
+              {onFallbackUpload ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleCloseModal();
+                    onFallbackUpload();
+                  }}
+                  className="text-xs text-zinc-400 hover:text-white flex items-center gap-1.5 px-2 py-1 cursor-pointer"
+                >
+                  <Upload className="h-3.5 w-3.5" />
+                  Or pick from files
+                </button>
+              ) : (
+                <div />
+              )}
 
               <div className="flex items-center gap-3">
                 <button
@@ -607,7 +536,7 @@ export function CameraCaptureModal({
                   disabled={cameraState !== "streaming" || isUploading}
                   onClick={handleTakeSnapshot}
                   className="relative group disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                  title="Snap Photo"
+                  title="Snap Product Photo"
                 >
                   <div className="h-14 w-14 rounded-full border-4 border-white bg-transparent p-1 transition-transform group-active:scale-95">
                     <div className="h-full w-full rounded-full bg-white group-hover:bg-primary transition-colors grid place-items-center">
@@ -618,8 +547,8 @@ export function CameraCaptureModal({
               </div>
 
               <div className="w-24 text-right">
-                <span className="text-[11px] text-zinc-500 flex items-center justify-end gap-1">
-                  <Layers className="h-3 w-3" /> HQ Photo
+                <span className="text-[11px] text-zinc-500">
+                  HQ Camera
                 </span>
               </div>
             </>

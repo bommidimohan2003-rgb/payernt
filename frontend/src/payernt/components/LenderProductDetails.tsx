@@ -15,7 +15,6 @@ import {
   ExternalLink,
   MapPin,
   Tag,
-  Layers,
   Sparkles,
   Video,
   Plus,
@@ -32,7 +31,7 @@ import { getOptimizedImageUrl } from "@/utils/images";
 import type { PayerntProduct } from "../types";
 import payerntApi from "../payerntApiService";
 import { VendorAvailabilityCalendar } from "./VendorAvailabilityCalendar";
-import { resolveProductImageUrl, resolveAllProductImages } from "../productUtils";
+import { resolveProductImageUrl } from "../productUtils";
 
 export function LenderProductDetails({ productId: propId }: { productId?: string }) {
   const navigate = useNavigate();
@@ -45,7 +44,6 @@ export function LenderProductDetails({ productId: propId }: { productId?: string
   const [isEditingPrice, setIsEditingPrice] = useState(false);
   const [newPrice, setNewPrice] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [activePhotoIdx, setActivePhotoIdx] = useState(0);
 
   // Time-Slot & Availability Settings
   const [allowHalfDay, setAllowHalfDay] = useState(true);
@@ -293,11 +291,10 @@ export function LenderProductDetails({ productId: propId }: { productId?: string
 
       {/* Main Product Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Column: Image Gallery & Specs */}
+        {/* Left Column: Product Photo & Specs */}
         <div className="lg:col-span-7 space-y-4">
           {(() => {
-            const allImgs = resolveAllProductImages(product);
-            const mainImg = allImgs[activePhotoIdx] || resolveProductImageUrl(product);
+            const mainImg = resolveProductImageUrl(product);
 
             return (
               <div className="space-y-2.5">
@@ -336,26 +333,6 @@ export function LenderProductDetails({ productId: propId }: { productId?: string
                     </span>
                   </div>
                 </div>
-
-                {/* Thumbnails if multiple images exist */}
-                {allImgs.length > 1 && (
-                  <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-                    {allImgs.map((url, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => setActivePhotoIdx(idx)}
-                        className={`h-14 w-14 rounded-xl overflow-hidden border-2 shrink-0 cursor-pointer transition-all ${
-                          activePhotoIdx === idx
-                            ? "border-foreground scale-102"
-                            : "border-border/60 opacity-70 hover:opacity-100"
-                        }`}
-                      >
-                        <img src={url} alt={`Photo ${idx + 1}`} className="w-full h-full object-cover" />
-                      </button>
-                    ))}
-                  </div>
-                )}
               </div>
             );
           })()}
