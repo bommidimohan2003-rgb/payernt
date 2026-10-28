@@ -308,69 +308,109 @@ export function LenderProductDetails({ productId: propId }: { productId?: string
       {/* Main Product Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Column: Product Photo & Specs */}
-        <div className="lg:col-span-7 space-y-4">
+        {/* Left Column: Hero Product Photo with Overlay Text & Specs */}
+        <div className="lg:col-span-7 space-y-5">
           {(() => {
             const mainImg = resolveProductImageUrl(product);
+            const conditionGrade = typeof product.condition === "object"
+              ? product.condition?.grade || "Good"
+              : product.condition || "Good";
+            const locationCity = typeof product.location === "object"
+              ? product.location?.city || product.location?.area || "Visakhapatnam"
+              : product.location || "Visakhapatnam";
 
             return (
-              <div className="space-y-2.5">
-                <div className="relative aspect-video sm:aspect-4/3 rounded-2xl overflow-hidden bg-secondary/60 border border-border flex items-center justify-center">
+              <div className="relative w-full aspect-[4/3] sm:aspect-[16/10] min-h-[380px] sm:min-h-[440px] rounded-3xl overflow-hidden bg-neutral-950 border border-black/10 dark:border-white/10 shadow-lg flex flex-col justify-between p-5 sm:p-7 select-none group">
+                {/* 1. Large Hero Product Image */}
+                <div className="absolute inset-0 w-full h-full overflow-hidden bg-neutral-900 pointer-events-none">
                   {mainImg ? (
                     <img
                       src={getOptimizedImageUrl(mainImg) || mainImg}
                       alt={product.title}
-                      className="w-full h-full object-cover object-center"
+                      className="w-full h-full object-cover object-center group-hover:scale-[1.01] transition-transform duration-500 ease-out"
                       onError={(e) => {
                         (e.target as HTMLElement).style.display = "none";
                       }}
                     />
                   ) : (
-                    <div className="flex flex-col items-center justify-center text-muted-foreground p-6 text-center">
-                      <Package className="w-10 h-10 opacity-60 mb-1" />
+                    <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground p-6 text-center">
+                      <Package className="w-12 h-12 opacity-40 mb-2" />
                       <span className="text-xs font-semibold">{product.category || "Gear"}</span>
                     </div>
                   )}
-                  <div className="absolute top-3 left-3 flex flex-wrap gap-2">
-                    {isApproved && (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500 text-white text-[11px] font-extrabold shadow-md">
-                        <CheckCircle2 className="w-3 h-3" />
-                        Verified & Live
-                      </span>
-                    )}
-                    {isUnderReview && (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500 text-white text-[11px] font-extrabold shadow-md">
-                        <Clock className="w-3 h-3" />
-                        Under Admin Review
-                      </span>
-                    )}
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md text-white text-[11px] font-bold">
-                      <Tag className="w-3 h-3" />
-                      {product.category || "Gear"}
+
+                  {/* Gradient Scrims: subtle dark vignette on top for badges, rich smooth gradient at bottom for text */}
+                  <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/75 via-black/35 to-transparent pointer-events-none" />
+                  <div className="absolute inset-x-0 bottom-0 h-3/5 bg-gradient-to-t from-black/95 via-black/60 to-transparent pointer-events-none" />
+                </div>
+
+                {/* 2. Top Badges Over Image */}
+                <div className="relative z-10 flex flex-wrap items-center gap-2">
+                  {isApproved && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500 text-white text-xs font-bold shadow-md backdrop-blur-md">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Verified & Live
                     </span>
+                  )}
+                  {isUnderReview && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500 text-white text-xs font-bold shadow-md backdrop-blur-md">
+                      <Clock className="w-3.5 h-3.5" />
+                      Under Admin Review
+                    </span>
+                  )}
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/55 backdrop-blur-md text-white text-xs font-bold border border-white/15 shadow-sm">
+                    <Tag className="w-3.5 h-3.5" />
+                    {product.category || "Gear"}
+                  </span>
+                  {!isAvailable && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/90 text-white text-xs font-bold shadow-md backdrop-blur-md">
+                      Paused
+                    </span>
+                  )}
+                </div>
+
+                {/* 3. Hero Text Overlay at Bottom of Image */}
+                <div className="relative z-10 space-y-2 mt-auto">
+                  {(product.brand || product.model) && (
+                    <div className="flex items-center gap-2 text-white/85 text-xs sm:text-sm font-semibold tracking-wide">
+                      {product.brand && <span className="text-white font-bold">{product.brand}</span>}
+                      {product.brand && product.model && <span className="text-white/40">•</span>}
+                      {product.model && (
+                        <span className="text-white/80 font-mono text-[11px] sm:text-xs">
+                          {product.model}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-white font-display tracking-tight leading-tight drop-shadow-md">
+                    {product.title}
+                  </h1>
+
+                  <div className="flex flex-wrap items-center gap-3 pt-1 text-white/85 text-xs">
+                    <div className="flex items-center gap-1.5 font-medium">
+                      <MapPin className="w-3.5 h-3.5 text-primary shrink-0" />
+                      <span>{locationCity}</span>
+                    </div>
+                    <span className="text-white/30">•</span>
+                    <div className="flex items-center gap-1.5 font-medium">
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      <span>Condition: <strong className="text-white font-semibold">{conditionGrade}</strong></span>
+                    </div>
                   </div>
                 </div>
               </div>
             );
           })()}
 
-          {/* Details Card */}
-          <div className="p-5 rounded-2xl border border-border bg-card space-y-4">
-            <div>
-              <h1 className="text-xl sm:text-2xl font-black text-foreground tracking-tight">
-                {product.title}
-              </h1>
-              <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-                {product.brand && <span className="font-semibold text-foreground">{product.brand} • </span>}
-                {product.model || product.category}
-              </p>
-            </div>
-
+          {/* Details & Specifications Card */}
+          <div className="p-6 rounded-3xl border border-border bg-card space-y-5 shadow-xs">
             {product.description && (
-              <div className="pt-3 border-t border-border/70">
+              <div>
                 <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                   Description
                 </h3>
-                <p className="text-sm text-foreground/90 mt-1.5 leading-relaxed whitespace-pre-line">
+                <p className="text-sm text-foreground/90 mt-2 leading-relaxed whitespace-pre-line">
                   {product.description}
                 </p>
               </div>
@@ -378,7 +418,7 @@ export function LenderProductDetails({ productId: propId }: { productId?: string
 
             {/* Included Accessories */}
             {product.accessories && (Array.isArray(product.accessories) ? product.accessories.length > 0 : String(product.accessories).trim().length > 0) && (
-              <div className="pt-3 border-t border-border/70">
+              <div className="pt-4 border-t border-border/70">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                   Included Accessories
                 </h3>
@@ -403,7 +443,7 @@ export function LenderProductDetails({ productId: propId }: { productId?: string
             )}
 
             {/* Condition & Damage Disclosure */}
-            <div className="pt-3 border-t border-border/70 space-y-2">
+            <div className={`${product.description ? "pt-4 border-t border-border/70" : ""} space-y-2`}>
               <div className="flex items-center justify-between">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                   Condition & Physical Wear
@@ -418,7 +458,7 @@ export function LenderProductDetails({ productId: propId }: { productId?: string
                 </p>
               )}
               {(product.damageDetails || (typeof product.condition === "object" && product.condition?.visibleDamage)) ? (
-                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-700 dark:text-amber-400 space-y-1">
+                <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-700 dark:text-amber-400 space-y-1">
                   <span className="font-bold flex items-center gap-1.5">
                     <AlertTriangle className="w-3.5 h-3.5" />
                     Disclosed Cosmetic Wear / Scuffs:
@@ -436,7 +476,7 @@ export function LenderProductDetails({ productId: propId }: { productId?: string
             </div>
 
             {/* Handover Location & Pickup Instructions */}
-            <div className="pt-3 border-t border-border/70 space-y-2">
+            <div className="pt-4 border-t border-border/70 space-y-2">
               <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                 Handover & Pickup Instructions
               </h3>
@@ -451,7 +491,7 @@ export function LenderProductDetails({ productId: propId }: { productId?: string
                 </span>
               </div>
               {(product.pickupInstructions || (product as any).pickup_instructions || (typeof product.location === "object" && product.location?.pickupInstructions)) && (
-                <div className="p-3 rounded-xl bg-secondary/50 border border-border/70 text-xs text-muted-foreground leading-relaxed">
+                <div className="p-3.5 rounded-2xl bg-secondary/50 border border-border/70 text-xs text-muted-foreground leading-relaxed">
                   <span className="font-bold text-foreground block mb-0.5">Instructions for Renter:</span>
                   {product.pickupInstructions || (product as any).pickup_instructions || (typeof product.location === "object" ? product.location?.pickupInstructions : "")}
                 </div>
