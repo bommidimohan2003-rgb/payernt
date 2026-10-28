@@ -236,3 +236,129 @@ export function normalizePayerntProduct(raw: any): PayerntProduct {
     securityDeposit: deposit,
   };
 }
+
+/**
+ * Deduplicates adjacent or repeated tokens in an address string or list of components,
+ * case-insensitively, preserving original casing of first occurrence.
+ */
+export function deduplicateAddressTokens(tokens: string[]): string[] {
+  const result: string[] = [];
+  const seen = new Set<string>();
+
+  for (const token of tokens) {
+    if (!token) continue;
+    const subParts = token.split(",").map((s) => s.trim()).filter(Boolean);
+    for (const part of subParts) {
+      const lower = part.toLowerCase();
+      if (!seen.has(lower)) {
+        seen.add(lower);
+        result.push(part);
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Formats a clean, deduplicated product location string (e.g. "Pendurthi, Visakhapatnam").
+ * Prevents redundant outputs like "Pendurthi, Pendurthi".
+ */
+export function formatProductAddress(product: any): string {
+  if (!product) return "Visakhapatnam, Andhra Pradesh";
+
+  let area = (
+    typeof product.location === "object"
+      ? product.location?.area || product.location?.landmark || product.location?.address
+      : product.area
+  ) || "";
+
+  const city = (
+    typeof product.location === "object"
+      ? product.location?.city
+      : product.city
+  ) || "";
+
+  const state = (
+    typeof product.location === "object"
+      ? product.location?.state
+      : (product as any).state
+  ) || "";
+
+  const pincode = (
+    typeof product.location === "object"
+      ? product.location?.pincode || (product.location as any)?.postalCode
+      : (product as any).pincode || (product as any).postalCode
+  ) || "";
+
+  // If area is empty, attempt to extract locality from pickup_instructions (e.g. "Pickup: Pendurthi, ...")
+  if (!area) {
+    const rawInstr =
+      product.pickupInstructions ||
+      (product as any).pickup_instructions ||
+      (typeof product.location === "object" ? product.location?.pickupInstructions : "");
+    if (typeof rawInstr === "string") {
+      const match = rawInstr.match(/Pickup:\s*([^,;]+)/i);
+      if (match && match[1]) {
+        const candidate = match[1].trim();
+        if (
+          candidate &&
+          candidate.toLowerCase() !== city.toLowerCase() &&
+          candidate.toLowerCase() !== state.toLowerCase() &&
+          !candidate.toLowerCase().startsWith("same as")
+        ) {
+          area = candidate;
+        }
+      }
+    }
+  }
+
+  const rawParts = [area, city, state, pincode].filter(Boolean);
+  const deduplicated = deduplicateAddressTokens(rawParts);
+
+  if (deduplicated.length === 0) {
+    return "Visakhapatnam, Andhra Pradesh";
+  }
+
+  return deduplicated.join(", ");
+}
+
+/**
+ * Normalizes pickup instructions by trimming whitespace and removing redundant,
+ * duplicate adjacent and repeated address tokens within pickup/drop clauses.
+ */
+export function formatPickupInstructions(instructions: string): string {
+  if (!instructions || typeof instructions !== "string") return "";
+
+  const trimmed = instructions.trim();
+  if (!trimmed) return "";
+
+  // If instructions contain semicolons separating clauses (e.g. "Pickup: ...; Drop: ...")
+  const clauses = trimmed.split(";").map((c) => c.trim()).filter(Boolean);
+
+  const cleanedClauses = clauses.map((clause) => {
+    const prefixMatch = clause.match(/^([A-Za-z\s]+:)\s*(.*)$/);
+    if (prefixMatch) {
+      const prefix = prefixMatch[1];
+      const body = prefixMatch[2];
+
+      if (body.toLowerCase() === "same as pickup") {
+        return `${prefix} Same as pickup`;
+      }
+
+      const tokens = body.split(",").map((t) => t.trim()).filter(Boolean);
+      const deduplicated = deduplicateAddressTokens(tokens);
+      return `${prefix} ${deduplicated.join(", ")}`;
+    } else {
+      const tokens = clause.split(",").map((t) => t.trim()).filter(Boolean);
+      if (tokens.length > 1) {
+        const deduplicated = deduplicateAddressTokens(tokens);
+        return deduplicated.join(", ");
+      }
+      return clause;
+    }
+  });
+
+  return cleanedClauses.join("; ");
+}
+
