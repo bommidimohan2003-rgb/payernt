@@ -525,6 +525,7 @@ def health_check(response: Response):
             "status": "ok",
             "database": "connected",
             "service": "Payent FastAPI Backend API",
+            "version": "1.6.1",
             "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
         }
     response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
@@ -532,6 +533,7 @@ def health_check(response: Response):
         "status": "degraded",
         "database": "disconnected",
         "service": "Payent FastAPI Backend API",
+        "version": "1.6.1",
         "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
     }
 
@@ -5228,6 +5230,15 @@ def format_product_dict(p: dict, is_summary: bool = False, booked_pids_set: Opti
         "description": str(p.get("description", "")),
         "price": float(p.get("price") if p.get("price") is not None else (p.get("daily_rate") or 0)),
         "daily_rate": float(p.get("daily_rate") if p.get("daily_rate") is not None else (p.get("price") or 0)),
+        "dailyRate": float(p.get("daily_rate") if p.get("daily_rate") is not None else (p.get("price") or 0)),
+        "pricePerDay": float(p.get("daily_rate") if p.get("daily_rate") is not None else (p.get("price") or 0)),
+        "pricing": p.get("pricing") if isinstance(p.get("pricing"), dict) else {
+            "daily": float(p.get("daily_rate") if p.get("daily_rate") is not None else (p.get("price") or 0)),
+            "dailyRate": float(p.get("daily_rate") if p.get("daily_rate") is not None else (p.get("price") or 0)),
+            "weekly": round(float(p.get("daily_rate") if p.get("daily_rate") is not None else (p.get("price") or 0)) * 7 * 0.85),
+            "monthly": round(float(p.get("daily_rate") if p.get("daily_rate") is not None else (p.get("price") or 0)) * 30 * 0.7),
+            "securityDeposit": float(p.get("security_deposit") or p.get("securityDeposit") or 0),
+        },
         "image": raw_img,
         "primary_image": p.get("primary_image") or raw_img,
         "images": images_list,
@@ -5312,6 +5323,14 @@ def fetch_public_listings(
                         "description": p.get("description"),
                         "price": p.get("daily_rate", 999),
                         "daily_rate": p.get("daily_rate", 999),
+                        "dailyRate": p.get("daily_rate", 999),
+                        "pricePerDay": p.get("daily_rate", 999),
+                        "pricing": p.get("pricing") if isinstance(p.get("pricing"), dict) else {
+                            "daily": p.get("daily_rate", 999),
+                            "dailyRate": p.get("daily_rate", 999),
+                            "weekly": round(float(p.get("daily_rate", 999)) * 7 * 0.85),
+                            "monthly": round(float(p.get("daily_rate", 999)) * 30 * 0.7),
+                        },
                         "image": p.get("primary_image") or (parsed_imgs[0] if parsed_imgs else ""),
                         "primary_image": p.get("primary_image"),
                         "images": parsed_imgs,
@@ -5389,8 +5408,17 @@ def fetch_product_by_id(id: str, response: Response):
                         "specifications": p.get("specifications"),
                         "price": p.get("daily_rate", 999),
                         "daily_rate": p.get("daily_rate", 999),
+                        "dailyRate": p.get("daily_rate", 999),
+                        "pricePerDay": p.get("daily_rate", 999),
                         "weekly_rate": p.get("weekly_rate", 0),
                         "monthly_rate": p.get("monthly_rate", 0),
+                        "pricing": p.get("pricing") if isinstance(p.get("pricing"), dict) else {
+                            "daily": p.get("daily_rate", 999),
+                            "dailyRate": p.get("daily_rate", 999),
+                            "weekly": round(float(p.get("daily_rate", 999)) * 7 * 0.85),
+                            "monthly": round(float(p.get("daily_rate", 999)) * 30 * 0.7),
+                            "securityDeposit": float(p.get("security_deposit") or p.get("securityDeposit") or 0),
+                        },
                         "image": p.get("primary_image") or (parsed_imgs[0] if parsed_imgs else ""),
                         "primary_image": p.get("primary_image"),
                         "images": parsed_imgs,
