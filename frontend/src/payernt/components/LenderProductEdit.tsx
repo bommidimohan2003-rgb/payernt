@@ -293,6 +293,19 @@ export function LenderProductEdit({ productId: propId }: { productId?: string })
       return;
     }
 
+    if (editFormData.availabilityStatus === "available") {
+      try {
+        const kycRes = await payerntApi.getKycStatus();
+        if (kycRes && kycRes.status !== "APPROVED") {
+          toast.error("Admin-approved KYC verification is required before activating or publishing products.");
+          return;
+        }
+      } catch {
+        toast.error("Admin-approved KYC verification is required before activating or publishing products.");
+        return;
+      }
+    }
+
     const weeklyNum = editFormData.weeklyPrice
       ? Number(editFormData.weeklyPrice)
       : Math.round(priceNum * 7 * 0.85);

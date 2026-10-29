@@ -201,6 +201,7 @@ export default function Orders() {
   const [loading, setLoading] = useState(true);
   const [error, setErrorState] = useState<string | null>(null);
   const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
   const [revealedPins, setRevealedPins] = useState<Record<string, { pin: string; instructions?: string }>>({});
   const [loadingPinOrderId, setLoadingPinOrderId] = useState<string | null>(null);
 
@@ -406,9 +407,11 @@ export default function Orders() {
   };
 
   const handleCancelOrder = (orderId: string) => {
+    if (isCancelling) return;
     const currentToken = storage.get<string | null>(STORAGE_KEYS.token, null);
     if (!currentToken) return;
     const nowIso = new Date().toISOString();
+    setIsCancelling(true);
     api
       .cancelOrder(currentToken, orderId)
       .then(() => {
@@ -431,11 +434,14 @@ export default function Orders() {
             detail: { bookingId: orderId, status: "cancelled", cancelled_at: nowIso },
           })
         );
+        setCancellingOrderId(null);
       })
       .catch((err) => {
         toast.error(err.message || "Failed to cancel order.");
       })
-      .finally(() => setCancellingOrderId(null));
+      .finally(() => {
+        setIsCancelling(false);
+      });
   };
 
   // Compute filter counts
@@ -1182,6 +1188,7 @@ export default function Orders() {
               <div className="mt-6 flex justify-end gap-3">
                 <Button
                   variant="ghost"
+                  disabled={isCancelling}
                   onClick={() => setCancellingOrderId(null)}
                   className="text-neutral-700 dark:text-[#A1A1AA] hover:text-neutral-950 dark:hover:text-[#F5F5F5]"
                 >
@@ -1189,13 +1196,15 @@ export default function Orders() {
                 </Button>
                 <Button
                   variant="destructive"
+                  disabled={isCancelling}
                   onClick={() => {
-                    handleCancelOrder(cancellingOrderId);
-                    setCancellingOrderId(null);
+                    if (cancellingOrderId) {
+                      handleCancelOrder(cancellingOrderId);
+                    }
                   }}
-                  className="bg-red-600 hover:bg-red-700 text-white font-bold"
+                  className="bg-red-600 hover:bg-red-700 text-white font-bold disabled:opacity-50"
                 >
-                  Confirm Cancellation
+                  {isCancelling ? "Cancelling..." : "Confirm Cancellation"}
                 </Button>
               </div>
             </motion.div>

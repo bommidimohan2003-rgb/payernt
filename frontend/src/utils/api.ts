@@ -1401,23 +1401,27 @@ export const api = {
     return await res.json();
   },
 
-  async cancelOrder(token: string, orderId: string) {
-    let res: Response | null = null;
+  async cancelOrder(token: string, orderId: string, options?: { reason?: string; notes?: string }) {
+    let res: Response;
     try {
       res = await this.fetchWithAuth(
         `${API_BASE}/api/orders/${orderId}/cancel`,
         {
           method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(options || {}),
         },
       );
-    } catch {
-      /* fetch network error / backend offline */
+    } catch (networkErr: any) {
+      throw new Error(networkErr?.message || "Failed to reach server to cancel order. Please check your connection.");
     }
 
-    if (res && !res.ok) {
+    if (!res.ok) {
       const data = await res.json().catch(() => ({}));
       throw new Error(parseApiError(data, "Failed to cancel order"));
     }
+
+    const resJson = await res.json().catch(() => ({ success: true, status: "cancelled" }));
 
     const currentOrders = storage.get<Order[]>(STORAGE_KEYS.orders, []);
     const updatedOrders = currentOrders.map((o) =>
@@ -1430,11 +1434,18 @@ export const api = {
     storage.set(STORAGE_KEYS.orders, updatedOrders);
     this.invalidateCache("user_orders");
     this.invalidateCache("public_stats");
+    this.invalidateCache("dashboard");
+    this.invalidateCache("vendor_bookings");
+    this.invalidateCache("bookings");
+
     if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("payent_orders_updated"));
-      window.dispatchEvent(new CustomEvent("payent_booking_updated"));
+      const detail = { bookingId: orderId, status: "cancelled" };
+      window.dispatchEvent(new CustomEvent("payent_orders_updated", { detail }));
+      window.dispatchEvent(new CustomEvent("payent_booking_updated", { detail }));
+      window.dispatchEvent(new CustomEvent("payent_queue_updated", { detail }));
+      window.dispatchEvent(new CustomEvent("payernt_data_refresh"));
     }
-    return res ? res.json() : { success: true };
+    return resJson;
   },
 
   async advanceRentalQueue(

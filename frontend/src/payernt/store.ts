@@ -701,12 +701,17 @@ export function usePayerntStore() {
             });
           }
 
-          // Update upcoming bookings preview if present and rentalRequests is unpopulated or mock
+          // Update upcoming bookings preview if present
           if (Array.isArray(d.bookings) && d.bookings.length > 0) {
             setRentalRequests((prev) => {
-              const hasRealRequests = prev.some((r) => !isMockItem(r.id) && !r.id.startsWith("ord-fx3"));
-              if (hasRealRequests) return prev;
-              return d.bookings.map(mapRawBookingToRentalRequest);
+              const mapped = d.bookings.map(mapRawBookingToRentalRequest);
+              const map = new Map<string, RentalRequest>();
+              prev.forEach((r) => map.set(r.id, r));
+              mapped.forEach((r: RentalRequest) => {
+                const existing = map.get(r.id);
+                map.set(r.id, existing ? { ...existing, ...r } : r);
+              });
+              return Array.from(map.values());
             });
           }
 
@@ -778,15 +783,34 @@ export function usePayerntStore() {
       }
     };
 
+    const handleBookingUpdate = (e: any) => {
+      const bId = e?.detail?.bookingId;
+      const newStatus = e?.detail?.status;
+      if (bId && newStatus) {
+        setRentalRequests((prev) =>
+          prev.map((r) =>
+            r.id === bId || (r as any).bookingId === bId
+              ? { ...r, status: newStatus as any }
+              : r
+          )
+        );
+      }
+      refreshDashboard(true);
+      fetchBookings(true);
+      fetchNotifications(true);
+    };
+
     window.addEventListener("paye₹nt_data_refresh", handleRefresh);
     window.addEventListener("payernt_data_refresh", handleRefresh);
-    window.addEventListener("payent_orders_updated", handleRefresh);
-    window.addEventListener("payent_queue_updated", handleRefresh);
+    window.addEventListener("payent_orders_updated", handleBookingUpdate);
+    window.addEventListener("payent_queue_updated", handleBookingUpdate);
+    window.addEventListener("payent_booking_updated", handleBookingUpdate);
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     const pollInterval = setInterval(() => {
       if (typeof document !== "undefined" && document.visibilityState === "visible") {
-        refreshDashboard();
+        refreshDashboard(false);
+        fetchBookings(true);
         fetchNotifications(true);
       }
     }, 15000);

@@ -2690,8 +2690,9 @@ class KycSubmitSchema(BaseModel):
     model_config = {"populate_by_name": True}
 
 class KycReviewSchema(BaseModel):
-    action: str  # "approve" or "reject"
+    action: str  # "approve", "reject", "needs_information", "request_info"
     rejection_reason: Optional[str] = Field(None, alias="rejectionReason")
+    notes: Optional[str] = None
 
     model_config = {"populate_by_name": True}
 
@@ -3014,22 +3015,59 @@ def review_kyc_verification_route(
         raise HTTPException(status_code=404, detail="KYC verification record not found.")
 
     action = (data.action or "").strip().lower()
-    if action not in ("approve", "reject"):
-        raise HTTPException(status_code=400, detail="Invalid action. Must be 'approve' or 'reject'.")
+    if action not in ("approve", "reject", "needs_information", "request_info"):
+        raise HTTPException(status_code=400, detail="Invalid action. Must be 'approve', 'reject', or 'needs_information'.")
 
-    new_status = "APPROVED" if action == "approve" else "REJECTED"
+    reason_or_notes = (data.rejection_reason or data.notes or "").strip()
+    if action == "reject":
+        if not reason_or_notes:
+            raise HTTPException(status_code=400, detail="Rejection reason is mandatory when rejecting KYC.")
+        new_status = "REJECTED"
+    elif action in ("needs_information", "request_info"):
+        if not reason_or_notes:
+            raise HTTPException(status_code=400, detail="Information request details are mandatory.")
+        new_status = "NEEDS_INFORMATION"
+    else:
+        new_status = "APPROVED"
+        reason_or_notes = None
+
+    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
     updated = review_kyc_verification(
         verification_id=verification_id,
         new_status=new_status,
         reviewer_email=current_user_email,
-        rejection_reason=data.rejection_reason
+        rejection_reason=reason_or_notes
     )
+
+    # Record administrative audit trail
+    try:
+        execute_query("""
+            INSERT INTO admin_logs (admin_email, action, target_type, target_id, details, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """, (
+            current_user_email,
+            f"KYC_{new_status}",
+            "user_kyc_verifications",
+            verification_id,
+            json.dumps({"reviewer": current_user_email, "decision": new_status, "reason": reason_or_notes, "reviewed_at": now_iso}),
+            now_iso
+        ))
+    except Exception:
+        pass
+
+    logger.info(f"Admin {current_user_email} reviewed KYC {verification_id} -> {new_status}")
 
     return {
         "success": True,
         "status": new_status,
         "message": f"KYC verification {new_status.lower()} successfully.",
-        "verification": updated
+        "verification": updated,
+        "audit": {
+            "reviewerEmail": current_user_email,
+            "reviewedAt": now_iso,
+            "decision": new_status,
+            "reason": reason_or_notes
+        }
     }
 
 class LocationGeocodeSchema(BaseModel):
@@ -3401,6 +3439,17 @@ def check_category_restriction_endpoint(
 @app.post("/api/orders")
 def add_order(data: OrderSchema, current_user: dict = Depends(get_approved_user)):
     clean_email = current_user["email"].strip().lower()
+
+    # Requirement 2: Enforce Admin-Approved KYC for Renter before creating/submitting booking
+    from database import get_user_kyc_status
+    is_admin = (current_user.get("role") in ("admin", "superadmin"))
+    if not is_admin:
+        renter_kyc = get_user_kyc_status(clean_email, "payrent")
+        if (renter_kyc.get("status") or "").upper() != "APPROVED":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Admin-approved KYC verification is required before initiating or submitting bookings. Please complete your identity verification."
+            )
     order_dict = getattr(data, "model_dump", data.dict)()
     pid = data.productId or data.product_id or ""
     title = data.productTitle or data.product_title or "Gear Rental"
@@ -3431,6 +3480,16 @@ def add_order(data: OrderSchema, current_user: dict = Depends(get_approved_user)
     is_avail, _, reason = evaluate_product_availability(prod)
     if not is_avail:
         raise HTTPException(status_code=400, detail=f"Product is currently unavailable: {reason}")
+
+    # Requirement 2: Enforce Admin-Approved KYC for Product Owner (Vendor)
+    owner_email = (prod.get("user_email") or prod.get("owner_email") or prod.get("ownerId") or prod.get("owner_id") or "").strip().lower()
+    if owner_email and "@" in owner_email:
+        vendor_kyc = get_user_kyc_status(owner_email, "payernt")
+        if (vendor_kyc.get("status") or "").upper() != "APPROVED":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot book this item: The vendor's KYC verification is pending or unapproved."
+            )
 
     prod_category = (prod.get("category") or "").strip()
     if not prod_category:
@@ -3631,71 +3690,121 @@ def cancel_user_order(
     data: Optional[Dict[str, Any]] = None,
     email: str = Depends(get_current_user_email)
 ):
-    clean_email = email.strip().lower()
-    order = fetch_one("SELECT * FROM orders WHERE id = %s OR product_id = %s", (id, id))
-    if not order and id in MOCK_ORDERS:
-        order = MOCK_ORDERS[id]
+    from database import _BOOKING_CONCURRENCY_LOCK, record_booking_cancellation, get_order_by_id
+    from payernt_database import invalidate_vendor_dashboard_cache, MOCK_RENTAL_SECURITIES
 
-    if not order:
-        user_orders = get_orders(clean_email)
-        for uo in user_orders:
-            if uo.get("id") == id or uo.get("productId") == id or uo.get("product_id") == id:
-                order = uo
-                break
+    with _BOOKING_CONCURRENCY_LOCK:
+        clean_email = email.strip().lower()
+        order = fetch_one("SELECT * FROM orders WHERE id = %s OR product_id = %s", (id, id))
+        if not order and id in MOCK_ORDERS:
+            order = MOCK_ORDERS[id]
 
-    if not order:
-        raise HTTPException(status_code=404, detail="Order not found.")
+        if not order:
+            user_orders = get_orders(clean_email)
+            for uo in user_orders:
+                if uo.get("id") == id or uo.get("productId") == id or uo.get("product_id") == id:
+                    order = uo
+                    break
 
-    order_owner = (order.get("user_email") or order.get("userEmail") or "").strip().lower()
-    user = get_user(clean_email)
-    is_admin = (user.get("role") == "admin") if (user and isinstance(user, dict)) else False
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found.")
 
-    if order_owner and order_owner != clean_email and not is_admin:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden. You do not have permission to cancel this order.")
+        order_owner = (order.get("user_email") or order.get("userEmail") or "").strip().lower()
+        user = get_user(clean_email)
+        is_admin = (user.get("role") == "admin") if (user and isinstance(user, dict)) else False
 
-    curr_st = str(order.get("status") or "").lower()
-    if curr_st in ("cancelled", "canceled"):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This booking has already been cancelled.")
+        if order_owner and order_owner != clean_email and not is_admin:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden. You do not have permission to cancel this order.")
 
-    if curr_st in ("completed", "returned"):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot cancel a completed booking.")
+        curr_st = str(order.get("status") or "").lower()
+        if curr_st in ("cancelled", "canceled"):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This booking has already been cancelled.")
 
-    target_id = str(order.get("id")) if (order and order.get("id")) else id
-    reason_code = (data or {}).get("reason") or "RENTER_REQUESTED"
-    feedback = (data or {}).get("notes") or (data or {}).get("feedback")
+        if curr_st in ("completed", "returned"):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot cancel a completed booking.")
 
-    has_pu = bool(order.get("picked_up_at") or order.get("pickedUpAt"))
+        if curr_st in ("active", "in_progress", "ongoing"):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot cancel booking after physical handover has occurred.")
 
-    from database import record_booking_cancellation
-    canc_record = record_booking_cancellation(
-        booking_id=target_id,
-        product_id=order.get("product_id") or order.get("productId") or "",
-        lender_id=order.get("owner_id") or order.get("lender_email") or "lender",
-        renter_id=order_owner or clean_email,
-        reason_code=reason_code,
-        feedback=feedback,
-        previous_status=curr_st,
-        new_status="cancelled",
-        initiated_by="ADMIN" if is_admin else "RENTER",
-        policy_outcome="released" if not has_pu else "return_required",
-        notification_sent=True
-    )
+        target_id = str(order.get("id")) if (order and order.get("id")) else id
 
-    # Dispatch authoritative cancellation notifications to both renter and lender
-    try:
-        notify_booking_event(target_id, "cancelled_by_renter", actor_email=clean_email)
-    except Exception as e:
-        logger.warning(f"Could not dispatch cancel notification for order {target_id}: {e}")
+        # Handover and courier pickup check
+        sec = fetch_one("SELECT * FROM rental_security WHERE booking_id = %s", (target_id,))
+        if not sec and target_id in MOCK_RENTAL_SECURITIES:
+            sec = MOCK_RENTAL_SECURITIES[target_id]
+        if sec:
+            if (sec.get("vendor_handover_verified") or 
+                sec.get("renter_handover_verified") or 
+                sec.get("rental_started") or 
+                sec.get("rental_activated")):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Cannot cancel booking after physical handover or pickup has been verified."
+                )
 
-    logger.info(f"Order {target_id} cancelled by {clean_email}")
-    invalidate_cache()
-    broadcast_admin_event("booking.cancelled", {"id": target_id, "status": "cancelled"})
-    return {
-        "success": True,
-        "message": "Order cancelled successfully.",
-        "bookingId": target_id,
-        "cancellation": canc_record
-    }
+        if order and order.get("delivery_status") in ("PICKED_UP_FROM_VENDOR", "OUT_FOR_DELIVERY", "DELIVERED", "COMPLETED"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot cancel booking after courier pickup has occurred."
+            )
+
+        reason_code = (data or {}).get("reason") or "RENTER_REQUESTED"
+        feedback = (data or {}).get("notes") or (data or {}).get("feedback")
+
+        has_pu = bool(order.get("picked_up_at") or order.get("pickedUpAt"))
+
+        canc_record = record_booking_cancellation(
+            booking_id=target_id,
+            product_id=order.get("product_id") or order.get("productId") or "",
+            lender_id=order.get("owner_id") or order.get("lender_email") or "lender",
+            renter_id=order_owner or clean_email,
+            reason_code=reason_code,
+            feedback=feedback,
+            previous_status=curr_st,
+            new_status="cancelled",
+            initiated_by="ADMIN" if is_admin else "RENTER",
+            policy_outcome="released" if not has_pu else "return_required",
+            notification_sent=True
+        )
+
+        # Payment safety: If payment collected/held, set refund_status = 'pending_review'
+        pay_status = str((order.get("payment_status") if order else None) or (order.get("paymentStatus") if order else "")).lower()
+        if pay_status in ("paid", "completed", "escrowed", "captured", "held"):
+            try:
+                execute_query("UPDATE orders SET refund_status = 'pending_review' WHERE id = %s", (target_id,))
+            except Exception:
+                pass
+            if target_id in MOCK_ORDERS:
+                MOCK_ORDERS[target_id]["refund_status"] = "pending_review"
+
+        # Update in-memory rental security if present
+        if target_id in MOCK_RENTAL_SECURITIES:
+            MOCK_RENTAL_SECURITIES[target_id]["status"] = "cancelled"
+
+        # Invalidate both general cache and vendor dashboard cache
+        invalidate_cache()
+        invalidate_vendor_dashboard_cache()
+
+        # Dispatch authoritative cancellation notifications to both renter and lender
+        try:
+            notify_booking_event(target_id, "cancelled_by_renter", actor_email=clean_email)
+        except Exception as e:
+            logger.warning(f"Could not dispatch cancel notification for order {target_id}: {e}")
+
+        logger.info(f"Order {target_id} cancelled by {clean_email}")
+        broadcast_admin_event("booking.cancelled", {"id": target_id, "status": "cancelled"})
+
+        updated_order = get_order_by_id(target_id) or order or {}
+
+        return {
+            "success": True,
+            "message": "Order cancelled successfully.",
+            "bookingId": target_id,
+            "status": "cancelled",
+            "booking": updated_order,
+            "cancellation": canc_record
+        }
+
 
 @app.post("/api/orders/{id}/accept")
 @app.post("/api/bookings/{id}/accept")

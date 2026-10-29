@@ -694,6 +694,17 @@ export function ListProductWizard({
   // 5 = PRICE RANGE + FINAL SUBMISSION
   const [currentStage, setCurrentStage] = useState<number>(1);
   const [isSubmittedSuccess, setIsSubmittedSuccess] = useState(false);
+  const [vendorKycStatus, setVendorKycStatus] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    payerntApi.getKycStatus().then((res) => {
+      if (mounted && res) {
+        setVendorKycStatus(res.status || "NOT_STARTED");
+      }
+    }).catch(() => {});
+    return () => { mounted = false; };
+  }, []);
   const [createdProduct, setCreatedProduct] = useState<PayerntProduct | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showFullTermsModal, setShowFullTermsModal] = useState(false);
@@ -1619,6 +1630,11 @@ export function ListProductWizard({
       return;
     }
 
+    if (vendorKycStatus && vendorKycStatus !== "APPROVED") {
+      toast.error("Admin-approved KYC verification is required before creating rental product listings. Please complete your vendor verification.");
+      return;
+    }
+
     for (let s = 1; s <= 4; s++) {
       if (!validateStage(s)) {
         setCurrentStage(s);
@@ -1767,6 +1783,25 @@ export function ListProductWizard({
             Complete the 5 listing steps to publish gear for peer-to-peer rentals.
           </p>
         </div>
+
+      {vendorKycStatus && vendorKycStatus !== "APPROVED" && (
+        <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-4 text-xs text-red-200 flex items-start justify-between gap-3 shadow-sm">
+          <div className="flex items-start gap-2.5">
+            <AlertCircle className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
+            <div>
+              <span className="font-bold text-red-300 block text-sm">Vendor Verification Required</span>
+              Admin-approved Aadhaar KYC verification is required before creating or publishing rental listings.
+            </div>
+          </div>
+          <a
+            href="/payernt/kyc"
+            className="px-3.5 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold text-xs shrink-0 cursor-pointer inline-flex items-center gap-1 transition-all"
+          >
+            {vendorKycStatus === "NOT_STARTED" ? "Complete KYC" : "View KYC Status"}
+            <ArrowRight className="h-3 w-3" />
+          </a>
+        </div>
+      )}
 
         <div className="flex items-center gap-2">
           <button
@@ -3302,7 +3337,7 @@ export function ListProductWizard({
                       min={0}
                       max={100}
                       value={dragProgress}
-                      disabled={!finalConfirmationChecked || isSubmitting}
+                      disabled={!finalConfirmationChecked || isSubmitting || (vendorKycStatus !== null && vendorKycStatus !== "APPROVED")}
                       onChange={(e) => {
                         const val = Number(e.target.value);
                         setDragProgress(val);
@@ -3340,7 +3375,7 @@ export function ListProductWizard({
                     <span>Keyboard user?</span>
                     <button
                       type="button"
-                      disabled={!finalConfirmationChecked || isSubmitting}
+                      disabled={!finalConfirmationChecked || isSubmitting || (vendorKycStatus !== null && vendorKycStatus !== "APPROVED")}
                       onClick={handleFinalSubmit}
                       className="font-bold text-primary hover:underline cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                     >

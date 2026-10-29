@@ -198,6 +198,19 @@ export default function Checkout() {
     restricted: boolean;
     message: string;
   } | null>(null);
+  const [kycStatus, setKycStatus] = useState<string | null>(null);
+
+  useEffect(() => {
+    const token = storage.get<string | null>(STORAGE_KEYS.token, null);
+    if (!token) return;
+    let isMounted = true;
+    api.getKycStatus(token).then((res) => {
+      if (isMounted && res) {
+        setKycStatus(res.status || "NOT_STARTED");
+      }
+    }).catch(() => {});
+    return () => { isMounted = false; };
+  }, []);
 
   // Fulfillment Method & Location State
   const [fulfillmentMethod, setFulfillmentMethod] = useState<"delivery" | "pickup" | "custom">("delivery");
@@ -416,6 +429,14 @@ export default function Checkout() {
         "You already have a product in this category awaiting delivery. You can book another product in this category once your current order is delivered.";
       toast.error(msg);
       setPaymentError(msg);
+      return;
+    }
+
+    if (kycStatus && kycStatus !== "APPROVED") {
+      const msg = "Admin-approved KYC verification is required before initiating or submitting bookings. Please complete your identity verification.";
+      toast.error(msg);
+      setPaymentError(msg);
+      navigate({ to: "/kyc" });
       return;
     }
 
@@ -1492,6 +1513,25 @@ export default function Checkout() {
               </div>
             )}
 
+            {kycStatus && kycStatus !== "APPROVED" && (
+              <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-3.5 text-xs text-red-200 flex items-start justify-between gap-3">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
+                  <div>
+                    <span className="font-bold text-red-300 block">Identity Verification Required</span>
+                    Admin-approved KYC verification is required before initiating or submitting bookings.
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => navigate({ to: "/kyc" })}
+                  className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold text-xs shrink-0 cursor-pointer transition-all active:scale-95"
+                >
+                  {kycStatus === "NOT_STARTED" ? "Complete KYC" : "View KYC Status"}
+                </button>
+              </div>
+            )}
+
             {/* PRIMARY ACTION BUTTON: Explicitly labelled "Confirm Order" */}
             <div className="space-y-2">
               <Button
@@ -1504,6 +1544,7 @@ export default function Checkout() {
                   isProcessing ||
                   isVerifying ||
                   categoryRestriction?.restricted ||
+                  (kycStatus !== null && kycStatus !== "APPROVED") ||
                   (fulfillmentMethod === "delivery" && !selectedAddress)
                 }
               >

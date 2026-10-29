@@ -712,6 +712,9 @@ def get_payernt_account_by_email(email: str) -> Optional[Dict[str, Any]]:
     except Exception as e:
         logger.warning(f"DB fetch error for user in payernt fallback: {e}")
 
+    for acc in MOCK_PAYERNT_ACCOUNTS.values():
+        if acc.get("email", "").strip().lower() == clean_email:
+            return acc
     return MOCK_PAYERNT_ACCOUNTS.get(clean_email)
 
 
@@ -1122,7 +1125,7 @@ def create_payernt_product(
     afternoon_slot_val = 1 if bool(data.get("afternoon_slot_enabled", data.get("afternoonSlotEnabled", True))) else 0
     full_day_slot_val = 1 if bool(data.get("full_day_slot_enabled", data.get("fullDaySlotEnabled", True))) else 0
     half_day_rate_val = int(data.get("half_day_rate") or data.get("halfDayRate") or round(daily_val * 0.6))
-    buffer_min_val = int(data.get("buffer_minutes") or data.get("bufferMinutes") or (data.get("availability", {}).get("bufferDaysBetweenRentals", 0) * 1440) or 60)
+    buffer_min_val = int(data.get("buffer_minutes") or data.get("bufferMinutes") or ((data.get("availability") or {}).get("bufferDaysBetweenRentals", 0) * 1440) or 60)
 
     avail_from = data.get("available_from_date") or data.get("availableFromDate") or (data.get("availability", {}).get("availableFromDate") if isinstance(data.get("availability"), dict) else "")
     avail_until = data.get("available_until_date") or data.get("availableUntilDate") or (data.get("availability", {}).get("availableUntilDate") if isinstance(data.get("availability"), dict) else "")

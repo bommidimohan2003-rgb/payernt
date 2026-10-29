@@ -1069,6 +1069,15 @@ def create_product_endpoint(
     data: PayerntProductCreateSchema,
     account: Dict[str, Any] = Depends(get_current_payernt_account),
 ):
+    # Requirement 2: Vendor must have admin-approved KYC before creating listing
+    from database import get_user_kyc_status
+    clean_email = account["email"].strip().lower()
+    vendor_kyc = get_user_kyc_status(clean_email, "payernt")
+    if (vendor_kyc.get("status") or "").upper() != "APPROVED":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin-approved KYC verification is required before creating rental product listings. Please complete your vendor verification."
+        )
     """
     Step 5 Listing Submission:
     1. Validates all 5 listing stages and ownership.
@@ -1418,6 +1427,15 @@ def update_vendor_product_endpoint(
     """Updates vendor product specifications without modifying Vendor Secret PIN, ownership, or moderation status."""
     try:
         raw_dict = data.dict(exclude_unset=True)
+        # Requirement 2: Vendor must have admin-approved KYC before activating or publishing
+        if raw_dict.get("availability_status") == "available" or raw_dict.get("available") is True:
+            from database import get_user_kyc_status
+            vendor_kyc = get_user_kyc_status(account["email"], "payernt")
+            if (vendor_kyc.get("status") or "").upper() != "APPROVED":
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Admin-approved KYC verification is required before activating or publishing product listings. Please complete your vendor verification."
+                )
         # Defense-in-depth: explicitly strip any forbidden/privileged keys if present
         for forbidden in ("status", "verification_status", "owner_id", "owner_email", "vendor_secret_pin", "vendorSecretPin", "id"):
             raw_dict.pop(forbidden, None)
@@ -1493,6 +1511,15 @@ def update_product_status_endpoint(
     account: Dict[str, Any] = Depends(get_current_payernt_account),
 ):
     """Updates status or availability status of a vendor's product."""
+    # Requirement 2: Vendor must have admin-approved KYC before activating or publishing
+    if data.availability_status == "available" or data.status in ("approved", "active", "published"):
+        from database import get_user_kyc_status
+        vendor_kyc = get_user_kyc_status(account["email"], "payernt")
+        if (vendor_kyc.get("status") or "").upper() != "APPROVED":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Admin-approved KYC verification is required before activating or publishing product listings. Please complete your vendor verification."
+            )
     # Enforce that vendors cannot change moderation status to approved/verified
     if data.status in ("approved", "verified"):
         existing = get_payernt_product_by_id(product_id, include_pin=False)
