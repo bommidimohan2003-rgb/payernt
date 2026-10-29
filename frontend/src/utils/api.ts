@@ -1537,6 +1537,87 @@ export const api = {
     return this.advanceRentalQueue(token, orderId, "completed");
   },
 
+  async acceptOrder(token: string, orderId: string) {
+    let res: Response | null = null;
+    try {
+      res = await this.fetchWithAuth(
+        `${API_BASE}/api/orders/${orderId}/accept`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    } catch {
+      /* network error / fallback */
+    }
+
+    if (res && !res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(parseApiError(data, `Failed to accept booking ${orderId}`));
+    }
+
+    const payload = res ? await res.json().catch(() => ({})) : { success: true, status: "accepted" };
+
+    const currentOrders = storage.get<Order[]>(STORAGE_KEYS.orders, []);
+    const updatedOrders = currentOrders.map((o) => {
+      if (o.id === orderId || o.productId === orderId) {
+        return { ...o, status: "accepted" as any };
+      }
+      return o;
+    });
+    storage.set(STORAGE_KEYS.orders, updatedOrders);
+    this.invalidateCache("user_orders");
+
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("payent_orders_updated"));
+      window.dispatchEvent(new CustomEvent("payent_booking_updated"));
+      window.dispatchEvent(new CustomEvent("payent_queue_updated", { detail: { orderId, bookingId: orderId, status: "accepted", payload } }));
+    }
+
+    return payload;
+  },
+
+  async rejectOrder(token: string, orderId: string, reason?: string, feedback?: string) {
+    let res: Response | null = null;
+    try {
+      res = await this.fetchWithAuth(
+        `${API_BASE}/api/orders/${orderId}/reject`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reason: reason || "declined_by_vendor", feedback: feedback || reason || "" }),
+        },
+      );
+    } catch {
+      /* network error / fallback */
+    }
+
+    if (res && !res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(parseApiError(data, `Failed to decline booking ${orderId}`));
+    }
+
+    const payload = res ? await res.json().catch(() => ({})) : { success: true, status: "rejected" };
+
+    const currentOrders = storage.get<Order[]>(STORAGE_KEYS.orders, []);
+    const updatedOrders = currentOrders.map((o) => {
+      if (o.id === orderId || o.productId === orderId) {
+        return { ...o, status: "rejected" as any };
+      }
+      return o;
+    });
+    storage.set(STORAGE_KEYS.orders, updatedOrders);
+    this.invalidateCache("user_orders");
+
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("payent_orders_updated"));
+      window.dispatchEvent(new CustomEvent("payent_booking_updated"));
+      window.dispatchEvent(new CustomEvent("payent_queue_updated", { detail: { orderId, bookingId: orderId, status: "rejected", payload } }));
+    }
+
+    return payload;
+  },
+
   async submitOrderDispute(token: string, orderId: string, rebuttalNotes: string, evidence?: any) {
     const res = await this.fetchWithAuth(`${API_BASE}/api/orders/${orderId}/dispute`, {
       method: "POST",

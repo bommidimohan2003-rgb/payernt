@@ -41,6 +41,11 @@ from database import (
     DEFAULT_BUFFER_MINUTES,
     MOCK_ORDERS,
     MOCK_BOOKING_CANCELLATIONS,
+    _extract_order_interval,
+    find_authoritative_product,
+    get_user,
+    MOCK_CUSTOM_PRODUCTS,
+    broadcast_admin_event,
 )
 from payernt_database import (
     create_payernt_account,
@@ -96,6 +101,8 @@ from payernt_database import (
     get_payernt_vendor_dashboard,
     invalidate_vendor_dashboard_cache,
     MOCK_PAYERNT_ACCOUNTS,
+    MOCK_PAYERNT_PRODUCTS,
+    MOCK_RENTAL_SECURITIES,
 )
 
 logger = logging.getLogger("payent.payernt_router")
@@ -1973,6 +1980,254 @@ class LenderRejectBookingSchema(BaseModel):
     feedback: Optional[str] = None
 
 
+def process_lender_booking_decision(
+    booking_id: str,
+    action: str,
+    vendor_id: str,
+    vendor_email: Optional[str] = None,
+    reason: Optional[str] = None,
+    feedback: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Authoritative handler for lender/vendor booking decision (Accept or Decline/Reject).
+    Validates:
+      1. Order existence.
+      2. Caller authorization (only product owner / lender or platform admin).
+      3. Booking status eligibility (prevent duplicates and invalid state transitions).
+      4. Product availability and interval schedule conflicts (on Accept).
+    Persists updated status atomically to orders and rental_security, and notifies parties.
+    """
+    clean_action = str(action or "").strip().lower()
+    if clean_action not in ("accept", "reject", "decline"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid booking decision action '{action}'. Must be 'accept' or 'reject'."
+        )
+
+    order = get_order_by_id(booking_id)
+    if not order:
+        order = fetch_one("SELECT * FROM orders WHERE id = %s OR product_id = %s", (booking_id, booking_id))
+    if not order and booking_id in MOCK_ORDERS:
+        order = MOCK_ORDERS[booking_id]
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Booking #{booking_id} not found.")
+
+    target_id = str(order.get("id") or booking_id)
+    pid = str(order.get("product_id") or order.get("productId") or "").strip()
+
+    # 1. Authorize: Verify that caller owns the product for this booking (or is admin)
+    owner_candidates = set()
+    if pid:
+        pp_row = fetch_one("SELECT owner_id, owner_email FROM payernt_products WHERE id = %s", (pid,))
+        if pp_row:
+            if pp_row.get("owner_id"):
+                owner_candidates.add(str(pp_row["owner_id"]).strip().lower())
+            if pp_row.get("owner_email"):
+                owner_candidates.add(str(pp_row["owner_email"]).strip().lower())
+        mock_pp = MOCK_PAYERNT_PRODUCTS.get(pid)
+        if mock_pp:
+            if mock_pp.get("owner_id"):
+                owner_candidates.add(str(mock_pp["owner_id"]).strip().lower())
+            if mock_pp.get("owner_email"):
+                owner_candidates.add(str(mock_pp["owner_email"]).strip().lower())
+
+        cp_row = fetch_one("SELECT user_email, owner_id FROM custom_products WHERE id = %s", (pid,))
+        if cp_row:
+            if cp_row.get("user_email"):
+                owner_candidates.add(str(cp_row["user_email"]).strip().lower())
+            if cp_row.get("owner_id"):
+                owner_candidates.add(str(cp_row["owner_id"]).strip().lower())
+        mock_cp = MOCK_CUSTOM_PRODUCTS.get(pid)
+        if mock_cp:
+            if mock_cp.get("user_email"):
+                owner_candidates.add(str(mock_cp["user_email"]).strip().lower())
+            if mock_cp.get("owner_email"):
+                owner_candidates.add(str(mock_cp["owner_email"]).strip().lower())
+            if mock_cp.get("owner_id"):
+                owner_candidates.add(str(mock_cp["owner_id"]).strip().lower())
+
+    sec_row = fetch_one("SELECT vendor_id FROM rental_security WHERE booking_id = %s", (target_id,))
+    if sec_row and sec_row.get("vendor_id"):
+        owner_candidates.add(str(sec_row["vendor_id"]).strip().lower())
+    mock_sec = MOCK_RENTAL_SECURITIES.get(target_id)
+    if mock_sec and mock_sec.get("vendor_id"):
+        owner_candidates.add(str(mock_sec["vendor_id"]).strip().lower())
+
+    if order.get("lender_email"):
+        owner_candidates.add(str(order["lender_email"]).strip().lower())
+    if order.get("lender_id"):
+        owner_candidates.add(str(order["lender_id"]).strip().lower())
+
+    clean_v_id = str(vendor_id or "").strip().lower()
+    clean_v_email = str(vendor_email or "").strip().lower()
+
+    caller_user = get_user(clean_v_email) if clean_v_email else (get_user(clean_v_id) if "@" in clean_v_id else None)
+    is_admin = bool(caller_user and caller_user.get("role") in ("admin", "superadmin"))
+
+    is_owner = False
+    for cand in owner_candidates:
+        if not cand:
+            continue
+        if cand in (clean_v_id, clean_v_email) or (clean_v_id and clean_v_id in cand) or (clean_v_email and clean_v_email in cand):
+            is_owner = True
+            break
+
+    if not is_owner and not is_admin:
+        if owner_candidates:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Forbidden: You are not authorized to accept or decline bookings for this product."
+            )
+
+    curr_status = str(order.get("status") or "").lower().strip()
+
+    if clean_action == "accept":
+        if curr_status == "accepted":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Booking has already been accepted.")
+        if curr_status in ("rejected", "declined", "cancelled", "canceled"):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Booking is already {curr_status} and cannot be accepted.")
+        if curr_status in ("ready_for_pickup", "picked_up", "rental_in_progress", "active", "return_initiated", "handed_back", "awaiting_inspection", "completed", "returned"):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Cannot accept booking from status '{curr_status}'.")
+        if curr_status not in ("pending", "requested", "security_pending", "awaiting_confirmation", "submitted"):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Booking with status '{curr_status}' is not eligible for vendor acceptance.")
+
+        # Check product availability
+        prod = find_authoritative_product(pid) if pid else None
+        if prod:
+            is_avail = (
+                prod.get("available", True) is not False
+                and prod.get("is_available", True) is not False
+                and str(prod.get("availability_status") or "available").lower() != "paused"
+            )
+            if not is_avail:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Cannot accept booking: Product listing is currently paused or unavailable."
+                )
+
+        # Check interval conflict
+        ord_start, ord_end = _extract_order_interval(order)
+        if ord_start and ord_end and pid:
+            has_conflict, conflict_reason = check_product_interval_conflicts(
+                product_id=pid,
+                req_start_dt=ord_start,
+                req_end_dt=ord_end,
+                buffer_minutes=60,
+                exclude_order_id=target_id
+            )
+            if has_conflict:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"Cannot accept booking: Requested dates conflict with existing schedule ({conflict_reason})."
+                )
+
+        now_iso = datetime.now(timezone.utc).isoformat()
+        execute_query("UPDATE orders SET status = 'accepted', accepted_at = %s WHERE id = %s", (now_iso, target_id))
+        if target_id in MOCK_ORDERS:
+            MOCK_ORDERS[target_id]["status"] = "accepted"
+            MOCK_ORDERS[target_id]["accepted_at"] = now_iso
+            MOCK_ORDERS[target_id]["acceptedAt"] = now_iso
+        order["status"] = "accepted"
+        order["accepted_at"] = now_iso
+        order["acceptedAt"] = now_iso
+
+        try:
+            execute_query("UPDATE rental_security SET status = 'accepted', updated_at = %s WHERE booking_id = %s", (now_iso, target_id))
+        except Exception:
+            pass
+        if target_id in MOCK_RENTAL_SECURITIES:
+            MOCK_RENTAL_SECURITIES[target_id]["status"] = "accepted"
+
+        actor = clean_v_email or clean_v_id
+        try:
+            notify_booking_event(target_id, "accepted", actor_email=actor)
+        except Exception as e:
+            logger.warning(f"Failed to dispatch notify_booking_event for {target_id}: {e}")
+
+        try:
+            broadcast_admin_event("booking.accepted", {"id": target_id, "status": "accepted"})
+        except Exception:
+            pass
+
+        try:
+            invalidate_vendor_dashboard_cache()
+        except Exception:
+            pass
+
+        return {
+            "success": True,
+            "message": f"Booking request #{target_id} accepted.",
+            "status": "accepted",
+            "bookingId": target_id,
+            "booking": order
+        }
+
+    else:
+        # Decline / Reject
+        if curr_status in ("rejected", "declined", "cancelled", "canceled"):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Booking is already {curr_status}.")
+        if curr_status in ("picked_up", "rental_in_progress", "active", "completed", "returned"):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Cannot decline booking that has already progressed to '{curr_status}'.")
+
+        now_iso = datetime.now(timezone.utc).isoformat()
+        execute_query("UPDATE orders SET status = 'rejected' WHERE id = %s", (target_id,))
+        if target_id in MOCK_ORDERS:
+            MOCK_ORDERS[target_id]["status"] = "rejected"
+        order["status"] = "rejected"
+
+        try:
+            execute_query("UPDATE rental_security SET status = 'rejected', updated_at = %s WHERE booking_id = %s", (now_iso, target_id))
+        except Exception:
+            pass
+        if target_id in MOCK_RENTAL_SECURITIES:
+            MOCK_RENTAL_SECURITIES[target_id]["status"] = "rejected"
+
+        actor = clean_v_email or clean_v_id
+        reason_text = (reason if reason else feedback) or "Lender declined rental request"
+        try:
+            notify_booking_event(target_id, "booking_rejected", actor_email=actor, reason=reason_text)
+        except Exception as e:
+            logger.warning(f"Failed to dispatch reject notification for {target_id}: {e}")
+
+        try:
+            broadcast_admin_event("booking.rejected", {"id": target_id, "status": "rejected"})
+        except Exception:
+            pass
+
+        try:
+            invalidate_vendor_dashboard_cache()
+        except Exception:
+            pass
+
+        return {
+            "success": True,
+            "message": f"Booking request #{target_id} declined.",
+            "status": "rejected",
+            "bookingId": target_id,
+            "booking": order
+        }
+
+
+@payernt_router.post("/bookings/{booking_id}/accept")
+@payernt_router.post("/requests/{booking_id}/accept")
+@payernt_router.post("/paye₹nt/bookings/{booking_id}/accept")
+@payernt_router.post("/payernt/bookings/{booking_id}/accept")
+def payernt_accept_booking_endpoint(
+    booking_id: str,
+    account: Dict[str, Any] = Depends(get_current_payernt_account),
+):
+    """
+    Lender accepts a rental request. Validates authorization, eligibility, and conflicts,
+    persists 'accepted' status, and notifies both parties.
+    """
+    return process_lender_booking_decision(
+        booking_id=booking_id,
+        action="accept",
+        vendor_id=account["id"],
+        vendor_email=account.get("email"),
+    )
+
+
 @payernt_router.post("/bookings/{booking_id}/reject")
 @payernt_router.post("/requests/{booking_id}/reject")
 @payernt_router.post("/paye₹nt/bookings/{booking_id}/reject")
@@ -1983,31 +2238,19 @@ def payernt_reject_booking_endpoint(
     account: Dict[str, Any] = Depends(get_current_payernt_account),
 ):
     """
-    Lender declines a rental request. Updates booking status and notifies both parties.
+    Lender declines a rental request. Validates authorization and eligibility,
+    persists 'rejected' status, and notifies both parties.
     """
-    order = fetch_one("SELECT * FROM orders WHERE id = %s", (booking_id,))
-    if not order:
-        order = MOCK_ORDERS.get(booking_id)
-    if not order:
-        raise HTTPException(status_code=404, detail=f"Booking #{booking_id} not found.")
-
-    curr_status = str(order.get("status") or "").lower()
-    if curr_status in ("cancelled", "rejected", "declined"):
-        raise HTTPException(status_code=400, detail=f"Booking is already {curr_status}.")
-
-    reason_text = (data.reason if data and data.reason else (data.feedback if data else None)) or "Lender declined rental request"
-    execute_query("UPDATE orders SET status = %s WHERE id = %s", ("rejected", booking_id))
-    order["status"] = "rejected"
-    MOCK_ORDERS[booking_id] = order
-
-    notify_booking_event(booking_id, "booking_rejected", actor_email=account.get("email") or account.get("id"), reason=reason_text)
-
-    return {
-        "success": True,
-        "message": f"Booking request #{booking_id} declined.",
-        "status": "rejected",
-        "bookingId": booking_id
-    }
+    reason = data.reason if data else None
+    feedback = data.feedback if data else None
+    return process_lender_booking_decision(
+        booking_id=booking_id,
+        action="reject",
+        vendor_id=account["id"],
+        vendor_email=account.get("email"),
+        reason=reason,
+        feedback=feedback,
+    )
 
 
 @payernt_router.get("/products/{product_id}/availability-config")

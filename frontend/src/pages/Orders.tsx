@@ -68,6 +68,7 @@ export const isCancelledBooking = (o: Order): boolean => {
     s === "cancelled" ||
     s === "canceled" ||
     s === "rejected" ||
+    s === "declined" ||
     s === "failed" ||
     Boolean((o as any).cancelledAt || (o as any).cancelled_at)
   );
@@ -102,10 +103,23 @@ export const isOngoingBooking = (o: Order): boolean => {
  */
 function getStatusBadge(status: string, isCancelled: boolean) {
   const norm = (status || "").toLowerCase().trim();
-  if (isCancelled || norm === "cancelled" || norm === "canceled" || norm === "rejected" || norm === "failed") {
+  if (
+    isCancelled ||
+    norm === "cancelled" ||
+    norm === "canceled" ||
+    norm === "rejected" ||
+    norm === "declined" ||
+    norm === "failed"
+  ) {
     return {
-      label: norm === "rejected" ? "Rejected" : "Cancelled",
+      label: norm === "rejected" || norm === "declined" ? "Declined" : "Cancelled",
       classes: "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20",
+    };
+  }
+  if (norm === "accepted" || norm === "confirmed") {
+    return {
+      label: "Accepted",
+      classes: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
     };
   }
   if (norm === "completed" || norm === "rental_completed" || norm === "returned") {
@@ -834,7 +848,7 @@ export default function Orders() {
                               o.deliveryAddress ||
                               (o as any).delivery_address ||
                               (method === "pickup"
-                                ? o.pickupLocation || (o as any).pickup_location || "Lender Verified Hub"
+                                ? o.pickupLocation || (o as any).pickup_location || ""
                                 : o.customLocation || (o as any).custom_location || "");
                             const directions =
                               o.locationDirections || (o as any).location_directions || "";
@@ -925,8 +939,9 @@ export default function Orders() {
                                     )}
                                   </div>
                                 ) : (
-                                  <p className="text-xs text-neutral-500 dark:text-[#A1A1AA]">
-                                    No address provided for this fulfillment method.
+                                  <p className="text-xs text-neutral-500 dark:text-[#A1A1AA] flex items-center gap-1.5 font-medium">
+                                    <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                                    <span>Location not provided</span>
                                   </p>
                                 )}
 

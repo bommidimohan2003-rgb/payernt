@@ -46,7 +46,12 @@ import { ProfilePhoto } from "@/components/common/ProfilePhoto";
 
 interface RentalRequestsProps {
   requests: RentalRequest[];
-  onRequestAction: (requestId: string, action: "accept" | "reject") => void;
+  onRequestAction: (
+    requestId: string,
+    action: "accept" | "reject",
+    reason?: string,
+    feedback?: string
+  ) => Promise<{ success: boolean; message?: string; error?: string }> | void;
   onAdvanceLifecycle: (requestId: string, nextStatus: RentalRequestStatus) => void;
   onNavigateToWallet: () => void;
   onBack?: () => void;
@@ -103,10 +108,20 @@ export const isCompletedRequest = (r: RentalRequest): boolean => {
   return s === "completed";
 };
 
-export const isPendingRequest = (r: RentalRequest): boolean => {
+export const isEligibleForDecision = (r: RentalRequest): boolean => {
   if (isCancelledRequest(r) || isCompletedRequest(r)) return false;
   const s = String(r.status || "").toLowerCase().trim();
-  return s === "requested" || s === "pending";
+  return (
+    s === "requested" ||
+    s === "pending" ||
+    s === "security_pending" ||
+    s === "awaiting_confirmation" ||
+    s === "payment_pending"
+  );
+};
+
+export const isPendingRequest = (r: RentalRequest): boolean => {
+  return isEligibleForDecision(r);
 };
 
 export const isOngoingRequest = (r: RentalRequest): boolean => {
@@ -136,6 +151,59 @@ export function RentalRequests({
   }, []);
   const [approvingChangeId, setApprovingChangeId] = useState<string | null>(null);
   const [rejectingChangeId, setRejectingChangeId] = useState<string | null>(null);
+
+  // Accept / Decline Decision State
+  const [decisionProcessingId, setDecisionProcessingId] = useState<string | null>(null);
+  const [decisionActionType, setDecisionActionType] = useState<"accept" | "reject" | null>(null);
+  const [declineModalBooking, setDeclineModalBooking] = useState<RentalRequest | null>(null);
+  const [declineReason, setDeclineReason] = useState<string>("Product unavailable / Scheduling conflict");
+  const [declineFeedback, setDeclineFeedback] = useState<string>("");
+
+  const handleAcceptBooking = async (req: RentalRequest) => {
+    if (decisionProcessingId) return;
+    setDecisionProcessingId(req.id);
+    setDecisionActionType("accept");
+    try {
+      const res = await onRequestAction(req.id, "accept");
+      if (res && (res as any).success === false) {
+        toast.error((res as any).error || "Failed to accept booking.");
+      } else {
+        toast.success(`Booking #${req.id.length > 16 ? req.id.slice(0, 16) : req.id} accepted! Product confirmed for ${req.renter?.name || "renter"}.`);
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to accept booking.");
+    } finally {
+      setDecisionProcessingId(null);
+      setDecisionActionType(null);
+    }
+  };
+
+  const handleOpenDeclineModal = (req: RentalRequest) => {
+    setDeclineModalBooking(req);
+    setDeclineReason("Product unavailable / Scheduling conflict");
+    setDeclineFeedback("");
+  };
+
+  const handleConfirmDecline = async () => {
+    if (!declineModalBooking || decisionProcessingId) return;
+    const req = declineModalBooking;
+    setDecisionProcessingId(req.id);
+    setDecisionActionType("reject");
+    try {
+      const res = await onRequestAction(req.id, "reject", declineReason, declineFeedback);
+      if (res && (res as any).success === false) {
+        toast.error((res as any).error || "Failed to decline booking.");
+      } else {
+        toast.info(`Booking #${req.id.length > 16 ? req.id.slice(0, 16) : req.id} has been declined.`);
+        setDeclineModalBooking(null);
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to decline booking.");
+    } finally {
+      setDecisionProcessingId(null);
+      setDecisionActionType(null);
+    }
+  };
 
   const handleCopyAddress = (text: string) => {
     if (!text || text.trim() === "") {
@@ -198,10 +266,29 @@ export function RentalRequests({
   };
 
   const getLocationDisplay = (req: RentalRequest) => {
-    const method = (req.deliveryMethod || req.delivery_method || "delivery").toLowerCase();
+    const rawMethod = (req.deliveryMethod || req.delivery_method || "").toLowerCase().trim();
+    const deliveryAddr = (req.deliveryAddress || req.delivery_address || "").trim();
+    const pickupLoc = (req.pickupLocation || req.pickup_location || "").trim();
+    const customLoc = (req.customLocation || req.custom_location || "").trim();
+    const directions = (req.locationDirections || req.location_directions || "").trim();
+    const lat = req.latitude ?? req.location_latitude ?? null;
+    const lng = req.longitude ?? req.location_longitude ?? null;
+
+    const hasDelivery = Boolean(deliveryAddr);
+    const hasPickup = Boolean(pickupLoc);
+    const hasCustom = Boolean(customLoc);
+    const hasBothDeliveryAndPickup = hasDelivery && hasPickup;
+    const hasAnyLocation = hasDelivery || hasPickup || hasCustom;
+
+    let method = rawMethod;
+    if (!method) {
+      if (hasPickup && !hasDelivery) method = "pickup";
+      else if (hasCustom && !hasDelivery) method = "custom";
+      else method = "delivery";
+    }
+
     let methodLabel = "Doorstep Delivery";
     let methodIcon = Truck;
-
     if (method === "pickup") {
       methodLabel = "Owner Pickup";
       methodIcon = MapPin;
@@ -210,31 +297,36 @@ export function RentalRequests({
       methodIcon = Navigation;
     }
 
-    let address = "";
-    if (method === "delivery") {
-      address = req.deliveryAddress || req.delivery_address || req.renter?.city || "";
-    } else if (method === "pickup") {
-      address = req.pickupLocation || req.pickup_location || "Lender Verified Hub (Details shared after confirmation)";
+    let primaryAddress = "";
+    if (method === "pickup") {
+      primaryAddress = pickupLoc || deliveryAddr || customLoc;
+    } else if (method === "custom") {
+      primaryAddress = customLoc || deliveryAddr || pickupLoc;
     } else {
-      address = req.customLocation || req.custom_location || "Agreed Public Meeting Point";
+      primaryAddress = deliveryAddr || pickupLoc || customLoc;
     }
 
-    const directions = req.locationDirections || req.location_directions || "";
-    const lat = req.latitude ?? req.location_latitude ?? null;
-    const lng = req.longitude ?? req.location_longitude ?? null;
-
-    let mapUrl = req.mapUrl || req.map_url || "";
+    let mapUrl = (req.mapUrl || req.map_url || "").trim();
     if (!mapUrl && lat && lng) {
       mapUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
-    } else if (!mapUrl && address && address !== "Address Pending Confirmation") {
-      mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+    } else if (!mapUrl && primaryAddress) {
+      mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(primaryAddress)}`;
     }
 
     return {
       method,
       methodLabel,
       methodIcon,
-      address,
+      address: primaryAddress,
+      primaryAddress,
+      deliveryAddress: deliveryAddr,
+      pickupLocation: pickupLoc,
+      customLocation: customLoc,
+      hasDelivery,
+      hasPickup,
+      hasCustom,
+      hasBothDeliveryAndPickup,
+      hasAnyLocation,
       directions,
       lat,
       lng,
@@ -831,7 +923,7 @@ export function RentalRequests({
                       <h3 className="font-bold text-sm sm:text-base text-neutral-950 dark:text-[#F5F5F5] font-display truncate">
                         {req.productTitle}
                       </h3>
-                      <div className="flex items-center gap-2 text-xs text-neutral-500 dark:text-[#A1A1AA]">
+                      <div className="flex items-center gap-2 text-xs text-neutral-500 dark:text-[#A1A1AA] flex-wrap">
                         <span className="font-mono">
                           #{req.id.length > 20 ? `${req.id.slice(0, 16)}...` : req.id}
                         </span>
@@ -842,13 +934,41 @@ export function RentalRequests({
                             {formattedBookingTime ? `Booked On: ${formattedBookingTime}` : `Booked on ${bookingDate}`}
                           </span>
                         </span>
+                        <span>•</span>
+                        {(() => {
+                          const compactLoc = getLocationDisplay(req);
+                          if (compactLoc.hasAnyLocation) {
+                            return (
+                              <span
+                                className="flex items-center gap-1 text-xs text-neutral-600 dark:text-[#A1A1AA] truncate max-w-[200px]"
+                                title={compactLoc.primaryAddress}
+                              >
+                                <MapPin className="h-3 w-3 text-emerald-500 shrink-0" />
+                                <span className="truncate">{compactLoc.primaryAddress}</span>
+                              </span>
+                            );
+                          }
+                          return (
+                            <span className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400 font-medium">
+                              <AlertTriangle className="h-3 w-3 shrink-0" />
+                              <span>Location not provided</span>
+                            </span>
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>
 
                   {/* Right: Current Booking Status + View Details Button */}
                   <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-black/5 dark:border-white/5">
-                    <div>{getStatusBadge(req.status, isCancelled)}</div>
+                    <div className="flex items-center gap-2">
+                      {isEligibleForDecision(req) && (
+                        <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                          Action Required
+                        </span>
+                      )}
+                      {getStatusBadge(req.status, isCancelled)}
+                    </div>
 
                     <button
                       type="button"
@@ -1149,78 +1269,163 @@ export function RentalRequests({
                           )}
 
                           {/* Confirmed Booking Location Card */}
-                          <div className="p-4 sm:p-5 rounded-2xl border border-black/5 dark:border-[#A1A1AA]/15 bg-neutral-50/70 dark:bg-[#050709]/60 space-y-3 shadow-xs">
-                            <div className="flex flex-wrap items-center justify-between gap-3">
-                              <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-bold text-neutral-500 dark:text-[#A1A1AA] uppercase tracking-wider">
-                                  Confirmed Booking Location
-                                </span>
-                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide border ${
-                                  loc.method === "delivery"
-                                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25"
-                                    : loc.method === "pickup"
-                                    ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/25"
-                                    : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25"
-                                }`}>
-                                  <loc.methodIcon className="h-3 w-3" />
-                                  <span>{loc.methodLabel}</span>
-                                </span>
+                          <div className="p-4 sm:p-5 rounded-2xl border border-black/5 dark:border-[#A1A1AA]/15 bg-neutral-50/70 dark:bg-[#050709]/60 space-y-4 shadow-xs">
+                            {/* Location Section Header with Booking ID and Dates */}
+                            <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-black/5 dark:border-white/5">
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[10px] font-bold text-neutral-500 dark:text-[#A1A1AA] uppercase tracking-wider">
+                                    Booking & Fulfillment Location
+                                  </span>
+                                  <span
+                                    className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide border ${
+                                      loc.method === "delivery"
+                                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25"
+                                        : loc.method === "pickup"
+                                        ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/25"
+                                        : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25"
+                                    }`}
+                                  >
+                                    <loc.methodIcon className="h-3 w-3" />
+                                    <span>{loc.methodLabel}</span>
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2 text-xs text-neutral-600 dark:text-[#A1A1AA]">
+                                  <span className="font-mono font-semibold text-neutral-900 dark:text-white">
+                                    Booking #{req.id}
+                                  </span>
+                                  <span>•</span>
+                                  <span className="flex items-center gap-1 font-medium">
+                                    <Calendar className="h-3.5 w-3.5 text-neutral-400" />
+                                    <span>{req.startDate} to {req.endDate} ({req.totalDays} Days)</span>
+                                  </span>
+                                </div>
                               </div>
 
-                              <div className="flex items-center gap-2">
-                                {loc.address && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleCopyAddress(loc.address)}
-                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-black/10 dark:border-white/10 hover:bg-neutral-200/50 dark:hover:bg-white/5 text-xs font-semibold text-neutral-700 dark:text-neutral-200 transition-colors cursor-pointer"
-                                    title="Copy Address to clipboard"
-                                  >
-                                    <Copy className="h-3.5 w-3.5" />
-                                    <span>Copy Address</span>
-                                  </button>
-                                )}
-                                {loc.mapUrl && (
-                                  <a
-                                    href={loc.mapUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-neutral-900 text-white dark:bg-[#F5F5F5] dark:text-[#050709] hover:opacity-95 dark:hover:bg-white text-xs font-bold transition-all shadow-xs"
-                                  >
-                                    <ExternalLink className="h-3.5 w-3.5" />
-                                    <span>Open in Google Maps</span>
-                                  </a>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Primary Address Details */}
-                            <div className="space-y-1.5 pt-1">
-                              {loc.address ? (
-                                <div className="flex items-start gap-2.5 text-xs text-neutral-900 dark:text-[#F5F5F5]">
-                                  <MapPin className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
-                                  <div className="space-y-1">
-                                    <p className="font-semibold text-sm leading-relaxed text-neutral-900 dark:text-white">
-                                      {loc.address}
-                                    </p>
-                                    {loc.directions && (
-                                      <p className="text-xs text-neutral-600 dark:text-[#A1A1AA] italic">
-                                        <strong>Directions / Landmark:</strong> {loc.directions}
-                                      </p>
-                                    )}
-                                    {loc.lat && loc.lng && (
-                                      <p className="text-[11px] font-mono text-neutral-500 dark:text-neutral-400">
-                                        GPS Coordinates: {loc.lat.toFixed(5)}, {loc.lng.toFixed(5)}
-                                      </p>
-                                    )}
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="flex items-center gap-2.5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 text-xs font-semibold">
-                                  <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />
-                                  <span>Address Pending Confirmation — Renter will provide delivery address prior to handover.</span>
-                                </div>
+                              {loc.mapUrl && (
+                                <a
+                                  href={loc.mapUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-neutral-900 text-white dark:bg-[#F5F5F5] dark:text-[#050709] hover:opacity-95 dark:hover:bg-white text-xs font-bold transition-all shadow-xs shrink-0"
+                                >
+                                  <ExternalLink className="h-3.5 w-3.5" />
+                                  <span>Open in Google Maps</span>
+                                </a>
                               )}
                             </div>
+
+                            {/* Location Display Blocks */}
+                            {!loc.hasAnyLocation ? (
+                              /* Empty State: Location not provided */
+                              <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-800 dark:text-amber-300 text-xs">
+                                <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500 mt-0.5" />
+                                <div className="space-y-1">
+                                  <p className="font-bold text-sm">Location not provided</p>
+                                  <p className="text-neutral-600 dark:text-neutral-300">
+                                    The customer did not provide a fulfillment address for this booking. You can contact {req.renter?.name || "the customer"} directly to coordinate delivery or pickup.
+                                  </p>
+                                </div>
+                              </div>
+                            ) : loc.hasBothDeliveryAndPickup ? (
+                              /* Both Delivery Address AND Pickup Location exist */
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {/* Delivery Address */}
+                                <div className="p-3.5 rounded-xl bg-white/70 dark:bg-white/[0.03] border border-black/5 dark:border-white/5 space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <span className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                                      <Truck className="h-3.5 w-3.5" />
+                                      <span>Customer Delivery Address</span>
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleCopyAddress(loc.deliveryAddress)}
+                                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-black/10 dark:border-white/10 hover:bg-neutral-100 dark:hover:bg-white/5 text-[11px] font-semibold text-neutral-600 dark:text-neutral-300 cursor-pointer"
+                                      title="Copy Delivery Address"
+                                    >
+                                      <Copy className="h-3 w-3" />
+                                      <span>Copy</span>
+                                    </button>
+                                  </div>
+                                  <p className="text-xs font-medium text-neutral-900 dark:text-white leading-relaxed">
+                                    {loc.deliveryAddress}
+                                  </p>
+                                  {loc.directions && (
+                                    <p className="text-[11px] text-neutral-500 dark:text-neutral-400 italic">
+                                      <strong>Directions:</strong> {loc.directions}
+                                    </p>
+                                  )}
+                                </div>
+
+                                {/* Pickup Location */}
+                                <div className="p-3.5 rounded-xl bg-white/70 dark:bg-white/[0.03] border border-black/5 dark:border-white/5 space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <span className="flex items-center gap-1.5 text-xs font-bold text-blue-600 dark:text-blue-400">
+                                      <MapPin className="h-3.5 w-3.5" />
+                                      <span>Pickup / Handover Location</span>
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleCopyAddress(loc.pickupLocation)}
+                                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-black/10 dark:border-white/10 hover:bg-neutral-100 dark:hover:bg-white/5 text-[11px] font-semibold text-neutral-600 dark:text-neutral-300 cursor-pointer"
+                                      title="Copy Pickup Location"
+                                    >
+                                      <Copy className="h-3 w-3" />
+                                      <span>Copy</span>
+                                    </button>
+                                  </div>
+                                  <p className="text-xs font-medium text-neutral-900 dark:text-white leading-relaxed">
+                                    {loc.pickupLocation}
+                                  </p>
+                                </div>
+                              </div>
+                            ) : (
+                              /* Single Location Block: Delivery or Pickup or Custom */
+                              <div className="p-3.5 rounded-xl bg-white/70 dark:bg-white/[0.03] border border-black/5 dark:border-white/5 space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="flex items-center gap-1.5 text-xs font-bold text-neutral-900 dark:text-white">
+                                    {loc.hasDelivery ? (
+                                      <>
+                                        <Truck className="h-3.5 w-3.5 text-emerald-500" />
+                                        <span>Customer Delivery Address</span>
+                                      </>
+                                    ) : loc.hasPickup ? (
+                                      <>
+                                        <MapPin className="h-3.5 w-3.5 text-blue-500" />
+                                        <span>Pickup Location</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Navigation className="h-3.5 w-3.5 text-amber-500" />
+                                        <span>Custom Meeting Point</span>
+                                      </>
+                                    )}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCopyAddress(loc.primaryAddress)}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-black/10 dark:border-white/10 hover:bg-neutral-100 dark:hover:bg-white/5 text-[11px] font-semibold text-neutral-600 dark:text-neutral-300 cursor-pointer"
+                                    title="Copy Address"
+                                  >
+                                    <Copy className="h-3 w-3" />
+                                    <span>Copy Address</span>
+                                  </button>
+                                </div>
+                                <p className="text-xs font-semibold text-neutral-900 dark:text-white leading-relaxed">
+                                  {loc.primaryAddress}
+                                </p>
+                                {loc.directions && (
+                                  <p className="text-[11px] text-neutral-500 dark:text-neutral-400 italic">
+                                    <strong>Directions / Landmark:</strong> {loc.directions}
+                                  </p>
+                                )}
+                                {loc.lat && loc.lng && (
+                                  <p className="text-[11px] font-mono text-neutral-500 dark:text-neutral-400">
+                                    GPS Coordinates: {loc.lat.toFixed(5)}, {loc.lng.toFixed(5)}
+                                  </p>
+                                )}
+                              </div>
+                            )}
                           </div>
                         </div>
                       );
@@ -1253,27 +1458,46 @@ export function RentalRequests({
                     {/* Card Action Controls & Lifecycle Triggers - Only if not cancelled */}
                     {!isCancelled && (
                       <div className="pt-2 flex flex-wrap items-center justify-between gap-4 border-t border-black/5 dark:border-white/5">
-                        {/* 1. When PENDING: Accept / Reject Buttons */}
-                        {req.status === "requested" && (
+                        {/* 1. When ELIGIBLE FOR DECISION: Accept Booking & Decline Booking */}
+                        {isEligibleForDecision(req) && (
                           <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
                             <button
-                              onClick={() => {
-                                onRequestAction(req.id, "accept");
-                                toast.success(`Booking approved for ${req.renter.name}! Prepare equipment for handover.`);
-                              }}
-                              className="flex-1 sm:flex-initial px-6 py-3 rounded-2xl bg-neutral-900 text-white dark:bg-[#F5F5F5] dark:text-[#050709] dark:hover:bg-white font-bold text-xs shadow-md active:scale-98 transition-all cursor-pointer flex items-center justify-center gap-2"
+                              type="button"
+                              id={`btn-accept-booking-${req.id}`}
+                              onClick={() => handleAcceptBooking(req)}
+                              disabled={Boolean(decisionProcessingId)}
+                              className="flex-1 sm:flex-initial px-6 py-3 rounded-2xl bg-neutral-900 text-white dark:bg-[#F5F5F5] dark:text-[#050709] dark:hover:bg-white font-bold text-xs shadow-md active:scale-98 transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                              <CheckCircle2 className="h-4 w-4" />
-                              <span>Accept & Confirm Booking</span>
+                              {decisionProcessingId === req.id && decisionActionType === "accept" ? (
+                                <>
+                                  <RefreshCw className="h-4 w-4 animate-spin" />
+                                  <span>Accepting Booking...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <CheckCircle2 className="h-4 w-4" />
+                                  <span>Accept Booking</span>
+                                </>
+                              )}
                             </button>
                             <button
-                              onClick={() => {
-                                onRequestAction(req.id, "reject");
-                                toast.info("Rental request declined.");
-                              }}
-                              className="px-4 py-3 rounded-2xl border border-black/10 dark:border-[#A1A1AA]/30 text-xs font-semibold text-neutral-600 dark:text-[#A1A1AA] hover:text-red-500 hover:bg-red-500/10 transition-all cursor-pointer"
+                              type="button"
+                              id={`btn-decline-booking-${req.id}`}
+                              onClick={() => handleOpenDeclineModal(req)}
+                              disabled={Boolean(decisionProcessingId)}
+                              className="px-5 py-3 rounded-2xl border border-red-500/30 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-500/10 transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                              Decline
+                              {decisionProcessingId === req.id && decisionActionType === "reject" ? (
+                                <>
+                                  <RefreshCw className="h-4 w-4 animate-spin" />
+                                  <span>Declining...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <XCircle className="h-4 w-4" />
+                                  <span>Decline Booking</span>
+                                </>
+                              )}
                             </button>
                           </div>
                         )}
@@ -1884,6 +2108,127 @@ export function RentalRequests({
                     <>
                       <XCircle className="h-4 w-4" />
                       <span>Confirm Cancellation</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {/* Decline Booking Confirmation Dialog */}
+        {declineModalBooking && (
+          <div
+            id="decline-booking-confirmation-modal"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
+            onClick={() => {
+              if (!decisionProcessingId) setDeclineModalBooking(null);
+            }}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white dark:bg-[#10151B] border border-black/10 dark:border-[#A1A1AA]/20 rounded-3xl p-6 sm:p-7 max-w-md w-full shadow-2xl space-y-5"
+            >
+              {/* Header */}
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-2xl bg-red-500/10 text-red-600 dark:text-red-400 flex items-center justify-center shrink-0">
+                    <AlertTriangle className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-base text-neutral-950 dark:text-[#F5F5F5]">
+                      Decline Booking?
+                    </h3>
+                    <p className="text-xs text-neutral-500 dark:text-[#A1A1AA]">
+                      Booking #{declineModalBooking.id.length > 16 ? declineModalBooking.id.slice(0, 16) : declineModalBooking.id}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  disabled={Boolean(decisionProcessingId)}
+                  onClick={() => setDeclineModalBooking(null)}
+                  className="p-1 rounded-lg text-neutral-400 hover:text-neutral-700 dark:hover:text-white transition-colors cursor-pointer"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              {/* Product and Dates Summary */}
+              <div className="p-3.5 rounded-2xl bg-neutral-50 dark:bg-white/[0.03] border border-black/5 dark:border-white/5 text-xs space-y-1.5">
+                <div className="font-bold text-neutral-900 dark:text-white truncate">
+                  {declineModalBooking.productTitle}
+                </div>
+                <div className="text-neutral-500 dark:text-[#A1A1AA] flex items-center gap-2">
+                  <span>Borrower: {declineModalBooking.renter?.name || "Customer"}</span>
+                  <span>•</span>
+                  <span>{declineModalBooking.startDate} to {declineModalBooking.endDate}</span>
+                </div>
+              </div>
+
+              {/* Decline Reason Selector */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-neutral-700 dark:text-neutral-300">
+                  Select Reason for Declining:
+                </label>
+                <select
+                  value={declineReason}
+                  onChange={(e) => setDeclineReason(e.target.value)}
+                  disabled={Boolean(decisionProcessingId)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#050709] text-xs font-semibold text-neutral-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white/20"
+                >
+                  <option value="Product unavailable / Scheduling conflict">Product unavailable / Scheduling conflict</option>
+                  <option value="Equipment undergoing maintenance or repair">Equipment undergoing maintenance or repair</option>
+                  <option value="Cannot deliver or fulfill at requested location">Cannot deliver or fulfill at requested location</option>
+                  <option value="Rental duration or pricing mismatch">Rental duration or pricing mismatch</option>
+                  <option value="Other reason">Other reason</option>
+                </select>
+              </div>
+
+              {/* Optional message / feedback */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-medium text-neutral-600 dark:text-[#A1A1AA]">
+                  Additional Notes for Renter (Optional):
+                </label>
+                <textarea
+                  value={declineFeedback}
+                  onChange={(e) => setDeclineFeedback(e.target.value)}
+                  disabled={Boolean(decisionProcessingId)}
+                  placeholder="Provide any additional context or suggested alternate dates..."
+                  rows={2}
+                  className="w-full px-3.5 py-2 rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#050709] text-xs text-neutral-900 dark:text-white placeholder:text-neutral-400 focus:outline-hidden focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white/20 resize-none"
+                />
+              </div>
+
+              {/* Dialog Actions */}
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  disabled={Boolean(decisionProcessingId)}
+                  onClick={() => setDeclineModalBooking(null)}
+                  className="flex-1 py-3 px-4 rounded-xl border border-black/10 dark:border-white/15 text-xs font-bold text-neutral-700 dark:text-[#A1A1AA] hover:bg-neutral-100 dark:hover:bg-white/5 transition-all cursor-pointer"
+                >
+                  Keep Booking
+                </button>
+                <button
+                  type="button"
+                  id="btn-confirm-decline-booking"
+                  disabled={Boolean(decisionProcessingId)}
+                  onClick={handleConfirmDecline}
+                  className="flex-1 py-3 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {decisionProcessingId ? (
+                    <>
+                      <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                      <span>Declining...</span>
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="h-4 w-4" />
+                      <span>Confirm Decline</span>
                     </>
                   )}
                 </button>

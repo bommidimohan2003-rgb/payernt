@@ -880,11 +880,45 @@ export const payerntApi = {
     }
   },
 
+  async acceptBooking(
+    bookingId: string
+  ): Promise<{ success: boolean; message?: string; booking?: any; status?: string; error?: string }> {
+    try {
+      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/bookings/${encodeURIComponent(bookingId)}/accept`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        return {
+          success: false,
+          error: extractApiErrorMessage(data, "Failed to accept booking request."),
+        };
+      }
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("payent_orders_updated"));
+        window.dispatchEvent(new CustomEvent("payent_booking_updated"));
+        window.dispatchEvent(new CustomEvent("payent_queue_updated", { detail: { bookingId, status: "accepted" } }));
+      }
+      return {
+        success: true,
+        message: data.message || "Booking accepted successfully.",
+        booking: data.booking,
+        status: data.status || "accepted",
+      };
+    } catch (e: any) {
+      return {
+        success: false,
+        error: e?.message || "Network error while accepting booking request.",
+      };
+    }
+  },
+
   async rejectBooking(
     bookingId: string,
     reason?: string,
     feedback?: string
-  ): Promise<{ success: boolean; message?: string; error?: string }> {
+  ): Promise<{ success: boolean; message?: string; booking?: any; status?: string; error?: string }> {
     try {
       const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/bookings/${encodeURIComponent(bookingId)}/reject`, {
         method: "POST",
@@ -898,7 +932,17 @@ export const payerntApi = {
           error: extractApiErrorMessage(data, "Failed to decline booking request."),
         };
       }
-      return { success: true, message: data.message };
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("payent_orders_updated"));
+        window.dispatchEvent(new CustomEvent("payent_booking_updated"));
+        window.dispatchEvent(new CustomEvent("payent_queue_updated", { detail: { bookingId, status: "rejected" } }));
+      }
+      return {
+        success: true,
+        message: data.message || "Booking declined successfully.",
+        booking: data.booking,
+        status: data.status || "rejected",
+      };
     } catch (e: any) {
       return {
         success: false,

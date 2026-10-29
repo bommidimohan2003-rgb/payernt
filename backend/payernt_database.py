@@ -3993,6 +3993,11 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50) -> List[Dict[st
     Fetches real bookings for products belonging to this authenticated vendor.
     Queries rental_security records, orders, and deliveries.
     """
+    try:
+        limit = int(limit)
+    except (TypeError, ValueError):
+        limit = 50
+
     bookings = []
     seen_ids = set()
 
@@ -4341,8 +4346,8 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50) -> List[Dict[st
                 pu_at = sec.get("rental_started_at") or sec.get("activated_at") or mo.get("picked_up_at") or mo.get("pickedUpAt")
 
                 del_method = mo.get("deliveryMethod") or mo.get("delivery_method") or "delivery"
-                del_addr = mo.get("deliveryAddress") or mo.get("delivery_address") or "Indiranagar, Bengaluru, Karnataka"
-                pick_loc = mo.get("pickupLocation") or mo.get("pickup_location") or "Payent Partner Hub, Indiranagar"
+                del_addr = mo.get("deliveryAddress") or mo.get("delivery_address") or ""
+                pick_loc = mo.get("pickupLocation") or mo.get("pickup_location") or ""
                 cust_loc = mo.get("customLocation") or mo.get("custom_location") or ""
                 loc_dir = mo.get("locationDirections") or mo.get("location_directions") or ""
                 lat_num = mo.get("locationLatitude") or mo.get("latitude")

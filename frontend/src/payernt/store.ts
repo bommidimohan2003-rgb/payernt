@@ -1091,40 +1091,73 @@ export function usePayerntStore() {
   };
 
   // Rental Request Actions
-  const handleRequestAction = (requestId: string, action: "accept" | "reject") => {
-    setRentalRequests((prev) =>
-      prev.map((req) => {
-        if (req.id !== requestId) return req;
+  const handleRequestAction = async (
+    requestId: string,
+    action: "accept" | "reject",
+    reason?: string,
+    feedback?: string
+  ): Promise<{ success: boolean; message?: string; error?: string }> => {
+    try {
+      const res =
+        action === "accept"
+          ? await payerntApi.acceptBooking(requestId)
+          : await payerntApi.rejectBooking(requestId, reason, feedback);
+
+      if (!res.success) {
         return {
-          ...req,
-          status: action === "accept" ? "accepted" : "rejected",
+          success: false,
+          error: res.error || `Failed to ${action} booking.`,
         };
-      })
-    );
+      }
 
-    // Sync state to backend
-    lastBookingsFetchRef.current = 0;
-    lastDashboardFetchRef.current = 0;
-    if (action === "accept") {
-      payerntApi.advanceRentalQueue(requestId, "confirmed").catch(() => {});
-    } else if (action === "reject") {
-      payerntApi.rejectBooking(requestId).catch(() => {});
+      setRentalRequests((prev) =>
+        prev.map((req) => {
+          if (req.id !== requestId) return req;
+          return {
+            ...req,
+            status: action === "accept" ? "accepted" : "rejected",
+          };
+        })
+      );
+
+      // Invalidate cache and sync with backend
+      lastBookingsFetchRef.current = 0;
+      lastDashboardFetchRef.current = 0;
+      fetchBookings(true).catch(() => {});
+      fetchNotifications(true).catch(() => {});
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("payent_orders_updated"));
+        window.dispatchEvent(new CustomEvent("payent_booking_updated"));
+        window.dispatchEvent(
+          new CustomEvent("payent_queue_updated", {
+            detail: { bookingId: requestId, status: action === "accept" ? "accepted" : "rejected" },
+          })
+        );
+      }
+
+      const req = rentalRequests.find((r) => r.id === requestId);
+      const notif: LenderNotification = {
+        id: `notif-${Date.now()}`,
+        title: action === "accept" ? "Rental Request Accepted ✅" : "Rental Request Declined ❌",
+        message: `You ${action}ed ${req?.renter.name || "renter"}'s booking for "${req?.productTitle || "gear"}".`,
+        type: action === "accept" ? "success" : "info",
+        timestamp: "Just now",
+        read: false,
+        actionRoute: "requests",
+      };
+      setNotifications((prev) => [notif, ...prev]);
+
+      return {
+        success: true,
+        message: res.message || `Booking ${action}ed successfully.`,
+      };
+    } catch (e: any) {
+      return {
+        success: false,
+        error: e?.message || `Unexpected error while processing ${action}.`,
+      };
     }
-    window.dispatchEvent(new CustomEvent("payent_orders_updated"));
-    window.dispatchEvent(new CustomEvent("payent_queue_updated"));
-    fetchNotifications(true).catch(() => {});
-
-    const req = rentalRequests.find((r) => r.id === requestId);
-    const notif: LenderNotification = {
-      id: `notif-${Date.now()}`,
-      title: action === "accept" ? "Rental Request Accepted ✅" : "Rental Request Declined ❌",
-      message: `You ${action}ed ${req?.renter.name}'s booking for "${req?.productTitle}".`,
-      type: action === "accept" ? "success" : "info",
-      timestamp: "Just now",
-      read: false,
-      actionRoute: "requests",
-    };
-    setNotifications((prev) => [notif, ...prev]);
   };
 
   // Step Rental Lifecycle

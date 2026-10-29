@@ -3697,30 +3697,20 @@ def cancel_user_order(
         "cancellation": canc_record
     }
 
+@app.post("/api/orders/{id}/accept")
+@app.post("/api/bookings/{id}/accept")
+def accept_user_order(id: str, email: str = Depends(get_current_any_user_email)):
+    from payernt_router import process_lender_booking_decision
+    return process_lender_booking_decision(booking_id=id, action="accept", vendor_id=email, vendor_email=email)
+
+
 @app.post("/api/orders/{id}/reject")
-def reject_user_order(id: str, email: str = Depends(get_current_any_user_email)):
-    clean_email = email.strip().lower()
-    order = get_order_by_id(id)
-    if not order:
-        order = fetch_one("SELECT * FROM orders WHERE id = %s OR product_id = %s", (id, id))
-    if not order and id in MOCK_ORDERS:
-        order = MOCK_ORDERS[id]
-    if not order:
-        raise HTTPException(status_code=404, detail="Order not found.")
-
-    target_id = str(order.get("id") or id)
-    execute_query("UPDATE orders SET status = 'rejected' WHERE id = %s", (target_id,))
-    if target_id in MOCK_ORDERS:
-        MOCK_ORDERS[target_id]["status"] = "rejected"
-
-    try:
-        notify_booking_event(target_id, "booking_rejected", actor_email=clean_email)
-    except Exception as e:
-        logger.warning(f"Could not dispatch reject notification for order {target_id}: {e}")
-
-    logger.info(f"Order {target_id} rejected by {clean_email}")
-    broadcast_admin_event("booking.rejected", {"id": target_id, "status": "rejected"})
-    return {"success": True, "message": "Booking request declined."}
+@app.post("/api/bookings/{id}/reject")
+def reject_user_order(id: str, data: Optional[Dict[str, Any]] = None, email: str = Depends(get_current_any_user_email)):
+    from payernt_router import process_lender_booking_decision
+    reason = data.get("reason") if isinstance(data, dict) else None
+    feedback = data.get("feedback") if isinstance(data, dict) else None
+    return process_lender_booking_decision(booking_id=id, action="reject", vendor_id=email, vendor_email=email, reason=reason, feedback=feedback)
 
 @app.get("/api/orders/{id}")
 def get_order_details(id: str, email: str = Depends(get_current_any_user_email)):

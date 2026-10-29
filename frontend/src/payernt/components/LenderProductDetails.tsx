@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import {
   Package,
@@ -23,8 +23,6 @@ import {
   Sliders,
   Check,
   CalendarOff,
-  Maximize,
-  Minimize,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -33,13 +31,7 @@ import { getOptimizedImageUrl } from "@/utils/images";
 import type { PayerntProduct } from "../types";
 import payerntApi from "../payerntApiService";
 import { VendorAvailabilityCalendar } from "./VendorAvailabilityCalendar";
-import {
-  resolveProductImageUrl,
-  resolveProductDailyRate,
-  normalizePayerntProduct,
-  formatProductAddress,
-  formatPickupInstructions,
-} from "../productUtils";
+import { resolveProductImageUrl, resolveProductDailyRate, normalizePayerntProduct } from "../productUtils";
 
 export function LenderProductDetails({ productId: propId }: { productId?: string }) {
   const navigate = useNavigate();
@@ -52,87 +44,6 @@ export function LenderProductDetails({ productId: propId }: { productId?: string
   const [isEditingPrice, setIsEditingPrice] = useState(false);
   const [newPrice, setNewPrice] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
-
-  // Inspection Video Fullscreen State & Handlers
-  const videoContainerRef = useRef<HTMLDivElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const [isVideoFullscreen, setIsVideoFullscreen] = useState(false);
-
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      const container = videoContainerRef.current;
-      const video = videoRef.current;
-      const fsElement =
-        document.fullscreenElement ||
-        (document as any).webkitFullscreenElement ||
-        (document as any).mozFullScreenElement ||
-        (document as any).msFullscreenElement;
-      setIsVideoFullscreen(Boolean((container && fsElement === container) || (video && fsElement === video)));
-    };
-
-    document.addEventListener("fullscreenchange", handleFullscreenChange);
-    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
-    document.addEventListener("mozfullscreenchange", handleFullscreenChange);
-    document.addEventListener("MSFullscreenChange", handleFullscreenChange);
-
-    return () => {
-      document.removeEventListener("fullscreenchange", handleFullscreenChange);
-      document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
-      document.removeEventListener("mozfullscreenchange", handleFullscreenChange);
-      document.removeEventListener("MSFullscreenChange", handleFullscreenChange);
-    };
-  }, []);
-
-  const toggleVideoFullscreen = async (e?: React.MouseEvent) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-    const container = videoContainerRef.current;
-    const video = videoRef.current;
-    if (!container) return;
-
-    try {
-      const isCurrentlyFs =
-        document.fullscreenElement === container ||
-        document.fullscreenElement === video ||
-        (document as any).webkitFullscreenElement === container ||
-        (document as any).webkitFullscreenElement === video ||
-        (document as any).mozFullScreenElement === container ||
-        (document as any).msFullscreenElement === container;
-
-      if (isCurrentlyFs) {
-        if (document.exitFullscreen) {
-          await document.exitFullscreen();
-        } else if ((document as any).webkitExitFullscreen) {
-          (document as any).webkitExitFullscreen();
-        } else if ((document as any).mozCancelFullScreen) {
-          (document as any).mozCancelFullScreen();
-        } else if ((document as any).msExitFullscreen) {
-          (document as any).msExitFullscreen();
-        }
-      } else {
-        if (container.requestFullscreen) {
-          await container.requestFullscreen();
-        } else if ((container as any).webkitRequestFullscreen) {
-          (container as any).webkitRequestFullscreen();
-        } else if ((container as any).mozRequestFullScreen) {
-          (container as any).mozRequestFullScreen();
-        } else if ((container as any).msRequestFullscreen) {
-          (container as any).msRequestFullscreen();
-        } else if (video && (video as any).webkitEnterFullscreen) {
-          (video as any).webkitEnterFullscreen();
-        }
-      }
-    } catch (err) {
-      console.warn("[LenderProductDetails] Fullscreen toggle fallback:", err);
-      if (video && (video as any).webkitEnterFullscreen) {
-        try {
-          (video as any).webkitEnterFullscreen();
-        } catch {}
-      }
-    }
-  };
 
   // Time-Slot & Availability Settings
   const [allowHalfDay, setAllowHalfDay] = useState(true);
@@ -356,11 +267,10 @@ export function LenderProductDetails({ productId: propId }: { productId?: string
               toggleAvailability(product.id);
               toast.success(isAvailable ? "Listing paused." : "Listing set to active.");
             }}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-              isAvailable
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${isAvailable
                 ? "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20"
                 : "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20"
-            }`}
+              }`}
           >
             <Power className="w-3.5 h-3.5" />
             {isAvailable ? "Pause Listing" : "Resume Listing"}
@@ -395,18 +305,21 @@ export function LenderProductDetails({ productId: propId }: { productId?: string
       </div>
 
       {/* Main Product Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 min-w-0 max-w-full">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Left Column: Product Photo & Specs */}
         {/* Left Column: Hero Product Photo with Overlay Text & Specs */}
-        <div className="lg:col-span-7 space-y-5 min-w-0 max-w-full">
+        <div className="lg:col-span-7 space-y-5">
           {(() => {
             const mainImg = resolveProductImageUrl(product);
             const conditionGrade = typeof product.condition === "object"
               ? product.condition?.grade || "Good"
               : product.condition || "Good";
-            const locationDisplay = formatProductAddress(product);
+            const locationCity = typeof product.location === "object"
+              ? product.location?.city || product.location?.area || "Visakhapatnam"
+              : product.location || "Visakhapatnam";
 
             return (
-              <div className="relative w-full aspect-[4/3] sm:aspect-[16/10] min-h-[380px] sm:min-h-[440px] rounded-3xl overflow-hidden bg-neutral-950 border border-black/10 dark:border-white/10 shadow-lg flex flex-col justify-between p-5 sm:p-7 select-none group min-w-0 max-w-full">
+              <div className="relative w-full aspect-[4/3] sm:aspect-[16/10] min-h-[380px] sm:min-h-[440px] rounded-3xl overflow-hidden bg-neutral-950 border border-black/10 dark:border-white/10 shadow-lg flex flex-col justify-between p-5 sm:p-7 select-none group">
                 {/* 1. Large Hero Product Image */}
                 <div className="absolute inset-0 w-full h-full overflow-hidden bg-neutral-900 pointer-events-none">
                   {mainImg ? (
@@ -456,7 +369,7 @@ export function LenderProductDetails({ productId: propId }: { productId?: string
                 </div>
 
                 {/* 3. Hero Text Overlay at Bottom of Image */}
-                <div className="relative z-10 space-y-2 mt-auto min-w-0 max-w-full">
+                <div className="relative z-10 space-y-2 mt-auto">
                   {(product.brand || product.model) && (
                     <div className="flex items-center gap-2 text-white/85 text-xs sm:text-sm font-semibold tracking-wide">
                       {product.brand && <span className="text-white font-bold">{product.brand}</span>}
@@ -469,14 +382,14 @@ export function LenderProductDetails({ productId: propId }: { productId?: string
                     </div>
                   )}
 
-                  <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-white font-display tracking-tight leading-tight drop-shadow-md break-words [overflow-wrap:anywhere] min-w-0 max-w-full">
+                  <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-white font-display tracking-tight leading-tight drop-shadow-md">
                     {product.title}
                   </h1>
 
                   <div className="flex flex-wrap items-center gap-3 pt-1 text-white/85 text-xs">
                     <div className="flex items-center gap-1.5 font-medium">
                       <MapPin className="w-3.5 h-3.5 text-primary shrink-0" />
-                      <span className="break-words">{locationDisplay}</span>
+                      <span>{locationCity}</span>
                     </div>
                     <span className="text-white/30">•</span>
                     <div className="flex items-center gap-1.5 font-medium">
@@ -490,13 +403,13 @@ export function LenderProductDetails({ productId: propId }: { productId?: string
           })()}
 
           {/* Details & Specifications Card */}
-          <div className="p-6 rounded-3xl border border-border bg-card space-y-5 shadow-xs min-w-0 max-w-full box-border">
+          <div className="p-6 rounded-3xl border border-border bg-card space-y-5 shadow-xs">
             {product.description && (
-              <div className="min-w-0 max-w-full">
+              <div>
                 <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                   Description
                 </h3>
-                <p className="text-sm text-foreground/90 mt-2 leading-relaxed whitespace-pre-line break-words [overflow-wrap:anywhere] [word-break:break-word] min-w-0 max-w-full">
+                <p className="text-sm text-foreground/90 mt-2 leading-relaxed whitespace-pre-line">
                   {product.description}
                 </p>
               </div>
@@ -504,7 +417,7 @@ export function LenderProductDetails({ productId: propId }: { productId?: string
 
             {/* Included Accessories */}
             {product.accessories && (Array.isArray(product.accessories) ? product.accessories.length > 0 : String(product.accessories).trim().length > 0) && (
-              <div className="pt-4 border-t border-border/70 min-w-0 max-w-full">
+              <div className="pt-4 border-t border-border/70">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                   Included Accessories
                 </h3>
@@ -529,7 +442,7 @@ export function LenderProductDetails({ productId: propId }: { productId?: string
             )}
 
             {/* Condition & Damage Disclosure */}
-            <div className={`${product.description ? "pt-4 border-t border-border/70" : ""} space-y-2 min-w-0 max-w-full`}>
+            <div className={`${product.description ? "pt-4 border-t border-border/70" : ""} space-y-2`}>
               <div className="flex items-center justify-between">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                   Condition & Physical Wear
@@ -539,17 +452,17 @@ export function LenderProductDetails({ productId: propId }: { productId?: string
                 </span>
               </div>
               {(typeof product.condition === "object" && (product.condition?.additionalNotes || product.condition?.notes)) && (
-                <p className="text-xs text-foreground/80 leading-relaxed break-words [overflow-wrap:anywhere]">
+                <p className="text-xs text-foreground/80 leading-relaxed">
                   {product.condition?.additionalNotes || product.condition?.notes}
                 </p>
               )}
               {(product.damageDetails || (typeof product.condition === "object" && product.condition?.visibleDamage)) ? (
-                <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-700 dark:text-amber-400 space-y-1 min-w-0 max-w-full">
+                <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-700 dark:text-amber-400 space-y-1">
                   <span className="font-bold flex items-center gap-1.5">
                     <AlertTriangle className="w-3.5 h-3.5" />
                     Disclosed Cosmetic Wear / Scuffs:
                   </span>
-                  <p className="text-[11px] leading-relaxed break-words [overflow-wrap:anywhere]">
+                  <p className="text-[11px] leading-relaxed">
                     {product.damageDetails || (typeof product.condition === "object" ? product.condition?.damageDetails || product.condition?.damageDescription : "") || "Disclosed cosmetic markings."}
                   </p>
                 </div>
@@ -562,88 +475,50 @@ export function LenderProductDetails({ productId: propId }: { productId?: string
             </div>
 
             {/* Handover Location & Pickup Instructions */}
-            <div className="pt-4 border-t border-border/70 space-y-2 min-w-0 max-w-full">
+            <div className="pt-4 border-t border-border/70 space-y-2">
               <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                 Handover & Pickup Instructions
               </h3>
-              <div className="flex items-center gap-2 text-xs font-semibold text-foreground min-w-0 max-w-full">
+              <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
                 <MapPin className="w-3.5 h-3.5 text-primary shrink-0" />
-                <span className="break-words [overflow-wrap:anywhere]">
-                  {formatProductAddress(product)}
+                <span>
+                  {[
+                    typeof product.location === "object" ? product.location?.area : (product as any).area,
+                    typeof product.location === "object" ? product.location?.city : (product.city || ""),
+                    typeof product.location === "object" ? product.location?.pincode : ((product as any).pincode || ""),
+                  ].filter(Boolean).join(", ") || "Visakhapatnam, Andhra Pradesh"}
                 </span>
               </div>
-              {(() => {
-                const rawInstructions =
-                  product.pickupInstructions ||
-                  (product as any).pickup_instructions ||
-                  (typeof product.location === "object" ? product.location?.pickupInstructions : "") ||
-                  "";
-                const normalizedInstructions = formatPickupInstructions(rawInstructions);
-
-                if (!normalizedInstructions) return null;
-
-                return (
-                  <div className="p-3.5 rounded-2xl bg-secondary/50 border border-border/70 text-xs text-muted-foreground leading-relaxed min-w-0 max-w-full break-words [overflow-wrap:anywhere]">
-                    <span className="font-bold text-foreground block mb-0.5">Instructions for Renter:</span>
-                    {normalizedInstructions}
-                  </div>
-                );
-              })()}
+              {(product.pickupInstructions || (product as any).pickup_instructions || (typeof product.location === "object" && product.location?.pickupInstructions)) && (
+                <div className="p-3.5 rounded-2xl bg-secondary/50 border border-border/70 text-xs text-muted-foreground leading-relaxed">
+                  <span className="font-bold text-foreground block mb-0.5">Instructions for Renter:</span>
+                  {product.pickupInstructions || (product as any).pickup_instructions || (typeof product.location === "object" ? product.location?.pickupInstructions : "")}
+                </div>
+              )}
             </div>
           </div>
 
           {/* 10-Second Equipment Inspection Video */}
           {(product.videoUrl || (product as any).video_url) && (
-            <div className="p-5 rounded-2xl border border-border bg-card space-y-3.5 shadow-2xs text-left min-w-0 max-w-full">
-              <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex flex-wrap items-center justify-between gap-2">
+            <div className="p-5 rounded-2xl border border-border bg-card space-y-3.5 shadow-2xs text-left">
+              <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
                 <div className="flex items-center gap-1.5 text-foreground">
                   <Video className="w-4 h-4 text-primary" />
                   <span>Verified 10s Inspection Video</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded-full">
-                    <ShieldCheck className="w-3 h-3" /> Recorded Live Check
-                  </span>
-                  <button
-                    type="button"
-                    onClick={toggleVideoFullscreen}
-                    className="inline-flex items-center gap-1.5 text-[11px] font-bold text-muted-foreground hover:text-foreground transition-all cursor-pointer px-2.5 py-1 rounded-lg border border-border/80 hover:bg-secondary active:scale-95"
-                    title={isVideoFullscreen ? "Exit Fullscreen (Esc)" : "Expand Video Player to Fullscreen"}
-                  >
-                    {isVideoFullscreen ? <Minimize className="w-3.5 h-3.5 text-primary" /> : <Maximize className="w-3.5 h-3.5" />}
-                    <span>{isVideoFullscreen ? "Exit Fullscreen" : "Fullscreen"}</span>
-                  </button>
-                </div>
+                <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded-full">
+                  <ShieldCheck className="w-3 h-3" /> Recorded Live Check
+                </span>
               </div>
 
-              <div
-                ref={videoContainerRef}
-                className={`relative overflow-hidden bg-black flex items-center justify-center transition-all ${
-                  isVideoFullscreen
-                    ? "fixed inset-0 z-[9999] w-screen h-screen rounded-none border-0 p-0"
-                    : "rounded-2xl border border-border aspect-video group"
-                }`}
-                style={isVideoFullscreen ? { width: "100vw", height: "100vh", maxHeight: "100vh", maxWidth: "100vw", backgroundColor: "#000000" } : undefined}
-              >
+              <div className="relative rounded-2xl overflow-hidden bg-black border border-border aspect-video group">
                 <video
-                  ref={videoRef}
                   src={product.videoUrl || (product as any).video_url}
                   controls
                   playsInline
                   preload="metadata"
-                  className="w-full h-full object-contain max-w-full max-h-full"
+                  className="w-full h-full object-contain"
                 />
-
-                {/* Video Player Overlay Fullscreen Button */}
-                <button
-                  type="button"
-                  onClick={toggleVideoFullscreen}
-                  className="absolute top-3 right-3 z-20 p-2 rounded-xl bg-black/60 hover:bg-black/85 text-white/90 hover:text-white backdrop-blur-md border border-white/20 transition-all shadow-md active:scale-95 cursor-pointer opacity-80 hover:opacity-100 group-hover:opacity-100"
-                  title={isVideoFullscreen ? "Exit Fullscreen (Esc)" : "Expand Video Player to Fullscreen"}
-                  aria-label={isVideoFullscreen ? "Exit Fullscreen" : "Fullscreen Video Player"}
-                >
-                  {isVideoFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
-                </button>
               </div>
 
               <p className="text-[11px] text-muted-foreground flex items-center gap-1.5">
@@ -655,7 +530,7 @@ export function LenderProductDetails({ productId: propId }: { productId?: string
         </div>
 
         {/* Right Column: Rate Card, KYC & Actions */}
-        <div className="lg:col-span-5 space-y-5 min-w-0 max-w-full">
+        <div className="lg:col-span-5 space-y-5">
           {/* Rate Management Card */}
           <div className="p-5 rounded-2xl border border-border bg-card space-y-4">
             <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
