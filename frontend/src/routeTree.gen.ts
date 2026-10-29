@@ -96,6 +96,7 @@ import { Route as PayerntSettingsRouteImport } from './routes/payernt/settings'
 import { Route as PayerntWalletRouteImport } from './routes/payernt/wallet'
 import { Route as ProductIdRouteImport } from './routes/product.$id'
 import { Route as VerifyTokenRouteImport } from './routes/verify.$token'
+import { Route as AdminKycIdRouteImport } from './routes/admin/kyc.$id'
 import { Route as AdminProductsIdRouteImport } from './routes/admin/products.$id'
 import { Route as PayentProductsIdRouteImport } from './routes/payent/products.$id'
 import { Route as PayerntProductsIdRouteImport } from './routes/payernt/products.$id'
@@ -539,6 +540,11 @@ const VerifyTokenRoute = VerifyTokenRouteImport.update({
   path: '/verify/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminKycIdRoute = AdminKycIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => AdminKycRoute,
+} as any)
 const AdminProductsIdRoute = AdminProductsIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -618,7 +624,7 @@ export interface FileRoutesByFullPath {
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/help': typeof AdminHelpRoute
-  '/admin/kyc': typeof AdminKycRoute
+  '/admin/kyc': typeof AdminKycRouteWithChildren
   '/admin/login': typeof AdminLoginRoute
   '/admin/messages': typeof AdminMessagesRoute
   '/admin/notifications': typeof AdminNotificationsRoute
@@ -663,6 +669,7 @@ export interface FileRoutesByFullPath {
   '/admin/': typeof AdminIndexRoute
   '/payent/': typeof PayentIndexRoute
   '/payernt/': typeof PayerntIndexRoute
+  '/admin/kyc/$id': typeof AdminKycIdRoute
   '/admin/products/$id': typeof AdminProductsIdRouteWithChildren
   '/payent/products/$id': typeof PayentProductsIdRoute
   '/payernt/products/$id': typeof PayerntProductsIdRouteWithChildren
@@ -711,7 +718,7 @@ export interface FileRoutesByTo {
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/help': typeof AdminHelpRoute
-  '/admin/kyc': typeof AdminKycRoute
+  '/admin/kyc': typeof AdminKycRouteWithChildren
   '/admin/login': typeof AdminLoginRoute
   '/admin/messages': typeof AdminMessagesRoute
   '/admin/notifications': typeof AdminNotificationsRoute
@@ -756,6 +763,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminIndexRoute
   '/payent': typeof PayentIndexRoute
   '/payernt': typeof PayerntIndexRoute
+  '/admin/kyc/$id': typeof AdminKycIdRoute
   '/admin/products/$id': typeof AdminProductsIdRouteWithChildren
   '/payent/products/$id': typeof PayentProductsIdRoute
   '/payernt/products/$id': typeof PayerntProductsIdRouteWithChildren
@@ -808,7 +816,7 @@ export interface FileRoutesById {
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/help': typeof AdminHelpRoute
-  '/admin/kyc': typeof AdminKycRoute
+  '/admin/kyc': typeof AdminKycRouteWithChildren
   '/admin/login': typeof AdminLoginRoute
   '/admin/messages': typeof AdminMessagesRoute
   '/admin/notifications': typeof AdminNotificationsRoute
@@ -853,6 +861,7 @@ export interface FileRoutesById {
   '/admin/': typeof AdminIndexRoute
   '/payent/': typeof PayentIndexRoute
   '/payernt/': typeof PayerntIndexRoute
+  '/admin/kyc/$id': typeof AdminKycIdRoute
   '/admin/products/$id': typeof AdminProductsIdRouteWithChildren
   '/payent/products/$id': typeof PayentProductsIdRoute
   '/payernt/products/$id': typeof PayerntProductsIdRouteWithChildren
@@ -951,6 +960,7 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/payent/'
     | '/payernt/'
+    | '/admin/kyc/$id'
     | '/admin/products/$id'
     | '/payent/products/$id'
     | '/payernt/products/$id'
@@ -1044,6 +1054,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/payent'
     | '/payernt'
+    | '/admin/kyc/$id'
     | '/admin/products/$id'
     | '/payent/products/$id'
     | '/payernt/products/$id'
@@ -1140,6 +1151,7 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/payent/'
     | '/payernt/'
+    | '/admin/kyc/$id'
     | '/admin/products/$id'
     | '/payent/products/$id'
     | '/payernt/products/$id'
@@ -1800,6 +1812,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VerifyTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/kyc/$id': {
+      id: '/admin/kyc/$id'
+      path: '/$id'
+      fullPath: '/admin/kyc/$id'
+      preLoaderRoute: typeof AdminKycIdRouteImport
+      parentRoute: typeof AdminKycRoute
+    }
     '/admin/products/$id': {
       id: '/admin/products/$id'
       path: '/$id'
@@ -1852,6 +1871,18 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AdminKycRouteChildren {
+  AdminKycIdRoute: typeof AdminKycIdRoute
+}
+
+const AdminKycRouteChildren: AdminKycRouteChildren = {
+  AdminKycIdRoute: AdminKycIdRoute,
+}
+
+const AdminKycRouteWithChildren = AdminKycRoute._addFileChildren(
+  AdminKycRouteChildren,
+)
+
 interface AdminProductsIdRouteChildren {
   AdminProductsIdReviewRoute: typeof AdminProductsIdReviewRoute
 }
@@ -1886,7 +1917,7 @@ interface AdminRouteChildren {
   AdminCategoriesRoute: typeof AdminCategoriesRoute
   AdminDashboardRoute: typeof AdminDashboardRoute
   AdminHelpRoute: typeof AdminHelpRoute
-  AdminKycRoute: typeof AdminKycRoute
+  AdminKycRoute: typeof AdminKycRouteWithChildren
   AdminLoginRoute: typeof AdminLoginRoute
   AdminMessagesRoute: typeof AdminMessagesRoute
   AdminNotificationsRoute: typeof AdminNotificationsRoute
@@ -1913,7 +1944,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminCategoriesRoute: AdminCategoriesRoute,
   AdminDashboardRoute: AdminDashboardRoute,
   AdminHelpRoute: AdminHelpRoute,
-  AdminKycRoute: AdminKycRoute,
+  AdminKycRoute: AdminKycRouteWithChildren,
   AdminLoginRoute: AdminLoginRoute,
   AdminMessagesRoute: AdminMessagesRoute,
   AdminNotificationsRoute: AdminNotificationsRoute,

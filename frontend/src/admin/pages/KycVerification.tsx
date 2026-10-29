@@ -1,65 +1,35 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { Link, useSearch } from "@tanstack/react-router";
 import {
   ShieldCheck,
   CheckCircle2,
   XCircle,
   Clock,
   HelpCircle,
-  FileText,
   Search,
   Filter,
   RefreshCw,
   Eye,
-  ZoomIn,
-  ZoomOut,
-  RotateCw,
-  Maximize2,
-  ExternalLink,
-  AlertTriangle,
   User,
-  Mail,
-  Phone,
-  Calendar,
-  Layers,
-  FileCheck,
   Building,
-  Info,
-  Check,
   X,
-  Lock,
+  Layers,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { StatsCard } from "../components/layout/StatsCard";
 import { Table, Column } from "../components/layout/Table";
 import { Pagination } from "../components/layout/Pagination";
-import { Modal } from "../components/layout/Modal";
-import { Loader } from "../components/layout/Loader";
-import { EmptyState } from "../components/layout/EmptyState";
 import { ProfilePhoto } from "@/components/common/ProfilePhoto";
-import {
-  kycService,
-  AdminKycVerification,
-  KycStats,
-  KycDocumentPayload,
-} from "../services/kyc";
-
-const REJECTION_TEMPLATES = [
-  "Document photo is blurry, dark, or illegible.",
-  "Name on identity document does not match profile registration name.",
-  "Document is cropped; all four corners and details must be visible.",
-  "Invalid or expired document format.",
-  "Incorrect document type submitted for this account type.",
-];
-
-const REQUEST_INFO_TEMPLATES = [
-  "Please re-upload a clear, high-resolution photo of your document with all four corners visible.",
-  "Please provide a document where your full name, photo, and government ID number are clearly readable.",
-  "For Payernt vendor accounts, please upload a valid Aadhaar card. Ensure details are not obscured.",
-  "For Payrent renter accounts, please upload a valid PAN card with clear signature.",
-];
+import { kycService, AdminKycVerification, KycStats } from "../services/kyc";
 
 export default function KycVerification() {
+  const routerSearch = useSearch({ strict: false }) as {
+    status?: string;
+    type?: string;
+    q?: string;
+  };
+
   const [verifications, setVerifications] = useState<AdminKycVerification[]>(
     [],
   );
@@ -74,32 +44,18 @@ export default function KycVerification() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Filters & Search
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [accountTypeFilter, setAccountTypeFilter] = useState<string>("all");
-  const [searchQuery, setSearchQuery] = useState<string>("");
+  // Filters & Search (initialized from router search params if present)
+  const [statusFilter, setStatusFilter] = useState<string>(
+    routerSearch?.status || "all",
+  );
+  const [accountTypeFilter, setAccountTypeFilter] = useState<string>(
+    routerSearch?.type || "all",
+  );
+  const [searchQuery, setSearchQuery] = useState<string>(routerSearch?.q || "");
 
   // Pagination
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [itemsPerPage, setItemsPerPage] = useState<number>(10);
-
-  // Detail & Document Preview Modal
-  const [selectedVerification, setSelectedVerification] =
-    useState<AdminKycVerification | null>(null);
-  const [docLoading, setDocLoading] = useState(false);
-  const [docError, setDocError] = useState<string | null>(null);
-  const [docPayload, setDocPayload] = useState<KycDocumentPayload | null>(null);
-
-  // Document Viewer Controls (Zoom, Pan, Rotation)
-  const [zoomLevel, setZoomLevel] = useState<number>(1);
-  const [rotationAngle, setRotationAngle] = useState<number>(0);
-
-  // Decision Modals State
-  const [isApproveOpen, setIsApproveOpen] = useState(false);
-  const [isRejectOpen, setIsRejectOpen] = useState(false);
-  const [isRequestInfoOpen, setIsRequestInfoOpen] = useState(false);
-  const [actionReason, setActionReason] = useState("");
-  const [submittingAction, setSubmittingAction] = useState(false);
 
   // Fetch real applications from backend
   const fetchData = useCallback(async (isRefresh = false) => {
@@ -140,46 +96,6 @@ export default function KycVerification() {
     fetchData();
   }, [fetchData]);
 
-  // Load document payload securely when viewing details
-  const handleOpenDetails = async (item: AdminKycVerification) => {
-    setSelectedVerification(item);
-    setDocPayload(null);
-    setDocError(null);
-    setZoomLevel(1);
-    setRotationAngle(0);
-
-    try {
-      setDocLoading(true);
-      const doc = await kycService.getKycDocument(item.id);
-      setDocPayload(doc);
-    } catch (err: unknown) {
-      const errorObj = err as { message?: string };
-      console.warn("Could not load KYC document payload:", err);
-      setDocError(
-        errorObj?.message || "Failed to load identity document image.",
-      );
-    } finally {
-      setDocLoading(false);
-    }
-  };
-
-  const handleCloseDetails = () => {
-    setSelectedVerification(null);
-    setDocPayload(null);
-    setDocError(null);
-    setZoomLevel(1);
-    setRotationAngle(0);
-  };
-
-  // Zoom / Rotation actions
-  const handleZoomIn = () => setZoomLevel((z) => Math.min(z + 0.25, 3));
-  const handleZoomOut = () => setZoomLevel((z) => Math.max(z - 0.25, 0.5));
-  const handleResetZoom = () => {
-    setZoomLevel(1);
-    setRotationAngle(0);
-  };
-  const handleRotate = () => setRotationAngle((r) => (r + 90) % 360);
-
   // Filtered & Sorted items
   const filteredItems = useMemo(() => {
     return verifications
@@ -196,8 +112,9 @@ export default function KycVerification() {
           if (
             statusFilter === "NEEDS_INFORMATION" &&
             !["NEEDS_INFORMATION", "NEEDS_INFO"].includes(itemStatus)
-          )
+          ) {
             return false;
+          }
         }
 
         // Account type filter
@@ -248,93 +165,14 @@ export default function KycVerification() {
     return filteredItems.slice(start, start + itemsPerPage);
   }, [filteredItems, currentPage, itemsPerPage]);
 
-  // Decision Execution: Approve
-  const handleConfirmApprove = async () => {
-    if (!selectedVerification) return;
-    try {
-      setSubmittingAction(true);
-      const res = await kycService.reviewKyc(selectedVerification.id, {
-        action: "approve",
-      });
-      toast.success(res.message || "KYC verification approved successfully!");
-      setIsApproveOpen(false);
-      handleCloseDetails();
-      await fetchData(true);
-    } catch (err: unknown) {
-      const errorObj = err as { response?: { data?: { detail?: string } } };
-      toast.error(
-        errorObj?.response?.data?.detail ||
-          "Failed to approve KYC application.",
-      );
-    } finally {
-      setSubmittingAction(false);
-    }
-  };
-
-  // Decision Execution: Reject
-  const handleConfirmReject = async () => {
-    if (!selectedVerification) return;
-    const cleanReason = actionReason.trim();
-    if (!cleanReason) {
-      toast.error("Rejection reason is mandatory.");
-      return;
-    }
-
-    try {
-      setSubmittingAction(true);
-      const res = await kycService.reviewKyc(selectedVerification.id, {
-        action: "reject",
-        rejection_reason: cleanReason,
-        rejectionReason: cleanReason,
-      });
-      toast.success(res.message || "KYC verification rejected.");
-      setIsRejectOpen(false);
-      setActionReason("");
-      handleCloseDetails();
-      await fetchData(true);
-    } catch (err: unknown) {
-      const errorObj = err as { response?: { data?: { detail?: string } } };
-      toast.error(
-        errorObj?.response?.data?.detail || "Failed to reject KYC application.",
-      );
-    } finally {
-      setSubmittingAction(false);
-    }
-  };
-
-  // Decision Execution: Request More Info
-  const handleConfirmRequestInfo = async () => {
-    if (!selectedVerification) return;
-    const cleanNotes = actionReason.trim();
-    if (!cleanNotes) {
-      toast.error("Information request details are mandatory.");
-      return;
-    }
-
-    try {
-      setSubmittingAction(true);
-      const res = await kycService.reviewKyc(selectedVerification.id, {
-        action: "needs_information",
-        notes: cleanNotes,
-        rejection_reason: cleanNotes,
-      });
-      toast.success(
-        res.message || "Requested additional information from applicant.",
-      );
-      setIsRequestInfoOpen(false);
-      setActionReason("");
-      handleCloseDetails();
-      await fetchData(true);
-    } catch (err: unknown) {
-      const errorObj = err as { response?: { data?: { detail?: string } } };
-      toast.error(
-        errorObj?.response?.data?.detail ||
-          "Failed to request additional information.",
-      );
-    } finally {
-      setSubmittingAction(false);
-    }
-  };
+  // Active search parameters to carry when navigating to details
+  const searchState = useMemo(() => {
+    return {
+      status: statusFilter !== "all" ? statusFilter : undefined,
+      type: accountTypeFilter !== "all" ? accountTypeFilter : undefined,
+      q: searchQuery.trim() ? searchQuery.trim() : undefined,
+    };
+  }, [statusFilter, accountTypeFilter, searchQuery]);
 
   // Table Column Definitions
   const columns: Column<AdminKycVerification>[] = [
@@ -343,9 +181,15 @@ export default function KycVerification() {
       label: "Application ID",
       sortable: true,
       render: (row) => (
-        <span className="font-mono text-xs font-semibold text-foreground/80 tracking-tight">
+        <Link
+          to="/admin/kyc/$id"
+          params={{ id: row.id }}
+          search={searchState}
+          className="font-mono text-xs font-semibold text-foreground/80 hover:text-primary transition-colors tracking-tight"
+          title="Open application review"
+        >
           {row.id.slice(0, 14)}...
-        </span>
+        </Link>
       ),
     },
     {
@@ -364,9 +208,14 @@ export default function KycVerification() {
               size="sm"
             />
             <div className="min-w-0">
-              <p className="font-semibold text-xs text-foreground truncate max-w-[160px]">
+              <Link
+                to="/admin/kyc/$id"
+                params={{ id: row.id }}
+                search={searchState}
+                className="font-semibold text-xs text-foreground hover:text-primary transition-colors truncate max-w-[160px] block"
+              >
                 {row.applicant_name || "Applicant"}
-              </p>
+              </Link>
               <span
                 className={cn(
                   "inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-md",
@@ -507,13 +356,15 @@ export default function KycVerification() {
       label: "Action",
       align: "right",
       render: (row) => (
-        <button
-          onClick={() => handleOpenDetails(row)}
+        <Link
+          to="/admin/kyc/$id"
+          params={{ id: row.id }}
+          search={searchState}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground border border-primary/20 transition-all cursor-pointer shadow-xs"
         >
           <Eye className="h-3.5 w-3.5" />
           <span>View Details</span>
-        </button>
+        </Link>
       ),
     },
   ];
@@ -553,7 +404,7 @@ export default function KycVerification() {
         </button>
       </div>
 
-      {/* Phase 3: Summary Cards */}
+      {/* Summary Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3.5">
         <StatsCard
           title="Total Submissions"
@@ -606,7 +457,7 @@ export default function KycVerification() {
         />
       </div>
 
-      {/* Phase 4: Filters and Search Bar */}
+      {/* Filters and Search Bar */}
       <div className="p-4 rounded-2xl bg-card border border-border/80 shadow-xs space-y-3.5">
         <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
           {/* Status Filter Tabs */}
@@ -710,7 +561,10 @@ export default function KycVerification() {
         data={paginatedItems}
         loading={loading}
         emptyTitle="No KYC Applications Found"
-        emptyDescription="No KYC submissions match your active filter and search criteria."
+        emptyDescription={
+          error ||
+          "No KYC submissions match your active filter and search criteria."
+        }
       />
 
       {/* Pagination */}
@@ -725,582 +579,6 @@ export default function KycVerification() {
             setCurrentPage(1);
           }}
         />
-      )}
-
-      {/* Phase 5: Detail & Document Preview Modal */}
-      {selectedVerification && (
-        <Modal
-          isOpen={Boolean(selectedVerification)}
-          onClose={handleCloseDetails}
-          title="KYC Application Review & Document Verification"
-          size="xl"
-        >
-          <div className="flex flex-col h-full max-h-[78vh] overflow-y-auto p-5 sm:p-6 space-y-6">
-            {/* Top Applicant Banner */}
-            <div className="p-4 rounded-2xl bg-card border border-border/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div className="flex items-center gap-3.5">
-                <ProfilePhoto
-                  src={selectedVerification.applicant_avatar || undefined}
-                  name={
-                    selectedVerification.applicant_name ||
-                    selectedVerification.email
-                  }
-                  size="md"
-                />
-                <div>
-                  <h3 className="text-base font-bold text-foreground">
-                    {selectedVerification.applicant_name || "Applicant"}
-                  </h3>
-                  <div className="flex flex-wrap items-center gap-2 mt-1">
-                    <span className="text-xs text-muted-foreground font-mono">
-                      {selectedVerification.email}
-                    </span>
-                    <span className="text-muted-foreground/40">•</span>
-                    <span
-                      className={cn(
-                        "inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md",
-                        ["payernt", "vendor", "lender"].includes(
-                          (
-                            selectedVerification.account_type || ""
-                          ).toLowerCase(),
-                        )
-                          ? "bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20"
-                          : "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20",
-                      )}
-                    >
-                      {["payernt", "vendor", "lender"].includes(
-                        (selectedVerification.account_type || "").toLowerCase(),
-                      )
-                        ? "Vendor (Payernt Lender)"
-                        : "Renter (Payrent Customer)"}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Status Badge */}
-              <div className="flex flex-col sm:items-end">
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">
-                  Current Status
-                </span>
-                <span
-                  className={cn(
-                    "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border tracking-wide",
-                    (selectedVerification.status || "").toUpperCase() ===
-                      "APPROVED"
-                      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
-                      : (selectedVerification.status || "").toUpperCase() ===
-                          "PENDING"
-                        ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
-                        : (selectedVerification.status || "").toUpperCase() ===
-                            "REJECTED"
-                          ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20"
-                          : "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20",
-                  )}
-                >
-                  {(selectedVerification.status || "").toUpperCase()}
-                </span>
-              </div>
-            </div>
-
-            {/* Document Metadata Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 rounded-2xl bg-secondary/30 border border-border/60 text-xs">
-              <div>
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
-                  Document Type
-                </span>
-                <span className="font-bold text-foreground">
-                  {(selectedVerification.document_type || "").toUpperCase() ===
-                  "AADHAAR"
-                    ? "Aadhaar Card (12-digit)"
-                    : "PAN Card (10-char)"}
-                </span>
-              </div>
-              <div>
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
-                  Masked Number
-                </span>
-                <span className="font-mono font-bold text-foreground">
-                  {selectedVerification.document_number_masked || "••••••••"}
-                </span>
-              </div>
-              <div>
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
-                  Submitted On
-                </span>
-                <span className="text-foreground">
-                  {new Date(
-                    selectedVerification.submitted_at ||
-                      selectedVerification.created_at ||
-                      "",
-                  ).toLocaleString()}
-                </span>
-              </div>
-              <div>
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
-                  Application ID
-                </span>
-                <span className="font-mono text-[11px] text-muted-foreground truncate block">
-                  {selectedVerification.id}
-                </span>
-              </div>
-            </div>
-
-            {/* Existing Rejection / Information Notice if present */}
-            {selectedVerification.rejection_reason && (
-              <div
-                className={cn(
-                  "p-4 rounded-2xl border text-xs space-y-1.5",
-                  (selectedVerification.status || "").toUpperCase() ===
-                    "REJECTED"
-                    ? "bg-rose-500/10 border-rose-500/30 text-rose-700 dark:text-rose-300"
-                    : "bg-amber-500/10 border-amber-500/30 text-amber-700 dark:text-amber-300",
-                )}
-              >
-                <div className="flex items-center gap-2 font-bold">
-                  <AlertTriangle className="h-4 w-4 shrink-0" />
-                  <span>
-                    {(selectedVerification.status || "").toUpperCase() ===
-                    "REJECTED"
-                      ? "Rejection Reason Feedback:"
-                      : "Information Requested from Applicant:"}
-                  </span>
-                </div>
-                <p className="text-foreground leading-relaxed pl-6">
-                  {selectedVerification.rejection_reason}
-                </p>
-                {selectedVerification.reviewed_by && (
-                  <p className="text-[10px] text-muted-foreground pl-6">
-                    Recorded by {selectedVerification.reviewed_by} on{" "}
-                    {selectedVerification.reviewed_at
-                      ? new Date(
-                          selectedVerification.reviewed_at,
-                        ).toLocaleString()
-                      : "prior review"}
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* Embedded Document Previewer */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                  <FileText className="h-4 w-4 text-primary" />
-                  <span>Submitted Identity Document Preview</span>
-                  {docPayload?.fileName && (
-                    <span className="text-muted-foreground font-normal text-[11px]">
-                      ({docPayload.fileName})
-                    </span>
-                  )}
-                </span>
-
-                {/* Viewer Zoom & Rotation Controls */}
-                <div className="flex items-center gap-1 bg-secondary/80 p-1 rounded-xl border border-border/80">
-                  <button
-                    type="button"
-                    onClick={handleZoomOut}
-                    title="Zoom Out"
-                    className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-card transition-colors cursor-pointer"
-                  >
-                    <ZoomOut className="h-3.5 w-3.5" />
-                  </button>
-                  <span className="text-[11px] font-mono px-1.5 text-muted-foreground">
-                    {Math.round(zoomLevel * 100)}%
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handleZoomIn}
-                    title="Zoom In"
-                    className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-card transition-colors cursor-pointer"
-                  >
-                    <ZoomIn className="h-3.5 w-3.5" />
-                  </button>
-                  <div className="h-3 w-px bg-border mx-0.5" />
-                  <button
-                    type="button"
-                    onClick={handleRotate}
-                    title="Rotate 90 degrees"
-                    className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-card transition-colors cursor-pointer"
-                  >
-                    <RotateCw className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleResetZoom}
-                    title="Fit to Window"
-                    className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-card transition-colors cursor-pointer"
-                  >
-                    <Maximize2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Preview Canvas */}
-              <div className="relative min-h-[340px] max-h-[460px] rounded-2xl bg-neutral-900 border border-border/80 overflow-auto flex items-center justify-center p-4">
-                {docLoading ? (
-                  <div className="flex flex-col items-center justify-center gap-2.5 text-muted-foreground">
-                    <Loader
-                      size="md"
-                      message="Decryption and loading identity document..."
-                    />
-                  </div>
-                ) : docError ? (
-                  <div className="flex flex-col items-center justify-center gap-2 text-center p-6 text-rose-400">
-                    <AlertTriangle className="h-8 w-8" />
-                    <p className="text-xs font-bold">{docError}</p>
-                    <p className="text-[11px] text-muted-foreground">
-                      The document file could not be retrieved from private
-                      secure storage.
-                    </p>
-                  </div>
-                ) : docPayload?.fileData ? (
-                  docPayload.fileType === "application/pdf" ? (
-                    <iframe
-                      src={docPayload.fileData}
-                      title="PDF Document Preview"
-                      className="w-full h-[400px] rounded-xl border border-border/40"
-                    />
-                  ) : (
-                    <div
-                      className="transition-transform duration-150 ease-out flex items-center justify-center"
-                      style={{
-                        transform: `scale(${zoomLevel}) rotate(${rotationAngle}deg)`,
-                        transformOrigin: "center center",
-                      }}
-                    >
-                      <img
-                        src={docPayload.fileData}
-                        alt="Submitted Identity Document"
-                        className="max-h-[380px] max-w-full object-contain rounded-lg shadow-2xl select-none"
-                      />
-                    </div>
-                  )
-                ) : (
-                  <div className="text-center p-6 text-muted-foreground text-xs">
-                    <FileText className="h-8 w-8 mx-auto mb-2 opacity-40" />
-                    <p>No document preview payload available.</p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Audit History Timeline */}
-            {selectedVerification.audit_history &&
-              selectedVerification.audit_history.length > 0 && (
-                <div className="space-y-2 pt-2 border-t border-border/60">
-                  <span className="text-xs font-bold text-foreground">
-                    Audit History & Decision Trail
-                  </span>
-                  <div className="space-y-2">
-                    {selectedVerification.audit_history.map((entry, idx) => (
-                      <div
-                        key={idx}
-                        className="p-3 rounded-xl bg-card border border-border/60 text-xs flex items-start justify-between gap-3"
-                      >
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-foreground uppercase">
-                              {entry.decision}
-                            </span>
-                            <span className="text-[11px] text-muted-foreground font-mono">
-                              by {entry.reviewer_email}
-                            </span>
-                          </div>
-                          {entry.reason && (
-                            <p className="text-muted-foreground mt-1 text-[11px]">
-                              Notes: {entry.reason}
-                            </p>
-                          )}
-                        </div>
-                        <span className="text-[10px] text-muted-foreground font-mono shrink-0">
-                          {new Date(entry.reviewed_at).toLocaleString()}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-            {/* Phase 6: Action Buttons Footer */}
-            <div className="pt-4 border-t border-border/80 flex flex-wrap items-center justify-between gap-3">
-              <button
-                type="button"
-                onClick={handleCloseDetails}
-                className="px-4 py-2 rounded-xl text-xs font-semibold bg-secondary hover:bg-secondary/80 text-foreground transition-colors cursor-pointer"
-              >
-                Close Preview
-              </button>
-
-              <div className="flex items-center gap-2">
-                {/* Request More Information Button */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActionReason("");
-                    setIsRequestInfoOpen(true);
-                  }}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500 hover:text-white border border-amber-500/30 transition-all cursor-pointer shadow-xs"
-                >
-                  <HelpCircle className="h-3.5 w-3.5" />
-                  <span>Request More Info</span>
-                </button>
-
-                {/* Reject KYC Button */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActionReason("");
-                    setIsRejectOpen(true);
-                  }}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-600 hover:text-white border border-rose-500/30 transition-all cursor-pointer shadow-xs"
-                >
-                  <XCircle className="h-3.5 w-3.5" />
-                  <span>Reject KYC</span>
-                </button>
-
-                {/* Approve KYC Button */}
-                <button
-                  type="button"
-                  onClick={() => setIsApproveOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition-all cursor-pointer shadow-md"
-                >
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                  <span>Approve KYC</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </Modal>
-      )}
-
-      {/* Confirmation Modal: Approve KYC */}
-      {isApproveOpen && selectedVerification && (
-        <Modal
-          isOpen={isApproveOpen}
-          onClose={() => setIsApproveOpen(false)}
-          title="Confirm KYC Approval"
-          size="sm"
-        >
-          <div className="p-5 space-y-4">
-            <div className="flex items-center gap-3 p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-semibold">
-              <CheckCircle2 className="h-6 w-6 shrink-0" />
-              <span>
-                You are about to approve KYC for{" "}
-                <strong>
-                  {selectedVerification.applicant_name ||
-                    selectedVerification.email}
-                </strong>
-                .
-              </span>
-            </div>
-
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Approving this application will grant verified status. The user
-              will immediately be permitted to:
-            </p>
-
-            <ul className="text-xs text-muted-foreground space-y-1 list-disc pl-5">
-              {["payernt", "vendor", "lender"].includes(
-                (selectedVerification.account_type || "").toLowerCase(),
-              ) ? (
-                <>
-                  <li>Publish and activate product listings on Payernt.</li>
-                  <li>Receive rental requests and verified lender badges.</li>
-                </>
-              ) : (
-                <>
-                  <li>
-                    Initiate checkout and confirm rental bookings on Payrent.
-                  </li>
-                  <li>Access zero-security-deposit rental perks.</li>
-                </>
-              )}
-            </ul>
-
-            <div className="pt-3 border-t border-border/80 flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setIsApproveOpen(false)}
-                disabled={submittingAction}
-                className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-secondary hover:bg-secondary/80 text-foreground transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmApprove}
-                disabled={submittingAction}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors cursor-pointer disabled:opacity-50"
-              >
-                {submittingAction && (
-                  <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                )}
-                <span>
-                  {submittingAction ? "Approving..." : "Confirm Approval"}
-                </span>
-              </button>
-            </div>
-          </div>
-        </Modal>
-      )}
-
-      {/* Confirmation Modal: Reject KYC (Mandatory Reason) */}
-      {isRejectOpen && selectedVerification && (
-        <Modal
-          isOpen={isRejectOpen}
-          onClose={() => setIsRejectOpen(false)}
-          title="Reject KYC Application"
-          size="md"
-        >
-          <div className="p-5 space-y-4">
-            <div className="flex items-center gap-3 p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-semibold">
-              <AlertTriangle className="h-6 w-6 shrink-0" />
-              <span>
-                A rejection reason is <strong>mandatory</strong>. It will be
-                communicated to{" "}
-                <strong>
-                  {selectedVerification.applicant_name ||
-                    selectedVerification.email}
-                </strong>{" "}
-                via notification.
-              </span>
-            </div>
-
-            {/* Quick Template Chips */}
-            <div className="space-y-1.5">
-              <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block">
-                Quick Reason Templates:
-              </span>
-              <div className="flex flex-wrap gap-1.5">
-                {REJECTION_TEMPLATES.map((tmpl, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => setActionReason(tmpl)}
-                    className="text-[11px] px-2.5 py-1 rounded-lg bg-secondary/80 hover:bg-secondary text-muted-foreground hover:text-foreground border border-border/60 transition-colors text-left cursor-pointer"
-                  >
-                    {tmpl}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Textarea */}
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-foreground">
-                Rejection Reason <span className="text-rose-500">*</span>
-              </label>
-              <textarea
-                rows={3}
-                placeholder="Explain clearly why this KYC document was rejected..."
-                value={actionReason}
-                onChange={(e) => setActionReason(e.target.value)}
-                className="w-full p-3 rounded-xl text-xs bg-secondary/40 border border-border/80 text-foreground placeholder:text-muted-foreground/60 focus:outline-hidden focus:ring-2 focus:ring-rose-500/30 transition-all resize-none"
-              />
-            </div>
-
-            <div className="pt-3 border-t border-border/80 flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setIsRejectOpen(false)}
-                disabled={submittingAction}
-                className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-secondary hover:bg-secondary/80 text-foreground transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmReject}
-                disabled={submittingAction || !actionReason.trim()}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white transition-colors cursor-pointer disabled:opacity-50"
-              >
-                {submittingAction && (
-                  <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                )}
-                <span>
-                  {submittingAction ? "Rejecting..." : "Confirm Rejection"}
-                </span>
-              </button>
-            </div>
-          </div>
-        </Modal>
-      )}
-
-      {/* Confirmation Modal: Request More Information */}
-      {isRequestInfoOpen && selectedVerification && (
-        <Modal
-          isOpen={isRequestInfoOpen}
-          onClose={() => setIsRequestInfoOpen(false)}
-          title="Request More Information"
-          size="md"
-        >
-          <div className="p-5 space-y-4">
-            <div className="flex items-center gap-3 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs font-semibold">
-              <HelpCircle className="h-6 w-6 shrink-0" />
-              <span>
-                Enter clear instructions on what document or correction the
-                applicant must submit.
-              </span>
-            </div>
-
-            {/* Quick Template Chips */}
-            <div className="space-y-1.5">
-              <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block">
-                Quick Request Templates:
-              </span>
-              <div className="flex flex-wrap gap-1.5">
-                {REQUEST_INFO_TEMPLATES.map((tmpl, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => setActionReason(tmpl)}
-                    className="text-[11px] px-2.5 py-1 rounded-lg bg-secondary/80 hover:bg-secondary text-muted-foreground hover:text-foreground border border-border/60 transition-colors text-left cursor-pointer"
-                  >
-                    {tmpl}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Textarea */}
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-foreground">
-                Requested Information Details{" "}
-                <span className="text-amber-500">*</span>
-              </label>
-              <textarea
-                rows={3}
-                placeholder="Explain what needs to be corrected or re-uploaded..."
-                value={actionReason}
-                onChange={(e) => setActionReason(e.target.value)}
-                className="w-full p-3 rounded-xl text-xs bg-secondary/40 border border-border/80 text-foreground placeholder:text-muted-foreground/60 focus:outline-hidden focus:ring-2 focus:ring-amber-500/30 transition-all resize-none"
-              />
-            </div>
-
-            <div className="pt-3 border-t border-border/80 flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setIsRequestInfoOpen(false)}
-                disabled={submittingAction}
-                className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-secondary hover:bg-secondary/80 text-foreground transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmRequestInfo}
-                disabled={submittingAction || !actionReason.trim()}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-500 text-white transition-colors cursor-pointer disabled:opacity-50"
-              >
-                {submittingAction && (
-                  <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                )}
-                <span>{submittingAction ? "Sending..." : "Send Request"}</span>
-              </button>
-            </div>
-          </div>
-        </Modal>
       )}
     </div>
   );

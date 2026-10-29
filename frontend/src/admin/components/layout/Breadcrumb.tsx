@@ -5,6 +5,7 @@ const CUSTOM_NAMES: Record<string, string> = {
   "pin-verification": "8-Digit PIN Verification",
   "activity-logs": "Activity Logs",
   "dashboard": "Dashboard",
+  "kyc": "KYC Verification",
 };
 
 export function Breadcrumb() {
