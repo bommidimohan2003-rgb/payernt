@@ -42,20 +42,20 @@ class TestSharedDatabaseCrossIntegration(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         try:
-            from database import execute_write
+            from database import execute_query
             if getattr(cls, "payrent_email", None):
-                execute_write("DELETE FROM users WHERE email = %s", (cls.payrent_email,))
+                execute_query("DELETE FROM users WHERE email = %s", (cls.payrent_email,))
             if getattr(cls, "test_email", None):
-                execute_write("DELETE FROM users WHERE email = %s", (cls.test_email,))
+                execute_query("DELETE FROM users WHERE email = %s", (cls.test_email,))
             if getattr(cls, "payernt_account_id", None):
-                execute_write("DELETE FROM payernt_wallet_transactions WHERE owner_id = %s", (cls.payernt_account_id,))
-                execute_write("DELETE FROM payernt_wallets WHERE owner_id = %s", (cls.payernt_account_id,))
-                execute_write("DELETE FROM payernt_bank_accounts WHERE owner_id = %s", (cls.payernt_account_id,))
-                execute_write("DELETE FROM payernt_notifications WHERE owner_id = %s", (cls.payernt_account_id,))
-                execute_write("DELETE FROM payernt_audit_logs WHERE user_id = %s", (cls.payernt_account_id,))
-                execute_write("DELETE FROM payernt_products WHERE owner_id = %s", (cls.payernt_account_id,))
-                execute_write("DELETE FROM rental_security WHERE vendor_id = %s OR renter_id = %s", (cls.payernt_account_id, cls.payernt_account_id))
-                execute_write("DELETE FROM payernt_accounts WHERE id = %s", (cls.payernt_account_id,))
+                execute_query("DELETE FROM payernt_wallet_transactions WHERE owner_id = %s", (cls.payernt_account_id,))
+                execute_query("DELETE FROM payernt_wallets WHERE owner_id = %s", (cls.payernt_account_id,))
+                execute_query("DELETE FROM payernt_bank_accounts WHERE owner_id = %s", (cls.payernt_account_id,))
+                execute_query("DELETE FROM payernt_notifications WHERE owner_id = %s", (cls.payernt_account_id,))
+                execute_query("DELETE FROM payernt_audit_logs WHERE user_id = %s", (cls.payernt_account_id,))
+                execute_query("DELETE FROM payernt_products WHERE owner_id = %s", (cls.payernt_account_id,))
+                execute_query("DELETE FROM rental_security WHERE vendor_id = %s OR renter_id = %s", (cls.payernt_account_id, cls.payernt_account_id))
+                execute_query("DELETE FROM payernt_accounts WHERE id = %s", (cls.payernt_account_id,))
         except Exception:
             pass
 
@@ -88,6 +88,26 @@ class TestSharedDatabaseCrossIntegration(unittest.TestCase):
             "otp": "DIRECT"
         })
         assert payrent_res.status_code in (200, 201), f"pay₹ent register failed: {payrent_res.text}"
+
+        # Approve vendor and renter accounts for end-to-end integration test
+        from database import execute_query, MOCK_USERS
+        from payernt_database import MOCK_PAYERNT_ACCOUNTS
+        try:
+            execute_query("UPDATE payernt_accounts SET status = 'active' WHERE email = %s", (self.test_email,))
+            execute_query("UPDATE users SET status = 'active', verified = 1 WHERE email = %s", (self.test_email,))
+        except Exception:
+            pass
+        for acc in list(MOCK_PAYERNT_ACCOUNTS.values()):
+            if acc.get("email") == self.test_email:
+                acc["status"] = "active"
+                acc["kyc_status"] = "APPROVED"
+        if self.test_email in MOCK_PAYERNT_ACCOUNTS:
+            MOCK_PAYERNT_ACCOUNTS[self.test_email]["status"] = "active"
+            MOCK_PAYERNT_ACCOUNTS[self.test_email]["kyc_status"] = "APPROVED"
+        if self.test_email in MOCK_USERS:
+            MOCK_USERS[self.test_email]["status"] = "active"
+            MOCK_USERS[self.test_email]["verified"] = True
+            MOCK_USERS[self.test_email]["kyc_status"] = "APPROVED"
 
         # 3. Login to paye₹nt and verify account claims
         login_payernt = client.post("/api/paye₹nt/auth/login", json={
@@ -127,6 +147,18 @@ class TestSharedDatabaseCrossIntegration(unittest.TestCase):
         TestSharedDatabaseCrossIntegration.product_id = prod_data["product"]["id"]
         TestSharedDatabaseCrossIntegration.vendor_pin = prod_data["vendorSecretPin"]
         assert len(str(TestSharedDatabaseCrossIntegration.vendor_pin)) == 4
+
+        # Mark product available and approved for cross-side booking lifecycle
+        from database import execute_query
+        from payernt_database import MOCK_PAYERNT_PRODUCTS
+        try:
+            execute_query("UPDATE payernt_products SET available = 1, availability_status = 'available', status = 'approved' WHERE id = %s", (self.product_id,))
+        except Exception:
+            pass
+        if self.product_id in MOCK_PAYERNT_PRODUCTS:
+            MOCK_PAYERNT_PRODUCTS[self.product_id]["available"] = True
+            MOCK_PAYERNT_PRODUCTS[self.product_id]["availability_status"] = "available"
+            MOCK_PAYERNT_PRODUCTS[self.product_id]["status"] = "approved"
 
         # 2. Renter accesses product catalog via public catalog endpoint
         renter_view = client.get(f"/api/paye₹nt/catalog/{self.product_id}")
@@ -198,15 +230,15 @@ class TestSharedDatabaseCrossIntegration(unittest.TestCase):
     @classmethod
     def teardown_class(cls):
         try:
-            from database import execute_write
-            execute_write("DELETE FROM users WHERE email = %s", (cls.payrent_email,))
-            execute_write("DELETE FROM payernt_wallet_transactions WHERE owner_id = %s", (cls.payernt_account_id,))
-            execute_write("DELETE FROM payernt_wallets WHERE owner_id = %s", (cls.payernt_account_id,))
-            execute_write("DELETE FROM payernt_bank_accounts WHERE owner_id = %s", (cls.payernt_account_id,))
-            execute_write("DELETE FROM payernt_notifications WHERE owner_id = %s", (cls.payernt_account_id,))
-            execute_write("DELETE FROM payernt_audit_logs WHERE user_id = %s", (cls.payernt_account_id,))
-            execute_write("DELETE FROM payernt_products WHERE owner_id = %s", (cls.payernt_account_id,))
-            execute_write("DELETE FROM rental_security WHERE vendor_id = %s OR renter_id = %s", (cls.payernt_account_id, cls.payernt_account_id))
-            execute_write("DELETE FROM payernt_accounts WHERE id = %s", (cls.payernt_account_id,))
+            from database import execute_query
+            execute_query("DELETE FROM users WHERE email = %s", (cls.payrent_email,))
+            execute_query("DELETE FROM payernt_wallet_transactions WHERE owner_id = %s", (cls.payernt_account_id,))
+            execute_query("DELETE FROM payernt_wallets WHERE owner_id = %s", (cls.payernt_account_id,))
+            execute_query("DELETE FROM payernt_bank_accounts WHERE owner_id = %s", (cls.payernt_account_id,))
+            execute_query("DELETE FROM payernt_notifications WHERE owner_id = %s", (cls.payernt_account_id,))
+            execute_query("DELETE FROM payernt_audit_logs WHERE user_id = %s", (cls.payernt_account_id,))
+            execute_query("DELETE FROM payernt_products WHERE owner_id = %s", (cls.payernt_account_id,))
+            execute_query("DELETE FROM rental_security WHERE vendor_id = %s OR renter_id = %s", (cls.payernt_account_id, cls.payernt_account_id))
+            execute_query("DELETE FROM payernt_accounts WHERE id = %s", (cls.payernt_account_id,))
         except Exception:
             pass

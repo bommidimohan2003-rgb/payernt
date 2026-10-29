@@ -1444,6 +1444,7 @@ export const api = {
       window.dispatchEvent(new CustomEvent("payent_booking_updated", { detail }));
       window.dispatchEvent(new CustomEvent("payent_queue_updated", { detail }));
       window.dispatchEvent(new CustomEvent("payernt_data_refresh"));
+      window.dispatchEvent(new CustomEvent("paye₹nt_data_refresh"));
     }
     return resJson;
   },

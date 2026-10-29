@@ -454,20 +454,37 @@ export function usePayerntStore() {
 
   const mapRawBookingToRentalRequest = useCallback((b: any): RentalRequest => {
     const daily = Number(b.amount || b.daily_rate || b.dailyRate || 500);
-    const rawStatus = String(b.status || "").toLowerCase().trim();
+    const rawStatus = String(b.status || b.bookingStatus || "").toLowerCase().trim();
     let parsedStatus: RentalRequestStatus = "approved";
-    if (rawStatus === "order confirmed" || rawStatus === "confirmed") parsedStatus = "confirmed";
-    else if (rawStatus === "ready for pickup" || rawStatus === "ready_for_pickup") parsedStatus = "ready_for_pickup";
-    else if (rawStatus === "picked up" || rawStatus === "picked_up") parsedStatus = "picked_up";
-    else if (rawStatus === "rental in progress" || rawStatus === "rental_in_progress" || rawStatus === "active" || b.rentalStarted) parsedStatus = "active";
-    else if (rawStatus === "return initiated" || rawStatus === "return_initiated") parsedStatus = "return_initiated";
-    else if (rawStatus === "item handed back to owner" || rawStatus === "handed_back" || rawStatus === "handed back") parsedStatus = "handed_back";
-    else if (rawStatus === "awaiting owner inspection" || rawStatus === "awaiting_inspection" || rawStatus === "inspection") parsedStatus = "awaiting_inspection";
-    else if (rawStatus === "rental completed" || rawStatus === "completed") parsedStatus = "completed";
-    else if (rawStatus === "cancelled") parsedStatus = "cancelled";
-    else if (rawStatus === "rejected") parsedStatus = "rejected";
-    else if (rawStatus === "handover") parsedStatus = "handover";
-    else parsedStatus = (b.status || "approved") as RentalRequestStatus;
+    if (b.cancellation || b.cancelled_at || b.cancelledAt || rawStatus === "cancelled" || rawStatus === "canceled") {
+      parsedStatus = "cancelled";
+    } else if (rawStatus === "order confirmed" || rawStatus === "confirmed") {
+      parsedStatus = "confirmed";
+    } else if (rawStatus === "pending" || rawStatus === "requested" || rawStatus === "submitted" || rawStatus === "security_pending") {
+      parsedStatus = "pending";
+    } else if (rawStatus === "ready for pickup" || rawStatus === "ready_for_pickup") {
+      parsedStatus = "ready_for_pickup";
+    } else if (rawStatus === "picked up" || rawStatus === "picked_up") {
+      parsedStatus = "picked_up";
+    } else if (rawStatus === "rental in progress" || rawStatus === "rental_in_progress" || rawStatus === "active" || b.rentalStarted) {
+      parsedStatus = "active";
+    } else if (rawStatus === "return initiated" || rawStatus === "return_initiated") {
+      parsedStatus = "return_initiated";
+    } else if (rawStatus === "item handed back to owner" || rawStatus === "handed_back" || rawStatus === "handed back") {
+      parsedStatus = "handed_back";
+    } else if (rawStatus === "awaiting owner inspection" || rawStatus === "awaiting_inspection" || rawStatus === "inspection") {
+      parsedStatus = "awaiting_inspection";
+    } else if (rawStatus === "rental completed" || rawStatus === "completed" || rawStatus === "returned") {
+      parsedStatus = "completed";
+    } else if (rawStatus === "rejected" || rawStatus === "declined") {
+      parsedStatus = "rejected";
+    } else if (rawStatus === "handover") {
+      parsedStatus = "handover";
+    } else if (rawStatus === "accepted") {
+      parsedStatus = "accepted";
+    } else {
+      parsedStatus = (b.status || "approved") as RentalRequestStatus;
+    }
 
     return {
       id: b.bookingId || b.id,
@@ -494,6 +511,13 @@ export function usePayerntStore() {
       platformFee: 0,
       netEarnings: daily * 3,
       securityDeposit: 0,
+      cancellation: b.cancellation || (b.cancellationReason ? {
+        reasonCode: b.cancellationReason,
+        reason: b.cancellationReason,
+        feedback: b.cancellationFeedback,
+        cancelledAt: b.cancelledAt,
+        cancelledBy: b.cancelledBy,
+      } : undefined),
       status: parsedStatus,
       requestDate: b.createdAt || b.created_at || b.requestDate || b.request_date || "",
       createdAt: b.createdAt || b.created_at || b.requestDate || b.request_date || "",
@@ -784,7 +808,7 @@ export function usePayerntStore() {
     };
 
     const handleBookingUpdate = (e: any) => {
-      const bId = e?.detail?.bookingId;
+      const bId = e?.detail?.bookingId || e?.detail?.id;
       const newStatus = e?.detail?.status;
       if (bId && newStatus) {
         setRentalRequests((prev) =>
@@ -818,8 +842,9 @@ export function usePayerntStore() {
     return () => {
       window.removeEventListener("paye₹nt_data_refresh", handleRefresh);
       window.removeEventListener("payernt_data_refresh", handleRefresh);
-      window.removeEventListener("payent_orders_updated", handleRefresh);
-      window.removeEventListener("payent_queue_updated", handleRefresh);
+      window.removeEventListener("payent_orders_updated", handleBookingUpdate);
+      window.removeEventListener("payent_queue_updated", handleBookingUpdate);
+      window.removeEventListener("payent_booking_updated", handleBookingUpdate);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       clearInterval(pollInterval);
     };

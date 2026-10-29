@@ -761,13 +761,13 @@ def register_payernt_vendor(data: PayerntRegisterSchema):
     return {
         "success": True,
         "status": "PENDING_REVIEW",
-        "accountType": "Payernt",
+        "accountType": "paye₹nt",
         "message": "Your account has been created successfully. Our Admin team is currently reviewing your submitted information.",
         "user": {
             "id": account["id"],
             "name": account["name"],
             "email": account["email"],
-            "accountType": "Payernt",
+            "accountType": "paye₹nt",
             "status": "PENDING_REVIEW",
         },
         "userId": account["id"],
@@ -896,7 +896,7 @@ def login_payernt_vendor(data: PayerntLoginSchema, request: Request = None):
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail={
                     "status": "PENDING_REVIEW",
-                    "accountType": "Payernt",
+                    "accountType": "paye₹nt",
                     "email": clean_email,
                     "message": "Your account is still under review. Our Admin team is currently reviewing your submitted information."
                 },
@@ -907,7 +907,7 @@ def login_payernt_vendor(data: PayerntLoginSchema, request: Request = None):
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail={
                     "status": "REJECTED",
-                    "accountType": "Payernt",
+                    "accountType": "paye₹nt",
                     "email": clean_email,
                     "rejectionReason": account.get("rejection_reason") or "Your submitted information could not be verified.",
                     "message": "Your account was not approved."
@@ -919,7 +919,7 @@ def login_payernt_vendor(data: PayerntLoginSchema, request: Request = None):
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail={
                     "status": "SUSPENDED",
-                    "accountType": "Payernt",
+                    "accountType": "paye₹nt",
                     "email": clean_email,
                     "message": "Your paye₹nt vendor account is inactive or suspended. Please contact support."
                 },
@@ -1801,7 +1801,7 @@ def get_vendor_bookings_endpoint(
     Fetches real bookings belonging to the authenticated vendor.
     Exclusively returns bookings for this vendor's listed products.
     """
-    bookings = get_payernt_vendor_bookings(vendor_id=account["id"], limit=limit)
+    bookings = get_payernt_vendor_bookings(vendor_id=account["id"], limit=limit, vendor_email=account.get("email"))
     return {
         "success": True,
         "bookings": bookings,
@@ -2139,7 +2139,7 @@ def process_lender_booking_decision(
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Booking is already {curr_status} and cannot be accepted.")
         if curr_status in ("ready_for_pickup", "picked_up", "rental_in_progress", "active", "return_initiated", "handed_back", "awaiting_inspection", "completed", "returned"):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Cannot accept booking from status '{curr_status}'.")
-        if curr_status not in ("pending", "requested", "security_pending", "awaiting_confirmation", "submitted"):
+        if curr_status not in ("pending", "requested", "security_pending", "awaiting_confirmation", "submitted", "confirmed"):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Booking with status '{curr_status}' is not eligible for vendor acceptance.")
 
         # Check product availability
@@ -2572,6 +2572,15 @@ def create_booking_with_security(
     renter_email = payload["sub"].strip().lower()
     renter_id = payload.get("user_id") or f"PAYRENT_USER_{renter_email}"
 
+    # Requirement: Renter must have admin-approved KYC before booking
+    from database import get_user_kyc_status
+    renter_kyc = get_user_kyc_status(renter_email, "payrent")
+    if (renter_kyc.get("status") or "").upper() != "APPROVED":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin-approved KYC verification is required before initiating or confirming rental reservations. Please complete your KYC verification."
+        )
+
     # Verify product existence
     product = get_payernt_product_by_id(data.productId, include_pin=True)
     if not product:
@@ -2585,6 +2594,14 @@ def create_booking_with_security(
     daily_rate = 2499
 
     if product:
+        v_email = product.get("owner_email") or product.get("user_email")
+        if v_email:
+            v_kyc = get_user_kyc_status(v_email, "payernt")
+            if (v_kyc.get("status") or "").upper() != "APPROVED":
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="This product cannot be booked because the vendor's KYC verification is pending or unapproved."
+                )
         vendor_id = product.get("owner_id", "PAYERNT_USER_001")
         vendor_pin = str(product.get("vendor_secret_pin", "5831")).strip()
         prod_title = product.get("title") or product.get("name", "Tech Gear")
@@ -2736,6 +2753,7 @@ def create_booking_with_security(
             "endDatetime": e_dt.isoformat(),
             "total": booking_total,
             "status": "pending",
+            "renterSecretPin": str(security_record.get("renter_secret_pin") or sanitized_sec.get("renterSecretPin") or "6314"),
             "renterId": renter_id,
             "vendorId": vendor_id,
             "createdAt": normalized_order["createdAt"],
@@ -2921,6 +2939,9 @@ def verify_otp_endpoint(
     valid, msg, record = verify_handover_otp_backend(booking_id, data.otp)
     if not valid:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
+    sec = get_rental_security_record(booking_id)
+    if sec and sec.get("vendor_pin_verified") and sec.get("renter_pin_verified"):
+        activate_rental_transactional(booking_id)
     return {"success": True, "message": msg}
 
 
@@ -3468,7 +3489,7 @@ def resubmit_payernt_vendor(data: PayerntResubmitSchema):
     return {
         "success": True,
         "status": "PENDING_REVIEW",
-        "accountType": "Payernt",
+        "accountType": "paye₹nt",
         "message": "Your vendor details have been updated and resubmitted for Admin review.",
     }
 
@@ -3501,7 +3522,7 @@ def get_payernt_status(email: Optional[str] = None, authorization: Optional[str]
     return {
         "status": status_val,
         "is_approved": status_val == "APPROVED",
-        "accountType": "Payernt",
+        "accountType": "paye₹nt",
         "email": clean_email,
         "name": acc.get("name"),
         "rejectionReason": acc.get("rejection_reason"),

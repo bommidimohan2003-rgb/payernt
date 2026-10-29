@@ -8824,7 +8824,9 @@ def get_user_kyc_status(email: str, account_type: str) -> Dict[str, Any]:
             from payernt_database import MOCK_PAYERNT_ACCOUNTS, get_payernt_account_by_email
             for p_acc in MOCK_PAYERNT_ACCOUNTS.values():
                 if p_acc.get("email", "").strip().lower() == clean_email:
-                    if str(p_acc.get("kyc_status") or "").upper() == "APPROVED":
+                    acc_st = str(p_acc.get("status") or "").upper()
+                    raw_kyc = str(p_acc.get("kyc_status") or "").upper()
+                    if raw_kyc == "APPROVED" or (acc_st in ("ACTIVE", "APPROVED") and raw_kyc not in ("NOT_STARTED", "PENDING", "REJECTED")):
                         return {
                             "id": p_acc.get("id"),
                             "userId": p_acc.get("id"),
@@ -8844,8 +8846,11 @@ def get_user_kyc_status(email: str, account_type: str) -> Dict[str, Any]:
                             "providerStatus": "APPROVED"
                         }
             p_acc = get_payernt_account_by_email(clean_email)
-            if p_acc and str(p_acc.get("kyc_status") or "").upper() == "APPROVED":
-                return {
+            if p_acc:
+                acc_st = str(p_acc.get("status") or "").upper()
+                raw_kyc = str(p_acc.get("kyc_status") or "").upper()
+                if raw_kyc == "APPROVED" or (acc_st in ("ACTIVE", "APPROVED") and raw_kyc not in ("NOT_STARTED", "PENDING", "REJECTED")):
+                    return {
                     "id": p_acc.get("id"),
                     "userId": p_acc.get("id"),
                     "email": clean_email,

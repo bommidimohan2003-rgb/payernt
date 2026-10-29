@@ -3991,22 +3991,52 @@ def consume_cross_side_verification_token(token: str, target_account_type: str) 
 # PAYE₹NT VENDOR BOOKINGS & AUTHORITATIVE DASHBOARD AGGREGATION
 # ============================================================
 
-def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50) -> List[Dict[str, Any]]:
+def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50, vendor_email: Optional[str] = None) -> List[Dict[str, Any]]:
     """
     Fetches real bookings for products belonging to this authenticated vendor.
-    Queries rental_security records, orders, and deliveries.
+    Queries rental_security records, orders, and deliveries across both vendor_id and vendor_email.
     """
     try:
         limit = int(limit)
     except (TypeError, ValueError):
         limit = 50
 
+    clean_v_id = str(vendor_id or "").strip()
+    clean_v_email = str(vendor_email or "").strip().lower() if vendor_email else ""
+    if not clean_v_email and "@" in clean_v_id:
+        clean_v_email = clean_v_id.lower()
+    elif not clean_v_email:
+        acc = MOCK_PAYERNT_ACCOUNTS.get(clean_v_id)
+        if acc and acc.get("email"):
+            clean_v_email = acc.get("email").strip().lower()
+        else:
+            try:
+                acc_row = fetch_one("SELECT email FROM payernt_accounts WHERE id = %s", (clean_v_id,))
+                if acc_row and acc_row.get("email"):
+                    clean_v_email = acc_row.get("email").strip().lower()
+            except Exception:
+                pass
+
+    ident_list = [clean_v_id]
+    if clean_v_email and clean_v_email not in ident_list:
+        ident_list.append(clean_v_email)
+    if clean_v_email:
+        p_user_id = f"PAYERNT_USER_{clean_v_email}"
+        if p_user_id not in ident_list:
+            ident_list.append(p_user_id)
+        u_user_id = f"PAYERNT_USER_{clean_v_email.replace('@', '_').replace('.', '_')}"
+        if u_user_id not in ident_list:
+            ident_list.append(u_user_id)
+
+    target_vendor_identifiers = set(ident_list)
+
     bookings = []
     seen_ids = set()
 
-    # 1. Query DB rental_security joined with orders, payernt_products, and deliveries
+    # 1. Query DB rental_security joined with orders, products, cancellations, and deliveries
     try:
-        query = """
+        placeholders = ", ".join(["%s"] * len(ident_list))
+        query = f"""
             SELECT 
                 sec.booking_id,
                 sec.product_id,
@@ -4051,10 +4081,10 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50) -> List[Dict[st
                 bc.feedback as cancellation_feedback,
                 bc.created_at as cancelled_at,
                 bc.initiated_by as cancelled_by,
-                pp.title as product_title,
-                pp.primary_image as product_image,
-                pp.category as product_category,
-                pp.daily_rate,
+                COALESCE(pp.title, cp.title) as product_title,
+                COALESCE(pp.primary_image, cp.image) as product_image,
+                COALESCE(pp.category, cp.category) as product_category,
+                COALESCE(pp.daily_rate, cp.daily_rate, cp.price) as daily_rate,
                 d.status as delivery_status,
                 d.delivery_boy_name,
                 d.delivery_boy_phone,
@@ -4076,12 +4106,19 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50) -> List[Dict[st
             LEFT JOIN orders o ON sec.booking_id = o.id
             LEFT JOIN booking_cancellations bc ON sec.booking_id = bc.booking_id
             LEFT JOIN payernt_products pp ON sec.product_id = pp.id
+            LEFT JOIN custom_products cp ON sec.product_id = cp.id
             LEFT JOIN deliveries d ON sec.booking_id = d.booking_id
-            WHERE sec.vendor_id = %s OR pp.owner_id = %s
+            WHERE sec.vendor_id IN ({placeholders}) 
+               OR pp.owner_id IN ({placeholders})
+               OR pp.owner_email IN ({placeholders})
+               OR cp.owner_id IN ({placeholders})
+               OR cp.user_email IN ({placeholders})
+               OR o.lender_email IN ({placeholders})
             ORDER BY sec.created_at DESC
             LIMIT %s
         """
-        rows = fetch_all(query, (vendor_id, vendor_id, limit))
+        params = list(ident_list) * 6 + [limit]
+        rows = fetch_all(query, tuple(params))
         if rows:
             for r in rows:
                 b_id = r.get("booking_id")
@@ -4092,7 +4129,10 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50) -> List[Dict[st
                 r_name = renter_email.split("@")[0].capitalize() if renter_email else "Customer"
                 del_status = r.get("delivery_status") or "WAITING_FOR_ADMIN"
                 canc_info = None
-                if r.get("cancellation_reason") or r.get("order_status") == "cancelled":
+                order_st = str(r.get("order_status") or "").lower()
+                sec_st = str(r.get("security_status") or "").lower()
+                is_canc = order_st in ("cancelled", "canceled") or sec_st in ("cancelled", "canceled") or bool(r.get("cancellation_reason"))
+                if is_canc:
                     canc_info = {
                         "reasonCode": r.get("cancellation_reason") or "LENDER_CANCELLED",
                         "reason": r.get("cancellation_reason") or "Booking cancelled",
@@ -4131,6 +4171,8 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50) -> List[Dict[st
                     except Exception:
                         change_obj = None
 
+                eff_status = "cancelled" if is_canc else (r.get("order_status") or r.get("security_status") or "pending")
+
                 bookings.append({
                     "id": b_id,
                     "bookingId": b_id,
@@ -4152,8 +4194,8 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50) -> List[Dict[st
                     "cancellation": canc_info,
                     "amount": float(r.get("total") or r.get("daily_rate") or 0.0),
                     "total": float(r.get("total") or r.get("daily_rate") or 0.0),
-                    "status": r.get("order_status") or r.get("security_status") or "pending",
-                    "bookingStatus": r.get("order_status") or "CONFIRMED",
+                    "status": eff_status,
+                    "bookingStatus": eff_status.upper(),
                     "deliveryStatus": del_status,
                     "securityStatus": r.get("security_status") or "security_pending",
                     "vendorPinVerified": bool(r.get("vendor_pin_verified")),
@@ -4197,7 +4239,8 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50) -> List[Dict[st
     if len(bookings) < limit:
         remaining_limit = limit - len(bookings)
         try:
-            orders_query = """
+            placeholders = ", ".join(["%s"] * len(ident_list))
+            orders_query = f"""
                 SELECT 
                     o.id as booking_id,
                     o.product_id,
@@ -4225,8 +4268,12 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50) -> List[Dict[st
                     o.location_latitude as order_lat,
                     o.location_longitude as order_lng,
                     o.location_change_data as order_location_change,
-                    pp.category,
-                    pp.daily_rate,
+                    bc.reason_code as cancellation_reason,
+                    bc.feedback as cancellation_feedback,
+                    bc.created_at as cancelled_at,
+                    bc.initiated_by as cancelled_by,
+                    COALESCE(pp.category, cp.category) as category,
+                    COALESCE(pp.daily_rate, cp.daily_rate, cp.price) as daily_rate,
                     d.status as delivery_status,
                     d.delivery_address as d_delivery_address,
                     d.pickup_address as d_pickup_address,
@@ -4234,13 +4281,20 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50) -> List[Dict[st
                     d.delivery_latitude as d_delivery_lat,
                     d.delivery_longitude as d_delivery_lng
                 FROM orders o
-                JOIN payernt_products pp ON o.product_id = pp.id
+                LEFT JOIN payernt_products pp ON o.product_id = pp.id
+                LEFT JOIN custom_products cp ON o.product_id = cp.id
+                LEFT JOIN booking_cancellations bc ON o.id = bc.booking_id
                 LEFT JOIN deliveries d ON o.id = d.booking_id
-                WHERE pp.owner_id = %s
+                WHERE pp.owner_id IN ({placeholders})
+                   OR pp.owner_email IN ({placeholders})
+                   OR cp.owner_id IN ({placeholders})
+                   OR cp.user_email IN ({placeholders})
+                   OR o.lender_email IN ({placeholders})
                 ORDER BY o.created_at DESC
                 LIMIT %s
             """
-            o_rows = fetch_all(orders_query, (vendor_id, remaining_limit))
+            params_o = list(ident_list) * 5 + [remaining_limit]
+            o_rows = fetch_all(orders_query, tuple(params_o))
             if o_rows:
                 for r in o_rows:
                     b_id = r.get("booking_id")
@@ -4281,6 +4335,20 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50) -> List[Dict[st
                         except Exception:
                             change_obj = None
 
+                    canc_info = None
+                    order_st = str(r.get("order_status") or "").lower()
+                    is_canc = order_st in ("cancelled", "canceled") or bool(r.get("cancellation_reason"))
+                    if is_canc:
+                        canc_info = {
+                            "reasonCode": r.get("cancellation_reason") or "LENDER_CANCELLED",
+                            "reason": r.get("cancellation_reason") or "Booking cancelled",
+                            "feedback": r.get("cancellation_feedback"),
+                            "cancelledAt": r.get("cancelled_at") or r.get("created_at"),
+                            "cancelledBy": r.get("cancelled_by") or "LENDER"
+                        }
+
+                    eff_status = "cancelled" if is_canc else (r.get("order_status") or "pending")
+
                     bookings.append({
                         "id": b_id,
                         "bookingId": b_id,
@@ -4295,10 +4363,11 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50) -> List[Dict[st
                         "endDate": r.get("end_date") or "",
                         "amount": float(r.get("total") or r.get("daily_rate") or 0.0),
                         "total": float(r.get("total") or r.get("daily_rate") or 0.0),
-                        "status": r.get("order_status") or "pending",
-                        "bookingStatus": r.get("order_status") or "CONFIRMED",
+                        "status": eff_status,
+                        "bookingStatus": eff_status.upper(),
                         "deliveryStatus": del_status,
                         "securityStatus": "pending",
+                        "cancellation": canc_info,
                         "vendorPinVerified": False,
                         "renterPinVerified": False,
                         "vendorOtpVerified": False,
@@ -4334,17 +4403,22 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50) -> List[Dict[st
 
     # 3. Fallback to in-memory mock store if database is offline or empty
     if not bookings:
-        vendor_products = [p for p in MOCK_PAYERNT_PRODUCTS.values() if p.get("owner_id") == vendor_id]
-        vendor_prod_ids = {p["id"] for p in vendor_products}
+        from database import MOCK_ORDERS, MOCK_CUSTOM_PRODUCTS, MOCK_BOOKING_CANCELLATIONS
+        vendor_products = [
+            p for p in list(MOCK_PAYERNT_PRODUCTS.values()) + list(MOCK_CUSTOM_PRODUCTS.values())
+            if p.get("owner_id") in target_vendor_identifiers
+            or p.get("owner_email") in target_vendor_identifiers
+            or p.get("user_email") in target_vendor_identifiers
+        ]
+        vendor_prod_ids = {p["id"] for p in vendor_products if p.get("id")}
         for sec in MOCK_RENTAL_SECURITIES.values():
-            if sec.get("vendor_id") == vendor_id or sec.get("product_id") in vendor_prod_ids:
+            if sec.get("vendor_id") in target_vendor_identifiers or sec.get("product_id") in vendor_prod_ids:
                 b_id = sec.get("booking_id")
                 if not b_id or b_id in seen_ids:
                     continue
                 seen_ids.add(b_id)
-                prod = MOCK_PAYERNT_PRODUCTS.get(sec.get("product_id", ""))
-                daily = float(prod.get("daily_rate", 500) if prod else 500)
-                from database import MOCK_ORDERS
+                prod = MOCK_PAYERNT_PRODUCTS.get(sec.get("product_id", "")) or MOCK_CUSTOM_PRODUCTS.get(sec.get("product_id", ""))
+                daily = float(prod.get("daily_rate") or prod.get("price", 500) if prod else 500)
                 mo = MOCK_ORDERS.get(b_id, {})
                 pu_at = sec.get("rental_started_at") or sec.get("activated_at") or mo.get("picked_up_at") or mo.get("pickedUpAt")
 
@@ -4364,6 +4438,21 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50) -> List[Dict[st
                     import urllib.parse
                     map_url = f"https://www.google.com/maps/search/?api=1&query={urllib.parse.quote_plus(target_disp)}"
 
+                bc = MOCK_BOOKING_CANCELLATIONS.get(b_id)
+                canc_info = None
+                order_st = str(mo.get("status") or sec.get("status") or "").lower()
+                is_canc = order_st in ("cancelled", "canceled") or bc is not None or bool(mo.get("cancellation"))
+                if is_canc:
+                    canc_info = {
+                        "reasonCode": (bc.get("reason_code") if bc else None) or (mo.get("cancellation", {}).get("reasonCode") if isinstance(mo.get("cancellation"), dict) else None) or "LENDER_CANCELLED",
+                        "reason": (bc.get("reason_code") if bc else None) or (mo.get("cancellation", {}).get("reason") if isinstance(mo.get("cancellation"), dict) else None) or "Booking cancelled",
+                        "feedback": (bc.get("feedback") if bc else None) or (mo.get("cancellation", {}).get("feedback") if isinstance(mo.get("cancellation"), dict) else None),
+                        "cancelledAt": (bc.get("created_at") if bc else None) or mo.get("cancelled_at") or mo.get("created_at"),
+                        "cancelledBy": (bc.get("initiated_by") if bc else None) or (mo.get("cancellation", {}).get("cancelledBy") if isinstance(mo.get("cancellation"), dict) else None) or "LENDER"
+                    }
+
+                eff_st = "cancelled" if is_canc else (mo.get("status") or sec.get("status", "security_pending"))
+
                 bookings.append({
                     "id": b_id,
                     "bookingId": b_id,
@@ -4377,9 +4466,11 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50) -> List[Dict[st
                     "startDate": mo.get("startDate", ""),
                     "endDate": mo.get("endDate", ""),
                     "amount": daily,
-                    "total": daily,
-                    "status": mo.get("status") or sec.get("status", "security_pending"),
+                    "total": float(mo.get("total") or daily),
+                    "status": eff_st,
+                    "bookingStatus": eff_st.upper(),
                     "securityStatus": sec.get("status", "security_pending"),
+                    "cancellation": canc_info,
                     "vendorPinVerified": bool(sec.get("vendor_pin_verified")),
                     "renterPinVerified": bool(sec.get("renter_pin_verified")),
                     "otpVerified": bool(sec.get("otp_verified")),
@@ -4407,7 +4498,6 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50) -> List[Dict[st
                     "requestDate": mo.get("created_at") or mo.get("createdAt") or sec.get("created_at") or "",
                 })
 
-        from database import MOCK_ORDERS, MOCK_CUSTOM_PRODUCTS
         for b_id, mo in MOCK_ORDERS.items():
             if b_id in seen_ids:
                 continue
@@ -4416,8 +4506,15 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50) -> List[Dict[st
             owner = ""
             if prod:
                 owner = str(prod.get("user_email") or prod.get("owner_email") or prod.get("ownerId") or prod.get("owner_id") or "").strip().lower()
-            clean_v = str(vendor_id or "").strip().lower()
-            if owner and (owner == clean_v or clean_v in owner or owner in clean_v):
+            lender_e = str(mo.get("lender_email") or mo.get("owner_id") or "").strip().lower()
+            
+            is_match = (
+                lender_e in target_vendor_identifiers
+                or pid in vendor_prod_ids
+                or (owner and owner in target_vendor_identifiers)
+                or any(ident in owner for ident in target_vendor_identifiers if ident)
+            )
+            if is_match:
                 seen_ids.add(b_id)
                 del_method = mo.get("deliveryMethod") or mo.get("delivery_method") or "delivery"
                 del_addr = mo.get("deliveryAddress") or mo.get("delivery_address") or ""
@@ -4453,6 +4550,21 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50) -> List[Dict[st
                 r_email = mo.get("userEmail") or mo.get("user_email") or ""
                 r_name = r_email.split("@")[0].capitalize() if r_email else "Customer"
 
+                bc = MOCK_BOOKING_CANCELLATIONS.get(b_id)
+                canc_info = None
+                order_st = str(mo.get("status") or "").lower()
+                is_canc = order_st in ("cancelled", "canceled") or bc is not None or bool(mo.get("cancellation"))
+                if is_canc:
+                    canc_info = {
+                        "reasonCode": (bc.get("reason_code") if bc else None) or (mo.get("cancellation", {}).get("reasonCode") if isinstance(mo.get("cancellation"), dict) else None) or "LENDER_CANCELLED",
+                        "reason": (bc.get("reason_code") if bc else None) or (mo.get("cancellation", {}).get("reason") if isinstance(mo.get("cancellation"), dict) else None) or "Booking cancelled",
+                        "feedback": (bc.get("feedback") if bc else None) or (mo.get("cancellation", {}).get("feedback") if isinstance(mo.get("cancellation"), dict) else None),
+                        "cancelledAt": (bc.get("created_at") if bc else None) or mo.get("cancelled_at") or mo.get("created_at"),
+                        "cancelledBy": (bc.get("initiated_by") if bc else None) or (mo.get("cancellation", {}).get("cancelledBy") if isinstance(mo.get("cancellation"), dict) else None) or "LENDER"
+                    }
+
+                eff_st = "cancelled" if is_canc else (mo.get("status") or "pending")
+
                 bookings.append({
                     "id": b_id,
                     "bookingId": b_id,
@@ -4467,10 +4579,11 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50) -> List[Dict[st
                     "endDate": mo.get("endDate") or mo.get("end_date") or "",
                     "amount": float(mo.get("total") or 0.0),
                     "total": float(mo.get("total") or 0.0),
-                    "status": mo.get("status") or "pending",
-                    "bookingStatus": mo.get("status") or "CONFIRMED",
+                    "status": eff_st,
+                    "bookingStatus": eff_st.upper(),
                     "deliveryStatus": "WAITING_FOR_ADMIN",
                     "securityStatus": "pending",
+                    "cancellation": canc_info,
                     "vendorPinVerified": False,
                     "renterPinVerified": False,
                     "vendorOtpVerified": False,
@@ -4497,7 +4610,6 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50) -> List[Dict[st
                 })
 
     return bookings[:limit]
-
 
 
 # In-memory bounded cache for vendor dashboard (TTL = 10s)
@@ -4540,7 +4652,7 @@ def get_payernt_vendor_dashboard(vendor_id: str, email: str) -> Dict[str, Any]:
     pending_listings = len([p for p in products if p.get("status") in ("pending_confirmation", "pending", "under_review", "pending_admin_review")])
 
     # 3. Bookings & Rentals
-    bookings = get_payernt_vendor_bookings(vendor_id, limit=20)
+    bookings = get_payernt_vendor_bookings(vendor_id, limit=20, vendor_email=email)
     active_rentals = len([
         b for b in bookings
         if b.get("rentalStarted") or b.get("status") in ("active", "ongoing", "in_progress", "handover")

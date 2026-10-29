@@ -3777,7 +3777,11 @@ def cancel_user_order(
             if target_id in MOCK_ORDERS:
                 MOCK_ORDERS[target_id]["refund_status"] = "pending_review"
 
-        # Update in-memory rental security if present
+        # Update database and in-memory rental security record
+        try:
+            execute_query("UPDATE rental_security SET status = 'cancelled', updated_at = %s WHERE booking_id = %s", (datetime.datetime.now(datetime.timezone.utc).isoformat(), target_id))
+        except Exception:
+            pass
         if target_id in MOCK_RENTAL_SECURITIES:
             MOCK_RENTAL_SECURITIES[target_id]["status"] = "cancelled"
 
