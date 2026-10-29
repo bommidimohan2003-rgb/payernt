@@ -1202,6 +1202,17 @@ export const api = {
       longitude: (o.longitude ?? o.location_longitude ?? null) as number | null,
       mapUrl: (o.mapUrl || o.map_url || "") as string,
       locationChangeRequest: (o.locationChangeRequest || o.location_change_request || null) as any,
+      vendor: o.vendor || (o.vendorName ? { id: o.vendorId || o.vendor_id, name: o.vendorName, city: o.vendorCity, verified: o.vendorVerified } : undefined),
+      vendorName: o.vendorName || o.vendor?.name,
+      vendorCity: o.vendorCity || o.vendor?.city,
+      vendorVerified: o.vendorVerified ?? o.vendor?.verified ?? true,
+      vendorId: o.vendorId || o.vendor_id || o.vendor?.id,
+      vendor_id: o.vendor_id || o.vendorId || o.vendor?.id,
+      paymentStatus: o.paymentStatus || o.payment_status || "paid",
+      payment_status: o.payment_status || o.paymentStatus || "paid",
+      dailyRate: o.dailyRate != null ? Number(o.dailyRate) : (o.daily_rate != null ? Number(o.daily_rate) : undefined),
+      daily_rate: o.daily_rate != null ? Number(o.daily_rate) : (o.dailyRate != null ? Number(o.dailyRate) : undefined),
+      bookingStatus: o.bookingStatus || (typeof o.status === "string" ? o.status.toUpperCase() : "ACTIVE"),
     } as Order;
   },
 

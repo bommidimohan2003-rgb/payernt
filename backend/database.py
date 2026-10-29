@@ -594,8 +594,12 @@ def init_db(force: bool = False):
     add_column_safely("orders", "cancellation_request_data LONGTEXT NULL")
     add_column_safely("orders", "delivery_address_id VARCHAR(255) NULL")
     add_column_safely("orders", "delivery_address_snapshot LONGTEXT NULL")
+    add_column_safely("orders", "lender_email VARCHAR(255) NULL")
+    add_column_safely("orders", "vendor_id VARCHAR(255) NULL")
     add_index_safely("orders", "idx_orders_user_cat", "user_email, category")
     add_index_safely("orders", "idx_orders_user_email", "user_email")
+    add_index_safely("orders", "idx_orders_lender_email", "lender_email")
+    add_index_safely("orders", "idx_orders_vendor_id", "vendor_id")
     add_index_safely("orders", "idx_orders_status", "status")
     add_index_safely("orders", "idx_orders_created_at", "created_at")
     add_index_safely("orders", "idx_orders_product_status", "product_id, status")
@@ -2308,6 +2312,32 @@ def create_order(email: str, order: dict):
         if delivery_method == "custom" and not custom_location:
             custom_location = delivery_address or "Selected Custom Meetup Location"
 
+        vendor_id = (
+            order.get("vendor_id")
+            or order.get("vendorId")
+            or (product_rec.get("owner_id") if product_rec else None)
+            or (product_rec.get("ownerId") if product_rec else None)
+            or (product_rec.get("vendor_id") if product_rec else None)
+            or (product_rec.get("vendorId") if product_rec else None)
+            or (product_rec.get("owner_email") if product_rec else None)
+            or (product_rec.get("user_email") if product_rec else None)
+            or ""
+        )
+        lender_email = (
+            order.get("lender_email")
+            or order.get("lenderEmail")
+            or (product_rec.get("owner_email") if product_rec else None)
+            or (product_rec.get("ownerEmail") if product_rec else None)
+            or (product_rec.get("user_email") if product_rec else None)
+            or (product_rec.get("userEmail") if product_rec else None)
+            or (vendor_id if "@" in str(vendor_id) else None)
+            or ""
+        )
+        if not vendor_id and lender_email:
+            vendor_id = lender_email
+        if not lender_email and "@" in str(vendor_id):
+            lender_email = str(vendor_id).strip().lower()
+
         normalized = {
             "id": order_id,
             "user_email": clean_email,
@@ -2367,6 +2397,10 @@ def create_order(email: str, order: dict):
             "locationLongitude": lng,
             "location_change_data": None,
             "locationChangeRequest": None,
+            "vendor_id": str(vendor_id),
+            "vendorId": str(vendor_id),
+            "lender_email": str(lender_email).strip().lower(),
+            "lenderEmail": str(lender_email).strip().lower(),
         }
         MOCK_ORDERS[order_id] = normalized
 
@@ -2376,30 +2410,48 @@ def create_order(email: str, order: dict):
                     id, user_email, product_id, product_title, product_image, start_date, end_date, total, status, created_at,
                     time_slot, duration_type, start_time, end_time, start_datetime, end_datetime, confirmed_at, category,
                     delivery_method, delivery_address, pickup_location, custom_location, location_directions, location_latitude, location_longitude,
-                    delivery_address_id, delivery_address_snapshot
+                    delivery_address_id, delivery_address_snapshot, lender_email, vendor_id
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 order_id, clean_email, pid, title, img, start, end, total, status, created,
                 time_slot, duration_type, start_time, end_time, start_datetime, end_datetime,
                 confirmed_at, prod_category, delivery_method, delivery_address, pickup_location,
                 custom_location, location_directions, lat, lng, delivery_address_id,
-                delivery_address_snapshot if isinstance(delivery_address_snapshot, str) else json.dumps(delivery_address_snapshot)
+                delivery_address_snapshot if isinstance(delivery_address_snapshot, str) else json.dumps(delivery_address_snapshot),
+                str(lender_email).strip().lower(), str(vendor_id)
             ))
         except Exception:
-            execute_query("""
-                INSERT INTO orders (
-                    id, user_email, product_id, product_title, product_image, start_date, end_date, total, status, created_at,
-                    time_slot, duration_type, start_time, end_time, start_datetime, end_datetime, confirmed_at, category,
-                    delivery_method, delivery_address, pickup_location, custom_location, location_directions, location_latitude, location_longitude
-                )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """, (
-                order_id, clean_email, pid, title, img, start, end, total, status, created,
-                time_slot, duration_type, start_time, end_time, start_datetime, end_datetime,
-                confirmed_at, prod_category, delivery_method, delivery_address, pickup_location,
-                custom_location, location_directions, lat, lng
-            ))
+            try:
+                execute_query("""
+                    INSERT INTO orders (
+                        id, user_email, product_id, product_title, product_image, start_date, end_date, total, status, created_at,
+                        time_slot, duration_type, start_time, end_time, start_datetime, end_datetime, confirmed_at, category,
+                        delivery_method, delivery_address, pickup_location, custom_location, location_directions, location_latitude, location_longitude,
+                        delivery_address_id, delivery_address_snapshot
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    order_id, clean_email, pid, title, img, start, end, total, status, created,
+                    time_slot, duration_type, start_time, end_time, start_datetime, end_datetime,
+                    confirmed_at, prod_category, delivery_method, delivery_address, pickup_location,
+                    custom_location, location_directions, lat, lng, delivery_address_id,
+                    delivery_address_snapshot if isinstance(delivery_address_snapshot, str) else json.dumps(delivery_address_snapshot)
+                ))
+            except Exception:
+                execute_query("""
+                    INSERT INTO orders (
+                        id, user_email, product_id, product_title, product_image, start_date, end_date, total, status, created_at,
+                        time_slot, duration_type, start_time, end_time, start_datetime, end_datetime, confirmed_at, category,
+                        delivery_method, delivery_address, pickup_location, custom_location, location_directions, location_latitude, location_longitude
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    order_id, clean_email, pid, title, img, start, end, total, status, created,
+                    time_slot, duration_type, start_time, end_time, start_datetime, end_datetime,
+                    confirmed_at, prod_category, delivery_method, delivery_address, pickup_location,
+                    custom_location, location_directions, lat, lng
+                ))
 
     # Synchronize initial delivery record
     try:

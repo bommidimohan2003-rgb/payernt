@@ -40,7 +40,10 @@ import { toast } from "sonner";
 import { rentalSecurityService } from "@/services/rentalSecurityService";
 import { payerntApi } from "../payerntApiService";
 import type { RentalRequest, RentalRequestStatus } from "../types";
-import { SecretPinDisplay, SecretPinInput } from "@/components/common/SecretPinDisplay";
+import {
+  SecretPinDisplay,
+  SecretPinInput,
+} from "@/components/common/SecretPinDisplay";
 import { LiveRentalQueue } from "@/components/rental/LiveRentalQueue";
 import { formatBookingDateTime } from "@/utils/formatters";
 import { ProfilePhoto } from "@/components/common/ProfilePhoto";
@@ -51,16 +54,29 @@ interface RentalRequestsProps {
     requestId: string,
     action: "accept" | "reject" | "cancel",
     reason?: string,
-    feedback?: string
+    feedback?: string,
   ) => Promise<{ success: boolean; message?: string; error?: string }> | void;
-  onAdvanceLifecycle: (requestId: string, nextStatus: RentalRequestStatus) => void;
+  onAdvanceLifecycle: (
+    requestId: string,
+    nextStatus: RentalRequestStatus,
+  ) => void;
   onNavigateToWallet: () => void;
   onBack?: () => void;
-  onApproveLocationChange?: (bookingId: string) => Promise<{ success: boolean; message?: string }>;
-  onRejectLocationChange?: (bookingId: string, feedback?: string) => Promise<{ success: boolean; message?: string }>;
+  onApproveLocationChange?: (
+    bookingId: string,
+  ) => Promise<{ success: boolean; message?: string }>;
+  onRejectLocationChange?: (
+    bookingId: string,
+    feedback?: string,
+  ) => Promise<{ success: boolean; message?: string }>;
+  onRefresh?: () => void | Promise<void>;
 }
 
-const LIFECYCLE_STEPS: { key: RentalRequestStatus; label: string; desc: string }[] = [
+const LIFECYCLE_STEPS: {
+  key: RentalRequestStatus;
+  label: string;
+  desc: string;
+}[] = [
   { key: "requested", label: "Requested", desc: "Awaiting approval" },
   { key: "accepted", label: "Accepted", desc: "Prepare for pickup" },
   { key: "handover", label: "Handover", desc: "Inspect & handover" },
@@ -91,10 +107,13 @@ function getLifecycleStepIndex(status: RentalRequestStatus): number {
   }
 }
 
-export type LenderBookingFilter = "all" | "pending" | "ongoing" | "cancelled" | "completed";
+export type LenderBookingFilter =
+  "all" | "pending" | "ongoing" | "cancelled" | "completed";
 
 export const isCancelledRequest = (r: RentalRequest): boolean => {
-  const s = String(r.status || "").toLowerCase().trim();
+  const s = String(r.status || "")
+    .toLowerCase()
+    .trim();
   return (
     s === "cancelled" ||
     s === "canceled" ||
@@ -105,13 +124,17 @@ export const isCancelledRequest = (r: RentalRequest): boolean => {
 
 export const isCompletedRequest = (r: RentalRequest): boolean => {
   if (isCancelledRequest(r)) return false;
-  const s = String(r.status || "").toLowerCase().trim();
+  const s = String(r.status || "")
+    .toLowerCase()
+    .trim();
   return s === "completed";
 };
 
 export const isEligibleForDecision = (r: RentalRequest): boolean => {
   if (isCancelledRequest(r) || isCompletedRequest(r)) return false;
-  const s = String(r.status || "").toLowerCase().trim();
+  const s = String(r.status || "")
+    .toLowerCase()
+    .trim();
   return (
     s === "requested" ||
     s === "pending" ||
@@ -126,19 +149,31 @@ export const isPendingRequest = (r: RentalRequest): boolean => {
 };
 
 export const isOngoingRequest = (r: RentalRequest): boolean => {
-  if (isCancelledRequest(r) || isCompletedRequest(r) || isPendingRequest(r)) return false;
+  if (isCancelledRequest(r) || isCompletedRequest(r) || isPendingRequest(r))
+    return false;
   return true;
 };
 
-export const getCancellationEligibility = (req: RentalRequest): { eligible: boolean; reason?: string } => {
+export const getCancellationEligibility = (
+  req: RentalRequest,
+): { eligible: boolean; reason?: string } => {
   if (isCancelledRequest(req)) {
-    return { eligible: false, reason: "Booking is already cancelled or declined" };
+    return {
+      eligible: false,
+      reason: "Booking is already cancelled or declined",
+    };
   }
   if (req.status === "completed" || req.status === "returned") {
-    return { eligible: false, reason: "Completed bookings cannot be cancelled" };
+    return {
+      eligible: false,
+      reason: "Completed bookings cannot be cancelled",
+    };
   }
   if (req.status === "active") {
-    return { eligible: false, reason: "Handover has commenced; rental is active" };
+    return {
+      eligible: false,
+      reason: "Handover has commenced; rental is active",
+    };
   }
   const anyReq = req as any;
   if (
@@ -148,10 +183,22 @@ export const getCancellationEligibility = (req: RentalRequest): { eligible: bool
     anyReq.rental_activated ||
     anyReq.isPickedUp
   ) {
-    return { eligible: false, reason: "Physical handover has already been verified" };
+    return {
+      eligible: false,
+      reason: "Physical handover has already been verified",
+    };
   }
-  const delStatus = String(anyReq.delivery_status || anyReq.deliveryStatus || "").toUpperCase();
-  if (["PICKED_UP_FROM_VENDOR", "OUT_FOR_DELIVERY", "DELIVERED", "COMPLETED"].includes(delStatus)) {
+  const delStatus = String(
+    anyReq.delivery_status || anyReq.deliveryStatus || "",
+  ).toUpperCase();
+  if (
+    [
+      "PICKED_UP_FROM_VENDOR",
+      "OUT_FOR_DELIVERY",
+      "DELIVERED",
+      "COMPLETED",
+    ].includes(delStatus)
+  ) {
     return { eligible: false, reason: "Courier pickup has already occurred" };
   }
   return { eligible: true };
@@ -165,26 +212,43 @@ export function RentalRequests({
   onBack,
   onApproveLocationChange,
   onRejectLocationChange,
+  onRefresh,
 }: RentalRequestsProps) {
   const [filter, setFilter] = useState<LenderBookingFilter>("all");
-  const [expandedBookingId, setExpandedBookingId] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [expandedBookingId, setExpandedBookingId] = useState<string | null>(
+    null,
+  );
 
   const toggleRequestDetails = useCallback((requestId: string | number) => {
     const idStr = String(requestId);
-    setExpandedBookingId((prev) => (prev !== null && String(prev) === idStr ? null : idStr));
+    setExpandedBookingId((prev) =>
+      prev !== null && String(prev) === idStr ? null : idStr,
+    );
   }, []);
 
   const closeRequestDetails = useCallback(() => {
     setExpandedBookingId(null);
   }, []);
-  const [approvingChangeId, setApprovingChangeId] = useState<string | null>(null);
-  const [rejectingChangeId, setRejectingChangeId] = useState<string | null>(null);
+  const [approvingChangeId, setApprovingChangeId] = useState<string | null>(
+    null,
+  );
+  const [rejectingChangeId, setRejectingChangeId] = useState<string | null>(
+    null,
+  );
 
   // Accept / Decline Decision State
-  const [decisionProcessingId, setDecisionProcessingId] = useState<string | null>(null);
-  const [decisionActionType, setDecisionActionType] = useState<"accept" | "reject" | null>(null);
-  const [declineModalBooking, setDeclineModalBooking] = useState<RentalRequest | null>(null);
-  const [declineReason, setDeclineReason] = useState<string>("Product unavailable / Scheduling conflict");
+  const [decisionProcessingId, setDecisionProcessingId] = useState<
+    string | null
+  >(null);
+  const [decisionActionType, setDecisionActionType] = useState<
+    "accept" | "reject" | null
+  >(null);
+  const [declineModalBooking, setDeclineModalBooking] =
+    useState<RentalRequest | null>(null);
+  const [declineReason, setDeclineReason] = useState<string>(
+    "Product unavailable / Scheduling conflict",
+  );
   const [declineFeedback, setDeclineFeedback] = useState<string>("");
 
   const handleAcceptBooking = async (req: RentalRequest) => {
@@ -196,7 +260,9 @@ export function RentalRequests({
       if (res && (res as any).success === false) {
         toast.error((res as any).error || "Failed to accept booking.");
       } else {
-        toast.success(`Booking #${req.id.length > 16 ? req.id.slice(0, 16) : req.id} accepted! Product confirmed for ${req.renter?.name || "renter"}.`);
+        toast.success(
+          `Booking #${req.id.length > 16 ? req.id.slice(0, 16) : req.id} accepted! Product confirmed for ${req.renter?.name || "renter"}.`,
+        );
       }
     } catch (err: any) {
       toast.error(err?.message || "Failed to accept booking.");
@@ -218,11 +284,18 @@ export function RentalRequests({
     setDecisionProcessingId(req.id);
     setDecisionActionType("reject");
     try {
-      const res = await onRequestAction(req.id, "reject", declineReason, declineFeedback);
+      const res = await onRequestAction(
+        req.id,
+        "reject",
+        declineReason,
+        declineFeedback,
+      );
       if (res && (res as any).success === false) {
         toast.error((res as any).error || "Failed to decline booking.");
       } else {
-        toast.info(`Booking #${req.id.length > 16 ? req.id.slice(0, 16) : req.id} has been declined.`);
+        toast.info(
+          `Booking #${req.id.length > 16 ? req.id.slice(0, 16) : req.id} has been declined.`,
+        );
         setDeclineModalBooking(null);
       }
     } catch (err: any) {
@@ -268,7 +341,8 @@ export function RentalRequests({
   };
 
   const handleRejectLocationChange = async (bookingId: string) => {
-    const feedback = window.prompt("Reason for declining location change (optional):") || "";
+    const feedback =
+      window.prompt("Reason for declining location change (optional):") || "";
     setRejectingChangeId(bookingId);
     try {
       if (onRejectLocationChange) {
@@ -294,11 +368,21 @@ export function RentalRequests({
   };
 
   const getLocationDisplay = (req: RentalRequest) => {
-    const rawMethod = (req.deliveryMethod || req.delivery_method || "").toLowerCase().trim();
-    const deliveryAddr = (req.deliveryAddress || req.delivery_address || "").trim();
+    const rawMethod = (req.deliveryMethod || req.delivery_method || "")
+      .toLowerCase()
+      .trim();
+    const deliveryAddr = (
+      req.deliveryAddress ||
+      req.delivery_address ||
+      ""
+    ).trim();
     const pickupLoc = (req.pickupLocation || req.pickup_location || "").trim();
     const customLoc = (req.customLocation || req.custom_location || "").trim();
-    const directions = (req.locationDirections || req.location_directions || "").trim();
+    const directions = (
+      req.locationDirections ||
+      req.location_directions ||
+      ""
+    ).trim();
     const lat = req.latitude ?? req.location_latitude ?? null;
     const lng = req.longitude ?? req.location_longitude ?? null;
 
@@ -364,7 +448,12 @@ export function RentalRequests({
 
   // Handover Security Clearance Modal State
   const [handoverReq, setHandoverReq] = useState<RentalRequest | null>(null);
-  const [enteredRenterPin, setEnteredRenterPin] = useState<string[]>(["", "", "", ""]);
+  const [enteredRenterPin, setEnteredRenterPin] = useState<string[]>([
+    "",
+    "",
+    "",
+    "",
+  ]);
   const [pinError, setPinError] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const pinInputRefs = React.useRef<(HTMLInputElement | null)[]>([]);
@@ -378,7 +467,9 @@ export function RentalRequests({
   } | null>(null);
   const [isPreparing, setIsPreparing] = useState(false);
   const [showPinMap, setShowPinMap] = useState<Record<string, boolean>>({});
-  const [vendorPinDataMap, setVendorPinDataMap] = useState<Record<string, { pin: string; createdAt: string }>>({});
+  const [vendorPinDataMap, setVendorPinDataMap] = useState<
+    Record<string, { pin: string; createdAt: string }>
+  >({});
   const [generatingPinId, setGeneratingPinId] = useState<string | null>(null);
 
   // Lender Cancellation Modal State
@@ -400,10 +491,16 @@ export function RentalRequests({
 
   const CANCELLATION_REASONS = [
     { code: "NO_LONGER_AVAILABLE", label: "Product is no longer available." },
-    { code: "DAMAGED_OR_TECHNICAL_ISSUE", label: "Product has a newly discovered issue or damage." },
+    {
+      code: "DAMAGED_OR_TECHNICAL_ISSUE",
+      label: "Product has a newly discovered issue or damage.",
+    },
     { code: "SCHEDULING_CONFLICT", label: "Scheduling conflict." },
     { code: "PERSONAL_USE", label: "I need the product for personal use." },
-    { code: "CANNOT_COMPLETE_HANDOVER", label: "I cannot complete the handover at the scheduled time." },
+    {
+      code: "CANNOT_COMPLETE_HANDOVER",
+      label: "I cannot complete the handover at the scheduled time.",
+    },
     { code: "RENTER_REQUESTED", label: "The renter requested cancellation." },
     { code: "OTHER", label: "Other (requires description)." },
   ];
@@ -428,7 +525,8 @@ export function RentalRequests({
       if (!cleanFeedback || cleanFeedback.length < 5) {
         setCancellationModal((prev) => ({
           ...prev,
-          error: "Written explanation is required when selecting 'Other' (minimum 5 characters).",
+          error:
+            "Written explanation is required when selecting 'Other' (minimum 5 characters).",
         }));
         return;
       }
@@ -447,16 +545,22 @@ export function RentalRequests({
       return;
     }
 
-    setCancellationModal((prev) => ({ ...prev, submitting: true, error: null }));
+    setCancellationModal((prev) => ({
+      ...prev,
+      submitting: true,
+      error: null,
+    }));
     try {
       const res = await payerntApi.cancelBooking(
         booking.id,
         reasonCode,
-        cleanFeedback || undefined
+        cleanFeedback || undefined,
       );
 
       if (res.success) {
-        toast.success("Booking cancelled successfully. Reservation interval released.");
+        toast.success(
+          "Booking cancelled successfully. Reservation interval released.",
+        );
         onAdvanceLifecycle(booking.id, "cancelled" as any);
         setCancellationModal({
           isOpen: false,
@@ -535,7 +639,9 @@ export function RentalRequests({
           pin: res.vendorSecretPin,
           productTitle: req.productTitle,
         });
-        toast.success("Product prepared! Status updated to Waiting for Delivery Boy.");
+        toast.success(
+          "Product prepared! Status updated to Waiting for Delivery Boy.",
+        );
         onAdvanceLifecycle(req.id, "accepted");
       } else {
         toast.error(res.error || "Failed to prepare product for delivery.");
@@ -570,25 +676,41 @@ export function RentalRequests({
 
   const handleVerifyVendorPickupOtp = async () => {
     if (!deliveryBoyOtpModal || deliveryBoyOtpModal.otp.length < 4) return;
-    setDeliveryBoyOtpModal((prev) => prev ? { ...prev, isSubmitting: true, error: null } : null);
+    setDeliveryBoyOtpModal((prev) =>
+      prev ? { ...prev, isSubmitting: true, error: null } : null,
+    );
     try {
       const res = await payerntApi.verifyVendorHandoverOtp(
         deliveryBoyOtpModal.bookingId,
-        deliveryBoyOtpModal.otp
+        deliveryBoyOtpModal.otp,
       );
       if (res.success) {
-        toast.success("Pickup verified! Product handed over to delivery courier.");
+        toast.success(
+          "Pickup verified! Product handed over to delivery courier.",
+        );
         const currentBookingId = deliveryBoyOtpModal.bookingId;
         setDeliveryBoyOtpModal(null);
         onAdvanceLifecycle(currentBookingId, "handover");
       } else {
         setDeliveryBoyOtpModal((prev) =>
-          prev ? { ...prev, isSubmitting: false, error: res.error || "Invalid OTP code." } : null
+          prev
+            ? {
+                ...prev,
+                isSubmitting: false,
+                error: res.error || "Invalid OTP code.",
+              }
+            : null,
         );
       }
     } catch (e: any) {
       setDeliveryBoyOtpModal((prev) =>
-        prev ? { ...prev, isSubmitting: false, error: e?.message || "Verification failed." } : null
+        prev
+          ? {
+              ...prev,
+              isSubmitting: false,
+              error: e?.message || "Verification failed.",
+            }
+          : null,
       );
     }
   };
@@ -619,7 +741,10 @@ export function RentalRequests({
     }
   };
 
-  const handleRenterPinKeyDown = (idx: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleRenterPinKeyDown = (
+    idx: number,
+    e: React.KeyboardEvent<HTMLInputElement>,
+  ) => {
     if (e.key === "Backspace" && !enteredRenterPin[idx] && idx > 0) {
       pinInputRefs.current[idx - 1]?.focus();
     } else if (e.key === "ArrowLeft" && idx > 0) {
@@ -644,7 +769,9 @@ export function RentalRequests({
       setIsVerifying(false);
       const res = rentalSecurityService.verifyRenterPin(handoverReq.id, pin);
       if (!res.valid) {
-        setPinError(res.error || "Incorrect Renter PIN. Rental will NOT start.");
+        setPinError(
+          res.error || "Incorrect Renter PIN. Rental will NOT start.",
+        );
         toast.error(res.error || "Incorrect Renter PIN. Try again.");
         return;
       }
@@ -652,11 +779,16 @@ export function RentalRequests({
       // Also mark vendor side verified
       const sec = rentalSecurityService.getSecurityRecord(handoverReq.id);
       if (sec) {
-        rentalSecurityService.verifyVendorPin(handoverReq.id, sec.vendorSecretPin);
+        rentalSecurityService.verifyVendorPin(
+          handoverReq.id,
+          sec.vendorSecretPin,
+        );
       }
 
       onAdvanceLifecycle(handoverReq.id, "active");
-      toast.success("Security PIN verified! Equipment handed over and rental is active.");
+      toast.success(
+        "Security PIN verified! Equipment handed over and rental is active.",
+      );
       setHandoverReq(null);
     }, 350);
   };
@@ -706,15 +838,28 @@ export function RentalRequests({
     });
   }, [requests, filter]);
 
-  const FILTER_TABS: { id: LenderBookingFilter; label: string; count: number; highlight?: boolean }[] = [
+  const FILTER_TABS: {
+    id: LenderBookingFilter;
+    label: string;
+    count: number;
+    highlight?: boolean;
+  }[] = [
     { id: "all", label: "All", count: filterCounts.all },
-    { id: "pending", label: "Pending", count: filterCounts.pending, highlight: filterCounts.pending > 0 },
+    {
+      id: "pending",
+      label: "Pending",
+      count: filterCounts.pending,
+      highlight: filterCounts.pending > 0,
+    },
     { id: "ongoing", label: "Ongoing", count: filterCounts.ongoing },
     { id: "cancelled", label: "Cancelled", count: filterCounts.cancelled },
     { id: "completed", label: "Completed", count: filterCounts.completed },
   ];
 
-  const emptyFilterMessages: Record<LenderBookingFilter, { title: string; desc: string }> = {
+  const emptyFilterMessages: Record<
+    LenderBookingFilter,
+    { title: string; desc: string }
+  > = {
     all: {
       title: "No bookings found",
       desc: "When verified borrowers book your listed gear, rental requests will appear here.",
@@ -737,7 +882,10 @@ export function RentalRequests({
     },
   };
 
-  const getStatusBadge = (status: RentalRequestStatus, isCancelled?: boolean) => {
+  const getStatusBadge = (
+    status: RentalRequestStatus,
+    isCancelled?: boolean,
+  ) => {
     if (isCancelled || status === "cancelled" || status === "rejected") {
       return (
         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/25">
@@ -759,7 +907,8 @@ export function RentalRequests({
       case "ready_for_pickup":
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/25">
-            <PackageCheck className="h-3.5 w-3.5" /> Accepted • Ready For Handover
+            <PackageCheck className="h-3.5 w-3.5" /> Accepted • Ready For
+            Handover
           </span>
         );
       case "handover":
@@ -788,7 +937,8 @@ export function RentalRequests({
       case "awaiting_inspection":
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-teal-500/10 text-teal-600 border border-teal-500/25">
-            <CheckCircle2 className="h-3.5 w-3.5" /> Item Returned • Inspect Condition
+            <CheckCircle2 className="h-3.5 w-3.5" /> Item Returned • Inspect
+            Condition
           </span>
         );
       case "completed":
@@ -833,11 +983,37 @@ export function RentalRequests({
               Bookings & Rental Lifecycles
             </h1>
             <p className="text-xs sm:text-sm text-neutral-500 dark:text-[#A1A1AA] max-w-xl">
-              Manage incoming borrower requests, execute secure device handovers, confirm returns, and approve escrow payout settlements directly into your User Wallet.
+              Manage incoming borrower requests, execute secure device
+              handovers, confirm returns, and approve escrow payout settlements
+              directly into your User Wallet.
             </p>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            {onRefresh && (
+              <button
+                type="button"
+                disabled={isRefreshing}
+                onClick={async () => {
+                  try {
+                    setIsRefreshing(true);
+                    await onRefresh();
+                    toast.success("Requests refreshed");
+                  } catch {
+                    toast.error("Failed to refresh requests");
+                  } finally {
+                    setIsRefreshing(false);
+                  }
+                }}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#10151B] text-neutral-700 dark:text-[#F5F5F5] hover:bg-neutral-50 dark:hover:bg-white/5 font-bold text-xs shadow-sm active:scale-98 transition-all cursor-pointer"
+                title="Refresh booking requests"
+              >
+                <RefreshCw
+                  className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`}
+                />
+                <span className="hidden sm:inline">Refresh</span>
+              </button>
+            )}
             <button
               onClick={onNavigateToWallet}
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-neutral-900 text-white dark:bg-[#F5F5F5] dark:text-[#050709] dark:hover:bg-white font-bold text-xs shadow-md active:scale-98 transition-all cursor-pointer"
@@ -852,7 +1028,9 @@ export function RentalRequests({
         <div className="mt-6 pt-4 border-t border-black/5 dark:border-white/5 flex flex-wrap items-center justify-between gap-4 text-xs text-neutral-500 dark:text-[#A1A1AA]">
           <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-semibold">
             <ShieldCheck className="h-4 w-4 shrink-0" />
-            <span>All rentals backed by ₹50,000 Lender Protection & Verified Escrow</span>
+            <span>
+              All rentals backed by ₹50,000 Lender Protection & Verified Escrow
+            </span>
           </div>
           <div className="flex items-center gap-4 text-[11px]">
             <span>100% Net Payout</span>
@@ -884,8 +1062,8 @@ export function RentalRequests({
                   isActive
                     ? "bg-white/20 dark:bg-black/20 text-white dark:text-[#050709]"
                     : tab.highlight
-                    ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 font-bold"
-                    : "bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-[#A1A1AA]"
+                      ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 font-bold"
+                      : "bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-[#A1A1AA]"
                 }`}
               >
                 {tab.count}
@@ -906,7 +1084,8 @@ export function RentalRequests({
               {emptyFilterMessages[filter]?.title || "No Bookings in this View"}
             </h3>
             <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-              {emptyFilterMessages[filter]?.desc || "When verified tech creators book your listed gear, rental requests will appear with full escrow verification here."}
+              {emptyFilterMessages[filter]?.desc ||
+                "When verified tech creators book your listed gear, rental requests will appear with full escrow verification here."}
             </p>
           </div>
           {filter !== "all" && (
@@ -921,12 +1100,21 @@ export function RentalRequests({
       ) : (
         <div className="space-y-4">
           {filteredRequests.map((req) => {
-            const isExpanded = Boolean(expandedBookingId !== null && String(expandedBookingId) === String(req.id));
+            const isExpanded = Boolean(
+              expandedBookingId !== null &&
+              String(expandedBookingId) === String(req.id),
+            );
             const isCancelled = isCancelledRequest(req);
             const isDeclined = req.status === "rejected" || isCancelled;
-            const actualCreationTs = req.createdAt || (req as any).created_at || req.requestDate;
-            const formattedBookingTime = formatBookingDateTime(actualCreationTs);
-            const bookingDate = formattedBookingTime || req.requestDate || req.startDate || "Recent";
+            const actualCreationTs =
+              req.createdAt || (req as any).created_at || req.requestDate;
+            const formattedBookingTime =
+              formatBookingDateTime(actualCreationTs);
+            const bookingDate =
+              formattedBookingTime ||
+              req.requestDate ||
+              req.startDate ||
+              "Recent";
 
             return (
               <div
@@ -953,13 +1141,18 @@ export function RentalRequests({
                       </h3>
                       <div className="flex items-center gap-2 text-xs text-neutral-500 dark:text-[#A1A1AA] flex-wrap">
                         <span className="font-mono">
-                          #{req.id.length > 20 ? `${req.id.slice(0, 16)}...` : req.id}
+                          #
+                          {req.id.length > 20
+                            ? `${req.id.slice(0, 16)}...`
+                            : req.id}
                         </span>
                         <span>•</span>
                         <span className="flex items-center gap-1">
                           <Calendar className="h-3 w-3 text-[#A1A1AA]" />
                           <span suppressHydrationWarning>
-                            {formattedBookingTime ? `Booked On: ${formattedBookingTime}` : `Booked on ${bookingDate}`}
+                            {formattedBookingTime
+                              ? `Booked On: ${formattedBookingTime}`
+                              : `Booked on ${bookingDate}`}
                           </span>
                         </span>
                         <span>•</span>
@@ -972,7 +1165,9 @@ export function RentalRequests({
                                 title={compactLoc.primaryAddress}
                               >
                                 <MapPin className="h-3 w-3 text-emerald-500 shrink-0" />
-                                <span className="truncate">{compactLoc.primaryAddress}</span>
+                                <span className="truncate">
+                                  {compactLoc.primaryAddress}
+                                </span>
                               </span>
                             );
                           }
@@ -1007,15 +1202,23 @@ export function RentalRequests({
                       }}
                       aria-expanded={isExpanded}
                       aria-controls={`rental-request-details-${req.id}`}
-                      aria-label={isExpanded ? `Close details for booking ${req.id}` : `View details for booking ${req.id}`}
+                      aria-label={
+                        isExpanded
+                          ? `Close details for booking ${req.id}`
+                          : `View details for booking ${req.id}`
+                      }
                       className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
                         isExpanded
                           ? "bg-neutral-900 text-white dark:bg-[#F5F5F5] dark:text-[#050709] border-transparent shadow-xs"
                           : "border-black/10 dark:border-[#A1A1AA]/30 bg-neutral-900/5 dark:bg-white/5 hover:bg-neutral-900 hover:text-white dark:hover:bg-white dark:hover:text-[#050709] text-neutral-900 dark:text-[#F5F5F5]"
                       }`}
                     >
-                      <span>{isExpanded ? "Close Details" : "View Details"}</span>
-                      <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
+                      <span>
+                        {isExpanded ? "Close Details" : "View Details"}
+                      </span>
+                      <ChevronDown
+                        className={`h-3.5 w-3.5 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}
+                      />
                     </button>
                   </div>
                 </div>
@@ -1054,16 +1257,34 @@ export function RentalRequests({
                             Booking Cancelled
                           </div>
                           <p className="text-xs text-neutral-700 dark:text-neutral-300 leading-relaxed">
-                            This booking has been cancelled. Active milestone buttons, handover actions, and Live Rental Queue operations are permanently disabled.
+                            This booking has been cancelled. Active milestone
+                            buttons, handover actions, and Live Rental Queue
+                            operations are permanently disabled.
                           </p>
-                          {(req.cancellation?.reasonCode || (req as any).cancellationReason || (req as any).cancellation_reason) && (
+                          {(req.cancellation?.reasonCode ||
+                            (req as any).cancellationReason ||
+                            (req as any).cancellation_reason) && (
                             <p className="text-xs text-red-600 dark:text-red-400 font-medium pt-0.5">
-                              Reason: {String(req.cancellation?.reasonCode || (req as any).cancellationReason || (req as any).cancellation_reason).replace(/_/g, " ")}
+                              Reason:{" "}
+                              {String(
+                                req.cancellation?.reasonCode ||
+                                  (req as any).cancellationReason ||
+                                  (req as any).cancellation_reason,
+                              ).replace(/_/g, " ")}
                             </p>
                           )}
-                          {((req as any).cancelledAt || (req as any).cancelled_at) && (
+                          {((req as any).cancelledAt ||
+                            (req as any).cancelled_at) && (
                             <p className="text-[11px] text-neutral-500 dark:text-[#A1A1AA] font-mono pt-0.5">
-                              Cancelled on: {formatBookingDateTime((req as any).cancelledAt || (req as any).cancelled_at) || String((req as any).cancelledAt || (req as any).cancelled_at)}
+                              Cancelled on:{" "}
+                              {formatBookingDateTime(
+                                (req as any).cancelledAt ||
+                                  (req as any).cancelled_at,
+                              ) ||
+                                String(
+                                  (req as any).cancelledAt ||
+                                    (req as any).cancelled_at,
+                                )}
                             </p>
                           )}
                         </div>
@@ -1078,8 +1299,16 @@ export function RentalRequests({
                       role="lender"
                       startDate={req.startDate}
                       endDate={req.endDate}
-                      createdAt={req.createdAt || (req as any).created_at || req.requestDate}
-                      requestDate={req.requestDate || req.createdAt || (req as any).created_at}
+                      createdAt={
+                        req.createdAt ||
+                        (req as any).created_at ||
+                        req.requestDate
+                      }
+                      requestDate={
+                        req.requestDate ||
+                        req.createdAt ||
+                        (req as any).created_at
+                      }
                       confirmedAt={req.confirmedAt || req.requestDate}
                       readyForPickupAt={req.readyForPickupAt}
                       pickedUpAt={req.pickedUpAt}
@@ -1087,8 +1316,14 @@ export function RentalRequests({
                       handedBackAt={req.handedBackAt}
                       awaitingInspectionAt={req.awaitingInspectionAt}
                       completedAt={req.completedAt}
-                      cancelledAt={(req as any).cancelledAt || (req as any).cancelled_at}
-                      cancellationReason={(req as any).cancellationReason || (req as any).cancellation_reason || req.cancellation?.reasonCode}
+                      cancelledAt={
+                        (req as any).cancelledAt || (req as any).cancelled_at
+                      }
+                      cancellationReason={
+                        (req as any).cancellationReason ||
+                        (req as any).cancellation_reason ||
+                        req.cancellation?.reasonCode
+                      }
                       queueNotes={req.queueNotes}
                       onStatusUpdated={(newStatus) => {
                         onAdvanceLifecycle(req.id, newStatus as any);
@@ -1121,11 +1356,17 @@ export function RentalRequests({
                             className="border border-black/10 dark:border-[#A1A1AA]/20 shadow-xs"
                           />
                           <div>
-                            <p className="font-bold text-neutral-950 dark:text-[#F5F5F5] text-sm">{req.renter.name}</p>
+                            <p className="font-bold text-neutral-950 dark:text-[#F5F5F5] text-sm">
+                              {req.renter.name}
+                            </p>
                             <p className="text-[11px] text-neutral-500 dark:text-[#A1A1AA] flex items-center gap-1">
-                              <span className="text-amber-500 font-bold">★ {req.renter.rating}</span>
+                              <span className="text-amber-500 font-bold">
+                                ★ {req.renter.rating}
+                              </span>
                               <span>•</span>
-                              <span>{req.renter.completedRentals} past rentals</span>
+                              <span>
+                                {req.renter.completedRentals} past rentals
+                              </span>
                             </p>
                           </div>
                         </div>
@@ -1133,11 +1374,15 @@ export function RentalRequests({
                         <div className="pt-2 border-t border-black/5 dark:border-white/5 text-[11px] text-neutral-500 dark:text-[#A1A1AA] space-y-1">
                           <p className="flex items-center gap-1.5">
                             <Phone className="h-3.5 w-3.5 text-[#A1A1AA] shrink-0" />
-                            <span className="text-neutral-900 dark:text-[#F5F5F5] font-medium">{req.renter.phone}</span>
+                            <span className="text-neutral-900 dark:text-[#F5F5F5] font-medium">
+                              {req.renter.phone}
+                            </span>
                           </p>
                           <p className="flex items-center gap-1.5 truncate">
                             <Mail className="h-3.5 w-3.5 text-[#A1A1AA] shrink-0" />
-                            <span className="text-neutral-900 dark:text-[#F5F5F5] font-medium truncate">{req.renter.email}</span>
+                            <span className="text-neutral-900 dark:text-[#F5F5F5] font-medium truncate">
+                              {req.renter.email}
+                            </span>
                           </p>
                           <p className="flex items-center gap-1.5">
                             <MapPin className="h-3.5 w-3.5 text-[#A1A1AA] shrink-0" />
@@ -1154,8 +1399,12 @@ export function RentalRequests({
 
                         <div className="space-y-1.5">
                           <div className="flex items-baseline gap-2">
-                            <span className="text-2xl font-black text-neutral-950 dark:text-[#F5F5F5] font-display">{req.totalDays}</span>
-                            <span className="text-xs text-neutral-500 dark:text-[#A1A1AA] font-semibold">Days Total</span>
+                            <span className="text-2xl font-black text-neutral-950 dark:text-[#F5F5F5] font-display">
+                              {req.totalDays}
+                            </span>
+                            <span className="text-xs text-neutral-500 dark:text-[#A1A1AA] font-semibold">
+                              Days Total
+                            </span>
                           </div>
                           <div className="p-2.5 rounded-xl bg-neutral-100/60 dark:bg-white/[0.03] border border-black/5 dark:border-white/5 text-[11px] space-y-1">
                             <div className="flex justify-between items-center pb-1 border-b border-black/5 dark:border-white/5">
@@ -1164,28 +1413,40 @@ export function RentalRequests({
                                 <span>Booking Placed:</span>
                               </span>
                               <span className="font-bold text-neutral-950 dark:text-[#F5F5F5] font-mono">
-                                {formattedBookingTime ? `Booked On: ${formattedBookingTime}` : `Booked on ${bookingDate}`}
+                                {formattedBookingTime
+                                  ? `Booked On: ${formattedBookingTime}`
+                                  : `Booked on ${bookingDate}`}
                               </span>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-neutral-500 dark:text-[#A1A1AA]">Start:</span>
-                              <span className="font-bold text-neutral-950 dark:text-[#F5F5F5]">{req.startDate}</span>
+                              <span className="text-neutral-500 dark:text-[#A1A1AA]">
+                                Start:
+                              </span>
+                              <span className="font-bold text-neutral-950 dark:text-[#F5F5F5]">
+                                {req.startDate}
+                              </span>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-neutral-500 dark:text-[#A1A1AA]">Return:</span>
-                              <span className="font-bold text-neutral-950 dark:text-[#F5F5F5]">{req.endDate}</span>
+                              <span className="text-neutral-500 dark:text-[#A1A1AA]">
+                                Return:
+                              </span>
+                              <span className="font-bold text-neutral-950 dark:text-[#F5F5F5]">
+                                {req.endDate}
+                              </span>
                             </div>
                             {req.timeSlot && (
                               <div className="flex justify-between pt-1 border-t border-black/5 dark:border-white/5">
-                                <span className="text-neutral-500 dark:text-[#A1A1AA]">Slot:</span>
+                                <span className="text-neutral-500 dark:text-[#A1A1AA]">
+                                  Slot:
+                                </span>
                                 <span className="font-bold text-neutral-950 dark:text-[#F5F5F5] capitalize">
                                   {req.timeSlot === "morning"
                                     ? "Morning (8:00 AM – 12:00 PM)"
                                     : req.timeSlot === "afternoon"
-                                    ? "Afternoon (1:00 PM – 5:00 PM)"
-                                    : req.timeSlot === "full_day"
-                                    ? "Full Day (8:00 AM – 5:00 PM)"
-                                    : req.timeSlot}
+                                      ? "Afternoon (1:00 PM – 5:00 PM)"
+                                      : req.timeSlot === "full_day"
+                                        ? "Full Day (8:00 AM – 5:00 PM)"
+                                        : req.timeSlot}
                                 </span>
                               </div>
                             )}
@@ -1194,7 +1455,9 @@ export function RentalRequests({
 
                         <div className="pt-1 border-t border-black/5 dark:border-white/5 flex justify-between text-[11px] text-neutral-500 dark:text-[#A1A1AA]">
                           <span>Daily Base Rate:</span>
-                          <span className="font-semibold text-neutral-900 dark:text-[#F5F5F5]">₹{req.dailyRate} / day</span>
+                          <span className="font-semibold text-neutral-900 dark:text-[#F5F5F5]">
+                            ₹{req.dailyRate} / day
+                          </span>
                         </div>
                       </div>
 
@@ -1206,7 +1469,9 @@ export function RentalRequests({
 
                         <div className="space-y-1.5">
                           <div className="flex items-baseline justify-between">
-                            <span className="text-xs text-neutral-500 dark:text-[#A1A1AA]">Total Payout:</span>
+                            <span className="text-xs text-neutral-500 dark:text-[#A1A1AA]">
+                              Total Payout:
+                            </span>
                             <span className="text-2xl font-black text-neutral-950 dark:text-[#F5F5F5] font-display">
                               ₹{req.grossRental.toLocaleString("en-IN")}
                             </span>
@@ -1220,8 +1485,12 @@ export function RentalRequests({
                         </div>
 
                         <div className="pt-2 border-t border-black/5 dark:border-white/5 flex items-center justify-between text-[11px] font-bold">
-                          <span className="text-neutral-500 dark:text-[#A1A1AA]">Payent Platform Fee:</span>
-                          <span className="px-2 py-0.5 rounded-md bg-neutral-100 dark:bg-white/10 text-neutral-900 dark:text-[#F5F5F5]">0% (₹0 Deducted)</span>
+                          <span className="text-neutral-500 dark:text-[#A1A1AA]">
+                            Payent Platform Fee:
+                          </span>
+                          <span className="px-2 py-0.5 rounded-md bg-neutral-100 dark:bg-white/10 text-neutral-900 dark:text-[#F5F5F5]">
+                            0% (₹0 Deducted)
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -1230,7 +1499,9 @@ export function RentalRequests({
                     {(() => {
                       const loc = getLocationDisplay(req);
                       const changeReq = req.locationChangeRequest;
-                      const isChangePending = changeReq && (changeReq.status === "pending" || !changeReq.status);
+                      const isChangePending =
+                        changeReq &&
+                        (changeReq.status === "pending" || !changeReq.status);
 
                       return (
                         <div className="space-y-3">
@@ -1240,7 +1511,9 @@ export function RentalRequests({
                               <div className="flex items-start justify-between gap-3">
                                 <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-bold text-xs sm:text-sm">
                                   <AlertTriangle className="h-4 w-4 shrink-0" />
-                                  <span>Location Change Requested by Renter</span>
+                                  <span>
+                                    Location Change Requested by Renter
+                                  </span>
                                 </div>
                                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30">
                                   Approval Needed
@@ -1249,20 +1522,34 @@ export function RentalRequests({
 
                               <div className="text-xs space-y-1.5 text-neutral-800 dark:text-neutral-200 bg-white/50 dark:bg-black/20 p-3 rounded-xl border border-black/5 dark:border-white/5">
                                 <div className="flex items-center gap-2">
-                                  <span className="text-neutral-500 dark:text-neutral-400 font-medium">Proposed Method:</span>
+                                  <span className="text-neutral-500 dark:text-neutral-400 font-medium">
+                                    Proposed Method:
+                                  </span>
                                   <span className="capitalize font-bold text-neutral-900 dark:text-white px-2 py-0.5 rounded bg-amber-500/15">
-                                    {changeReq.deliveryMethod ? changeReq.deliveryMethod.replace(/_/g, " ") : loc.methodLabel}
+                                    {changeReq.deliveryMethod
+                                      ? changeReq.deliveryMethod.replace(
+                                          /_/g,
+                                          " ",
+                                        )
+                                      : loc.methodLabel}
                                   </span>
                                 </div>
                                 <div>
-                                  <span className="text-neutral-500 dark:text-neutral-400 font-medium">Proposed Location: </span>
+                                  <span className="text-neutral-500 dark:text-neutral-400 font-medium">
+                                    Proposed Location:{" "}
+                                  </span>
                                   <span className="font-bold text-neutral-900 dark:text-white">
-                                    {changeReq.deliveryAddress || changeReq.customLocation || changeReq.pickupLocation || "New location proposed"}
+                                    {changeReq.deliveryAddress ||
+                                      changeReq.customLocation ||
+                                      changeReq.pickupLocation ||
+                                      "New location proposed"}
                                   </span>
                                 </div>
                                 {changeReq.locationDirections && (
                                   <div className="text-[11px] text-neutral-600 dark:text-neutral-300">
-                                    <span className="font-medium text-neutral-500">Directions: </span>
+                                    <span className="font-medium text-neutral-500">
+                                      Directions:{" "}
+                                    </span>
                                     {changeReq.locationDirections}
                                   </div>
                                 )}
@@ -1276,21 +1563,33 @@ export function RentalRequests({
                               <div className="flex items-center gap-3 pt-1">
                                 <button
                                   type="button"
-                                  onClick={() => handleApproveLocationChange(req.id)}
+                                  onClick={() =>
+                                    handleApproveLocationChange(req.id)
+                                  }
                                   disabled={approvingChangeId === req.id}
                                   className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-all active:scale-98"
                                 >
                                   <CheckCircle2 className="h-4 w-4" />
-                                  <span>{approvingChangeId === req.id ? "Approving..." : "Approve Change"}</span>
+                                  <span>
+                                    {approvingChangeId === req.id
+                                      ? "Approving..."
+                                      : "Approve Change"}
+                                  </span>
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => handleRejectLocationChange(req.id)}
+                                  onClick={() =>
+                                    handleRejectLocationChange(req.id)
+                                  }
                                   disabled={rejectingChangeId === req.id}
                                   className="px-4 py-2.5 rounded-xl border border-red-500/30 hover:bg-red-500/10 text-red-600 dark:text-red-400 font-semibold text-xs transition-colors cursor-pointer disabled:opacity-50"
                                 >
                                   <XCircle className="h-4 w-4" />
-                                  <span>{rejectingChangeId === req.id ? "Declining..." : "Decline"}</span>
+                                  <span>
+                                    {rejectingChangeId === req.id
+                                      ? "Declining..."
+                                      : "Decline"}
+                                  </span>
                                 </button>
                               </div>
                             </div>
@@ -1310,8 +1609,8 @@ export function RentalRequests({
                                       loc.method === "delivery"
                                         ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25"
                                         : loc.method === "pickup"
-                                        ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/25"
-                                        : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25"
+                                          ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/25"
+                                          : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25"
                                     }`}
                                   >
                                     <loc.methodIcon className="h-3 w-3" />
@@ -1325,7 +1624,10 @@ export function RentalRequests({
                                   <span>•</span>
                                   <span className="flex items-center gap-1 font-medium">
                                     <Calendar className="h-3.5 w-3.5 text-neutral-400" />
-                                    <span>{req.startDate} to {req.endDate} ({req.totalDays} Days)</span>
+                                    <span>
+                                      {req.startDate} to {req.endDate} (
+                                      {req.totalDays} Days)
+                                    </span>
                                   </span>
                                 </div>
                               </div>
@@ -1349,9 +1651,14 @@ export function RentalRequests({
                               <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-800 dark:text-amber-300 text-xs">
                                 <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500 mt-0.5" />
                                 <div className="space-y-1">
-                                  <p className="font-bold text-sm">Location not provided</p>
+                                  <p className="font-bold text-sm">
+                                    Location not provided
+                                  </p>
                                   <p className="text-neutral-600 dark:text-neutral-300">
-                                    The customer did not provide a fulfillment address for this booking. You can contact {req.renter?.name || "the customer"} directly to coordinate delivery or pickup.
+                                    The customer did not provide a fulfillment
+                                    address for this booking. You can contact{" "}
+                                    {req.renter?.name || "the customer"}{" "}
+                                    directly to coordinate delivery or pickup.
                                   </p>
                                 </div>
                               </div>
@@ -1367,7 +1674,9 @@ export function RentalRequests({
                                     </span>
                                     <button
                                       type="button"
-                                      onClick={() => handleCopyAddress(loc.deliveryAddress)}
+                                      onClick={() =>
+                                        handleCopyAddress(loc.deliveryAddress)
+                                      }
                                       className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-black/10 dark:border-white/10 hover:bg-neutral-100 dark:hover:bg-white/5 text-[11px] font-semibold text-neutral-600 dark:text-neutral-300 cursor-pointer"
                                       title="Copy Delivery Address"
                                     >
@@ -1380,7 +1689,8 @@ export function RentalRequests({
                                   </p>
                                   {loc.directions && (
                                     <p className="text-[11px] text-neutral-500 dark:text-neutral-400 italic">
-                                      <strong>Directions:</strong> {loc.directions}
+                                      <strong>Directions:</strong>{" "}
+                                      {loc.directions}
                                     </p>
                                   )}
                                 </div>
@@ -1394,7 +1704,9 @@ export function RentalRequests({
                                     </span>
                                     <button
                                       type="button"
-                                      onClick={() => handleCopyAddress(loc.pickupLocation)}
+                                      onClick={() =>
+                                        handleCopyAddress(loc.pickupLocation)
+                                      }
                                       className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-black/10 dark:border-white/10 hover:bg-neutral-100 dark:hover:bg-white/5 text-[11px] font-semibold text-neutral-600 dark:text-neutral-300 cursor-pointer"
                                       title="Copy Pickup Location"
                                     >
@@ -1431,7 +1743,9 @@ export function RentalRequests({
                                   </span>
                                   <button
                                     type="button"
-                                    onClick={() => handleCopyAddress(loc.primaryAddress)}
+                                    onClick={() =>
+                                      handleCopyAddress(loc.primaryAddress)
+                                    }
                                     className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-black/10 dark:border-white/10 hover:bg-neutral-100 dark:hover:bg-white/5 text-[11px] font-semibold text-neutral-600 dark:text-neutral-300 cursor-pointer"
                                     title="Copy Address"
                                   >
@@ -1444,12 +1758,14 @@ export function RentalRequests({
                                 </p>
                                 {loc.directions && (
                                   <p className="text-[11px] text-neutral-500 dark:text-neutral-400 italic">
-                                    <strong>Directions / Landmark:</strong> {loc.directions}
+                                    <strong>Directions / Landmark:</strong>{" "}
+                                    {loc.directions}
                                   </p>
                                 )}
                                 {loc.lat && loc.lng && (
                                   <p className="text-[11px] font-mono text-neutral-500 dark:text-neutral-400">
-                                    GPS Coordinates: {loc.lat.toFixed(5)}, {loc.lng.toFixed(5)}
+                                    GPS Coordinates: {loc.lat.toFixed(5)},{" "}
+                                    {loc.lng.toFixed(5)}
                                   </p>
                                 )}
                               </div>
@@ -1460,28 +1776,35 @@ export function RentalRequests({
                     })()}
 
                     {/* Vendor Secret PIN Section (Stage 3) - Only if not cancelled */}
-                    {!isCancelled && (() => {
-                      const sec = rentalSecurityService.getSecurityRecord(req.id);
-                      const pin = vendorPinDataMap[req.id]?.pin || sec?.vendorSecretPin || "5831";
-                      return (
-                        <SecretPinDisplay
-                          pin={pin}
-                          type="vendor"
-                          title="Vendor Secret PIN (4-Digit)"
-                          subtitle="Private security credential generated for this booking stage. Keep secure."
-                          isMaskedDefault={!showPinMap[req.id]}
-                          showToggleMask={true}
-                          showCopy={true}
-                          onGenerate={
-                            req.status === "accepted" || req.status === "handover"
-                              ? () => handleGenerateSecretPin(req)
-                              : undefined
-                          }
-                          isGenerating={generatingPinId === req.id}
-                          statusBadge="Status: Pickup Ready"
-                        />
-                      );
-                    })()}
+                    {!isCancelled &&
+                      (() => {
+                        const sec = rentalSecurityService.getSecurityRecord(
+                          req.id,
+                        );
+                        const pin =
+                          vendorPinDataMap[req.id]?.pin ||
+                          sec?.vendorSecretPin ||
+                          "5831";
+                        return (
+                          <SecretPinDisplay
+                            pin={pin}
+                            type="vendor"
+                            title="Vendor Secret PIN (4-Digit)"
+                            subtitle="Private security credential generated for this booking stage. Keep secure."
+                            isMaskedDefault={!showPinMap[req.id]}
+                            showToggleMask={true}
+                            showCopy={true}
+                            onGenerate={
+                              req.status === "accepted" ||
+                              req.status === "handover"
+                                ? () => handleGenerateSecretPin(req)
+                                : undefined
+                            }
+                            isGenerating={generatingPinId === req.id}
+                            statusBadge="Status: Pickup Ready"
+                          />
+                        );
+                      })()}
 
                     {/* Card Action Controls & Lifecycle Triggers - Only if not cancelled */}
                     {!isCancelled && (
@@ -1496,7 +1819,8 @@ export function RentalRequests({
                               disabled={Boolean(decisionProcessingId)}
                               className="flex-1 sm:flex-initial px-6 py-3 rounded-2xl bg-neutral-900 text-white dark:bg-[#F5F5F5] dark:text-[#050709] dark:hover:bg-white font-bold text-xs shadow-md active:scale-98 transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                              {decisionProcessingId === req.id && decisionActionType === "accept" ? (
+                              {decisionProcessingId === req.id &&
+                              decisionActionType === "accept" ? (
                                 <>
                                   <RefreshCw className="h-4 w-4 animate-spin" />
                                   <span>Accepting Booking...</span>
@@ -1515,7 +1839,8 @@ export function RentalRequests({
                               disabled={Boolean(decisionProcessingId)}
                               className="px-5 py-3 rounded-2xl border border-red-500/30 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-500/10 transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                              {decisionProcessingId === req.id && decisionActionType === "reject" ? (
+                              {decisionProcessingId === req.id &&
+                              decisionActionType === "reject" ? (
                                 <>
                                   <RefreshCw className="h-4 w-4 animate-spin" />
                                   <span>Declining...</span>
@@ -1534,12 +1859,18 @@ export function RentalRequests({
                         {req.status === "accepted" && (
                           <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
                             <button
-                              onClick={() => handlePrepareProductForDelivery(req)}
+                              onClick={() =>
+                                handlePrepareProductForDelivery(req)
+                              }
                               disabled={isPreparing}
                               className="px-5 py-3 rounded-2xl bg-neutral-900 text-white dark:bg-[#F5F5F5] dark:text-[#050709] dark:hover:bg-white font-bold text-xs shadow-md active:scale-98 cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
                             >
                               <PackageCheck className="h-4 w-4" />
-                              <span>{isPreparing ? "Preparing..." : "Prepare Product for Delivery"}</span>
+                              <span>
+                                {isPreparing
+                                  ? "Preparing..."
+                                  : "Prepare Product for Delivery"}
+                              </span>
                             </button>
 
                             <button
@@ -1565,7 +1896,9 @@ export function RentalRequests({
                           <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
                             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-neutral-100 dark:bg-white/5 text-neutral-800 dark:text-[#F5F5F5] border border-black/5 dark:border-white/10 text-xs font-semibold">
                               <Truck className="h-3.5 w-3.5 text-[#A1A1AA]" />
-                              <span>In Delivery Transit / Handover to Borrower</span>
+                              <span>
+                                In Delivery Transit / Handover to Borrower
+                              </span>
                             </div>
                             <button
                               onClick={() => handleOpenHandoverModal(req)}
@@ -1582,12 +1915,16 @@ export function RentalRequests({
                             <button
                               onClick={() => {
                                 onAdvanceLifecycle(req.id, "returned");
-                                toast.success("Return marked as received. Ready for post-rental inspection.");
+                                toast.success(
+                                  "Return marked as received. Ready for post-rental inspection.",
+                                );
                               }}
                               className="w-full sm:w-auto px-6 py-3 rounded-2xl border border-black/10 dark:border-[#A1A1AA]/30 text-neutral-900 dark:text-[#F5F5F5] hover:bg-neutral-100 dark:hover:bg-white/5 font-bold text-xs cursor-pointer flex items-center justify-center gap-2 active:scale-98 shadow-xs"
                             >
                               <RotateCcw className="h-4 w-4 text-[#A1A1AA]" />
-                              <span>Receive Return from Borrower (Inspect Condition)</span>
+                              <span>
+                                Receive Return from Borrower (Inspect Condition)
+                              </span>
                             </button>
                           </div>
                         )}
@@ -1599,13 +1936,16 @@ export function RentalRequests({
                               onClick={() => {
                                 onAdvanceLifecycle(req.id, "completed");
                                 toast.success(
-                                  `Inspection passed! ₹${req.grossRental.toLocaleString("en-IN")} credited to your User Wallet.`
+                                  `Inspection passed! ₹${req.grossRental.toLocaleString("en-IN")} credited to your User Wallet.`,
                                 );
                               }}
                               className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-neutral-900 text-white dark:bg-[#F5F5F5] dark:text-[#050709] dark:hover:bg-white font-bold text-xs shadow-lg active:scale-98 cursor-pointer flex items-center justify-center gap-2"
                             >
                               <ShieldCheck className="h-4 w-4" />
-                              <span>Approve Inspection & Credit Payout (₹{req.grossRental.toLocaleString("en-IN")})</span>
+                              <span>
+                                Approve Inspection & Credit Payout (₹
+                                {req.grossRental.toLocaleString("en-IN")})
+                              </span>
                             </button>
                           </div>
                         )}
@@ -1614,19 +1954,27 @@ export function RentalRequests({
                         {req.status === "completed" && (
                           <div className="flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400 font-bold">
                             <CheckCircle2 className="h-4 w-4" />
-                            <span>₹{req.grossRental.toLocaleString("en-IN")} credited to User Wallet Balance</span>
+                            <span>
+                              ₹{req.grossRental.toLocaleString("en-IN")}{" "}
+                              credited to User Wallet Balance
+                            </span>
                           </div>
                         )}
 
                         {/* Post-Acceptance / Pending Cancellation Actions */}
                         {(() => {
                           const eligibility = getCancellationEligibility(req);
-                          if (req.status === "accepted" || req.status === "handover") {
+                          if (
+                            req.status === "accepted" ||
+                            req.status === "handover"
+                          ) {
                             if (eligibility.eligible) {
                               return (
                                 <button
                                   type="button"
-                                  onClick={() => handleOpenCancellationModal(req)}
+                                  onClick={() =>
+                                    handleOpenCancellationModal(req)
+                                  }
                                   className="px-4 py-2.5 rounded-2xl border border-red-500/30 text-xs font-bold text-red-600 dark:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer flex items-center gap-1.5 active:scale-98"
                                   title="Cancel Accepted Booking"
                                 >
@@ -1641,7 +1989,10 @@ export function RentalRequests({
                                   title={eligibility.reason}
                                 >
                                   <AlertCircle className="h-3.5 w-3.5 text-neutral-400" />
-                                  <span>Cancellation Unavailable ({eligibility.reason})</span>
+                                  <span>
+                                    Cancellation Unavailable (
+                                    {eligibility.reason})
+                                  </span>
                                 </div>
                               );
                             }
@@ -1653,11 +2004,16 @@ export function RentalRequests({
                                 title="Active rental in progress. Cancellation is disabled."
                               >
                                 <AlertCircle className="h-3.5 w-3.5 text-neutral-400" />
-                                <span>Cancellation Unavailable (Handover Completed)</span>
+                                <span>
+                                  Cancellation Unavailable (Handover Completed)
+                                </span>
                               </div>
                             );
                           }
-                          if (req.status === "requested" || req.status === "pending") {
+                          if (
+                            req.status === "requested" ||
+                            req.status === "pending"
+                          ) {
                             return (
                               <button
                                 type="button"
@@ -1745,7 +2101,8 @@ export function RentalRequests({
                   Product Prepared for Delivery
                 </h3>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Your product is ready. Below is your private 4-digit Vendor Secret PIN.
+                  Your product is ready. Below is your private 4-digit Vendor
+                  Secret PIN.
                 </p>
               </div>
 
@@ -1759,9 +2116,20 @@ export function RentalRequests({
               />
 
               <div className="p-3.5 rounded-xl bg-secondary/40 border border-border text-left text-xs text-muted-foreground space-y-1">
-                <span className="font-bold text-foreground block">Next Steps:</span>
-                <p>1. Status updated to <span className="font-semibold text-foreground">Waiting for Delivery Boy</span>.</p>
-                <p>2. Complete mobile OTP verification when the courier arrives for pickup.</p>
+                <span className="font-bold text-foreground block">
+                  Next Steps:
+                </span>
+                <p>
+                  1. Status updated to{" "}
+                  <span className="font-semibold text-foreground">
+                    Waiting for Delivery Boy
+                  </span>
+                  .
+                </p>
+                <p>
+                  2. Complete mobile OTP verification when the courier arrives
+                  for pickup.
+                </p>
               </div>
 
               <button
@@ -1819,7 +2187,11 @@ export function RentalRequests({
                   Courier Pickup OTP
                 </h3>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Enter the 6-digit OTP received on your mobile {deliveryBoyOtpModal.phoneMasked ? `(${deliveryBoyOtpModal.phoneMasked})` : ""} to confirm handover to the delivery courier.
+                  Enter the 6-digit OTP received on your mobile{" "}
+                  {deliveryBoyOtpModal.phoneMasked
+                    ? `(${deliveryBoyOtpModal.phoneMasked})`
+                    : ""}{" "}
+                  to confirm handover to the delivery courier.
                 </p>
               </div>
 
@@ -1830,7 +2202,9 @@ export function RentalRequests({
                   value={deliveryBoyOtpModal.otp}
                   onChange={(e) => {
                     const val = e.target.value.replace(/\D/g, "").slice(0, 6);
-                    setDeliveryBoyOtpModal((prev) => prev ? { ...prev, otp: val, error: null } : null);
+                    setDeliveryBoyOtpModal((prev) =>
+                      prev ? { ...prev, otp: val, error: null } : null,
+                    );
                   }}
                   placeholder="Enter 6-Digit OTP"
                   className="w-full text-center font-mono text-2xl font-black rounded-2xl border border-white/20 bg-[#050709] text-[#F5F5F5] py-3 focus:outline-none focus:ring-2 focus:ring-white/30 focus:border-white transition-all shadow-inner tracking-widest placeholder:text-muted-foreground/40 placeholder:tracking-normal placeholder:font-sans placeholder:text-base placeholder:font-normal"
@@ -1855,7 +2229,10 @@ export function RentalRequests({
                 <button
                   type="button"
                   onClick={handleVerifyVendorPickupOtp}
-                  disabled={deliveryBoyOtpModal.otp.length < 4 || deliveryBoyOtpModal.isSubmitting}
+                  disabled={
+                    deliveryBoyOtpModal.otp.length < 4 ||
+                    deliveryBoyOtpModal.isSubmitting
+                  }
                   className="flex-1 py-3 px-4 rounded-2xl bg-[#F5F5F5] text-[#050709] text-xs font-bold shadow-md hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-98"
                 >
                   {deliveryBoyOtpModal.isSubmitting ? (
@@ -1919,13 +2296,16 @@ export function RentalRequests({
                   Authorize Equipment Handover
                 </h3>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Verify the borrower's identity and match credentials before releasing "{handoverReq.productTitle}".
+                  Verify the borrower's identity and match credentials before
+                  releasing "{handoverReq.productTitle}".
                 </p>
               </div>
 
               {/* Step A: Vendor's Product Secret PIN (Originating from product) */}
               {(() => {
-                const sec = rentalSecurityService.getSecurityRecord(handoverReq.id);
+                const sec = rentalSecurityService.getSecurityRecord(
+                  handoverReq.id,
+                );
                 const vendorPin = sec?.vendorSecretPin || "5831";
                 return (
                   <SecretPinDisplay
@@ -1950,11 +2330,16 @@ export function RentalRequests({
                     </span>
                   </div>
                   <p className="text-[11px] text-muted-foreground">
-                    Ask {handoverReq.renter.name} for the 4-digit PIN generated on their booking confirmation screen.
+                    Ask {handoverReq.renter.name} for the 4-digit PIN generated
+                    on their booking confirmation screen.
                   </p>
                 </div>
 
-                <div className="flex items-center justify-center gap-3 pt-1" role="group" aria-label="Borrower 4-Digit Renter PIN input">
+                <div
+                  className="flex items-center justify-center gap-3 pt-1"
+                  role="group"
+                  aria-label="Borrower 4-Digit Renter PIN input"
+                >
                   {enteredRenterPin.map((digit, idx) => (
                     <input
                       key={idx}
@@ -1967,7 +2352,9 @@ export function RentalRequests({
                       maxLength={1}
                       aria-label={`Digit ${idx + 1} of borrower PIN`}
                       value={digit}
-                      onChange={(e) => handleRenterPinChange(idx, e.target.value)}
+                      onChange={(e) =>
+                        handleRenterPinChange(idx, e.target.value)
+                      }
                       onKeyDown={(e) => handleRenterPinKeyDown(idx, e)}
                       className="w-12 h-14 text-center font-mono text-2xl font-black rounded-2xl border border-white/20 bg-[#050709] text-[#F5F5F5] focus:outline-none focus:ring-2 focus:ring-white/30 focus:border-white transition-all shadow-inner"
                     />
@@ -1994,7 +2381,9 @@ export function RentalRequests({
                 <button
                   type="button"
                   onClick={handleVerifyAndStartRental}
-                  disabled={enteredRenterPin.join("").length !== 4 || isVerifying}
+                  disabled={
+                    enteredRenterPin.join("").length !== 4 || isVerifying
+                  }
                   className="flex-1 py-3 px-4 rounded-2xl bg-[#F5F5F5] text-[#050709] text-xs font-bold shadow-md hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-98"
                 >
                   {isVerifying ? (
@@ -2049,7 +2438,8 @@ export function RentalRequests({
                       Cancel Booking
                     </h3>
                     <p className="text-xs text-neutral-500 dark:text-[#A1A1AA]">
-                      Booking #{cancellationModal.booking.id} • {cancellationModal.booking.productTitle}
+                      Booking #{cancellationModal.booking.id} •{" "}
+                      {cancellationModal.booking.productTitle}
                     </p>
                   </div>
                 </div>
@@ -2058,7 +2448,10 @@ export function RentalRequests({
                   type="button"
                   onClick={() => {
                     if (!cancellationModal.submitting) {
-                      setCancellationModal((prev) => ({ ...prev, isOpen: false }));
+                      setCancellationModal((prev) => ({
+                        ...prev,
+                        isOpen: false,
+                      }));
                     }
                   }}
                   className="p-1.5 rounded-full hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer"
@@ -2097,10 +2490,13 @@ export function RentalRequests({
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-bold text-neutral-800 dark:text-[#F5F5F5]">
-                      Additional Feedback {cancellationModal.reasonCode === "OTHER" ? (
+                      Additional Feedback{" "}
+                      {cancellationModal.reasonCode === "OTHER" ? (
                         <span className="text-red-500">* (Required)</span>
                       ) : (
-                        <span className="text-neutral-400 font-normal">(Optional)</span>
+                        <span className="text-neutral-400 font-normal">
+                          (Optional)
+                        </span>
                       )}
                     </label>
                     <span className="text-[10px] text-neutral-400 font-mono">
@@ -2142,7 +2538,11 @@ export function RentalRequests({
                     <span>Renter Impact Warning</span>
                   </p>
                   <p className="text-[11px] leading-relaxed text-amber-900/90 dark:text-amber-200/90">
-                    Cancelling an accepted booking may disrupt the renter's plans. Please only proceed if you cannot fulfill this rental. The reservation interval will be released, and any collected payments or deposits will be safely queued for review.
+                    Cancelling an accepted booking may disrupt the renter's
+                    plans. Please only proceed if you cannot fulfill this
+                    rental. The reservation interval will be released, and any
+                    collected payments or deposits will be safely queued for
+                    review.
                   </p>
                 </div>
               </div>
@@ -2213,7 +2613,10 @@ export function RentalRequests({
                       Decline Booking?
                     </h3>
                     <p className="text-xs text-neutral-500 dark:text-[#A1A1AA]">
-                      Booking #{declineModalBooking.id.length > 16 ? declineModalBooking.id.slice(0, 16) : declineModalBooking.id}
+                      Booking #
+                      {declineModalBooking.id.length > 16
+                        ? declineModalBooking.id.slice(0, 16)
+                        : declineModalBooking.id}
                     </p>
                   </div>
                 </div>
@@ -2233,9 +2636,14 @@ export function RentalRequests({
                   {declineModalBooking.productTitle}
                 </div>
                 <div className="text-neutral-500 dark:text-[#A1A1AA] flex items-center gap-2">
-                  <span>Borrower: {declineModalBooking.renter?.name || "Customer"}</span>
+                  <span>
+                    Borrower: {declineModalBooking.renter?.name || "Customer"}
+                  </span>
                   <span>•</span>
-                  <span>{declineModalBooking.startDate} to {declineModalBooking.endDate}</span>
+                  <span>
+                    {declineModalBooking.startDate} to{" "}
+                    {declineModalBooking.endDate}
+                  </span>
                 </div>
               </div>
 
@@ -2250,10 +2658,18 @@ export function RentalRequests({
                   disabled={Boolean(decisionProcessingId)}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#050709] text-xs font-semibold text-neutral-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white/20"
                 >
-                  <option value="Product unavailable / Scheduling conflict">Product unavailable / Scheduling conflict</option>
-                  <option value="Equipment undergoing maintenance or repair">Equipment undergoing maintenance or repair</option>
-                  <option value="Cannot deliver or fulfill at requested location">Cannot deliver or fulfill at requested location</option>
-                  <option value="Rental duration or pricing mismatch">Rental duration or pricing mismatch</option>
+                  <option value="Product unavailable / Scheduling conflict">
+                    Product unavailable / Scheduling conflict
+                  </option>
+                  <option value="Equipment undergoing maintenance or repair">
+                    Equipment undergoing maintenance or repair
+                  </option>
+                  <option value="Cannot deliver or fulfill at requested location">
+                    Cannot deliver or fulfill at requested location
+                  </option>
+                  <option value="Rental duration or pricing mismatch">
+                    Rental duration or pricing mismatch
+                  </option>
                   <option value="Other reason">Other reason</option>
                 </select>
               </div>

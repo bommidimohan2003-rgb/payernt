@@ -190,6 +190,22 @@ export interface Order {
   delivery_address_id?: string;
   deliveryAddressSnapshot?: any;
   delivery_address_snapshot?: any;
+  vendor?: {
+    id?: string;
+    name?: string;
+    city?: string;
+    verified?: boolean;
+  };
+  vendorName?: string;
+  vendorCity?: string;
+  vendorVerified?: boolean;
+  vendorId?: string;
+  vendor_id?: string;
+  paymentStatus?: string;
+  payment_status?: string;
+  dailyRate?: number;
+  daily_rate?: number;
+  bookingStatus?: string;
 }
 
 export interface UserAddress {

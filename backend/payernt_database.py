@@ -4114,10 +4114,11 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50, vendor_email: O
                OR cp.owner_id IN ({placeholders})
                OR cp.user_email IN ({placeholders})
                OR o.lender_email IN ({placeholders})
+               OR o.vendor_id IN ({placeholders})
             ORDER BY sec.created_at DESC
             LIMIT %s
         """
-        params = list(ident_list) * 6 + [limit]
+        params = list(ident_list) * 7 + [limit]
         rows = fetch_all(query, tuple(params))
         if rows:
             for r in rows:
@@ -4290,10 +4291,11 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50, vendor_email: O
                    OR cp.owner_id IN ({placeholders})
                    OR cp.user_email IN ({placeholders})
                    OR o.lender_email IN ({placeholders})
+                   OR o.vendor_id IN ({placeholders})
                 ORDER BY o.created_at DESC
                 LIMIT %s
             """
-            params_o = list(ident_list) * 5 + [remaining_limit]
+            params_o = list(ident_list) * 6 + [remaining_limit]
             o_rows = fetch_all(orders_query, tuple(params_o))
             if o_rows:
                 for r in o_rows:
@@ -4401,14 +4403,15 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50, vendor_email: O
         except Exception as e:
             logger.warning(f"DB error fetching vendor orders: {e}")
 
-    # 3. Fallback to in-memory mock store if database is offline or empty
-    if not bookings:
-        from database import MOCK_ORDERS, MOCK_CUSTOM_PRODUCTS, MOCK_BOOKING_CANCELLATIONS
+    # 3. Fallback to in-memory mock store if database is offline or has capacity
+    if len(bookings) < limit:
+        from database import MOCK_ORDERS, MOCK_CUSTOM_PRODUCTS, MOCK_BOOKING_CANCELLATIONS, find_authoritative_product
         vendor_products = [
             p for p in list(MOCK_PAYERNT_PRODUCTS.values()) + list(MOCK_CUSTOM_PRODUCTS.values())
             if p.get("owner_id") in target_vendor_identifiers
             or p.get("owner_email") in target_vendor_identifiers
             or p.get("user_email") in target_vendor_identifiers
+            or p.get("vendor_id") in target_vendor_identifiers
         ]
         vendor_prod_ids = {p["id"] for p in vendor_products if p.get("id")}
         for sec in MOCK_RENTAL_SECURITIES.values():
@@ -4417,7 +4420,7 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50, vendor_email: O
                 if not b_id or b_id in seen_ids:
                     continue
                 seen_ids.add(b_id)
-                prod = MOCK_PAYERNT_PRODUCTS.get(sec.get("product_id", "")) or MOCK_CUSTOM_PRODUCTS.get(sec.get("product_id", ""))
+                prod = find_authoritative_product(sec.get("product_id", "")) or MOCK_PAYERNT_PRODUCTS.get(sec.get("product_id", "")) or MOCK_CUSTOM_PRODUCTS.get(sec.get("product_id", ""))
                 daily = float(prod.get("daily_rate") or prod.get("price", 500) if prod else 500)
                 mo = MOCK_ORDERS.get(b_id, {})
                 pu_at = sec.get("rental_started_at") or sec.get("activated_at") or mo.get("picked_up_at") or mo.get("pickedUpAt")
@@ -4502,17 +4505,17 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50, vendor_email: O
             if b_id in seen_ids:
                 continue
             pid = str(mo.get("product_id") or mo.get("productId") or "")
-            prod = MOCK_CUSTOM_PRODUCTS.get(pid) or MOCK_PAYERNT_PRODUCTS.get(pid)
+            prod = find_authoritative_product(pid) or MOCK_CUSTOM_PRODUCTS.get(pid) or MOCK_PAYERNT_PRODUCTS.get(pid)
             owner = ""
             if prod:
-                owner = str(prod.get("user_email") or prod.get("owner_email") or prod.get("ownerId") or prod.get("owner_id") or "").strip().lower()
-            lender_e = str(mo.get("lender_email") or mo.get("owner_id") or "").strip().lower()
+                owner = str(prod.get("owner_id") or prod.get("ownerId") or prod.get("owner_email") or prod.get("ownerEmail") or prod.get("user_email") or prod.get("vendor_id") or "").strip().lower()
+            lender_e = str(mo.get("lender_email") or mo.get("lenderEmail") or mo.get("vendor_id") or mo.get("vendorId") or mo.get("owner_id") or "").strip().lower()
             
             is_match = (
                 lender_e in target_vendor_identifiers
                 or pid in vendor_prod_ids
                 or (owner and owner in target_vendor_identifiers)
-                or any(ident in owner for ident in target_vendor_identifiers if ident)
+                or any(ident and (ident in owner or ident in lender_e) for ident in target_vendor_identifiers)
             )
             if is_match:
                 seen_ids.add(b_id)

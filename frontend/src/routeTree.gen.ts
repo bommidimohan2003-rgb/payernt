@@ -33,6 +33,7 @@ import { Route as PayantRouteImport } from './routes/payant'
 import { Route as PayentRouteImport } from './routes/payent'
 import { Route as PayerntRouteImport } from './routes/payernt'
 import { Route as PaymentRouteImport } from './routes/payment'
+import { Route as PayrentRouteImport } from './routes/payrent'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as RegisterRouteImport } from './routes/register'
@@ -98,9 +99,11 @@ import { Route as ProductIdRouteImport } from './routes/product.$id'
 import { Route as VerifyTokenRouteImport } from './routes/verify.$token'
 import { Route as AdminKycIdRouteImport } from './routes/admin/kyc.$id'
 import { Route as AdminProductsIdRouteImport } from './routes/admin/products.$id'
+import { Route as PayentBookingsIdRouteImport } from './routes/payent/bookings.$id'
 import { Route as PayentProductsIdRouteImport } from './routes/payent/products.$id'
 import { Route as PayerntProductsIdRouteImport } from './routes/payernt/products.$id'
 import { Route as PayerntProductsCreateRouteImport } from './routes/payernt/products.create'
+import { Route as PayrentBookingsIdRouteImport } from './routes/payrent/bookings.$id'
 import { Route as VerifyDeviceTokenRouteImport } from './routes/verify.device.$token'
 import { Route as AdminProductsIdReviewRouteImport } from './routes/admin/products.$id.review'
 import { Route as PayerntProductsIdEditRouteImport } from './routes/payernt/products.$id.edit'
@@ -223,6 +226,11 @@ const PayerntRoute = PayerntRouteImport.update({
 const PaymentRoute = PaymentRouteImport.update({
   id: '/payment',
   path: '/payment',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PayrentRoute = PayrentRouteImport.update({
+  id: '/payrent',
+  path: '/payrent',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PrivacyRoute = PrivacyRouteImport.update({
@@ -550,6 +558,11 @@ const AdminProductsIdRoute = AdminProductsIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => AdminProductsRoute,
 } as any)
+const PayentBookingsIdRoute = PayentBookingsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => PayentBookingsRoute,
+} as any)
 const PayentProductsIdRoute = PayentProductsIdRouteImport.update({
   id: '/products/$id',
   path: '/products/$id',
@@ -564,6 +577,11 @@ const PayerntProductsCreateRoute = PayerntProductsCreateRouteImport.update({
   id: '/create',
   path: '/create',
   getParentRoute: () => PayerntProductsRoute,
+} as any)
+const PayrentBookingsIdRoute = PayrentBookingsIdRouteImport.update({
+  id: '/bookings/$id',
+  path: '/bookings/$id',
+  getParentRoute: () => PayrentRoute,
 } as any)
 const VerifyDeviceTokenRoute = VerifyDeviceTokenRouteImport.update({
   id: '/verify/device/$token',
@@ -606,6 +624,7 @@ export interface FileRoutesByFullPath {
   '/payent': typeof PayentRouteWithChildren
   '/payernt': typeof PayerntRouteWithChildren
   '/payment': typeof PaymentRoute
+  '/payrent': typeof PayrentRouteWithChildren
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/register': typeof RegisterRoute
@@ -640,7 +659,7 @@ export interface FileRoutesByFullPath {
   '/admin/wallet': typeof AdminWalletRoute
   '/delivery/$id': typeof DeliveryIdRoute
   '/payent/$': typeof PayentSplatRoute
-  '/payent/bookings': typeof PayentBookingsRoute
+  '/payent/bookings': typeof PayentBookingsRouteWithChildren
   '/payent/cart': typeof PayentCartRoute
   '/payent/explore': typeof PayentExploreRoute
   '/payent/help': typeof PayentHelpRoute
@@ -671,9 +690,11 @@ export interface FileRoutesByFullPath {
   '/payernt/': typeof PayerntIndexRoute
   '/admin/kyc/$id': typeof AdminKycIdRoute
   '/admin/products/$id': typeof AdminProductsIdRouteWithChildren
+  '/payent/bookings/$id': typeof PayentBookingsIdRoute
   '/payent/products/$id': typeof PayentProductsIdRoute
   '/payernt/products/$id': typeof PayerntProductsIdRouteWithChildren
   '/payernt/products/create': typeof PayerntProductsCreateRoute
+  '/payrent/bookings/$id': typeof PayrentBookingsIdRoute
   '/verify/device/$token': typeof VerifyDeviceTokenRoute
   '/admin/products/$id/review': typeof AdminProductsIdReviewRoute
   '/payernt/products/$id/edit': typeof PayerntProductsIdEditRoute
@@ -700,6 +721,7 @@ export interface FileRoutesByTo {
   '/otp': typeof OtpRoute
   '/payant': typeof PayantRoute
   '/payment': typeof PaymentRoute
+  '/payrent': typeof PayrentRouteWithChildren
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/register': typeof RegisterRoute
@@ -734,7 +756,7 @@ export interface FileRoutesByTo {
   '/admin/wallet': typeof AdminWalletRoute
   '/delivery/$id': typeof DeliveryIdRoute
   '/payent/$': typeof PayentSplatRoute
-  '/payent/bookings': typeof PayentBookingsRoute
+  '/payent/bookings': typeof PayentBookingsRouteWithChildren
   '/payent/cart': typeof PayentCartRoute
   '/payent/explore': typeof PayentExploreRoute
   '/payent/help': typeof PayentHelpRoute
@@ -765,9 +787,11 @@ export interface FileRoutesByTo {
   '/payernt': typeof PayerntIndexRoute
   '/admin/kyc/$id': typeof AdminKycIdRoute
   '/admin/products/$id': typeof AdminProductsIdRouteWithChildren
+  '/payent/bookings/$id': typeof PayentBookingsIdRoute
   '/payent/products/$id': typeof PayentProductsIdRoute
   '/payernt/products/$id': typeof PayerntProductsIdRouteWithChildren
   '/payernt/products/create': typeof PayerntProductsCreateRoute
+  '/payrent/bookings/$id': typeof PayrentBookingsIdRoute
   '/verify/device/$token': typeof VerifyDeviceTokenRoute
   '/admin/products/$id/review': typeof AdminProductsIdReviewRoute
   '/payernt/products/$id/edit': typeof PayerntProductsIdEditRoute
@@ -798,6 +822,7 @@ export interface FileRoutesById {
   '/payent': typeof PayentRouteWithChildren
   '/payernt': typeof PayerntRouteWithChildren
   '/payment': typeof PaymentRoute
+  '/payrent': typeof PayrentRouteWithChildren
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/register': typeof RegisterRoute
@@ -832,7 +857,7 @@ export interface FileRoutesById {
   '/admin/wallet': typeof AdminWalletRoute
   '/delivery/$id': typeof DeliveryIdRoute
   '/payent/$': typeof PayentSplatRoute
-  '/payent/bookings': typeof PayentBookingsRoute
+  '/payent/bookings': typeof PayentBookingsRouteWithChildren
   '/payent/cart': typeof PayentCartRoute
   '/payent/explore': typeof PayentExploreRoute
   '/payent/help': typeof PayentHelpRoute
@@ -863,9 +888,11 @@ export interface FileRoutesById {
   '/payernt/': typeof PayerntIndexRoute
   '/admin/kyc/$id': typeof AdminKycIdRoute
   '/admin/products/$id': typeof AdminProductsIdRouteWithChildren
+  '/payent/bookings/$id': typeof PayentBookingsIdRoute
   '/payent/products/$id': typeof PayentProductsIdRoute
   '/payernt/products/$id': typeof PayerntProductsIdRouteWithChildren
   '/payernt/products/create': typeof PayerntProductsCreateRoute
+  '/payrent/bookings/$id': typeof PayrentBookingsIdRoute
   '/verify/device/$token': typeof VerifyDeviceTokenRoute
   '/admin/products/$id/review': typeof AdminProductsIdReviewRoute
   '/payernt/products/$id/edit': typeof PayerntProductsIdEditRoute
@@ -897,6 +924,7 @@ export interface FileRouteTypes {
     | '/payent'
     | '/payernt'
     | '/payment'
+    | '/payrent'
     | '/privacy'
     | '/profile'
     | '/register'
@@ -962,9 +990,11 @@ export interface FileRouteTypes {
     | '/payernt/'
     | '/admin/kyc/$id'
     | '/admin/products/$id'
+    | '/payent/bookings/$id'
     | '/payent/products/$id'
     | '/payernt/products/$id'
     | '/payernt/products/create'
+    | '/payrent/bookings/$id'
     | '/verify/device/$token'
     | '/admin/products/$id/review'
     | '/payernt/products/$id/edit'
@@ -991,6 +1021,7 @@ export interface FileRouteTypes {
     | '/otp'
     | '/payant'
     | '/payment'
+    | '/payrent'
     | '/privacy'
     | '/profile'
     | '/register'
@@ -1056,9 +1087,11 @@ export interface FileRouteTypes {
     | '/payernt'
     | '/admin/kyc/$id'
     | '/admin/products/$id'
+    | '/payent/bookings/$id'
     | '/payent/products/$id'
     | '/payernt/products/$id'
     | '/payernt/products/create'
+    | '/payrent/bookings/$id'
     | '/verify/device/$token'
     | '/admin/products/$id/review'
     | '/payernt/products/$id/edit'
@@ -1088,6 +1121,7 @@ export interface FileRouteTypes {
     | '/payent'
     | '/payernt'
     | '/payment'
+    | '/payrent'
     | '/privacy'
     | '/profile'
     | '/register'
@@ -1153,9 +1187,11 @@ export interface FileRouteTypes {
     | '/payernt/'
     | '/admin/kyc/$id'
     | '/admin/products/$id'
+    | '/payent/bookings/$id'
     | '/payent/products/$id'
     | '/payernt/products/$id'
     | '/payernt/products/create'
+    | '/payrent/bookings/$id'
     | '/verify/device/$token'
     | '/admin/products/$id/review'
     | '/payernt/products/$id/edit'
@@ -1186,6 +1222,7 @@ export interface RootRouteChildren {
   PayentRoute: typeof PayentRouteWithChildren
   PayerntRoute: typeof PayerntRouteWithChildren
   PaymentRoute: typeof PaymentRoute
+  PayrentRoute: typeof PayrentRouteWithChildren
   PrivacyRoute: typeof PrivacyRoute
   ProfileRoute: typeof ProfileRoute
   RegisterRoute: typeof RegisterRoute
@@ -1369,6 +1406,13 @@ declare module '@tanstack/react-router' {
       path: '/payment'
       fullPath: '/payment'
       preLoaderRoute: typeof PaymentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/payrent': {
+      id: '/payrent'
+      path: '/payrent'
+      fullPath: '/payrent'
+      preLoaderRoute: typeof PayrentRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/privacy': {
@@ -1826,6 +1870,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminProductsIdRouteImport
       parentRoute: typeof AdminProductsRoute
     }
+    '/payent/bookings/$id': {
+      id: '/payent/bookings/$id'
+      path: '/$id'
+      fullPath: '/payent/bookings/$id'
+      preLoaderRoute: typeof PayentBookingsIdRouteImport
+      parentRoute: typeof PayentBookingsRoute
+    }
     '/payent/products/$id': {
       id: '/payent/products/$id'
       path: '/products/$id'
@@ -1846,6 +1897,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/payernt/products/create'
       preLoaderRoute: typeof PayerntProductsCreateRouteImport
       parentRoute: typeof PayerntProductsRoute
+    }
+    '/payrent/bookings/$id': {
+      id: '/payrent/bookings/$id'
+      path: '/bookings/$id'
+      fullPath: '/payrent/bookings/$id'
+      preLoaderRoute: typeof PayrentBookingsIdRouteImport
+      parentRoute: typeof PayrentRoute
     }
     '/verify/device/$token': {
       id: '/verify/device/$token'
@@ -1963,9 +2021,21 @@ const AdminRouteChildren: AdminRouteChildren = {
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
+interface PayentBookingsRouteChildren {
+  PayentBookingsIdRoute: typeof PayentBookingsIdRoute
+}
+
+const PayentBookingsRouteChildren: PayentBookingsRouteChildren = {
+  PayentBookingsIdRoute: PayentBookingsIdRoute,
+}
+
+const PayentBookingsRouteWithChildren = PayentBookingsRoute._addFileChildren(
+  PayentBookingsRouteChildren,
+)
+
 interface PayentRouteChildren {
   PayentSplatRoute: typeof PayentSplatRoute
-  PayentBookingsRoute: typeof PayentBookingsRoute
+  PayentBookingsRoute: typeof PayentBookingsRouteWithChildren
   PayentCartRoute: typeof PayentCartRoute
   PayentExploreRoute: typeof PayentExploreRoute
   PayentHelpRoute: typeof PayentHelpRoute
@@ -1981,7 +2051,7 @@ interface PayentRouteChildren {
 
 const PayentRouteChildren: PayentRouteChildren = {
   PayentSplatRoute: PayentSplatRoute,
-  PayentBookingsRoute: PayentBookingsRoute,
+  PayentBookingsRoute: PayentBookingsRouteWithChildren,
   PayentCartRoute: PayentCartRoute,
   PayentExploreRoute: PayentExploreRoute,
   PayentHelpRoute: PayentHelpRoute,
@@ -2062,6 +2132,17 @@ const PayerntRouteChildren: PayerntRouteChildren = {
 const PayerntRouteWithChildren =
   PayerntRoute._addFileChildren(PayerntRouteChildren)
 
+interface PayrentRouteChildren {
+  PayrentBookingsIdRoute: typeof PayrentBookingsIdRoute
+}
+
+const PayrentRouteChildren: PayrentRouteChildren = {
+  PayrentBookingsIdRoute: PayrentBookingsIdRoute,
+}
+
+const PayrentRouteWithChildren =
+  PayrentRoute._addFileChildren(PayrentRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
@@ -2087,6 +2168,7 @@ const rootRouteChildren: RootRouteChildren = {
   PayentRoute: PayentRouteWithChildren,
   PayerntRoute: PayerntRouteWithChildren,
   PaymentRoute: PaymentRoute,
+  PayrentRoute: PayrentRouteWithChildren,
   PrivacyRoute: PrivacyRoute,
   ProfileRoute: ProfileRoute,
   RegisterRoute: RegisterRoute,

@@ -3659,6 +3659,31 @@ def add_order(data: OrderSchema, current_user: dict = Depends(get_approved_user)
                 detail=CATEGORY_BOOKING_RESTRICTION_MESSAGE
             )
 
+    # Authoritative vendor identification from authoritative product record
+    vendor_ident = (
+        prod.get("owner_id")
+        or prod.get("ownerId")
+        or prod.get("owner_email")
+        or prod.get("ownerEmail")
+        or prod.get("user_email")
+        or prod.get("userEmail")
+        or prod.get("vendor_id")
+        or prod.get("vendorId")
+        or ""
+    )
+    lender_email_val = (
+        prod.get("owner_email")
+        or prod.get("ownerEmail")
+        or prod.get("user_email")
+        or prod.get("userEmail")
+        or (vendor_ident if "@" in str(vendor_ident) else "")
+        or ""
+    ).strip().lower()
+
+    vendor_id_val = str(vendor_ident or lender_email_val or "PAYERNT_USER_001").strip()
+    if not lender_email_val and "@" in vendor_id_val:
+        lender_email_val = vendor_id_val.lower()
+
     normalized_order = {
         "id": data.id,
         "productId": pid,
@@ -3700,6 +3725,10 @@ def add_order(data: OrderSchema, current_user: dict = Depends(get_approved_user)
         "locationDirections": data.locationDirections or data.location_directions or "",
         "latitude": data.latitude,
         "longitude": data.longitude,
+        "vendor_id": vendor_id_val,
+        "vendorId": vendor_id_val,
+        "lender_email": lender_email_val,
+        "lenderEmail": lender_email_val,
         "createdAt": datetime.datetime.now(datetime.timezone.utc).isoformat()
     }
     
@@ -3723,12 +3752,11 @@ def add_order(data: OrderSchema, current_user: dict = Depends(get_approved_user)
         )
     try:
         from payernt_database import create_or_get_rental_security_record
-        lender_email_val = (prod.get("user_email") or "PAYERNT_USER_001").strip().lower()
         v_pin = prod.get("vendor_secret_pin") or "5831"
         create_or_get_rental_security_record(
             booking_id=data.id,
             product_id=pid,
-            vendor_id=lender_email_val,
+            vendor_id=vendor_id_val,
             renter_id=clean_email,
             vendor_secret_pin=v_pin,
         )
@@ -3997,16 +4025,54 @@ def get_order_details(id: str, email: str = Depends(get_current_any_user_email))
     user = get_user(clean_email)
     is_admin = (user.get("role") in ("admin", "superadmin")) if (user and isinstance(user, dict)) else False
 
-    # Check if caller is product lender or owner
+    # Check if caller is product lender, vendor, renter or admin
     pid = str(order.get("product_id") or order.get("productId") or "")
-    prod = fetch_one_product(pid) if pid else None
-    lender_email = (prod.get("user_email") if prod else "").strip().lower()
-    if not lender_email and prod:
-        lender_email = str(prod.get("owner_id") or "").strip().lower()
-    is_lender = (clean_email == lender_email) or (lender_email and (clean_email in lender_email or lender_email in clean_email))
+    prod = find_authoritative_product(pid) if pid else None
+    vendor_id = str(
+        order.get("vendor_id")
+        or order.get("vendorId")
+        or (prod.get("owner_id") if prod else "")
+        or (prod.get("ownerId") if prod else "")
+        or (prod.get("vendor_id") if prod else "")
+        or (prod.get("vendorId") if prod else "")
+        or ""
+    ).strip()
+    lender_email = str(
+        order.get("lender_email")
+        or order.get("lenderEmail")
+        or (prod.get("owner_email") if prod else "")
+        or (prod.get("ownerEmail") if prod else "")
+        or (prod.get("user_email") if prod else "")
+        or (prod.get("userEmail") if prod else "")
+        or (vendor_id if "@" in vendor_id else "")
+        or ""
+    ).strip().lower()
+
+    if not vendor_id and lender_email:
+        vendor_id = lender_email
+    if not lender_email and "@" in vendor_id:
+        lender_email = vendor_id.lower()
+
+    is_lender = (
+        (clean_email == lender_email)
+        or (clean_email == vendor_id.lower())
+        or (lender_email and (clean_email in lender_email or lender_email in clean_email))
+    )
 
     if order_owner and order_owner != clean_email and not is_admin and not is_lender:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden. You do not have permission to view this order.")
+
+    vendor_name = (
+        prod.get("owner_name")
+        or prod.get("ownerName")
+        or (lender_email.split("@")[0].capitalize() if lender_email else "Verified Gear Partner")
+    ) if prod else "Verified Gear Partner"
+    vendor_city = (
+        prod.get("city")
+        or (prod.get("location", {}).get("city") if isinstance(prod.get("location"), dict) else "Bengaluru, Karnataka")
+    ) if prod else "Bengaluru, Karnataka"
+    vendor_verified = bool(prod.get("verified", True)) if prod else True
+    daily_rate_val = float(prod.get("daily_rate") or prod.get("price") or 0.0) if prod else None
 
     pid = str(order.get("product_id") or order.get("productId") or "")
     title = str(order.get("product_title") or order.get("productTitle") or "Gear Rental")
@@ -4090,6 +4156,24 @@ def get_order_details(id: str, email: str = Depends(get_current_any_user_email))
         "locationLongitude": lng,
         "mapUrl": map_url,
         "locationChangeRequest": loc_change,
+        "vendor": {
+            "id": vendor_id,
+            "name": vendor_name,
+            "city": vendor_city,
+            "verified": vendor_verified
+        },
+        "vendorName": vendor_name,
+        "vendorCity": vendor_city,
+        "vendorVerified": vendor_verified,
+        "vendorId": vendor_id,
+        "vendor_id": vendor_id,
+        "lenderEmail": lender_email,
+        "lender_email": lender_email,
+        "paymentStatus": str(order.get("payment_status") or "paid"),
+        "payment_status": str(order.get("payment_status") or "paid"),
+        "dailyRate": daily_rate_val,
+        "daily_rate": daily_rate_val,
+        "bookingStatus": str(order.get("status", "active")).upper(),
     }
 
 class UpdateBookingLocationSchema(BaseModel):
