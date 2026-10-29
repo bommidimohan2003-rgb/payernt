@@ -2936,7 +2936,8 @@ def get_kyc_document_route(verification_id: str, authorization: Optional[str] = 
 
     doc_owner = (rec.get("email") or "").strip().lower()
     is_owner = ctx["email"] == doc_owner
-    is_admin = ctx.get("role") in ("admin", "superadmin")
+    user_db = get_user(ctx["email"]) or {}
+    is_admin = (ctx.get("role") in ("admin", "superadmin")) or (user_db.get("role") in ("admin", "superadmin"))
 
     if not is_owner and not is_admin:
         raise HTTPException(
@@ -2967,8 +2968,8 @@ def list_admin_kyc_verifications(
     current_user_email: str = Depends(get_current_user_email),
     authorization: Optional[str] = Header(None)
 ):
-    """Lists all KYC verification submissions for administrative review."""
-    from database import get_all_kyc_verifications_admin
+    """Lists all KYC verification submissions for administrative review with summary statistics."""
+    from database import get_all_kyc_verifications_admin, get_kyc_stats_admin
     user_rec = get_user(current_user_email) or {}
     token_role = None
     if authorization and authorization.startswith("Bearer "):
@@ -2983,9 +2984,81 @@ def list_admin_kyc_verifications(
         raise HTTPException(status_code=403, detail="Forbidden: Admin access required.")
     
     rows = get_all_kyc_verifications_admin()
+    stats = get_kyc_stats_admin()
     return {
         "success": True,
+        "stats": stats,
         "verifications": rows
+    }
+
+@app.get("/api/admin/kyc/stats")
+def get_admin_kyc_stats(
+    current_user_email: str = Depends(get_current_user_email),
+    authorization: Optional[str] = Header(None)
+):
+    """Summary counts for all KYC applications."""
+    from database import get_kyc_stats_admin
+    user_rec = get_user(current_user_email) or {}
+    token_role = None
+    if authorization and authorization.startswith("Bearer "):
+        try:
+            payload = decode_access_token(authorization.split(" ")[1])
+            if payload:
+                token_role = payload.get("role")
+        except Exception:
+            pass
+
+    if user_rec.get("role") not in ("admin", "superadmin") and token_role not in ("admin", "superadmin"):
+        raise HTTPException(status_code=403, detail="Forbidden: Admin access required.")
+    
+    return {
+        "success": True,
+        "stats": get_kyc_stats_admin()
+    }
+
+@app.get("/api/admin/kyc/{verification_id}")
+def get_admin_kyc_details(
+    verification_id: str,
+    current_user_email: str = Depends(get_current_user_email),
+    authorization: Optional[str] = Header(None)
+):
+    """Admin endpoint to fetch detailed KYC record and document data for preview."""
+    from database import get_kyc_verification_by_id
+    user_rec = get_user(current_user_email) or {}
+    token_role = None
+    if authorization and authorization.startswith("Bearer "):
+        try:
+            payload = decode_access_token(authorization.split(" ")[1])
+            if payload:
+                token_role = payload.get("role")
+        except Exception:
+            pass
+
+    if user_rec.get("role") not in ("admin", "superadmin") and token_role not in ("admin", "superadmin"):
+        raise HTTPException(status_code=403, detail="Forbidden: Admin access required.")
+
+    rec = get_kyc_verification_by_id(verification_id)
+    if not rec:
+        raise HTTPException(status_code=404, detail="KYC verification record not found.")
+
+    file_data = rec.get("document_data_encrypted") or ""
+    if not file_data and rec.get("document_storage_path") and os.path.exists(rec["document_storage_path"]):
+        try:
+            with open(rec["document_storage_path"], "r", encoding="utf-8") as f:
+                file_data = f.read()
+        except Exception:
+            pass
+
+    return {
+        "success": True,
+        "verification": rec,
+        "document": {
+            "fileName": rec.get("document_file_name"),
+            "fileType": rec.get("document_mime_type"),
+            "fileData": file_data,
+            "maskedNumber": rec.get("document_number_masked"),
+            "fileSize": rec.get("document_file_size")
+        }
     }
 
 @app.post("/api/admin/kyc/{verification_id}/review")
@@ -3056,6 +3129,85 @@ def review_kyc_verification_route(
         pass
 
     logger.info(f"Admin {current_user_email} reviewed KYC {verification_id} -> {new_status}")
+
+    # Phase 7 — Send in-app, email, and SMS notifications to applicant
+    target_email = (rec.get("email") or "").strip().lower()
+    acc_type = (rec.get("account_type") or "payrent").strip().lower()
+    doc_type = rec.get("document_type") or ("Aadhaar" if acc_type == "payernt" else "PAN")
+
+    if target_email:
+        if new_status == "APPROVED":
+            notif_title = f"KYC Verification Approved ({doc_type})"
+            if acc_type in ("payernt", "vendor", "lender"):
+                notif_msg = f"Congratulations! Your {doc_type} KYC verification has been approved by admin. You can now list and activate products on Payernt."
+                notif_link = "/payernt/kyc"
+            else:
+                notif_msg = f"Congratulations! Your {doc_type} KYC verification has been approved by admin. You can now rent products on Payrent."
+                notif_link = "/kyc"
+        elif new_status == "REJECTED":
+            notif_title = f"KYC Verification Rejected ({doc_type})"
+            notif_msg = f"Your {doc_type} KYC verification was rejected. Reason: {reason_or_notes}. Please review your details and resubmit."
+            notif_link = "/payernt/kyc" if acc_type in ("payernt", "vendor", "lender") else "/kyc"
+        else: # NEEDS_INFORMATION
+            notif_title = f"KYC Needs More Information ({doc_type})"
+            notif_msg = f"Additional information is required for your {doc_type} KYC: {reason_or_notes}. Please update your document and resubmit."
+            notif_link = "/payernt/kyc" if acc_type in ("payernt", "vendor", "lender") else "/kyc"
+
+        # 1. In-app notification
+        try:
+            from database import create_notification
+            create_notification(
+                email=target_email,
+                title=notif_title,
+                message=notif_msg,
+                type="success" if new_status == "APPROVED" else ("warning" if new_status == "NEEDS_INFORMATION" else "error"),
+                link=notif_link
+            )
+            if acc_type in ("payernt", "vendor", "lender"):
+                from payernt_database import add_payernt_notification
+                add_payernt_notification(
+                    owner_id=target_email,
+                    title=notif_title,
+                    message=notif_msg,
+                    type="success" if new_status == "APPROVED" else ("warning" if new_status == "NEEDS_INFORMATION" else "error"),
+                    action_route=notif_link
+                )
+        except Exception as e:
+            logger.warning(f"Error creating in-app notification for KYC review: {e}")
+
+        # 2. SMTP Email notification (if configured)
+        try:
+            from email_service import send_email_smtp, is_smtp_configured
+            if is_smtp_configured():
+                email_html = f"""
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+                    <h2 style="color: #1e293b;">{notif_title}</h2>
+                    <p style="color: #475569; font-size: 14px; line-height: 1.6;">{notif_msg}</p>
+                    <div style="margin-top: 24px;">
+                        <a href="https://payent.in{notif_link}" style="background-color: #0f172a; color: #ffffff; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px;">View KYC Status</a>
+                    </div>
+                    <p style="margin-top: 30px; font-size: 12px; color: #94a3b8;">This is an automated notification from the Payent compliance team.</p>
+                </div>
+                """
+                send_email_smtp(target_email, notif_title, email_html, notif_msg)
+        except Exception as e:
+            logger.warning(f"Email delivery for KYC review skipped or failed: {e}")
+
+        # 3. SMS notification (if configured)
+        try:
+            if ENABLE_TWILIO_SMS and TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN and TWILIO_VERIFY_SERVICE_SID:
+                user_rec_target = get_user(target_email) or {}
+                phone_num = user_rec_target.get("phone") or user_rec_target.get("mobile")
+                if phone_num:
+                    from twilio.rest import Client
+                    client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+                    client.messages.create(
+                        body=f"Payent KYC: {notif_msg}",
+                        from_=os.getenv("TWILIO_PHONE_NUMBER", ""),
+                        to=phone_num
+                    )
+        except Exception as e:
+            logger.warning(f"SMS delivery for KYC review skipped or failed: {e}")
 
     return {
         "success": True,

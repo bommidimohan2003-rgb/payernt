@@ -8996,16 +8996,81 @@ def record_kyc_submission(
     MOCK_KYC_VERIFICATIONS[verification_id] = record
     return record
 
+def enrich_kyc_verification_row(row: Dict[str, Any]) -> Dict[str, Any]:
+    """Enriches a KYC verification row with applicant details, contact, and audit history."""
+    if not row:
+        return row
+    copy_row = dict(row)
+    email = (copy_row.get("email") or "").strip().lower()
+    acc_type = (copy_row.get("account_type") or "payrent").strip().lower()
+
+    applicant_name = None
+    applicant_phone = None
+    applicant_avatar = None
+
+    if acc_type in ("payernt", "vendor", "lender"):
+        try:
+            from payernt_database import MOCK_PAYERNT_ACCOUNTS
+            for acc in MOCK_PAYERNT_ACCOUNTS.values():
+                if (acc.get("email") or "").strip().lower() == email:
+                    applicant_name = acc.get("business_name") or acc.get("name") or acc.get("owner_name")
+                    applicant_phone = acc.get("phone") or acc.get("mobile")
+                    applicant_avatar = acc.get("avatar") or acc.get("profile_photo_url")
+                    break
+        except Exception:
+            pass
+
+        if not applicant_name:
+            try:
+                db_acc = fetch_one("SELECT name, business_name, phone, avatar FROM payernt_accounts WHERE LOWER(email) = LOWER(%s)", (email,))
+                if db_acc:
+                    applicant_name = db_acc.get("business_name") or db_acc.get("name")
+                    applicant_phone = db_acc.get("phone")
+                    applicant_avatar = db_acc.get("avatar")
+            except Exception:
+                pass
+
+    if not applicant_name:
+        u = get_user(email)
+        if u:
+            applicant_name = u.get("full_name") or u.get("name")
+            applicant_phone = u.get("phone") or u.get("mobile")
+            applicant_avatar = u.get("avatar") or u.get("profile_photo_url")
+
+    if not applicant_name and email:
+        applicant_name = email.split("@")[0].replace(".", " ").title()
+
+    copy_row["applicant_name"] = applicant_name or "Applicant"
+    copy_row["applicant_phone"] = applicant_phone
+    copy_row["applicant_avatar"] = applicant_avatar
+
+    # Build audit trail
+    audit_history = []
+    if copy_row.get("reviewed_by") and copy_row.get("reviewed_at"):
+        audit_history.append({
+            "reviewer_email": copy_row["reviewed_by"],
+            "reviewed_at": copy_row["reviewed_at"],
+            "decision": copy_row.get("status"),
+            "reason": copy_row.get("rejection_reason")
+        })
+    copy_row["audit_history"] = audit_history
+    return copy_row
+
 def get_kyc_verification_by_id(verification_id: str) -> Optional[Dict[str, Any]]:
-    """Fetches a KYC verification record by verification ID."""
+    """Fetches a KYC verification record by verification ID with enriched metadata."""
     clean_id = (verification_id or "").strip()
+    record = None
     try:
         row = fetch_one("SELECT * FROM user_kyc_verifications WHERE id = %s", (clean_id,))
         if row:
-            return row
+            record = row
     except Exception as e:
         logger.warning(f"DB read error in get_kyc_verification_by_id: {e}")
-    return MOCK_KYC_VERIFICATIONS.get(clean_id)
+    if not record:
+        record = MOCK_KYC_VERIFICATIONS.get(clean_id)
+    if record:
+        return enrich_kyc_verification_row(record)
+    return None
 
 def review_kyc_verification(
     verification_id: str,
@@ -9102,7 +9167,7 @@ def review_kyc_verification(
     return rec or {"id": verification_id, "status": norm_status}
 
 def get_all_kyc_verifications_admin() -> List[Dict[str, Any]]:
-    """Admin listing of all KYC verifications."""
+    """Admin listing of all KYC verifications with enriched details."""
     try:
         rows = fetch_all("""
             SELECT id, user_id, email, account_type, document_type, document_number_masked,
@@ -9111,7 +9176,7 @@ def get_all_kyc_verifications_admin() -> List[Dict[str, Any]]:
             FROM user_kyc_verifications ORDER BY created_at DESC
         """)
         if rows:
-            return rows
+            return [enrich_kyc_verification_row(r) for r in rows]
     except Exception as e:
         logger.warning(f"DB error in get_all_kyc_verifications_admin: {e}")
 
@@ -9120,7 +9185,23 @@ def get_all_kyc_verifications_admin() -> List[Dict[str, Any]]:
         copy = dict(k)
         copy.pop("document_data_encrypted", None)
         copy.pop("document_number_hash", None)
-        safe_list.append(copy)
+        safe_list.append(enrich_kyc_verification_row(copy))
     return safe_list
+
+def get_kyc_stats_admin() -> Dict[str, int]:
+    """Computes summary statistics for all KYC verifications."""
+    rows = get_all_kyc_verifications_admin()
+    total = len(rows)
+    pending = sum(1 for r in rows if str(r.get("status", "")).upper() == "PENDING")
+    approved = sum(1 for r in rows if str(r.get("status", "")).upper() == "APPROVED")
+    rejected = sum(1 for r in rows if str(r.get("status", "")).upper() == "REJECTED")
+    needs_info = sum(1 for r in rows if str(r.get("status", "")).upper() in ("NEEDS_INFORMATION", "NEEDS_INFO"))
+    return {
+        "total": total,
+        "pending": pending,
+        "approved": approved,
+        "rejected": rejected,
+        "needs_information": needs_info
+    }
 
 

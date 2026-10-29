@@ -52,6 +52,7 @@ import { Route as AdminBookingsRouteImport } from './routes/admin/bookings'
 import { Route as AdminCategoriesRouteImport } from './routes/admin/categories'
 import { Route as AdminDashboardRouteImport } from './routes/admin/dashboard'
 import { Route as AdminHelpRouteImport } from './routes/admin/help'
+import { Route as AdminKycRouteImport } from './routes/admin/kyc'
 import { Route as AdminLoginRouteImport } from './routes/admin/login'
 import { Route as AdminMessagesRouteImport } from './routes/admin/messages'
 import { Route as AdminNotificationsRouteImport } from './routes/admin/notifications'
@@ -316,6 +317,11 @@ const AdminDashboardRoute = AdminDashboardRouteImport.update({
 const AdminHelpRoute = AdminHelpRouteImport.update({
   id: '/help',
   path: '/help',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminKycRoute = AdminKycRouteImport.update({
+  id: '/kyc',
+  path: '/kyc',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminLoginRoute = AdminLoginRouteImport.update({
@@ -612,6 +618,7 @@ export interface FileRoutesByFullPath {
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/help': typeof AdminHelpRoute
+  '/admin/kyc': typeof AdminKycRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/messages': typeof AdminMessagesRoute
   '/admin/notifications': typeof AdminNotificationsRoute
@@ -704,6 +711,7 @@ export interface FileRoutesByTo {
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/help': typeof AdminHelpRoute
+  '/admin/kyc': typeof AdminKycRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/messages': typeof AdminMessagesRoute
   '/admin/notifications': typeof AdminNotificationsRoute
@@ -800,6 +808,7 @@ export interface FileRoutesById {
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/help': typeof AdminHelpRoute
+  '/admin/kyc': typeof AdminKycRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/messages': typeof AdminMessagesRoute
   '/admin/notifications': typeof AdminNotificationsRoute
@@ -897,6 +906,7 @@ export interface FileRouteTypes {
     | '/admin/categories'
     | '/admin/dashboard'
     | '/admin/help'
+    | '/admin/kyc'
     | '/admin/login'
     | '/admin/messages'
     | '/admin/notifications'
@@ -989,6 +999,7 @@ export interface FileRouteTypes {
     | '/admin/categories'
     | '/admin/dashboard'
     | '/admin/help'
+    | '/admin/kyc'
     | '/admin/login'
     | '/admin/messages'
     | '/admin/notifications'
@@ -1084,6 +1095,7 @@ export interface FileRouteTypes {
     | '/admin/categories'
     | '/admin/dashboard'
     | '/admin/help'
+    | '/admin/kyc'
     | '/admin/login'
     | '/admin/messages'
     | '/admin/notifications'
@@ -1480,6 +1492,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminHelpRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/kyc': {
+      id: '/admin/kyc'
+      path: '/kyc'
+      fullPath: '/admin/kyc'
+      preLoaderRoute: typeof AdminKycRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/login': {
       id: '/admin/login'
       path: '/login'
@@ -1867,6 +1886,7 @@ interface AdminRouteChildren {
   AdminCategoriesRoute: typeof AdminCategoriesRoute
   AdminDashboardRoute: typeof AdminDashboardRoute
   AdminHelpRoute: typeof AdminHelpRoute
+  AdminKycRoute: typeof AdminKycRoute
   AdminLoginRoute: typeof AdminLoginRoute
   AdminMessagesRoute: typeof AdminMessagesRoute
   AdminNotificationsRoute: typeof AdminNotificationsRoute
@@ -1893,6 +1913,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminCategoriesRoute: AdminCategoriesRoute,
   AdminDashboardRoute: AdminDashboardRoute,
   AdminHelpRoute: AdminHelpRoute,
+  AdminKycRoute: AdminKycRoute,
   AdminLoginRoute: AdminLoginRoute,
   AdminMessagesRoute: AdminMessagesRoute,
   AdminNotificationsRoute: AdminNotificationsRoute,
