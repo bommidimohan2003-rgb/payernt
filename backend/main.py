@@ -6699,6 +6699,8 @@ ws_manager = ConnectionManager()
 
 def broadcast_admin_event(event_type: str, data: dict):
     """Safely broadcast platform events to all active admin WebSocket connections."""
+    if not getattr(ws_manager, "active_connections", None):
+        return
     # Sanitize payload: strip sensitive fields like password_hash or internal secrets
     sanitized = {k: v for k, v in data.items() if k not in ("password_hash", "otp", "password")}
     payload = {

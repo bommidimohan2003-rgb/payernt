@@ -23,6 +23,7 @@ import type {
   PayerntMessage,
 } from "../types";
 import { resolveProductDailyRate } from "../productUtils";
+import { KycStatusBanner } from "@/components/kyc/KycStatusBanner";
 
 export interface PayerntHomeProps {
   stats: {
@@ -168,6 +169,9 @@ export function PayerntHome({
             )}
           </div>
         )}
+
+        {/* Authoritative KYC Verification Banner */}
+        <KycStatusBanner role="vendor" className="mb-2" />
 
         {/* Mobile Greeting */}
         <div className="pt-1 pb-1">
@@ -595,6 +599,9 @@ export function PayerntHome({
               )}
             </div>
           )}
+
+          {/* Authoritative KYC Verification Banner */}
+          <KycStatusBanner role="vendor" className="mb-6 relative z-10" />
 
           {/* 1. Header: Greeting (Left) & Status/Date (Right) */}
           <div className="relative z-10 flex items-start justify-between">

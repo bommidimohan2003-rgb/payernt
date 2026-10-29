@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
+import { ShareProductModal } from "@/components/common/ShareProductModal";
 
 export function MainLayout({
   children,
@@ -14,6 +15,7 @@ export function MainLayout({
       <Navbar />
       <main className="flex-1">{children}</main>
       {!hideFooter && <Footer />}
+      <ShareProductModal />
     </div>
   );
 }

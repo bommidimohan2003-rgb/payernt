@@ -1093,15 +1093,19 @@ export function usePayerntStore() {
   // Rental Request Actions
   const handleRequestAction = async (
     requestId: string,
-    action: "accept" | "reject",
+    action: "accept" | "reject" | "cancel",
     reason?: string,
     feedback?: string
   ): Promise<{ success: boolean; message?: string; error?: string }> => {
     try {
-      const res =
-        action === "accept"
-          ? await payerntApi.acceptBooking(requestId)
-          : await payerntApi.rejectBooking(requestId, reason, feedback);
+      let res;
+      if (action === "accept") {
+        res = await payerntApi.acceptBooking(requestId);
+      } else if (action === "cancel") {
+        res = await payerntApi.cancelBooking(requestId, reason || "NO_LONGER_AVAILABLE", feedback);
+      } else {
+        res = await payerntApi.rejectBooking(requestId, reason, feedback);
+      }
 
       if (!res.success) {
         return {
@@ -1110,12 +1114,14 @@ export function usePayerntStore() {
         };
       }
 
+      const nextStatus = action === "accept" ? "accepted" : (action === "cancel" ? "cancelled" : "rejected");
+
       setRentalRequests((prev) =>
         prev.map((req) => {
           if (req.id !== requestId) return req;
           return {
             ...req,
-            status: action === "accept" ? "accepted" : "rejected",
+            status: nextStatus as any,
           };
         })
       );
@@ -1131,7 +1137,7 @@ export function usePayerntStore() {
         window.dispatchEvent(new CustomEvent("payent_booking_updated"));
         window.dispatchEvent(
           new CustomEvent("payent_queue_updated", {
-            detail: { bookingId: requestId, status: action === "accept" ? "accepted" : "rejected" },
+            detail: { bookingId: requestId, status: nextStatus },
           })
         );
       }
@@ -1139,8 +1145,10 @@ export function usePayerntStore() {
       const req = rentalRequests.find((r) => r.id === requestId);
       const notif: LenderNotification = {
         id: `notif-${Date.now()}`,
-        title: action === "accept" ? "Rental Request Accepted ✅" : "Rental Request Declined ❌",
-        message: `You ${action}ed ${req?.renter.name || "renter"}'s booking for "${req?.productTitle || "gear"}".`,
+        title: action === "accept" ? "Rental Request Accepted ✅" : (action === "cancel" ? "Booking Cancelled ⚠️" : "Rental Request Declined ❌"),
+        message: action === "cancel"
+          ? `You cancelled ${req?.renter?.name || "renter"}'s booking for "${req?.productTitle || "gear"}".`
+          : `You ${action}ed ${req?.renter?.name || "renter"}'s booking for "${req?.productTitle || "gear"}".`,
         type: action === "accept" ? "success" : "info",
         timestamp: "Just now",
         read: false,
@@ -1150,7 +1158,7 @@ export function usePayerntStore() {
 
       return {
         success: true,
-        message: res.message || `Booking ${action}ed successfully.`,
+        message: res.message || `Booking ${nextStatus} successfully.`,
       };
     } catch (e: any) {
       return {
@@ -1159,7 +1167,6 @@ export function usePayerntStore() {
       };
     }
   };
-
   // Step Rental Lifecycle
   const advanceRentalLifecycle = (requestId: string, nextStatus: RentalRequestStatus) => {
     const nowIso = new Date().toISOString();

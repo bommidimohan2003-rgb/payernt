@@ -50,6 +50,8 @@ import { formatOwnerAddress } from "@/utils/formatters";
 import type { Product, Order } from "@/types";
 import { ProfilePhoto } from "@/components/common/ProfilePhoto";
 import { ProductMessageModal } from "@/components/browse/ProductMessageModal";
+import { shareRentalProduct } from "@/utils/productSharing";
+import { ShareProductModal } from "@/components/common/ShareProductModal";
 
 const KNOWN_BRANDS = [
   "Sony",
@@ -141,11 +143,12 @@ export default function ProductDetails() {
   } | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
 
-  const handleShare = () => {
-    if (typeof window !== "undefined") {
-      navigator.clipboard.writeText(window.location.href);
+  const handleShare = async () => {
+    if (!product && !id) return;
+    const item = product || { id, title: typeof document !== "undefined" ? document.title : "Gear Rental" };
+    const res = await shareRentalProduct(item);
+    if (res.success && res.method === "clipboard") {
       setCopiedLink(true);
-      toast.success("Link copied to clipboard!");
       setTimeout(() => setCopiedLink(false), 2500);
     }
   };
@@ -821,7 +824,8 @@ export default function ProductDetails() {
             </div>
           </div>
         </div>
-      </MainLayout>
+        <ShareProductModal />
+    </MainLayout>
     );
   }
 

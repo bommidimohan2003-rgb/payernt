@@ -718,16 +718,30 @@ export default function Orders() {
                       {isCancelled && (
                         <div className="p-4 sm:p-5 rounded-2xl bg-red-500/10 border border-red-500/25 flex items-start gap-3.5">
                           <Ban className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
-                          <div className="space-y-1">
+                          <div className="space-y-1.5">
                             <div className="font-bold text-sm text-red-600 dark:text-red-400">
-                              Booking Cancelled
+                              {(o as any).cancelled_by === "LENDER" || (o as any).cancelledBy === "LENDER"
+                                ? "Booking Cancelled by Lender"
+                                : "Booking Cancelled"}
                             </div>
                             <p className="text-xs text-neutral-700 dark:text-neutral-300 leading-relaxed">
-                              This booking has been cancelled. Active milestone buttons, handover actions, and Live Rental Queue operations are permanently disabled.
+                              {(o as any).cancelled_by === "LENDER" || (o as any).cancelledBy === "LENDER"
+                                ? "The lender was unable to fulfill this rental request and cancelled the booking. Any payments or deposits are protected."
+                                : "This booking has been cancelled. Active milestone buttons, handover actions, and Live Rental Queue operations are permanently disabled."}
                             </p>
                             {((o as any).cancellationReason || (o as any).cancellation_reason) && (
                               <p className="text-xs text-red-600 dark:text-red-400 font-medium pt-0.5">
-                                Reason: {String((o as any).cancellationReason || (o as any).cancellation_reason).replace(/_/g, " ")}
+                                Cancellation Reason: {String((o as any).cancellationReason || (o as any).cancellation_reason).replace(/_/g, " ")}
+                              </p>
+                            )}
+                            {((o as any).cancellation_feedback || (o as any).cancellationFeedback) && (
+                              <p className="text-xs text-neutral-600 dark:text-neutral-400 italic">
+                                Note from Lender: &quot;{String((o as any).cancellation_feedback || (o as any).cancellationFeedback)}&quot;
+                              </p>
+                            )}
+                            {((o as any).refund_status || (o as any).refundStatus) && (
+                              <p className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold">
+                                Refund Status: {String((o as any).refund_status || (o as any).refundStatus).replace(/_/g, " ").toUpperCase()}
                               </p>
                             )}
                             {((o as any).cancelledAt || (o as any).cancelled_at) && (

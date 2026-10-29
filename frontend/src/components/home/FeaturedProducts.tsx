@@ -8,6 +8,7 @@ import {
   Sparkles,
   Star,
   Tag,
+  Share2,
 } from "lucide-react";
 import { api } from "@/utils/api";
 import { storage, STORAGE_KEYS } from "@/utils/storage";
@@ -17,6 +18,7 @@ import { toast } from "sonner";
 import type { Product } from "@/types";
 import { getOptimizedImageUrl, getResponsiveImageSrcSet } from "@/utils/images";
 import { isFakeOrDeletedProduct } from "@/utils/productFilters";
+import { shareRentalProduct } from "@/utils/productSharing";
 
 interface DisplayProduct {
   id: string;
@@ -137,6 +139,12 @@ export function FeaturedProducts() {
     toggle(id);
     const isLiked = has(id);
     toast.success(isLiked ? "Removed from wishlist" : "Saved to wishlist!");
+  };
+
+  const handleShare = (e: React.MouseEvent, product: DisplayProduct) => {
+    e.stopPropagation();
+    e.preventDefault();
+    shareRentalProduct(product);
   };
 
   const handleDetails = (id: string) => {
@@ -296,19 +304,31 @@ export function FeaturedProducts() {
                       </div>
                     </div>
 
-                    {/* Wishlist Button */}
-                    <button
-                      type="button"
-                      onClick={(e) => handleWishlist(e, p.id)}
-                      aria-label="Save to wishlist"
-                      className="h-8 w-8 rounded-full bg-black/60 hover:bg-black/85 backdrop-blur-md flex items-center justify-center text-white hover:text-rose-500 transition-all cursor-pointer shadow-md border border-white/20"
-                    >
-                      <Heart
-                        className={`h-3.5 w-3.5 transition-colors ${
-                          isLiked ? "fill-rose-500 text-rose-500" : ""
-                        }`}
-                      />
-                    </button>
+                    {/* Top Right: Share & Wishlist Buttons */}
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={(e) => handleShare(e, p)}
+                        aria-label={`Share ${p.title}`}
+                        title="Share Product"
+                        className="h-8 w-8 rounded-full bg-black/60 hover:bg-black/85 backdrop-blur-md flex items-center justify-center text-white/90 hover:text-white transition-all cursor-pointer shadow-md border border-white/20 active:scale-95"
+                      >
+                        <Share2 className="h-3.5 w-3.5" />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={(e) => handleWishlist(e, p.id)}
+                        aria-label="Save to wishlist"
+                        className="h-8 w-8 rounded-full bg-black/60 hover:bg-black/85 backdrop-blur-md flex items-center justify-center text-white hover:text-rose-500 transition-all cursor-pointer shadow-md border border-white/20"
+                      >
+                        <Heart
+                          className={`h-3.5 w-3.5 transition-colors ${
+                            isLiked ? "fill-rose-500 text-rose-500" : ""
+                          }`}
+                        />
+                      </button>
+                    </div>
                   </div>
 
                   {/* Bottom Row: Details sitting directly on the image */}

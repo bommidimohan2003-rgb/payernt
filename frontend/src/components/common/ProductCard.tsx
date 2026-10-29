@@ -15,6 +15,7 @@ import {
   Calendar,
   Video,
   Layers,
+  Share2,
 } from "lucide-react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
@@ -31,6 +32,7 @@ import { CSSTiltCard } from "./CSSTiltCard";
 import { getOptimizedImageUrl, getResponsiveImageSrcSet } from "@/utils/images";
 import { ProductMessageModal } from "@/components/browse/ProductMessageModal";
 import { isFakeOrDeletedProduct } from "@/utils/productFilters";
+import { shareRentalProduct } from "@/utils/productSharing";
 
 export interface ProductCardProps {
   product: Product;
@@ -242,6 +244,12 @@ export function ProductCard({
     );
   };
 
+  const handleShareProduct = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    shareRentalProduct(product);
+  };
+
   return (
     <>
       <CSSTiltCard className={cn("group text-card-foreground p-0.5", className)}>
@@ -327,8 +335,19 @@ export function ProductCard({
               )}
             </div>
 
-            {/* Top Right: Message & Wishlist Buttons */}
+            {/* Top Right: Message, Share & Wishlist Buttons */}
             <div className="flex items-center gap-1.5">
+              {/* Share Product Action */}
+              <button
+                type="button"
+                onClick={handleShareProduct}
+                aria-label={`Share ${product.title || "product"}`}
+                title="Share product link"
+                className="h-8 w-8 rounded-full bg-black/60 hover:bg-black/85 backdrop-blur-md text-white/90 hover:text-white transition-all shadow-md border border-white/20 flex items-center justify-center cursor-pointer active:scale-95"
+              >
+                <Share2 className="h-3.5 w-3.5" />
+              </button>
+
               {/* Message Owner Action Button */}
               {!product.isReference && !isOwner && (
                 <button

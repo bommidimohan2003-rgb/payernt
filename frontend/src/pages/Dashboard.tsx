@@ -33,6 +33,7 @@ import { Button } from "@/components/common/Button";
 import { getOptimizedImageUrl } from "@/utils/images";
 import { SecretPinDisplay } from "@/components/common/SecretPinDisplay";
 import { LiveRentalQueue } from "@/components/rental/LiveRentalQueue";
+import { KycStatusBanner } from "@/components/kyc/KycStatusBanner";
 
 export default function Dashboard() {
   const { user, ready } = useAuth();
@@ -243,6 +244,9 @@ export default function Dashboard() {
             </Link>
           </div>
         )}
+
+        {/* Authoritative Dual-Side KYC Status Banner */}
+        <KycStatusBanner role="renter" className="mb-4" />
 
         {/* 1. WELCOME & COMMAND HEADER */}
         <div className="rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#10151B] p-6 sm:p-8 shadow-sm">

@@ -48,7 +48,7 @@ interface RentalRequestsProps {
   requests: RentalRequest[];
   onRequestAction: (
     requestId: string,
-    action: "accept" | "reject",
+    action: "accept" | "reject" | "cancel",
     reason?: string,
     feedback?: string
   ) => Promise<{ success: boolean; message?: string; error?: string }> | void;
@@ -127,6 +127,33 @@ export const isPendingRequest = (r: RentalRequest): boolean => {
 export const isOngoingRequest = (r: RentalRequest): boolean => {
   if (isCancelledRequest(r) || isCompletedRequest(r) || isPendingRequest(r)) return false;
   return true;
+};
+
+export const getCancellationEligibility = (req: RentalRequest): { eligible: boolean; reason?: string } => {
+  if (isCancelledRequest(req)) {
+    return { eligible: false, reason: "Booking is already cancelled or declined" };
+  }
+  if (req.status === "completed" || req.status === "returned") {
+    return { eligible: false, reason: "Completed bookings cannot be cancelled" };
+  }
+  if (req.status === "active") {
+    return { eligible: false, reason: "Handover has commenced; rental is active" };
+  }
+  const anyReq = req as any;
+  if (
+    anyReq.vendor_handover_verified ||
+    anyReq.renter_handover_verified ||
+    anyReq.rental_started ||
+    anyReq.rental_activated ||
+    anyReq.isPickedUp
+  ) {
+    return { eligible: false, reason: "Physical handover has already been verified" };
+  }
+  const delStatus = String(anyReq.delivery_status || anyReq.deliveryStatus || "").toUpperCase();
+  if (["PICKED_UP_FROM_VENDOR", "OUT_FOR_DELIVERY", "DELIVERED", "COMPLETED"].includes(delStatus)) {
+    return { eligible: false, reason: "Courier pickup has already occurred" };
+  }
+  return { eligible: true };
 };
 
 export function RentalRequests({
@@ -364,27 +391,27 @@ export function RentalRequests({
   }>({
     isOpen: false,
     booking: null,
-    reasonCode: "PERSONAL_USE",
+    reasonCode: "NO_LONGER_AVAILABLE",
     feedback: "",
     submitting: false,
     error: null,
   });
 
   const CANCELLATION_REASONS = [
-    { code: "PERSONAL_USE", label: "I need the product for personal use." },
     { code: "NO_LONGER_AVAILABLE", label: "Product is no longer available." },
-    { code: "DAMAGED_OR_TECHNICAL_ISSUE", label: "Product has a technical issue or is damaged." },
+    { code: "DAMAGED_OR_TECHNICAL_ISSUE", label: "Product has a newly discovered issue or damage." },
+    { code: "SCHEDULING_CONFLICT", label: "Scheduling conflict." },
+    { code: "PERSONAL_USE", label: "I need the product for personal use." },
     { code: "CANNOT_COMPLETE_HANDOVER", label: "I cannot complete the handover at the scheduled time." },
     { code: "RENTER_REQUESTED", label: "The renter requested cancellation." },
-    { code: "SCHEDULING_CONFLICT", label: "Scheduling conflict." },
-    { code: "OTHER", label: "Other." },
+    { code: "OTHER", label: "Other (requires description)." },
   ];
 
   const handleOpenCancellationModal = (booking: RentalRequest) => {
     setCancellationModal({
       isOpen: true,
       booking,
-      reasonCode: "PERSONAL_USE",
+      reasonCode: "NO_LONGER_AVAILABLE",
       feedback: "",
       submitting: false,
       error: null,
@@ -433,7 +460,7 @@ export function RentalRequests({
         setCancellationModal({
           isOpen: false,
           booking: null,
-          reasonCode: "PERSONAL_USE",
+          reasonCode: "NO_LONGER_AVAILABLE",
           feedback: "",
           submitting: false,
           error: null,
@@ -1590,17 +1617,59 @@ export function RentalRequests({
                           </div>
                         )}
 
-                        {/* Lender Cancellation Button */}
-                        {(req.status === "requested" || req.status === "accepted" || req.status === "handover") && (
-                          <button
-                            type="button"
-                            onClick={() => handleOpenCancellationModal(req)}
-                            className="px-4 py-2.5 rounded-2xl border border-red-500/30 text-xs font-bold text-red-600 dark:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer flex items-center gap-1.5"
-                          >
-                            <XCircle className="h-4 w-4" />
-                            <span>Cancel Booking</span>
-                          </button>
-                        )}
+                        {/* Post-Acceptance / Pending Cancellation Actions */}
+                        {(() => {
+                          const eligibility = getCancellationEligibility(req);
+                          if (req.status === "accepted" || req.status === "handover") {
+                            if (eligibility.eligible) {
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenCancellationModal(req)}
+                                  className="px-4 py-2.5 rounded-2xl border border-red-500/30 text-xs font-bold text-red-600 dark:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer flex items-center gap-1.5 active:scale-98"
+                                  title="Cancel Accepted Booking"
+                                >
+                                  <XCircle className="h-4 w-4" />
+                                  <span>Cancel Accepted Booking</span>
+                                </button>
+                              );
+                            } else {
+                              return (
+                                <div
+                                  className="px-3 py-2 rounded-xl bg-neutral-100 dark:bg-white/5 border border-black/5 dark:border-white/10 text-neutral-400 text-xs font-medium flex items-center gap-1.5"
+                                  title={eligibility.reason}
+                                >
+                                  <AlertCircle className="h-3.5 w-3.5 text-neutral-400" />
+                                  <span>Cancellation Unavailable ({eligibility.reason})</span>
+                                </div>
+                              );
+                            }
+                          }
+                          if (req.status === "active") {
+                            return (
+                              <div
+                                className="px-3 py-2 rounded-xl bg-neutral-100 dark:bg-white/5 border border-black/5 dark:border-white/10 text-neutral-400 text-xs font-medium flex items-center gap-1.5"
+                                title="Active rental in progress. Cancellation is disabled."
+                              >
+                                <AlertCircle className="h-3.5 w-3.5 text-neutral-400" />
+                                <span>Cancellation Unavailable (Handover Completed)</span>
+                              </div>
+                            );
+                          }
+                          if (req.status === "requested" || req.status === "pending") {
+                            return (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenCancellationModal(req)}
+                                className="px-4 py-2.5 rounded-2xl border border-red-500/30 text-xs font-bold text-red-600 dark:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer flex items-center gap-1.5"
+                              >
+                                <XCircle className="h-4 w-4" />
+                                <span>Cancel Booking</span>
+                              </button>
+                            );
+                          }
+                          return null;
+                        })()}
 
                         {/* Right side escrow note */}
                         <div className="text-[11px] text-neutral-400 dark:text-[#A1A1AA] ml-auto hidden sm:block">
@@ -2068,11 +2137,11 @@ export function RentalRequests({
                 {/* Impact Notice */}
                 <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 text-xs space-y-1">
                   <p className="font-bold flex items-center gap-1.5">
-                    <Info className="h-4 w-4 shrink-0" />
-                    <span>Renter Impact Notice</span>
+                    <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />
+                    <span>Renter Impact Warning</span>
                   </p>
-                  <p className="text-[11px] leading-relaxed text-amber-900/80 dark:text-amber-200/80">
-                    You are about to cancel this booking. The renter may be affected by this change. Please confirm that you want to continue.
+                  <p className="text-[11px] leading-relaxed text-amber-900/90 dark:text-amber-200/90">
+                    Cancelling an accepted booking may disrupt the renter's plans. Please only proceed if you cannot fulfill this rental. The reservation interval will be released, and any collected payments or deposits will be safely queued for review.
                   </p>
                 </div>
               </div>

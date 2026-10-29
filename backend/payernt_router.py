@@ -46,6 +46,7 @@ from database import (
     get_user,
     MOCK_CUSTOM_PRODUCTS,
     broadcast_admin_event,
+    _BOOKING_CONCURRENCY_LOCK,
 )
 from payernt_database import (
     create_payernt_account,
@@ -584,7 +585,9 @@ class CreateBookingSchema(BaseModel):
 
 
 class LenderCancelBookingSchema(BaseModel):
-    reasonCode: str = Field(..., min_length=1)
+    reasonCode: Optional[str] = None
+    reason_code: Optional[str] = None
+    reason: Optional[str] = None
     feedback: Optional[str] = None
 
 
@@ -1781,190 +1784,209 @@ def get_vendor_bookings_endpoint(
 
 def process_lender_booking_cancellation(
     booking_id: str,
-    data: LenderCancelBookingSchema,
-    vendor_id: str,
+    data: Optional[LenderCancelBookingSchema] = None,
+    vendor_id: str = "",
     vendor_email: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Core atomic handler for lender-initiated booking cancellation.
     Validates reason, feedback, permissions, and eligibility, then updates booking and releases slot.
+    Wrapped in _BOOKING_CONCURRENCY_LOCK for concurrency safety.
     """
-    raw_code = (data.reasonCode or "").strip()
-    norm_key = raw_code.upper().replace(" ", "_").strip(".")
-    
-    code = None
-    if norm_key in VALID_CANCELLATION_REASONS:
-        code = norm_key
-    else:
-        cleaned_label = raw_code.lower().strip(".")
-        if cleaned_label in REASON_LABEL_TO_CODE:
-            code = REASON_LABEL_TO_CODE[cleaned_label]
-        elif "personal" in cleaned_label:
-            code = "PERSONAL_USE"
-        elif "no longer" in cleaned_label or "unavailable" in cleaned_label:
-            code = "NO_LONGER_AVAILABLE"
-        elif "damage" in cleaned_label or "technical" in cleaned_label:
-            code = "DAMAGED_OR_TECHNICAL_ISSUE"
-        elif "handover" in cleaned_label or "scheduled" in cleaned_label:
-            code = "CANNOT_COMPLETE_HANDOVER"
-        elif "renter" in cleaned_label:
-            code = "RENTER_REQUESTED"
-        elif "conflict" in cleaned_label or "schedule" in cleaned_label:
-            code = "SCHEDULING_CONFLICT"
-        elif "other" in cleaned_label:
-            code = "OTHER"
+    with _BOOKING_CONCURRENCY_LOCK:
+        raw_code = ""
+        clean_fb = None
+        if data:
+            raw_code = (data.reasonCode or data.reason_code or data.reason or "").strip()
+            clean_fb = (data.feedback or "").strip() if data.feedback else None
             
-    if not code:
-        valid_opts = list(VALID_CANCELLATION_REASONS.keys())
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid cancellation reason '{raw_code}'. Valid reasons are: {valid_opts}"
-        )
+        norm_key = raw_code.upper().replace(" ", "_").strip(".")
         
-    clean_fb = (data.feedback or "").strip() if data.feedback else None
-    if code == "OTHER":
-        if not clean_fb or len(clean_fb) < 5:
+        code = None
+        if norm_key in VALID_CANCELLATION_REASONS:
+            code = norm_key
+        else:
+            cleaned_label = raw_code.lower().strip(".")
+            if cleaned_label in REASON_LABEL_TO_CODE:
+                code = REASON_LABEL_TO_CODE[cleaned_label]
+            elif "personal" in cleaned_label:
+                code = "PERSONAL_USE"
+            elif "no longer" in cleaned_label or "unavailable" in cleaned_label:
+                code = "NO_LONGER_AVAILABLE"
+            elif "damage" in cleaned_label or "technical" in cleaned_label:
+                code = "DAMAGED_OR_TECHNICAL_ISSUE"
+            elif "handover" in cleaned_label or "scheduled" in cleaned_label:
+                code = "CANNOT_COMPLETE_HANDOVER"
+            elif "renter" in cleaned_label:
+                code = "RENTER_REQUESTED"
+            elif "conflict" in cleaned_label or "schedule" in cleaned_label:
+                code = "SCHEDULING_CONFLICT"
+            elif "other" in cleaned_label:
+                code = "OTHER"
+                
+        if not code:
+            valid_opts = list(VALID_CANCELLATION_REASONS.keys())
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="A written explanation is required when selecting 'Other' (minimum 5 characters)."
-            )
-        if len(clean_fb) > 500:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Cancellation feedback cannot exceed 500 characters."
-            )
-    else:
-        if clean_fb and len(clean_fb) > 500:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Cancellation feedback cannot exceed 500 characters."
+                detail=f"Invalid cancellation reason '{raw_code}'. Valid reasons are: {valid_opts}"
             )
             
-    order = get_order_by_id(booking_id)
-    sec = get_rental_security_record(booking_id)
-    
-    if not order and not sec:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Booking '{booking_id}' not found."
-        )
+        if code == "OTHER":
+            if not clean_fb or len(clean_fb) < 5:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="A written explanation is required when selecting 'Other' (minimum 5 characters)."
+                )
+            if len(clean_fb) > 500:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Cancellation feedback cannot exceed 500 characters."
+                )
+        else:
+            if clean_fb and len(clean_fb) > 500:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Cancellation feedback cannot exceed 500 characters."
+                )
+                
+        order = get_order_by_id(booking_id)
+        sec = get_rental_security_record(booking_id)
         
-    prod_id = (order.get("product_id") or order.get("productId") if order else None) or (sec.get("product_id") if sec else "")
-    product = get_payernt_product_by_id(prod_id) if prod_id else None
-    
-    actual_vendor_id = (
-        (sec.get("vendor_id") if sec else None)
-        or (product.get("owner_id") if product else None)
-        or (product.get("user_email") if product else None)
-        or (order.get("owner_id") if order else None)
-        or (order.get("lender_email") if order else None)
-    )
-    valid_ids = {
-        str(vendor_id).strip().lower(),
-        str(vendor_email or "").strip().lower(),
-    }
-    valid_ids.discard("")
+        if not order and not sec:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Booking '{booking_id}' not found."
+            )
+            
+        prod_id = (order.get("product_id") or order.get("productId") if order else None) or (sec.get("product_id") if sec else "")
+        product = get_payernt_product_by_id(prod_id) if prod_id else None
+        
+        actual_vendor_id = (
+            (sec.get("vendor_id") if sec else None)
+            or (product.get("owner_id") if product else None)
+            or (product.get("user_email") if product else None)
+            or (order.get("owner_id") if order else None)
+            or (order.get("lender_email") if order else None)
+        )
+        valid_ids = {
+            str(vendor_id).strip().lower(),
+            str(vendor_email or "").strip().lower(),
+        }
+        valid_ids.discard("")
 
-    actual_vendor_str = str(actual_vendor_id or "").strip().lower()
-    is_authorized_vendor = (
-        vendor_id in ("admin", "superadmin")
-        or not actual_vendor_id
-        or any(
-            actual_vendor_str == v
-            or actual_vendor_str in v
-            or v in actual_vendor_str
-            for v in valid_ids
+        actual_vendor_str = str(actual_vendor_id or "").strip().lower()
+        is_authorized_vendor = (
+            vendor_id in ("admin", "superadmin")
+            or not actual_vendor_id
+            or any(
+                actual_vendor_str == v
+                or actual_vendor_str in v
+                or v in actual_vendor_str
+                for v in valid_ids
+            )
         )
-    )
-    if not is_authorized_vendor:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Unauthorized: You are not the lender associated with this booking."
-        )
-        
-    current_status = (order.get("status") if order else None) or (sec.get("status") if sec else "pending")
-    current_status = str(current_status).strip().lower()
-    
-    if current_status == "cancelled":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="This booking has already been cancelled."
-        )
-        
-    if current_status in ("completed", "returned"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Completed bookings cannot be cancelled through the normal lender cancellation flow."
-        )
-        
-    if current_status in ("active", "in_progress", "ongoing"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot cancel booking after physical handover has occurred."
-        )
-        
-    if sec:
-        if (sec.get("vendor_handover_verified") or 
-            sec.get("renter_handover_verified") or 
-            sec.get("rental_started") or 
-            sec.get("rental_activated")):
+        if not is_authorized_vendor:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Cannot cancel booking after physical handover or pickup has been verified."
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Unauthorized: You are not the lender associated with this booking."
             )
             
-    if order and order.get("delivery_status") in ("PICKED_UP_FROM_VENDOR", "OUT_FOR_DELIVERY", "DELIVERED", "COMPLETED"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot cancel booking after courier pickup has occurred."
-        )
+        current_status = (order.get("status") if order else None) or (sec.get("status") if sec else "pending")
+        current_status = str(current_status).strip().lower()
         
-    renter_id = (order.get("user_email") if order else None) or (sec.get("renter_id") if sec else "renter")
-    prod_title = (order.get("product_title") if order else None) or (product.get("title") if product else "Tech Gear")
-    
-    canc_record = record_booking_cancellation(
-        booking_id=booking_id,
-        product_id=prod_id,
-        lender_id=vendor_id,
-        renter_id=renter_id,
-        reason_code=code,
-        feedback=clean_fb,
-        previous_status=current_status,
-        new_status="cancelled",
-        initiated_by="LENDER",
-        policy_outcome="released",
-        notification_sent=True,
-    )
-    
-    human_reason = VALID_CANCELLATION_REASONS.get(code, code)
-    if clean_fb:
-        human_reason = f"{human_reason} (Feedback: {clean_fb})"
-    try:
-        notify_booking_event(
+        if current_status == "cancelled":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This booking has already been cancelled."
+            )
+            
+        if current_status in ("completed", "returned"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Completed bookings cannot be cancelled through the normal lender cancellation flow."
+            )
+            
+        if current_status in ("active", "in_progress", "ongoing"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot cancel booking after physical handover has occurred."
+            )
+            
+        if sec:
+            if (sec.get("vendor_handover_verified") or 
+                sec.get("renter_handover_verified") or 
+                sec.get("rental_started") or 
+                sec.get("rental_activated")):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Cannot cancel booking after physical handover or pickup has been verified."
+                )
+                
+        if order and order.get("delivery_status") in ("PICKED_UP_FROM_VENDOR", "OUT_FOR_DELIVERY", "DELIVERED", "COMPLETED"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot cancel booking after courier pickup has occurred."
+            )
+            
+        renter_id = (order.get("user_email") if order else None) or (sec.get("renter_id") if sec else "renter")
+        prod_title = (order.get("product_title") if order else None) or (product.get("title") if product else "Tech Gear")
+        
+        canc_record = record_booking_cancellation(
             booking_id=booking_id,
-            event_type="cancelled_by_lender",
-            actor_email=vendor_id,
-            reason=human_reason
+            product_id=prod_id,
+            lender_id=vendor_id,
+            renter_id=renter_id,
+            reason_code=code,
+            feedback=clean_fb,
+            previous_status=current_status,
+            new_status="cancelled",
+            initiated_by="LENDER",
+            policy_outcome="released",
+            notification_sent=True,
         )
-    except Exception as notif_err:
-        logger.warning(f"Could not dispatch cancellation notification for booking {booking_id}: {notif_err}")
         
-    updated_order = get_order_by_id(booking_id) or order or {}
-    
-    return {
-        "success": True,
-        "message": "Booking cancelled successfully. Reservation interval released.",
-        "bookingId": booking_id,
-        "status": "cancelled",
-        "booking": updated_order,
-        "cancellation": canc_record
-    }
+        # Payment safety: If payment collected/escrowed, mark refund_status as pending_review
+        pay_status = str((order.get("payment_status") if order else None) or (order.get("paymentStatus") if order else "")).lower()
+        if pay_status in ("paid", "completed", "escrowed", "captured", "held"):
+            try:
+                execute_query("UPDATE orders SET refund_status = 'pending_review' WHERE id = %s", (booking_id,))
+            except Exception:
+                pass
+            if booking_id in MOCK_ORDERS:
+                MOCK_ORDERS[booking_id]["refund_status"] = "pending_review"
+        
+        human_reason = VALID_CANCELLATION_REASONS.get(code, code)
+        if clean_fb:
+            human_reason = f"{human_reason} (Feedback: {clean_fb})"
+        try:
+            notify_booking_event(
+                booking_id=booking_id,
+                event_type="cancelled_by_lender",
+                actor_email=vendor_id,
+                reason=human_reason
+            )
+        except Exception as notif_err:
+            logger.warning(f"Could not dispatch cancellation notification for booking {booking_id}: {notif_err}")
+            
+        updated_order = get_order_by_id(booking_id) or order or {}
+        
+        return {
+            "success": True,
+            "message": "Booking cancelled successfully. Reservation interval released.",
+            "bookingId": booking_id,
+            "status": "cancelled",
+            "booking": updated_order,
+            "cancellation": canc_record
+        }
 
 
 @payernt_router.post("/bookings/{booking_id}/cancel")
+@payernt_router.post("/requests/{booking_id}/cancel")
+@payernt_router.post("/paye₹nt/bookings/{booking_id}/cancel")
+@payernt_router.post("/payernt/bookings/{booking_id}/cancel")
 def payernt_cancel_booking_endpoint(
     booking_id: str,
-    data: LenderCancelBookingSchema,
+    data: Optional[LenderCancelBookingSchema] = None,
     account: Dict[str, Any] = Depends(get_current_payernt_account),
 ):
     """
@@ -1972,6 +1994,8 @@ def payernt_cancel_booking_endpoint(
     Safely cancels an eligible booking, records reason and feedback,
     releases the reservation interval, and notifies the renter.
     """
+    if data is None:
+        data = LenderCancelBookingSchema(reasonCode="OTHER", feedback="Cancelled by lender")
     return process_lender_booking_cancellation(booking_id, data, account["id"], account.get("email"))
 
 
@@ -2163,17 +2187,68 @@ def process_lender_booking_decision(
         }
 
     else:
-        # Decline / Reject
+        # Decline / Reject (including post-acceptance decline)
         if curr_status in ("rejected", "declined", "cancelled", "canceled"):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Booking is already {curr_status}.")
         if curr_status in ("picked_up", "rental_in_progress", "active", "completed", "returned"):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Cannot decline booking that has already progressed to '{curr_status}'.")
 
+        # Handover and courier pickup check for accepted bookings
+        sec_rec = fetch_one("SELECT * FROM rental_security WHERE booking_id = %s", (target_id,))
+        if not sec_rec and target_id in MOCK_RENTAL_SECURITIES:
+            sec_rec = MOCK_RENTAL_SECURITIES[target_id]
+        if sec_rec:
+            if (sec_rec.get("vendor_handover_verified") or 
+                sec_rec.get("renter_handover_verified") or 
+                sec_rec.get("rental_started") or 
+                sec_rec.get("rental_activated")):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Cannot decline booking after physical handover or pickup has been verified."
+                )
+        if order and order.get("delivery_status") in ("PICKED_UP_FROM_VENDOR", "OUT_FOR_DELIVERY", "DELIVERED", "COMPLETED"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot decline booking after courier pickup has occurred."
+            )
+
         now_iso = datetime.now(timezone.utc).isoformat()
+        reason_code = reason or "DECLINED_BY_VENDOR"
+        clean_fb = feedback
+
+        # If booking was previously accepted, record to booking_cancellations for audit trail
+        if curr_status == "accepted":
+            try:
+                record_booking_cancellation(
+                    booking_id=target_id,
+                    product_id=pid,
+                    lender_id=clean_v_id,
+                    renter_id=(order.get("user_email") or order.get("userId") or "renter"),
+                    reason_code=reason_code,
+                    feedback=clean_fb,
+                    previous_status="accepted",
+                    new_status="rejected",
+                    initiated_by="LENDER",
+                    policy_outcome="released",
+                    notification_sent=True,
+                )
+            except Exception as canc_err:
+                logger.warning(f"Failed to record booking cancellation audit trail: {canc_err}")
+
         execute_query("UPDATE orders SET status = 'rejected' WHERE id = %s", (target_id,))
         if target_id in MOCK_ORDERS:
             MOCK_ORDERS[target_id]["status"] = "rejected"
         order["status"] = "rejected"
+
+        # Payment safety: If payment collected/escrowed, mark refund_status as pending_review
+        pay_status = str((order.get("payment_status") if order else None) or (order.get("paymentStatus") if order else "")).lower()
+        if pay_status in ("paid", "completed", "escrowed", "captured", "held"):
+            try:
+                execute_query("UPDATE orders SET refund_status = 'pending_review' WHERE id = %s", (target_id,))
+            except Exception:
+                pass
+            if target_id in MOCK_ORDERS:
+                MOCK_ORDERS[target_id]["refund_status"] = "pending_review"
 
         try:
             execute_query("UPDATE rental_security SET status = 'rejected', updated_at = %s WHERE booking_id = %s", (now_iso, target_id))
@@ -2185,7 +2260,8 @@ def process_lender_booking_decision(
         actor = clean_v_email or clean_v_id
         reason_text = (reason if reason else feedback) or "Lender declined rental request"
         try:
-            notify_booking_event(target_id, "booking_rejected", actor_email=actor, reason=reason_text)
+            event_type = "cancelled_by_lender" if curr_status == "accepted" else "booking_rejected"
+            notify_booking_event(target_id, event_type, actor_email=actor, reason=reason_text)
         except Exception as e:
             logger.warning(f"Failed to dispatch reject notification for {target_id}: {e}")
 
