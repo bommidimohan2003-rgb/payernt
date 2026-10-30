@@ -50,6 +50,9 @@ import { ProfilePhoto } from "@/components/common/ProfilePhoto";
 
 interface RentalRequestsProps {
   requests: RentalRequest[];
+  isLoading?: boolean;
+  error?: string | null;
+  onRetry?: () => void | Promise<void>;
   onRequestAction: (
     requestId: string,
     action: "accept" | "reject" | "cancel",
@@ -206,6 +209,9 @@ export const getCancellationEligibility = (
 
 export function RentalRequests({
   requests,
+  isLoading = false,
+  error = null,
+  onRetry,
   onRequestAction,
   onAdvanceLifecycle,
   onNavigateToWallet,
@@ -1074,7 +1080,71 @@ export function RentalRequests({
       </div>
 
       {/* Requests List */}
-      {filteredRequests.length === 0 ? (
+      {error ? (
+        <div className="rounded-3xl border border-red-500/20 bg-red-500/5 dark:bg-red-500/10 p-8 sm:p-12 text-center space-y-4">
+          <div className="h-16 w-16 rounded-3xl bg-red-500/10 text-red-500 flex items-center justify-center mx-auto shadow-inner">
+            <AlertTriangle className="h-8 w-8" />
+          </div>
+          <div className="space-y-1 max-w-md mx-auto">
+            <h3 className="font-bold text-base text-neutral-900 dark:text-[#F5F5F5] font-display">
+              Unable to load booking requests
+            </h3>
+            <p className="text-xs text-neutral-600 dark:text-[#A1A1AA]">
+              {error}
+            </p>
+          </div>
+          <div className="flex items-center justify-center gap-3 pt-2">
+            {(onRetry || onRefresh) && (
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    setIsRefreshing(true);
+                    if (onRetry) await onRetry();
+                    else if (onRefresh) await onRefresh();
+                  } finally {
+                    setIsRefreshing(false);
+                  }
+                }}
+                disabled={isRefreshing}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-neutral-900 text-white dark:bg-[#F5F5F5] dark:text-[#050709] font-bold text-xs shadow-md active:scale-98 transition-all cursor-pointer"
+              >
+                <RefreshCw
+                  className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`}
+                />
+                <span>Retry</span>
+              </button>
+            )}
+            {onBack && (
+              <button
+                type="button"
+                onClick={onBack}
+                className="px-4 py-2.5 rounded-2xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#10151B] text-neutral-700 dark:text-[#F5F5F5] text-xs font-semibold hover:bg-neutral-50 dark:hover:bg-white/5 transition-all cursor-pointer"
+              >
+                Back to Home
+              </button>
+            )}
+          </div>
+        </div>
+      ) : isLoading && requests.length === 0 ? (
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#10151B] p-5 shadow-xs animate-pulse space-y-3"
+            >
+              <div className="flex items-center gap-4">
+                <div className="h-14 w-14 rounded-2xl bg-neutral-200 dark:bg-white/10 shrink-0" />
+                <div className="space-y-2 flex-1">
+                  <div className="h-4 bg-neutral-200 dark:bg-white/10 rounded w-1/3" />
+                  <div className="h-3 bg-neutral-100 dark:bg-white/5 rounded w-1/4" />
+                </div>
+                <div className="h-8 w-24 bg-neutral-200 dark:bg-white/10 rounded-xl" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : filteredRequests.length === 0 ? (
         <div className="rounded-3xl border border-dashed border-border p-12 text-center space-y-4 bg-card/50">
           <div className="h-16 w-16 rounded-3xl bg-secondary text-muted-foreground flex items-center justify-center mx-auto shadow-inner">
             <Filter className="h-8 w-8" />

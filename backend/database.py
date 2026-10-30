@@ -738,6 +738,8 @@ def init_db(force: bool = False):
     add_column_safely("custom_products", "price_approved_by VARCHAR(255) NULL")
     add_column_safely("custom_products", "price_history LONGTEXT NULL")
     add_column_safely("custom_products", "video_url LONGTEXT NULL")
+    add_column_safely("custom_products", "owner_id VARCHAR(255) NULL")
+    add_column_safely("custom_products", "daily_rate INT NULL")
     add_column_safely("custom_products", "revision_notes LONGTEXT NULL")
     add_column_safely("custom_products", "allow_half_day BOOLEAN DEFAULT TRUE")
     add_column_safely("custom_products", "morning_slot_enabled BOOLEAN DEFAULT TRUE")

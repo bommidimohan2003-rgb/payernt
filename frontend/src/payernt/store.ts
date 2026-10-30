@@ -19,7 +19,6 @@ import { payerntApi } from "./payerntApiService";
 import { isFakeOrDeletedProduct } from "@/utils/productFilters";
 import { normalizePayerntProduct } from "./productUtils";
 
-
 export const STORAGE_KEY_PRODUCTS = "paye₹nt_products";
 export const STORAGE_KEY_SESSION = "paye₹nt_session";
 export const STORAGE_KEY_ACCOUNT = "paye₹nt_account";
@@ -43,7 +42,8 @@ export const INITIAL_REQUESTS: RentalRequest[] = [
     id: "ord-fx3-cinema-782",
     productId: "prod-sony-fx3",
     productTitle: "Sony FX3 Cinema Camera Kit",
-    productImage: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=600",
+    productImage:
+      "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=600",
     category: "Cameras",
     renter: {
       name: "Arjun Verma",
@@ -71,7 +71,8 @@ export const INITIAL_REQUESTS: RentalRequest[] = [
     paymentStatus: "paid_to_escrow",
     confirmedAt: "2026-10-26T10:15:00.000Z",
     deliveryMethod: "delivery",
-    deliveryAddress: "Flat 402, Green Glen Layout, Bellandur, Bengaluru, Karnataka 560103",
+    deliveryAddress:
+      "Flat 402, Green Glen Layout, Bellandur, Bengaluru, Karnataka 560103",
     locationDirections: "Near Central Mall, gate buzzer #402",
     latitude: 12.926,
     longitude: 77.6762,
@@ -128,24 +129,82 @@ export const INITIAL_WALLET: UserWallet = {
 // Custom React Hook for Payernt Store
 export function usePayerntStore() {
   // paye₹nt Account & Session State
-  const [activeAccount, setActiveAccount] = useState<PayerntAccount | null>(null);
+  const [activeAccount, setActiveAccount] = useState<PayerntAccount | null>(
+    null,
+  );
+  const [isLoadingBookings, setIsLoadingBookings] = useState<boolean>(false);
+  const [bookingsError, setBookingsError] = useState<string | null>(null);
+
+  const getStoredToken = () => {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw =
+        localStorage.getItem("paye₹nt_token") ||
+        localStorage.getItem("payernt_token") ||
+        localStorage.getItem("payent:token") ||
+        localStorage.getItem("payent_token") ||
+        localStorage.getItem("payent_auth_token") ||
+        localStorage.getItem("token");
+      if (!raw) return null;
+      let t = raw.trim();
+      if (t.startsWith('"') && t.endsWith('"')) t = t.slice(1, -1).trim();
+      return t || null;
+    } catch {
+      return null;
+    }
+  };
+
+  const getRehydratedAccount = (): PayerntAccount | null => {
+    if (typeof window === "undefined") return null;
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY_ACCOUNT);
+      if (stored) {
+        return JSON.parse(stored);
+      }
+      const rawUser =
+        localStorage.getItem("payent:currentUser") ||
+        localStorage.getItem("payent_user") ||
+        localStorage.getItem("pay₹ent_account");
+      if (rawUser) {
+        const u = JSON.parse(rawUser);
+        if (u?.email) {
+          return {
+            id: u.id || `PAYERNT_USER_${u.email}`,
+            accountId: u.id || `PAYERNT_USER_${u.email}`,
+            accountType: "paye₹nt",
+            name: u.fullName || u.name || u.email.split("@")[0],
+            email: u.email,
+            phone: u.phone || "",
+            role: u.role || "vendor",
+            status: "active",
+            avatar: u.avatar || u.profilePhotoUrl || "",
+          } as unknown as PayerntAccount;
+        }
+      }
+    } catch {}
+    return null;
+  };
 
   const isAuthenticated = !!(
-    activeAccount &&
-    (typeof window !== "undefined" &&
-      (localStorage.getItem("paye₹nt_token") ||
-        localStorage.getItem("payernt_token")))
+    (activeAccount ||
+      (typeof window !== "undefined" && getRehydratedAccount())) &&
+    typeof window !== "undefined" &&
+    getStoredToken()
   );
 
   useEffect(() => {
     // Load stored account on client mount
     try {
-      const token =
-        localStorage.getItem("paye₹nt_token") ||
-        localStorage.getItem("payernt_token");
+      const token = getStoredToken();
+      let accountToSet = null;
       const stored = localStorage.getItem(STORAGE_KEY_ACCOUNT);
-      if (stored && token) {
-        setActiveAccount(JSON.parse(stored));
+      if (stored) {
+        accountToSet = JSON.parse(stored);
+      } else {
+        accountToSet = getRehydratedAccount();
+      }
+      if (accountToSet && token) {
+        setActiveAccount(accountToSet);
       }
       const storedUser = localStorage.getItem(STORAGE_KEY_ACTIVE_USER);
       if (storedUser) setActiveUserId(storedUser);
@@ -165,7 +224,9 @@ export function usePayerntStore() {
       if (storedEarnings) {
         const parsed = JSON.parse(storedEarnings);
         if (Array.isArray(parsed)) {
-          setEarningsTransactions(parsed.filter((t) => !t.id?.startsWith("tx-70")));
+          setEarningsTransactions(
+            parsed.filter((t) => !t.id?.startsWith("tx-70")),
+          );
         }
       }
 
@@ -182,7 +243,9 @@ export function usePayerntStore() {
         const parsed = JSON.parse(storedMsgs);
         if (Array.isArray(parsed)) {
           setMessages(parsed);
-          setUnreadMessagesCount(parsed.filter((m) => !m.read && !m.is_read).length);
+          setUnreadMessagesCount(
+            parsed.filter((m) => !m.read && !m.is_read).length,
+          );
         }
       }
 
@@ -193,9 +256,17 @@ export function usePayerntStore() {
       if (storedWallet) {
         const parsed = JSON.parse(storedWallet);
         if (parsed) {
-          const cleanTx = (parsed.transactions || []).filter((tx: any) => !tx.id?.startsWith("wtx-00"));
-          const cleanBank = (parsed.bankAccounts || []).filter((b: any) => !b.id?.startsWith("bank-00"));
-          setWallet({ ...parsed, transactions: cleanTx, bankAccounts: cleanBank });
+          const cleanTx = (parsed.transactions || []).filter(
+            (tx: any) => !tx.id?.startsWith("wtx-00"),
+          );
+          const cleanBank = (parsed.bankAccounts || []).filter(
+            (b: any) => !b.id?.startsWith("bank-00"),
+          );
+          setWallet({
+            ...parsed,
+            transactions: cleanTx,
+            bankAccounts: cleanBank,
+          });
         }
       }
     } catch {}
@@ -207,7 +278,9 @@ export function usePayerntStore() {
       } else if (detail) {
         setActiveAccount(detail);
       } else {
-        const token = localStorage.getItem("paye₹nt_token") || localStorage.getItem("payernt_token");
+        const token =
+          localStorage.getItem("paye₹nt_token") ||
+          localStorage.getItem("payernt_token");
         const stored = localStorage.getItem(STORAGE_KEY_ACCOUNT);
         if (stored && token) {
           try {
@@ -238,8 +311,16 @@ export function usePayerntStore() {
         email: activeAccount.email,
         phone: activeAccount.phone || "",
         avatar: activeAccount.profilePhotoUrl || activeAccount.avatar || "",
-        profilePhotoUrl: activeAccount.profilePhotoUrl || activeAccount.profile_photo_url || activeAccount.avatar || "",
-        profile_photo_url: activeAccount.profilePhotoUrl || activeAccount.profile_photo_url || activeAccount.avatar || "",
+        profilePhotoUrl:
+          activeAccount.profilePhotoUrl ||
+          activeAccount.profile_photo_url ||
+          activeAccount.avatar ||
+          "",
+        profile_photo_url:
+          activeAccount.profilePhotoUrl ||
+          activeAccount.profile_photo_url ||
+          activeAccount.avatar ||
+          "",
         city: activeAccount.address?.split(",")[0]?.trim() || "India",
         role: "Vendor",
       }
@@ -272,10 +353,15 @@ export function usePayerntStore() {
 
   const [wallet, setWallet] = useState<UserWallet>(INITIAL_WALLET);
   const [products, setProducts] = useState<PayerntProduct[]>([]);
-  const [draftProduct, setDraftProduct] = useState<Partial<PayerntProduct> | null>(null);
-  const [rentalRequests, setRentalRequests] = useState<RentalRequest[]>(INITIAL_REQUESTS);
-  const [earningsTransactions, setEarningsTransactions] = useState<EarningTransaction[]>(INITIAL_EARNINGS);
-  const [notifications, setNotifications] = useState<LenderNotification[]>(INITIAL_NOTIFICATIONS);
+  const [draftProduct, setDraftProduct] =
+    useState<Partial<PayerntProduct> | null>(null);
+  const [rentalRequests, setRentalRequests] =
+    useState<RentalRequest[]>(INITIAL_REQUESTS);
+  const [earningsTransactions, setEarningsTransactions] =
+    useState<EarningTransaction[]>(INITIAL_EARNINGS);
+  const [notifications, setNotifications] = useState<LenderNotification[]>(
+    INITIAL_NOTIFICATIONS,
+  );
   const [messages, setMessages] = useState<PayerntMessage[]>([]);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState<number>(0);
   const [profile, setProfile] = useState<LenderProfile>(INITIAL_PROFILE);
@@ -284,7 +370,9 @@ export function usePayerntStore() {
   const [isLoadingDashboard, setIsLoadingDashboard] = useState<boolean>(false);
   const [dashboardError, setDashboardError] = useState<string | null>(null);
   const [backendDashboard, setBackendDashboard] = useState<any>(null);
-  const [backendActivities, setBackendActivities] = useState<Array<{ id: string; title: string; timestamp: string; amount?: string }>>([]);
+  const [backendActivities, setBackendActivities] = useState<
+    Array<{ id: string; title: string; timestamp: string; amount?: string }>
+  >([]);
 
   // Login handler
   const login = useCallback((account: PayerntAccount) => {
@@ -301,10 +389,17 @@ export function usePayerntStore() {
 
     setActiveAccount(account);
     try {
-      localStorage.setItem(STORAGE_KEY_SESSION, `session_${account.accountId || (account as any).id}_${Date.now()}`);
+      localStorage.setItem(
+        STORAGE_KEY_SESSION,
+        `session_${account.accountId || (account as any).id}_${Date.now()}`,
+      );
       localStorage.setItem(STORAGE_KEY_ACCOUNT, JSON.stringify(account));
     } catch {}
-    const aadhaarVal = account.aadhaarNumber || (account as any).aadhaar_number || (account as any).aadhaarMasked || "";
+    const aadhaarVal =
+      account.aadhaarNumber ||
+      (account as any).aadhaar_number ||
+      (account as any).aadhaarMasked ||
+      "";
     setProfile((prev) => ({
       ...prev,
       id: account.accountId || (account as any).id,
@@ -317,13 +412,27 @@ export function usePayerntStore() {
       pincode: account.pincode,
       aadhaarMasked: aadhaarVal,
       avatar: account.profilePhotoUrl || account.avatar || prev.avatar,
-      profilePhotoUrl: account.profilePhotoUrl || account.profile_photo_url || account.avatar || prev.profilePhotoUrl || "",
-      profile_photo_url: account.profilePhotoUrl || account.profile_photo_url || account.avatar || prev.profile_photo_url || "",
+      profilePhotoUrl:
+        account.profilePhotoUrl ||
+        account.profile_photo_url ||
+        account.avatar ||
+        prev.profilePhotoUrl ||
+        "",
+      profile_photo_url:
+        account.profilePhotoUrl ||
+        account.profile_photo_url ||
+        account.avatar ||
+        prev.profile_photo_url ||
+        "",
     }));
-    window.dispatchEvent(new CustomEvent("paye₹nt_auth_change", { detail: account }));
+    window.dispatchEvent(
+      new CustomEvent("paye₹nt_auth_change", { detail: account }),
+    );
 
     if (account.role === "admin" || (account as any).role === "superadmin") {
-      const vendorToken = localStorage.getItem("paye₹nt_token") || localStorage.getItem("payernt_token");
+      const vendorToken =
+        localStorage.getItem("paye₹nt_token") ||
+        localStorage.getItem("payernt_token");
       if (vendorToken) {
         localStorage.setItem("payent:admin:token", vendorToken);
       }
@@ -336,7 +445,7 @@ export function usePayerntStore() {
           role: "admin",
           status: "active",
           verified: true,
-        })
+        }),
       );
       window.dispatchEvent(new Event("payent:admin:profile-updated"));
     }
@@ -358,7 +467,9 @@ export function usePayerntStore() {
       localStorage.setItem("payent:signed_out", "true");
     } catch {}
     window.dispatchEvent(new Event("payent:admin:profile-updated"));
-    window.dispatchEvent(new CustomEvent("paye₹nt_auth_change", { detail: null }));
+    window.dispatchEvent(
+      new CustomEvent("paye₹nt_auth_change", { detail: null }),
+    );
     window.dispatchEvent(new CustomEvent("payent:storage_change"));
   }, []);
 
@@ -371,7 +482,9 @@ export function usePayerntStore() {
 
   useEffect(() => {
     try {
-      const walletKey = activeAccount ? `paye₹nt_wallet_${activeAccount.accountId}` : STORAGE_KEY_WALLET;
+      const walletKey = activeAccount
+        ? `paye₹nt_wallet_${activeAccount.accountId}`
+        : STORAGE_KEY_WALLET;
       localStorage.setItem(walletKey, JSON.stringify(wallet));
     } catch {}
   }, [wallet, activeAccount]);
@@ -388,13 +501,19 @@ export function usePayerntStore() {
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY_REQUESTS, JSON.stringify(rentalRequests));
+      localStorage.setItem(
+        STORAGE_KEY_REQUESTS,
+        JSON.stringify(rentalRequests),
+      );
     } catch {}
   }, [rentalRequests]);
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY_EARNINGS, JSON.stringify(earningsTransactions));
+      localStorage.setItem(
+        STORAGE_KEY_EARNINGS,
+        JSON.stringify(earningsTransactions),
+      );
     } catch {}
   }, [earningsTransactions]);
 
@@ -424,7 +543,11 @@ export function usePayerntStore() {
         if (stored) {
           const parsed = JSON.parse(stored);
           if (Array.isArray(parsed)) {
-            setProducts(parsed.filter((p: any) => !isMockItem(p.id)).map(normalizePayerntProduct));
+            setProducts(
+              parsed
+                .filter((p: any) => !isMockItem(p.id))
+                .map(normalizePayerntProduct),
+            );
           }
         }
       } catch {}
@@ -454,27 +577,63 @@ export function usePayerntStore() {
 
   const mapRawBookingToRentalRequest = useCallback((b: any): RentalRequest => {
     const daily = Number(b.amount || b.daily_rate || b.dailyRate || 500);
-    const rawStatus = String(b.status || b.bookingStatus || "").toLowerCase().trim();
+    const rawStatus = String(b.status || b.bookingStatus || "")
+      .toLowerCase()
+      .trim();
     let parsedStatus: RentalRequestStatus = "approved";
-    if (b.cancellation || b.cancelled_at || b.cancelledAt || rawStatus === "cancelled" || rawStatus === "canceled") {
+    if (
+      b.cancellation ||
+      b.cancelled_at ||
+      b.cancelledAt ||
+      rawStatus === "cancelled" ||
+      rawStatus === "canceled"
+    ) {
       parsedStatus = "cancelled";
     } else if (rawStatus === "order confirmed" || rawStatus === "confirmed") {
       parsedStatus = "confirmed";
-    } else if (rawStatus === "pending" || rawStatus === "requested" || rawStatus === "submitted" || rawStatus === "security_pending") {
+    } else if (
+      rawStatus === "pending" ||
+      rawStatus === "requested" ||
+      rawStatus === "submitted" ||
+      rawStatus === "security_pending"
+    ) {
       parsedStatus = "pending";
-    } else if (rawStatus === "ready for pickup" || rawStatus === "ready_for_pickup") {
+    } else if (
+      rawStatus === "ready for pickup" ||
+      rawStatus === "ready_for_pickup"
+    ) {
       parsedStatus = "ready_for_pickup";
     } else if (rawStatus === "picked up" || rawStatus === "picked_up") {
       parsedStatus = "picked_up";
-    } else if (rawStatus === "rental in progress" || rawStatus === "rental_in_progress" || rawStatus === "active" || b.rentalStarted) {
+    } else if (
+      rawStatus === "rental in progress" ||
+      rawStatus === "rental_in_progress" ||
+      rawStatus === "active" ||
+      b.rentalStarted
+    ) {
       parsedStatus = "active";
-    } else if (rawStatus === "return initiated" || rawStatus === "return_initiated") {
+    } else if (
+      rawStatus === "return initiated" ||
+      rawStatus === "return_initiated"
+    ) {
       parsedStatus = "return_initiated";
-    } else if (rawStatus === "item handed back to owner" || rawStatus === "handed_back" || rawStatus === "handed back") {
+    } else if (
+      rawStatus === "item handed back to owner" ||
+      rawStatus === "handed_back" ||
+      rawStatus === "handed back"
+    ) {
       parsedStatus = "handed_back";
-    } else if (rawStatus === "awaiting owner inspection" || rawStatus === "awaiting_inspection" || rawStatus === "inspection") {
+    } else if (
+      rawStatus === "awaiting owner inspection" ||
+      rawStatus === "awaiting_inspection" ||
+      rawStatus === "inspection"
+    ) {
       parsedStatus = "awaiting_inspection";
-    } else if (rawStatus === "rental completed" || rawStatus === "completed" || rawStatus === "returned") {
+    } else if (
+      rawStatus === "rental completed" ||
+      rawStatus === "completed" ||
+      rawStatus === "returned"
+    ) {
       parsedStatus = "completed";
     } else if (rawStatus === "rejected" || rawStatus === "declined") {
       parsedStatus = "rejected";
@@ -493,7 +652,9 @@ export function usePayerntStore() {
       productImage: b.productImage || "",
       category: b.category || "Tech Gear",
       renter: {
-        name: b.renterName || (b.renterEmail ? b.renterEmail.split("@")[0] : "Verified Renter"),
+        name:
+          b.renterName ||
+          (b.renterEmail ? b.renterEmail.split("@")[0] : "Verified Renter"),
         avatar: "",
         profilePhotoUrl: "",
         profile_photo_url: "",
@@ -511,19 +672,28 @@ export function usePayerntStore() {
       platformFee: 0,
       netEarnings: daily * 3,
       securityDeposit: 0,
-      cancellation: b.cancellation || (b.cancellationReason ? {
-        reasonCode: b.cancellationReason,
-        reason: b.cancellationReason,
-        feedback: b.cancellationFeedback,
-        cancelledAt: b.cancelledAt,
-        cancelledBy: b.cancelledBy,
-      } : undefined),
+      cancellation:
+        b.cancellation ||
+        (b.cancellationReason
+          ? {
+              reasonCode: b.cancellationReason,
+              reason: b.cancellationReason,
+              feedback: b.cancellationFeedback,
+              cancelledAt: b.cancelledAt,
+              cancelledBy: b.cancelledBy,
+            }
+          : undefined),
       status: parsedStatus,
-      requestDate: b.createdAt || b.created_at || b.requestDate || b.request_date || "",
-      createdAt: b.createdAt || b.created_at || b.requestDate || b.request_date || "",
-      created_at: b.created_at || b.createdAt || b.requestDate || b.request_date || "",
-      paymentStatus: parsedStatus === "completed" ? "settled_to_lender" : "paid_to_escrow",
-      confirmedAt: b.confirmedAt || b.confirmed_at || b.createdAt || b.created_at,
+      requestDate:
+        b.createdAt || b.created_at || b.requestDate || b.request_date || "",
+      createdAt:
+        b.createdAt || b.created_at || b.requestDate || b.request_date || "",
+      created_at:
+        b.created_at || b.createdAt || b.requestDate || b.request_date || "",
+      paymentStatus:
+        parsedStatus === "completed" ? "settled_to_lender" : "paid_to_escrow",
+      confirmedAt:
+        b.confirmedAt || b.confirmed_at || b.createdAt || b.created_at,
       readyForPickupAt: b.readyForPickupAt || b.ready_for_pickup_at,
       pickedUpAt: b.pickedUpAt || b.picked_up_at,
       returnInitiatedAt: b.returnInitiatedAt || b.return_initiated_at,
@@ -538,124 +708,208 @@ export function usePayerntStore() {
       locationDirections: b.locationDirections || b.location_directions || "",
       latitude: b.latitude ?? b.location_latitude ?? null,
       longitude: b.longitude ?? b.location_longitude ?? null,
-      mapUrl: b.mapUrl || b.map_url || (b.latitude && b.longitude ? `https://www.google.com/maps/search/?api=1&query=${b.latitude},${b.longitude}` : (b.deliveryAddress ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(b.deliveryAddress)}` : "")),
-      locationChangeRequest: b.locationChangeRequest || b.location_change_request || null,
+      mapUrl:
+        b.mapUrl ||
+        b.map_url ||
+        (b.latitude && b.longitude
+          ? `https://www.google.com/maps/search/?api=1&query=${b.latitude},${b.longitude}`
+          : b.deliveryAddress
+            ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(b.deliveryAddress)}`
+            : ""),
+      locationChangeRequest:
+        b.locationChangeRequest || b.location_change_request || null,
     };
   }, []);
 
-  const fetchBookings = useCallback(async (force: boolean = false) => {
-    if (!activeAccount || !isAuthenticated) return;
-    if (!force && Date.now() - lastBookingsFetchRef.current < CACHE_TTL_MS) return;
-    if (inFlightBookingsRef.current && !force) return inFlightBookingsRef.current;
-    const promise = (async () => {
-      try {
-        const bookingsRes = await payerntApi.getBookings(50);
-        lastBookingsFetchRef.current = Date.now();
-        if (bookingsRes.success && Array.isArray(bookingsRes.bookings)) {
-          const mapped = bookingsRes.bookings.map(mapRawBookingToRentalRequest);
-          setRentalRequests(mapped);
-        }
-      } catch (err) {
-        console.warn("[paye₹nt Store] fetchBookings error:", err);
-      } finally {
-        inFlightBookingsRef.current = null;
+  const fetchBookings = useCallback(
+    async (force: boolean = false) => {
+      const token = getStoredToken();
+      let currentAcc = activeAccount || getRehydratedAccount();
+      if (!currentAcc && token) {
+        currentAcc = getRehydratedAccount();
+        if (currentAcc) setActiveAccount(currentAcc);
       }
-    })();
-    inFlightBookingsRef.current = promise;
-    return promise;
-  }, [activeAccount, isAuthenticated, mapRawBookingToRentalRequest]);
+      if (!token) {
+        setIsLoadingBookings(false);
+        setBookingsError(
+          "Authentication required. Please sign in to view your bookings.",
+        );
+        return;
+      }
+      if (!force && Date.now() - lastBookingsFetchRef.current < CACHE_TTL_MS)
+        return;
+      if (inFlightBookingsRef.current && !force)
+        return inFlightBookingsRef.current;
 
-  const fetchProducts = useCallback(async (force: boolean = false) => {
-    if (!activeAccount || !isAuthenticated) return;
-    if (!force && Date.now() - lastProductsFetchRef.current < CACHE_TTL_MS) return;
-    if (inFlightProductsRef.current && !force) return inFlightProductsRef.current;
-    const promise = (async () => {
-      try {
-        const prodRes = await payerntApi.getProducts();
-        lastProductsFetchRef.current = Date.now();
-        if (prodRes.success && Array.isArray(prodRes.products)) {
-          setProducts(prodRes.products.filter((p) => !isMockItem(p.id)).map(normalizePayerntProduct));
-        }
-      } catch (err) {
-        console.warn("[paye₹nt Store] fetchProducts error:", err);
-      } finally {
-        inFlightProductsRef.current = null;
-      }
-    })();
-    inFlightProductsRef.current = promise;
-    return promise;
-  }, [activeAccount, isAuthenticated]);
+      setIsLoadingBookings(true);
+      setBookingsError(null);
 
-  const fetchWallet = useCallback(async (force: boolean = false) => {
-    if (!activeAccount || !isAuthenticated) return;
-    if (!force && Date.now() - lastWalletFetchRef.current < CACHE_TTL_MS) return;
-    if (inFlightWalletRef.current && !force) return inFlightWalletRef.current;
-    const promise = (async () => {
-      try {
-        const walletRes = await payerntApi.getWallet();
-        lastWalletFetchRef.current = Date.now();
-        if (walletRes.success && walletRes.wallet) {
-          const w = walletRes.wallet as any;
-          setWallet((prev) => ({
-            ...prev,
-            availableBalance: Number(w.available_balance ?? w.availableBalance ?? prev.availableBalance),
-            pendingBalance: Number(w.pending_amount ?? w.pendingBalance ?? prev.pendingBalance),
-            totalReceived: Number(w.total_received ?? w.totalReceived ?? prev.totalReceived),
-            totalWithdrawn: Number(w.total_withdrawn ?? w.totalWithdrawn ?? prev.totalWithdrawn),
-            bankAccounts: Array.isArray(walletRes.bankAccounts)
-              ? (walletRes.bankAccounts as any).filter((b: any) => !b.id?.startsWith("bank-00"))
-              : prev.bankAccounts,
-            transactions: Array.isArray(walletRes.transactions)
-              ? (walletRes.transactions as any).filter((t: any) => !t.id?.startsWith("wtx-00"))
-              : prev.transactions,
-          }));
+      const promise = (async () => {
+        try {
+          const bookingsRes = await payerntApi.getBookings(50);
+          lastBookingsFetchRef.current = Date.now();
+          if (bookingsRes.success && Array.isArray(bookingsRes.bookings)) {
+            const mapped = bookingsRes.bookings.map(
+              mapRawBookingToRentalRequest,
+            );
+            setRentalRequests(mapped);
+            setBookingsError(null);
+          } else {
+            const errMsg =
+              bookingsRes.error || "Failed to load bookings from server.";
+            setBookingsError(errMsg);
+          }
+        } catch (err: any) {
+          console.warn("[paye₹nt Store] fetchBookings error:", err);
+          setBookingsError(
+            err?.message || "Failed to load bookings from server.",
+          );
+        } finally {
+          setIsLoadingBookings(false);
+          inFlightBookingsRef.current = null;
         }
-      } catch (err) {
-        console.warn("[paye₹nt Store] fetchWallet error:", err);
-      } finally {
-        inFlightWalletRef.current = null;
-      }
-    })();
-    inFlightWalletRef.current = promise;
-    return promise;
-  }, [activeAccount, isAuthenticated]);
+      })();
+      inFlightBookingsRef.current = promise;
+      return promise;
+    },
+    [activeAccount, mapRawBookingToRentalRequest],
+  );
 
-  const fetchNotifications = useCallback(async (force: boolean = false) => {
-    if (!activeAccount || !isAuthenticated) return;
-    if (!force && Date.now() - lastNotifsFetchRef.current < CACHE_TTL_MS) return;
-    if (inFlightNotifsRef.current && !force) return inFlightNotifsRef.current;
-    const promise = (async () => {
-      try {
-        const notifRes = await payerntApi.getNotifications();
-        lastNotifsFetchRef.current = Date.now();
-        if (notifRes.success && Array.isArray(notifRes.notifications)) {
-          setNotifications(notifRes.notifications.filter((n) => n.id !== "notif-1"));
+  const fetchProducts = useCallback(
+    async (force: boolean = false) => {
+      if (!activeAccount || !isAuthenticated) return;
+      if (!force && Date.now() - lastProductsFetchRef.current < CACHE_TTL_MS)
+        return;
+      if (inFlightProductsRef.current && !force)
+        return inFlightProductsRef.current;
+      const promise = (async () => {
+        try {
+          const prodRes = await payerntApi.getProducts();
+          lastProductsFetchRef.current = Date.now();
+          if (prodRes.success && Array.isArray(prodRes.products)) {
+            setProducts(
+              prodRes.products
+                .filter((p) => !isMockItem(p.id))
+                .map(normalizePayerntProduct),
+            );
+          }
+        } catch (err) {
+          console.warn("[paye₹nt Store] fetchProducts error:", err);
+        } finally {
+          inFlightProductsRef.current = null;
         }
-      } catch (err) {
-        console.warn("[paye₹nt Store] fetchNotifications error:", err);
-      } finally {
-        inFlightNotifsRef.current = null;
-      }
-    })();
-    inFlightNotifsRef.current = promise;
-    return promise;
-  }, [activeAccount, isAuthenticated]);
+      })();
+      inFlightProductsRef.current = promise;
+      return promise;
+    },
+    [activeAccount, isAuthenticated],
+  );
+
+  const fetchWallet = useCallback(
+    async (force: boolean = false) => {
+      if (!activeAccount || !isAuthenticated) return;
+      if (!force && Date.now() - lastWalletFetchRef.current < CACHE_TTL_MS)
+        return;
+      if (inFlightWalletRef.current && !force) return inFlightWalletRef.current;
+      const promise = (async () => {
+        try {
+          const walletRes = await payerntApi.getWallet();
+          lastWalletFetchRef.current = Date.now();
+          if (walletRes.success && walletRes.wallet) {
+            const w = walletRes.wallet as any;
+            setWallet((prev) => ({
+              ...prev,
+              availableBalance: Number(
+                w.available_balance ??
+                  w.availableBalance ??
+                  prev.availableBalance,
+              ),
+              pendingBalance: Number(
+                w.pending_amount ?? w.pendingBalance ?? prev.pendingBalance,
+              ),
+              totalReceived: Number(
+                w.total_received ?? w.totalReceived ?? prev.totalReceived,
+              ),
+              totalWithdrawn: Number(
+                w.total_withdrawn ?? w.totalWithdrawn ?? prev.totalWithdrawn,
+              ),
+              bankAccounts: Array.isArray(walletRes.bankAccounts)
+                ? (walletRes.bankAccounts as any).filter(
+                    (b: any) => !b.id?.startsWith("bank-00"),
+                  )
+                : prev.bankAccounts,
+              transactions: Array.isArray(walletRes.transactions)
+                ? (walletRes.transactions as any).filter(
+                    (t: any) => !t.id?.startsWith("wtx-00"),
+                  )
+                : prev.transactions,
+            }));
+          }
+        } catch (err) {
+          console.warn("[paye₹nt Store] fetchWallet error:", err);
+        } finally {
+          inFlightWalletRef.current = null;
+        }
+      })();
+      inFlightWalletRef.current = promise;
+      return promise;
+    },
+    [activeAccount, isAuthenticated],
+  );
+
+  const fetchNotifications = useCallback(
+    async (force: boolean = false) => {
+      if (!activeAccount || !isAuthenticated) return;
+      if (!force && Date.now() - lastNotifsFetchRef.current < CACHE_TTL_MS)
+        return;
+      if (inFlightNotifsRef.current && !force) return inFlightNotifsRef.current;
+      const promise = (async () => {
+        try {
+          const notifRes = await payerntApi.getNotifications();
+          lastNotifsFetchRef.current = Date.now();
+          if (notifRes.success && Array.isArray(notifRes.notifications)) {
+            setNotifications(
+              notifRes.notifications.filter((n) => n.id !== "notif-1"),
+            );
+          }
+        } catch (err) {
+          console.warn("[paye₹nt Store] fetchNotifications error:", err);
+        } finally {
+          inFlightNotifsRef.current = null;
+        }
+      })();
+      inFlightNotifsRef.current = promise;
+      return promise;
+    },
+    [activeAccount, isAuthenticated],
+  );
 
   const fetchMessages = useCallback(
     async (productId?: string, force: boolean = false) => {
       if (!activeAccount?.accountId) return;
-      if (!force && !productId && Date.now() - lastMessagesFetchRef.current < CACHE_TTL_MS) return;
-      if (inFlightMessagesRef.current && !force) return inFlightMessagesRef.current;
+      if (
+        !force &&
+        !productId &&
+        Date.now() - lastMessagesFetchRef.current < CACHE_TTL_MS
+      )
+        return;
+      if (inFlightMessagesRef.current && !force)
+        return inFlightMessagesRef.current;
       const promise = (async () => {
         try {
           const res = await payerntApi.getMessages(productId);
           if (!productId) lastMessagesFetchRef.current = Date.now();
           if (res.success && Array.isArray(res.messages)) {
             setMessages(res.messages);
-            const count = res.unreadCount ?? res.messages.filter((m: any) => !m.read && !m.is_read).length;
+            const count =
+              res.unreadCount ??
+              res.messages.filter((m: any) => !m.read && !m.is_read).length;
             setUnreadMessagesCount(count);
             try {
-              localStorage.setItem(STORAGE_KEY_MESSAGES, JSON.stringify(res.messages));
+              localStorage.setItem(
+                STORAGE_KEY_MESSAGES,
+                JSON.stringify(res.messages),
+              );
             } catch {}
           }
         } catch (err) {
@@ -667,124 +921,157 @@ export function usePayerntStore() {
       inFlightMessagesRef.current = promise;
       return promise;
     },
-    [activeAccount?.accountId]
+    [activeAccount?.accountId],
   );
 
   // Authoritative real paye₹nt backend synchronization
-  const refreshDashboard = useCallback(async (forceFull: boolean = false) => {
-    if (!activeAccount || !isAuthenticated) return;
-    if (inFlightDashboardRef.current && !forceFull) {
-      return inFlightDashboardRef.current;
-    }
-
-    setIsLoadingDashboard(true);
-    setDashboardError(null);
-
-    const promise = (async () => {
-      try {
-        const dashRes = await payerntApi.getDashboard();
-        lastDashboardFetchRef.current = Date.now();
-
-        if (dashRes.success && dashRes.dashboard) {
-          const d = dashRes.dashboard;
-          setBackendDashboard(d);
-
-          // Update wallet balances from dashboard aggregation
-          if (d.wallet) {
-            setWallet((prev) => ({
-              ...prev,
-              availableBalance: Number(d.wallet.availableBalance ?? prev.availableBalance),
-              pendingBalance: Number(d.wallet.pendingAmount ?? prev.pendingBalance),
-              totalReceived: Number(d.wallet.totalReceived ?? prev.totalReceived),
-              totalWithdrawn: Number(d.wallet.totalWithdrawn ?? prev.totalWithdrawn),
-            }));
-          }
-
-          // Update recent activities
-          if (Array.isArray(d.recentActivity) && d.recentActivity.length > 0) {
-            setBackendActivities(
-              d.recentActivity.map((act: any) => ({
-                id: act.id,
-                title: act.title,
-                timestamp: act.timestamp
-                  ? new Date(act.timestamp).toLocaleDateString("en-IN", { day: "numeric", month: "short" })
-                  : "Recent",
-                amount: act.amount,
-              }))
-            );
-          }
-
-          // Update products preview if returned
-          if (Array.isArray(d.products) && d.products.length > 0) {
-            setProducts((prev) => {
-              const fetched = d.products.filter((p: any) => !isMockItem(p.id)).map(normalizePayerntProduct);
-              const map = new Map<string, PayerntProduct>();
-              prev.forEach((p) => map.set(p.id, p));
-              fetched.forEach((p: any) => map.set(p.id, { ...map.get(p.id), ...p }));
-              return Array.from(map.values());
-            });
-          }
-
-          // Update upcoming bookings preview if present
-          if (Array.isArray(d.bookings) && d.bookings.length > 0) {
-            setRentalRequests((prev) => {
-              const mapped = d.bookings.map(mapRawBookingToRentalRequest);
-              const map = new Map<string, RentalRequest>();
-              prev.forEach((r) => map.set(r.id, r));
-              mapped.forEach((r: RentalRequest) => {
-                const existing = map.get(r.id);
-                map.set(r.id, existing ? { ...existing, ...r } : r);
-              });
-              return Array.from(map.values());
-            });
-          }
-
-          // Update messages unread count
-          if (d.messages?.unread !== undefined) {
-            setUnreadMessagesCount(d.messages.unread);
-          }
-        } else if (dashRes.error) {
-          const errorStr = typeof dashRes.error === "string" ? dashRes.error : JSON.stringify(dashRes.error);
-          const errLower = errorStr.toLowerCase();
-          if (
-            errLower.includes("401") ||
-            errLower.includes("expired") ||
-            errLower.includes("unauthorized") ||
-            errLower.includes("revoked") ||
-            errLower.includes("forbidden") ||
-            errLower.includes("session expired") ||
-            errLower.includes("authorization")
-          ) {
-            setActiveAccount(null);
-            setIsLoadingDashboard(false);
-            return;
-          }
-          setDashboardError(errorStr);
-        }
-
-        // Always refresh notifications with dashboard
-        fetchNotifications(forceFull).catch(() => {});
-
-        if (forceFull) {
-          await Promise.allSettled([
-            fetchBookings(true),
-            fetchProducts(true),
-            fetchWallet(true),
-            fetchMessages(),
-          ]);
-        }
-      } catch (e: any) {
-        console.warn("[paye₹nt Store] Dashboard refresh error:", e);
-        setDashboardError(e?.message || "Failed to synchronize with server.");
-      } finally {
-        setIsLoadingDashboard(false);
-        inFlightDashboardRef.current = null;
+  const refreshDashboard = useCallback(
+    async (forceFull: boolean = false) => {
+      if (!activeAccount || !isAuthenticated) return;
+      if (inFlightDashboardRef.current && !forceFull) {
+        return inFlightDashboardRef.current;
       }
-    })();
 
-    inFlightDashboardRef.current = promise;
-    return promise;
-  }, [activeAccount, isAuthenticated, mapRawBookingToRentalRequest, fetchBookings, fetchProducts, fetchWallet, fetchNotifications, fetchMessages]);
+      setIsLoadingDashboard(true);
+      setDashboardError(null);
+
+      const promise = (async () => {
+        try {
+          const dashRes = await payerntApi.getDashboard();
+          lastDashboardFetchRef.current = Date.now();
+
+          if (dashRes.success && dashRes.dashboard) {
+            const d = dashRes.dashboard;
+            setBackendDashboard(d);
+
+            // Update wallet balances from dashboard aggregation
+            if (d.wallet) {
+              setWallet((prev) => ({
+                ...prev,
+                availableBalance: Number(
+                  d.wallet.availableBalance ?? prev.availableBalance,
+                ),
+                pendingBalance: Number(
+                  d.wallet.pendingAmount ?? prev.pendingBalance,
+                ),
+                totalReceived: Number(
+                  d.wallet.totalReceived ?? prev.totalReceived,
+                ),
+                totalWithdrawn: Number(
+                  d.wallet.totalWithdrawn ?? prev.totalWithdrawn,
+                ),
+              }));
+            }
+
+            // Update recent activities
+            if (
+              Array.isArray(d.recentActivity) &&
+              d.recentActivity.length > 0
+            ) {
+              setBackendActivities(
+                d.recentActivity.map((act: any) => ({
+                  id: act.id,
+                  title: act.title,
+                  timestamp: act.timestamp
+                    ? new Date(act.timestamp).toLocaleDateString("en-IN", {
+                        day: "numeric",
+                        month: "short",
+                      })
+                    : "Recent",
+                  amount: act.amount,
+                })),
+              );
+            }
+
+            // Update products preview if returned
+            if (Array.isArray(d.products) && d.products.length > 0) {
+              setProducts((prev) => {
+                const fetched = d.products
+                  .filter((p: any) => !isMockItem(p.id))
+                  .map(normalizePayerntProduct);
+                const map = new Map<string, PayerntProduct>();
+                prev.forEach((p) => map.set(p.id, p));
+                fetched.forEach((p: any) =>
+                  map.set(p.id, { ...map.get(p.id), ...p }),
+                );
+                return Array.from(map.values());
+              });
+            }
+
+            // Update upcoming bookings preview if present
+            if (Array.isArray(d.bookings) && d.bookings.length > 0) {
+              setRentalRequests((prev) => {
+                const mapped = d.bookings.map(mapRawBookingToRentalRequest);
+                const map = new Map<string, RentalRequest>();
+                prev.forEach((r) => map.set(r.id, r));
+                mapped.forEach((r: RentalRequest) => {
+                  const existing = map.get(r.id);
+                  map.set(r.id, existing ? { ...existing, ...r } : r);
+                });
+                return Array.from(map.values());
+              });
+            }
+
+            // Update messages unread count
+            if (d.messages?.unread !== undefined) {
+              setUnreadMessagesCount(d.messages.unread);
+            }
+          } else if (dashRes.error) {
+            const errorStr =
+              typeof dashRes.error === "string"
+                ? dashRes.error
+                : JSON.stringify(dashRes.error);
+            const errLower = errorStr.toLowerCase();
+            if (
+              errLower.includes("401") ||
+              errLower.includes("expired") ||
+              errLower.includes("unauthorized") ||
+              errLower.includes("revoked") ||
+              errLower.includes("forbidden") ||
+              errLower.includes("session expired") ||
+              errLower.includes("authorization")
+            ) {
+              setActiveAccount(null);
+              setIsLoadingDashboard(false);
+              return;
+            }
+            setDashboardError(errorStr);
+          }
+
+          // Always refresh notifications with dashboard
+          fetchNotifications(forceFull).catch(() => {});
+
+          if (forceFull) {
+            await Promise.allSettled([
+              fetchBookings(true),
+              fetchProducts(true),
+              fetchWallet(true),
+              fetchMessages(),
+            ]);
+          }
+        } catch (e: any) {
+          console.warn("[paye₹nt Store] Dashboard refresh error:", e);
+          setDashboardError(e?.message || "Failed to synchronize with server.");
+        } finally {
+          setIsLoadingDashboard(false);
+          inFlightDashboardRef.current = null;
+        }
+      })();
+
+      inFlightDashboardRef.current = promise;
+      return promise;
+    },
+    [
+      activeAccount,
+      isAuthenticated,
+      mapRawBookingToRentalRequest,
+      fetchBookings,
+      fetchProducts,
+      fetchWallet,
+      fetchNotifications,
+      fetchMessages,
+    ],
+  );
 
   // Sync real paye₹nt backend state upon authentication and listen for refresh events
   useEffect(() => {
@@ -815,8 +1102,8 @@ export function usePayerntStore() {
           prev.map((r) =>
             r.id === bId || (r as any).bookingId === bId
               ? { ...r, status: newStatus as any }
-              : r
-          )
+              : r,
+          ),
         );
       }
       refreshDashboard(true);
@@ -832,7 +1119,10 @@ export function usePayerntStore() {
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     const pollInterval = setInterval(() => {
-      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+      if (
+        typeof document !== "undefined" &&
+        document.visibilityState === "visible"
+      ) {
         refreshDashboard(false);
         fetchBookings(true);
         fetchNotifications(true);
@@ -850,7 +1140,6 @@ export function usePayerntStore() {
     };
   }, [activeAccount, isAuthenticated, refreshDashboard]);
 
-
   const switchDemoUser = (userId: string) => {
     const found = DEMO_USERS.find((u) => u.id === userId);
     if (!found) return;
@@ -862,26 +1151,40 @@ export function usePayerntStore() {
       email: found.email,
       phone: found.phone,
       avatar: found.profilePhotoUrl || found.avatar || "",
-      profilePhotoUrl: found.profilePhotoUrl || found.profile_photo_url || found.avatar || "",
-      profile_photo_url: found.profilePhotoUrl || found.profile_photo_url || found.avatar || "",
+      profilePhotoUrl:
+        found.profilePhotoUrl || found.profile_photo_url || found.avatar || "",
+      profile_photo_url:
+        found.profilePhotoUrl || found.profile_photo_url || found.avatar || "",
       city: found.city,
     }));
-    window.dispatchEvent(new CustomEvent("payent_user_changed", { detail: found }));
+    window.dispatchEvent(
+      new CustomEvent("payent_user_changed", { detail: found }),
+    );
     window.dispatchEvent(new CustomEvent("payent_products_updated"));
   };
 
   // Actions
   const addProduct = (newProduct: PayerntProduct) => {
     const ownerId = activeAccount?.accountId || activeUser.id;
-    const ownerName = activeAccount?.name || activeUser.fullName || activeUser.name;
+    const ownerName =
+      activeAccount?.name || activeUser.fullName || activeUser.name;
     const ownerEmail = activeAccount?.email || activeUser.email;
-    const ownerAvatar = activeAccount?.profilePhotoUrl || activeAccount?.profile_photo_url || activeAccount?.avatar || activeUser.profilePhotoUrl || activeUser.profile_photo_url || activeUser.avatar || "";
+    const ownerAvatar =
+      activeAccount?.profilePhotoUrl ||
+      activeAccount?.profile_photo_url ||
+      activeAccount?.avatar ||
+      activeUser.profilePhotoUrl ||
+      activeUser.profile_photo_url ||
+      activeUser.avatar ||
+      "";
 
     const finalized: PayerntProduct = {
       ...newProduct,
       ownerId,
       ownerAccountType: "paye₹nt",
-      vendorSecretPin: newProduct.vendorSecretPin || Math.floor(1000 + Math.random() * 9000).toString(),
+      vendorSecretPin:
+        newProduct.vendorSecretPin ||
+        Math.floor(1000 + Math.random() * 9000).toString(),
       owner: {
         id: ownerId,
         name: ownerName,
@@ -946,8 +1249,12 @@ export function usePayerntStore() {
 
   const updateProduct = async (
     id: string,
-    updates: Partial<PayerntProduct>
-  ): Promise<{ success: boolean; product?: PayerntProduct; error?: string }> => {
+    updates: Partial<PayerntProduct>,
+  ): Promise<{
+    success: boolean;
+    product?: PayerntProduct;
+    error?: string;
+  }> => {
     try {
       const res = await payerntApi.updateProduct(id, updates);
       if (res.success && res.product) {
@@ -955,7 +1262,10 @@ export function usePayerntStore() {
         setProducts((prev) => {
           const nextList = prev.map((p) => (p.id === id ? canonical : p));
           try {
-            localStorage.setItem(STORAGE_KEY_PRODUCTS, JSON.stringify(nextList));
+            localStorage.setItem(
+              STORAGE_KEY_PRODUCTS,
+              JSON.stringify(nextList),
+            );
           } catch {}
           return nextList;
         });
@@ -964,9 +1274,15 @@ export function usePayerntStore() {
         window.dispatchEvent(new CustomEvent("payent_products_updated"));
         return { success: true, product: canonical };
       }
-      return { success: false, error: res.error || "Failed to update product." };
+      return {
+        success: false,
+        error: res.error || "Failed to update product.",
+      };
     } catch (e: any) {
-      return { success: false, error: e?.message || "Network error while updating product." };
+      return {
+        success: false,
+        error: e?.message || "Network error while updating product.",
+      };
     }
   };
 
@@ -980,7 +1296,9 @@ export function usePayerntStore() {
     });
     lastProductsFetchRef.current = 0;
     lastDashboardFetchRef.current = 0;
-    payerntApi.deleteProduct(id).catch((e) => console.warn("[paye₹nt Backend] deleteProduct sync:", e));
+    payerntApi
+      .deleteProduct(id)
+      .catch((e) => console.warn("[paye₹nt Backend] deleteProduct sync:", e));
     window.dispatchEvent(new CustomEvent("payent_products_updated"));
   };
 
@@ -1004,113 +1322,132 @@ export function usePayerntStore() {
     });
     lastProductsFetchRef.current = 0;
     lastDashboardFetchRef.current = 0;
-    payerntApi.updateProductStatus(id, "active", nextStatus).catch((e) => console.warn("[paye₹nt Backend] toggleAvailability sync:", e));
+    payerntApi
+      .updateProductStatus(id, "active", nextStatus)
+      .catch((e) =>
+        console.warn("[paye₹nt Backend] toggleAvailability sync:", e),
+      );
     window.dispatchEvent(new CustomEvent("payent_products_updated"));
   };
 
   // Admin Review / Approval Actions
-  const adminApproveProduct = useCallback((id: string) => {
-    setProducts((prev) => {
-      const nextList = prev.map((p) => {
-        if (p.id !== id) return p;
-        return {
-          ...p,
-          verificationStatus: "approved" as VerificationStatus,
-          status: "approved",
-          availabilityStatus: "available" as ProductAvailability,
-          reviewedAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
+  const adminApproveProduct = useCallback(
+    (id: string) => {
+      setProducts((prev) => {
+        const nextList = prev.map((p) => {
+          if (p.id !== id) return p;
+          return {
+            ...p,
+            verificationStatus: "approved" as VerificationStatus,
+            status: "approved",
+            availabilityStatus: "available" as ProductAvailability,
+            reviewedAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+        });
+        try {
+          localStorage.setItem(STORAGE_KEY_PRODUCTS, JSON.stringify(nextList));
+        } catch {}
+        return nextList;
       });
-      try {
-        localStorage.setItem(STORAGE_KEY_PRODUCTS, JSON.stringify(nextList));
-      } catch {}
-      return nextList;
-    });
 
-    const product = products.find((p) => p.id === id);
-    const notif: LenderNotification = {
-      id: `notif-${Date.now()}`,
-      title: "Product Approved by Admin! 🎉",
-      message: `"${product?.title || "Your gear"}" has been approved and is now live on Explore.`,
-      type: "success",
-      timestamp: "Just now",
-      read: false,
-      actionRoute: "products",
-    };
-    setNotifications((prev) => [notif, ...prev]);
-    window.dispatchEvent(new CustomEvent("payent_products_updated"));
-  }, [products]);
+      const product = products.find((p) => p.id === id);
+      const notif: LenderNotification = {
+        id: `notif-${Date.now()}`,
+        title: "Product Approved by Admin! 🎉",
+        message: `"${product?.title || "Your gear"}" has been approved and is now live on Explore.`,
+        type: "success",
+        timestamp: "Just now",
+        read: false,
+        actionRoute: "products",
+      };
+      setNotifications((prev) => [notif, ...prev]);
+      window.dispatchEvent(new CustomEvent("payent_products_updated"));
+    },
+    [products],
+  );
 
-  const adminRejectProduct = useCallback((id: string, notes?: string) => {
-    setProducts((prev) => {
-      const nextList = prev.map((p) => {
-        if (p.id !== id) return p;
-        return {
-          ...p,
-          verificationStatus: "rejected" as VerificationStatus,
-          status: "rejected",
-          verificationNotes: notes || "Listing did not meet platform safety requirements.",
-          availabilityStatus: "paused" as ProductAvailability,
-          reviewedAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
+  const adminRejectProduct = useCallback(
+    (id: string, notes?: string) => {
+      setProducts((prev) => {
+        const nextList = prev.map((p) => {
+          if (p.id !== id) return p;
+          return {
+            ...p,
+            verificationStatus: "rejected" as VerificationStatus,
+            status: "rejected",
+            verificationNotes:
+              notes || "Listing did not meet platform safety requirements.",
+            availabilityStatus: "paused" as ProductAvailability,
+            reviewedAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+        });
+        try {
+          localStorage.setItem(STORAGE_KEY_PRODUCTS, JSON.stringify(nextList));
+        } catch {}
+        return nextList;
       });
-      try {
-        localStorage.setItem(STORAGE_KEY_PRODUCTS, JSON.stringify(nextList));
-      } catch {}
-      return nextList;
-    });
 
-    const product = products.find((p) => p.id === id);
-    const notif: LenderNotification = {
-      id: `notif-${Date.now()}`,
-      title: "Product Listing Rejected ❌",
-      message: `"${product?.title || "Your gear"}" was rejected by Admin.`,
-      type: "alert",
-      timestamp: "Just now",
-      read: false,
-      actionRoute: "products",
-    };
-    setNotifications((prev) => [notif, ...prev]);
-    window.dispatchEvent(new CustomEvent("payent_products_updated"));
-  }, [products]);
+      const product = products.find((p) => p.id === id);
+      const notif: LenderNotification = {
+        id: `notif-${Date.now()}`,
+        title: "Product Listing Rejected ❌",
+        message: `"${product?.title || "Your gear"}" was rejected by Admin.`,
+        type: "alert",
+        timestamp: "Just now",
+        read: false,
+        actionRoute: "products",
+      };
+      setNotifications((prev) => [notif, ...prev]);
+      window.dispatchEvent(new CustomEvent("payent_products_updated"));
+    },
+    [products],
+  );
 
-  const adminRequestCorrection = useCallback((id: string, notes?: string) => {
-    setProducts((prev) => {
-      const nextList = prev.map((p) => {
-        if (p.id !== id) return p;
-        return {
-          ...p,
-          verificationStatus: "needs_correction" as VerificationStatus,
-          status: "needs_correction",
-          verificationNotes: notes || "Please update product serial number photo and details.",
-          availabilityStatus: "paused" as ProductAvailability,
-          reviewedAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
+  const adminRequestCorrection = useCallback(
+    (id: string, notes?: string) => {
+      setProducts((prev) => {
+        const nextList = prev.map((p) => {
+          if (p.id !== id) return p;
+          return {
+            ...p,
+            verificationStatus: "needs_correction" as VerificationStatus,
+            status: "needs_correction",
+            verificationNotes:
+              notes || "Please update product serial number photo and details.",
+            availabilityStatus: "paused" as ProductAvailability,
+            reviewedAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+        });
+        try {
+          localStorage.setItem(STORAGE_KEY_PRODUCTS, JSON.stringify(nextList));
+        } catch {}
+        return nextList;
       });
-      try {
-        localStorage.setItem(STORAGE_KEY_PRODUCTS, JSON.stringify(nextList));
-      } catch {}
-      return nextList;
-    });
 
-    const product = products.find((p) => p.id === id);
-    const notif: LenderNotification = {
-      id: `notif-${Date.now()}`,
-      title: "Correction Requested by Admin ⚠️",
-      message: `Admin requested corrections for "${product?.title || "Your gear"}".`,
-      type: "warning",
-      timestamp: "Just now",
-      read: false,
-      actionRoute: "products",
-    };
-    setNotifications((prev) => [notif, ...prev]);
-    window.dispatchEvent(new CustomEvent("payent_products_updated"));
-  }, [products]);
+      const product = products.find((p) => p.id === id);
+      const notif: LenderNotification = {
+        id: `notif-${Date.now()}`,
+        title: "Correction Requested by Admin ⚠️",
+        message: `Admin requested corrections for "${product?.title || "Your gear"}".`,
+        type: "warning",
+        timestamp: "Just now",
+        read: false,
+        actionRoute: "products",
+      };
+      setNotifications((prev) => [notif, ...prev]);
+      window.dispatchEvent(new CustomEvent("payent_products_updated"));
+    },
+    [products],
+  );
 
-  const simulateVerificationChange = (id: string, status: VerificationStatus, notes?: string) => {
+  const simulateVerificationChange = (
+    id: string,
+    status: VerificationStatus,
+    notes?: string,
+  ) => {
     if (status === "approved" || status === "verified") {
       adminApproveProduct(id);
     } else if (status === "rejected") {
@@ -1144,14 +1481,18 @@ export function usePayerntStore() {
     requestId: string,
     action: "accept" | "reject" | "cancel",
     reason?: string,
-    feedback?: string
+    feedback?: string,
   ): Promise<{ success: boolean; message?: string; error?: string }> => {
     try {
       let res;
       if (action === "accept") {
         res = await payerntApi.acceptBooking(requestId);
       } else if (action === "cancel") {
-        res = await payerntApi.cancelBooking(requestId, reason || "NO_LONGER_AVAILABLE", feedback);
+        res = await payerntApi.cancelBooking(
+          requestId,
+          reason || "NO_LONGER_AVAILABLE",
+          feedback,
+        );
       } else {
         res = await payerntApi.rejectBooking(requestId, reason, feedback);
       }
@@ -1163,7 +1504,12 @@ export function usePayerntStore() {
         };
       }
 
-      const nextStatus = action === "accept" ? "accepted" : (action === "cancel" ? "cancelled" : "rejected");
+      const nextStatus =
+        action === "accept"
+          ? "accepted"
+          : action === "cancel"
+            ? "cancelled"
+            : "rejected";
 
       setRentalRequests((prev) =>
         prev.map((req) => {
@@ -1172,7 +1518,7 @@ export function usePayerntStore() {
             ...req,
             status: nextStatus as any,
           };
-        })
+        }),
       );
 
       // Invalidate cache and sync with backend
@@ -1187,17 +1533,23 @@ export function usePayerntStore() {
         window.dispatchEvent(
           new CustomEvent("payent_queue_updated", {
             detail: { bookingId: requestId, status: nextStatus },
-          })
+          }),
         );
       }
 
       const req = rentalRequests.find((r) => r.id === requestId);
       const notif: LenderNotification = {
         id: `notif-${Date.now()}`,
-        title: action === "accept" ? "Rental Request Accepted ✅" : (action === "cancel" ? "Booking Cancelled ⚠️" : "Rental Request Declined ❌"),
-        message: action === "cancel"
-          ? `You cancelled ${req?.renter?.name || "renter"}'s booking for "${req?.productTitle || "gear"}".`
-          : `You ${action}ed ${req?.renter?.name || "renter"}'s booking for "${req?.productTitle || "gear"}".`,
+        title:
+          action === "accept"
+            ? "Rental Request Accepted ✅"
+            : action === "cancel"
+              ? "Booking Cancelled ⚠️"
+              : "Rental Request Declined ❌",
+        message:
+          action === "cancel"
+            ? `You cancelled ${req?.renter?.name || "renter"}'s booking for "${req?.productTitle || "gear"}".`
+            : `You ${action}ed ${req?.renter?.name || "renter"}'s booking for "${req?.productTitle || "gear"}".`,
         type: action === "accept" ? "success" : "info",
         timestamp: "Just now",
         read: false,
@@ -1217,7 +1569,10 @@ export function usePayerntStore() {
     }
   };
   // Step Rental Lifecycle
-  const advanceRentalLifecycle = (requestId: string, nextStatus: RentalRequestStatus) => {
+  const advanceRentalLifecycle = (
+    requestId: string,
+    nextStatus: RentalRequestStatus,
+  ) => {
     const nowIso = new Date().toISOString();
     lastBookingsFetchRef.current = 0;
     lastDashboardFetchRef.current = 0;
@@ -1225,20 +1580,24 @@ export function usePayerntStore() {
       prev.map((req) => {
         if (req.id !== requestId) return req;
         const updated: RentalRequest = { ...req, status: nextStatus };
-        if (nextStatus === "ready_for_pickup") updated.readyForPickupAt = updated.readyForPickupAt || nowIso;
-        if (nextStatus === "picked_up" || nextStatus === "active") updated.pickedUpAt = updated.pickedUpAt || nowIso;
-        if (nextStatus === "return_initiated") updated.returnInitiatedAt = updated.returnInitiatedAt || nowIso;
+        if (nextStatus === "ready_for_pickup")
+          updated.readyForPickupAt = updated.readyForPickupAt || nowIso;
+        if (nextStatus === "picked_up" || nextStatus === "active")
+          updated.pickedUpAt = updated.pickedUpAt || nowIso;
+        if (nextStatus === "return_initiated")
+          updated.returnInitiatedAt = updated.returnInitiatedAt || nowIso;
         if (nextStatus === "handed_back") {
           updated.handedBackAt = updated.handedBackAt || nowIso;
           updated.awaitingInspectionAt = updated.awaitingInspectionAt || nowIso;
         }
-        if (nextStatus === "awaiting_inspection") updated.awaitingInspectionAt = updated.awaitingInspectionAt || nowIso;
+        if (nextStatus === "awaiting_inspection")
+          updated.awaitingInspectionAt = updated.awaitingInspectionAt || nowIso;
         if (nextStatus === "completed") {
           updated.paymentStatus = "settled_to_lender";
           updated.completedAt = updated.completedAt || nowIso;
         }
         return updated;
-      })
+      }),
     );
 
     // Asynchronously synchronize with backend datastore
@@ -1252,14 +1611,20 @@ export function usePayerntStore() {
               return {
                 ...r,
                 confirmedAt: res.all_timestamps?.confirmed_at || r.confirmedAt,
-                readyForPickupAt: res.all_timestamps?.ready_for_pickup_at || r.readyForPickupAt,
+                readyForPickupAt:
+                  res.all_timestamps?.ready_for_pickup_at || r.readyForPickupAt,
                 pickedUpAt: res.all_timestamps?.picked_up_at || r.pickedUpAt,
-                returnInitiatedAt: res.all_timestamps?.return_initiated_at || r.returnInitiatedAt,
-                handedBackAt: res.all_timestamps?.handed_back_at || r.handedBackAt,
-                awaitingInspectionAt: res.all_timestamps?.awaiting_inspection_at || r.awaitingInspectionAt,
+                returnInitiatedAt:
+                  res.all_timestamps?.return_initiated_at ||
+                  r.returnInitiatedAt,
+                handedBackAt:
+                  res.all_timestamps?.handed_back_at || r.handedBackAt,
+                awaitingInspectionAt:
+                  res.all_timestamps?.awaiting_inspection_at ||
+                  r.awaitingInspectionAt,
                 completedAt: res.all_timestamps?.completed_at || r.completedAt,
               };
-            })
+            }),
           );
         }
       })
@@ -1297,11 +1662,12 @@ export function usePayerntStore() {
             ? {
                 ...p,
                 totalRentalsCount: p.totalRentalsCount + 1,
-                totalEarningsGenerated: p.totalEarningsGenerated + req.netEarnings,
+                totalEarningsGenerated:
+                  p.totalEarningsGenerated + req.netEarnings,
                 availabilityStatus: "available",
               }
-            : p
-        )
+            : p,
+        ),
       );
 
       setProfile((prev) => ({
@@ -1321,7 +1687,9 @@ export function usePayerntStore() {
       setNotifications((prev) => [notif, ...prev]);
     } else if (nextStatus === "active") {
       setProducts((prev) =>
-        prev.map((p) => (p.id === req.productId ? { ...p, availabilityStatus: "rented" } : p))
+        prev.map((p) =>
+          p.id === req.productId ? { ...p, availabilityStatus: "rented" } : p,
+        ),
       );
     }
   };
@@ -1338,19 +1706,37 @@ export function usePayerntStore() {
             const updated: RentalRequest = {
               ...req,
               deliveryMethod: changeReq?.deliveryMethod || req.deliveryMethod,
-              deliveryAddress: changeReq?.deliveryAddress !== undefined ? changeReq.deliveryAddress : req.deliveryAddress,
-              pickupLocation: changeReq?.pickupLocation !== undefined ? changeReq.pickupLocation : req.pickupLocation,
-              customLocation: changeReq?.customLocation !== undefined ? changeReq.customLocation : req.customLocation,
-              locationDirections: changeReq?.locationDirections !== undefined ? changeReq.locationDirections : req.locationDirections,
-              latitude: changeReq?.latitude !== undefined ? changeReq.latitude : req.latitude,
-              longitude: changeReq?.longitude !== undefined ? changeReq.longitude : req.longitude,
+              deliveryAddress:
+                changeReq?.deliveryAddress !== undefined
+                  ? changeReq.deliveryAddress
+                  : req.deliveryAddress,
+              pickupLocation:
+                changeReq?.pickupLocation !== undefined
+                  ? changeReq.pickupLocation
+                  : req.pickupLocation,
+              customLocation:
+                changeReq?.customLocation !== undefined
+                  ? changeReq.customLocation
+                  : req.customLocation,
+              locationDirections:
+                changeReq?.locationDirections !== undefined
+                  ? changeReq.locationDirections
+                  : req.locationDirections,
+              latitude:
+                changeReq?.latitude !== undefined
+                  ? changeReq.latitude
+                  : req.latitude,
+              longitude:
+                changeReq?.longitude !== undefined
+                  ? changeReq.longitude
+                  : req.longitude,
               mapUrl: changeReq?.deliveryAddress
                 ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(changeReq.deliveryAddress)}`
                 : req.mapUrl,
               locationChangeRequest: null,
             };
             return updated;
-          })
+          }),
         );
         const notif: LenderNotification = {
           id: `notif-${Date.now()}`,
@@ -1366,7 +1752,10 @@ export function usePayerntStore() {
       }
       return { success: false, message: res.message };
     } catch (e: any) {
-      return { success: false, message: e?.message || "Failed to approve location change." };
+      return {
+        success: false,
+        message: e?.message || "Failed to approve location change.",
+      };
     }
   };
 
@@ -1388,7 +1777,7 @@ export function usePayerntStore() {
                   }
                 : null,
             };
-          })
+          }),
         );
         const notif: LenderNotification = {
           id: `notif-${Date.now()}`,
@@ -1404,7 +1793,10 @@ export function usePayerntStore() {
       }
       return { success: false, message: res.message };
     } catch (e: any) {
-      return { success: false, message: e?.message || "Failed to reject location change." };
+      return {
+        success: false,
+        message: e?.message || "Failed to reject location change.",
+      };
     }
   };
 
@@ -1414,11 +1806,16 @@ export function usePayerntStore() {
     } catch {}
   }, [wallet, activeUserId]);
 
-  const requestWithdrawal = (amount: number, bankAccountId: string): boolean => {
+  const requestWithdrawal = (
+    amount: number,
+    bankAccountId: string,
+  ): boolean => {
     if (amount <= 0 || amount > wallet.availableBalance) {
       return false;
     }
-    const targetBank = wallet.bankAccounts.find((b) => b.id === bankAccountId) || wallet.bankAccounts[0];
+    const targetBank =
+      wallet.bankAccounts.find((b) => b.id === bankAccountId) ||
+      wallet.bankAccounts[0];
 
     const newTx: WalletTransaction = {
       id: `wtx-${Date.now()}`,
@@ -1428,7 +1825,9 @@ export function usePayerntStore() {
       description: "Bank Withdrawal Transfer",
       date: new Date().toISOString(),
       status: "Processing",
-      bankAccountMasked: targetBank ? targetBank.maskedAccountNumber : "XXXX XXXX 4582",
+      bankAccountMasked: targetBank
+        ? targetBank.maskedAccountNumber
+        : "XXXX XXXX 4582",
     };
 
     setWallet((prev) => ({
@@ -1505,10 +1904,13 @@ export function usePayerntStore() {
     lastNotifsFetchRef.current = 0;
     lastDashboardFetchRef.current = 0;
     setNotifications((prev) =>
-      prev.map((n) => (n.id === notifId ? { ...n, read: true } : n))
+      prev.map((n) => (n.id === notifId ? { ...n, read: true } : n)),
     );
     payerntApi.markNotificationRead(notifId).catch((err) => {
-      console.warn("[Payernt] Failed to mark notification read on backend:", err);
+      console.warn(
+        "[Payernt] Failed to mark notification read on backend:",
+        err,
+      );
     });
   };
 
@@ -1517,7 +1919,10 @@ export function usePayerntStore() {
     lastDashboardFetchRef.current = 0;
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
     payerntApi.markAllNotificationsRead().catch((err) => {
-      console.warn("[Payernt] Failed to mark all notifications read on backend:", err);
+      console.warn(
+        "[Payernt] Failed to mark all notifications read on backend:",
+        err,
+      );
     });
   };
 
@@ -1528,9 +1933,14 @@ export function usePayerntStore() {
       setMessages((prev) =>
         prev.map((m) =>
           m.id === messageId || m.messageId === messageId
-            ? { ...m, read: true, status: "READ", readAt: new Date().toISOString() }
-            : m
-        )
+            ? {
+                ...m,
+                read: true,
+                status: "READ",
+                readAt: new Date().toISOString(),
+              }
+            : m,
+        ),
       );
       setUnreadMessagesCount((prev) => Math.max(0, prev - 1));
 
@@ -1542,7 +1952,7 @@ export function usePayerntStore() {
         }
       }
     },
-    [activeAccount?.accountId]
+    [activeAccount?.accountId],
   );
 
   const sendAdminMessage = useCallback(
@@ -1566,7 +1976,7 @@ export function usePayerntStore() {
       }
       return null;
     },
-    []
+    [],
   );
 
   const updateProfile = (updates: Partial<LenderProfile>) => {
@@ -1593,7 +2003,8 @@ export function usePayerntStore() {
   };
 
   // User-isolated product sets (belongs to active paye₹nt account)
-  const currentOwnerId = activeAccount?.accountId || (activeAccount as any)?.id || activeUser.id;
+  const currentOwnerId =
+    activeAccount?.accountId || (activeAccount as any)?.id || activeUser.id;
   const activeEmail = activeAccount?.email || activeUser.email;
 
   const userProducts = products.filter((p) => {
@@ -1604,26 +2015,28 @@ export function usePayerntStore() {
       pOwnerId === activeAccount?.accountId ||
       pOwnerId === (activeAccount as any)?.id ||
       pOwnerId === activeUser.id ||
-      (pOwnerEmail && activeEmail && pOwnerEmail.toLowerCase() === activeEmail.toLowerCase()) ||
-      (currentOwnerId === "PAYERNT_USER_001" && (pOwnerId === "user_001" || pOwnerId === "PAYERNT_USER_001"))
+      (pOwnerEmail &&
+        activeEmail &&
+        pOwnerEmail.toLowerCase() === activeEmail.toLowerCase()) ||
+      (currentOwnerId === "PAYERNT_USER_001" &&
+        (pOwnerId === "user_001" || pOwnerId === "PAYERNT_USER_001"))
     );
   });
-  const exploreApprovedProducts = products.filter(
-    (p) => {
-      const pOwnerId = p.ownerId || (p as any).owner_id;
-      return (
-        (p.status === "approved" ||
-          p.status === "active" ||
-          p.verificationStatus === "approved" ||
-          p.verificationStatus === "verified") &&
-        pOwnerId !== currentOwnerId &&
-        pOwnerId !== activeUser.id
-      );
-    }
-  );
+  const exploreApprovedProducts = products.filter((p) => {
+    const pOwnerId = p.ownerId || (p as any).owner_id;
+    return (
+      (p.status === "approved" ||
+        p.status === "active" ||
+        p.verificationStatus === "approved" ||
+        p.verificationStatus === "verified") &&
+      pOwnerId !== currentOwnerId &&
+      pOwnerId !== activeUser.id
+    );
+  });
 
   // Authoritative Aggregated Stats (Backend is single source of truth)
-  const totalProductsCount = backendDashboard?.listings?.total ?? userProducts.length;
+  const totalProductsCount =
+    backendDashboard?.listings?.total ?? userProducts.length;
   const activeProductsCount =
     backendDashboard?.listings?.active ??
     userProducts.filter(
@@ -1631,7 +2044,8 @@ export function usePayerntStore() {
         p.status === "active" ||
         p.status === "approved" ||
         (p.availabilityStatus === "available" &&
-          (p.verificationStatus === "approved" || p.verificationStatus === "verified"))
+          (p.verificationStatus === "approved" ||
+            p.verificationStatus === "verified")),
     ).length;
   const underVerificationCount =
     backendDashboard?.listings?.pending ??
@@ -1642,18 +2056,25 @@ export function usePayerntStore() {
         p.status === "pending_admin_review" ||
         p.status === "pending" ||
         p.verificationStatus === "under_review" ||
-        p.verificationStatus === "submitted"
+        p.verificationStatus === "submitted",
     ).length;
   const activeRentalsCount =
     backendDashboard?.rentals?.active ??
-    rentalRequests.filter((r) => r.status === "active" || r.status === "handover").length;
+    rentalRequests.filter(
+      (r) => r.status === "active" || r.status === "handover",
+    ).length;
   const pendingRequestsCount =
-    backendDashboard?.bookings?.filter((b: any) => b.status === "pending" || b.status === "security_pending").length ??
-    rentalRequests.filter((r) => r.status === "requested" || r.status === "pending").length;
+    backendDashboard?.bookings?.filter(
+      (b: any) => b.status === "pending" || b.status === "security_pending",
+    ).length ??
+    rentalRequests.filter(
+      (r) => r.status === "requested" || r.status === "pending",
+    ).length;
   const totalEarnings =
     backendDashboard?.earnings?.total ??
     (wallet.totalReceived > 0 ? wallet.totalReceived : wallet.availableBalance);
-  const pendingEarnings = backendDashboard?.wallet?.pendingAmount ?? wallet.pendingBalance;
+  const pendingEarnings =
+    backendDashboard?.wallet?.pendingAmount ?? wallet.pendingBalance;
 
   return {
     activeAccount,
@@ -1681,6 +2102,8 @@ export function usePayerntStore() {
     backendActivities,
     refreshDashboard,
     fetchBookings,
+    isLoadingBookings,
+    bookingsError,
     fetchProducts,
     fetchWallet,
     fetchNotifications,
@@ -1720,5 +2143,3 @@ export function usePayerntStore() {
     resetToDefaults,
   };
 }
-
-

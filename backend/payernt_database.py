@@ -4027,6 +4027,24 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50, vendor_email: O
         u_user_id = f"PAYERNT_USER_{clean_v_email.replace('@', '_').replace('.', '_')}"
         if u_user_id not in ident_list:
             ident_list.append(u_user_id)
+        try:
+            u_row = fetch_one("SELECT id FROM users WHERE LOWER(email) = %s LIMIT 1", (clean_v_email,))
+            if u_row and u_row.get("id"):
+                uid = str(u_row["id"]).strip()
+                if uid not in ident_list:
+                    ident_list.append(uid)
+            p_row = fetch_one("SELECT id FROM payernt_accounts WHERE LOWER(email) = %s LIMIT 1", (clean_v_email,))
+            if p_row and p_row.get("id"):
+                pid = str(p_row["id"]).strip()
+                if pid not in ident_list:
+                    ident_list.append(pid)
+        except Exception:
+            pass
+        for acc in MOCK_PAYERNT_ACCOUNTS.values():
+            if acc.get("email", "").strip().lower() == clean_v_email:
+                aid = str(acc.get("id") or "").strip()
+                if aid and aid not in ident_list:
+                    ident_list.append(aid)
 
     target_vendor_identifiers = set(ident_list)
 
@@ -4084,7 +4102,7 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50, vendor_email: O
                 COALESCE(pp.title, cp.title) as product_title,
                 COALESCE(pp.primary_image, cp.image) as product_image,
                 COALESCE(pp.category, cp.category) as product_category,
-                COALESCE(pp.daily_rate, cp.daily_rate, cp.price) as daily_rate,
+                COALESCE(pp.daily_rate, cp.price) as daily_rate,
                 d.status as delivery_status,
                 d.delivery_boy_name,
                 d.delivery_boy_phone,
@@ -4111,14 +4129,13 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50, vendor_email: O
             WHERE sec.vendor_id IN ({placeholders}) 
                OR pp.owner_id IN ({placeholders})
                OR pp.owner_email IN ({placeholders})
-               OR cp.owner_id IN ({placeholders})
                OR cp.user_email IN ({placeholders})
                OR o.lender_email IN ({placeholders})
                OR o.vendor_id IN ({placeholders})
             ORDER BY sec.created_at DESC
             LIMIT %s
         """
-        params = list(ident_list) * 7 + [limit]
+        params = list(ident_list) * 6 + [limit]
         rows = fetch_all(query, tuple(params))
         if rows:
             for r in rows:
@@ -4274,7 +4291,7 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50, vendor_email: O
                     bc.created_at as cancelled_at,
                     bc.initiated_by as cancelled_by,
                     COALESCE(pp.category, cp.category) as category,
-                    COALESCE(pp.daily_rate, cp.daily_rate, cp.price) as daily_rate,
+                    COALESCE(pp.daily_rate, cp.price) as daily_rate,
                     d.status as delivery_status,
                     d.delivery_address as d_delivery_address,
                     d.pickup_address as d_pickup_address,
@@ -4288,14 +4305,13 @@ def get_payernt_vendor_bookings(vendor_id: str, limit: int = 50, vendor_email: O
                 LEFT JOIN deliveries d ON o.id = d.booking_id
                 WHERE pp.owner_id IN ({placeholders})
                    OR pp.owner_email IN ({placeholders})
-                   OR cp.owner_id IN ({placeholders})
                    OR cp.user_email IN ({placeholders})
                    OR o.lender_email IN ({placeholders})
                    OR o.vendor_id IN ({placeholders})
                 ORDER BY o.created_at DESC
                 LIMIT %s
             """
-            params_o = list(ident_list) * 6 + [remaining_limit]
+            params_o = list(ident_list) * 5 + [remaining_limit]
             o_rows = fetch_all(orders_query, tuple(params_o))
             if o_rows:
                 for r in o_rows:

@@ -1,4 +1,3 @@
-
 import type {
   PayerntAccount,
   PayerntProduct,
@@ -21,14 +20,20 @@ const getApiBase = () => {
   }
   if (import.meta.env.VITE_PAYERNT_API_URL) {
     const apiUrl = import.meta.env.VITE_PAYERNT_API_URL;
-    if (typeof window !== "undefined" && window.location.hostname === "10.0.2.2") {
+    if (
+      typeof window !== "undefined" &&
+      window.location.hostname === "10.0.2.2"
+    ) {
       return apiUrl.replace(/localhost|127\.0\.0\.1/, "10.0.2.2");
     }
     return apiUrl;
   }
   if (import.meta.env.VITE_API_URL) {
     const apiUrl = import.meta.env.VITE_API_URL;
-    if (typeof window !== "undefined" && window.location.hostname === "10.0.2.2") {
+    if (
+      typeof window !== "undefined" &&
+      window.location.hostname === "10.0.2.2"
+    ) {
       return apiUrl.replace(/localhost|127\.0\.0\.1/, "10.0.2.2");
     }
     return apiUrl;
@@ -49,6 +54,8 @@ function getAuthHeaders(): Record<string, string> {
     let token =
       localStorage.getItem("paye₹nt_token") ||
       localStorage.getItem("payernt_token") ||
+      localStorage.getItem("payent:token") ||
+      localStorage.getItem("payent_token") ||
       localStorage.getItem("payent_auth_token") ||
       localStorage.getItem("token");
     if (token) {
@@ -71,16 +78,21 @@ export function handlePayerntUnauthorized() {
     localStorage.removeItem(STORAGE_KEY_SESSION);
     localStorage.removeItem(STORAGE_KEY_ACCOUNT);
     if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("paye₹nt_auth_change", { detail: null }));
+      window.dispatchEvent(
+        new CustomEvent("paye₹nt_auth_change", { detail: null }),
+      );
     }
   } catch {}
 }
 
-async function fetchWithPayerntAuth(url: string, options: RequestInit = {}): Promise<Response> {
+async function fetchWithPayerntAuth(
+  url: string,
+  options: RequestInit = {},
+): Promise<Response> {
   const authHeaders = getAuthHeaders();
   const headers = {
     ...authHeaders,
-    ...(options.headers as Record<string, string> || {}),
+    ...((options.headers as Record<string, string>) || {}),
   };
   const res = await fetch(url, { ...options, headers });
   if (res.status === 401) {
@@ -106,7 +118,9 @@ export function extractApiErrorMessage(data: any, fallback: string): string {
         if (typeof item === "string") return item;
         if (typeof item === "object") {
           const locParts = Array.isArray(item.loc)
-            ? item.loc.filter((p: any) => p !== "body" && p !== "query" && p !== "path")
+            ? item.loc.filter(
+                (p: any) => p !== "body" && p !== "query" && p !== "path",
+              )
             : [];
           const field = locParts.join(".");
           const msg = item.msg || item.message || JSON.stringify(item);
@@ -121,14 +135,23 @@ export function extractApiErrorMessage(data: any, fallback: string): string {
   }
 
   if (detail && typeof detail === "object") {
-    if (typeof detail.message === "string" && detail.message.trim()) return detail.message.trim();
-    if (typeof detail.error === "string" && detail.error.trim()) return detail.error.trim();
-    if (typeof detail.msg === "string" && detail.msg.trim()) return detail.msg.trim();
-    if (typeof detail.rejectionReason === "string" && detail.rejectionReason.trim()) return detail.rejectionReason.trim();
+    if (typeof detail.message === "string" && detail.message.trim())
+      return detail.message.trim();
+    if (typeof detail.error === "string" && detail.error.trim())
+      return detail.error.trim();
+    if (typeof detail.msg === "string" && detail.msg.trim())
+      return detail.msg.trim();
+    if (
+      typeof detail.rejectionReason === "string" &&
+      detail.rejectionReason.trim()
+    )
+      return detail.rejectionReason.trim();
   }
 
-  if (typeof data.message === "string" && data.message.trim()) return data.message.trim();
-  if (typeof data.error === "string" && data.error.trim()) return data.error.trim();
+  if (typeof data.message === "string" && data.message.trim())
+    return data.message.trim();
+  if (typeof data.error === "string" && data.error.trim())
+    return data.error.trim();
 
   return fallback;
 }
@@ -162,23 +185,27 @@ export const payerntApi = {
     message?: string;
   }> {
     try {
-      const res = await fetch(`${API_BASE}/api/payernt/auth/check-registration`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: params.name,
-          mobile: params.mobile,
-          email: params.email,
-          targetAccountType: params.targetAccountType || "paye₹nt",
-        }),
-      });
+      const res = await fetch(
+        `${API_BASE}/api/payernt/auth/check-registration`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: params.name,
+            mobile: params.mobile,
+            email: params.email,
+            targetAccountType: params.targetAccountType || "paye₹nt",
+          }),
+        },
+      );
       const data = await res.json();
       return data;
     } catch (e: any) {
       return {
         success: false,
         found: false,
-        message: e?.message || "Unable to check registration details with server.",
+        message:
+          e?.message || "Unable to check registration details with server.",
       };
     }
   },
@@ -237,17 +264,20 @@ export const payerntApi = {
       }
       return {
         success: false,
-        error: extractApiErrorMessage(data, "Registration failed. Please check your details."),
+        error: extractApiErrorMessage(
+          data,
+          "Registration failed. Please check your details.",
+        ),
       };
     } catch (e: any) {
-      return { success: false, error: e?.message || "Unable to connect to the server." };
+      return {
+        success: false,
+        error: e?.message || "Unable to connect to the server.",
+      };
     }
   },
 
-  async login(params: {
-    email: string;
-    password: string;
-  }): Promise<{
+  async login(params: { email: string; password: string }): Promise<{
     success: boolean;
     status?: string;
     accountType?: string;
@@ -287,23 +317,34 @@ export const payerntApi = {
         return { success: true, account: data.account, token: data.token };
       }
       if (res.status === 403) {
-        const detail = typeof data?.detail === "object" && !Array.isArray(data?.detail) ? data.detail : {};
+        const detail =
+          typeof data?.detail === "object" && !Array.isArray(data?.detail)
+            ? data.detail
+            : {};
         return {
           success: false,
           status: detail.status || data.status || "PENDING_REVIEW",
           accountType: detail.accountType || data.accountType || "Payernt",
           rejectionReason: detail.rejectionReason || data.rejectionReason,
-          error: extractApiErrorMessage(data, "Your Payernt account is currently under review."),
+          error: extractApiErrorMessage(
+            data,
+            "Your Payernt account is currently under review.",
+          ),
         };
       }
       return {
         success: false,
-        error: extractApiErrorMessage(data, "Invalid email or password for Payernt account."),
+        error: extractApiErrorMessage(
+          data,
+          "Invalid email or password for Payernt account.",
+        ),
       };
     } catch (e: any) {
       return {
         success: false,
-        error: e?.message || "Unable to reach server. Please check your network connection.",
+        error:
+          e?.message ||
+          "Unable to reach server. Please check your network connection.",
       };
     }
   },
@@ -315,7 +356,12 @@ export const payerntApi = {
     phoneNumber?: string;
     address?: string;
     pincode?: string;
-  }): Promise<{ success: boolean; status?: string; message?: string; error?: string }> {
+  }): Promise<{
+    success: boolean;
+    status?: string;
+    message?: string;
+    error?: string;
+  }> {
     try {
       const res = await fetch(`${API_BASE}/api/payernt/auth/resubmit`, {
         method: "POST",
@@ -331,11 +377,21 @@ export const payerntApi = {
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.success) {
-        return { success: true, status: data.status || "PENDING_REVIEW", message: data.message };
+        return {
+          success: true,
+          status: data.status || "PENDING_REVIEW",
+          message: data.message,
+        };
       }
-      return { success: false, error: extractApiErrorMessage(data, "Failed to resubmit details.") };
+      return {
+        success: false,
+        error: extractApiErrorMessage(data, "Failed to resubmit details."),
+      };
     } catch (e: any) {
-      return { success: false, error: e?.message || "Unable to connect to the server." };
+      return {
+        success: false,
+        error: e?.message || "Unable to connect to the server.",
+      };
     }
   },
 
@@ -346,14 +402,20 @@ export const payerntApi = {
     rejectionReason?: string;
   }> {
     try {
-      const res = await fetch(`${API_BASE}/api/auth/status?email=${encodeURIComponent(email)}&type=payernt`);
+      const res = await fetch(
+        `${API_BASE}/api/auth/status?email=${encodeURIComponent(email)}&type=payernt`,
+      );
       if (res.ok) {
         return await res.json();
       }
     } catch (e) {
       console.warn("Payernt status fetch error:", e);
     }
-    return { status: "PENDING_REVIEW", is_approved: false, accountType: "Payernt" };
+    return {
+      status: "PENDING_REVIEW",
+      is_approved: false,
+      accountType: "Payernt",
+    };
   },
 
   async logout(): Promise<{ success: boolean }> {
@@ -386,32 +448,53 @@ export const payerntApi = {
     return { success: true };
   },
 
-  async getProfile(): Promise<{ success: boolean; profile?: any; error?: string }> {
+  async getProfile(): Promise<{
+    success: boolean;
+    profile?: any;
+    error?: string;
+  }> {
     try {
       const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/profile`);
       const data = await res.json();
       if (res.ok && data.success) {
         return { success: true, profile: data.profile };
       }
-      return { success: false, error: extractApiErrorMessage(data, "Failed to load profile.") };
+      return {
+        success: false,
+        error: extractApiErrorMessage(data, "Failed to load profile."),
+      };
     } catch (e: any) {
-      return { success: false, error: e?.message || "Failed to fetch profile." };
+      return {
+        success: false,
+        error: e?.message || "Failed to fetch profile.",
+      };
     }
   },
 
-  async updateProfile(updates: any): Promise<{ success: boolean; profile?: any; error?: string }> {
+  async updateProfile(
+    updates: any,
+  ): Promise<{ success: boolean; profile?: any; error?: string }> {
     try {
-      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/profile`, {
-        method: "PATCH",
-        body: JSON.stringify(updates),
-      });
+      const res = await fetchWithPayerntAuth(
+        `${API_BASE}/api/payernt/profile`,
+        {
+          method: "PATCH",
+          body: JSON.stringify(updates),
+        },
+      );
       const data = await res.json();
       if (res.ok && data.success) {
         return { success: true, profile: data.profile };
       }
-      return { success: false, error: extractApiErrorMessage(data, "Failed to update profile.") };
+      return {
+        success: false,
+        error: extractApiErrorMessage(data, "Failed to update profile."),
+      };
     } catch (e: any) {
-      return { success: false, error: e?.message || "Network error while updating profile." };
+      return {
+        success: false,
+        error: e?.message || "Network error while updating profile.",
+      };
     }
   },
 
@@ -431,10 +514,13 @@ export const payerntApi = {
     error?: string;
   }> {
     try {
-      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/products`, {
-        method: "POST",
-        body: JSON.stringify(productData),
-      });
+      const res = await fetchWithPayerntAuth(
+        `${API_BASE}/api/payernt/products`,
+        {
+          method: "POST",
+          body: JSON.stringify(productData),
+        },
+      );
       const data = await res.json();
       if (res.ok && data.success) {
         return {
@@ -442,7 +528,8 @@ export const payerntApi = {
           product: data.product,
           productId: data.productId || data.product?.id,
           status: data.status || data.product?.status || "under_review",
-          vendorSecretPin: data.vendorSecretPin || data.product?.vendor_secret_pin,
+          vendorSecretPin:
+            data.vendorSecretPin || data.product?.vendor_secret_pin,
           maskedPhone: data.maskedPhone,
           otpExpiresIn: data.otpExpiresIn || 300,
           resendCooldown: data.resendCooldown || 60,
@@ -451,7 +538,10 @@ export const payerntApi = {
       }
       return {
         success: false,
-        error: extractApiErrorMessage(data, "Failed to submit product listing to database."),
+        error: extractApiErrorMessage(
+          data,
+          "Failed to submit product listing to database.",
+        ),
       };
     } catch (e: any) {
       return {
@@ -461,74 +551,120 @@ export const payerntApi = {
     }
   },
 
-  async getProducts(): Promise<{ success: boolean; products?: PayerntProduct[]; error?: string }> {
+  async getProducts(): Promise<{
+    success: boolean;
+    products?: PayerntProduct[];
+    error?: string;
+  }> {
     try {
-      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/products`);
+      const res = await fetchWithPayerntAuth(
+        `${API_BASE}/api/payernt/products`,
+      );
       const data = await res.json();
       if (res.ok && data.success) {
         return { success: true, products: data.products };
       }
-      return { success: false, error: extractApiErrorMessage(data, "Failed to fetch products.") };
+      return {
+        success: false,
+        error: extractApiErrorMessage(data, "Failed to fetch products."),
+      };
     } catch (e: any) {
       return { success: false, error: e?.message || "Network error." };
     }
   },
 
-  async getProductById(id: string): Promise<{ success: boolean; product?: PayerntProduct; error?: string }> {
+  async getProductById(
+    id: string,
+  ): Promise<{ success: boolean; product?: PayerntProduct; error?: string }> {
     try {
-      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/products/${id}`);
+      const res = await fetchWithPayerntAuth(
+        `${API_BASE}/api/payernt/products/${id}`,
+      );
       const data = await res.json();
       if (res.ok && data.success) {
         return { success: true, product: data.product };
       }
-      return { success: false, error: extractApiErrorMessage(data, "Product not found.") };
+      return {
+        success: false,
+        error: extractApiErrorMessage(data, "Product not found."),
+      };
     } catch (e: any) {
       return { success: false, error: e?.message || "Network error." };
     }
   },
 
-  async updateProduct(id: string, updates: Partial<PayerntProduct>): Promise<{ success: boolean; product?: PayerntProduct; error?: string }> {
+  async updateProduct(
+    id: string,
+    updates: Partial<PayerntProduct>,
+  ): Promise<{ success: boolean; product?: PayerntProduct; error?: string }> {
     try {
-      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/products/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify(updates),
-      });
+      const res = await fetchWithPayerntAuth(
+        `${API_BASE}/api/payernt/products/${id}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify(updates),
+        },
+      );
       const data = await res.json();
       if (res.ok && data.success) {
         return { success: true, product: data.product };
       }
-      return { success: false, error: extractApiErrorMessage(data, "Failed to update product.") };
+      return {
+        success: false,
+        error: extractApiErrorMessage(data, "Failed to update product."),
+      };
     } catch (e: any) {
       return { success: false, error: e?.message || "Network error." };
     }
   },
 
-  async deleteProduct(id: string): Promise<{ success: boolean; error?: string }> {
+  async deleteProduct(
+    id: string,
+  ): Promise<{ success: boolean; error?: string }> {
     try {
-      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/products/${id}`, {
-        method: "DELETE",
-      });
+      const res = await fetchWithPayerntAuth(
+        `${API_BASE}/api/payernt/products/${id}`,
+        {
+          method: "DELETE",
+        },
+      );
       const data = await res.json();
       if (res.ok && data.success) {
         return { success: true };
       }
-      return { success: false, error: extractApiErrorMessage(data, "Failed to delete product.") };
+      return {
+        success: false,
+        error: extractApiErrorMessage(data, "Failed to delete product."),
+      };
     } catch (e: any) {
       return { success: false, error: e?.message || "Network error." };
     }
   },
 
-  async updateProductStatus(id: string, status: string, availabilityStatus?: string): Promise<{ success: boolean; product?: PayerntProduct; error?: string }> {
+  async updateProductStatus(
+    id: string,
+    status: string,
+    availabilityStatus?: string,
+  ): Promise<{ success: boolean; product?: PayerntProduct; error?: string }> {
     try {
-      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/products/${id}/status`, {
-        method: "PATCH",
-        body: JSON.stringify({ status, availability_status: availabilityStatus }),
-      });
+      const res = await fetchWithPayerntAuth(
+        `${API_BASE}/api/payernt/products/${id}/status`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            status,
+            availability_status: availabilityStatus,
+          }),
+        },
+      );
       const data = await res.json();
       if (res.ok && data.success) {
         return { success: true, product: data.product };
       }
-      return { success: false, error: extractApiErrorMessage(data, "Failed to update product status.") };
+      return {
+        success: false,
+        error: extractApiErrorMessage(data, "Failed to update product status."),
+      };
     } catch (e: any) {
       return { success: false, error: e?.message || "Network error." };
     }
@@ -555,20 +691,32 @@ export const payerntApi = {
           bankAccounts: data.bankAccounts,
         };
       }
-      return { success: false, error: extractApiErrorMessage(data, "Failed to load wallet.") };
+      return {
+        success: false,
+        error: extractApiErrorMessage(data, "Failed to load wallet."),
+      };
     } catch (e: any) {
       return { success: false, error: e?.message || "Network error." };
     }
   },
 
-  async getTransactions(): Promise<{ success: boolean; transactions?: WalletTransaction[]; error?: string }> {
+  async getTransactions(): Promise<{
+    success: boolean;
+    transactions?: WalletTransaction[];
+    error?: string;
+  }> {
     try {
-      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/wallet/transactions`);
+      const res = await fetchWithPayerntAuth(
+        `${API_BASE}/api/payernt/wallet/transactions`,
+      );
       const data = await res.json();
       if (res.ok && data.success) {
         return { success: true, transactions: data.transactions };
       }
-      return { success: false, error: extractApiErrorMessage(data, "Failed to load transactions.") };
+      return {
+        success: false,
+        error: extractApiErrorMessage(data, "Failed to load transactions."),
+      };
     } catch (e: any) {
       return { success: false, error: e?.message || "Network error." };
     }
@@ -576,7 +724,7 @@ export const payerntApi = {
 
   async withdraw(
     amountOrParams: number | { amount: number; bankAccountId: string },
-    optionalBankAccountId?: string
+    optionalBankAccountId?: string,
   ): Promise<{
     success: boolean;
     message?: string;
@@ -588,17 +736,26 @@ export const payerntApi = {
         : amountOrParams;
 
     try {
-      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/wallet/withdraw`, {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
+      const res = await fetchWithPayerntAuth(
+        `${API_BASE}/api/payernt/wallet/withdraw`,
+        {
+          method: "POST",
+          body: JSON.stringify(payload),
+        },
+      );
       const data = await res.json();
       if (res.ok && data.success) {
         return { success: true, message: data.message };
       }
-      return { success: false, error: extractApiErrorMessage(data, "Withdrawal failed.") };
+      return {
+        success: false,
+        error: extractApiErrorMessage(data, "Withdrawal failed."),
+      };
     } catch (e: any) {
-      return { success: false, error: e?.message || "Network error during withdrawal." };
+      return {
+        success: false,
+        error: e?.message || "Network error during withdrawal.",
+      };
     }
   },
 
@@ -610,30 +767,44 @@ export const payerntApi = {
     ifsc: string;
   }): Promise<{ success: boolean; bankAccount?: any; error?: string }> {
     try {
-      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/wallet/bank-accounts`, {
-        method: "POST",
-        body: JSON.stringify(bankData),
-      });
+      const res = await fetchWithPayerntAuth(
+        `${API_BASE}/api/payernt/wallet/bank-accounts`,
+        {
+          method: "POST",
+          body: JSON.stringify(bankData),
+        },
+      );
       const data = await res.json();
       if (res.ok && data.success) {
         return { success: true, bankAccount: data.bankAccount };
       }
-      return { success: false, error: extractApiErrorMessage(data, "Failed to add bank account.") };
+      return {
+        success: false,
+        error: extractApiErrorMessage(data, "Failed to add bank account."),
+      };
     } catch (e: any) {
       return { success: false, error: e?.message || "Network error." };
     }
   },
 
-  async deleteBankAccount(bankId: string): Promise<{ success: boolean; error?: string }> {
+  async deleteBankAccount(
+    bankId: string,
+  ): Promise<{ success: boolean; error?: string }> {
     try {
-      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/wallet/bank-accounts/${bankId}`, {
-        method: "DELETE",
-      });
+      const res = await fetchWithPayerntAuth(
+        `${API_BASE}/api/payernt/wallet/bank-accounts/${bankId}`,
+        {
+          method: "DELETE",
+        },
+      );
       const data = await res.json();
       if (res.ok && data.success) {
         return { success: true };
       }
-      return { success: false, error: extractApiErrorMessage(data, "Failed to delete bank account.") };
+      return {
+        success: false,
+        error: extractApiErrorMessage(data, "Failed to delete bank account."),
+      };
     } catch (e: any) {
       return { success: false, error: e?.message || "Network error." };
     }
@@ -642,14 +813,23 @@ export const payerntApi = {
   // ============================================================
   // NOTIFICATIONS
   // ============================================================
-  async getNotifications(): Promise<{ success: boolean; notifications?: LenderNotification[]; error?: string }> {
+  async getNotifications(): Promise<{
+    success: boolean;
+    notifications?: LenderNotification[];
+    error?: string;
+  }> {
     try {
-      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/notifications`);
+      const res = await fetchWithPayerntAuth(
+        `${API_BASE}/api/payernt/notifications`,
+      );
       const data = await res.json();
       if (res.ok && data.success) {
         return { success: true, notifications: data.notifications };
       }
-      return { success: false, error: extractApiErrorMessage(data, "Failed to load notifications.") };
+      return {
+        success: false,
+        error: extractApiErrorMessage(data, "Failed to load notifications."),
+      };
     } catch (e: any) {
       return { success: false, error: e?.message || "Network error." };
     }
@@ -657,18 +837,24 @@ export const payerntApi = {
 
   async markNotificationRead(id: string): Promise<{ success: boolean }> {
     try {
-      await fetchWithPayerntAuth(`${API_BASE}/api/payernt/notifications/${id}/read`, {
-        method: "PATCH",
-      });
+      await fetchWithPayerntAuth(
+        `${API_BASE}/api/payernt/notifications/${id}/read`,
+        {
+          method: "PATCH",
+        },
+      );
     } catch {}
     return { success: true };
   },
 
   async markAllNotificationsRead(): Promise<{ success: boolean }> {
     try {
-      await fetchWithPayerntAuth(`${API_BASE}/api/payernt/notifications/read-all`, {
-        method: "POST",
-      });
+      await fetchWithPayerntAuth(
+        `${API_BASE}/api/payernt/notifications/read-all`,
+        {
+          method: "POST",
+        },
+      );
     } catch {}
     return { success: true };
   },
@@ -676,7 +862,14 @@ export const payerntApi = {
   // ============================================================
   // MESSAGES (ADMIN / PRODUCT BASED)
   // ============================================================
-  async getMessages(productId?: string): Promise<{ success: boolean; messages?: any[]; unreadCount?: number; error?: string }> {
+  async getMessages(
+    productId?: string,
+  ): Promise<{
+    success: boolean;
+    messages?: any[];
+    unreadCount?: number;
+    error?: string;
+  }> {
     try {
       const url = productId
         ? `${API_BASE}/api/payernt/messages?product_id=${encodeURIComponent(productId)}`
@@ -684,17 +877,36 @@ export const payerntApi = {
       const res = await fetchWithPayerntAuth(url);
       const data = await res.json();
       if (res.ok && data.success) {
-        return { success: true, messages: data.messages, unreadCount: data.unreadCount ?? 0 };
+        return {
+          success: true,
+          messages: data.messages,
+          unreadCount: data.unreadCount ?? 0,
+        };
       }
-      return { success: false, messages: [], unreadCount: 0, error: extractApiErrorMessage(data, "Failed to load messages.") };
+      return {
+        success: false,
+        messages: [],
+        unreadCount: 0,
+        error: extractApiErrorMessage(data, "Failed to load messages."),
+      };
     } catch (e: any) {
-      return { success: false, messages: [], unreadCount: 0, error: e?.message || "Network error." };
+      return {
+        success: false,
+        messages: [],
+        unreadCount: 0,
+        error: e?.message || "Network error.",
+      };
     }
   },
 
-  async getUnreadMessagesCount(): Promise<{ success: boolean; unreadCount: number }> {
+  async getUnreadMessagesCount(): Promise<{
+    success: boolean;
+    unreadCount: number;
+  }> {
     try {
-      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/messages/unread-count`);
+      const res = await fetchWithPayerntAuth(
+        `${API_BASE}/api/payernt/messages/unread-count`,
+      );
       const data = await res.json();
       if (res.ok && data.success) {
         return { success: true, unreadCount: data.unreadCount ?? 0 };
@@ -703,11 +915,16 @@ export const payerntApi = {
     return { success: false, unreadCount: 0 };
   },
 
-  async markMessageRead(messageId: string): Promise<{ success: boolean; unreadCount?: number; error?: string }> {
+  async markMessageRead(
+    messageId: string,
+  ): Promise<{ success: boolean; unreadCount?: number; error?: string }> {
     try {
-      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/messages/${encodeURIComponent(messageId)}/read`, {
-        method: "PATCH",
-      });
+      const res = await fetchWithPayerntAuth(
+        `${API_BASE}/api/payernt/messages/${encodeURIComponent(messageId)}/read`,
+        {
+          method: "PATCH",
+        },
+      );
       const data = await res.json();
       if (res.ok && data.success) {
         return { success: true, unreadCount: data.unreadCount };
@@ -722,15 +939,21 @@ export const payerntApi = {
     content: string;
   }): Promise<{ success: boolean; message?: any; error?: string }> {
     try {
-      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/messages`, {
-        method: "POST",
-        body: JSON.stringify(params),
-      });
+      const res = await fetchWithPayerntAuth(
+        `${API_BASE}/api/payernt/messages`,
+        {
+          method: "POST",
+          body: JSON.stringify(params),
+        },
+      );
       const data = await res.json();
       if (res.ok && data.success) {
         return { success: true, message: data.message };
       }
-      return { success: false, error: extractApiErrorMessage(data, "Failed to send message.") };
+      return {
+        success: false,
+        error: extractApiErrorMessage(data, "Failed to send message."),
+      };
     } catch (e: any) {
       return { success: false, error: e?.message || "Network error." };
     }
@@ -748,15 +971,21 @@ export const payerntApi = {
     productCategory?: string;
   }): Promise<{ success: boolean; message?: any; error?: string }> {
     try {
-      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/messages/admin-send`, {
-        method: "POST",
-        body: JSON.stringify(params),
-      });
+      const res = await fetchWithPayerntAuth(
+        `${API_BASE}/api/payernt/messages/admin-send`,
+        {
+          method: "POST",
+          body: JSON.stringify(params),
+        },
+      );
       const data = await res.json();
       if (res.ok && data.success) {
         return { success: true, message: data.message };
       }
-      return { success: false, error: extractApiErrorMessage(data, "Failed to send admin message.") };
+      return {
+        success: false,
+        error: extractApiErrorMessage(data, "Failed to send admin message."),
+      };
     } catch (e: any) {
       return { success: false, error: e?.message || "Network error." };
     }
@@ -780,7 +1009,9 @@ export const payerntApi = {
     error?: string;
   }> {
     try {
-      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/dashboard`);
+      const res = await fetchWithPayerntAuth(
+        `${API_BASE}/api/payernt/dashboard`,
+      );
       const data = await res.json();
       if (res.ok && data.success) {
         return {
@@ -816,7 +1047,9 @@ export const payerntApi = {
     error?: string;
   }> {
     try {
-      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/bookings?limit=${limit}`);
+      const res = await fetchWithPayerntAuth(
+        `${API_BASE}/api/payernt/bookings?limit=${limit}`,
+      );
       const data = await res.json();
       if (res.ok && data.success) {
         return {
@@ -844,7 +1077,7 @@ export const payerntApi = {
   async cancelBooking(
     bookingId: string,
     reasonCode: string,
-    feedback?: string
+    feedback?: string,
   ): Promise<{
     success: boolean;
     message?: string;
@@ -853,13 +1086,16 @@ export const payerntApi = {
     error?: string;
   }> {
     try {
-      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/bookings/${bookingId}/cancel`, {
-        method: "POST",
-        body: JSON.stringify({
-          reasonCode,
-          feedback: feedback?.trim() || undefined,
-        }),
-      });
+      const res = await fetchWithPayerntAuth(
+        `${API_BASE}/api/payernt/bookings/${bookingId}/cancel`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            reasonCode,
+            feedback: feedback?.trim() || undefined,
+          }),
+        },
+      );
       const data = await res.json();
       if (res.ok && data.success) {
         return {
@@ -882,24 +1118,40 @@ export const payerntApi = {
   },
 
   async acceptBooking(
-    bookingId: string
-  ): Promise<{ success: boolean; message?: string; booking?: any; status?: string; error?: string }> {
+    bookingId: string,
+  ): Promise<{
+    success: boolean;
+    message?: string;
+    booking?: any;
+    status?: string;
+    error?: string;
+  }> {
     try {
-      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/bookings/${encodeURIComponent(bookingId)}/accept`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      });
+      const res = await fetchWithPayerntAuth(
+        `${API_BASE}/api/payernt/bookings/${encodeURIComponent(bookingId)}/accept`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        },
+      );
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         return {
           success: false,
-          error: extractApiErrorMessage(data, "Failed to accept booking request."),
+          error: extractApiErrorMessage(
+            data,
+            "Failed to accept booking request.",
+          ),
         };
       }
       if (typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent("payent_orders_updated"));
         window.dispatchEvent(new CustomEvent("payent_booking_updated"));
-        window.dispatchEvent(new CustomEvent("payent_queue_updated", { detail: { bookingId, status: "accepted" } }));
+        window.dispatchEvent(
+          new CustomEvent("payent_queue_updated", {
+            detail: { bookingId, status: "accepted" },
+          }),
+        );
       }
       return {
         success: true,
@@ -918,25 +1170,41 @@ export const payerntApi = {
   async rejectBooking(
     bookingId: string,
     reason?: string,
-    feedback?: string
-  ): Promise<{ success: boolean; message?: string; booking?: any; status?: string; error?: string }> {
+    feedback?: string,
+  ): Promise<{
+    success: boolean;
+    message?: string;
+    booking?: any;
+    status?: string;
+    error?: string;
+  }> {
     try {
-      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/bookings/${encodeURIComponent(bookingId)}/reject`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reason, feedback }),
-      });
+      const res = await fetchWithPayerntAuth(
+        `${API_BASE}/api/payernt/bookings/${encodeURIComponent(bookingId)}/reject`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reason, feedback }),
+        },
+      );
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         return {
           success: false,
-          error: extractApiErrorMessage(data, "Failed to decline booking request."),
+          error: extractApiErrorMessage(
+            data,
+            "Failed to decline booking request.",
+          ),
         };
       }
       if (typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent("payent_orders_updated"));
         window.dispatchEvent(new CustomEvent("payent_booking_updated"));
-        window.dispatchEvent(new CustomEvent("payent_queue_updated", { detail: { bookingId, status: "rejected" } }));
+        window.dispatchEvent(
+          new CustomEvent("payent_queue_updated", {
+            detail: { bookingId, status: "rejected" },
+          }),
+        );
       }
       return {
         success: true,
@@ -968,7 +1236,9 @@ export const payerntApi = {
     error?: string;
   }> {
     try {
-      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/products/${productId}/availability-config`);
+      const res = await fetchWithPayerntAuth(
+        `${API_BASE}/api/payernt/products/${productId}/availability-config`,
+      );
       const data = await res.json();
       if (res.ok && data.success) {
         return {
@@ -978,7 +1248,10 @@ export const payerntApi = {
       }
       return {
         success: false,
-        error: extractApiErrorMessage(data, "Failed to load availability config."),
+        error: extractApiErrorMessage(
+          data,
+          "Failed to load availability config.",
+        ),
       };
     } catch (e: any) {
       return {
@@ -998,7 +1271,7 @@ export const payerntApi = {
       halfDayRate?: number;
       bufferMinutes?: number;
       blockedDates?: string[];
-    }
+    },
   ): Promise<{
     success: boolean;
     config?: any;
@@ -1006,10 +1279,13 @@ export const payerntApi = {
     error?: string;
   }> {
     try {
-      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/products/${productId}/availability-config`, {
-        method: "POST",
-        body: JSON.stringify(config),
-      });
+      const res = await fetchWithPayerntAuth(
+        `${API_BASE}/api/payernt/products/${productId}/availability-config`,
+        {
+          method: "POST",
+          body: JSON.stringify(config),
+        },
+      );
       const data = await res.json();
       if (res.ok && data.success) {
         return {
@@ -1020,7 +1296,10 @@ export const payerntApi = {
       }
       return {
         success: false,
-        error: extractApiErrorMessage(data, "Failed to update availability config."),
+        error: extractApiErrorMessage(
+          data,
+          "Failed to update availability config.",
+        ),
       };
     } catch (e: any) {
       return {
@@ -1040,7 +1319,9 @@ export const payerntApi = {
     error?: string;
   }> {
     try {
-      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/earnings/summary`);
+      const res = await fetchWithPayerntAuth(
+        `${API_BASE}/api/payernt/earnings/summary`,
+      );
       const data = await res.json();
       if (res.ok && data.success) {
         return {
@@ -1073,9 +1354,12 @@ export const payerntApi = {
     error?: string;
   }> {
     try {
-      const res = await fetchWithPayerntAuth(`${API_BASE}/api/payernt/bookings/${encodeURIComponent(bookingId)}/prepare`, {
-        method: "POST",
-      });
+      const res = await fetchWithPayerntAuth(
+        `${API_BASE}/api/payernt/bookings/${encodeURIComponent(bookingId)}/prepare`,
+        {
+          method: "POST",
+        },
+      );
       const data = await res.json();
       if (res.ok && data.success) {
         return {
@@ -1088,12 +1372,16 @@ export const payerntApi = {
       }
       return {
         success: false,
-        error: extractApiErrorMessage(data, "Failed to prepare product for delivery."),
+        error: extractApiErrorMessage(
+          data,
+          "Failed to prepare product for delivery.",
+        ),
       };
     } catch (e: any) {
       return {
         success: false,
-        error: e?.message || "Network error while preparing product for delivery.",
+        error:
+          e?.message || "Network error while preparing product for delivery.",
       };
     }
   },
@@ -1106,9 +1394,12 @@ export const payerntApi = {
     error?: string;
   }> {
     try {
-      const res = await fetchWithPayerntAuth(`${API_BASE}/api/deliveries/${encodeURIComponent(bookingId)}/vendor-otp/send`, {
-        method: "POST",
-      });
+      const res = await fetchWithPayerntAuth(
+        `${API_BASE}/api/deliveries/${encodeURIComponent(bookingId)}/vendor-otp/send`,
+        {
+          method: "POST",
+        },
+      );
       const data = await res.json();
       if (res.ok && data.success) {
         return {
@@ -1120,7 +1411,10 @@ export const payerntApi = {
       }
       return {
         success: false,
-        error: extractApiErrorMessage(data, "Failed to send vendor handover OTP."),
+        error: extractApiErrorMessage(
+          data,
+          "Failed to send vendor handover OTP.",
+        ),
       };
     } catch (e: any) {
       return {
@@ -1130,17 +1424,23 @@ export const payerntApi = {
     }
   },
 
-  async verifyVendorHandoverOtp(bookingId: string, otp: string): Promise<{
+  async verifyVendorHandoverOtp(
+    bookingId: string,
+    otp: string,
+  ): Promise<{
     success: boolean;
     deliveryStatus?: string;
     message?: string;
     error?: string;
   }> {
     try {
-      const res = await fetchWithPayerntAuth(`${API_BASE}/api/deliveries/${encodeURIComponent(bookingId)}/vendor-otp/verify`, {
-        method: "POST",
-        body: JSON.stringify({ otp }),
-      });
+      const res = await fetchWithPayerntAuth(
+        `${API_BASE}/api/deliveries/${encodeURIComponent(bookingId)}/vendor-otp/verify`,
+        {
+          method: "POST",
+          body: JSON.stringify({ otp }),
+        },
+      );
       const data = await res.json();
       if (res.ok && data.success) {
         return {
@@ -1151,12 +1451,16 @@ export const payerntApi = {
       }
       return {
         success: false,
-        error: extractApiErrorMessage(data, "Failed to verify vendor handover OTP."),
+        error: extractApiErrorMessage(
+          data,
+          "Failed to verify vendor handover OTP.",
+        ),
       };
     } catch (e: any) {
       return {
         success: false,
-        error: e?.message || "Network error while verifying vendor handover OTP.",
+        error:
+          e?.message || "Network error while verifying vendor handover OTP.",
       };
     }
   },
@@ -1168,7 +1472,7 @@ export const payerntApi = {
     bookingId: string,
     milestone: string,
     notes?: string,
-    customToken?: string
+    customToken?: string,
   ): Promise<{
     success: boolean;
     status?: string;
@@ -1187,15 +1491,22 @@ export const payerntApi = {
         }
         headers["Authorization"] = `Bearer ${cleanToken}`;
       }
-      const res = await fetch(`${API_BASE}/api/payernt/bookings/${encodeURIComponent(bookingId)}/queue-advance`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ milestone, notes }),
-      });
+      const res = await fetch(
+        `${API_BASE}/api/payernt/bookings/${encodeURIComponent(bookingId)}/queue-advance`,
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ milestone, notes }),
+        },
+      );
       const data = await res.json().catch(() => ({}));
       if (res.ok && (data.success || data.status)) {
         if (typeof window !== "undefined") {
-          window.dispatchEvent(new CustomEvent("payent_queue_updated", { detail: { bookingId, orderId: bookingId, milestone, data } }));
+          window.dispatchEvent(
+            new CustomEvent("payent_queue_updated", {
+              detail: { bookingId, orderId: bookingId, milestone, data },
+            }),
+          );
           window.dispatchEvent(new CustomEvent("payent_orders_updated"));
         }
         return {
@@ -1239,32 +1550,60 @@ export const payerntApi = {
     return this.advanceRentalQueue(bookingId, "completed");
   },
 
-  async approveLocationChange(bookingId: string): Promise<{ success: boolean; message: string; booking?: any; location?: any }> {
+  async approveLocationChange(
+    bookingId: string,
+  ): Promise<{
+    success: boolean;
+    message: string;
+    booking?: any;
+    location?: any;
+  }> {
     try {
-      const res = await fetch(`${API_BASE}/api/payernt/bookings/${encodeURIComponent(bookingId)}/location-change/approve`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-      });
+      const res = await fetch(
+        `${API_BASE}/api/payernt/bookings/${encodeURIComponent(bookingId)}/location-change/approve`,
+        {
+          method: "POST",
+          headers: getAuthHeaders(),
+        },
+      );
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.success) {
         if (typeof window !== "undefined") {
           window.dispatchEvent(new CustomEvent("payent_orders_updated"));
         }
-        return { success: true, message: data.message, booking: data.booking, location: data.location };
+        return {
+          success: true,
+          message: data.message,
+          booking: data.booking,
+          location: data.location,
+        };
       }
-      return { success: false, message: data.detail || data.message || "Failed to approve location change." };
+      return {
+        success: false,
+        message:
+          data.detail || data.message || "Failed to approve location change.",
+      };
     } catch (e: any) {
-      return { success: false, message: e?.message || "Network error while approving location change." };
+      return {
+        success: false,
+        message: e?.message || "Network error while approving location change.",
+      };
     }
   },
 
-  async rejectLocationChange(bookingId: string, feedback?: string): Promise<{ success: boolean; message: string; booking?: any }> {
+  async rejectLocationChange(
+    bookingId: string,
+    feedback?: string,
+  ): Promise<{ success: boolean; message: string; booking?: any }> {
     try {
-      const res = await fetch(`${API_BASE}/api/payernt/bookings/${encodeURIComponent(bookingId)}/location-change/reject`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ feedback: feedback || "" }),
-      });
+      const res = await fetch(
+        `${API_BASE}/api/payernt/bookings/${encodeURIComponent(bookingId)}/location-change/reject`,
+        {
+          method: "POST",
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ feedback: feedback || "" }),
+        },
+      );
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.success) {
         if (typeof window !== "undefined") {
@@ -1272,9 +1611,16 @@ export const payerntApi = {
         }
         return { success: true, message: data.message, booking: data.booking };
       }
-      return { success: false, message: data.detail || data.message || "Failed to reject location change." };
+      return {
+        success: false,
+        message:
+          data.detail || data.message || "Failed to reject location change.",
+      };
     } catch (e: any) {
-      return { success: false, message: e?.message || "Network error while rejecting location change." };
+      return {
+        success: false,
+        message: e?.message || "Network error while rejecting location change.",
+      };
     }
   },
 
@@ -1298,7 +1644,11 @@ export const payerntApi = {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || data.success === false) {
-      throw new Error(data.detail || data.message || "Failed to load KYC verification status.");
+      throw new Error(
+        data.detail ||
+          data.message ||
+          "Failed to load KYC verification status.",
+      );
     }
     return data;
   },
@@ -1326,11 +1676,14 @@ export const payerntApi = {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || data.success === false) {
-      throw new Error(data.detail || data.message || "Failed to submit Aadhaar KYC verification.");
+      throw new Error(
+        data.detail ||
+          data.message ||
+          "Failed to submit Aadhaar KYC verification.",
+      );
     }
     return data;
   },
 };
 
 export default payerntApi;
-

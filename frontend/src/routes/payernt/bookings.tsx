@@ -22,6 +22,8 @@ function PayerntBookingsRoute() {
     handleRequestAction,
     advanceRentalLifecycle,
     fetchBookings,
+    isLoadingBookings,
+    bookingsError,
   } = usePayernt();
 
   useEffect(() => {
@@ -31,6 +33,9 @@ function PayerntBookingsRoute() {
   return (
     <RentalRequests
       requests={rentalRequests}
+      isLoading={isLoadingBookings}
+      error={bookingsError}
+      onRetry={() => fetchBookings(true)}
       onRequestAction={handleRequestAction}
       onAdvanceLifecycle={advanceRentalLifecycle}
       onRefresh={() => fetchBookings(true)}

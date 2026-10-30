@@ -154,12 +154,16 @@ def get_current_payernt_account(authorization: Optional[str] = Header(None)) -> 
 
     account_type = (payload.get("account_type") or payload.get("accountType") or "").strip().lower()
     role = str(payload.get("role") or "").strip().lower()
-    if account_type in ("pay₹ent", "payrent", "customer") and role not in ("admin", "superadmin"):
+
+    ALLOWED_VENDOR_ROLES = {"vendor", "lender", "admin", "superadmin"}
+    ALLOWED_ACCOUNT_TYPES = {"paye₹nt", "payernt", "admin", "vendor", "lender"}
+
+    if account_type in ("pay₹ent", "payrent", "customer") and role not in ALLOWED_VENDOR_ROLES:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Forbidden: This endpoint requires a paye₹nt vendor account.",
         )
-    if account_type not in ("paye₹nt", "payernt", "admin", "vendor", "lender") and role not in ("vendor", "admin", "superadmin"):
+    if account_type not in ALLOWED_ACCOUNT_TYPES and role not in ALLOWED_VENDOR_ROLES:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Forbidden: This endpoint requires a paye₹nt vendor account.",
@@ -168,14 +172,21 @@ def get_current_payernt_account(authorization: Optional[str] = Header(None)) -> 
     email = payload["sub"].strip().lower()
     account = get_payernt_account_by_email(email)
 
-    if not account:
+    if account:
+        raw_status = str(account.get("status") or "").upper()
+        if raw_status == "REJECTED":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your vendor account application was rejected. Please review feedback in your account settings.",
+            )
+    else:
         user_id = payload.get("user_id") or f"PAYERNT_USER_{email}"
         account = {
             "id": user_id,
             "account_type": "paye₹nt",
             "email": email,
             "name": payload.get("name") or email.split("@")[0],
-            "role": "vendor",
+            "role": role if role in ALLOWED_VENDOR_ROLES else "vendor",
             "status": "active",
         }
     return account
