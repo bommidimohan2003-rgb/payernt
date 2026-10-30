@@ -334,6 +334,13 @@ try:
 except Exception as router_err:
     logger.warning(f"Notice: Failed to register payernt routers: {router_err}")
 
+# Register Payent Agent Router
+try:
+    from agent_router import agent_router
+    app.include_router(agent_router)
+except Exception as agent_router_err:
+    logger.warning(f"Notice: Failed to register agent router: {agent_router_err}")
+
 _cache_store = {}
 
 def get_cached(key: str, ttl_seconds: int, fetch_func):

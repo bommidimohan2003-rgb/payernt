@@ -1251,6 +1251,12 @@ def init_db(force: bool = False):
     except Exception as payernt_err:
         print(f"Notice: Payernt tables initialization notice: {payernt_err}")
 
+    try:
+        from agent_engine.persistence import init_agent_tables
+        init_agent_tables()
+    except Exception as agent_tables_err:
+        print(f"Notice: Agent tables initialization notice: {agent_tables_err}")
+
     _db_initialized = True
     print("MySQL database structures initialized.")
 

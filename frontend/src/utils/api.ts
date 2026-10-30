@@ -3077,4 +3077,102 @@ export const api = {
     }
     return await res.json();
   },
+
+  async agentChat(payload: {
+    message: string;
+    session_id?: string;
+    conversation_id?: string;
+  }): Promise<{
+    success: boolean;
+    response: string;
+    intent?: string;
+    confidence?: number;
+    tool_called?: string;
+    tool_result?: any;
+    suggestions: string[];
+    requires_auth?: boolean;
+    requires_confirmation?: boolean;
+    session_id: string;
+    conversation_id?: string;
+    authenticated: boolean;
+    user_email?: string;
+    status: string;
+    persistence_error?: boolean;
+  }> {
+    const token = storage.get<string | null>(STORAGE_KEYS.token, null);
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    const res = await fetchWithTimeout(`${API_BASE}/api/agent/chat`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(parseApiError(data, "Payent Agent is temporarily unavailable."));
+    }
+    return data;
+  },
+
+  async getAgentConversations(sessionId?: string): Promise<{
+    conversations: Array<{
+      id: string;
+      user_email?: string;
+      session_id: string;
+      account_type: string;
+      status: string;
+      created_at: string;
+      updated_at: string;
+    }>;
+  }> {
+    const token = storage.get<string | null>(STORAGE_KEYS.token, null);
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    const query = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : "";
+    const res = await fetchWithTimeout(`${API_BASE}/api/agent/conversations${query}`, {
+      method: "GET",
+      headers,
+    });
+    if (!res.ok) return { conversations: [] };
+    return await res.json().catch(() => ({ conversations: [] }));
+  },
+
+  async getAgentConversationDetail(conversationId: string, sessionId?: string): Promise<{
+    conversation: any;
+    messages: Array<{
+      id: string;
+      conversation_id: string;
+      sender_type: string;
+      intent?: string;
+      content: string;
+      entities_json?: string;
+      tool_calls_json?: string;
+      created_at: string;
+    }>;
+  }> {
+    const token = storage.get<string | null>(STORAGE_KEYS.token, null);
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    const query = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : "";
+    const res = await fetchWithTimeout(`${API_BASE}/api/agent/conversations/${encodeURIComponent(conversationId)}${query}`, {
+      method: "GET",
+      headers,
+    });
+    if (!res.ok) {
+      throw new Error("Unable to retrieve conversation history.");
+    }
+    return await res.json();
+  },
 };

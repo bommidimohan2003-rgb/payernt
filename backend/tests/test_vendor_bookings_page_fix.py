@@ -16,6 +16,7 @@ Validates:
 
 import pytest
 import time
+from datetime import datetime, timezone
 from fastapi.testclient import TestClient
 
 from main import app
@@ -27,6 +28,7 @@ from database import (
     MOCK_USERS,
     MOCK_ORDERS,
     MOCK_CUSTOM_PRODUCTS,
+    MOCK_KYC_VERIFICATIONS,
     execute_query,
     find_authoritative_product
 )
@@ -61,6 +63,15 @@ def test_01_renter_creates_booking_and_vendor_retrieves_it():
         password="ValidPassword@123"
     )
     vendor_id = v_acc["id"]
+    MOCK_KYC_VERIFICATIONS[f"kyc_{vendor_email}"] = {
+        "id": f"kyc_{vendor_email}",
+        "user_id": vendor_id,
+        "email": vendor_email,
+        "full_name": "Alpha Lender",
+        "account_type": "payernt",
+        "status": "APPROVED",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
 
     # Register renter user
     create_user(
@@ -68,8 +79,18 @@ def test_01_renter_creates_booking_and_vendor_retrieves_it():
         phone="9999999999",
         password_hash="hashed_pw",
         full_name="Alpha Renter",
-        role="customer"
+        role="customer",
+        status="approved"
     )
+    MOCK_KYC_VERIFICATIONS[f"kyc_{renter_email}"] = {
+        "id": f"kyc_{renter_email}",
+        "user_id": renter_email,
+        "email": renter_email,
+        "full_name": "Alpha Renter",
+        "account_type": "payrent",
+        "status": "APPROVED",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
 
     # Vendor creates a listed product (available=True)
     prod_id = f"p_alpha_{int(time.time()*1000)}"
@@ -87,7 +108,8 @@ def test_01_renter_creates_booking_and_vendor_retrieves_it():
             "area": "Indiranagar",
             "pincode": "560038",
             "available": True,
-            "availability_status": "AVAILABLE"
+            "availability_status": "AVAILABLE",
+            "status": "approved"
         }
     )
 
@@ -227,7 +249,8 @@ def test_05_isolation_between_different_vendors():
             "title": "DJI Mini 4 Pro",
             "daily_rate": 2000.0,
             "available": True,
-            "availability_status": "AVAILABLE"
+            "availability_status": "AVAILABLE",
+            "status": "approved"
         }
     )
 
@@ -279,7 +302,8 @@ def test_06_refreshing_preserves_booking_persistence():
             "title": "Shure SM7B Microphone",
             "daily_rate": 1200.0,
             "available": True,
-            "availability_status": "AVAILABLE"
+            "availability_status": "AVAILABLE",
+            "status": "approved"
         }
     )
 
@@ -328,7 +352,8 @@ def test_07_cancellation_preserves_history_and_updates_status():
             "title": "DJI Ronin RS3 Gimbal",
             "daily_rate": 1800.0,
             "available": True,
-            "availability_status": "AVAILABLE"
+            "availability_status": "AVAILABLE",
+            "status": "approved"
         }
     )
 

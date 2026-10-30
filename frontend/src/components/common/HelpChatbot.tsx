@@ -1,269 +1,248 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MessageSquare, X, Send, Bot, AlertCircle } from "lucide-react";
+import {
+  MessageSquare,
+  X,
+  Send,
+  Bot,
+  AlertCircle,
+  RefreshCw,
+  LogIn,
+  CheckCircle2,
+  Headphones,
+} from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { api } from "@/utils/api";
+import { storage, STORAGE_KEYS } from "@/utils/storage";
 import { Button } from "@/components/common/Button";
-import type { Product, Category } from "@/types";
 
-interface Message {
+interface ChatMessage {
+  id: string;
   sender: "bot" | "user";
   text: string;
   timestamp: Date;
+  intent?: string;
+  toolCalled?: string;
+  toolResult?: any;
+  suggestions?: string[];
+  requiresAuth?: boolean;
+  requiresConfirmation?: boolean;
+  isError?: boolean;
+  lastUserQuery?: string;
 }
+
+const DEFAULT_SUGGESTIONS = [
+  "Check Booking Status",
+  "Delivery Tracking",
+  "Refund & Payment",
+  "Talk to Human Support",
+];
 
 export function HelpChatbot() {
   const [isOpen, setIsOpen] = useState(false);
-  const [productsList, setProductsList] = useState<Product[]>([]);
-  const [categoriesList, setCategoriesList] = useState<Category[]>([]);
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      sender: "bot",
-      text: "Namaste! I am your Payent Assistant. Ask me anything about our rental products, category offerings, owner earnings, or insurance protection!",
-      timestamp: new Date(),
-    },
-  ]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [activeSuggestions, setActiveSuggestions] = useState<string[]>(DEFAULT_SUGGESTIONS);
+  const [conversationId, setConversationId] = useState<string>("");
+  const [sessionId, setSessionId] = useState<string>("");
+  const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
 
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Initialize or restore session ID and welcome greeting
+  useEffect(() => {
+    let sid = sessionStorage.getItem("payent_agent_session_id");
+    if (!sid) {
+      sid = `sess_${Math.random().toString(36).substring(2, 11)}_${Date.now()}`;
+      sessionStorage.setItem("payent_agent_session_id", sid);
+    }
+    setSessionId(sid);
+
+    const savedConvId = sessionStorage.getItem("payent_agent_conv_id");
+    if (savedConvId) {
+      setConversationId(savedConvId);
+    }
+
+    const token = storage.get<string | null>(STORAGE_KEYS.token, null);
+    const user = storage.get<any>(STORAGE_KEYS.currentUser, null);
+    const email = user?.email || null;
+    setCurrentUserEmail(email);
+
+    const greetingText = token && email
+      ? `Namaste, ${user?.name || email.split("@")[0]}! I am Payent Agent. How can I assist you with your equipment rentals, orders, delivery, or support today?`
+      : "Namaste! I am Payent Agent, your digital assistant for peer-to-peer equipment rentals, bookings, payments, and support. How can I help you today?";
+
+    setMessages([
+      {
+        id: "msg_welcome",
+        sender: "bot",
+        text: greetingText,
+        timestamp: new Date(),
+        suggestions: DEFAULT_SUGGESTIONS,
+      },
+    ]);
+  }, []);
+
+  // Handle external open event (e.g. from support links)
   useEffect(() => {
     const handleOpen = () => setIsOpen(true);
     window.addEventListener("open-payent-help-chat", handleOpen);
-    return () =>
-      window.removeEventListener("open-payent-help-chat", handleOpen);
+    return () => window.removeEventListener("open-payent-help-chat", handleOpen);
   }, []);
 
+  // Account switching / logout safety: clear conversation when authentication state changes
   useEffect(() => {
-    if (!isOpen || (productsList.length > 0 && categoriesList.length > 0)) return;
-    let isMounted = true;
-    Promise.all([api.getPublicProducts(), api.getPublicCategories()]).then(
-      ([prods, cats]) => {
-        if (isMounted) {
-          if (prods) setProductsList(prods);
-          if (cats) setCategoriesList(cats);
-        }
-      },
-    );
-    return () => {
-      isMounted = false;
+    const checkAuthChange = () => {
+      const user = storage.get<any>(STORAGE_KEYS.currentUser, null);
+      const email = user?.email || null;
+      if (email !== currentUserEmail) {
+        setCurrentUserEmail(email);
+        sessionStorage.removeItem("payent_agent_conv_id");
+        setConversationId("");
+        const greeting = email
+          ? `Welcome back, ${user?.name || email.split("@")[0]}! How can I assist you today?`
+          : "Namaste! I am Payent Agent. How can I help you with your gear rentals today?";
+        setMessages([
+          {
+            id: `msg_switched_${Date.now()}`,
+            sender: "bot",
+            text: greeting,
+            timestamp: new Date(),
+            suggestions: DEFAULT_SUGGESTIONS,
+          },
+        ]);
+        setActiveSuggestions(DEFAULT_SUGGESTIONS);
+      }
     };
-  }, [isOpen, productsList.length, categoriesList.length]);
 
+    window.addEventListener("storage", checkAuthChange);
+    const interval = setInterval(checkAuthChange, 2000);
+    return () => {
+      window.removeEventListener("storage", checkAuthChange);
+      clearInterval(interval);
+    };
+  }, [currentUserEmail]);
+
+  // Auto-scroll to bottom
   useEffect(() => {
-    if (messagesEndRef.current) {
+    if (isOpen && messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
-  }, [messages, isTyping]);
+  }, [messages, isTyping, isOpen]);
 
-  const handleSend = (text: string) => {
-    if (!text.trim()) return;
+  // Focus input when opened
+  useEffect(() => {
+    if (isOpen) {
+      setTimeout(() => inputRef.current?.focus(), 250);
+    }
+  }, [isOpen]);
 
-    // User message
-    const userMsg: Message = {
-      sender: "user",
-      text,
-      timestamp: new Date(),
-    };
-    setMessages((prev) => [...prev, userMsg]);
-    setInput("");
-    setIsTyping(true);
+  const handleSend = useCallback(
+    async (textToSend: string) => {
+      const cleanText = textToSend.trim();
+      if (!cleanText || isTyping) return;
 
-    // Simulate thinking delay
-    setTimeout(() => {
-      const response = generateBotResponse(text);
-      setMessages((prev) => [
-        ...prev,
-        {
+      const userMsgId = `user_${Date.now()}`;
+      const newUserMsg: ChatMessage = {
+        id: userMsgId,
+        sender: "user",
+        text: cleanText,
+        timestamp: new Date(),
+      };
+
+      setMessages((prev) => [...prev, newUserMsg]);
+      setInput("");
+      setIsTyping(true);
+
+      try {
+        const response = await api.agentChat({
+          message: cleanText,
+          session_id: sessionId,
+          conversation_id: conversationId || undefined,
+        });
+
+        if (response.conversation_id) {
+          setConversationId(response.conversation_id);
+          sessionStorage.setItem("payent_agent_conv_id", response.conversation_id);
+        }
+
+        const botMsg: ChatMessage = {
+          id: `bot_${Date.now()}`,
           sender: "bot",
-          text: response,
+          text: response.response,
           timestamp: new Date(),
-        },
-      ]);
-      setIsTyping(false);
-    }, 1000);
+          intent: response.intent,
+          toolCalled: response.tool_called,
+          toolResult: response.tool_result,
+          suggestions: response.suggestions || [],
+          requiresAuth: response.requires_auth,
+          requiresConfirmation: response.requires_confirmation,
+        };
+
+        setMessages((prev) => [...prev, botMsg]);
+
+        if (response.suggestions && response.suggestions.length > 0) {
+          setActiveSuggestions(response.suggestions);
+        }
+      } catch (err: any) {
+        const errMsg: ChatMessage = {
+          id: `err_${Date.now()}`,
+          sender: "bot",
+          text: "I am having trouble connecting to the Payent Agent service right now. Please check your connection or try again in a few moments.",
+          timestamp: new Date(),
+          isError: true,
+          lastUserQuery: cleanText,
+          suggestions: ["Try Again", "Help Center", "Talk to Human Support"],
+        };
+        setMessages((prev) => [...prev, errMsg]);
+        setActiveSuggestions(["Try Again", "Help Center", "Talk to Human Support"]);
+      } finally {
+        setIsTyping(false);
+      }
+    },
+    [conversationId, isTyping, sessionId]
+  );
+
+  const renderFormattedText = (text: string) => {
+    if (!text) return null;
+    const lines = text.split("\n");
+    return (
+      <div className="space-y-1">
+        {lines.map((line, lIdx) => {
+          if (!line.trim()) return <div key={lIdx} className="h-1.5" />;
+
+          // Parse basic bold markdown: **bold**
+          const parts = line.split(/(\*\*[^*]+\*\*)/g);
+          return (
+            <p key={lIdx} className="leading-relaxed">
+              {parts.map((part, pIdx) => {
+                if (part.startsWith("**") && part.endsWith("**")) {
+                  return (
+                    <strong key={pIdx} className="font-semibold text-foreground">
+                      {part.slice(2, -2)}
+                    </strong>
+                  );
+                }
+                return <span key={pIdx}>{part}</span>;
+              })}
+            </p>
+          );
+        })}
+      </div>
+    );
   };
-
-  const generateBotResponse = (query: string): string => {
-    const q = query.toLowerCase().trim();
-
-    // Check if query is related to payent rentals
-    const isPayentRelated =
-      /payent|rent|lend|price|rate|cost|gear|deposit|insur|deliver|city|cities|owner|earn|product|list|item/i.test(
-        q,
-      ) ||
-      categoriesList.some(
-        (cat) => q.includes(cat.id) || q.includes(cat.name.toLowerCase()),
-      ) ||
-      productsList.some(
-        (p) => q.includes(p.title.toLowerCase()) || q.includes(p.category),
-      );
-
-    if (!isPayentRelated && !/hi|hello|hey|namaste|help/i.test(q)) {
-      return "I am the Payent AI Assistant, trained specifically to assist with peer-to-peer rentals on the Payent platform. I can only answer questions related to our gear listings, daily rental rates, owner earnings, platform cities, and insurance coverage. How can I help you with your rental today?";
-    }
-
-    // 1. Bikes & Rides
-    if (
-      q.includes("bike") ||
-      q.includes("scooter") ||
-      q.includes("ride") ||
-      q.includes("cycle") ||
-      q.includes("enfield") ||
-      q.includes("ktm") ||
-      q.includes("activa")
-    ) {
-      const bikes = productsList.filter((p) => p.category === "bikes");
-      if (bikes.length === 0) {
-        return "We have multiple rides available on Payent! Browse the marketplace to find the latest available vehicles.";
-      }
-      let bikeListText =
-        "We have multiple premium rides available for rent on Payent:\n";
-      bikes.forEach((b) => {
-        bikeListText += `• *${b.title}* - ₹${b.price}/day (${b.description.slice(0, 60)}...)\n`;
-      });
-      return bikeListText + "\nSelect any ride to book it directly on Payent!";
-    }
-
-    // 2. Drilling machines & tools
-    if (
-      q.includes("drill") ||
-      q.includes("machine") ||
-      q.includes("tool") ||
-      q.includes("saw") ||
-      q.includes("grinder") ||
-      q.includes("bosch") ||
-      q.includes("dewalt") ||
-      q.includes("makita")
-    ) {
-      const tools = productsList.filter((p) => p.category === "tools");
-      if (tools.length === 0) {
-        return "Yes! We list heavy-duty electric tools for home projects and contract work. Browse the marketplace categories for current availability.";
-      }
-      let toolListText =
-        "Yes! We list heavy-duty electric tools for home projects and contract work:\n";
-      tools.forEach((t) => {
-        toolListText += `• *${t.title}* - ₹${t.price}/day (Perfect for drilling, grinding, or sawing)\n`;
-      });
-      return (
-        toolListText +
-        "\nAll tools include standard handles, cables, and basic safety accessories."
-      );
-    }
-
-    // 3. Power banks
-    if (
-      q.includes("power") ||
-      q.includes("bank") ||
-      q.includes("anker") ||
-      q.includes("ambrane") ||
-      q.includes("charger") ||
-      q.includes("battery")
-    ) {
-      const powerbanks = productsList.filter(
-        (p) => p.category === "powerbanks",
-      );
-      if (powerbanks.length === 0) {
-        return "We offer high-capacity power banks perfect for outdoor shoots or trips! Search our powerbanks category to rent.";
-      }
-      let pbListText =
-        "We have high-capacity power banks perfect for outdoor shoots or trips:\n";
-      powerbanks.forEach((pb) => {
-        pbListText += `• *${pb.title}* - ₹${pb.price}/day\n`;
-      });
-      return (
-        pbListText +
-        "\nKeep your cameras, drones, or laptops charged on the go!"
-      );
-    }
-
-    // 4. Cameras
-    if (
-      q.includes("camera") ||
-      q.includes("sony") ||
-      q.includes("lens") ||
-      q.includes("mirrorless")
-    ) {
-      const camera = productsList.find((p) => p.category === "cameras");
-      return camera
-        ? `We have professional cameras like the *${camera.title}* for rent at just ₹${camera.price}/day. It includes a lens, additional batteries, and a carrying case.`
-        : "We rent professional full-frame mirrorless cameras, lenses, and accessories at competitive daily rates.";
-    }
-
-    // 5. Laptops & Drones
-    if (q.includes("laptop") || q.includes("macbook")) {
-      const macbook = productsList.find((p) => p.category === "laptops");
-      return macbook
-        ? `You can rent the high-end *${macbook.title}* for editing or development work at ₹${macbook.price}/day.`
-        : "Need power on the go? Rent premium editing and coding laptops by the day.";
-    }
-
-    if (q.includes("drone") || q.includes("dji") || q.includes("mavic")) {
-      const drone = productsList.find((p) => p.category === "drones");
-      return drone
-        ? `Fly in style! Rent the *${drone.title}* with triple-cameras and additional flight batteries for ₹${drone.price}/day.`
-        : "We offer professional DJI camera drones for cinematic aerial videography.";
-    }
-
-    // 6. Insurance & Security
-    if (
-      q.includes("deposit") ||
-      q.includes("security") ||
-      q.includes("insur") ||
-      q.includes("safe") ||
-      q.includes("damage") ||
-      q.includes("protect")
-    ) {
-      return "Payent offers ₹5 Lakhs damage protection coverage on every single rental. To ensure a seamless P2P experience, verified renters do not need to pay security deposits. If any damage occurs, our insurance system covers verified claims.";
-    }
-
-    // 7. Becoming a lender & earnings
-    if (
-      q.includes("earn") ||
-      q.includes("lend") ||
-      q.includes("list") ||
-      q.includes("become lender") ||
-      q.includes("income")
-    ) {
-      return "Becoming a Payent Lender is extremely easy! You can list your unused tech gear, tools, or rides in under 2 minutes. High-demand items like cameras, laptops, and bikes can help you earn up to ₹1 Lakh/month in passive income.";
-    }
-
-    // 8. Locations / Cities
-    if (
-      q.includes("city") ||
-      q.includes("cities") ||
-      q.includes("locat") ||
-      q.includes("where") ||
-      q.includes("deliver")
-    ) {
-      return "Payent operates in over 40+ major Indian cities (including Bengaluru, Mumbai, Delhi-NCR, Pune, Hyderabad, and Chennai). We offer direct same-day delivery or easy local pickup options for all rental bookings.";
-    }
-
-    // Greetings
-    if (/hi|hello|hey|namaste/i.test(q)) {
-      return "Hello! How can I help you today? Ask me about our rental bikes, electric drills, power banks, pricing, or lending requirements.";
-    }
-
-    // Default payent general response
-    return "Payent is India's premium peer-to-peer tech gear and utility rental marketplace. You can search our marketplace for Cameras, Laptops, Drones, Bikes, Electric Tools, and Power Banks. All items are fully insured up to ₹5 Lakhs, and verified users pay zero security deposit. Let me know what specific gear you are looking to rent!";
-  };
-
-  const quickQuestions = [
-    "What bikes are available for rent?",
-    "Do you have drilling machines or electric tools?",
-    "Show me available Power Banks & rates",
-    "How does the ₹5 Lakhs damage protection work?",
-    "How can I list my gear and earn passive income?",
-  ];
 
   return (
     <>
-      {/* Floating launcher button */}
+      {/* Floating launcher button (Responsive: visible on mobile & desktop) */}
       <motion.button
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         onClick={() => setIsOpen((prev) => !prev)}
-        className="fixed bottom-6 right-6 z-40 h-14 w-14 rounded-full btn-gradient shadow-lg hidden lg:flex items-center justify-center text-white"
-        aria-label="Payent Support Chatbot"
+        className="fixed bottom-6 right-6 z-40 h-14 w-14 rounded-full bg-foreground text-background shadow-2xl flex items-center justify-center border border-border/80 hover:bg-foreground/90 transition-colors"
+        aria-label="Payent Support Assistant"
       >
         <AnimatePresence mode="wait">
           {isOpen ? (
@@ -280,11 +259,11 @@ export function HelpChatbot() {
               key="chat"
               initial={{ rotate: 90, opacity: 0 }}
               animate={{ rotate: 0, opacity: 1 }}
-              exit={{ rotate: -90, opacity: 0 }}
+              exit={{ rotate: 90, opacity: 0 }}
               className="relative"
             >
               <MessageSquare className="h-6 w-6" />
-              <span className="absolute -top-1.5 -right-1.5 h-3 w-3 bg-destructive border border-background rounded-full animate-pulse" />
+              <span className="absolute -top-1 -right-1 h-3 w-3 bg-emerald-500 border-2 border-background rounded-full animate-pulse" />
             </motion.div>
           )}
         </AnimatePresence>
@@ -294,96 +273,178 @@ export function HelpChatbot() {
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, y: 50, scale: 0.9 }}
+            initial={{ opacity: 0, y: 30, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 50, scale: 0.9 }}
-            className="fixed bottom-24 right-6 z-50 w-[380px] max-w-[calc(100vw-2rem)] h-[540px] max-h-[calc(100vh-8rem)] rounded-2xl glass border border-border shadow-2xl flex flex-col overflow-hidden"
+            exit={{ opacity: 0, y: 30, scale: 0.95 }}
+            transition={{ duration: 0.2 }}
+            className="fixed bottom-24 right-4 sm:right-6 z-50 w-[390px] max-w-[calc(100vw-2rem)] h-[560px] max-h-[calc(100vh-7.5rem)] rounded-2xl bg-card border border-border shadow-2xl flex flex-col overflow-hidden"
           >
             {/* Header */}
-            <div className="p-4 btn-gradient text-white flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="h-9 w-9 rounded-xl bg-white/20 grid place-items-center">
-                  <Bot className="h-5 w-5 text-white" />
+            <div className="p-3.5 bg-foreground text-background flex items-center justify-between border-b border-border/40">
+              <div className="flex items-center gap-2.5">
+                <div className="h-9 w-9 rounded-xl bg-background/10 grid place-items-center border border-background/20">
+                  <Bot className="h-5 w-5 text-background" />
                 </div>
                 <div>
-                  <h4 className="font-bold text-sm leading-none flex items-center gap-1.5">
-                    Payent Support Assistant
+                  <h4 className="font-semibold text-sm leading-tight flex items-center gap-1.5">
+                    Payent Agent
                   </h4>
-                  <span className="text-[11px] text-white/80">
-                    Support Online
-                  </span>
+                  <div className="flex items-center gap-1.5 text-[11px] text-background/70">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                    <span>Deterministic Assistant • Telugu & English</span>
+                  </div>
                 </div>
               </div>
               <button
                 onClick={() => setIsOpen(false)}
-                className="hover:bg-white/10 p-1.5 rounded-lg transition-colors"
-                aria-label="Minimize Chat"
+                className="hover:bg-background/10 p-1.5 rounded-lg transition-colors text-background"
+                aria-label="Close Chat"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            {/* Warning bar for platform limitations */}
-            <div className="bg-amber-500/10 dark:bg-amber-500/5 border-b border-amber-500/10 px-3 py-2 flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400">
-              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-              <span>Answers are limited strictly to Payent rental topics.</span>
-            </div>
-
             {/* Chat Body */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-background/50 scrollbar-thin">
-              {messages.map((m, idx) => (
-                <div
-                  key={idx}
-                  className={`flex ${m.sender === "user" ? "justify-end" : "justify-start"}`}
-                >
+            <div className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-background/60 scrollbar-thin">
+              {messages.map((m) => {
+                const isUser = m.sender === "user";
+                const toolRes = m.toolResult;
+                const hasCreatedTicket =
+                  toolRes &&
+                  typeof toolRes === "object" &&
+                  toolRes.ticket_id &&
+                  (m.toolCalled === "create_support_ticket" || toolRes.ticket_id.startsWith("TICK-"));
+
+                return (
                   <div
-                    className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm shadow-sm ${m.sender === "user"
-                        ? "btn-gradient text-white rounded-tr-none"
-                        : "bg-secondary/70 border border-border text-foreground rounded-tl-none whitespace-pre-line"
-                      }`}
+                    key={m.id}
+                    className={`flex flex-col ${isUser ? "items-end" : "items-start"}`}
                   >
-                    {m.text}
+                    <div
+                      className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm shadow-sm ${
+                        isUser
+                          ? "bg-foreground text-background rounded-tr-none font-medium"
+                          : "bg-secondary/70 border border-border text-foreground rounded-tl-none"
+                      }`}
+                    >
+                      {renderFormattedText(m.text)}
+
+                      {/* Created Support Ticket Card */}
+                      {hasCreatedTicket && (
+                        <div className="mt-3 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-foreground">
+                          <div className="flex items-center justify-between font-semibold text-emerald-600 dark:text-emerald-400 mb-1.5">
+                            <span className="flex items-center gap-1">
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                              Support Ticket Confirmed
+                            </span>
+                            <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-[10px] font-bold uppercase tracking-wider">
+                              {toolRes.status || "OPEN"}
+                            </span>
+                          </div>
+                          <div className="font-mono text-[11px] text-foreground font-semibold">
+                            Ticket #{toolRes.ticket_id}
+                          </div>
+                          <div className="text-muted-foreground text-[11px] mt-0.5">
+                            Category: {toolRes.category || "General Help"}
+                          </div>
+                          <div className="mt-2 pt-2 border-t border-emerald-500/20 flex gap-2">
+                            <Link
+                              to="/support"
+                              className="text-xs text-emerald-600 dark:text-emerald-400 font-medium hover:underline flex items-center gap-1"
+                              onClick={() => setIsOpen(false)}
+                            >
+                              <Headphones className="h-3 w-3" />
+                              View in Support Messages
+                            </Link>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Sign In Required Callout */}
+                      {m.requiresAuth && (
+                        <div className="mt-2.5 pt-2 border-t border-border flex items-center gap-2">
+                          <Link
+                            to="/login"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-foreground text-background text-xs font-semibold hover:bg-foreground/90 transition-colors"
+                            onClick={() => setIsOpen(false)}
+                          >
+                            <LogIn className="h-3.5 w-3.5" />
+                            Sign In to Payent
+                          </Link>
+                        </div>
+                      )}
+
+                      {/* Retry on Error */}
+                      {m.isError && m.lastUserQuery && (
+                        <div className="mt-2 pt-2 border-t border-border">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleSend(m.lastUserQuery!)}
+                            className="h-7 text-xs flex items-center gap-1.5"
+                          >
+                            <RefreshCw className="h-3 w-3" />
+                            Retry Query
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                    <span className="text-[10px] text-muted-foreground/70 mt-1 px-1">
+                      {new Date(m.timestamp).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
                   </div>
-                </div>
-              ))}
+                );
+              })}
+
+              {/* Typing indicator */}
               {isTyping && (
                 <div className="flex justify-start">
-                  <div className="bg-secondary/70 border border-border text-foreground rounded-2xl rounded-tl-none px-4 py-2.5 flex items-center gap-1">
+                  <div className="bg-secondary/70 border border-border text-foreground rounded-2xl rounded-tl-none px-4 py-2.5 flex items-center gap-1.5">
                     <span
-                      className="h-2 w-2 rounded-full bg-muted-foreground/60 animate-bounce"
+                      className="h-2 w-2 rounded-full bg-foreground/60 animate-bounce"
                       style={{ animationDelay: "0ms" }}
                     />
                     <span
-                      className="h-2 w-2 rounded-full bg-muted-foreground/60 animate-bounce"
+                      className="h-2 w-2 rounded-full bg-foreground/60 animate-bounce"
                       style={{ animationDelay: "150ms" }}
                     />
                     <span
-                      className="h-2 w-2 rounded-full bg-muted-foreground/60 animate-bounce"
+                      className="h-2 w-2 rounded-full bg-foreground/60 animate-bounce"
                       style={{ animationDelay: "300ms" }}
                     />
                   </div>
                 </div>
               )}
-              <div ref={messagesEndRef} />
 
-              {/* Suggestions */}
-              {messages.length === 1 && (
-                <div className="pt-2 space-y-2">
-                  <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">
-                    Suggested Questions
-                  </span>
-                  {quickQuestions.map((q, i) => (
-                    <button
-                      key={i}
-                      onClick={() => handleSend(q)}
-                      className="w-full text-left p-2.5 text-xs rounded-xl bg-card border border-border hover:border-primary hover:bg-secondary transition-colors font-medium text-foreground/80 hover:text-foreground"
-                    >
-                      {q}
-                    </button>
-                  ))}
-                </div>
-              )}
+              <div ref={messagesEndRef} />
             </div>
+
+            {/* Dynamic Suggestion Chips */}
+            {activeSuggestions.length > 0 && (
+              <div className="px-3.5 py-2 border-t border-border/60 bg-secondary/30 flex flex-wrap gap-1.5">
+                {activeSuggestions.map((suggestion, sIdx) => {
+                  const isConfirm = suggestion.toLowerCase().includes("confirm");
+                  return (
+                    <button
+                      key={sIdx}
+                      type="button"
+                      disabled={isTyping}
+                      onClick={() => handleSend(suggestion)}
+                      className={`text-xs px-2.5 py-1 rounded-lg border transition-all text-left font-medium ${
+                        isConfirm
+                          ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 font-semibold"
+                          : "bg-card border-border hover:border-foreground/40 text-foreground/80 hover:text-foreground"
+                      }`}
+                    >
+                      {suggestion}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
             {/* Input Footer */}
             <form
@@ -391,20 +452,23 @@ export function HelpChatbot() {
                 e.preventDefault();
                 handleSend(input);
               }}
-              className="p-3 border-t border-border bg-card flex gap-2"
+              className="p-3 border-t border-border bg-card flex gap-2 items-center"
             >
               <input
+                ref={inputRef}
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask about Payent rentals..."
-                className="flex-1 h-10 px-3 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                placeholder="Ask in English or Telugu (T-English)..."
+                disabled={isTyping}
+                maxLength={2000}
+                className="flex-1 h-10 px-3.5 rounded-xl border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-foreground transition-all"
               />
               <Button
                 type="submit"
                 size="icon"
                 disabled={!input.trim() || isTyping}
-                className="shrink-0"
+                className="shrink-0 h-10 w-10 rounded-xl bg-foreground text-background hover:bg-foreground/90 disabled:opacity-40"
               >
                 <Send className="h-4 w-4" />
               </Button>
