@@ -12,8 +12,10 @@ import {
   MessageSquare,
   AlertCircle,
   ShieldAlert,
+  Sparkles,
 } from "lucide-react";
 import { notificationsService } from "../services/notifications";
+import { suggestKnowledgeFromTicket } from "../services/knowledge";
 import { AdminSupportTicket } from "../services/api";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -31,6 +33,7 @@ export default function Support() {
   // Reply state
   const [reply, setReply] = useState("");
   const [submittingReply, setSubmittingReply] = useState(false);
+  const [suggestingKnowledge, setSuggestingKnowledge] = useState(false);
 
   const fetchTickets = useCallback(async (silent = false) => {
     try {
@@ -69,6 +72,19 @@ export default function Support() {
       toast.error("Failed to submit support reply.");
     } finally {
       setSubmittingReply(false);
+    }
+  };
+
+  const handleSuggestKnowledge = async () => {
+    if (!selectedTicket) return;
+    try {
+      setSuggestingKnowledge(true);
+      const res = await suggestKnowledgeFromTicket(selectedTicket.id);
+      toast.success(res.message || "Draft suggested for knowledge base review!");
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || "Failed to create draft suggestion.");
+    } finally {
+      setSuggestingKnowledge(false);
     }
   };
 
@@ -310,6 +326,18 @@ export default function Support() {
                 </div>
 
                 <div className="flex items-center gap-1.5">
+                  {selectedTicket.status === "resolved" && (
+                    <button
+                      type="button"
+                      onClick={handleSuggestKnowledge}
+                      disabled={suggestingKnowledge}
+                      title="Suggest this resolved support thread as a draft knowledge article"
+                      className="px-2.5 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-semibold flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-colors"
+                    >
+                      <Sparkles className="h-3.5 w-3.5" />
+                      <span>{suggestingKnowledge ? "Suggesting..." : "Suggest as Knowledge"}</span>
+                    </button>
+                  )}
                   <select
                     value={selectedTicket.status}
                     onChange={(e) => handleUpdateStatus(e.target.value as AdminSupportTicket["status"])}
