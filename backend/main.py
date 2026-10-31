@@ -341,6 +341,13 @@ try:
 except Exception as agent_router_err:
     logger.warning(f"Notice: Failed to register agent router: {agent_router_err}")
 
+# Register Payent Agent Admin Knowledge Router (Phase 8.6)
+try:
+    from admin_knowledge_router import admin_knowledge_router
+    app.include_router(admin_knowledge_router)
+except Exception as admin_knowledge_router_err:
+    logger.warning(f"Notice: Failed to register admin knowledge router: {admin_knowledge_router_err}")
+
 _cache_store = {}
 
 def get_cached(key: str, ttl_seconds: int, fetch_func):

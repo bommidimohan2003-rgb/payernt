@@ -27,6 +27,7 @@ from database import (
     execute_query,
     fetch_all,
     fetch_one,
+    get_db_connection,
     get_order_by_id,
 )
 
@@ -192,26 +193,27 @@ def find_active_support_ticket(
     except Exception:
         pass
 
-    # 2. Search in Mock store
-    from database import MOCK_SUPPORT_TICKETS
-    for t in MOCK_SUPPORT_TICKETS.values():
-        if (t.get("user_email") or "").strip().lower() == clean_email:
-            st = str(t.get("status") or "open").lower()
-            if st in ('open', 'pending', 'in_progress', 'waiting_for_user'):
-                msgs = t.get("messages") or []
-                if isinstance(msgs, str):
-                    try:
-                        msgs = json.loads(msgs)
-                    except Exception:
-                        msgs = []
-                if conversation_id:
-                    for m in msgs:
-                        if m.get("conversationId") == conversation_id:
+    # 2. Search in Mock store ONLY if not in production
+    if not IS_PRODUCTION:
+        from database import MOCK_SUPPORT_TICKETS
+        for t in MOCK_SUPPORT_TICKETS.values():
+            if (t.get("user_email") or "").strip().lower() == clean_email:
+                st = str(t.get("status") or "open").lower()
+                if st in ('open', 'pending', 'in_progress', 'waiting_for_user'):
+                    msgs = t.get("messages") or []
+                    if isinstance(msgs, str):
+                        try:
+                            msgs = json.loads(msgs)
+                        except Exception:
+                            msgs = []
+                    if conversation_id:
+                        for m in msgs:
+                            if m.get("conversationId") == conversation_id:
+                                return t
+                    if booking_id:
+                        tb = t.get("bookingId") or t.get("booking_id")
+                        if tb and str(tb).strip() == str(booking_id).strip():
                             return t
-                if booking_id:
-                    tb = t.get("bookingId") or t.get("booking_id")
-                    if tb and str(tb).strip() == str(booking_id).strip():
-                        return t
 
     return None
 
@@ -486,23 +488,48 @@ def get_user_support_tickets(context: AgentSessionContext, limit: int = 5) -> Di
 
     # Read from DB
     try:
-        rows = fetch_all("""
-            SELECT * FROM support_tickets 
-            WHERE LOWER(user_email) = %s 
-            ORDER BY COALESCE(updated_at, created_at) DESC
-            LIMIT %s
-        """, (clean_email, limit))
-        if rows:
-            tickets.extend(rows)
-    except Exception:
-        pass
+        conn = get_db_connection()
+        if conn:
+            try:
+                with conn.cursor() as cursor:
+                    cursor.execute("""
+                        SELECT * FROM support_tickets 
+                        WHERE LOWER(user_email) = %s 
+                        ORDER BY COALESCE(updated_at, created_at) DESC
+                        LIMIT %s
+                    """, (clean_email, limit))
+                    rows = cursor.fetchall()
+                    if rows:
+                        tickets.extend(rows)
+            finally:
+                conn.close()
+        else:
+            if IS_PRODUCTION:
+                return {
+                    "success": False,
+                    "error": "Payent support ticket service is temporarily unavailable due to a database connection delay. Please try again shortly.",
+                    "status": "service_unavailable",
+                    "database_error": True,
+                    "tickets": [],
+                }
+    except Exception as e:
+        logger.warning(f"Database error in get_user_support_tickets: {e}")
+        if IS_PRODUCTION:
+            return {
+                "success": False,
+                "error": "Payent support ticket service is temporarily unavailable due to a database connection delay. Please try again shortly.",
+                "status": "service_unavailable",
+                "database_error": True,
+                "tickets": [],
+            }
 
-    # Read from Mock
-    from database import MOCK_SUPPORT_TICKETS
-    seen_ids = {t["id"] for t in tickets}
-    for tid, mt in MOCK_SUPPORT_TICKETS.items():
-        if tid not in seen_ids and (mt.get("user_email") or "").strip().lower() == clean_email:
-            tickets.append(mt)
+    # Read from Mock ONLY if not in production
+    if not IS_PRODUCTION:
+        from database import MOCK_SUPPORT_TICKETS
+        seen_ids = {t["id"] for t in tickets}
+        for tid, mt in MOCK_SUPPORT_TICKETS.items():
+            if tid not in seen_ids and (mt.get("user_email") or "").strip().lower() == clean_email:
+                tickets.append(mt)
 
     sanitized_tickets = []
     for t in tickets[:limit]:
@@ -528,11 +555,33 @@ def get_support_ticket_detail(context: AgentSessionContext, ticket_id: str) -> D
     ticket = None
 
     try:
-        ticket = fetch_one("SELECT * FROM support_tickets WHERE id = %s", (clean_tid,))
-    except Exception:
-        pass
+        conn = get_db_connection()
+        if conn:
+            try:
+                with conn.cursor() as cursor:
+                    cursor.execute("SELECT * FROM support_tickets WHERE id = %s", (clean_tid,))
+                    ticket = cursor.fetchone()
+            finally:
+                conn.close()
+        else:
+            if IS_PRODUCTION:
+                return {
+                    "success": False,
+                    "error": "Payent support ticket service is temporarily unavailable due to a database connection delay. Please try again shortly.",
+                    "status": "service_unavailable",
+                    "database_error": True,
+                }
+    except Exception as e:
+        logger.warning(f"Database error in get_support_ticket_detail: {e}")
+        if IS_PRODUCTION:
+            return {
+                "success": False,
+                "error": "Payent support ticket service is temporarily unavailable due to a database connection delay. Please try again shortly.",
+                "status": "service_unavailable",
+                "database_error": True,
+            }
 
-    if not ticket:
+    if not ticket and not IS_PRODUCTION:
         from database import MOCK_SUPPORT_TICKETS
         ticket = MOCK_SUPPORT_TICKETS.get(clean_tid)
 

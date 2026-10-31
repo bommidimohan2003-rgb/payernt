@@ -13,8 +13,12 @@ class TestFix1PaymentWebhookIntegrity(unittest.TestCase):
         """Verify that starting config with empty RAZORPAY_WEBHOOK_SECRET in production logs a warning and loads cleanly."""
         with patch.dict("os.environ", {
             "ENVIRONMENT": "production",
+            "ALLOW_PRODUCTION_TESTING": "true",
             "JWT_SECRET_KEY": "supersecretkey_production_test_12345",
-            "MYSQL_PASSWORD": "StrongProductionPassword123!",
+            "PIN_HASH_SECRET": "test_pin_hash_secret_production_safe_123",
+            "TIDB_HOST": "gateway01.prod.tidbcloud.com",
+            "TIDB_USER": "test_tidb_user",
+            "TIDB_PASSWORD": "StrongProductionPassword123!",
             "ADMIN_SETUP_CODE": "AdminSetupCode123!",
             "RAZORPAY_WEBHOOK_SECRET": ""
         }):

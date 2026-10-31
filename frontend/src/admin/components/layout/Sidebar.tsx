@@ -21,6 +21,7 @@ import {
   Menu,
   X,
   KeyRound,
+  BookOpen,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -55,6 +56,7 @@ const menuItems = [
       { to: "/admin/agents", icon: UserCheck, label: "Agents" },
       { to: "/admin/products", icon: Package, label: "Products" },
       { to: "/admin/categories", icon: Grid, label: "Categories" },
+      { to: "/admin/knowledge", icon: BookOpen, label: "Knowledge Base" },
     ],
   },
   {

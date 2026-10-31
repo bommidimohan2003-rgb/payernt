@@ -8,7 +8,7 @@ from typing import Any, Dict, Optional
 
 from agent_engine.context import AgentSessionContext
 from agent_engine.privacy import sanitize_kyc_record
-from database import get_user_kyc_status
+from database import DatabaseConnectionError, get_user_kyc_status
 
 
 def get_kyc_status_tool(
@@ -32,6 +32,13 @@ def get_kyc_status_tool(
 
     try:
         raw_kyc = get_user_kyc_status(context.clean_email, norm_acc_type)
+    except DatabaseConnectionError:
+        return {
+            "success": False,
+            "error": "Payent KYC verification service is temporarily unavailable due to a database connection delay. Please try again shortly.",
+            "status": "service_unavailable",
+            "database_error": True
+        }
     except Exception as e:
         return {
             "success": False,

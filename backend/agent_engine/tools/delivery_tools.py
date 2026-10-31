@@ -8,7 +8,7 @@ from typing import Any, Dict, Optional
 
 from agent_engine.context import AgentSessionContext
 from agent_engine.privacy import sanitize_delivery_record
-from database import get_delivery, get_delivery_by_booking, get_order_by_id
+from database import DatabaseConnectionError, get_delivery, get_delivery_by_booking, get_order_by_id
 
 
 def get_delivery_status_tool(
@@ -46,12 +46,30 @@ def get_delivery_status_tool(
             raw_delivery = get_delivery(clean_did)
             if raw_delivery:
                 target_bid = str(raw_delivery.get("booking_id") or "").strip()
+    except DatabaseConnectionError:
+        return {
+            "success": False,
+            "error": "Payent delivery tracking service is temporarily unavailable due to a database connection delay. Please try again shortly.",
+            "status": "service_unavailable",
+            "database_error": True
+        }
     except Exception as e:
         return {"success": False, "error": f"Error querying delivery record: {str(e)}"}
 
     # Resolve associated booking to perform authoritative ownership check
     if target_bid:
-        order = get_order_by_id(target_bid)
+        try:
+            order = get_order_by_id(target_bid)
+        except DatabaseConnectionError:
+            return {
+                "success": False,
+                "error": "Payent delivery tracking service is temporarily unavailable due to a database connection delay. Please try again shortly.",
+                "status": "service_unavailable",
+                "database_error": True
+            }
+        except Exception:
+            order = None
+
         if order and not context.can_access_booking(order):
             return {
                 "success": False,
