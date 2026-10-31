@@ -33,6 +33,12 @@ from config import MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DB,
 logger = logging.getLogger("payent.database")
 _BOOKING_CONCURRENCY_LOCK = threading.RLock()
 
+
+class DatabaseConnectionError(RuntimeError):
+    """Raised when the persistent database connection cannot be established or drops in production."""
+    pass
+
+
 def get_ssl_kwargs():
     """
     Configure secure verified TLS for TiDB Cloud / MySQL database connections.
@@ -1257,6 +1263,12 @@ def init_db(force: bool = False):
     except Exception as agent_tables_err:
         print(f"Notice: Agent tables initialization notice: {agent_tables_err}")
 
+    try:
+        from agent_engine.retrieval import init_knowledge_tables
+        init_knowledge_tables()
+    except Exception as knowledge_err:
+        print(f"Notice: Knowledge tables initialization notice: {knowledge_err}")
+
     _db_initialized = True
     print("MySQL database structures initialized.")
 
@@ -1414,6 +1426,10 @@ def get_user(email: str):
             return user
     except Exception as e:
         logger.warning("DB read error in get_user for %s — falling back to MOCK_USERS: %s", clean_email, e)
+
+    # In production, never return mock user records
+    if IS_PRODUCTION:
+        return None
 
     res = MOCK_USERS.get(clean_email)
     if res:
@@ -1997,12 +2013,21 @@ def get_orders(email: str):
                         LIMIT 100
                     """, (clean_email,))
                     rows = cursor.fetchall()
-                    if rows:
-                        return rows
+                    return rows if rows is not None else []
             finally:
                 conn.close()
+        else:
+            if IS_PRODUCTION:
+                raise DatabaseConnectionError("Database connection unavailable in production")
+    except DatabaseConnectionError:
+        raise
     except Exception as e:
-        print(f"Notice: Database read error in get_orders: {e}")
+        logger.warning(f"Database read error in get_orders: {e}")
+        if IS_PRODUCTION:
+            raise DatabaseConnectionError(f"Database read error in get_orders: {e}") from e
+
+    if IS_PRODUCTION:
+        return []
     return [o for o in MOCK_ORDERS.values() if (o.get("user_email") or o.get("userEmail")) == clean_email]
 
 
@@ -3564,7 +3589,32 @@ def get_all_custom_products():
     return list(MOCK_CUSTOM_PRODUCTS.values())
 
 MOCK_AGENTS = {}
-MOCK_SUPPORT_TICKETS: Dict[str, dict] = {}
+MOCK_SUPPORT_TICKETS: Dict[str, dict] = {
+    "TCK-2026-001": {
+        "id": "TCK-2026-001",
+        "ticket_id": "TCK-2026-001",
+        "subject": "Can I pick up rental items on Sunday?",
+        "category": "DELIVERY",
+        "status": "resolved",
+        "messages": [
+            {
+                "id": "m1",
+                "sender": "user",
+                "message": "Are pickup centers open on Sunday in Hyderabad? Call me at +91 9876543210 or email user@test.in.",
+            },
+            {
+                "id": "m2",
+                "sender": "admin",
+                "message": "Yes, Hyderabad hub operates Monday through Sunday 9 AM to 8 PM.",
+            },
+            {
+                "id": "m3",
+                "sender": "admin",
+                "message": "CONFIDENTIAL INTERNAL NOTE: Sunday staff operates on double shift overtime.",
+            },
+        ],
+    }
+}
 
 REAL_ACCOUNTS = {
     "bommidimohan2003@gmail.com",
@@ -4757,11 +4807,30 @@ def get_order_by_id(order_id: str):
     if not order_id:
         return None
     try:
-        order = fetch_one("SELECT * FROM orders WHERE id = %s", (order_id,))
-        if order:
-            return order
+        conn = get_db_connection()
+        if conn:
+            try:
+                with conn.cursor() as cursor:
+                    cursor.execute("SELECT * FROM orders WHERE id = %s", (order_id,))
+                    order = cursor.fetchone()
+                    if order:
+                        return order
+                    if IS_PRODUCTION:
+                        return None
+            finally:
+                conn.close()
+        else:
+            if IS_PRODUCTION:
+                raise DatabaseConnectionError("Database connection unavailable in production")
+    except DatabaseConnectionError:
+        raise
     except Exception as e:
-        print(f"Warning: Database read error in get_order_by_id: {e}")
+        logger.warning(f"Database read error in get_order_by_id: {e}")
+        if IS_PRODUCTION:
+            raise DatabaseConnectionError(f"Database read error in get_order_by_id: {e}") from e
+
+    if IS_PRODUCTION:
+        return None
     return MOCK_ORDERS.get(order_id)
 
 MOCK_PROCESSED_EVENTS = set()
@@ -5903,7 +5972,7 @@ def find_authoritative_product(product_id: str) -> Optional[Dict[str, Any]]:
         p = get_payernt_product_by_id(pid, include_pin=False)
         if p:
             return p
-        if pid in MOCK_PAYERNT_PRODUCTS:
+        if not IS_PRODUCTION and pid in MOCK_PAYERNT_PRODUCTS:
             return MOCK_PAYERNT_PRODUCTS[pid]
     except Exception:
         pass
@@ -5916,22 +5985,23 @@ def find_authoritative_product(product_id: str) -> Optional[Dict[str, Any]]:
     except Exception:
         pass
 
-    # 3. Check MOCK_CUSTOM_PRODUCTS
-    if pid in MOCK_CUSTOM_PRODUCTS:
+    # 3. Check MOCK_CUSTOM_PRODUCTS (dev/test only)
+    if not IS_PRODUCTION and pid in MOCK_CUSTOM_PRODUCTS:
         return MOCK_CUSTOM_PRODUCTS[pid]
 
     # 4. Case-insensitive lookup fallback
-    pid_lower = pid.lower()
-    try:
-        from payernt_database import MOCK_PAYERNT_PRODUCTS
-        for k, v in MOCK_PAYERNT_PRODUCTS.items():
+    if not IS_PRODUCTION:
+        pid_lower = pid.lower()
+        try:
+            from payernt_database import MOCK_PAYERNT_PRODUCTS
+            for k, v in MOCK_PAYERNT_PRODUCTS.items():
+                if str(k).lower() == pid_lower:
+                    return v
+        except Exception:
+            pass
+        for k, v in MOCK_CUSTOM_PRODUCTS.items():
             if str(k).lower() == pid_lower:
                 return v
-    except Exception:
-        pass
-    for k, v in MOCK_CUSTOM_PRODUCTS.items():
-        if str(k).lower() == pid_lower:
-            return v
 
     return None
 
@@ -7342,11 +7412,30 @@ def get_delivery_by_booking(booking_id: str) -> Optional[dict]:
     if not clean_id:
         return None
     try:
-        row = fetch_one("SELECT * FROM deliveries WHERE booking_id = %s", (clean_id,))
-        if row:
-            return row
+        conn = get_db_connection()
+        if conn:
+            try:
+                with conn.cursor() as cursor:
+                    cursor.execute("SELECT * FROM deliveries WHERE booking_id = %s", (clean_id,))
+                    row = cursor.fetchone()
+                    if row:
+                        return row
+                    if IS_PRODUCTION:
+                        return None
+            finally:
+                conn.close()
+        else:
+            if IS_PRODUCTION:
+                raise DatabaseConnectionError("Database connection unavailable in production")
+    except DatabaseConnectionError:
+        raise
     except Exception as e:
         logger.warning(f"get_delivery_by_booking DB error: {e}")
+        if IS_PRODUCTION:
+            raise DatabaseConnectionError(f"Database error in get_delivery_by_booking: {e}") from e
+
+    if IS_PRODUCTION:
+        return None
     for d in MOCK_DELIVERIES.values():
         if d.get("booking_id") == clean_id:
             return d
@@ -7357,11 +7446,30 @@ def get_delivery(delivery_id: str) -> Optional[dict]:
     if not clean_id:
         return None
     try:
-        row = fetch_one("SELECT * FROM deliveries WHERE id = %s OR booking_id = %s", (clean_id, clean_id))
-        if row:
-            return row
+        conn = get_db_connection()
+        if conn:
+            try:
+                with conn.cursor() as cursor:
+                    cursor.execute("SELECT * FROM deliveries WHERE id = %s OR booking_id = %s", (clean_id, clean_id))
+                    row = cursor.fetchone()
+                    if row:
+                        return row
+                    if IS_PRODUCTION:
+                        return None
+            finally:
+                conn.close()
+        else:
+            if IS_PRODUCTION:
+                raise DatabaseConnectionError("Database connection unavailable in production")
+    except DatabaseConnectionError:
+        raise
     except Exception as e:
         logger.warning(f"get_delivery DB error: {e}")
+        if IS_PRODUCTION:
+            raise DatabaseConnectionError(f"Database error in get_delivery: {e}") from e
+
+    if IS_PRODUCTION:
+        return None
     for d in MOCK_DELIVERIES.values():
         if d.get("id") == clean_id or d.get("booking_id") == clean_id:
             return d
@@ -8827,35 +8935,60 @@ def get_user_kyc_status(email: str, account_type: str) -> Dict[str, Any]:
 
     # Try DB lookup
     try:
-        row = fetch_one("""
-            SELECT * FROM user_kyc_verifications 
-            WHERE LOWER(email) = LOWER(%s) AND account_type = %s 
-            ORDER BY created_at DESC LIMIT 1
-        """, (clean_email, norm_acc_type))
-        if row:
-            st = row.get("status", "NOT_STARTED")
-            return {
-                "id": row["id"],
-                "userId": row.get("user_id"),
-                "email": clean_email,
-                "accountType": norm_acc_type,
-                "expectedDocumentType": expected_doc,
-                "documentType": row.get("document_type"),
-                "status": st,
-                "maskedNumber": row.get("document_number_masked"),
-                "documentFileName": row.get("document_file_name"),
-                "documentMimeType": row.get("document_mime_type"),
-                "submittedAt": row.get("submitted_at"),
-                "reviewedAt": row.get("reviewed_at"),
-                "rejectionReason": row.get("rejection_reason"),
-                "allowResubmission": st in ("NOT_STARTED", "REJECTED"),
-                "providerConfigured": False,
-                "providerStatus": "VERIFICATION_UNAVAILABLE" if st == "PENDING" else st
-            }
+        conn = get_db_connection()
+        if conn:
+            try:
+                with conn.cursor() as cursor:
+                    cursor.execute("""
+                        SELECT * FROM user_kyc_verifications 
+                        WHERE LOWER(email) = LOWER(%s) AND account_type = %s 
+                        ORDER BY created_at DESC LIMIT 1
+                    """, (clean_email, norm_acc_type))
+                    row = cursor.fetchone()
+                    if row:
+                        st = row.get("status", "NOT_STARTED")
+                        return {
+                            "id": row["id"],
+                            "userId": row.get("user_id"),
+                            "email": clean_email,
+                            "accountType": norm_acc_type,
+                            "expectedDocumentType": expected_doc,
+                            "documentType": row.get("document_type"),
+                            "status": st,
+                            "maskedNumber": row.get("document_number_masked"),
+                            "documentFileName": row.get("document_file_name"),
+                            "documentMimeType": row.get("document_mime_type"),
+                            "submittedAt": row.get("submitted_at"),
+                            "reviewedAt": row.get("reviewed_at"),
+                            "rejectionReason": row.get("rejection_reason"),
+                            "allowResubmission": st in ("NOT_STARTED", "REJECTED"),
+                            "providerConfigured": False,
+                            "providerStatus": "VERIFICATION_UNAVAILABLE" if st == "PENDING" else st
+                        }
+                    if IS_PRODUCTION:
+                        return {
+                            "status": "NOT_STARTED",
+                            "email": clean_email,
+                            "accountType": norm_acc_type,
+                            "expectedDocumentType": expected_doc,
+                            "allowResubmission": True,
+                        }
+            finally:
+                conn.close()
+        else:
+            if IS_PRODUCTION:
+                raise DatabaseConnectionError("Database connection unavailable for KYC verification lookup in production")
+    except DatabaseConnectionError:
+        raise
     except Exception as e:
         logger.warning(f"DB read error in get_user_kyc_status: {e}")
+        if IS_PRODUCTION:
+            raise DatabaseConnectionError(f"Database error in get_user_kyc_status: {e}") from e
 
-    # Fallback to mock dictionary
+    if IS_PRODUCTION:
+        return {"status": "NOT_STARTED", "email": clean_email, "accountType": norm_acc_type}
+
+    # Fallback to mock dictionary for tests
     for kyc in sorted(MOCK_KYC_VERIFICATIONS.values(), key=lambda x: x.get("created_at", ""), reverse=True):
         if kyc.get("email") == clean_email and kyc.get("account_type") == norm_acc_type:
             st = kyc.get("status", "NOT_STARTED")
