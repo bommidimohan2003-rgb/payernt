@@ -50,6 +50,16 @@ from agent_engine.tools import (
     get_refund_status_tool,
     get_user_bookings_tool,
 )
+from agent_engine.hybrid_coordinator import HybridQueryCoordinator, QueryType
+from agent_engine.retrieval import (
+    AgentKnowledgeRetriever,
+    KnowledgeDocument,
+    KnowledgeIndexManager,
+    KnowledgeManager,
+    RetrievalConfig,
+    RetrievalResult,
+    SynonymRegistry,
+)
 
 __all__ = [
     # Phase 2 Core NLP
@@ -97,4 +107,14 @@ __all__ = [
     "save_agent_message",
     "get_conversation_messages",
     "AgentToolRouter",
+    # Phase 8 Retrieval Engine & Knowledge DB
+    "AgentKnowledgeRetriever",
+    "KnowledgeDocument",
+    "RetrievalConfig",
+    "RetrievalResult",
+    "SynonymRegistry",
+    "KnowledgeManager",
+    "KnowledgeIndexManager",
+    "HybridQueryCoordinator",
+    "QueryType",
 ]

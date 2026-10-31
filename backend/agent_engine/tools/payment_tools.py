@@ -8,7 +8,7 @@ from typing import Any, Dict, Optional, List
 
 from agent_engine.context import AgentSessionContext
 from agent_engine.privacy import sanitize_booking_record
-from database import get_orders, get_order_by_id
+from database import DatabaseConnectionError, get_orders, get_order_by_id
 
 
 def get_payment_status_tool(
@@ -31,6 +31,13 @@ def get_payment_status_tool(
     if clean_bid:
         try:
             order = get_order_by_id(clean_bid)
+        except DatabaseConnectionError:
+            return {
+                "success": False,
+                "error": "Payent payment service is temporarily unavailable due to a database connection delay. Please try again shortly.",
+                "status": "service_unavailable",
+                "database_error": True
+            }
         except Exception as e:
             return {"success": False, "error": f"Error retrieving payment record: {str(e)}"}
 
@@ -67,6 +74,14 @@ def get_payment_status_tool(
     # If no specific booking ID is provided, look at recent orders
     try:
         user_orders = get_orders(context.clean_email)
+    except DatabaseConnectionError:
+        return {
+            "success": False,
+            "error": "Payent payment service is temporarily unavailable due to a database connection delay. Please try again shortly.",
+            "status": "service_unavailable",
+            "database_error": True,
+            "payments": []
+        }
     except Exception as e:
         return {"success": False, "error": f"Could not fetch recent payments: {str(e)}"}
 
@@ -117,6 +132,13 @@ def get_refund_status_tool(
     if clean_bid:
         try:
             order = get_order_by_id(clean_bid)
+        except DatabaseConnectionError:
+            return {
+                "success": False,
+                "error": "Payent refund tracking service is temporarily unavailable due to a database connection delay. Please try again shortly.",
+                "status": "service_unavailable",
+                "database_error": True
+            }
         except Exception as e:
             return {"success": False, "error": f"Error retrieving refund details: {str(e)}"}
 
@@ -160,6 +182,14 @@ def get_refund_status_tool(
     # If no booking ID given, check if any recent cancelled booking has a refund
     try:
         user_orders = get_orders(context.clean_email)
+    except DatabaseConnectionError:
+        return {
+            "success": False,
+            "error": "Payent refund tracking service is temporarily unavailable due to a database connection delay. Please try again shortly.",
+            "status": "service_unavailable",
+            "database_error": True,
+            "refunds": []
+        }
     except Exception as e:
         return {"success": False, "error": f"Could not check refund history: {str(e)}"}
 

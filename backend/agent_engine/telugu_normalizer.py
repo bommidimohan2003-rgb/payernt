@@ -36,6 +36,8 @@ class TeluguNormalizer:
         "chesanuu": "chesanu",
         "chesa": "chesanu",
         # Status / State
+        "vachinda": "vachinda",
+        "vastundi": "vastundi",
         "ayyinda": "ayyinda",
         "ayinda": "ayyinda",
         "ainda": "ayyinda",
@@ -99,8 +101,8 @@ class TeluguNormalizer:
         (re.compile(r"\bbagunnara\b", re.IGNORECASE), "how are you greeting"),
         (re.compile(r"\bnamaskaram\b", re.IGNORECASE), "namaste greeting"),
         # Booking Status & Details
-        (re.compile(r"\b((na|maa|my)\s+)?booking\s+ek+ada\s+undi\b", re.IGNORECASE), "booking status location"),
-        (re.compile(r"\b((na|maa|my)\s+)?booking\s+(status\s+)?enti\b", re.IGNORECASE), "my booking status check"),
+        (re.compile(r"\b((na|naa|maa|my)\s+)?booking\s+ek+ada\s+undi\b", re.IGNORECASE), "booking status location"),
+        (re.compile(r"\b((na|naa|maa|my)\s+)?booking\s+(status\s+)?enti\b", re.IGNORECASE), "my booking status check"),
         (re.compile(r"\bbooking\s+confirm\s+ayyinda\b", re.IGNORECASE), "booking confirmed status"),
         (re.compile(r"\bbooking\s+details\s+kavali\b", re.IGNORECASE), "booking details request"),
         # Booking Cancellation
@@ -112,15 +114,17 @@ class TeluguNormalizer:
         (re.compile(r"\bpayment\s+(fail|failed)\s+ayyindi\b", re.IGNORECASE), "payment failed issue"),
         (re.compile(r"\bpayment\s+success\s+ayyinda\b", re.IGNORECASE), "payment success check"),
         # Refund Status
+        (re.compile(r"\b(refund|dabulu|amount|money)\s+(vachinda|vastundi)\b", re.IGNORECASE), "refund status received check"),
         (re.compile(r"\b(refund|dabulu|amount|money)\s+(eppudu\s+vastundi|return\s+eppudu\s+vastundi)\b", re.IGNORECASE), "refund status when return"),
-        (re.compile(r"\b(na\s+money|na\s+dabulu|na\s+amount)\s+return\s+(cheyyandi|kavali)\b", re.IGNORECASE), "refund request return money"),
+        (re.compile(r"\b((na|naa)\s+money|(na|naa)\s+dabulu|(na|naa)\s+amount)\s+return\s+(cheyyandi|kavali)\b", re.IGNORECASE), "refund request return money"),
         (re.compile(r"\b(amount|refund|money)\s+inka\s+raledu\b", re.IGNORECASE), "refund delayed not received"),
         # KYC Verification
-        (re.compile(r"\b(na\s+)?kyc\s+pending(\s+lo\s+undi)?\b", re.IGNORECASE), "kyc status pending check"),
+        (re.compile(r"\b((na|naa|maa|my)\s+)?kyc\s+pending(\s+lo\s+undi)?\b", re.IGNORECASE), "kyc status pending check"),
         (re.compile(r"\bkyc\s+reject\s+ayyindi\b", re.IGNORECASE), "kyc rejection issue"),
         (re.compile(r"\bkyc\s+approve\s+ayyinda\b", re.IGNORECASE), "kyc approval check"),
         (re.compile(r"\bdocuments?\s+submit\s+chesanu\b", re.IGNORECASE), "kyc documents submitted status"),
         # Delivery & Tracking
+        (re.compile(r"\b(order|delivery)\s+deliver(ed)?\s+ayyinda\b", re.IGNORECASE), "delivery status tracking delivered check"),
         (re.compile(r"\bdelivery\s+ek+ada\s+undi\b", re.IGNORECASE), "delivery status location track"),
         (re.compile(r"\bdelivery\s+boy\s+ek+ada\s+unnadu\b", re.IGNORECASE), "delivery courier location track"),
         (re.compile(r"\b(product|item|gear)\s+inka\s+raledu\b", re.IGNORECASE), "delivery delayed product not arrived"),
@@ -133,9 +137,10 @@ class TeluguNormalizer:
 
     # Individual Tenglish words indicating vernacular context
     TELUGU_INDICATOR_WORDS: Set[str] = {
-        "na", "maa", "enti", "yenti", "ekkada", "ekada", "eppudu", "epudu",
+        "na", "naa", "maa", "enti", "yenti", "ekkada", "ekada", "eppudu", "epudu",
         "kavali", "cheyali", "cheyyandi", "cheyyi", "chesanu", "ayyinda",
         "ayyindi", "aindi", "raledu", "undi", "undhi", "unnaru", "unnadu",
+        "vachinda", "vastundi",
         "dabulu", "dabbulu", "paisalu", "matladali", "vadhu", "oddu", "inka",
         "namaste", "namaskaram", "bagunnara", "tho", "lo", "kosam"
     }

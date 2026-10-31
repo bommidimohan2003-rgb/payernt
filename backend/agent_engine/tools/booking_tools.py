@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional
 
 from agent_engine.context import AgentSessionContext
 from agent_engine.privacy import sanitize_booking_record
-from database import get_orders, get_order_by_id
+from database import DatabaseConnectionError, get_orders, get_order_by_id
 from payernt_database import get_payernt_vendor_bookings
 
 
@@ -40,6 +40,14 @@ def get_user_bookings_tool(context: AgentSessionContext, limit: int = 10) -> Dic
             # Renter querying their orders
             raw_orders = get_orders(context.clean_email)
             raw_bookings = raw_orders if isinstance(raw_orders, list) else []
+    except DatabaseConnectionError:
+        return {
+            "success": False,
+            "error": "Payent booking service is temporarily unavailable due to a database connection delay. Please try again shortly.",
+            "status": "service_unavailable",
+            "database_error": True,
+            "bookings": []
+        }
     except Exception as e:
         return {
             "success": False,
@@ -80,16 +88,23 @@ def get_booking_details_tool(context: AgentSessionContext, booking_id: str) -> D
         order = get_order_by_id(clean_bid)
         if not order:
             order = get_order_by_id(clean_bid.upper()) or get_order_by_id(clean_bid.lower())
+    except DatabaseConnectionError:
+        return {
+            "success": False,
+            "error": "Payent booking service is temporarily unavailable due to a database connection delay. Please try again shortly.",
+            "status": "service_unavailable",
+            "database_error": True
+        }
     except Exception as e:
         return {
             "success": False,
-            "error": f"Error retrieving booking record: {str(e)}"
+            "error": f"Error retrieving booking details: {str(e)}"
         }
 
     if not order:
         return {
             "success": False,
-            "error": f"No booking found with ID '{clean_bid}'."
+            "error": f"No booking found with ID '{clean_bid}' in your account records."
         }
 
     # Strict ownership check

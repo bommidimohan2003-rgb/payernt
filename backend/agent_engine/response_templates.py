@@ -250,7 +250,7 @@ TEMPLATES: Dict[str, ResponseTemplate] = {
     # 22. Unknown Intent Response
     "unknown_intent_response": ResponseTemplate(
         key="unknown_intent_response",
-        message="I'm sorry, I could not understand your inquiry. I am trained specifically to help with Payent peer-to-peer gear rentals, bookings, payments, and delivery tracking. How can I assist you?",
+        message="I'm sorry, I could not understand your inquiry. I am an automated customer support assistant for Payent peer-to-peer gear rentals, bookings, payments, and delivery tracking. How can I assist you?",
         suggested_chips=[
             "Check Booking Status",
             "Delivery Tracking",
