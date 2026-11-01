@@ -101,6 +101,7 @@ function AdminLayout() {
           navigate({
             to: "/login",
             search: { redirect: currentPath } as any,
+            replace: true,
           });
         }
         return;

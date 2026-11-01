@@ -416,6 +416,8 @@ adminApi.interceptors.request.use((config) => {
 
 export const isOfflineMode = () => false;
 
+let _isAdminRedirecting = false;
+
 adminApi.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -424,7 +426,8 @@ adminApi.interceptors.response.use(
       localStorage.removeItem("payent:admin:token");
       localStorage.removeItem("payent:admin:current_user");
 
-      if (window.location.pathname !== "/login") {
+      if (window.location.pathname !== "/login" && !_isAdminRedirecting) {
+        _isAdminRedirecting = true;
         const redirectTarget = window.location.pathname.startsWith("/admin")
           ? window.location.pathname + window.location.search
           : "/admin/dashboard";

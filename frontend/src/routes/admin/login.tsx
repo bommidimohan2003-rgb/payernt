@@ -14,11 +14,12 @@ function AdminLoginRedirect() {
     authService.verifyAdminSession().then(({ isValid }) => {
       if (!isMounted) return;
       if (isValid) {
-        navigate({ to: "/admin/dashboard" });
+        navigate({ to: "/admin/dashboard", replace: true });
       } else {
         navigate({
           to: "/login",
           search: { redirect: "/admin/dashboard" } as any,
+          replace: true,
         });
       }
     });

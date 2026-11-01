@@ -76,21 +76,35 @@ export function LoginForm() {
     }
 
     const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
+    const hasAdminToken = typeof window !== "undefined" && !!localStorage.getItem("payent:admin:token");
     const isAdmin = user.role === "admin" || (user as any).role === "superadmin";
+
+    // If target is /admin, user MUST have a valid payent:admin:token
+    const isTargetingAdmin = redirectUrl?.startsWith("/admin");
+    if (isTargetingAdmin && (!isAdmin || !hasAdminToken)) {
+      // User was redirected to /login because their admin session is missing or invalid.
+      // Must remain on /login so user can submit admin credentials without loop.
+      return;
+    }
+
+    // If user is admin in general session, but has no active admin token, do NOT auto-redirect to /admin
+    if (isAdmin && !hasAdminToken) {
+      return;
+    }
 
     // If user is not admin, prevent redirect to any /admin routes
     const effectiveRedirect = isValidInternalRedirect(redirectUrl, currentPath)
-      ? (redirectUrl.startsWith("/admin") && !isAdmin ? null : redirectUrl)
+      ? (redirectUrl.startsWith("/admin") && (!isAdmin || !hasAdminToken) ? null : redirectUrl)
       : null;
 
     if (effectiveRedirect) {
-      navigate({ to: effectiveRedirect as any });
+      navigate({ to: effectiveRedirect as any, replace: true });
     } else if (pendingProductId && `/product/${pendingProductId}` !== currentPath) {
-      navigate({ to: `/product/${pendingProductId}` as any });
-    } else if (isAdmin && currentPath !== "/admin/dashboard") {
-      navigate({ to: "/admin/dashboard" });
-    } else if (currentPath !== "/dashboard") {
-      navigate({ to: "/dashboard" });
+      navigate({ to: `/product/${pendingProductId}` as any, replace: true });
+    } else if (isAdmin && hasAdminToken && currentPath !== "/admin/dashboard") {
+      navigate({ to: "/admin/dashboard", replace: true });
+    } else if (!isTargetingAdmin && currentPath !== "/dashboard") {
+      navigate({ to: "/dashboard", replace: true });
     }
   }, [ready, user, navigate]);
 
