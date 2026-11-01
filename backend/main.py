@@ -539,7 +539,7 @@ def health_check(response: Response):
             "status": "ok",
             "database": "connected",
             "service": "Payent FastAPI Backend API",
-            "version": "1.6.1",
+            "version": "1.6.2",
             "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
         }
     response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
@@ -547,7 +547,7 @@ def health_check(response: Response):
         "status": "degraded",
         "database": "disconnected",
         "service": "Payent FastAPI Backend API",
-        "version": "1.6.1",
+        "version": "1.6.2",
         "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
     }
 
