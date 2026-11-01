@@ -516,7 +516,7 @@ DEFAULT_INTENT_DEFINITIONS: List[IntentDefinition] = [
     IntentDefinition(
         canonical_name="FAQ_QUERY",
         description="General questions about security deposits, damage insurance, operating cities, rental rules.",
-        english_keywords=("insurance", "damage protection", "deposit", "security deposit", "5 lakhs", "cities", "locations", "coverage", "how payent works"),
+        english_keywords=("insurance", "damage protection", "deposit", "security deposit", "5 lakhs", "cities", "locations", "coverage"),
         telugu_keywords=("insurance ela work avtundi", "security deposit unda", "cities ekkada"),
         synonyms=("damage policy", "zero deposit policy", "is gear insured", "deposit policy"),
         exact_phrases=(
@@ -636,7 +636,62 @@ DEFAULT_INTENT_DEFINITIONS: List[IntentDefinition] = [
         response_template_key="human_support_acknowledgement",
     ),
 
-    # 23. Unknown Intent (Fallback Default)
+    # 23. About Payent Platform
+    IntentDefinition(
+        canonical_name="ABOUT_PAYENT",
+        description="General questions asking what Payent is, how the platform operates, and what users can do.",
+        english_keywords=(
+            "what is payent",
+            "tell me about payent",
+            "explain payent",
+            "how does payent work",
+            "what can i do on payent",
+            "about payent",
+            "payent platform",
+            "payent overview",
+        ),
+        telugu_keywords=(
+            "payent ante enti",
+            "payent ela work avutundi",
+            "payent ela work avtundi",
+            "payent ante emiti",
+            "payent gurinchi",
+            "payent ante what",
+        ),
+        synonyms=(
+            "what is payent",
+            "about payent",
+            "payent details",
+            "overview of payent",
+            "how payent works",
+        ),
+        exact_phrases=(
+            "what is payent",
+            "tell me about payent",
+            "explain payent",
+            "how does payent work",
+            "what can i do on payent",
+            "about payent",
+            "payent ante enti",
+            "payent ela work avutundi",
+            "payent ela work avtundi",
+            "payent ante emiti",
+        ),
+        regex_patterns=(
+            r"\b(what\s+is|tell\s+me\s+about|explain|describe)\s+payent\b",
+            r"\bhow\s+does\s+payent\s+work\b",
+            r"\bwhat\s+can\s+i\s+do\s+(on|with)\s+payent\b",
+            r"\bpayent\s+ante\s+(enti|emiti|what)\b",
+            r"\bpayent\s+ela\s+work\s*(avutundi|avtundi)\b",
+            r"\b(about|overview\s+of)\s+payent\b",
+        ),
+        priority=72,
+        confidence_threshold=0.65,
+        clarification_message="Are you asking for an overview of what Payent is and how it works?",
+        response_template_key="about_payent_response",
+    ),
+
+    # 24. Unknown Intent (Fallback Default)
     IntentDefinition(
         canonical_name="UNKNOWN_INTENT",
         description="Input does not match any recognized customer support pattern with sufficient confidence.",

@@ -98,11 +98,7 @@ class AdminWebSocketService {
   public connect() {
     if (typeof window === "undefined") return;
 
-    let token =
-      localStorage.getItem("payent:admin:token") ||
-      localStorage.getItem("payent:token") ||
-      localStorage.getItem("paye₹nt_token") ||
-      localStorage.getItem("payernt_token");
+    let token = localStorage.getItem("payent:admin:token");
 
     if (token) {
       token = token.trim();

@@ -650,3 +650,35 @@ def test_30_regression_full_turn_kyc_and_support_flow(router: AgentToolRouter, m
     # 3. Escalation
     res3 = router.process_message("I need human support with my account", ctx)
     assert res3["tool_called"] == "propose_escalation"
+
+
+def test_31_about_payent_deterministic_response():
+    """User asking 'What is Payent?' receives the exact deterministic overview response."""
+    empty_km = KnowledgeManager(use_in_memory=True)
+    empty_im = KnowledgeIndexManager(knowledge_manager=empty_km)
+    coord = HybridQueryCoordinator(knowledge_manager=empty_km, index_manager=empty_im)
+
+    guest = create_guest_context()
+    queries = [
+        "What is Payent?",
+        "what is payent",
+        "Tell me about Payent",
+        "How does Payent work?",
+        "What can I do on Payent?",
+        "Payent ante enti?",
+        "payent ela work倾 avutundi".replace("倾", ""),
+        "payent ela work avutundi",
+    ]
+    expected_msg = (
+        "Payent is a peer-to-peer equipment rental marketplace. "
+        "Equipment owners can list their products for rent, while customers can discover, "
+        "book and rent equipment. Payent also supports payments, identity verification and delivery coordination."
+    )
+    for q in queries:
+        res = coord.coordinate_query(q, guest)
+        assert res["intent"] == "ABOUT_PAYENT", f"Query '{q}' returned intent {res['intent']}"
+        assert str(res["query_type"]).lower() == "guide"
+        assert res["confidence"] >= 0.70
+        assert res["response_text"] == expected_msg
+        assert res["suggestions"] == ["Browse Equipment", "List Gear", "How It Works", "Help Center"]
+

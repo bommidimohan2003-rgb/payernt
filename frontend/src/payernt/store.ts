@@ -428,27 +428,6 @@ export function usePayerntStore() {
     window.dispatchEvent(
       new CustomEvent("paye₹nt_auth_change", { detail: account }),
     );
-
-    if (account.role === "admin" || (account as any).role === "superadmin") {
-      const vendorToken =
-        localStorage.getItem("paye₹nt_token") ||
-        localStorage.getItem("payernt_token");
-      if (vendorToken) {
-        localStorage.setItem("payent:admin:token", vendorToken);
-      }
-      localStorage.setItem(
-        "payent:admin:current_user",
-        JSON.stringify({
-          id: account.accountId || (account as any).id,
-          fullName: account.name,
-          email: account.email,
-          role: "admin",
-          status: "active",
-          verified: true,
-        }),
-      );
-      window.dispatchEvent(new Event("payent:admin:profile-updated"));
-    }
   }, []);
 
   // Logout handler

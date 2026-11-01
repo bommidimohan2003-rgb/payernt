@@ -98,7 +98,7 @@ def get_current_admin_user(
         if user_role:
             role = user_role
 
-    if role != "admin":
+    if role not in ("admin", "superadmin"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Forbidden. Administrator authorization required for knowledge management.",
@@ -106,7 +106,7 @@ def get_current_admin_user(
 
     return {
         "email": email,
-        "role": "admin",
+        "role": role if role in ("admin", "superadmin") else "admin",
         "user_id": user.get("id") if user else payload.get("user_id"),
         "full_name": user.get("full_name") if user else payload.get("name"),
     }

@@ -195,6 +195,28 @@ def test_06_stats_endpoint_rejects_vendor_role():
     assert "authorization required" in detail or "forbidden" in detail
 
 
+def test_06b_stats_endpoint_accepts_superadmin_role():
+    """Superadmin role is accepted with 200 OK."""
+    super_email = "superadmin@payent.com"
+    MOCK_USERS[super_email] = {
+        "id": super_email,
+        "email": super_email,
+        "full_name": "Chief Super Admin",
+        "role": "superadmin",
+        "verified": True,
+        "status": "active",
+    }
+    token = create_access_token(
+        {"sub": super_email, "role": "superadmin", "account_type": "payrent", "jti": "jti_super_86"},
+        expires_delta=timedelta(minutes=60),
+    )
+    res = client.get(
+        "/api/admin/agent-knowledge/stats",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert res.status_code == 200
+
+
 def test_07_stats_endpoint_allows_admin():
     """Admin role gets 200 and complete stats structure."""
     token = make_admin_token()

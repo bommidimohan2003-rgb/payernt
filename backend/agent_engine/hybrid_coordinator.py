@@ -124,7 +124,7 @@ class HybridQueryCoordinator:
         guide_intents = {
             "FAQ_QUERY", "HOW_IT_WORKS", "CANCELLATION_POLICY",
             "SECURITY_DEPOSIT", "DAMAGE_PROTECTION", "KYC_INFO",
-            "PAYMENT_OPTIONS", "PIN_SAFETY"
+            "PAYMENT_OPTIONS", "PIN_SAFETY", "ABOUT_PAYENT"
         }
         if intent in guide_intents:
             return True

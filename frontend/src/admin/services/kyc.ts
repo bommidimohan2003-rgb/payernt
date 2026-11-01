@@ -128,11 +128,7 @@ export const kycService = {
       // fallback to direct document endpoint
     }
 
-    let token =
-      localStorage.getItem("payent:admin:token") ||
-      localStorage.getItem("payent:token") ||
-      localStorage.getItem("paye₹nt_token") ||
-      localStorage.getItem("payernt_token");
+    let token = localStorage.getItem("payent:admin:token");
     if (token) {
       token = token.trim().replace(/^"|"$/g, "");
     }

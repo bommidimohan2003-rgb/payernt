@@ -394,3 +394,33 @@ def test_structured_dict_output(classifier):
     assert "booking_id" in d["entities"]
     assert d["entities"]["booking_id"] == "ord_12345678"
     assert len(d["suggested_chips"]) > 0
+
+
+# -------------------------------------------------------------
+# 15. About Payent Intent Tests
+# -------------------------------------------------------------
+
+@pytest.mark.parametrize("query", [
+    "What is Payent?",
+    "what is payent",
+    "Tell me about Payent",
+    "tell me about payent",
+    "Explain Payent",
+    "How does Payent work?",
+    "how does payent work",
+    "What can I do on Payent?",
+    "what can i do on payent",
+    "Payent ante enti?",
+    "payent ante enti",
+    "payent ela work avutundi",
+    "payent ela work avtundi",
+    "payent ante emiti",
+    "About Payent",
+])
+def test_about_payent_intent_classification(classifier, query):
+    res = classifier.classify(query)
+    assert res.intent == "ABOUT_PAYENT", f"Query '{query}' classified as {res.intent} instead of ABOUT_PAYENT"
+    assert res.confidence >= 0.70
+    assert res.is_ambiguous is False
+    assert res.response_template_key == "about_payent_response"
+

@@ -402,11 +402,7 @@ export const adminApi = axios.create({
 });
 
 adminApi.interceptors.request.use((config) => {
-  let token =
-    localStorage.getItem("payent:admin:token") ||
-    localStorage.getItem("payent:token") ||
-    localStorage.getItem("paye₹nt_token") ||
-    localStorage.getItem("payernt_token");
+  let token = localStorage.getItem("payent:admin:token");
 
   if (token) {
     token = token.trim();
@@ -424,12 +420,15 @@ adminApi.interceptors.response.use(
   (response) => response,
   async (error) => {
     const status = error.response?.status;
-    if (status === 401 && typeof window !== "undefined") {
+    if ((status === 401 || status === 403) && typeof window !== "undefined") {
       localStorage.removeItem("payent:admin:token");
       localStorage.removeItem("payent:admin:current_user");
 
       if (window.location.pathname !== "/login") {
-        window.location.href = "/login?redirect=/admin/dashboard";
+        const redirectTarget = window.location.pathname.startsWith("/admin")
+          ? window.location.pathname + window.location.search
+          : "/admin/dashboard";
+        window.location.href = `/login?redirect=${encodeURIComponent(redirectTarget)}`;
       }
     }
     return Promise.reject(error);

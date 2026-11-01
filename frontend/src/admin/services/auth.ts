@@ -126,11 +126,7 @@ export const authService = {
   async verifyAdminSession(): Promise<{ isValid: boolean; user: AdminUser | null; isForbidden?: boolean }> {
     if (typeof window === "undefined") return { isValid: false, user: null };
 
-    const token =
-      localStorage.getItem("payent:admin:token") ||
-      localStorage.getItem("payent:token") ||
-      localStorage.getItem("paye₹nt_token") ||
-      localStorage.getItem("payernt_token");
+    const token = localStorage.getItem("payent:admin:token");
 
     if (!token) {
       return { isValid: false, user: null };
@@ -190,7 +186,7 @@ export const authService = {
   getCurrentUser(): AdminUser | null {
     if (typeof window === "undefined") return null;
 
-    // 1. Direct admin storage (Must have a valid token)
+    // Direct admin storage (Must have a valid token)
     const adminToken = localStorage.getItem("payent:admin:token");
     const adminUserStr = localStorage.getItem("payent:admin:current_user");
     if (adminToken && adminUserStr) {
@@ -210,60 +206,6 @@ export const authService = {
             profile_photo_url: u.profilePhotoUrl || u.profile_photo_url || u.avatar || "",
             createdAt: u.createdAt || new Date().toISOString(),
           };
-        }
-      } catch {}
-    }
-
-    // 2. Payrent user storage (if role === 'admin' or 'superadmin')
-    const customerUserStr = localStorage.getItem("payent:currentUser");
-    const customerToken = localStorage.getItem("payent:token");
-    if (customerUserStr && customerToken) {
-      try {
-        const u = JSON.parse(customerUserStr);
-        if (u && (u.role === "admin" || u.role === "superadmin")) {
-          localStorage.setItem("payent:admin:token", customerToken);
-          const adminPayload: AdminUser = {
-            id: u.email || u.id || "",
-            fullName: u.fullName || u.name || u.email?.split("@")[0] || "Administrator",
-            email: u.email || "",
-            phone: u.phone || "",
-            role: "admin",
-            status: u.status || "active",
-            verified: true,
-            avatar: u.profilePhotoUrl || u.profile_photo_url || u.avatar || "",
-            profilePhotoUrl: u.profilePhotoUrl || u.profile_photo_url || u.avatar || "",
-            profile_photo_url: u.profilePhotoUrl || u.profile_photo_url || u.avatar || "",
-            createdAt: u.createdAt || new Date().toISOString(),
-          };
-          localStorage.setItem("payent:admin:current_user", JSON.stringify(adminPayload));
-          return adminPayload;
-        }
-      } catch {}
-    }
-
-    // 3. Payernt vendor storage (if role === 'admin' or 'superadmin')
-    const payerntAccountStr = localStorage.getItem("paye₹nt_account") || localStorage.getItem("payernt_account");
-    const payerntToken = localStorage.getItem("paye₹nt_token") || localStorage.getItem("payernt_token");
-    if (payerntAccountStr && payerntToken) {
-      try {
-        const u = JSON.parse(payerntAccountStr);
-        if (u && (u.role === "admin" || u.role === "superadmin")) {
-          localStorage.setItem("payent:admin:token", payerntToken);
-          const adminPayload: AdminUser = {
-            id: u.email || u.id || u.accountId || "",
-            fullName: u.name || u.fullName || u.email?.split("@")[0] || "Administrator",
-            email: u.email || "",
-            phone: u.phone || "",
-            role: "admin",
-            status: u.status || "active",
-            verified: true,
-            avatar: u.profilePhotoUrl || u.profile_photo_url || u.avatar || "",
-            profilePhotoUrl: u.profilePhotoUrl || u.profile_photo_url || u.avatar || "",
-            profile_photo_url: u.profilePhotoUrl || u.profile_photo_url || u.avatar || "",
-            createdAt: u.createdAt || new Date().toISOString(),
-          };
-          localStorage.setItem("payent:admin:current_user", JSON.stringify(adminPayload));
-          return adminPayload;
         }
       } catch {}
     }

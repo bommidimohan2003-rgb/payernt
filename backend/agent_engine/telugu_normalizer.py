@@ -133,6 +133,10 @@ class TeluguNormalizer:
         (re.compile(r"\bhuman\s+support\s+kavali\b", re.IGNORECASE), "human support agent talk"),
         (re.compile(r"\b(support\s+agent|customer\s+care|real\s+person)\s+tho\s+matladali\b", re.IGNORECASE), "human agent support talk"),
         (re.compile(r"\bcustomer\s+care\s+kavali\b", re.IGNORECASE), "human support customer care"),
+        # About Payent
+        (re.compile(r"\bpayent\s+ante\s+(enti|emiti)\b", re.IGNORECASE), "what is payent"),
+        (re.compile(r"\bpayent\s+ela\s+work\s*(avutundi|avtundi)\b", re.IGNORECASE), "how does payent work"),
+        (re.compile(r"\bpayent\s+gurinchi\b", re.IGNORECASE), "about payent"),
     ]
 
     # Individual Tenglish words indicating vernacular context

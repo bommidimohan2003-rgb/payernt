@@ -271,6 +271,18 @@ TEMPLATES: Dict[str, ResponseTemplate] = {
             "Connect to Human Support",
         ],
     ),
+
+    # 24. About Payent
+    "about_payent_response": ResponseTemplate(
+        key="about_payent_response",
+        message="Payent is a peer-to-peer equipment rental marketplace. Equipment owners can list their products for rent, while customers can discover, book and rent equipment. Payent also supports payments, identity verification and delivery coordination.",
+        suggested_chips=[
+            "Browse Equipment",
+            "List Gear",
+            "How It Works",
+            "Help Center",
+        ],
+    ),
 }
 
 
