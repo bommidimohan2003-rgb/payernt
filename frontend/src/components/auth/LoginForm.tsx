@@ -1,7 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate, Link } from "@tanstack/react-router";
 import { Eye, EyeOff, Lock, Mail, ArrowRight, Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "@/components/common/Button";
@@ -39,8 +39,12 @@ export function LoginForm() {
   const navigate = useNavigate();
   const [showPw, setShowPw] = useState(false);
   const [error, setErrorState] = useState<string | null>(null);
+  const hasNavigatedRef = useRef(false);
 
   useEffect(() => {
+    // Prevent multiple executions / navigation bounce loops
+    if (hasNavigatedRef.current) return;
+
     // Only auto-redirect if auth initialization is ready, user is active with a real token,
     // and the user did not explicitly sign out
     const isSignedOut =
@@ -61,49 +65,26 @@ export function LoginForm() {
         : null;
     const redirectUrl =
       searchParams?.get("redirect") ||
-      searchParams?.get("returnUrl") ||
-      (typeof window !== "undefined"
-        ? localStorage.getItem("pay₹ent_pending_product_redirect")
-        : null);
-    const pendingProductId =
-      typeof window !== "undefined"
-        ? localStorage.getItem("pendingProductId")
-        : null;
+      searchParams?.get("returnUrl");
 
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("pay₹ent_pending_product_redirect");
-      localStorage.removeItem("pendingProductId");
+    // CRITICAL LOOP GUARD: If the user arrived at /login with a redirect parameter
+    // (e.g. ?redirect=/dashboard or ?redirect=/admin), they were redirected here because
+    // their existing session was invalid or unauthorized. NEVER auto-navigate back to the
+    // rejected URL on mount! That causes an infinite ping-pong freeze ("Page Unresponsive").
+    if (redirectUrl) {
+      return;
     }
 
     const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
     const hasAdminToken = typeof window !== "undefined" && !!localStorage.getItem("payent:admin:token");
     const isAdmin = user.role === "admin" || (user as any).role === "superadmin";
 
-    // If target is /admin, user MUST have a valid payent:admin:token
-    const isTargetingAdmin = redirectUrl?.startsWith("/admin");
-    if (isTargetingAdmin && (!isAdmin || !hasAdminToken)) {
-      // User was redirected to /login because their admin session is missing or invalid.
-      // Must remain on /login so user can submit admin credentials without loop.
-      return;
-    }
+    // Auto-redirect only once for cleanly authenticated users who directly navigated to /login
+    hasNavigatedRef.current = true;
 
-    // If user is admin in general session, but has no active admin token, do NOT auto-redirect to /admin
-    if (isAdmin && !hasAdminToken) {
-      return;
-    }
-
-    // If user is not admin, prevent redirect to any /admin routes
-    const effectiveRedirect = isValidInternalRedirect(redirectUrl, currentPath)
-      ? (redirectUrl.startsWith("/admin") && (!isAdmin || !hasAdminToken) ? null : redirectUrl)
-      : null;
-
-    if (effectiveRedirect) {
-      navigate({ to: effectiveRedirect as any, replace: true });
-    } else if (pendingProductId && `/product/${pendingProductId}` !== currentPath) {
-      navigate({ to: `/product/${pendingProductId}` as any, replace: true });
-    } else if (isAdmin && hasAdminToken && currentPath !== "/admin/dashboard") {
+    if (isAdmin && hasAdminToken && currentPath !== "/admin/dashboard") {
       navigate({ to: "/admin/dashboard", replace: true });
-    } else if (!isTargetingAdmin && currentPath !== "/dashboard") {
+    } else if (!isAdmin && currentPath !== "/dashboard") {
       navigate({ to: "/dashboard", replace: true });
     }
   }, [ready, user, navigate]);

@@ -13,7 +13,7 @@ import {
   CheckCircle2,
   XCircle,
 } from "lucide-react";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "@/components/common/Button";
@@ -85,8 +85,11 @@ export function RegisterForm() {
   const [showConfirmPw, setShowConfirmPw] = useState(false);
   const [error, setErrorState] = useState<string | null>(null);
   const [isChecking, setIsChecking] = useState(false);
+  const hasNavigatedRef = useRef(false);
 
   useEffect(() => {
+    if (hasNavigatedRef.current) return;
+
     if (user) {
       const searchParams =
         typeof window !== "undefined"
@@ -94,29 +97,20 @@ export function RegisterForm() {
           : null;
       const redirectUrl =
         searchParams?.get("redirect") ||
-        searchParams?.get("returnUrl") ||
-        (typeof window !== "undefined"
-          ? localStorage.getItem("pay₹ent_pending_product_redirect")
-          : null);
-      const pendingProductId =
-        typeof window !== "undefined"
-          ? localStorage.getItem("pendingProductId")
-          : null;
+        searchParams?.get("returnUrl");
 
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("pay₹ent_pending_product_redirect");
-        localStorage.removeItem("pendingProductId");
+      // CRITICAL LOOP GUARD: If user arrived with a redirect query param, stay on register form
+      if (redirectUrl) {
+        return;
       }
 
       const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
-      if (isValidInternalRedirect(redirectUrl, currentPath)) {
-        navigate({ to: redirectUrl as any });
-      } else if (pendingProductId && `/product/${pendingProductId}` !== currentPath) {
-        navigate({ to: `/product/${pendingProductId}` as any });
-      } else if (user.role === "admin" && currentPath !== "/admin/dashboard") {
-        navigate({ to: "/admin/dashboard" });
+      hasNavigatedRef.current = true;
+
+      if (user.role === "admin" && currentPath !== "/admin/dashboard") {
+        navigate({ to: "/admin/dashboard", replace: true });
       } else if (currentPath !== "/categories") {
-        navigate({ to: "/categories" });
+        navigate({ to: "/categories", replace: true });
       }
     }
   }, [user, navigate]);

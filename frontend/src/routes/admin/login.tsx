@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { authService } from "@/admin/services/auth";
 
 export const Route = createFileRoute("/admin/login")({
@@ -8,11 +8,13 @@ export const Route = createFileRoute("/admin/login")({
 
 function AdminLoginRedirect() {
   const navigate = useNavigate();
+  const hasRedirectedRef = useRef(false);
 
   useEffect(() => {
     let isMounted = true;
     authService.verifyAdminSession().then(({ isValid }) => {
-      if (!isMounted) return;
+      if (!isMounted || hasRedirectedRef.current) return;
+      hasRedirectedRef.current = true;
       if (isValid) {
         navigate({ to: "/admin/dashboard", replace: true });
       } else {

@@ -1,5 +1,5 @@
 import { createFileRoute, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
-import { useEffect, useState, lazy, Suspense } from "react";
+import { useEffect, useState, useRef, lazy, Suspense } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { getSeoMetadata } from "@/utils/seo";
 import { PermissionDenied } from "@/components/states/PermissionDenied";
@@ -81,6 +81,7 @@ function AdminLayout() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isDenied, setIsDenied] = useState(false);
+  const hasRedirectedRef = useRef(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -96,7 +97,8 @@ function AdminLayout() {
         setLoading(false);
         if (isForbidden) {
           setIsDenied(true);
-        } else {
+        } else if (!hasRedirectedRef.current) {
+          hasRedirectedRef.current = true;
           // Unauthenticated visitor -> redirect to public login entry point
           navigate({
             to: "/login",

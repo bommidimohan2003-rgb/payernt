@@ -66,6 +66,7 @@ def get_ssl_kwargs():
 
 def ensure_database_exists():
     """Ensure the target TiDB / MySQL database exists before table initialization."""
+    global _last_db_failure_timestamp, _last_pool_failure_timestamp, _db_pool
     ssl_kwargs = get_ssl_kwargs()
     try:
         conn = pymysql.connect(
@@ -82,6 +83,9 @@ def ensure_database_exists():
             with conn.cursor() as cursor:
                 cursor.execute(f"CREATE DATABASE IF NOT EXISTS `{MYSQL_DB}`")
             conn.commit()
+            _last_db_failure_timestamp = 0.0
+            _last_pool_failure_timestamp = 0.0
+            _db_pool = None
             logger.info(f"Database '{MYSQL_DB}' ensured successfully on MySQL server.")
         finally:
             conn.close()
@@ -96,16 +100,17 @@ except ImportError:
 
 _db_pool = None
 _last_db_failure_timestamp = 0.0
+_last_pool_failure_timestamp = 0.0
 
 def get_db_pool():
-    global _db_pool, _last_db_failure_timestamp
+    global _db_pool, _last_pool_failure_timestamp
     if not HAS_POOLED_DB:
         return None
     if _db_pool is not None:
         return _db_pool
 
     now = dt.now(timezone.utc).timestamp()
-    if _last_db_failure_timestamp > 0 and (now - _last_db_failure_timestamp) < 5.0:
+    if _last_pool_failure_timestamp > 0 and (now - _last_pool_failure_timestamp) < 5.0:
         return None
 
     ssl_kwargs = get_ssl_kwargs()
@@ -130,11 +135,11 @@ def get_db_pool():
             autocommit=True,
             **ssl_kwargs
         )
-        _last_db_failure_timestamp = 0.0
+        _last_pool_failure_timestamp = 0.0
         logger.info("TiDB/MySQL connection pool initialized successfully with DBUtils PooledDB (ping=0 high-performance mode).")
         return _db_pool
     except Exception as e:
-        _last_db_failure_timestamp = now
+        _last_pool_failure_timestamp = now
         logger.warning(f"Failed to initialize TiDB Cloud connection pool ({e}). Operating in direct fallback mode.")
         return None
 
@@ -195,7 +200,23 @@ def execute_query(query: str, params: tuple = (), retry: bool = True):
     try:
         conn = get_db_connection()
         if not conn:
-            return
+            # Fallback direct connection for critical schema DDL
+            try:
+                ssl_kwargs = get_ssl_kwargs()
+                conn = pymysql.connect(
+                    host=MYSQL_HOST,
+                    port=MYSQL_PORT,
+                    user=MYSQL_USER,
+                    password=MYSQL_PASSWORD,
+                    database=MYSQL_DB,
+                    cursorclass=pymysql.cursors.DictCursor,
+                    connect_timeout=5,
+                    charset="utf8mb4",
+                    **ssl_kwargs
+                )
+            except Exception as direct_err:
+                logger.warning(f"execute_query dropped query because connection is unavailable: {direct_err}")
+                return
         try:
             with conn.cursor() as cursor:
                 cursor.execute(query, params)
@@ -266,11 +287,13 @@ def check_db_health() -> Tuple[bool, str]:
 _db_initialized = False
 
 def init_db(force: bool = False):
-    global _db_initialized
+    global _db_initialized, _last_db_failure_timestamp, _last_pool_failure_timestamp, _db_pool
     if _db_initialized and not force:
         return
     # Ensure database exists before table setup
     ensure_database_exists()
+    _last_db_failure_timestamp = 0.0
+    _last_pool_failure_timestamp = 0.0
 
     # Helper to safely add column if not exists
     def add_column_safely(table: str, column_def: str):

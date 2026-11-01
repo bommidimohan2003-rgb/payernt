@@ -1,4 +1,4 @@
-import { ReactNode, useEffect } from "react";
+import { ReactNode, useEffect, useRef } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/hooks/useAuth";
 import { storage, STORAGE_KEYS } from "@/utils/storage";
@@ -6,24 +6,25 @@ import { storage, STORAGE_KEYS } from "@/utils/storage";
 export function ProtectedRoute({ children }: { children: ReactNode }) {
   const { user, ready } = useAuth();
   const navigate = useNavigate();
+  const hasRedirectedRef = useRef(false);
 
   const token = typeof window !== "undefined" ? storage.get<string | null>(STORAGE_KEYS.token, null) : null;
   const cachedUser = typeof window !== "undefined" ? storage.get(STORAGE_KEYS.currentUser, null) : null;
   const isAuthPresent = Boolean(user || token || cachedUser);
 
   useEffect(() => {
-    if (ready) {
-      if (!user) {
-        const currentPath =
-          typeof window !== "undefined" ? window.location.pathname : "";
-        if (currentPath && currentPath !== "/login" && currentPath !== "/") {
-          navigate({
-            to: "/login",
-            search: { redirect: currentPath + (window.location.search || "") } as any,
-          });
-        } else {
-          navigate({ to: "/login" });
-        }
+    if (ready && !user && !hasRedirectedRef.current) {
+      hasRedirectedRef.current = true;
+      const currentPath =
+        typeof window !== "undefined" ? window.location.pathname : "";
+      if (currentPath && currentPath !== "/login" && currentPath !== "/") {
+        navigate({
+          to: "/login",
+          search: { redirect: currentPath + (window.location.search || "") } as any,
+          replace: true,
+        });
+      } else {
+        navigate({ to: "/login", replace: true });
       }
     }
   }, [ready, user, navigate]);
