@@ -225,7 +225,8 @@ export default function ProductDetails() {
     setIsAvailableForDates(null);
     setAvailabilityMessage("");
 
-    const initial = initialCachedProduct || api.getCachedProduct(id);
+    const cached = initialCachedProduct || api.getCachedProduct(id);
+    const initial = cached;
     if (initial) {
       if (isMounted) {
         setProduct(initial);
