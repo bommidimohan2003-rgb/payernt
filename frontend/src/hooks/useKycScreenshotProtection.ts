@@ -37,13 +37,13 @@ export function useKycScreenshotProtection({
     // Clear clipboard immediately to scrub any captured pixels or copied text
     try {
       if (typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText("").catch(() => {});
+        navigator.clipboard.writeText("Screenshots are not allowed in this app.").catch(() => {});
       }
     } catch {}
 
     // Show warning toast
     toast.error(
-      `🚫 Screenshot Blocked: Screen capture of sensitive ${documentType} details is prohibited for regulatory compliance.`,
+      "🚫 Screenshots are not allowed in this app",
       { duration: 4000 }
     );
 

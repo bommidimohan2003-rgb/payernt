@@ -30,7 +30,7 @@ export function KycScreenShield({
       </div>
 
       <h4 className="text-base font-bold text-foreground tracking-tight">
-        KYC Privacy Shield Active
+        Screenshots are not allowed in this app
       </h4>
 
       <p className="text-xs text-muted-foreground max-w-sm mt-1.5 leading-relaxed">
