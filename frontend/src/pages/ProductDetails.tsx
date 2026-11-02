@@ -1047,6 +1047,8 @@ const productSchema = product ? {
   const rawVideoUrl = product?.videoUrl || (product as any)?.video_url;
   const activeVideoUrl = (rawVideoUrl && !rawVideoUrl.includes("mixkit.co"))
     ? rawVideoUrl
+    : (product?.id === "prod-1792662405953" || (product?.title === "Acer" && product?.category === "computers"))
+    ? "https://res.cloudinary.com/dvyendk6j/video/upload/v1793643488/gv4p8hu7ccji2cie9xdk.mp4"
     : "/videos/inspection-sample.mp4";
 
   const brand = product ? getProductBrand(product) : null;
@@ -1103,19 +1105,21 @@ const productSchema = product ? {
 
   // Related Products
   const relatedProductsList = useMemo(() => {
+    if (!product) return [];
+    const currentId = product.id;
     const list = [...similarProducts, ...frequentlyTogether].filter(
-      (p, i, arr) => p && p.id !== product.id && arr.findIndex((x) => x.id === p.id) === i
+      (p, i, arr) => p && p.id !== currentId && arr.findIndex((x) => x.id === p.id) === i
     );
     if (list.length >= 4) return list;
     const catalog = storage.get<Product[]>("payent_server_products", []);
     for (const p of catalog) {
-      if (p && p.id !== product.id && !list.some((x) => x.id === p.id)) {
+      if (p && p.id !== currentId && !list.some((x) => x.id === p.id)) {
         list.push(p);
       }
       if (list.length >= 8) break;
     }
     return list;
-  }, [similarProducts, frequentlyTogether, product.id]);
+  }, [similarProducts, frequentlyTogether, product?.id]);
 
   const displayedRelated = useMemo(() => {
     if (relatedProductsList.length <= 4) return relatedProductsList;
@@ -1231,8 +1235,10 @@ const productSchema = product ? {
                     <video
                       key={activeVideoUrl}
                       src={activeVideoUrl}
+                      poster={activeDisplayImage || product?.image}
                       controls
                       autoPlay
+                      muted
                       playsInline
                       preload="auto"
                       className="w-full h-full max-h-[360px] object-contain rounded-2xl"
@@ -1244,10 +1250,7 @@ const productSchema = product ? {
                           target.play().catch(() => {});
                         }
                       }}
-                    >
-                      <source src={activeVideoUrl} type="video/mp4" />
-                      <source src="/videos/inspection-sample.mp4" type="video/mp4" />
-                    </video>
+                    />
                     <div className="absolute bottom-2 left-2 px-2.5 py-0.5 rounded-full bg-black/70 backdrop-blur-md text-[10px] text-emerald-400 font-bold border border-emerald-500/30 flex items-center gap-1 select-none pointer-events-none">
                       <ShieldCheck className="h-3 w-3" />
                       <span>Verified 10s Inspection Video</span>

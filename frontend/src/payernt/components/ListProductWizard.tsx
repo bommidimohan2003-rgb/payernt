@@ -1457,7 +1457,7 @@ export function ListProductWizard({
       photos: photosArr,
       images: photosArr.map((p) => p.url),
       primaryImage: frontPhotoUrl || backPhotoUrl || "",
-      videoUrl: capturedVideoUrl && !capturedVideoUrl.startsWith("blob:") ? capturedVideoUrl : undefined,
+      videoUrl: capturedVideoUrl || undefined,
       specs: {
         brand: brand.trim() || undefined,
         model: model.trim() || undefined,

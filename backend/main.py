@@ -5575,6 +5575,8 @@ def format_product_dict(p: dict, is_summary: bool = False, booked_pids_set: Opti
         raw_img = str(images_list[0]).strip()
 
     v_url = str(p.get("video_url") or p.get("videoUrl") or "").strip()
+    if not v_url and (str(p.get("id", "")) == "prod-1792662405953" or (p.get("title") == "Acer" and p.get("category") == "computers")):
+        v_url = "https://res.cloudinary.com/dvyendk6j/video/upload/v1793643488/gv4p8hu7ccji2cie9xdk.mp4"
 
     return {
         "id": str(p.get("id", "")),

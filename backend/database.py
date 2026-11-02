@@ -3830,13 +3830,24 @@ def create_custom_product(email: str, product: dict):
 
     try:
         with conn.cursor() as cursor:
+            imgs_raw = product.get("images")
+            if isinstance(imgs_raw, list):
+                imgs_json = json.dumps([str(u).strip() for u in imgs_raw if str(u).strip()])
+            elif isinstance(imgs_raw, str) and imgs_raw.strip():
+                imgs_json = imgs_raw.strip()
+            else:
+                imgs_json = json.dumps([product_entry["image"]]) if product_entry["image"] else "[]"
+            video_val = str(product.get("video_url") or product.get("videoUrl") or "").strip()
+            product_entry["images"] = imgs_json
+            product_entry["video_url"] = video_val
+
             cursor.execute("""
                 INSERT INTO custom_products (
-                    id, user_email, title, description, price, image, category,
+                    id, user_email, title, description, price, image, images, video_url, category,
                     rating, reviews, available, status, owner_name, owner_avatar,
                     owner_rating, created_at
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 product_entry["id"],
                 clean_email,
@@ -3844,6 +3855,8 @@ def create_custom_product(email: str, product: dict):
                 product_entry["description"],
                 product_entry["price"],
                 product_entry["image"],
+                imgs_json,
+                video_val,
                 product_entry["category"],
                 product_entry["rating"],
                 product_entry["reviews"],
@@ -3893,6 +3906,9 @@ def update_custom_product(product_id: str, email: str, patch: dict):
         "description": "description",
         "price": "price",
         "image": "image",
+        "images": "images",
+        "video_url": "video_url",
+        "videoUrl": "video_url",
         "category": "category",
         "available": "available",
         "rating": "rating",

@@ -105,8 +105,10 @@ export function PhotoDetailViewer({
             <video
               key={videoUrl || "/videos/inspection-sample.mp4"}
               src={videoUrl || "/videos/inspection-sample.mp4"}
+              poster={activeSrc || (photos && photos[0]) || ""}
               controls
               autoPlay
+              muted
               playsInline
               preload="auto"
               className="w-full h-full object-contain"
@@ -118,10 +120,7 @@ export function PhotoDetailViewer({
                   target.play().catch(() => {});
                 }
               }}
-            >
-              <source src={videoUrl || "/videos/inspection-sample.mp4"} type="video/mp4" />
-              <source src="/videos/inspection-sample.mp4" type="video/mp4" />
-            </video>
+            />
           </div>
         ) : (
           <>

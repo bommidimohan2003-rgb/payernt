@@ -1235,22 +1235,23 @@ def create_payernt_product(
     try:
         execute_query("""
             INSERT INTO custom_products (
-                id, user_email, title, description, price, image, category,
+                id, user_email, title, description, price, image, images, video_url, category,
                 rating, reviews, available, status, owner_name, owner_avatar,
                 owner_rating, created_at, blocked_dates, allow_half_day,
                 morning_slot_enabled, afternoon_slot_enabled, full_day_slot_enabled,
                 half_day_rate, buffer_minutes
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, 5.0, 0, %s, %s, %s, %s, 5.0, %s, %s, %s, %s, %s, %s, %s, %s)
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 5.0, 0, %s, %s, %s, %s, 5.0, %s, %s, %s, %s, %s, %s, %s, %s)
             ON DUPLICATE KEY UPDATE
                 title = VALUES(title), description = VALUES(description), price = VALUES(price),
-                image = VALUES(image), category = VALUES(category), available = VALUES(available),
+                image = VALUES(image), images = VALUES(images), video_url = VALUES(video_url),
+                category = VALUES(category), available = VALUES(available),
                 status = VALUES(status), blocked_dates = VALUES(blocked_dates),
                 allow_half_day = VALUES(allow_half_day), morning_slot_enabled = VALUES(morning_slot_enabled),
                 afternoon_slot_enabled = VALUES(afternoon_slot_enabled), full_day_slot_enabled = VALUES(full_day_slot_enabled),
                 half_day_rate = VALUES(half_day_rate), buffer_minutes = VALUES(buffer_minutes)
         """, (
             product["id"], owner_email, product["title"], product["description"],
-            product["daily_rate"], product["primary_image"], product["category"],
+            product["daily_rate"], product["primary_image"], product["images"], product["video_url"], product["category"],
             1 if product["available"] else 0, product["status"], owner_name, "",
             now_iso, blocked_dates_json, allow_half_day_val, morning_slot_val,
             afternoon_slot_val, full_day_slot_val, half_day_rate_val, buffer_min_val
@@ -1502,7 +1503,7 @@ def update_payernt_product(product_id: str, owner_id: str, updates: Dict[str, An
         "pickup_instructions", "daily_rate", "weekly_rate", "monthly_rate",
         "security_deposit", "available", "availability_status", "primary_image",
         "allow_half_day", "morning_slot_enabled", "afternoon_slot_enabled",
-        "full_day_slot_enabled", "half_day_rate", "buffer_minutes"
+        "full_day_slot_enabled", "half_day_rate", "buffer_minutes", "video_url"
     ]
 
     # Normalize camelCase and alias fields
@@ -1673,7 +1674,7 @@ def update_payernt_product(product_id: str, owner_id: str, updates: Dict[str, An
                 try:
                     cursor.execute("""
                         UPDATE custom_products
-                        SET title = %s, description = %s, price = %s, image = %s, images = %s,
+                        SET title = %s, description = %s, price = %s, image = %s, images = %s, video_url = %s,
                             category = %s, available = %s,
                             allow_half_day = %s, morning_slot_enabled = %s,
                             afternoon_slot_enabled = %s, full_day_slot_enabled = %s,
@@ -1685,6 +1686,7 @@ def update_payernt_product(product_id: str, owner_id: str, updates: Dict[str, An
                         existing.get("daily_rate", 500),
                         existing.get("primary_image", ""),
                         cp_images_json,
+                        existing.get("video_url") or existing.get("videoUrl") or "",
                         existing.get("category", "tech"),
                         1 if existing.get("available") else 0,
                         1 if existing.get("allow_half_day", True) else 0,
