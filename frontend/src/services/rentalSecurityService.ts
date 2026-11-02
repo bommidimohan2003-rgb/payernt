@@ -59,6 +59,15 @@ class RentalSecurityService {
   }
 
   /**
+   * Retrieves security deposit record for a product ID.
+   */
+  public async getSecurityDeposit(productId: string): Promise<RentalSecurity | null> {
+    if (!productId) return null;
+    const records = this.getSecurityRecordsByProduct(productId);
+    return records.length > 0 ? records[0] : null;
+  }
+
+  /**
    * Reads or creates ONE Rental Security Record for a booking.
    * 
    * Strict Rules:

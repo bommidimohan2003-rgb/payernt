@@ -870,12 +870,21 @@ export default function ProductDetails() {
     }
     loadRecommendations();
 
-    rentalSecurityService
-      .getSecurityDeposit(currentId)
-      .then((sec) => {
-        if (isMounted) setSecurityRecord(sec);
-      })
-      .catch(() => {});
+    if (typeof (rentalSecurityService as any)?.getSecurityDeposit === "function") {
+      (rentalSecurityService as any)
+        .getSecurityDeposit(currentId)
+        .then((sec: any) => {
+          if (isMounted) setSecurityRecord(sec);
+        })
+        .catch(() => {});
+    } else if (typeof (rentalSecurityService as any)?.getSecurityRecordsByProduct === "function") {
+      try {
+        const records = (rentalSecurityService as any).getSecurityRecordsByProduct(String(currentId));
+        if (isMounted && Array.isArray(records) && records.length > 0) {
+          setSecurityRecord(records[0]);
+        }
+      } catch {}
+    }
 
     return () => {
       isMounted = false;
