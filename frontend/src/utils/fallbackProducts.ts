@@ -20,6 +20,7 @@ export const INITIAL_FALLBACK_PRODUCTS: Product[] = [
     images: [cameraImg],
     description:
       "Full-frame mirrorless camera with 24.2MP BSI sensor, 4K HDR video, and 5-axis optical image stabilization.",
+    videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-camera-zoom-lens-focusing-41551-large.mp4",
     condition: "Excellent",
     status: "approved",
     available: true,
@@ -42,6 +43,7 @@ export const INITIAL_FALLBACK_PRODUCTS: Product[] = [
     images: [cameraImg],
     description:
       "45MP full-frame CMOS sensor, 8K raw internal video recording, and 8-stop in-body image stabilization.",
+    videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-camera-zoom-lens-focusing-41551-large.mp4",
     condition: "Like New",
     status: "approved",
     available: true,
@@ -64,6 +66,7 @@ export const INITIAL_FALLBACK_PRODUCTS: Product[] = [
     images: [cameraImg],
     description:
       "6K Super 35 global shutter sensor, REDCODE RAW recording, and ultra-compact cinema production body.",
+    videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-camera-zoom-lens-focusing-41551-large.mp4",
     condition: "Excellent",
     status: "approved",
     available: true,
@@ -86,6 +89,7 @@ export const INITIAL_FALLBACK_PRODUCTS: Product[] = [
     images: [droneImg],
     description:
       "Triple-camera system featuring 4/3 CMOS Hasselblad sensor, 43-min flight time, and Apple ProRes recording.",
+    videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-camera-zoom-lens-focusing-41551-large.mp4",
     condition: "Like New",
     status: "approved",
     available: true,
@@ -108,6 +112,7 @@ export const INITIAL_FALLBACK_PRODUCTS: Product[] = [
     images: [droneImg],
     description:
       "Sub-249g lightweight 4K/60fps HDR drone with omnidirectional obstacle sensing and 34-min flight time.",
+    videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-camera-zoom-lens-focusing-41551-large.mp4",
     condition: "Excellent",
     status: "approved",
     available: true,
@@ -130,6 +135,7 @@ export const INITIAL_FALLBACK_PRODUCTS: Product[] = [
     images: [laptopImg],
     description:
       "16-core CPU, 40-core GPU, Liquid Retina XDR display. High-performance video editing and 3D rendering workstation.",
+    videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-camera-zoom-lens-focusing-41551-large.mp4",
     condition: "Like New",
     status: "approved",
     available: true,
@@ -152,6 +158,7 @@ export const INITIAL_FALLBACK_PRODUCTS: Product[] = [
     images: [audioImg],
     description:
       "Compact wireless microphone system with 32-bit float on-board recording, timecode sync, and 260m range.",
+    videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-camera-zoom-lens-focusing-41551-large.mp4",
     condition: "Excellent",
     status: "approved",
     available: true,
@@ -174,6 +181,7 @@ export const INITIAL_FALLBACK_PRODUCTS: Product[] = [
     images: [bikeImg],
     description:
       "349cc single-cylinder 4-stroke air-oil cooled engine, dual-channel ABS, pristine touring setup with panniers.",
+    videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-camera-zoom-lens-focusing-41551-large.mp4",
     condition: "Excellent",
     status: "approved",
     available: true,
@@ -196,6 +204,7 @@ export const INITIAL_FALLBACK_PRODUCTS: Product[] = [
     images: [toolImg],
     description:
       "Heavy-duty 1/2-inch brushless cordless hammer drill with 2x 5Ah batteries, charger, and carbide masonry bits.",
+    videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-camera-zoom-lens-focusing-41551-large.mp4",
     condition: "Good",
     status: "approved",
     available: true,
@@ -218,6 +227,7 @@ export const INITIAL_FALLBACK_PRODUCTS: Product[] = [
     images: [powerbankImg],
     description:
       "24,000mAh 3-port ultra-powerful laptop & camera charging power bank with smart digital display and 140W fast output.",
+    videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-camera-zoom-lens-focusing-41551-large.mp4",
     condition: "Excellent",
     status: "approved",
     available: true,
@@ -240,6 +250,7 @@ export const INITIAL_FALLBACK_PRODUCTS: Product[] = [
     images: [cameraImg],
     description:
       "5500K daylight-balanced point-source LED light with Bowens mount, wireless remote control, and carry case.",
+    videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-camera-zoom-lens-focusing-41551-large.mp4",
     condition: "Like New",
     status: "approved",
     available: true,

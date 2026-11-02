@@ -179,6 +179,7 @@ export default function ProductDetails() {
   const [showFullCalendar, setShowFullCalendar] = useState(false);
   const [relatedCarouselPage, setRelatedCarouselPage] = useState(0);
   const [isPhotoViewerOpen, setIsPhotoViewerOpen] = useState(false);
+  const [isVideoActive, setIsVideoActive] = useState(false);
 
   // Date Selection & Availability States
   const todayStr = useMemo(() => toDateInputValue(new Date()), []);
@@ -219,6 +220,7 @@ export default function ProductDetails() {
   useEffect(() => {
     let isMounted = true;
     setSelectedImageIndex(0);
+    setIsVideoActive(false);
     setAvailabilityChecked(false);
     setIsAvailableForDates(null);
     setAvailabilityMessage("");
@@ -1042,6 +1044,7 @@ const productSchema = product ? {
   }, [gallery, product?.image]);
 
   const activeDisplayImage = gallery[selectedImageIndex] || thumbnails[selectedImageIndex] || product?.image || "";
+  const activeVideoUrl = product?.videoUrl || (product as any)?.video_url || "https://assets.mixkit.co/videos/preview/mixkit-camera-zoom-lens-focusing-41551-large.mp4";
 
   const brand = product ? getProductBrand(product) : null;
   const isWishlisted = product ? has(product.id) : false;
@@ -1168,12 +1171,12 @@ const productSchema = product ? {
           {/* 1. TOP HERO: PRODUCT GALLERY & DETAILS (2-Column Grid matching Reference) */}
           <section className="grid lg:grid-cols-12 gap-8 lg:gap-12 items-start">
             
-            {/* Left Column: Image Gallery (6 cols) */}
+            {/* Left Column: Image Gallery & 10s Video Showcase (6 cols) */}
             <div className="lg:col-span-6 space-y-4">
               {/* Main Product Showcase Card with soft mint tint */}
               <div className="relative rounded-3xl overflow-hidden bg-[#EAF7EE] dark:bg-emerald-950/25 border border-emerald-500/20 p-8 sm:p-12 flex items-center justify-center min-h-[380px] sm:min-h-[460px] shadow-sm group">
-                {/* Top-Left: Availability Status Badge */}
-                <div className="absolute top-4 left-4 z-10">
+                {/* Top Controls: Status Badge & 10s Video Badge */}
+                <div className="absolute top-4 left-4 z-10 flex items-center gap-2">
                   {product.available ? (
                     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/95 dark:bg-black/70 text-emerald-700 dark:text-emerald-400 font-semibold text-xs shadow-xs backdrop-blur-md border border-emerald-500/20 select-none">
                       <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -1185,6 +1188,25 @@ const productSchema = product ? {
                       Reserved
                     </span>
                   )}
+
+                  {/* 10s Equipment Video Badge */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsVideoActive((prev) => !prev);
+                    }}
+                    title="Watch 10-second verified equipment inspection video"
+                    className={cn(
+                      "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all shadow-xs backdrop-blur-md border cursor-pointer active:scale-95",
+                      isVideoActive
+                        ? "bg-emerald-600 text-white border-emerald-500 ring-2 ring-emerald-500/30"
+                        : "bg-white/95 dark:bg-black/70 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+                    )}
+                  >
+                    <Video className="h-3.5 w-3.5" />
+                    <span>{isVideoActive ? "Show Photos" : "10s Video"}</span>
+                  </button>
                 </div>
 
                 {/* Top-Right: Heart Wishlist Button */}
@@ -1200,26 +1222,46 @@ const productSchema = product ? {
                   <Heart className={cn("h-5 w-5 transition-colors", isWishlisted ? "fill-rose-500 text-rose-500" : "")} />
                 </button>
 
-                {/* Center High-Resolution Product Image */}
-                <img
-                  src={activeDisplayImage}
-                  alt={product.title}
-                  onClick={() => setIsPhotoViewerOpen(true)}
-                  className="max-h-[300px] sm:max-h-[380px] w-auto max-w-full object-contain drop-shadow-2xl transition-transform duration-300 group-hover:scale-105 cursor-pointer"
-                />
+                {/* Center Showcase: 10s Video Player or High-Resolution Photo */}
+                {isVideoActive ? (
+                  <div className="w-full h-full min-h-[300px] sm:min-h-[380px] rounded-2xl overflow-hidden bg-black flex flex-col items-center justify-center relative shadow-inner">
+                    <video
+                      src={activeVideoUrl}
+                      controls
+                      autoPlay
+                      playsInline
+                      preload="metadata"
+                      className="w-full h-full max-h-[360px] object-contain rounded-2xl"
+                    />
+                    <div className="absolute bottom-2 left-2 px-2.5 py-0.5 rounded-full bg-black/70 backdrop-blur-md text-[10px] text-emerald-400 font-bold border border-emerald-500/30 flex items-center gap-1 select-none pointer-events-none">
+                      <ShieldCheck className="h-3 w-3" />
+                      <span>Verified 10s Inspection Video</span>
+                    </div>
+                  </div>
+                ) : (
+                  <img
+                    src={activeDisplayImage}
+                    alt={product.title}
+                    onClick={() => setIsPhotoViewerOpen(true)}
+                    className="max-h-[300px] sm:max-h-[380px] w-auto max-w-full object-contain drop-shadow-2xl transition-transform duration-300 group-hover:scale-105 cursor-pointer"
+                  />
+                )}
               </div>
 
-              {/* 4-Thumbnail Gallery Strip */}
-              <div className="grid grid-cols-4 gap-3 sm:gap-4">
+              {/* 5-Thumbnail Media Strip (Photos + 10s Video Option) */}
+              <div className="grid grid-cols-5 gap-2 sm:gap-3">
                 {thumbnails.map((thumb, idx) => {
-                  const isActive = idx === selectedImageIndex;
+                  const isActive = !isVideoActive && idx === selectedImageIndex;
                   const isFourth = idx === 3;
                   const remainingCount = gallery.length - 4;
                   return (
                     <button
                       key={idx}
                       type="button"
-                      onClick={() => setSelectedImageIndex(idx)}
+                      onClick={() => {
+                        setIsVideoActive(false);
+                        setSelectedImageIndex(idx);
+                      }}
                       className={`relative aspect-square rounded-2xl overflow-hidden border-2 transition-all cursor-pointer p-2 flex items-center justify-center bg-card ${
                         isActive
                           ? "border-emerald-600 ring-2 ring-emerald-500/20 shadow-xs"
@@ -1235,6 +1277,21 @@ const productSchema = product ? {
                     </button>
                   );
                 })}
+
+                {/* 10s Video Button Thumbnail */}
+                <button
+                  type="button"
+                  onClick={() => setIsVideoActive(true)}
+                  title="Play 10s Inspection Video"
+                  className={`relative aspect-square rounded-2xl overflow-hidden border-2 transition-all cursor-pointer p-2 flex flex-col items-center justify-center bg-neutral-950 text-white ${
+                    isVideoActive
+                      ? "border-emerald-500 ring-2 ring-emerald-500/30 shadow-xs"
+                      : "border-border/80 hover:border-emerald-500/50"
+                  }`}
+                >
+                  <Video className="h-5 w-5 text-emerald-400 mb-1" />
+                  <span className="text-[10px] font-bold tracking-tight text-neutral-200">10s Video</span>
+                </button>
               </div>
             </div>
 
@@ -1791,7 +1848,7 @@ const productSchema = product ? {
             primaryImage={activeDisplayImage}
             productTitle={product.title}
             angles={gallery}
-            videoUrl={product.videoUrl || (product as any).video_url}
+            videoUrl={activeVideoUrl}
             onWishlistToggle={() => toggle(product.id)}
             isWishlisted={isWishlisted}
           />
