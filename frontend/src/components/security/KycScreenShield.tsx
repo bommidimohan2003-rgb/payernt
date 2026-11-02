@@ -60,3 +60,4 @@ export function KycProtectionBadge({ documentType = "KYC" }: { documentType?: st
     </div>
   );
 }
+
