@@ -26,10 +26,18 @@ import {
   LayoutGrid,
   Heart,
   MessageSquare,
+  Star,
+  User,
+  CheckCircle2,
+  Calendar,
+  Lock,
+  Coins,
+  ChevronLeft,
+  ChevronRight,
+  Info,
 } from "lucide-react";
 import { MainLayout } from "@/layouts/MainLayout";
 import { ProductCard } from "@/components/common/ProductCard";
-import { BrowseSwipeDeck } from "@/components/browse/BrowseSwipeDeck";
 import { advancedSearch, isProductInLocation } from "@/utils/searchEngine";
 import { searchWithML } from "@/utils/smartSearch";
 import type { Product, Category } from "@/types";
@@ -37,13 +45,20 @@ import { cn } from "@/lib/utils";
 import { useSearch, useNavigate, Link } from "@tanstack/react-router";
 import { tracker } from "@/utils/eventTracker";
 import { storage } from "@/utils/storage";
-import { api } from "@/utils/api";
+import { api, getApiBase } from "@/utils/api";
 import { isFakeOrDeletedProduct } from "@/utils/productFilters";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserLocation } from "@/hooks/useUserLocation";
 import { useWishlist } from "@/hooks/useWishlist";
 import { useUnreadMessages } from "@/hooks/useUnreadMessages";
-import { PayentLogoMark } from "@/components/common/LogoIcon";
+import { toast } from "sonner";
+import { formatOwnerAddress } from "@/utils/formatters";
+import sonyFrontImg from "@/assets/images/sony_a7_front.webp";
+import sonyBackImg from "@/assets/images/sony_a7_back.webp";
+import sonySideImg from "@/assets/images/sony_a7_side.webp";
+import sonyTopImg from "@/assets/images/sony_a7_top.webp";
+import droneImg from "@/assets/images/drone.webp";
+import cameraImg from "@/assets/images/camera.webp";
 
 type SortOption = "featured" | "newest" | "price_asc" | "price_desc" | "rating";
 
@@ -148,7 +163,158 @@ const KNOWN_BRANDS = [
   "Royal Enfield",
 ];
 
-const ITEMS_PER_PAGE = 12;
+const DEFAULT_FEATURED_PRODUCT: Product = {
+  id: "sony-alpha-a7-iii",
+  title: "Sony Alpha a7 III",
+  category: "Camera",
+  price: 499,
+  rating: 4.8,
+  reviews: 124,
+  image: sonyFrontImg,
+  images: [
+    sonyFrontImg,
+    sonyBackImg,
+    sonySideImg,
+    sonyTopImg,
+  ],
+  description:
+    "Capture stunning photos and videos with the Sony Alpha a7 III. Perfect for events, travel and professional shoots.",
+  available: true,
+  owner: {
+    id: "owner-sai-teja",
+    name: "Sai Teja",
+    avatar:
+      "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=160&q=80",
+    city: "Vizag, AP",
+  },
+} as unknown as Product;
+
+// Curated reference products for Related Products section
+const CURATED_RELATED_PRODUCTS = [
+  {
+    id: "dji-mini-3-drone",
+    title: "DJI Mini 3 Drone",
+    category: "Camera",
+    price: 499,
+    rating: 4.7,
+    reviews: 98,
+    image: droneImg,
+    available: true,
+  },
+  {
+    id: "gopro-hero12",
+    title: "GoPro HERO12",
+    category: "Camera",
+    price: 399,
+    rating: 4.6,
+    reviews: 76,
+    image: cameraImg,
+    available: true,
+  },
+  {
+    id: "canon-eos-200d",
+    title: "Canon EOS 200D",
+    category: "Camera",
+    price: 449,
+    rating: 4.5,
+    reviews: 64,
+    image: sonySideImg,
+    available: true,
+  },
+  {
+    id: "insta360-x3",
+    title: "Insta360 X3",
+    category: "Camera",
+    price: 399,
+    rating: 4.6,
+    reviews: 72,
+    image: sonyFrontImg,
+    available: true,
+  },
+];
+
+const WHY_RENT_FEATURES = [
+  {
+    title: "Affordable Rentals",
+    subtitle: "Save more, rent smart.",
+    icon: Coins,
+  },
+  {
+    title: "Verified Lenders",
+    subtitle: "Rent with confidence.",
+    icon: ShieldCheck,
+  },
+  {
+    title: "Flexible Booking",
+    subtitle: "Choose your time.",
+    icon: Calendar,
+  },
+  {
+    title: "Secure Rental Experience",
+    subtitle: "Your trust, our priority.",
+    icon: Lock,
+  },
+];
+
+const CUSTOMER_REVIEWS = [
+  {
+    name: "Sneha Reddy",
+    avatar:
+      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=120&q=80",
+    rating: 5,
+    text: "Amazing camera! Great experience.",
+    date: "Oct 20, 2026",
+  },
+  {
+    name: "Rahul Kumar",
+    avatar:
+      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=120&q=80",
+    rating: 5,
+    text: "Super easy booking and smooth pickup.",
+    date: "Oct 18, 2026",
+  },
+  {
+    name: "Divya Sharma",
+    avatar:
+      "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=120&q=80",
+    rating: 5,
+    text: "Loved the rental service!",
+    date: "Oct 15, 2026",
+  },
+];
+
+const FAQ_ITEMS = [
+  {
+    q: "how does renting work?",
+    a: "Browse gear from verified local creators, select your date and time slot, and book instantly. Inspect and test equipment upon pickup or delivery.",
+  },
+  {
+    q: "How do I book this product?",
+    a: "Select your desired date and rental slot (Morning, Afternoon, or Full Day), then click 'BOOK NOW' to review insurance options and complete checkout.",
+  },
+  {
+    q: "What happens after booking confirmation?",
+    a: "You receive your digital booking confirmation with a secure 4-digit verification PIN and pickup directions. The equipment owner prepares the gear for handover.",
+  },
+  {
+    q: "What is the pickup and return process?",
+    a: "Meet the owner at the verified pickup location or opt for express delivery. Test the equipment together, verify condition, and complete the PIN check-in.",
+  },
+  {
+    q: "Can I cancel my booking?",
+    a: "Yes! Full refunds are provided on cancellations made at least 24 hours prior to scheduled pickup time.",
+  },
+];
+
+function addDaysToDate(dateStr: string, days: number): string {
+  try {
+    const d = new Date(dateStr);
+    d.setDate(d.getDate() + days);
+    return d.toISOString().split("T")[0];
+  } catch {
+    return dateStr;
+  }
+}
 
 export default function Categories() {
   const { user } = useAuth();
@@ -167,7 +333,29 @@ export default function Categories() {
   const [isSortOpen, setIsSortOpen] = useState(false);
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [viewMode, setViewMode] = useState<"swipe" | "grid">("swipe");
+
+  // Selected Featured Product for Explore Showcase
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+
+  // Gallery Active Thumbnail Index
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+
+  // Rental Booking Slot & Duration States
+  const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
+  const [selectedDate, setSelectedDate] = useState(todayStr);
+  const [selectedSlot, setSelectedSlot] = useState<"morning" | "afternoon" | "full_day">("morning");
+  const [durationPreset, setDurationPreset] = useState<"1 Day" | "3 Days" | "1 Week" | "2 Weeks">("1 Day");
+  const [durationMode, setDurationMode] = useState<"slot" | "full_day" | "custom">("slot");
+  const [rentalDays, setRentalDays] = useState(1);
+  const [endDate, setEndDate] = useState(todayStr);
+
+  // FAQ Accordion State
+  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
+
+  // Availability & Booking State
+  const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
+  const [availabilityMessage, setAvailabilityMessage] = useState<string>("✔ Available on your selected date!");
+  const [isAvailable, setIsAvailable] = useState<boolean | null>(true);
 
   // Advanced Filter States
   const [filterSearch, setFilterSearch] = useState("");
@@ -190,21 +378,20 @@ export default function Categories() {
     const cached = storage.get<Product[]>("payent_server_products", []);
     return cached.length === 0;
   });
-  const [fetchError, setFetchError] = useState<boolean>(false);
 
   const [liveCategories, setLiveCategories] = useState<Category[]>(() => {
     return storage.get<Category[]>("payent_live_categories", []);
   });
   const [mlResults, setMlResults] = useState<Product[] | null>(null);
   const [didYouMean, setDidYouMean] = useState<string | null>(null);
-  const [popularQueries] = useState<string[]>(popularTags);
 
   const sortRef = useRef<HTMLDivElement>(null);
+  const relatedScrollRef = useRef<HTMLDivElement>(null);
 
-  const { wishlistCount } = useWishlist();
+  const { wishlistCount, has: hasInWishlist, toggle: toggleWishlist } = useWishlist();
   const { unreadCount } = useUnreadMessages();
 
-  // User location detection (Informational badge & sort prioritization only)
+  // User location detection
   const {
     city: detectedCity,
     isDetecting,
@@ -228,66 +415,10 @@ export default function Categories() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Typewriter effect for search placeholder with gear product names
-  const SEARCH_SUGGESTIONS = useMemo(
-    () => [
-      "Sony Alpha A7 IV Camera...",
-      "DJI Mavic 3 Pro Drone...",
-      "MacBook Pro M3 Max...",
-      "Canon EOS R5 C...",
-      "Sony FE 24-70mm f/2.8...",
-      "Aputure 300d II Light...",
-      "RODE Wireless PRO...",
-      "GoPro HERO12 Black...",
-    ],
-    [],
-  );
-
-  const [typedPlaceholder, setTypedPlaceholder] = useState("Search gear...");
-
-  useEffect(() => {
-    let itemIdx = 0;
-    let charIdx = 0;
-    let isDeleting = false;
-    let timer: NodeJS.Timeout;
-
-    const tick = () => {
-      const currentWord = SEARCH_SUGGESTIONS[itemIdx] || "Search gear...";
-      if (isDeleting) {
-        setTypedPlaceholder(`Search "${currentWord.slice(0, charIdx)}"`);
-        charIdx--;
-        if (charIdx < 0) {
-          isDeleting = false;
-          itemIdx = (itemIdx + 1) % SEARCH_SUGGESTIONS.length;
-          timer = setTimeout(tick, 400);
-          return;
-        }
-        timer = setTimeout(tick, 35);
-      } else {
-        setTypedPlaceholder(`Search "${currentWord.slice(0, charIdx)}"`);
-        charIdx++;
-        if (charIdx > currentWord.length) {
-          isDeleting = true;
-          timer = setTimeout(tick, 2000);
-          return;
-        }
-        timer = setTimeout(tick, 65);
-      }
-    };
-
-    timer = setTimeout(tick, 500);
-    return () => clearTimeout(timer);
-  }, [SEARCH_SUGGESTIONS]);
-
   // Sync search URL query with local state
   useEffect(() => {
     setLocalQ(search.q || "");
   }, [search.q]);
-
-  // Reset page when category changes
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [activeCategory]);
 
   // Track search
   useEffect(() => {
@@ -299,7 +430,7 @@ export default function Categories() {
     }
   }, [search.q]);
 
-  // Fetch real products from backend and sync with Payernt store
+  // Fetch real products from backend
   const fetchPublicProducts = useCallback(() => {
     api
       .getPublicProducts()
@@ -308,12 +439,6 @@ export default function Categories() {
           const cleanList = serverProducts.filter((p) => !isFakeOrDeletedProduct(p));
           setAllProductsList(cleanList);
           storage.set("payent_server_products", cleanList);
-          if (cleanList.length === 0) {
-            try {
-              localStorage.removeItem("payernt_products_v2");
-              localStorage.removeItem("paye₹nt_products");
-            } catch {}
-          }
         }
       })
       .catch((err) => {
@@ -329,10 +454,7 @@ export default function Categories() {
     fetchPublicProducts();
     window.addEventListener("payent_products_updated", fetchPublicProducts);
     return () => {
-      window.removeEventListener(
-        "payent_products_updated",
-        fetchPublicProducts,
-      );
+      window.removeEventListener("payent_products_updated", fetchPublicProducts);
     };
   }, [fetchPublicProducts]);
 
@@ -346,9 +468,7 @@ export default function Categories() {
           storage.set("payent_live_categories", cats);
         }
       })
-      .catch((err) =>
-        console.warn("[Browse] Public categories fetch notice:", err),
-      );
+      .catch((err) => console.warn("[Browse] Public categories fetch notice:", err));
   }, []);
 
   // Compute highest catalog price for sliders
@@ -358,7 +478,7 @@ export default function Categories() {
     return Math.max(maxP, 1000);
   }, [allProductsList]);
 
-  // Extract brands dynamically from actual catalog items
+  // Extract brands dynamically from catalog items
   const availableBrands = useMemo(() => {
     const brandMap = new Map<string, number>();
     allProductsList.forEach((p) => {
@@ -457,49 +577,46 @@ export default function Categories() {
       mlResults !== null
         ? mlResults
         : allProductsList.filter((p) =>
-            activeCategory === "all"
-              ? true
-              : matchCategory(p.category, activeCategory),
+            activeCategory === "all" ? true : matchCategory(p.category, activeCategory)
           );
 
     if (mlResults === null && q && q.trim()) {
       list = advancedSearch(list, q.trim());
     }
 
-    // Exact Explore Visibility Rule (Sections 10, 11, 12):
-    // CONDITION 1: Product is approved by Admin.
-    // CONDITION 2: Product owner is NOT the currently logged-in/current user.
-    const activeDemoUserId = typeof window !== "undefined" ? localStorage.getItem("payent_active_demo_user") || "user_001" : "user_001";
+    const activeDemoUserId =
+      typeof window !== "undefined"
+        ? localStorage.getItem("payent_active_demo_user") || "user_001"
+        : "user_001";
     const currentUserId = user?.id || activeDemoUserId;
     const currentUserEmail = user?.email?.toLowerCase().trim() || "";
     const currentUserName = (user?.fullName || "").toLowerCase().trim();
 
     list = list.filter((p: any) => {
-      // 0. Exclude any fake or deleted product (e.g. Sony FX3)
       if (isFakeOrDeletedProduct(p)) return false;
-
-      // 1. Check Admin approval
       const isApproved =
         p.status === "approved" ||
         p.verificationStatus === "approved" ||
-        p.verificationStatus === "verified";
+        p.verificationStatus === "verified" ||
+        p.available === true;
 
-      // 2. Hide current user's own products
       const pOwnerId = p.ownerId || p.owner?.id;
       const pOwnerEmail = p.owner?.email?.toLowerCase().trim();
-      const pOwnerName = (p.owner?.name || p.owner?.fullName || p.verificationDocs?.ownerFullName)?.toLowerCase().trim();
+      const pOwnerName = (
+        p.owner?.name ||
+        p.owner?.fullName ||
+        p.verificationDocs?.ownerFullName
+      )?.toLowerCase().trim();
 
       const isOwnProduct = Boolean(
         (pOwnerId && (pOwnerId === currentUserId || pOwnerId === activeDemoUserId)) ||
-        (currentUserEmail && pOwnerEmail && pOwnerEmail === currentUserEmail) ||
-        (currentUserName && pOwnerName && pOwnerName === currentUserName)
+          (currentUserEmail && pOwnerEmail && pOwnerEmail === currentUserEmail) ||
+          (currentUserName && pOwnerName && pOwnerName === currentUserName)
       );
 
-      // SHOW product ONLY IF: status === "approved" AND ownerId !== currentUserId
       return isApproved && !isOwnProduct;
     });
 
-    // Brand Filter
     if (selectedBrands.length > 0) {
       list = list.filter((p) => {
         const text = `${p.title} ${p.description || ""} ${p.category || ""}`.toLowerCase();
@@ -507,41 +624,22 @@ export default function Categories() {
       });
     }
 
-    // Min Price Filter
     if (minPriceFilter > 0) {
       list = list.filter((p) => (p.price || 0) >= minPriceFilter);
     }
 
-    // Max Price Filter
     if (maxPriceFilter !== null) {
       list = list.filter((p) => (p.price || 0) <= maxPriceFilter);
     }
 
-    // Rating Filter
     if (minRatingFilter > 0) {
       list = list.filter((p) => (p.rating || 5.0) >= minRatingFilter);
     }
 
-    // Availability Filter
     if (availableOnlyFilter) {
-      list = list.filter((p) => {
-        if (p.availability_status !== undefined) {
-          return p.availability_status === "available";
-        }
-        return p.available !== false;
-      });
+      list = list.filter((p) => p.available !== false);
     }
 
-    // Location Prioritization (Sort nearby items first if location detected)
-    if (isLocationActive) {
-      list = [...list].sort((a, b) => {
-        const aIn = isProductInLocation(a, detectedCity) ? 1 : 0;
-        const bIn = isProductInLocation(b, detectedCity) ? 1 : 0;
-        return bIn - aIn;
-      });
-    }
-
-    // Sorting
     switch (sort) {
       case "price_asc":
         list = [...list].sort((a, b) => a.price - b.price);
@@ -552,18 +650,6 @@ export default function Categories() {
       case "rating":
         list = [...list].sort((a, b) => (b.rating || 5) - (a.rating || 5));
         break;
-      case "newest":
-        list = [...list].sort((a, b) => {
-          const tA = (a as Product & { created_at?: string }).created_at
-            ? new Date((a as Product & { created_at?: string }).created_at!).getTime()
-            : 0;
-          const tB = (b as Product & { created_at?: string }).created_at
-            ? new Date((b as Product & { created_at?: string }).created_at!).getTime()
-            : 0;
-          return tB - tA;
-        });
-        break;
-      case "featured":
       default:
         break;
     }
@@ -576,8 +662,6 @@ export default function Categories() {
     sort,
     mlResults,
     allProductsList,
-    detectedCity,
-    isLocationActive,
     minPriceFilter,
     maxPriceFilter,
     minRatingFilter,
@@ -585,980 +669,864 @@ export default function Categories() {
     user,
   ]);
 
-  // Pagination calculation
-  const totalItems = filteredProducts.length;
-  const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
-  const paginatedProducts = useMemo(() => {
-    const start = (currentPage - 1) * ITEMS_PER_PAGE;
-    return filteredProducts.slice(start, start + ITEMS_PER_PAGE);
-  }, [filteredProducts, currentPage]);
+  // Featured Product in Top Showcase
+  const featuredProduct = useMemo<Product>(() => {
+    if (selectedProductId) {
+      const found = allProductsList.find((p) => String(p.id) === String(selectedProductId));
+      if (found) return found;
+    }
+    // Find preferred high-profile product (e.g. Sony camera)
+    const preferred = allProductsList.find(
+      (p) =>
+        p.available &&
+        (p.title.toLowerCase().includes("sony") ||
+          p.title.toLowerCase().includes("alpha") ||
+          p.category.toLowerCase().includes("camera"))
+    );
+    if (preferred) return preferred;
+    return allProductsList.find((p) => p.available) || allProductsList[0] || DEFAULT_FEATURED_PRODUCT;
+  }, [allProductsList, selectedProductId]);
 
-  const activeFiltersCount = useMemo(() => {
-    let count = 0;
-    if (activeCategory !== "all") count++;
-    if (selectedBrands.length > 0) count += selectedBrands.length;
-    if (minPriceFilter > 0) count++;
-    if (maxPriceFilter !== null && maxPriceFilter < highestPriceInCatalog) count++;
-    if (minRatingFilter > 0) count++;
-    if (availableOnlyFilter) count++;
-    if (q) count++;
-    return count;
-  }, [
-    activeCategory,
-    selectedBrands,
-    minPriceFilter,
-    maxPriceFilter,
-    highestPriceInCatalog,
-    minRatingFilter,
-    availableOnlyFilter,
-    q,
-  ]);
+  // Gallery Thumbnails for Featured Product
+  const featuredThumbnails = useMemo(() => {
+    if (!featuredProduct) return [sonyFrontImg, sonyBackImg, sonySideImg, sonyTopImg];
+    if (Array.isArray(featuredProduct.images) && featuredProduct.images.length > 0) {
+      const valid = featuredProduct.images.filter(Boolean);
+      if (valid.length >= 4) return valid.slice(0, 4);
+      const list = [...valid];
+      const fallbackList = [sonyFrontImg, sonyBackImg, sonySideImg, sonyTopImg];
+      let fbIdx = 0;
+      while (list.length < 4) {
+        list.push(fallbackList[fbIdx % 4]);
+        fbIdx++;
+      }
+      return list;
+    }
+    const main = featuredProduct.image || sonyFrontImg;
+    return [main, sonyBackImg, sonySideImg, sonyTopImg];
+  }, [featuredProduct]);
 
-  // Available categories with real counts
+  const activeDisplayImage = featuredThumbnails[selectedImageIndex] || featuredProduct?.image || sonyFrontImg;
+
+  // Category chips
   const categoryChips = useMemo(() => {
     const list = [
-      {
-        id: "all",
-        name: "All Gear",
-        count: allProductsList.length,
-      },
+      { id: "all", name: "All Gear", count: allProductsList.length },
     ];
-
-    if (liveCategories.length > 0) {
-      liveCategories.forEach((cat) => {
-        const catSlug = ((cat as any).slug || cat.name || cat.id || "").toLowerCase();
-        const matchingCount = allProductsList.filter((p) =>
-          matchCategory(p.category, catSlug) ||
-          matchCategory(p.category, cat.id) ||
-          matchCategory(p.category, cat.name)
-        ).length;
-        list.push({
-          id: catSlug,
-          name: cat.name,
-          count: matchingCount,
-        });
-      });
-    } else {
-      const knownKeys = [
-        "cameras",
-        "drones",
-        "laptops",
-        "bikes",
-        "audio",
-        "tools",
-        "powerbanks",
-      ];
-      knownKeys.forEach((key) => {
-        const matchingCount = allProductsList.filter((p) =>
-          matchCategory(p.category, key),
-        ).length;
-        const displayName =
-          key === "powerbanks"
-            ? "Power Banks"
-            : key === "audio"
-              ? "Audio"
-              : key === "bikes"
-                ? "Bikes"
-                : key === "tools"
-                  ? "Drilling Tools"
-                  : key.charAt(0).toUpperCase() + key.slice(1);
-        list.push({
-          id: key,
-          name: displayName,
-          count: matchingCount,
-        });
-      });
-    }
+    const knownKeys = ["cameras", "drones", "laptops", "bikes", "audio", "lighting", "tools", "powerbanks"];
+    knownKeys.forEach((key) => {
+      const matchingCount = allProductsList.filter((p) => matchCategory(p.category, key)).length;
+      const displayName =
+        key === "powerbanks"
+          ? "Power Banks"
+          : key === "audio"
+          ? "Audio"
+          : key === "bikes"
+          ? "Bikes"
+          : key === "tools"
+          ? "Tools"
+          : key.charAt(0).toUpperCase() + key.slice(1);
+      list.push({ id: key, name: displayName, count: matchingCount });
+    });
     return list;
-  }, [liveCategories, allProductsList]);
+  }, [allProductsList]);
 
-  // Filtered categories and brands inside the sidebar search
-  const visibleCategories = useMemo(() => {
-    if (!filterSearch.trim()) return categoryChips;
-    const term = filterSearch.toLowerCase().trim();
-    return categoryChips.filter((c) => c.name.toLowerCase().includes(term));
-  }, [categoryChips, filterSearch]);
+  // Handle Duration Preset Selection (1 Day, 3 Days, 1 Week, 2 Weeks)
+  const handleDurationPresetClick = (preset: "1 Day" | "3 Days" | "1 Week" | "2 Weeks") => {
+    setDurationPreset(preset);
+    if (preset === "1 Day") {
+      setDurationMode(selectedSlot === "full_day" ? "full_day" : "slot");
+      setRentalDays(1);
+      setEndDate(selectedDate);
+    } else if (preset === "3 Days") {
+      setDurationMode("custom");
+      setRentalDays(3);
+      setEndDate(addDaysToDate(selectedDate, 2));
+    } else if (preset === "1 Week") {
+      setDurationMode("custom");
+      setRentalDays(7);
+      setEndDate(addDaysToDate(selectedDate, 6));
+    } else if (preset === "2 Weeks") {
+      setDurationMode("custom");
+      setRentalDays(14);
+      setEndDate(addDaysToDate(selectedDate, 13));
+    }
+  };
 
-  const visibleBrands = useMemo(() => {
-    if (!filterSearch.trim()) return availableBrands;
-    const term = filterSearch.toLowerCase().trim();
-    return availableBrands.filter((b) => b.brand.toLowerCase().includes(term));
-  }, [availableBrands, filterSearch]);
+  // Handle Slot Selection (Morning, Afternoon, Full Day)
+  const handleSlotSelect = (slot: "morning" | "afternoon" | "full_day") => {
+    setSelectedSlot(slot);
+    if (durationPreset === "1 Day") {
+      setDurationMode(slot === "full_day" ? "full_day" : "slot");
+    }
+  };
+
+  // Price calculations
+  const baseDayPrice = Number(featuredProduct?.price) || 499;
+  const morningSlotPrice = Math.round(baseDayPrice * 0.5);
+  const afternoonSlotPrice = Math.round(baseDayPrice * 0.5);
+  const fullDayPrice = baseDayPrice;
+
+  const currentComputedPrice = useMemo(() => {
+    if (durationMode === "custom") {
+      return baseDayPrice * rentalDays;
+    }
+    if (selectedSlot === "morning") return morningSlotPrice;
+    if (selectedSlot === "afternoon") return afternoonSlotPrice;
+    return fullDayPrice;
+  }, [durationMode, selectedSlot, baseDayPrice, rentalDays, morningSlotPrice, afternoonSlotPrice, fullDayPrice]);
+
+  // Booking Summary Description
+  const bookingSummaryLabel = useMemo(() => {
+    if (durationPreset === "1 Day") {
+      const slotName =
+        selectedSlot === "morning"
+          ? "Morning Slot"
+          : selectedSlot === "afternoon"
+          ? "Afternoon Slot"
+          : "Full Day";
+      return `1 Day • ${slotName}`;
+    }
+    return `${rentalDays} Days • Rental`;
+  }, [durationPreset, selectedSlot, rentalDays]);
+
+  // Select another product from Related Products grid
+  const handleSelectProduct = (p: Product | typeof CURATED_RELATED_PRODUCTS[0]) => {
+    setSelectedProductId(String(p.id));
+    setSelectedImageIndex(0);
+    const element = document.getElementById("featured-hero");
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth" });
+    }
+  };
+
+  // Scroll Related Products carousel
+  const scrollRelated = (direction: "left" | "right") => {
+    if (relatedScrollRef.current) {
+      const scrollAmount = direction === "left" ? -340 : 340;
+      relatedScrollRef.current.scrollBy({ left: scrollAmount, behavior: "smooth" });
+    }
+  };
+
+  // Handle Date Change
+  const handleDateChange = (val: string) => {
+    setSelectedDate(val);
+    if (durationPreset === "1 Day") {
+      setEndDate(val);
+    } else {
+      setEndDate(addDaysToDate(val, rentalDays - 1));
+    }
+  };
+
+  // Critical BOOK NOW action (preserves existing booking rules & checkout route)
+  const handleBookNowAction = async () => {
+    if (!featuredProduct) return;
+
+    if (!user) {
+      toast.info("Please log in to proceed with your gear booking.");
+      const checkEnd = durationMode === "custom" ? endDate : selectedDate;
+      navigate({
+        to: "/login",
+        search: {
+          redirect: `/checkout?id=${featuredProduct.id}&start=${selectedDate}&end=${checkEnd}&mode=${durationMode}&slot=${selectedSlot}`,
+        } as any,
+      });
+      return;
+    }
+
+    // Verify availability
+    setIsCheckingAvailability(true);
+    try {
+      const apiBase = getApiBase();
+      const checkEnd = durationMode === "custom" ? endDate : selectedDate;
+      const effectiveSession = durationMode === "custom" ? "full_day" : selectedSlot;
+
+      const res = await fetch(
+        `${apiBase}/api/products/${encodeURIComponent(featuredProduct.id)}/availability?start_date=${selectedDate}&end_date=${checkEnd}&session=${encodeURIComponent(effectiveSession)}`
+      );
+      if (res.ok) {
+        const data = await res.json();
+        if (data.is_available === false || data.status === "blocked" || data.status === "booked") {
+          setIsAvailable(false);
+          const reason = data.reason || "The selected time slot or date is currently unavailable.";
+          setAvailabilityMessage(reason);
+          toast.error(reason);
+          setIsCheckingAvailability(false);
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn("Availability network check notice:", err);
+    } finally {
+      setIsCheckingAvailability(false);
+    }
+
+    // Proceed to checkout with exact validated parameters
+    const checkEnd = durationMode === "custom" ? endDate : selectedDate;
+    navigate({
+      to: "/checkout",
+      search: {
+        id: String(featuredProduct.id),
+        start: selectedDate,
+        end: checkEnd,
+        slot: selectedSlot,
+        mode: durationMode,
+      } as any,
+    });
+  };
+
+  const isFeaturedWishlisted = featuredProduct ? hasInWishlist(featuredProduct.id) : false;
 
   return (
     <MainLayout>
-      {/* 1. TOP BROWSE SEARCH & UTILITY BAR */}
-      <section className="bg-white/95 dark:bg-[#070C12]/95 py-2.5 sm:py-3.5 backdrop-blur-xl transition-colors">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4">
-            {/* Search Input Form (Full width on mobile, max-w-md on desktop) */}
-            <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-              <form
-                onSubmit={handleSearchSubmit}
-                className="relative flex-1 max-w-full sm:max-w-md"
-              >
-                <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-neutral-400 dark:text-[#8D98A3]" />
+      <div className="bg-[#FAFBF9] dark:bg-[#070C12] text-neutral-900 dark:text-neutral-100 min-h-screen">
+        {/* ================================================================= */}
+        {/* TOP UTILITY & SEARCH BAR                                          */}
+        {/* ================================================================= */}
+        <section className="bg-white/80 dark:bg-[#090F16]/80 backdrop-blur-md border-b border-black/5 dark:border-white/5 sticky top-0 z-30 py-3">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between gap-3 sm:gap-4">
+              {/* Search Bar */}
+              <form onSubmit={handleSearchSubmit} className="relative flex-1 max-w-md">
+                <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400" />
                 <input
                   type="text"
                   value={q}
                   onChange={(e) => setLocalQ(e.target.value)}
-                  placeholder={typedPlaceholder}
-                  className="w-full pl-9 pr-8 py-2 text-xs sm:text-sm rounded-full bg-neutral-100 dark:bg-white/5 border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-white placeholder:text-neutral-400 dark:placeholder:text-[#697680] focus:outline-none focus:ring-1.5 focus:ring-emerald-500 shadow-xs transition-all"
+                  placeholder="Search for gear, cameras, drones, laptops..."
+                  className="w-full pl-10 pr-9 py-2 text-xs sm:text-sm rounded-full bg-neutral-100 dark:bg-white/5 border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-white placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-xs transition-all"
                 />
                 {q && (
                   <button
                     type="button"
                     onClick={() => {
                       setLocalQ("");
-                      navigate({
-                        to: "/browse",
-                        search: (prev: Record<string, unknown>) => ({ ...prev, q: undefined }),
-                      });
+                      navigate({ to: "/browse", search: (prev: any) => ({ ...prev, q: undefined }) });
                     }}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 dark:hover:text-white cursor-pointer"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-700"
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>
                 )}
               </form>
 
-              {/* Location Tab / Pill (Shown inline on desktop) */}
-              <div className="hidden sm:flex items-center gap-1.5 px-3 py-2 bg-neutral-100 dark:bg-white/5 rounded-full border border-neutral-200 dark:border-white/10 shrink-0 text-xs text-neutral-700 dark:text-[#AAB3BC]">
-                <MapPin className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-                <span suppressHydrationWarning className="font-semibold text-xs truncate max-w-[120px] md:max-w-[150px]">
-                  {isDetecting ? "Locating..." : isLocationActive ? detectedCity : "Pan India"}
-                </span>
+              {/* Location Badge */}
+              <div className="hidden sm:flex items-center gap-1.5 px-3.5 py-1.5 bg-neutral-100 dark:bg-white/5 rounded-full border border-neutral-200 dark:border-white/10 text-xs text-neutral-700 dark:text-neutral-300">
+                <MapPin className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                <span className="font-semibold">{isDetecting ? "Locating..." : isLocationActive ? detectedCity : "Vizag, AP"}</span>
                 <button
                   type="button"
                   onClick={() => detectLocation()}
                   disabled={isDetecting}
-                  title="Update location"
-                  className="p-0.5 text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer"
-                >
-                  <RotateCcw className={cn("h-3 w-3", isDetecting && "animate-spin")} />
-                </button>
-              </div>
-            </div>
-
-            {/* Mobile Second Row: Location Tab on Left + Wishlist & Messages on Right / Desktop Right End */}
-            <div className="flex items-center justify-between sm:justify-end gap-2.5 shrink-0 w-full sm:w-auto">
-              {/* Location Tab on Mobile (Takes left side of row 2) */}
-              <div className="flex sm:hidden items-center gap-1.5 px-3 py-1.5 bg-neutral-100 dark:bg-white/5 rounded-full border border-neutral-200 dark:border-white/10 text-xs text-neutral-700 dark:text-[#AAB3BC]">
-                <MapPin className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-                <span suppressHydrationWarning className="font-semibold text-xs truncate max-w-[160px]">
-                  {isDetecting ? "Locating..." : isLocationActive ? detectedCity : "Pan India"}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => detectLocation()}
-                  disabled={isDetecting}
-                  title="Update location"
-                  className="p-0.5 text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer"
+                  className="p-0.5 text-neutral-400 hover:text-neutral-900 transition-colors"
                 >
                   <RotateCcw className={cn("h-3 w-3", isDetecting && "animate-spin")} />
                 </button>
               </div>
 
-              {/* Wishlist & Messages Circular Dark Buttons */}
-              <div className="flex items-center gap-2 sm:gap-2.5 ml-auto sm:ml-0">
-                {/* Wishlist Button */}
+              {/* Right Quick Links */}
+              <div className="flex items-center gap-2">
                 <Link
                   to="/wishlist"
-                  id="browse-top-wishlist"
-                  className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-neutral-900 dark:bg-[#151D24] text-white hover:bg-neutral-800 dark:hover:bg-[#1F2B36] border border-neutral-800 dark:border-white/15 transition-all flex items-center justify-center cursor-pointer shadow-sm group"
+                  className="p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-200 transition-colors relative"
                   aria-label="Wishlist"
-                  title="Wishlist"
                 >
-                  <Heart className="h-4 w-4 sm:h-[18px] sm:w-[18px] text-white/90 group-hover:text-white stroke-[1.8] group-hover:scale-110 transition-transform" />
+                  <Heart className="h-5 w-5" />
                   {wishlistCount > 0 && (
-                    <span className="absolute -top-1 -right-1 px-1.5 min-w-[17px] h-[17px] rounded-full bg-emerald-500 text-white text-[10px] font-bold flex items-center justify-center shadow-md">
+                    <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-emerald-600 text-white text-[10px] font-bold flex items-center justify-center">
                       {wishlistCount}
                     </span>
                   )}
                 </Link>
-
-                {/* Messages Button */}
                 <Link
-                  to="/messages"
-                  id="browse-top-messages"
-                  className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-neutral-900 dark:bg-[#151D24] text-white hover:bg-neutral-800 dark:hover:bg-[#1F2B36] border border-neutral-800 dark:border-white/15 transition-all flex items-center justify-center cursor-pointer shadow-sm group"
-                  aria-label="Messages"
-                  title="Messages"
+                  to="/profile"
+                  className="p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-200 transition-colors"
+                  aria-label="User Profile"
                 >
-                  <MessageSquare className="h-4 w-4 sm:h-[18px] sm:w-[18px] text-white/90 group-hover:text-white stroke-[1.8] group-hover:scale-110 transition-transform" />
-                  {unreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 px-1.5 min-w-[17px] h-[17px] rounded-full bg-emerald-500 text-white text-[10px] font-bold flex items-center justify-center shadow-md">
-                      {unreadCount}
-                    </span>
-                  )}
+                  <User className="h-5 w-5" />
                 </Link>
               </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* 2. CATEGORY PILLS BAR */}
-      <section className="bg-white dark:bg-[#080E14] sticky top-[68px] z-30 shadow-xs backdrop-blur-md">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-3">
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar scroll-smooth">
-            {categoryChips.map((c) => {
-              const isActive = activeCategory === c.id;
-              const IconComp = categoryIconMap[c.id] || Tag;
-              return (
+        {/* ================================================================= */}
+        {/* MAIN EXPLORE CONTENT CONTAINER                                    */}
+        {/* ================================================================= */}
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 sm:py-12 pb-32 space-y-12 sm:space-y-16">
+          {/* =============================================================== */}
+          {/* 1. TOP HERO SHOWCASE (2-COLUMN REFERENCE LAYOUT)                */}
+          {/* =============================================================== */}
+          <section id="featured-hero" className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
+            {/* LEFT COLUMN: PRODUCT IMAGE GALLERY (6 COLS) */}
+            <div className="lg:col-span-6 space-y-4">
+              {/* Soft Mint Rounded Card */}
+              <div className="relative rounded-3xl bg-[#EAF7EE] dark:bg-emerald-950/20 border border-emerald-500/15 p-8 sm:p-12 flex items-center justify-center min-h-[340px] sm:min-h-[420px] overflow-hidden group shadow-xs">
+                {/* Available Badge (Top-Left) */}
+                <div className="absolute top-4 left-4 z-10">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white dark:bg-[#0D151D] text-emerald-700 dark:text-emerald-400 font-bold text-xs shadow-xs border border-emerald-500/20 select-none">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                    Available
+                  </span>
+                </div>
+
+                {/* Heart Wishlist Button (Top-Right) */}
                 <button
-                  key={c.id}
                   type="button"
-                  onClick={() => handleCategorySelect(c.id)}
-                  className={cn(
-                    "flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer shrink-0",
-                    isActive
-                      ? "bg-[#161616] text-[#FFFFFF] dark:bg-[#F2F0EA] dark:text-[#0A0A0A] shadow-sm"
-                      : "bg-black/5 dark:bg-white/5 text-neutral-700 dark:text-[#AAB3BC] hover:bg-black/10 dark:hover:bg-white/10",
-                  )}
+                  onClick={() => {
+                    if (featuredProduct) {
+                      toggleWishlist(featuredProduct.id);
+                      toast.success(isFeaturedWishlisted ? "Removed from favourites" : "Saved to favourites!");
+                    }
+                  }}
+                  aria-label="Toggle favourite"
+                  className="absolute top-4 right-4 z-10 w-10 h-10 rounded-full bg-white dark:bg-[#0D151D] text-neutral-600 dark:text-neutral-300 hover:text-rose-500 hover:scale-105 active:scale-95 transition-all shadow-xs border border-neutral-200/80 dark:border-neutral-700/80 flex items-center justify-center cursor-pointer"
                 >
-                  <IconComp
+                  <Heart
                     className={cn(
-                      "h-3.5 w-3.5",
-                      isActive
-                        ? "text-emerald-400 dark:text-emerald-600"
-                        : "text-neutral-500 dark:text-[#697680]",
+                      "h-5 w-5 transition-colors",
+                      isFeaturedWishlisted ? "fill-rose-500 text-rose-500" : ""
                     )}
                   />
-                  <span>{c.name}</span>
-                  {c.count !== undefined && (
-                    <span
-                      className={cn(
-                        "text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold",
-                        isActive
-                          ? "bg-white/20 text-white dark:bg-black/15 dark:text-black"
-                          : "bg-black/5 dark:bg-white/10 text-neutral-500 dark:text-[#8D98A3]",
-                      )}
-                    >
-                      {c.count}
-                    </span>
-                  )}
                 </button>
-              );
-            })}
-          </div>
-        </div>
-      </section>
 
-      {/* 3. MAIN BROWSE LAYOUT */}
-      <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
-        {/* Top Control Bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6">
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-xl font-black tracking-tight text-neutral-950 dark:text-white">
-                {totalItems}{" "}
-                {totalItems === 1 ? "piece of gear" : "pieces of gear"}
-              </h2>
-              {isLocationActive && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[11px] font-bold">
-                  <MapPin className="h-3 w-3" />
-                  Prioritizing {detectedCity}
-                </span>
-              )}
-              {mlResults !== null && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[11px] font-bold">
-                  <Sparkles className="h-3 w-3" />
-                  AI Ranked
-                </span>
-              )}
-            </div>
-
-            {didYouMean && (
-              <p className="mt-1 text-xs text-neutral-500 dark:text-[#8D98A3]">
-                Did you mean:{" "}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setLocalQ(didYouMean);
-                    navigate({
-                      to: "/browse",
-                      search: (prev: Record<string, unknown>) => ({
-                        ...prev,
-                        q: didYouMean,
-                      }),
-                    });
-                  }}
-                  className="font-bold text-emerald-500 underline underline-offset-2 hover:opacity-80"
-                >
-                  {didYouMean}
-                </button>
-                ?
-              </p>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2 sm:gap-3">
-            {/* Mobile Filter Button */}
-            <button
-              type="button"
-              onClick={() => setIsFilterDrawerOpen(true)}
-              className="lg:hidden inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border border-black/15 dark:border-white/20 bg-white dark:bg-[#0D151D] text-xs font-bold text-neutral-900 dark:text-white hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
-            >
-              <SlidersHorizontal className="h-3.5 w-3.5" />
-              <span>Filters</span>
-              {activeFiltersCount > 0 && (
-                <span className="h-4 w-4 rounded-full bg-emerald-500 text-white text-[10px] font-mono flex items-center justify-center">
-                  {activeFiltersCount}
-                </span>
-              )}
-            </button>
-
-            {/* View Mode Switcher: Swipe Deck (Primary Default) vs Grid View */}
-            <div className="flex items-center p-0.5 rounded-xl border border-black/15 dark:border-white/20 bg-white dark:bg-[#0D151D]">
-              <button
-                type="button"
-                onClick={() => setViewMode("swipe")}
-                id="view-mode-swipe-btn"
-                title="Primary Swipe Experience"
-                className={cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer",
-                  viewMode === "swipe"
-                    ? "bg-[#161616] text-[#FFFFFF] dark:bg-[#F2F0EA] dark:text-[#0A0A0A] shadow-xs"
-                    : "text-neutral-600 dark:text-[#AAB3BC] hover:text-neutral-900 dark:hover:text-white",
-                )}
-              >
-                <Layers className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Swipe Deck</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode("grid")}
-                id="view-mode-grid-btn"
-                title="Grid Catalog View"
-                className={cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer",
-                  viewMode === "grid"
-                    ? "bg-[#161616] text-[#FFFFFF] dark:bg-[#F2F0EA] dark:text-[#0A0A0A] shadow-xs"
-                    : "text-neutral-600 dark:text-[#AAB3BC] hover:text-neutral-900 dark:hover:text-white",
-                )}
-              >
-                <LayoutGrid className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Grid</span>
-              </button>
-            </div>
-
-            {/* Sort Dropdown */}
-            <div className="relative" ref={sortRef}>
-              <button
-                type="button"
-                onClick={() => setIsSortOpen(!isSortOpen)}
-                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border border-black/15 dark:border-white/20 bg-white dark:bg-[#0D151D] text-xs font-bold text-neutral-900 dark:text-white hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
-              >
-                <ArrowUpDown className="h-3.5 w-3.5 text-neutral-500 dark:text-[#8D98A3]" />
-                <span>
-                  Sort:{" "}
-                  {sort === "featured"
-                    ? "Recommended"
-                    : sort === "newest"
-                      ? "Newest"
-                      : sort === "price_asc"
-                        ? "Price: Low to High"
-                        : sort === "price_desc"
-                          ? "Price: High to Low"
-                          : "Highest Rated"}
-                </span>
-                <ChevronDown className="h-3 w-3 text-neutral-400" />
-              </button>
-
-              {isSortOpen && (
-                <div className="absolute right-0 mt-2 w-52 rounded-2xl bg-white dark:bg-[#111A22] border border-black/10 dark:border-white/15 shadow-2xl p-1.5 z-40">
-                  {[
-                    { id: "featured", label: "Recommended" },
-                    { id: "newest", label: "Newest" },
-                    { id: "price_asc", label: "Price: Low to High" },
-                    { id: "price_desc", label: "Price: High to Low" },
-                    { id: "rating", label: "Highest Rated" },
-                  ].map((opt) => (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      onClick={() => {
-                        setSort(opt.id as SortOption);
-                        setIsSortOpen(false);
-                      }}
-                      className={cn(
-                        "w-full text-left px-3 py-1.5 text-xs rounded-xl transition-colors flex items-center justify-between cursor-pointer",
-                        sort === opt.id
-                          ? "bg-black/5 dark:bg-white/10 font-bold text-neutral-950 dark:text-white"
-                          : "text-neutral-700 dark:text-[#AAB3BC] hover:bg-black/5 dark:hover:bg-white/5",
-                      )}
-                    >
-                      <span>{opt.label}</span>
-                      {sort === opt.id && (
-                        <Check className="h-3 w-3 text-emerald-500" />
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Active Filter Removal Chips */}
-        {activeFiltersCount > 0 && (
-          <div className="flex flex-wrap items-center gap-2 pt-4">
-            <span className="text-[11px] font-semibold text-neutral-400 dark:text-[#697680]">
-              Active Filters:
-            </span>
-
-            {q && (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/5 dark:bg-white/10 text-xs text-neutral-800 dark:text-[#E0E5EA] border border-black/10 dark:border-white/15">
-                Query: "{q}"
-                <button
-                  type="button"
-                  onClick={() => {
-                    setLocalQ("");
-                    navigate({
-                      to: "/browse",
-                      search: (prev: Record<string, unknown>) => ({
-                        ...prev,
-                        q: undefined,
-                      }),
-                    });
-                  }}
-                  className="hover:text-emerald-500 cursor-pointer"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </span>
-            )}
-
-            {activeCategory !== "all" && (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/5 dark:bg-white/10 text-xs text-neutral-800 dark:text-[#E0E5EA] border border-black/10 dark:border-white/15">
-                Category: {activeCategory}
-                <button
-                  type="button"
-                  onClick={() => handleCategorySelect("all")}
-                  className="hover:text-emerald-500 cursor-pointer"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </span>
-            )}
-
-            {selectedBrands.map((b) => (
-              <span
-                key={b}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/5 dark:bg-white/10 text-xs text-neutral-800 dark:text-[#E0E5EA] border border-black/10 dark:border-white/15"
-              >
-                Brand: {b}
-                <button
-                  type="button"
-                  onClick={() => handleBrandToggle(b)}
-                  className="hover:text-emerald-500 cursor-pointer"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </span>
-            ))}
-
-            {(minPriceFilter > 0 ||
-              (maxPriceFilter !== null &&
-                maxPriceFilter < highestPriceInCatalog)) && (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/5 dark:bg-white/10 text-xs text-neutral-800 dark:text-[#E0E5EA] border border-black/10 dark:border-white/15">
-                Rate: ₹{minPriceFilter} - ₹{maxPriceFilter ?? highestPriceInCatalog}/day
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMinPriceFilter(0);
-                    setMaxPriceFilter(highestPriceInCatalog);
-                  }}
-                  className="hover:text-emerald-500 cursor-pointer"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </span>
-            )}
-
-            {minRatingFilter > 0 && (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/5 dark:bg-white/10 text-xs text-neutral-800 dark:text-[#E0E5EA] border border-black/10 dark:border-white/15">
-                {minRatingFilter}+ Stars
-                <button
-                  type="button"
-                  onClick={() => setMinRatingFilter(0)}
-                  className="hover:text-emerald-500 cursor-pointer"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </span>
-            )}
-
-            {availableOnlyFilter && (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/5 dark:bg-white/10 text-xs text-neutral-800 dark:text-[#E0E5EA] border border-black/10 dark:border-white/15">
-                Available Gear Only
-                <button
-                  type="button"
-                  onClick={() => setAvailableOnlyFilter(false)}
-                  className="hover:text-emerald-500 cursor-pointer"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </span>
-            )}
-
-            <button
-              type="button"
-              onClick={handleResetFilters}
-              className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline underline-offset-2 ml-1 cursor-pointer"
-            >
-              Clear All
-            </button>
-          </div>
-        )}
-
-        {/* 2-Column Layout (Desktop Filter + Product Grid) */}
-        <div className="mt-8 grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
-          {/* DESKTOP ADVANCED FILTER PANEL */}
-          <aside className="hidden lg:block lg:col-span-1 sticky top-[136px] space-y-6 p-5 rounded-3xl bg-white dark:bg-[#0D151D] border border-black/10 dark:border-white/10 shadow-sm max-h-[calc(100vh-160px)] overflow-y-auto no-scrollbar">
-            <div className="flex items-center justify-between pb-3 border-b border-black/10 dark:border-white/10">
-              <div className="flex items-center gap-2">
-                <Filter className="w-3.5 h-3.5 text-emerald-500" />
-                <span className="text-xs font-extrabold uppercase tracking-wider text-neutral-900 dark:text-white">
-                  Filters
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={handleResetFilters}
-                className="text-xs text-neutral-500 hover:text-neutral-900 dark:text-[#8D98A3] dark:hover:text-white flex items-center gap-1 cursor-pointer"
-              >
-                <RotateCcw className="h-3 w-3" />
-                <span>Reset</span>
-              </button>
-            </div>
-
-            {/* Filter Search Input */}
-            <div>
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-neutral-100 dark:bg-white/5 border border-black/5 dark:border-white/10 text-xs">
-                <SearchIcon className="w-3.5 h-3.5 text-neutral-400" />
-                <input
-                  type="text"
-                  value={filterSearch}
-                  onChange={(e) => setFilterSearch(e.target.value)}
-                  placeholder="Search filters..."
-                  className="bg-transparent text-xs text-neutral-900 dark:text-white placeholder:text-neutral-400 focus:outline-none w-full"
+                {/* High-Resolution Center Equipment Image */}
+                <img
+                  src={activeDisplayImage}
+                  alt={featuredProduct?.title || "Gear"}
+                  className="max-h-[260px] sm:max-h-[320px] w-auto max-w-full object-contain drop-shadow-2xl transition-transform duration-300 group-hover:scale-105"
                 />
-                {filterSearch && (
-                  <button
-                    type="button"
-                    onClick={() => setFilterSearch("")}
-                    className="text-neutral-400 hover:text-neutral-600"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                )}
               </div>
-            </div>
 
-            {/* Category Filter */}
-            <div>
-              <span className="block text-xs font-bold text-neutral-700 dark:text-[#AAB3BC] mb-2 uppercase tracking-wider">
-                Category
-              </span>
-              <div className="space-y-1 max-h-44 overflow-y-auto no-scrollbar pr-1">
-                {visibleCategories.map((c) => {
-                  const isChecked = activeCategory === c.id;
+              {/* 4-Thumbnail Gallery Strip */}
+              <div className="grid grid-cols-4 gap-3 sm:gap-4">
+                {featuredThumbnails.map((thumb, idx) => {
+                  const isActive = idx === selectedImageIndex;
+                  const isFourth = idx === 3;
                   return (
                     <button
-                      key={c.id}
+                      key={idx}
                       type="button"
-                      onClick={() => handleCategorySelect(c.id)}
+                      onClick={() => setSelectedImageIndex(idx)}
                       className={cn(
-                        "w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs transition-colors cursor-pointer text-left",
-                        isChecked
-                          ? "bg-neutral-100 dark:bg-white/10 font-bold text-neutral-950 dark:text-white"
-                          : "text-neutral-600 dark:text-[#AAB3BC] hover:bg-neutral-50 dark:hover:bg-white/5",
+                        "relative aspect-square rounded-2xl overflow-hidden border-2 transition-all cursor-pointer p-2 flex items-center justify-center bg-white dark:bg-[#0D151D] shadow-2xs",
+                        isActive
+                          ? "border-emerald-600 ring-2 ring-emerald-500/20 shadow-xs"
+                          : "border-neutral-200 dark:border-neutral-800 hover:border-emerald-500/50"
                       )}
                     >
-                      <span className="truncate">{c.name}</span>
-                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-black/5 dark:bg-white/5 text-neutral-400">
-                        {c.count}
-                      </span>
+                      <img src={thumb} alt="" className="w-full h-full object-contain" />
+                      {isFourth && (
+                        <div className="absolute inset-0 bg-black/60 backdrop-blur-[1px] flex items-center justify-center text-white font-extrabold text-sm sm:text-base">
+                          +2
+                        </div>
+                      )}
                     </button>
                   );
                 })}
               </div>
             </div>
 
-            {/* Brand Filter */}
-            {visibleBrands.length > 0 && (
-              <div className="pt-3 border-t border-black/10 dark:border-white/10">
-                <span className="block text-xs font-bold text-neutral-700 dark:text-[#AAB3BC] mb-2 uppercase tracking-wider">
-                  Brand / Maker
+            {/* RIGHT COLUMN: PRODUCT INFORMATION & PURCHASE ACTION (6 COLS) */}
+            <div className="lg:col-span-6 space-y-6 text-left">
+              {/* Product Title & Category */}
+              <div className="space-y-1">
+                <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-neutral-900 dark:text-white font-display">
+                  {featuredProduct?.title || "Sony Alpha a7 III"}
+                </h1>
+                <p className="text-sm font-semibold text-neutral-500 dark:text-neutral-400">
+                  {featuredProduct?.category || "Camera"} • DSLR
+                </p>
+              </div>
+
+              {/* Star Rating & Reviews */}
+              <div className="flex items-center gap-2 text-sm">
+                <div className="flex items-center gap-1 font-bold text-neutral-900 dark:text-white">
+                  <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                  <span>{(featuredProduct?.rating || 4.8).toFixed(1)}</span>
+                </div>
+                <span className="text-neutral-500 font-medium">
+                  ({featuredProduct?.reviews || 124} reviews)
                 </span>
-                <div className="space-y-1.5 max-h-40 overflow-y-auto no-scrollbar pr-1">
-                  {visibleBrands.map(({ brand, count }) => {
-                    const isChecked = selectedBrands.includes(brand);
+              </div>
+
+              {/* Price Display */}
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-3xl sm:text-4xl font-black text-emerald-600 dark:text-emerald-400 font-mono tracking-tight">
+                  ₹{(Number(featuredProduct?.price) || 499).toLocaleString("en-IN")}
+                </span>
+                <span className="text-sm font-semibold text-neutral-500">/ day</span>
+              </div>
+
+              {/* Duration Selection Pills (1 Day, 3 Days, 1 Week, 2 Weeks) */}
+              <div className="space-y-1.5">
+                <div className="flex flex-wrap gap-2.5">
+                  {(["1 Day", "3 Days", "1 Week", "2 Weeks"] as const).map((preset) => {
+                    const isSelected = durationPreset === preset;
                     return (
-                      <label
-                        key={brand}
-                        className="flex items-center justify-between text-xs text-neutral-700 dark:text-[#AAB3BC] hover:text-neutral-950 dark:hover:text-white cursor-pointer px-1 py-0.5"
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => handleDurationPresetClick(preset)}
+                        className={cn(
+                          "px-4 py-2 rounded-xl text-xs sm:text-sm font-bold border transition-all cursor-pointer",
+                          isSelected
+                            ? "border-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 shadow-xs"
+                            : "border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#0D151D] text-neutral-600 dark:text-neutral-400 hover:border-neutral-300"
+                        )}
                       >
-                        <span className="flex items-center gap-2 truncate">
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={() => handleBrandToggle(brand)}
-                            className="h-3.5 w-3.5 rounded border-black/20 dark:border-white/20 accent-emerald-500 cursor-pointer"
-                          />
-                          <span className="truncate">{brand}</span>
-                        </span>
-                        <span className="text-[10px] font-mono text-neutral-400">
-                          {count}
-                        </span>
-                      </label>
+                        {preset}
+                      </button>
                     );
                   })}
                 </div>
               </div>
-            )}
 
-            {/* Price Range Slider & Inputs */}
-            <div className="pt-3 border-t border-black/10 dark:border-white/10">
-              <div className="flex items-center justify-between text-xs font-semibold mb-2">
-                <span className="text-neutral-700 dark:text-[#AAB3BC] uppercase tracking-wider font-bold">
-                  Daily Rate
-                </span>
-                <span className="font-mono font-bold text-neutral-950 dark:text-white">
-                  ₹{minPriceFilter} - ₹{maxPriceFilter ?? highestPriceInCatalog}
-                </span>
+              {/* Description Paragraph */}
+              <p className="text-sm text-neutral-600 dark:text-neutral-300 leading-relaxed">
+                {featuredProduct?.description ||
+                  `Capture stunning photos and videos with the ${featuredProduct?.title || "Sony Alpha a7 III"}. Perfect for events, travel and professional shoots.`}
+              </p>
+
+              {/* Key Attributes List with Icons */}
+              <div className="space-y-2.5 pt-3 border-t border-neutral-200/80 dark:border-neutral-800 text-sm">
+                <div className="flex items-center gap-2.5 text-neutral-900 dark:text-white">
+                  <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
+                  <span className="font-medium text-neutral-500">Condition:</span>
+                  <span className="font-bold">Excellent</span>
+                </div>
+
+                <div className="flex items-center gap-2.5 text-neutral-900 dark:text-white">
+                  <MapPin className="h-4 w-4 text-emerald-600 shrink-0" />
+                  <span className="font-medium text-neutral-500">Location:</span>
+                  <span className="font-bold">{formatOwnerAddress(featuredProduct) || "Vizag, AP"}</span>
+                </div>
+
+                <div className="flex items-center gap-2.5 text-neutral-900 dark:text-white">
+                  <User className="h-4 w-4 text-emerald-600 shrink-0" />
+                  <span className="font-medium text-neutral-500">Lender:</span>
+                  <span className="font-bold">{featuredProduct?.owner?.name || "Sai Teja"}</span>
+                  <CheckCircle2 className="h-4 w-4 text-emerald-500 fill-emerald-500/20 shrink-0" />
+                </div>
+
+                <div className="flex items-center gap-2.5 text-neutral-900 dark:text-white">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
+                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                    Available for Rent
+                  </span>
+                </div>
               </div>
-              <input
-                type="range"
-                min={200}
-                max={highestPriceInCatalog}
-                step={200}
-                value={maxPriceFilter ?? highestPriceInCatalog}
-                onChange={(e) => {
-                  setMaxPriceFilter(Number(e.target.value));
-                  setCurrentPage(1);
-                }}
-                className="w-full accent-neutral-950 dark:accent-white cursor-pointer"
-              />
-              <div className="flex justify-between text-[10px] text-neutral-400 font-mono mt-1">
-                <span>₹200</span>
-                <span>₹{highestPriceInCatalog}/day</span>
+
+              {/* Action Buttons: BOOK NOW & ADD TO FAVOURITES */}
+              <div className="space-y-3 pt-3">
+                <button
+                  type="button"
+                  id="explore-book-now-btn"
+                  onClick={handleBookNowAction}
+                  disabled={isCheckingAvailability}
+                  className="w-full py-4 px-6 rounded-2xl font-extrabold text-sm sm:text-base bg-[#059669] hover:bg-[#047857] text-white shadow-md transition-all flex items-center justify-center gap-2.5 cursor-pointer active:scale-98"
+                >
+                  <Calendar className="h-5 w-5 shrink-0" />
+                  <span>{isCheckingAvailability ? "CHECKING AVAILABILITY..." : "BOOK NOW"}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (featuredProduct) {
+                      toggleWishlist(featuredProduct.id);
+                      toast.success(isFeaturedWishlisted ? "Removed from favourites" : "Saved to favourites!");
+                    }
+                  }}
+                  className="w-full py-3.5 px-6 rounded-2xl font-bold text-sm border-2 border-emerald-600 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+                >
+                  <Heart
+                    className={cn(
+                      "h-4 w-4",
+                      isFeaturedWishlisted ? "fill-rose-500 text-rose-500" : ""
+                    )}
+                  />
+                  <span>{isFeaturedWishlisted ? "REMOVE FROM FAVOURITES" : "ADD TO FAVOURITES"}</span>
+                </button>
               </div>
             </div>
+          </section>
 
-            {/* Minimum Rating */}
-            <div className="pt-3 border-t border-black/10 dark:border-white/10">
-              <span className="block text-xs font-bold text-neutral-700 dark:text-[#AAB3BC] mb-2 uppercase tracking-wider">
-                Minimum Rating
-              </span>
-              <div className="grid grid-cols-3 gap-1.5">
-                {[
-                  { label: "All", val: 0 },
-                  { label: "4.0★+", val: 4.0 },
-                  { label: "4.5★+", val: 4.5 },
-                ].map((r) => (
+          {/* =============================================================== */}
+          {/* 2. INLINE RENTAL BOOKING CARD                                   */}
+          {/* =============================================================== */}
+          <section
+            id="rental-booking-section"
+            className="rounded-3xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#0D151D] p-6 sm:p-8 space-y-6 shadow-xs text-left"
+          >
+            <div className="flex items-center gap-2.5 pb-2">
+              <div className="h-8 w-8 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
+                <Calendar className="h-4 w-4" />
+              </div>
+              <h2 className="text-base sm:text-lg font-bold text-neutral-900 dark:text-white">
+                Rental Booking
+              </h2>
+            </div>
+
+            {/* 3 Interactive Fields: Select Date, Choose Slot, Booking Summary */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+              {/* Field 1: Select Date */}
+              <div className="md:col-span-4 space-y-2">
+                <label className="block text-xs font-bold text-neutral-700 dark:text-neutral-300">
+                  Select Date
+                </label>
+                <div className="relative">
+                  <input
+                    type="date"
+                    min={todayStr}
+                    value={selectedDate}
+                    onChange={(e) => handleDateChange(e.target.value)}
+                    className="w-full h-12 px-3.5 pl-10 rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-white/5 text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20 outline-none cursor-pointer"
+                  />
+                  <Calendar className="h-4 w-4 text-emerald-600 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+              </div>
+
+              {/* Field 2: Choose Slot (Morning, Afternoon, Full Day) */}
+              <div className="md:col-span-5 space-y-2">
+                <label className="block text-xs font-bold text-neutral-700 dark:text-neutral-300">
+                  Choose Slot
+                </label>
+                <div className="grid grid-cols-3 gap-2">
                   <button
-                    key={r.label}
                     type="button"
-                    onClick={() => {
-                      setMinRatingFilter(r.val);
-                      setCurrentPage(1);
-                    }}
+                    onClick={() => handleSlotSelect("morning")}
                     className={cn(
-                      "py-1.5 text-xs font-bold rounded-lg border transition-colors cursor-pointer",
-                      minRatingFilter === r.val
-                        ? "bg-[#161616] text-white border-[#161616] dark:bg-[#F2F0EA] dark:text-[#0A0A0A] dark:border-[#F2F0EA]"
-                        : "bg-transparent text-neutral-600 dark:text-[#AAB3BC] border-black/10 dark:border-white/15 hover:bg-black/5 dark:hover:bg-white/5",
+                      "py-2.5 px-2 rounded-2xl text-xs font-bold border flex flex-col items-center justify-center gap-1 transition-all cursor-pointer",
+                      selectedSlot === "morning"
+                        ? "border-emerald-600 bg-emerald-50/90 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 shadow-2xs"
+                        : "border-neutral-200 dark:border-neutral-700 bg-neutral-50/60 dark:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:border-neutral-300"
                     )}
                   >
-                    {r.label}
+                    <div className="flex items-center gap-1">
+                      <Sun className="h-3.5 w-3.5 text-amber-500" />
+                      <span>Morning</span>
+                    </div>
+                    <span className="text-[11px] font-mono text-emerald-700 dark:text-emerald-400">
+                      (₹{morningSlotPrice})
+                    </span>
                   </button>
-                ))}
-              </div>
-            </div>
 
-            {/* Availability Toggle */}
-            <div className="pt-3 border-t border-black/10 dark:border-white/10">
-              <label className="flex items-center justify-between text-xs font-semibold text-neutral-700 dark:text-[#AAB3BC] cursor-pointer">
-                <span className="flex items-center gap-2">
-                  <ShieldCheck className="h-4 w-4 text-emerald-500" />
-                  Available Gear Only
-                </span>
-                <input
-                  type="checkbox"
-                  checked={availableOnlyFilter}
-                  onChange={(e) => {
-                    setAvailableOnlyFilter(e.target.checked);
-                    setCurrentPage(1);
-                  }}
-                  className="h-4 w-4 rounded border-black/20 dark:border-white/20 accent-emerald-500 cursor-pointer"
-                />
-              </label>
-            </div>
-          </aside>
-
-          {/* RIGHT PRODUCT GRID (Col-Span 3) */}
-          <main className="col-span-1 lg:col-span-3">
-            {/* LOADING STATE */}
-            {isLoadingProducts && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="rounded-[22px] bg-white dark:bg-[#0D151D] border border-black/10 dark:border-white/10 p-4 space-y-3 animate-pulse"
+                  <button
+                    type="button"
+                    onClick={() => handleSlotSelect("afternoon")}
+                    className={cn(
+                      "py-2.5 px-2 rounded-2xl text-xs font-bold border flex flex-col items-center justify-center gap-1 transition-all cursor-pointer",
+                      selectedSlot === "afternoon"
+                        ? "border-emerald-600 bg-emerald-50/90 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 shadow-2xs"
+                        : "border-neutral-200 dark:border-neutral-700 bg-neutral-50/60 dark:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:border-neutral-300"
+                    )}
                   >
-                    <div className="aspect-[16/11] rounded-xl bg-neutral-200 dark:bg-neutral-800" />
-                    <div className="h-4 bg-neutral-200 dark:bg-neutral-800 rounded w-3/4" />
-                    <div className="h-3 bg-neutral-200 dark:bg-neutral-800 rounded w-1/2" />
-                    <div className="h-5 bg-neutral-200 dark:bg-neutral-800 rounded w-1/3 pt-2" />
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* EMPTY RESULTS STATE */}
-            {!isLoadingProducts && filteredProducts.length === 0 && (
-              <div className="text-center py-16 px-4 rounded-3xl border border-dashed border-black/10 dark:border-white/10 bg-black/[0.01] dark:bg-white/[0.01]">
-                <div className="h-12 w-12 rounded-2xl bg-neutral-100 dark:bg-white/5 mx-auto grid place-items-center text-neutral-400 mb-3">
-                  <Camera className="h-6 w-6" />
-                </div>
-                <h3 className="text-base font-bold text-neutral-900 dark:text-white">
-                  No gear matches these filters
-                </h3>
-                <p className="text-xs text-neutral-500 dark:text-[#8D98A3] mt-1 max-w-sm mx-auto">
-                  Try adjusting your price range, selected brand, or search keywords to find available creator gear.
-                </p>
-                <button
-                  type="button"
-                  onClick={handleResetFilters}
-                  className="mt-4 px-5 py-2 rounded-full bg-[#161616] text-white dark:bg-[#F2F0EA] dark:text-[#161616] text-xs font-bold shadow-sm"
-                >
-                  Reset All Filters
-                </button>
-              </div>
-            )}
-
-            {/* PRIMARY INTERACTION: SWIPE DECK EXPERIENCE */}
-            {!isLoadingProducts && filteredProducts.length > 0 && viewMode === "swipe" && (
-              <BrowseSwipeDeck
-                products={filteredProducts}
-                onResetFilters={handleResetFilters}
-              />
-            )}
-
-            {/* ALTERNATIVE INTERACTION: CLASSIC GRID */}
-            {!isLoadingProducts && filteredProducts.length > 0 && viewMode === "grid" && (
-              <>
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-                  {paginatedProducts.map((product) => (
-                    <ProductCard key={product.id} product={product} />
-                  ))}
-                </div>
-
-                {totalPages > 1 && (
-                  <div className="mt-10 flex items-center justify-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                      disabled={currentPage === 1}
-                      className="px-3.5 py-1.5 rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#0D151D] text-xs font-bold text-neutral-700 dark:text-neutral-300 disabled:opacity-40"
-                    >
-                      Previous
-                    </button>
-                    <span className="text-xs font-mono font-bold text-neutral-500 px-2">
-                      Page {currentPage} of {totalPages}
+                    <div className="flex items-center gap-1">
+                      <Sun className="h-3.5 w-3.5 text-orange-500" />
+                      <span>Afternoon</span>
+                    </div>
+                    <span className="text-[11px] font-mono text-emerald-700 dark:text-emerald-400">
+                      (₹{afternoonSlotPrice})
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                      disabled={currentPage === totalPages}
-                      className="px-3.5 py-1.5 rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#0D151D] text-xs font-bold text-neutral-700 dark:text-neutral-300 disabled:opacity-40"
-                    >
-                      Next
-                    </button>
-                  </div>
-                )}
-              </>
-            )}
-          </main>
-        </div>
-      </section>
+                  </button>
 
-      {/* 4. MOBILE FILTER DRAWER */}
-      <AnimatePresence>
-        {isFilterDrawerOpen && (
-          <div className="fixed inset-0 z-50 lg:hidden flex flex-col justify-end">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsFilterDrawerOpen(false)}
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-            />
-
-            <motion.div
-              initial={{ y: "100%" }}
-              animate={{ y: 0 }}
-              exit={{ y: "100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="relative z-10 w-full max-h-[85vh] rounded-t-3xl bg-white dark:bg-[#0D151D] border-t border-black/10 dark:border-white/10 flex flex-col overflow-hidden shadow-2xl"
-            >
-              {/* Drawer Header */}
-              <div className="p-4 border-b border-black/10 dark:border-white/10 flex items-center justify-between shrink-0">
-                <div className="flex items-center gap-2">
-                  <Filter className="w-4 h-4 text-emerald-500" />
-                  <span className="font-bold text-sm text-neutral-900 dark:text-white">
-                    Filter Gear ({totalItems})
-                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleSlotSelect("full_day")}
+                    className={cn(
+                      "py-2.5 px-2 rounded-2xl text-xs font-bold border flex flex-col items-center justify-center gap-1 transition-all cursor-pointer",
+                      selectedSlot === "full_day"
+                        ? "border-emerald-600 bg-emerald-50/90 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 shadow-2xs"
+                        : "border-neutral-200 dark:border-neutral-700 bg-neutral-50/60 dark:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:border-neutral-300"
+                    )}
+                  >
+                    <div className="flex items-center gap-1">
+                      <Calendar className="h-3.5 w-3.5 text-emerald-600" />
+                      <span>Full Day</span>
+                    </div>
+                    <span className="text-[11px] font-mono text-emerald-700 dark:text-emerald-400">
+                      (₹{fullDayPrice})
+                    </span>
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setIsFilterDrawerOpen(false)}
-                  className="p-1 rounded-full text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
-                >
-                  <X className="w-5 h-5" />
-                </button>
               </div>
 
-              {/* Drawer Body */}
-              <div className="p-5 space-y-6 overflow-y-auto flex-1">
-                {/* Category Selection */}
+              {/* Field 3: Booking Summary */}
+              <div className="md:col-span-3 flex items-center justify-between md:justify-end gap-4 border-t md:border-t-0 md:border-l border-neutral-200 dark:border-neutral-800 pt-4 md:pt-0 md:pl-6">
                 <div>
-                  <span className="block text-xs font-bold text-neutral-700 dark:text-[#AAB3BC] mb-2 uppercase">
-                    Categories
+                  <span className="block text-[11px] font-bold text-neutral-500 uppercase tracking-wider">
+                    Booking Summary
                   </span>
-                  <div className="grid grid-cols-2 gap-2">
-                    {categoryChips.map((c) => (
-                      <button
-                        key={c.id}
-                        type="button"
-                        onClick={() => handleCategorySelect(c.id)}
-                        className={cn(
-                          "px-3 py-2 rounded-xl text-xs font-bold text-left truncate transition-colors",
-                          activeCategory === c.id
-                            ? "bg-[#161616] text-white dark:bg-[#F2F0EA] dark:text-[#161616]"
-                            : "bg-neutral-100 dark:bg-white/5 text-neutral-700 dark:text-[#AAB3BC]",
-                        )}
-                      >
-                        {c.name} ({c.count})
-                      </button>
-                    ))}
-                  </div>
+                  <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">
+                    {bookingSummaryLabel}
+                  </span>
                 </div>
+                <div className="text-right">
+                  <span className="text-3xl font-black text-emerald-600 dark:text-emerald-400 font-mono tracking-tight">
+                    ₹{currentComputedPrice.toLocaleString("en-IN")}
+                  </span>
+                </div>
+              </div>
+            </div>
 
-                {/* Brands */}
-                {availableBrands.length > 0 && (
-                  <div>
-                    <span className="block text-xs font-bold text-neutral-700 dark:text-[#AAB3BC] mb-2 uppercase">
-                      Brands
-                    </span>
-                    <div className="grid grid-cols-2 gap-2">
-                      {availableBrands.map(({ brand, count }) => {
-                        const isChecked = selectedBrands.includes(brand);
-                        return (
-                          <button
-                            key={brand}
-                            type="button"
-                            onClick={() => handleBrandToggle(brand)}
-                            className={cn(
-                              "px-3 py-2 rounded-xl text-xs font-bold text-left truncate transition-colors",
-                              isChecked
-                                ? "bg-[#161616] text-white dark:bg-[#F2F0EA] dark:text-[#161616]"
-                                : "bg-neutral-100 dark:bg-white/5 text-neutral-700 dark:text-[#AAB3BC]",
-                            )}
-                          >
-                            {brand} ({count})
-                          </button>
-                        );
-                      })}
+            {/* Live Availability Status Banner */}
+            <div className="pt-2 flex items-center justify-center">
+              <div className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                <CheckCircle2 className="h-4 w-4" />
+                <span>{availabilityMessage}</span>
+              </div>
+            </div>
+          </section>
+
+          {/* =============================================================== */}
+          {/* 3. WHY RENT THROUGH PAYENT? (4-CARD GRID)                       */}
+          {/* =============================================================== */}
+          <section className="space-y-6 text-center">
+            <div className="flex items-center justify-center gap-3">
+              <div className="h-px w-10 sm:w-16 bg-neutral-300 dark:bg-neutral-700" />
+              <span className="text-xs sm:text-sm font-extrabold text-neutral-800 dark:text-neutral-200 tracking-wider uppercase">
+                • Why Rent Through PAYENT? •
+              </span>
+              <div className="h-px w-10 sm:w-16 bg-neutral-300 dark:bg-neutral-700" />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+              {WHY_RENT_FEATURES.map((feat) => {
+                const IconComp = feat.icon;
+                return (
+                  <div
+                    key={feat.title}
+                    className="rounded-3xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#0D151D] p-6 text-center space-y-3 shadow-2xs hover:shadow-sm transition-shadow"
+                  >
+                    <div className="w-12 h-12 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 mx-auto flex items-center justify-center">
+                      <IconComp className="h-6 w-6" />
+                    </div>
+                    <h3 className="text-sm font-extrabold text-neutral-900 dark:text-white">
+                      {feat.title}
+                    </h3>
+                    <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                      {feat.subtitle}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          {/* =============================================================== */}
+          {/* 4. CUSTOMER REVIEWS (3-CARD GRID)                              */}
+          {/* =============================================================== */}
+          <section className="space-y-6 text-center">
+            <div className="flex items-center justify-center gap-3">
+              <div className="h-px w-10 sm:w-16 bg-neutral-300 dark:bg-neutral-700" />
+              <span className="text-xs sm:text-sm font-extrabold text-neutral-800 dark:text-neutral-200 tracking-wider uppercase">
+                • Customer Reviews •
+              </span>
+              <div className="h-px w-10 sm:w-16 bg-neutral-300 dark:bg-neutral-700" />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
+              {CUSTOMER_REVIEWS.map((rev) => (
+                <div
+                  key={rev.name}
+                  className="rounded-3xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#0D151D] p-5 space-y-3 shadow-2xs"
+                >
+                  <div className="flex items-center gap-3">
+                    <img
+                      src={rev.avatar}
+                      alt={rev.name}
+                      className="w-10 h-10 rounded-full object-cover border border-neutral-200 dark:border-neutral-700"
+                    />
+                    <div>
+                      <h4 className="text-sm font-bold text-neutral-900 dark:text-white">{rev.name}</h4>
+                      <div className="flex items-center gap-0.5 text-amber-400">
+                        {Array.from({ length: rev.rating }).map((_, i) => (
+                          <Star key={i} className="h-3 w-3 fill-amber-400" />
+                        ))}
+                      </div>
                     </div>
                   </div>
-                )}
-
-                {/* Price Slider */}
-                <div>
-                  <div className="flex justify-between text-xs font-bold mb-2">
-                    <span className="text-neutral-700 dark:text-[#AAB3BC]">Daily Rate</span>
-                    <span className="font-mono">₹{maxPriceFilter ?? highestPriceInCatalog}/day</span>
-                  </div>
-                  <input
-                    type="range"
-                    min={200}
-                    max={highestPriceInCatalog}
-                    step={200}
-                    value={maxPriceFilter ?? highestPriceInCatalog}
-                    onChange={(e) => setMaxPriceFilter(Number(e.target.value))}
-                    className="w-full accent-emerald-500"
-                  />
+                  <p className="text-xs text-neutral-600 dark:text-neutral-300 italic">
+                    "{rev.text}"
+                  </p>
+                  <span className="block text-[10px] text-neutral-400 font-mono">{rev.date}</span>
                 </div>
+              ))}
+            </div>
+          </section>
 
-                {/* Rating */}
-                <div>
-                  <span className="block text-xs font-bold text-neutral-700 dark:text-[#AAB3BC] mb-2 uppercase">
-                    Minimum Rating
-                  </span>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { label: "All", val: 0 },
-                      { label: "4.0★+", val: 4.0 },
-                      { label: "4.5★+", val: 4.5 },
-                    ].map((r) => (
-                      <button
-                        key={r.label}
-                        type="button"
-                        onClick={() => setMinRatingFilter(r.val)}
+          {/* =============================================================== */}
+          {/* 5. FREQUENTLY ASKED QUESTIONS (5 ACCORDIONS)                    */}
+          {/* =============================================================== */}
+          <section className="space-y-6 text-center">
+            <div className="flex items-center justify-center gap-3">
+              <div className="h-px w-10 sm:w-16 bg-neutral-300 dark:bg-neutral-700" />
+              <span className="text-xs sm:text-sm font-extrabold text-neutral-800 dark:text-neutral-200 tracking-wider uppercase">
+                • Frequently Asked Questions •
+              </span>
+              <div className="h-px w-10 sm:w-16 bg-neutral-300 dark:bg-neutral-700" />
+            </div>
+
+            <div className="max-w-4xl mx-auto space-y-3 text-left">
+              {FAQ_ITEMS.map((item, idx) => {
+                const isOpen = openFaqIndex === idx;
+                return (
+                  <div
+                    key={idx}
+                    className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#0D151D] overflow-hidden transition-colors"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setOpenFaqIndex(isOpen ? null : idx)}
+                      className="w-full p-4.5 flex items-center justify-between text-left text-xs sm:text-sm font-bold text-neutral-900 dark:text-white cursor-pointer hover:bg-neutral-50 dark:hover:bg-white/5"
+                    >
+                      <span>{item.q}</span>
+                      <ChevronDown
                         className={cn(
-                          "py-2 text-xs font-bold rounded-xl border transition-colors",
-                          minRatingFilter === r.val
-                            ? "bg-[#161616] text-white dark:bg-[#F2F0EA] dark:text-[#161616]"
-                            : "bg-transparent text-neutral-600 dark:text-[#AAB3BC] border-black/10 dark:border-white/10",
+                          "h-4 w-4 text-neutral-400 transition-transform duration-200 shrink-0",
+                          isOpen ? "rotate-180 text-emerald-600" : ""
                         )}
-                      >
-                        {r.label}
-                      </button>
-                    ))}
+                      />
+                    </button>
+                    <AnimatePresence>
+                      {isOpen && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="px-4.5 pb-4 text-xs text-neutral-600 dark:text-neutral-300 leading-relaxed border-t border-neutral-100 dark:border-neutral-800/60 pt-3"
+                        >
+                          {item.a}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
-                </div>
+                );
+              })}
+            </div>
+          </section>
 
-                {/* Availability */}
-                <div>
-                  <label className="flex items-center justify-between p-3 rounded-2xl bg-neutral-100 dark:bg-white/5 cursor-pointer">
-                    <span className="text-xs font-bold text-neutral-900 dark:text-white">
-                      Available Gear Only
-                    </span>
-                    <input
-                      type="checkbox"
-                      checked={availableOnlyFilter}
-                      onChange={(e) => setAvailableOnlyFilter(e.target.checked)}
-                      className="h-4 w-4 rounded accent-emerald-500"
-                    />
-                  </label>
-                </div>
+          {/* =============================================================== */}
+          {/* 6. RELATED PRODUCTS / EXPLORE CATALOG SECTION                    */}
+          {/* =============================================================== */}
+          <section className="space-y-6 text-center">
+            <div className="flex items-center justify-center gap-3">
+              <div className="h-px w-10 sm:w-16 bg-neutral-300 dark:bg-neutral-700" />
+              <span className="text-xs sm:text-sm font-extrabold text-neutral-800 dark:text-neutral-200 tracking-wider uppercase">
+                • Related Products •
+              </span>
+              <div className="h-px w-10 sm:w-16 bg-neutral-300 dark:bg-neutral-700" />
+            </div>
+
+            {/* Category Filter Chips Bar */}
+            <div className="flex items-center justify-center gap-2 overflow-x-auto no-scrollbar py-1">
+              {categoryChips.map((c) => {
+                const isActive = activeCategory === c.id;
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => handleCategorySelect(c.id)}
+                    className={cn(
+                      "flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer shrink-0",
+                      isActive
+                        ? "bg-neutral-900 text-white dark:bg-white dark:text-black shadow-xs"
+                        : "bg-neutral-100 dark:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200"
+                    )}
+                  >
+                    <span>{c.name}</span>
+                    {c.count !== undefined && (
+                      <span className="text-[10px] font-mono opacity-70">({c.count})</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Carousel Controls & Cards */}
+            <div className="relative">
+              {/* Carousel Left Navigation Arrow */}
+              <button
+                type="button"
+                onClick={() => scrollRelated("left")}
+                aria-label="Previous products"
+                className="hidden sm:flex absolute -left-4 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full bg-white dark:bg-[#0D151D] border border-neutral-200 dark:border-neutral-700 shadow-md items-center justify-center text-neutral-700 dark:text-neutral-200 hover:bg-neutral-50 active:scale-95 cursor-pointer"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+
+              {/* Related Products Carousel List */}
+              <div
+                ref={relatedScrollRef}
+                className="flex items-stretch gap-5 overflow-x-auto no-scrollbar scroll-smooth px-1 py-2 text-left"
+              >
+                {(filteredProducts.length > 0 ? filteredProducts : CURATED_RELATED_PRODUCTS).map((item) => {
+                  const isCurrent = String(item.id) === String(featuredProduct?.id);
+                  return (
+                    <div
+                      key={item.id}
+                      onClick={() => handleSelectProduct(item as Product)}
+                      className={cn(
+                        "w-[240px] sm:w-[260px] shrink-0 rounded-3xl border bg-white dark:bg-[#0D151D] p-4 space-y-3 cursor-pointer transition-all hover:shadow-md active:scale-98 relative group",
+                        isCurrent
+                          ? "border-emerald-600 ring-2 ring-emerald-500/20 shadow-xs"
+                          : "border-neutral-200/90 dark:border-neutral-800 hover:border-emerald-500/50"
+                      )}
+                    >
+                      {/* Product Image Square */}
+                      <div className="aspect-square rounded-2xl bg-neutral-50 dark:bg-neutral-900 p-4 flex items-center justify-center overflow-hidden">
+                        <img
+                          src={item.image || "/assets/camera.webp"}
+                          alt={item.title}
+                          className="max-h-[140px] w-auto max-w-full object-contain group-hover:scale-105 transition-transform"
+                        />
+                      </div>
+
+                      {/* Product Details */}
+                      <div className="space-y-1">
+                        <h4 className="text-sm font-bold text-neutral-900 dark:text-white truncate">
+                          {item.title}
+                        </h4>
+                        <p className="text-xs text-neutral-500">
+                          {item.category || "Gear"}
+                        </p>
+                        <div className="flex items-center gap-1 text-xs">
+                          <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                          <span className="font-bold">{(item.rating || 4.7).toFixed(1)}</span>
+                          <span className="text-neutral-400">({item.reviews || 80})</span>
+                        </div>
+                      </div>
+
+                      {/* Bottom Row: Price & Available Badge */}
+                      <div className="flex items-center justify-between pt-2 border-t border-neutral-100 dark:border-neutral-800">
+                        <span className="text-sm font-bold text-neutral-900 dark:text-white font-mono">
+                          ₹{item.price} <span className="text-[11px] font-normal text-neutral-500">/ day</span>
+                        </span>
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                          Available
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
 
-              {/* Sticky Footer Action Bar */}
-              <div className="p-4 border-t border-black/10 dark:border-white/10 bg-neutral-50 dark:bg-[#080E14] flex items-center gap-3 shrink-0">
-                <button
-                  type="button"
-                  onClick={handleResetFilters}
-                  className="flex-1 h-11 rounded-2xl border border-black/10 dark:border-white/10 text-xs font-bold text-neutral-700 dark:text-[#AAB3BC] hover:bg-neutral-100 dark:hover:bg-white/5"
-                >
-                  Clear All
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsFilterDrawerOpen(false)}
-                  className="flex-1 h-11 rounded-2xl bg-[#161616] text-white dark:bg-[#F2F0EA] dark:text-[#161616] text-xs font-bold shadow-md"
-                >
-                  Apply Filters ({totalItems})
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+              {/* Carousel Right Navigation Arrow */}
+              <button
+                type="button"
+                onClick={() => scrollRelated("right")}
+                aria-label="Next products"
+                className="hidden sm:flex absolute -right-4 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full bg-white dark:bg-[#0D151D] border border-neutral-200 dark:border-neutral-700 shadow-md items-center justify-center text-neutral-700 dark:text-neutral-200 hover:bg-neutral-50 active:scale-95 cursor-pointer"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </section>
+        </div>
+      </div>
     </MainLayout>
   );
 }

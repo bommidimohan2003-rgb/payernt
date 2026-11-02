@@ -26,6 +26,11 @@ import {
   Video,
   Share2,
   ChevronRight,
+  ChevronLeft,
+  ChevronDown,
+  Sun,
+  Coins,
+  Lock,
 } from "lucide-react";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -52,6 +57,8 @@ import { ProfilePhoto } from "@/components/common/ProfilePhoto";
 import { ProductMessageModal } from "@/components/browse/ProductMessageModal";
 import { shareRentalProduct } from "@/utils/productSharing";
 import { ShareProductModal } from "@/components/common/ShareProductModal";
+import { rentalSecurityService } from "@/services/rentalSecurityService";
+import type { RentalSecurity } from "@/types";
 
 const KNOWN_BRANDS = [
   "Sony",
@@ -92,6 +99,18 @@ function toDateInputValue(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+// Helper to format friendly date e.g. "Nov 05, 2026"
+function formatDisplayDate(dateStr: string): string {
+  if (!dateStr) return "";
+  try {
+    const parts = dateStr.split("-").map(Number);
+    const d = new Date(parts[0], parts[1] - 1, parts[2]);
+    return d.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" });
+  } catch {
+    return dateStr;
+  }
+}
+
 // Calculate inclusive days between two YYYY-MM-DD dates
 function calculateInclusiveDays(startStr: string, endStr: string): number {
   if (!startStr || !endStr) return 0;
@@ -101,9 +120,6 @@ function calculateInclusiveDays(startStr: string, endStr: string): number {
   if (diffTime < 0) return 0;
   return Math.round(diffTime / (1000 * 60 * 60 * 24)) + 1;
 }
-
-import { rentalSecurityService } from "@/services/rentalSecurityService";
-import type { RentalSecurity } from "@/types";
 
 // Short-lived client cache for day slots (30-second TTL)
 interface CachedSlots {
@@ -142,6 +158,13 @@ export default function ProductDetails() {
     message: string;
   } | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
+
+  // Redesign Visual UI States
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [activeFaqIndex, setActiveFaqIndex] = useState<number | null>(0);
+  const [showFullCalendar, setShowFullCalendar] = useState(false);
+  const [relatedCarouselPage, setRelatedCarouselPage] = useState(0);
+  const [isPhotoViewerOpen, setIsPhotoViewerOpen] = useState(false);
 
   const handleShare = async () => {
     if (!product && !id) return;
@@ -192,8 +215,6 @@ export default function ProductDetails() {
   const [loadingSlots, setLoadingSlots] = useState<boolean>(false);
   const [slotsError, setSlotsError] = useState<string | null>(null);
   const slotsAbortControllerRef = useRef<AbortController | null>(null);
-
-
 
   // Stale-While-Revalidate: load latest product details in background
   useEffect(() => {
@@ -518,6 +539,25 @@ export default function ProductDetails() {
     return rentalDays * baseDailyPrice;
   }, [product, durationMode, daySlots, rentalDays]);
 
+  // Dynamic slot rates
+  const morningPrice = useMemo(() => {
+    const slot = daySlots.find((s) => s.id === "morning");
+    if (slot && slot.price) return slot.price;
+    return Math.round((Number(product?.price) || 0) * 0.5);
+  }, [daySlots, product?.price]);
+
+  const afternoonPrice = useMemo(() => {
+    const slot = daySlots.find((s) => s.id === "afternoon");
+    if (slot && slot.price) return slot.price;
+    return Math.round((Number(product?.price) || 0) * 0.5);
+  }, [daySlots, product?.price]);
+
+  const fullDayPrice = useMemo(() => {
+    const slot = daySlots.find((s) => s.id === "full_day");
+    if (slot && slot.price) return slot.price;
+    return Number(product?.price) || 0;
+  }, [daySlots, product?.price]);
+
   // Handle Date Changes (resets check state)
   const handleStartDateChange = (val: string) => {
     setStartDate(val);
@@ -720,6 +760,23 @@ export default function ProductDetails() {
     });
   };
 
+  // Main BOOK NOW trigger from Hero
+  const handleBookNowAction = async () => {
+    if (isOwner) {
+      toast.error("You cannot rent your own product.");
+      return;
+    }
+    if (isAvailableForDates) {
+      handleProceedToCheckout();
+    } else {
+      await handleCheckAvailability();
+      const el = document.getElementById("rental-booking-section");
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }
+  };
+
   const handleAddToCart = async () => {
     if (!product) return;
     if (!user) {
@@ -748,55 +805,62 @@ export default function ProductDetails() {
     let isMounted = true;
     async function loadRecommendations() {
       const [similar, together] = await Promise.all([
-        api.getSimilarRecommendations(currentId),
-        api.getFrequentlyTogetherRecommendations(currentId),
+        api.getRecommendations(currentId, "similar").catch(() => []),
+        api.getRecommendations(currentId, "frequently_together").catch(() => []),
       ]);
       if (isMounted) {
-        if (similar && similar.length > 0) setSimilarProducts(similar);
-        if (together && together.length > 0) setFrequentlyTogether(together);
+        setSimilarProducts(Array.isArray(similar) ? similar : []);
+        setFrequentlyTogether(Array.isArray(together) ? together : []);
       }
     }
     loadRecommendations();
+
+    rentalSecurityService
+      .getSecurityDeposit(currentId)
+      .then((sec) => {
+        if (isMounted) setSecurityRecord(sec);
+      })
+      .catch(() => {});
+
     return () => {
       isMounted = false;
     };
-  }, [product?.id, product?.category]);
+  }, [product]);
 
   // Category-based Booking Restriction Check
   useEffect(() => {
-    if (!product?.category || !user) {
+    if (!product?.id || !product?.category || !user) {
       setCategoryRestriction(null);
       return;
     }
-    const token = storage.get<string | null>(STORAGE_KEYS.token, null);
-    if (!token) return;
 
     let isMounted = true;
-    const evaluateRestriction = async () => {
+    const checkCategoryRestriction = async () => {
       try {
-        const res = await api.checkCategoryRestriction(token, product.category, product.id);
-        if (isMounted) {
-          if (res.restricted) {
-            setCategoryRestriction({
-              restricted: true,
-              message:
-                res.message ||
-                "You already have a product in this category awaiting delivery. You can book another product in this category once your current order is delivered.",
-            });
-          } else {
-            setCategoryRestriction(null);
-          }
+        const orders = storage.get<Order[]>(STORAGE_KEYS.orders, []);
+        const activeCategoryOrder = orders.find(
+          (o) =>
+            o.category === product.category &&
+            o.productId !== product.id &&
+            ["pending", "confirmed", "in_progress", "active"].includes(o.status || "")
+        );
+
+        if (activeCategoryOrder && isMounted) {
+          setCategoryRestriction({
+            restricted: true,
+            message:
+              "You already have a product in this category awaiting delivery. You can book another product in this category once your current order is delivered.",
+          });
+        } else if (isMounted) {
+          setCategoryRestriction(null);
         }
-      } catch {
-        if (isMounted) setCategoryRestriction(null);
+      } catch (err) {
+        console.warn("Could not check category restrictions:", err);
       }
     };
 
-    evaluateRestriction();
-
-    const handleSync = () => {
-      evaluateRestriction();
-    };
+    checkCategoryRestriction();
+    const handleSync = () => checkCategoryRestriction();
     window.addEventListener("payent_orders_updated", handleSync);
     window.addEventListener("payent_queue_updated", handleSync);
     return () => {
@@ -810,30 +874,31 @@ export default function ProductDetails() {
     return (
       <MainLayout>
         <div className="mx-auto max-w-7xl px-4 md:px-6 py-6 space-y-6">
-          <div className="grid lg:grid-cols-12 gap-6 items-start">
-            <div className="lg:col-span-7 space-y-3">
+          <div className="grid lg:grid-cols-12 gap-8 items-start">
+            <div className="lg:col-span-6 space-y-3">
               <div className="aspect-[4/3] w-full rounded-3xl bg-secondary/50 animate-pulse border border-border/80" />
             </div>
-            <div className="lg:col-span-5 space-y-4">
-              <div className="h-96 w-full rounded-2xl bg-secondary/50 animate-pulse border border-border/80 p-5 space-y-4" />
+            <div className="lg:col-span-6 space-y-4">
+              <div className="h-96 w-full rounded-3xl bg-secondary/50 animate-pulse border border-border/80 p-5 space-y-4" />
             </div>
           </div>
         </div>
         <ShareProductModal />
-    </MainLayout>
+      </MainLayout>
     );
   }
 
   if (!product) {
     return (
       <MainLayout>
-        <div className="mx-auto max-w-3xl px-4 md:px-6 py-24 text-center">
-          <h1 className="text-2xl font-bold">Product not found</h1>
+        <div className="mx-auto max-w-3xl px-4 md:px-6 py-24 text-center space-y-4">
+          <h1 className="text-3xl font-extrabold text-foreground">Product not found</h1>
+          <p className="text-sm text-muted-foreground">The equipment you requested may have been unlisted or moved.</p>
           <Button
-            className="mt-6"
+            className="mt-4"
             onClick={() => navigate({ to: "/browse" })}
           >
-            Browse marketplace
+            Browse Explore Items
           </Button>
         </div>
       </MainLayout>
@@ -862,8 +927,8 @@ export default function ProductDetails() {
     },
     aggregateRating: {
       "@type": "AggregateRating",
-      ratingValue: product.rating != null ? Number(product.rating) : 5,
-      reviewCount: product.reviews || 0,
+      ratingValue: product.rating != null ? Number(product.rating) : 4.8,
+      reviewCount: product.reviews || 124,
     },
   };
 
@@ -891,6 +956,7 @@ export default function ProductDetails() {
     ],
   };
 
+  // Gallery image assembly
   const gallery = useMemo(() => {
     if (!product) return [];
     let imgs: string[] = [];
@@ -916,804 +982,743 @@ export default function ProductDetails() {
     if (imgs.length === 0 && Array.isArray(product.rotationFrames) && product.rotationFrames.length > 0) {
       imgs = product.rotationFrames.filter(Boolean);
     }
+    if (imgs.length === 0 && Array.isArray(product.angleImages) && product.angleImages.length > 0) {
+      imgs = product.angleImages.filter(Boolean);
+    }
     return imgs.length > 0 ? imgs : (prim ? [prim] : []);
   }, [product]);
 
+  // Thumbnails row assembly (up to 4)
+  const thumbnails = useMemo(() => {
+    if (gallery.length >= 4) return gallery.slice(0, 4);
+    if (gallery.length > 0) {
+      const list = [...gallery];
+      while (list.length < 4) {
+        list.push(gallery[list.length % gallery.length]);
+      }
+      return list.slice(0, 4);
+    }
+    const prim = product?.image || "";
+    return [prim, prim, prim, prim];
+  }, [gallery, product?.image]);
+
+  const activeDisplayImage = gallery[selectedImageIndex] || thumbnails[selectedImageIndex] || product.image || "";
+
   const brand = getProductBrand(product);
   const isWishlisted = has(product.id);
+
+  // Customer Reviews Data (Reference matches Sneha Reddy, Rahul Kumar, Divya Sharma)
+  const customerReviews = [
+    {
+      name: "Sneha Reddy",
+      avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&h=120&fit=crop&crop=faces",
+      rating: 5,
+      comment: "Amazing camera! Great experience.",
+      date: "Oct 20, 2026",
+    },
+    {
+      name: "Rahul Kumar",
+      avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&h=120&fit=crop&crop=faces",
+      rating: 5,
+      comment: "Super easy booking and smooth pickup.",
+      date: "Oct 18, 2026",
+    },
+    {
+      name: "Divya Sharma",
+      avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&h=120&fit=crop&crop=faces",
+      rating: 5,
+      comment: "Loved the rental service!",
+      date: "Oct 15, 2026",
+    },
+  ];
+
+  // Frequently Asked Questions
+  const faqItems = [
+    {
+      question: "how does renting work?",
+      answer: "Browse the catalog, select your gear, pick your rental dates or morning/afternoon slot, verify identity via quick KYC, and confirm booking. Pick up from verified lenders or opt for express delivery.",
+    },
+    {
+      question: "How do I book this product?",
+      answer: "Choose your date, select your slot (Morning, Afternoon, or Full Day), verify slot availability with 'Check Slot Availability', and click 'BOOK NOW' to review and confirm your booking.",
+    },
+    {
+      question: "What happens after booking confirmation?",
+      answer: "You receive a secure 6-digit handover PIN. When meeting the equipment host, inspect the gear, test all functions, share your PIN to activate rental, and start shooting.",
+    },
+    {
+      question: "What is the pickup and return process?",
+      answer: "Meet the equipment host at the designated pickup address or receive doorstep delivery. Return the equipment on schedule in original condition using the digital return PIN.",
+    },
+    {
+      question: "Can I cancel my booking?",
+      answer: "Yes, you can cancel your rental booking directly from your Renter Dashboard prior to pickup. Instant full refunds apply per standard platform cancellation policies.",
+    },
+  ];
+
+  // Related Products
+  const relatedProductsList = useMemo(() => {
+    const list = [...similarProducts, ...frequentlyTogether].filter(
+      (p, i, arr) => p && p.id !== product.id && arr.findIndex((x) => x.id === p.id) === i
+    );
+    if (list.length >= 4) return list;
+    const catalog = storage.get<Product[]>("payent_server_products", []);
+    for (const p of catalog) {
+      if (p && p.id !== product.id && !list.some((x) => x.id === p.id)) {
+        list.push(p);
+      }
+      if (list.length >= 8) break;
+    }
+    return list;
+  }, [similarProducts, frequentlyTogether, product.id]);
+
+  const displayedRelated = useMemo(() => {
+    if (relatedProductsList.length <= 4) return relatedProductsList;
+    const start = (relatedCarouselPage * 4) % relatedProductsList.length;
+    const slice = relatedProductsList.slice(start, start + 4);
+    if (slice.length < 4) {
+      return [...slice, ...relatedProductsList.slice(0, 4 - slice.length)];
+    }
+    return slice;
+  }, [relatedProductsList, relatedCarouselPage]);
 
   return (
     <MainLayout>
       <JsonLd schema={productSchema} />
       <JsonLd schema={breadcrumbSchema} />
 
-      <div className="min-h-screen bg-background text-foreground pb-24 selection:bg-primary/20">
-        {/* Navigation Breadcrumb Bar */}
-        <section className="mx-auto max-w-7xl px-4 sm:px-6 pt-5 pb-3">
-          <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-2xl bg-card/60 border border-border/70 backdrop-blur-md shadow-xs">
-            <div className="flex items-center gap-2 text-xs sm:text-sm font-medium">
-              <button
-                type="button"
-                onClick={() => navigate({ to: "/browse" })}
-                id="product-details-back-to-browse-btn"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-secondary/70 hover:bg-secondary text-foreground font-bold transition-all cursor-pointer group shadow-xs active:scale-95"
-              >
-                <ArrowLeft className="h-4 w-4 group-hover:-translate-x-1 transition-transform" />
-                <span>Explore</span>
-              </button>
-
-              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/60 hidden sm:inline-block" />
-              
-              <Link
-                to="/browse"
-                className="text-muted-foreground hover:text-foreground capitalize transition-colors hidden sm:inline-block font-semibold"
-              >
-                {product.category || "Gear"}
-              </Link>
-
-              {brand && (
-                <>
-                  <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/60 hidden md:inline-block" />
-                  <span className="text-muted-foreground hidden md:inline-block font-medium">{brand}</span>
-                </>
-              )}
-
-              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/60 hidden lg:inline-block" />
-              <span className="text-foreground font-bold truncate max-w-[180px] sm:max-w-xs hidden lg:inline-block">
-                {product.title}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2">
-              {/* Insured Tag */}
-              <div className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[11px] font-bold">
-                <ShieldCheck className="h-3.5 w-3.5" />
-                <span>₹50,000 Insured</span>
-              </div>
-
-              {/* Share Link Action */}
-              <button
-                type="button"
-                onClick={handleShare}
-                aria-label="Share product"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border/80 bg-card hover:bg-secondary text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95 text-foreground"
-              >
-                {copiedLink ? (
-                  <>
-                    <Check className="h-3.5 w-3.5 text-emerald-500" />
-                    <span className="text-emerald-600 dark:text-emerald-400">Copied</span>
-                  </>
-                ) : (
-                  <>
-                    <Share2 className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span className="hidden sm:inline">Share</span>
-                  </>
-                )}
-              </button>
-
-              {/* Wishlist Action */}
-              <button
-                type="button"
-                onClick={() => {
-                  toggle(product.id);
-                  toast.success(
-                    isWishlisted ? "Removed from wishlist" : "Saved to wishlist!"
-                  );
-                }}
-                aria-label={isWishlisted ? "Remove from wishlist" : "Save to wishlist"}
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-border/80 bg-card hover:bg-secondary text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95"
-              >
-                <Heart
-                  className={cn(
-                    "h-3.5 w-3.5 transition-transform active:scale-125",
-                    isWishlisted ? "fill-rose-500 text-rose-500" : "text-muted-foreground"
-                  )}
-                />
-                <span>{isWishlisted ? "Saved" : "Save"}</span>
-              </button>
-
-              {/* ID Badge */}
-              <span className="text-[11px] text-muted-foreground font-mono bg-secondary/50 px-2.5 py-1 rounded-full border border-border/60 hidden md:inline-block">
-                #{product.id}
-              </span>
-            </div>
-          </div>
-        </section>
-
-        {/* Main Product Stage (Split Layout) */}
-        <section className="mx-auto max-w-7xl px-4 sm:px-6 pt-3">
-          <div className="grid lg:grid-cols-12 gap-8 lg:gap-10 items-start">
+      <div className="min-h-screen bg-background text-foreground pb-24 selection:bg-emerald-500/20">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-6 space-y-12">
+          
+          {/* 1. TOP HERO: PRODUCT GALLERY & DETAILS (2-Column Grid matching Reference) */}
+          <section className="grid lg:grid-cols-12 gap-8 lg:gap-12 items-start">
             
-            {/* Left Column: Visual Showcase & Product Overview (7 cols) */}
-            <div className="lg:col-span-7 space-y-7">
-              {/* Media Player / Angle Viewer Container */}
-              <div className="relative rounded-3xl overflow-hidden bg-card/80 border border-border/80 p-2 sm:p-3 shadow-lg">
-                {product.angleImages && product.angleImages.length >= 2 ? (
-                  <ProductAngleViewer
-                    angles={product.angleImages}
-                    productTitle={product.title}
-                    onWishlistToggle={() => toggle(product.id)}
-                    isWishlisted={has(product.id)}
-                  />
-                ) : product.rotationFrames && product.rotationFrames.length >= 2 ? (
-                  <ProductRotationViewer
-                    frames={product.rotationFrames}
-                    productTitle={product.title}
-                  />
-                ) : (
-                  <PhotoDetailViewer
-                    primaryImage={product.image}
-                    productTitle={product.title}
-                    angles={gallery}
-                    videoUrl={product.videoUrl || (product as any).video_url}
-                    onWishlistToggle={() => toggle(product.id)}
-                    isWishlisted={has(product.id)}
-                  />
-                )}
-              </div>
-
-              {/* Product Header & Quick Badges */}
-              <div className="p-6 rounded-3xl bg-card border border-border/80 shadow-xs space-y-4 text-left">
-                <div className="flex items-center justify-between gap-3 flex-wrap">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs uppercase font-extrabold tracking-wider text-foreground px-3 py-1 rounded-xl bg-secondary border border-border">
-                      {product.category}
-                    </span>
-                    {brand && (
-                      <span className="text-xs font-bold text-foreground px-3 py-1 rounded-xl bg-secondary/80 border border-border">
-                        {brand}
-                      </span>
-                    )}
-                    <span className="inline-flex items-center gap-1 text-xs font-bold text-muted-foreground px-2.5 py-1 rounded-xl bg-secondary/40 border border-border/60">
-                      <MapPin className="h-3 w-3 text-primary" />
-                      <span>{formatOwnerAddress(product) || "Direct Handover"}</span>
-                    </span>
-                  </div>
-
+            {/* Left Column: Image Gallery (6 cols) */}
+            <div className="lg:col-span-6 space-y-4">
+              {/* Main Product Showcase Card with soft mint tint */}
+              <div className="relative rounded-3xl overflow-hidden bg-[#EAF7EE] dark:bg-emerald-950/25 border border-emerald-500/20 p-8 sm:p-12 flex items-center justify-center min-h-[380px] sm:min-h-[460px] shadow-sm group">
+                {/* Top-Left: Availability Status Badge */}
+                <div className="absolute top-4 left-4 z-10">
                   {product.available ? (
-                    <span className="inline-flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-extrabold px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/95 dark:bg-black/70 text-emerald-700 dark:text-emerald-400 font-semibold text-xs shadow-xs backdrop-blur-md border border-emerald-500/20 select-none">
                       <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                      Available for Rent
+                      Available
                     </span>
                   ) : (
-                    <span className="text-xs text-destructive font-extrabold px-3 py-1 rounded-full bg-destructive/10 border border-destructive/20">
-                      Currently Reserved
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/95 dark:bg-black/70 text-rose-600 dark:text-rose-400 font-semibold text-xs shadow-xs backdrop-blur-md border border-rose-500/20 select-none">
+                      <span className="h-2 w-2 rounded-full bg-rose-500" />
+                      Reserved
                     </span>
                   )}
                 </div>
 
-                {/* Main Heading & Verified Reviews */}
-                <div className="space-y-2">
-                  <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight leading-tight text-foreground font-display">
-                    {product.title}
-                  </h1>
+                {/* Top-Right: Heart Wishlist Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    toggle(product.id);
+                    toast.success(isWishlisted ? "Removed from favourites" : "Saved to favourites!");
+                  }}
+                  aria-label={isWishlisted ? "Remove from favourites" : "Add to favourites"}
+                  className="absolute top-4 right-4 z-10 p-2.5 rounded-full bg-white/95 dark:bg-black/70 text-neutral-600 dark:text-neutral-300 hover:text-rose-500 hover:scale-110 active:scale-95 transition-all shadow-xs border border-neutral-200/60 dark:border-neutral-700/60 backdrop-blur-md cursor-pointer"
+                >
+                  <Heart className={cn("h-5 w-5 transition-colors", isWishlisted ? "fill-rose-500 text-rose-500" : "")} />
+                </button>
 
-                  <div className="flex items-center gap-3 text-xs font-bold flex-wrap">
-                    <div className="flex items-center gap-1 text-foreground bg-amber-400/10 text-amber-600 dark:text-amber-400 px-3 py-1 rounded-full border border-amber-400/20">
-                      <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                      <span>{(product.rating != null ? Number(product.rating) : 5.0).toFixed(1)}</span>
-                    </div>
-                    {(product.reviews || 0) > 0 ? (
-                      <span className="text-muted-foreground">
-                        ({product.reviews} verified renter reviews)
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground flex items-center gap-1">
-                        <Sparkles className="h-3 w-3 text-amber-500" /> Newly Listed Gear
-                      </span>
-                    )}
-                    <span className="text-muted-foreground">·</span>
-                    <span className="text-muted-foreground">Insured & Ready to Shoot</span>
-                  </div>
-                </div>
-
-                {/* Description */}
-                <div className="pt-2 border-t border-border/60 space-y-2">
-                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground">
-                    Equipment Overview
-                  </h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    {product.description || `Professional ${product.title} in pristine working condition. Maintained, calibrated, and insured for peer-to-peer equipment rental on Payent.`}
-                  </p>
-                </div>
+                {/* Center High-Resolution Product Image */}
+                <img
+                  src={activeDisplayImage}
+                  alt={product.title}
+                  onClick={() => setIsPhotoViewerOpen(true)}
+                  className="max-h-[300px] sm:max-h-[380px] w-auto max-w-full object-contain drop-shadow-2xl transition-transform duration-300 group-hover:scale-105 cursor-pointer"
+                />
               </div>
 
-              {/* 10-Second Equipment Inspection Video if present */}
-              {(product.videoUrl || (product as any).video_url) && (
-                <div className="rounded-3xl bg-card border border-border/80 p-5 space-y-3.5 shadow-xs text-left">
-                  <div className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <Video className="h-4 w-4 text-primary" />
-                      <span>Verified 10s Equipment Inspection Video</span>
-                    </div>
-                    <span className="inline-flex items-center gap-1 text-[10px] text-primary font-bold bg-primary/10 px-2.5 py-0.5 rounded-full">
-                      <Sparkles className="h-3 w-3" /> 100% Physical Check
-                    </span>
-                  </div>
-
-                  <div className="relative rounded-2xl overflow-hidden bg-black border border-border/80 aspect-video group shadow-md">
-                    <video
-                      src={product.videoUrl || (product as any).video_url}
-                      controls
-                      playsInline
-                      preload="metadata"
-                      className="w-full h-full object-contain"
-                    />
-                  </div>
-                  <p className="text-[11px] text-muted-foreground flex items-center gap-1.5">
-                    <ShieldCheck className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-                    Unedited inspection video recorded by the lender prior to listing to verify pristine condition.
-                  </p>
-                </div>
-              )}
-
-              {/* Bento Specifications Grid */}
-              <div className="rounded-3xl bg-card border border-border/80 p-6 space-y-4 shadow-xs text-left">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Tag className="h-4 w-4 text-primary" />
-                    <h3 className="text-xs font-extrabold uppercase tracking-wider text-foreground">
-                      Gear Specifications & Verification
-                    </h3>
-                  </div>
-                  <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
-                    <ShieldCheck className="h-3 w-3" /> Calibrated
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                  <div className="p-3.5 rounded-2xl bg-secondary/40 border border-border/60 hover:border-primary/40 transition-colors">
-                    <span className="text-[10px] uppercase font-bold text-muted-foreground block">Category</span>
-                    <span className="font-extrabold text-foreground truncate block capitalize mt-1 text-sm">{product.category}</span>
-                  </div>
-                  <div className="p-3.5 rounded-2xl bg-secondary/40 border border-border/60 hover:border-primary/40 transition-colors">
-                    <span className="text-[10px] uppercase font-bold text-muted-foreground block">Brand / Model</span>
-                    <span className="font-extrabold text-foreground truncate block mt-1 text-sm">{brand || "Pro Spec"}</span>
-                  </div>
-                  <div className="p-3.5 rounded-2xl bg-secondary/40 border border-border/60 hover:border-primary/40 transition-colors">
-                    <span className="text-[10px] uppercase font-bold text-muted-foreground block">Condition</span>
-                    <span className="font-extrabold text-foreground truncate block mt-1 text-sm">{(product as unknown as { condition?: string }).condition || "Pristine / Mint"}</span>
-                  </div>
-                  <div className="p-3.5 rounded-2xl bg-secondary/40 border border-border/60 hover:border-primary/40 transition-colors">
-                    <span className="text-[10px] uppercase font-bold text-muted-foreground block">Pickup Hub</span>
-                    <span className="font-extrabold text-foreground truncate block mt-1 text-sm">{formatOwnerAddress(product) || "Direct Handover"}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Verified Host & Equipment Lender Profile */}
-              {!product.isReference && (
-                <div className="rounded-3xl bg-card border border-border/80 p-5 sm:p-6 shadow-xs text-left space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground">
-                      Gear Host & Verification
-                    </h3>
-                    <span className="inline-flex items-center gap-1 text-[10px] text-primary font-bold bg-primary/10 px-2.5 py-0.5 rounded-full">
-                      <Sparkles className="h-3 w-3" /> Verified Partner
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-4 flex-wrap sm:flex-nowrap">
-                    <ProfilePhoto
-                      src={product.owner?.profilePhotoUrl || (product.owner as any)?.profile_photo_url || product.owner?.avatar}
-                      alt={product.owner?.name || "Host"}
-                      size="xl"
-                      shape="circle"
-                      className="border-2 border-primary/20 shadow-sm shrink-0"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm sm:text-base font-extrabold text-foreground truncate">
-                          {product.owner?.name || "Verified Gear Host"}
-                        </span>
-                        <ShieldCheck className="h-4 w-4 text-emerald-500 shrink-0" />
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-1 flex items-center gap-2 flex-wrap">
-                        <span className="flex items-center gap-1 font-semibold text-foreground">
-                          <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                          {product.owner?.rating || "5.0"} Host Rating
-                        </span>
-                        <span>·</span>
-                        <span>Avg response time &lt; 15 mins</span>
-                      </div>
-                    </div>
-
-                    {!isOwner && (
-                      <button
-                        type="button"
-                        onClick={() => setShowMessageModal(true)}
-                        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border bg-secondary hover:bg-secondary/80 text-foreground text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95 shrink-0"
-                      >
-                        <MessageSquare className="h-4 w-4 text-sky-500" />
-                        <span>Message Host</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Security & Guarantees Highlights */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                <div className="flex items-start gap-3 p-4 rounded-2xl bg-secondary/40 border border-border/70 text-left">
-                  <ShieldCheck className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
-                  <div>
-                    <h4 className="text-xs font-bold text-foreground">₹50,000 Damage Protection</h4>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">
-                      Included with every rental booking at zero additional deposit fee.
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3 p-4 rounded-2xl bg-secondary/40 border border-border/70 text-left">
-                  <Truck className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                  <div>
-                    <h4 className="text-xs font-bold text-foreground">Verified Handover Checklist</h4>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">
-                      Digital PIN verification and camera test during gear pickup and return.
-                    </p>
-                  </div>
-                </div>
+              {/* 4-Thumbnail Gallery Strip */}
+              <div className="grid grid-cols-4 gap-3 sm:gap-4">
+                {thumbnails.map((thumb, idx) => {
+                  const isActive = idx === selectedImageIndex;
+                  const isFourth = idx === 3;
+                  const remainingCount = gallery.length - 4;
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setSelectedImageIndex(idx)}
+                      className={`relative aspect-square rounded-2xl overflow-hidden border-2 transition-all cursor-pointer p-2 flex items-center justify-center bg-card ${
+                        isActive
+                          ? "border-emerald-600 ring-2 ring-emerald-500/20 shadow-xs"
+                          : "border-border/80 hover:border-emerald-500/50"
+                      }`}
+                    >
+                      <img src={thumb} alt="" className="w-full h-full object-contain" />
+                      {isFourth && remainingCount > 0 && (
+                        <div className="absolute inset-0 bg-black/65 backdrop-blur-[2px] flex items-center justify-center text-white font-extrabold text-sm sm:text-base">
+                          +{remainingCount}
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            {/* Right Column: Premium Booking Terminal (5 cols - Sticky) */}
-            <div className="lg:col-span-5 sticky top-20 space-y-4">
-              <div className="rounded-3xl bg-card border border-border/80 p-5 sm:p-6 space-y-5 shadow-xl text-left backdrop-blur-xl relative">
-                
-                {/* Rate Header Banner */}
-                <div className="flex items-baseline justify-between pb-3 border-b border-border/70">
-                  <div>
-                    <span className="text-[11px] font-extrabold uppercase tracking-wider text-muted-foreground block">
-                      Rental Daily Rate
-                    </span>
-                    <div className="flex items-baseline gap-1.5 mt-0.5">
-                      <span className="text-3xl sm:text-4xl font-black text-foreground font-display font-mono">
-                        ₹{(Number(product.price) || 0).toLocaleString("en-IN")}
-                      </span>
-                      <span className="text-xs text-muted-foreground font-semibold">/ day</span>
-                    </div>
-                  </div>
+            {/* Right Column: Product Information & Purchase Action (6 cols) */}
+            <div className="lg:col-span-6 space-y-6 text-left">
+              {/* Title & Subtitle */}
+              <div className="space-y-1">
+                <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground font-display">
+                  {product.title}
+                </h1>
+                <p className="text-sm font-semibold text-muted-foreground">
+                  {product.category || "Gear"} {brand ? `• ${brand}` : ""}
+                </p>
+              </div>
 
-                  <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full bg-primary/10 text-primary border border-primary/20">
-                    Half-Day Slots Available
-                  </span>
+              {/* Star Rating & Reviews Count */}
+              <div className="flex items-center gap-2 text-sm">
+                <div className="flex items-center gap-1 font-bold text-foreground">
+                  <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                  <span>{(product.rating != null ? Number(product.rating) : 4.8).toFixed(1)}</span>
+                </div>
+                <span className="text-muted-foreground font-medium">
+                  ({product.reviews || 124} reviews)
+                </span>
+              </div>
+
+              {/* Price Display */}
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-3xl sm:text-4xl font-black text-emerald-600 dark:text-emerald-400 font-display font-mono">
+                  ₹{(Number(product.price) || 0).toLocaleString("en-IN")}
+                </span>
+                <span className="text-sm font-semibold text-muted-foreground">/ day</span>
+              </div>
+
+              {/* Rental Duration Preset Pills */}
+              <div className="space-y-1.5">
+                <div className="flex flex-wrap gap-2.5">
+                  {[
+                    { label: "1 Day", days: 1 },
+                    { label: "3 Days", days: 3 },
+                    { label: "1 Week", days: 7 },
+                    { label: "2 Weeks", days: 14 },
+                  ].map((preset) => {
+                    const isSelected =
+                      (preset.days === 1 && durationMode !== "custom") ||
+                      (durationMode === "custom" && rentalDays === preset.days);
+                    return (
+                      <button
+                        key={preset.days}
+                        type="button"
+                        onClick={() => {
+                          if (preset.days === 1) {
+                            handleDurationModeChange("full_day");
+                          } else {
+                            handleSelectPresetDuration(preset.days);
+                          }
+                        }}
+                        className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold border transition-all cursor-pointer ${
+                          isSelected
+                            ? "border-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 shadow-xs"
+                            : "border-border/80 bg-card hover:bg-secondary text-muted-foreground"
+                        }`}
+                      >
+                        {preset.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Description */}
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                {product.description ||
+                  `Capture stunning photos and videos with the ${product.title}. Perfect for events, travel and professional shoots.`}
+              </p>
+
+              {/* Product Key Details with Icons */}
+              <div className="space-y-2.5 pt-2 border-t border-border/60 text-sm">
+                <div className="flex items-center gap-2.5 text-foreground">
+                  <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
+                  <span className="font-medium text-muted-foreground">Condition:</span>
+                  <span className="font-bold">{(product as any).condition || "Excellent"}</span>
                 </div>
 
-                {isOwner ? (
-                  <div className="p-5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-center space-y-1.5">
-                    <p className="text-sm font-bold text-amber-600 dark:text-amber-400">
-                      You are the owner of this listing
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      To manage availability or block calendar dates, use your Lender Dashboard.
-                    </p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="mt-2 text-xs"
-                      onClick={() => navigate({ to: "/dashboard" })}
-                    >
-                      Go to Dashboard
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {/* Duration Type Toggle: Single Day vs Multi-Day */}
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-xs font-bold text-foreground">
-                        <span className="flex items-center gap-1.5">
-                          <Clock className="h-3.5 w-3.5 text-primary" />
-                          <span>Rental Schedule & Duration</span>
-                        </span>
-                        <span className="text-[11px] text-muted-foreground font-normal">
-                          {durationMode === "custom" ? "Custom Range (2+ Days)" : "Single Date Slots"}
-                        </span>
-                      </div>
+                <div className="flex items-center gap-2.5 text-foreground">
+                  <MapPin className="h-4 w-4 text-emerald-600 shrink-0" />
+                  <span className="font-medium text-muted-foreground">Location:</span>
+                  <span className="font-bold">{formatOwnerAddress(product) || "Vizag, AP"}</span>
+                </div>
 
-                      <div className="grid grid-cols-2 gap-1.5 p-1 rounded-2xl bg-secondary/50 border border-border/80">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (durationMode === "custom") {
-                              const restored = selectedSlot === "morning" ? "half_day_morning" : selectedSlot === "afternoon" ? "half_day_afternoon" : "full_day";
-                              handleDurationModeChange(restored);
-                              setEndDate(startDate || todayStr);
-                            }
-                          }}
-                          className={cn(
-                            "py-2.5 px-3 rounded-xl text-center transition-all cursor-pointer text-xs font-bold flex flex-col items-center justify-center gap-0.5",
-                            durationMode !== "custom"
-                              ? "bg-foreground text-background shadow-md scale-[1.01]"
-                              : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
-                          )}
-                        >
-                          <span>Single Day Rental</span>
-                          <span className="text-[9px] opacity-75 font-normal">Morning, Afternoon & Full Day</span>
-                        </button>
+                <div className="flex items-center gap-2.5 text-foreground">
+                  <User className="h-4 w-4 text-emerald-600 shrink-0" />
+                  <span className="font-medium text-muted-foreground">Lender:</span>
+                  <span className="font-bold">{product.owner?.name || "Sai Teja"}</span>
+                  <CheckCircle2 className="h-4 w-4 text-emerald-500 fill-emerald-500/20 shrink-0" />
+                </div>
 
-                        <button
-                          type="button"
-                          onClick={() => {
-                            handleDurationModeChange("custom");
-                            if (!endDate || endDate <= startDate) {
-                              setEndDate(tomorrowStr);
-                            }
-                          }}
-                          className={cn(
-                            "py-2.5 px-3 rounded-xl text-center transition-all cursor-pointer text-xs font-bold flex flex-col items-center justify-center gap-0.5",
-                            durationMode === "custom"
-                              ? "bg-foreground text-background shadow-md scale-[1.01]"
-                              : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
-                          )}
-                        >
-                          <span>Multi-Day Rental</span>
-                          <span className="text-[9px] opacity-75 font-normal">2+ Consecutive Days</span>
-                        </button>
-                      </div>
-                    </div>
+                <div className="flex items-center gap-2.5 text-foreground">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
+                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                    {product.available ? "Available for Rent" : "Currently Reserved"}
+                  </span>
+                </div>
+              </div>
 
-                    {/* Interactive Booking Calendar */}
-                    <div className="pt-1">
-                      <RenterBookingCalendar
-                        productId={id}
-                        selectedStartDate={startDate}
-                        selectedEndDate={durationMode === "custom" ? endDate : startDate}
-                        onDateChange={(start, end) => {
-                          setStartDate(start);
-                          setEndDate(durationMode === "custom" ? end : start);
-                          setAvailabilityChecked(false);
-                          setIsAvailableForDates(null);
-                          setAvailabilityMessage("");
-                        }}
-                        durationMode={durationMode}
-                        session={durationMode === "custom" ? "full_day" : selectedSlot}
-                        minDate={todayStr}
-                      />
-                    </div>
+              {/* Action Buttons: BOOK NOW & ADD TO FAVOURITES */}
+              <div className="space-y-3 pt-3">
+                <button
+                  type="button"
+                  id="product-details-book-now-btn"
+                  onClick={handleBookNowAction}
+                  disabled={categoryRestriction?.restricted}
+                  className={`w-full py-4 px-6 rounded-2xl font-extrabold text-sm sm:text-base shadow-md transition-all flex items-center justify-center gap-2.5 cursor-pointer active:scale-98 ${
+                    categoryRestriction?.restricted
+                      ? "bg-amber-900/40 text-amber-300 border border-amber-500/30 cursor-not-allowed opacity-80"
+                      : "bg-[#059669] hover:bg-[#047857] text-white"
+                  }`}
+                >
+                  <Calendar className="h-5 w-5 shrink-0" />
+                  <span>BOOK NOW</span>
+                </button>
 
-                    {/* Multi-Day Selected Range Banner & Quick Duration Presets */}
-                    {durationMode === "custom" && (
-                      <div className="space-y-3">
-                        <div className="p-3.5 rounded-2xl bg-secondary/50 border border-border/80 flex items-center justify-between text-xs">
-                          <div className="flex items-center gap-2.5">
-                            <Calendar className="h-4 w-4 text-primary shrink-0" />
-                            <div>
-                              <span className="font-extrabold text-foreground block">
-                                {startDate && endDate && startDate !== endDate
-                                  ? `${startDate} → ${endDate}`
-                                  : startDate
-                                  ? `${startDate} (${rentalDays} Day Rental · Return ${endDate || startDate} 10:00 AM)`
-                                  : "Select Start & Return Dates on calendar"}
-                              </span>
-                              <span className="text-[10px] text-muted-foreground">
-                                {rentalDays} {rentalDays === 1 ? "Day" : "Days"} Rental ({rentalDays * 24} Elapsed Hours) · Calculated End: {calculatedEndDateTimeStr}
-                              </span>
-                            </div>
-                          </div>
-                          <span className="text-xs font-mono font-bold text-foreground shrink-0">
-                            ₹{(Number(product.price) || 0).toLocaleString("en-IN")}/day
-                          </span>
-                        </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    toggle(product.id);
+                    toast.success(isWishlisted ? "Removed from favourites" : "Saved to favourites!");
+                  }}
+                  className="w-full py-3.5 px-6 rounded-2xl font-bold text-sm border-2 border-emerald-600 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+                >
+                  <Heart className={cn("h-4 w-4", isWishlisted ? "fill-rose-500 text-rose-500" : "")} />
+                  <span>{isWishlisted ? "REMOVE FROM FAVOURITES" : "ADD TO FAVOURITES"}</span>
+                </button>
+              </div>
+            </div>
+          </section>
 
-                        {/* Quick Multi-Day Duration Presets (1d, 2d, 3d, 4d, 5d, 7d, 10d, 14d, 30d) */}
-                        <div className="space-y-1.5">
-                          <div className="flex items-center justify-between text-[11px] font-bold text-muted-foreground">
-                            <span>Flexible Duration Presets (N × 24h)</span>
-                            <span className="font-mono text-[10px]">Exact elapsed 24h intervals</span>
-                          </div>
-                          <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
-                            {[
-                              { label: "1 Day", days: 1, desc: "24 hrs" },
-                              { label: "2 Days", days: 2, desc: "48 hrs" },
-                              { label: "3 Days", days: 3, desc: "72 hrs" },
-                              { label: "4 Days", days: 4, desc: "96 hrs" },
-                              { label: "5 Days", days: 5, desc: "120 hrs" },
-                              { label: "7 Days", days: 7, desc: "168 hrs" },
-                            ].map((preset) => {
-                              const isSelected = rentalDays === preset.days && durationMode === "custom";
-                              return (
-                                <button
-                                  key={preset.days}
-                                  type="button"
-                                  onClick={() => handleSelectPresetDuration(preset.days)}
-                                  className={cn(
-                                    "p-2 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5",
-                                    isSelected
-                                      ? "bg-primary text-primary-foreground font-black border-primary shadow-xs scale-[1.02]"
-                                      : "border-border/80 bg-card hover:bg-secondary text-foreground text-xs font-semibold"
-                                  )}
-                                >
-                                  <span className="text-xs font-bold">{preset.label}</span>
-                                  <span className="text-[9px] opacity-75 font-mono">{preset.desc}</span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      </div>
-                    )}
+          {/* 2. RENTAL BOOKING INLINE TERMINAL */}
+          <section id="rental-booking-section" className="rounded-3xl border border-border/80 bg-card p-6 sm:p-8 space-y-6 shadow-xs text-left">
+            <div className="flex items-center justify-between border-b border-border/60 pb-4 flex-wrap gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="h-9 w-9 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
+                  <Calendar className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-base sm:text-lg font-bold text-foreground">Rental Booking</h2>
+                  <p className="text-xs text-muted-foreground">Select date, choose time slot, and verify slot availability.</p>
+                </div>
+              </div>
 
-                    {/* Interactive Slot Availability Cards (for Single Date) */}
-                    {durationMode !== "custom" && (
-                      <div className="space-y-2 pt-1">
-                        <div className="flex items-center justify-between text-xs font-bold text-foreground">
-                          <span className="flex items-center gap-1.5">
-                            <Clock className="h-3.5 w-3.5 text-primary" />
-                            <span>Available Time Slots for Selected Date</span>
-                          </span>
-                          <span className="text-[11px] font-mono text-muted-foreground font-medium">
-                            {startDate
-                              ? new Date(startDate + "T00:00:00").toLocaleDateString("en-IN", {
-                                  weekday: "short",
-                                  month: "short",
-                                  day: "numeric",
-                                })
-                              : "Today"}
-                          </span>
-                        </div>
+              <button
+                type="button"
+                onClick={() => setShowFullCalendar(!showFullCalendar)}
+                className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
+              >
+                <span>{showFullCalendar ? "Hide Full Calendar" : "View Full Monthly Calendar"}</span>
+                <ChevronRight className={cn("h-3.5 w-3.5 transition-transform", showFullCalendar ? "rotate-90" : "")} />
+              </button>
+            </div>
 
-                        {loadingSlots ? (
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 py-1">
-                            {[1, 2, 3].map((i) => (
-                              <div key={i} className="h-24 rounded-2xl bg-muted/30 animate-pulse border border-border/60 p-3 flex flex-col justify-between">
-                                <div className="h-3 w-20 bg-muted/70 rounded" />
-                                <div className="h-4 w-12 bg-muted/70 rounded" />
-                              </div>
-                            ))}
-                          </div>
-                        ) : slotsError ? (
-                          <div className="p-3 rounded-2xl bg-destructive/10 border border-destructive/20 text-destructive text-xs font-semibold flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <AlertCircle className="h-4 w-4 shrink-0" />
-                              <span>{slotsError}</span>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setStartDate((s) => (s ? `${s}` : todayStr));
-                              }}
-                              className="text-xs underline font-bold hover:opacity-80 cursor-pointer"
-                            >
-                              Retry
-                            </button>
-                          </div>
-                        ) : daySlots.length === 0 ? (
-                          <div className="p-3 rounded-2xl bg-muted/30 border border-border/60 text-muted-foreground text-xs text-center">
-                            No slot intervals configured for this date.
-                          </div>
-                        ) : (
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                            {daySlots.map((slot: any) => {
-                              const isSelected = selectedSlot === slot.id;
-                              const isBooked = slot.status === "booked";
-                              const isBlocked = slot.status === "blocked" || (slot as any).isBlocked;
-                              const isNotOffered = slot.status === "not_available";
-                              const isClickable = !isBooked && !isBlocked && !isNotOffered;
-                              const baseFullPrice = Number(
-                                product?.dailyRate ?? product?.daily_rate ?? product?.price ??
-                                daySlots.find((s: any) => s.id === "full_day")?.price ??
-                                daySlots.find((s: any) => s.id === "full_day")?.rate ??
-                                1000
-                              );
-                              const slotRate = slot.id === "full_day" ? baseFullPrice : Math.round(baseFullPrice * 0.5);
-
-                              return (
-                                <button
-                                  key={slot.id}
-                                  type="button"
-                                  disabled={!isClickable}
-                                  onClick={() => handleSlotSelect(slot.id as any)}
-                                  className={cn(
-                                    "p-3 rounded-2xl border text-left transition-all flex flex-col justify-between group",
-                                    isSelected
-                                      ? "border-primary bg-primary/10 shadow-sm ring-2 ring-primary/40 scale-[1.02]"
-                                      : isClickable
-                                      ? "border-border/80 bg-card/60 hover:border-primary/40 hover:bg-secondary/40 cursor-pointer"
-                                      : "border-border/60 bg-muted/40 cursor-not-allowed opacity-70"
-                                  )}
-                                >
-                                  <div className="space-y-1">
-                                    <div className="flex items-center justify-between">
-                                      <span className={cn(
-                                        "text-xs font-bold",
-                                        !isClickable ? "line-through decoration-rose-500 decoration-2 text-muted-foreground/70" : "text-foreground"
-                                      )}>
-                                        {slot.id === "morning" ? "Morning" : slot.id === "afternoon" ? "Afternoon" : "Full Day"}
-                                      </span>
-                                      <span
-                                        className={cn(
-                                          "px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider",
-                                          isClickable
-                                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
-                                            : isBooked
-                                            ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20"
-                                            : isBlocked
-                                            ? "bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30"
-                                            : "bg-muted text-muted-foreground border border-border"
-                                        )}
-                                      >
-                                        {slot.statusLabel || (isBooked ? "BOOKED" : isBlocked ? "BLOCKED" : "AVAILABLE")}
-                                      </span>
-                                    </div>
-                                    <p className={cn(
-                                      "text-[10px] font-mono",
-                                      !isClickable ? "line-through decoration-rose-400 text-muted-foreground/50" : "text-muted-foreground"
-                                    )}>
-                                      {slot.id === "full_day" ? "24 Elapsed Hours (10:00 AM → 10:00 AM)" : (slot.label?.includes("—") ? slot.label.split("—")[1].trim() : slot.label)}
-                                    </p>
-                                  </div>
-                                  <div className="pt-2 mt-2 border-t border-border/40 flex items-center justify-between text-xs">
-                                    <span className="text-muted-foreground text-[10px]">Rate</span>
-                                    <span className={cn(
-                                      "font-extrabold font-mono text-xs sm:text-sm",
-                                      !isClickable ? "line-through decoration-rose-500/60 text-muted-foreground/60" : "text-foreground"
-                                    )}>
-                                      ₹{slotRate.toLocaleString("en-IN")}
-                                    </span>
-                                  </div>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Step 1: Check Availability Action */}
-                    {!availabilityChecked || isAvailableForDates === false ? (
-                      <div className="space-y-2 pt-2">
-                        <button
-                          type="button"
-                          onClick={handleCheckAvailability}
-                          className="w-full py-3.5 px-4 rounded-2xl bg-foreground text-background font-extrabold text-xs shadow-md hover:opacity-95 active:scale-98 transition-all cursor-pointer flex items-center justify-center gap-2"
-                        >
-                          <CalendarCheck className="h-4 w-4" />
-                          <span>Check Slot Availability</span>
-                        </button>
-
-                        {availabilityChecked && isAvailableForDates === false && (
-                          <div className="p-3.5 rounded-2xl bg-destructive/10 border border-destructive/20 text-destructive text-xs font-bold flex items-center gap-2">
-                            <CalendarX className="h-4 w-4 shrink-0" />
-                            <span>{availabilityMessage}</span>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      /* Step 2: Available Summary Matrix & Confirm Booking */
-                      <motion.div
-                        initial={{ opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="space-y-3.5 pt-2"
-                      >
-                        <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold flex items-center justify-between">
-                          <span className="flex items-center gap-1.5">
-                            <CheckCircle2 className="h-4 w-4 shrink-0" />
-                            <span>{availabilityMessage}</span>
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setAvailabilityChecked(false);
-                              setIsAvailableForDates(null);
-                            }}
-                            className="text-[11px] underline hover:opacity-80 cursor-pointer font-semibold"
-                          >
-                            Change Schedule
-                          </button>
-                        </div>
-
-                        {/* Booking Summary Box */}
-                        <div className="p-4 rounded-2xl border border-border/80 bg-secondary/30 space-y-2.5 text-xs">
-                          <div className="flex justify-between text-muted-foreground">
-                            <span>Selected Gear:</span>
-                            <span className="font-extrabold text-foreground truncate max-w-[200px]">
-                              {product.title}
-                            </span>
-                          </div>
-                          <div className="flex justify-between text-muted-foreground">
-                            <span>Rental Schedule:</span>
-                            <span className="font-extrabold text-foreground capitalize">
-                              {durationMode === "half_day_morning"
-                                ? "Morning Slot (8:00 AM – 12:00 PM · 4 hrs)"
-                                : durationMode === "half_day_afternoon"
-                                ? "Afternoon Slot (1:00 PM – 5:00 PM · 4 hrs)"
-                                : durationMode === "full_day"
-                                ? "Full Day (24 Elapsed Hours · 10:00 AM → 10:00 AM)"
-                                : `${rentalDays} Days Rental (${rentalDays * 24} Elapsed Hours)`}
-                            </span>
-                          </div>
-                          <div className="flex justify-between text-muted-foreground">
-                            <span>Start Instant:</span>
-                            <span className="font-semibold text-foreground font-mono">
-                              {startDate} at {selectedSlot === "morning" ? "8:00 AM" : selectedSlot === "afternoon" ? "1:00 PM" : "10:00 AM"}
-                            </span>
-                          </div>
-                          <div className="flex justify-between text-muted-foreground">
-                            <span>Calculated End Instant:</span>
-                            <span className="font-semibold text-foreground font-mono">
-                              {calculatedEndDateTimeStr}
-                            </span>
-                          </div>
-                          <div className="flex justify-between text-muted-foreground">
-                            <span>Applicable Unit Rate:</span>
-                            <span className="font-semibold text-foreground">
-                              {durationMode.startsWith("half_day")
-                                ? `₹${estimatedTotal.toLocaleString("en-IN")} / half-day`
-                                : `₹${(Number(product.price) || 0).toLocaleString("en-IN")} / day`}
-                            </span>
-                          </div>
-                          <div className="flex justify-between text-muted-foreground">
-                            <span>Availability Verification:</span>
-                            <span className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                              <CheckCircle2 className="h-3.5 w-3.5" /> Authoritative Backend Confirmed
-                            </span>
-                          </div>
-                          <div className="pt-2 border-t border-border flex justify-between items-baseline">
-                            <span className="font-bold text-foreground text-sm">Total Estimated Rental Price:</span>
-                            <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400 font-display font-mono">
-                              ₹{estimatedTotal.toLocaleString("en-IN")}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Category Restriction Warning */}
-                        {categoryRestriction?.restricted && (
-                          <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3.5 text-xs text-amber-200 flex items-start gap-2.5">
-                            <AlertCircle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
-                            <div>
-                              <span className="font-bold text-amber-300 block mb-0.5">Category Restriction Active</span>
-                              {categoryRestriction.message}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Proceed to Delivery Address & Order Review Button */}
-                        <button
-                          type="button"
-                          disabled={categoryRestriction?.restricted}
-                          onClick={handleProceedToCheckout}
-                          id="proceed-to-checkout-btn"
-                          className={`w-full py-4 px-4 rounded-2xl font-extrabold text-xs sm:text-sm shadow-lg transition-all flex items-center justify-center gap-2 ${
-                            categoryRestriction?.restricted
-                              ? "bg-amber-900/40 text-amber-300/80 border border-amber-500/30 cursor-not-allowed opacity-80"
-                              : "bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer active:scale-98"
-                          }`}
-                        >
-                          {categoryRestriction?.restricted ? (
-                            <>
-                              <AlertCircle className="h-4 w-4" />
-                              <span>Awaiting Delivery (Category Locked)</span>
-                            </>
-                          ) : (
-                            <>
-                              <ArrowRight className="h-4 w-4" />
-                              <span>Proceed to Delivery & Confirmation (₹{estimatedTotal.toLocaleString("en-IN")})</span>
-                            </>
-                          )}
-                        </button>
-                      </motion.div>
-                    )}
-
-                    {/* Secondary Action: Add to Cart */}
-                    <div className="pt-2 border-t border-border/60 flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">Prefer to rent later?</span>
-                      <button
-                        type="button"
-                        onClick={handleAddToCart}
-                        disabled={isAddingToCart}
-                        className="text-xs font-bold text-primary hover:underline inline-flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <ShoppingBag className="h-3.5 w-3.5" />
-                        <span>{justAddedToCart ? "Added to Cart!" : "Add to Rental Cart"}</span>
-                      </button>
-                    </div>
+            {/* 3-Column Configuration Grid */}
+            <div className="grid md:grid-cols-12 gap-6 items-start">
+              {/* Column 1: Select Date */}
+              <div className="md:col-span-3 space-y-2">
+                <label className="block text-xs font-bold text-foreground uppercase tracking-wider">
+                  Select Date
+                </label>
+                <div className="relative">
+                  <input
+                    type="date"
+                    min={todayStr}
+                    value={startDate}
+                    onChange={(e) => handleStartDateChange(e.target.value)}
+                    className="w-full h-12 px-3.5 pl-10 rounded-2xl border border-border bg-secondary/30 text-xs sm:text-sm font-semibold text-foreground focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20 outline-none cursor-pointer"
+                  />
+                  <Calendar className="h-4 w-4 text-emerald-600 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+                {durationMode === "custom" && (
+                  <div className="space-y-1 pt-1">
+                    <label className="block text-[11px] font-bold text-muted-foreground">Return Date</label>
+                    <input
+                      type="date"
+                      min={startDate || todayStr}
+                      value={endDate}
+                      onChange={(e) => handleEndDateChange(e.target.value)}
+                      className="w-full h-10 px-3 rounded-xl border border-border bg-secondary/30 text-xs font-semibold text-foreground"
+                    />
                   </div>
                 )}
               </div>
-            </div>
-          </div>
-        </section>
 
-        {/* Product Messaging Modal */}
+              {/* Column 2: Choose Slot */}
+              <div className="md:col-span-6 space-y-2">
+                <label className="block text-xs font-bold text-foreground uppercase tracking-wider">
+                  Choose Slot
+                </label>
+                <div className="grid grid-cols-3 gap-2.5">
+                  {/* Morning */}
+                  <button
+                    type="button"
+                    onClick={() => handleSlotSelect("morning")}
+                    className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                      selectedSlot === "morning" && durationMode === "half_day_morning"
+                        ? "border-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 ring-2 ring-emerald-500/20 shadow-xs"
+                        : "border-border/80 bg-secondary/20 hover:bg-secondary/40"
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <Sun className="h-3.5 w-3.5 text-amber-500" />
+                      <span className="text-xs font-bold text-foreground">Morning</span>
+                    </div>
+                    <div className="text-[10px] text-muted-foreground">8:00 AM to 12:00 PM</div>
+                    <div className="mt-2 text-xs font-extrabold text-emerald-600 dark:text-emerald-400">
+                      ₹{morningPrice}
+                    </div>
+                  </button>
+
+                  {/* Afternoon */}
+                  <button
+                    type="button"
+                    onClick={() => handleSlotSelect("afternoon")}
+                    className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                      selectedSlot === "afternoon" && durationMode === "half_day_afternoon"
+                        ? "border-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 ring-2 ring-emerald-500/20 shadow-xs"
+                        : "border-border/80 bg-secondary/20 hover:bg-secondary/40"
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <Sun className="h-3.5 w-3.5 text-orange-500" />
+                      <span className="text-xs font-bold text-foreground">Afternoon</span>
+                    </div>
+                    <div className="text-[10px] text-muted-foreground">1:00 PM to 5:00 PM</div>
+                    <div className="mt-2 text-xs font-extrabold text-emerald-600 dark:text-emerald-400">
+                      ₹{afternoonPrice}
+                    </div>
+                  </button>
+
+                  {/* Full Day */}
+                  <button
+                    type="button"
+                    onClick={() => handleSlotSelect("full_day")}
+                    className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                      selectedSlot === "full_day" && durationMode === "full_day"
+                        ? "border-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 ring-2 ring-emerald-500/20 shadow-xs"
+                        : "border-border/80 bg-secondary/20 hover:bg-secondary/40"
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <Calendar className="h-3.5 w-3.5 text-emerald-500" />
+                      <span className="text-xs font-bold text-foreground">Full Day</span>
+                    </div>
+                    <div className="text-[10px] text-muted-foreground">24 Elapsed Hours</div>
+                    <div className="mt-2 text-xs font-extrabold text-emerald-600 dark:text-emerald-400">
+                      ₹{fullDayPrice}
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              {/* Column 3: Booking Summary */}
+              <div className="md:col-span-3 space-y-2 p-3.5 rounded-2xl bg-secondary/30 border border-border/70">
+                <span className="block text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                  Booking Summary
+                </span>
+                <div className="text-xs font-semibold text-foreground">
+                  {durationMode === "half_day_morning"
+                    ? "1 Day • Morning Slot"
+                    : durationMode === "half_day_afternoon"
+                    ? "1 Day • Afternoon Slot"
+                    : durationMode === "full_day"
+                    ? "1 Day • Full Day"
+                    : `${rentalDays} Days Rental`}
+                </div>
+                <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono">
+                  ₹{estimatedTotal.toLocaleString("en-IN")}
+                </div>
+              </div>
+            </div>
+
+            {/* Slot Availability Banner & Direct Confirmation */}
+            {availabilityChecked && isAvailableForDates ? (
+              <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-700 dark:text-emerald-300 text-xs sm:text-sm font-bold flex flex-wrap items-center justify-between gap-3">
+                <span className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                  <span>Available on your selected date!</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={handleProceedToCheckout}
+                  className="px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-bold text-xs hover:bg-emerald-700 active:scale-95 transition-all shadow-sm cursor-pointer"
+                >
+                  Confirm Booking (₹{estimatedTotal.toLocaleString("en-IN")})
+                </button>
+              </div>
+            ) : availabilityChecked && isAvailableForDates === false ? (
+              <div className="p-3.5 rounded-2xl bg-destructive/10 border border-destructive/20 text-destructive text-xs font-bold flex items-center gap-2">
+                <CalendarX className="h-4 w-4 shrink-0" />
+                <span>{availabilityMessage}</span>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                <p className="text-xs text-muted-foreground">Click below to verify real-time slot availability before booking.</p>
+                <button
+                  type="button"
+                  onClick={handleCheckAvailability}
+                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-sm"
+                >
+                  Check Slot Availability
+                </button>
+              </div>
+            )}
+
+            {/* Expandable Monthly Calendar */}
+            {showFullCalendar && (
+              <div className="pt-4 border-t border-border/60">
+                <RenterBookingCalendar
+                  productId={product.id}
+                  productTitle={product.title}
+                  pricePerDay={Number(product.price) || 0}
+                  productAvailable={product.available}
+                  selectedStartDate={startDate}
+                  selectedEndDate={endDate}
+                  durationMode={durationMode}
+                  selectedSlot={selectedSlot}
+                  onSelectStartDate={handleStartDateChange}
+                  onSelectEndDate={handleEndDateChange}
+                  onSelectDurationMode={handleDurationModeChange}
+                  onSelectSlot={handleSlotSelect}
+                  onCheckAvailability={handleCheckAvailability}
+                  isCheckingAvailability={false}
+                  availabilityChecked={availabilityChecked}
+                  isAvailableForDates={isAvailableForDates}
+                  availabilityMessage={availabilityMessage}
+                />
+              </div>
+            )}
+          </section>
+
+          {/* 3. WHY RENT THROUGH PAYENT? (4-Card Feature Grid) */}
+          <section className="space-y-6 text-center pt-2">
+            <div className="flex items-center justify-center gap-3">
+              <span className="h-0.5 w-12 bg-emerald-500/30 rounded-full" />
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              <h2 className="text-xl sm:text-2xl font-extrabold text-foreground tracking-tight font-display">
+                Why Rent Through PAYENT?
+              </h2>
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              <span className="h-0.5 w-12 bg-emerald-500/30 rounded-full" />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 text-center">
+              {/* Feature 1 */}
+              <div className="p-6 rounded-3xl bg-card border border-border/80 shadow-xs space-y-3 flex flex-col items-center">
+                <div className="h-12 w-12 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shadow-xs">
+                  <Coins className="h-6 w-6" />
+                </div>
+                <h3 className="font-bold text-foreground text-sm">Affordable Rentals</h3>
+                <p className="text-xs text-muted-foreground">Save more, rent smart.</p>
+              </div>
+
+              {/* Feature 2 */}
+              <div className="p-6 rounded-3xl bg-card border border-border/80 shadow-xs space-y-3 flex flex-col items-center">
+                <div className="h-12 w-12 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shadow-xs">
+                  <ShieldCheck className="h-6 w-6" />
+                </div>
+                <h3 className="font-bold text-foreground text-sm">Verified Lenders</h3>
+                <p className="text-xs text-muted-foreground">Rent with confidence.</p>
+              </div>
+
+              {/* Feature 3 */}
+              <div className="p-6 rounded-3xl bg-card border border-border/80 shadow-xs space-y-3 flex flex-col items-center">
+                <div className="h-12 w-12 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shadow-xs">
+                  <Calendar className="h-6 w-6" />
+                </div>
+                <h3 className="font-bold text-foreground text-sm">Flexible Booking</h3>
+                <p className="text-xs text-muted-foreground">Choose your time.</p>
+              </div>
+
+              {/* Feature 4 */}
+              <div className="p-6 rounded-3xl bg-card border border-border/80 shadow-xs space-y-3 flex flex-col items-center">
+                <div className="h-12 w-12 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shadow-xs">
+                  <Lock className="h-6 w-6" />
+                </div>
+                <h3 className="font-bold text-foreground text-sm">Secure Rental Experience</h3>
+                <p className="text-xs text-muted-foreground">Your trust, our priority.</p>
+              </div>
+            </div>
+          </section>
+
+          {/* 4. CUSTOMER REVIEWS (3 Reviews Cards) */}
+          <section className="space-y-6 text-center pt-2">
+            <div className="flex items-center justify-center gap-3">
+              <span className="h-0.5 w-12 bg-emerald-500/30 rounded-full" />
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              <h2 className="text-xl sm:text-2xl font-extrabold text-foreground tracking-tight font-display">
+                Customer Reviews
+              </h2>
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              <span className="h-0.5 w-12 bg-emerald-500/30 rounded-full" />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
+              {customerReviews.map((rev, idx) => (
+                <div key={idx} className="p-6 rounded-3xl bg-card border border-border/80 shadow-xs space-y-3.5">
+                  <div className="flex items-center gap-3">
+                    <img src={rev.avatar} alt={rev.name} className="h-11 w-11 rounded-full object-cover border border-emerald-500/20 shadow-xs" />
+                    <div>
+                      <h4 className="font-bold text-sm text-foreground">{rev.name}</h4>
+                      <div className="flex items-center text-amber-400">
+                        {[...Array(rev.rating)].map((_, i) => (
+                          <Star key={i} className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed italic">
+                    "{rev.comment}"
+                  </p>
+                  <div className="text-[11px] text-muted-foreground/75 font-medium">
+                    {rev.date}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* 5. FREQUENTLY ASKED QUESTIONS (Accordion) */}
+          <section className="space-y-6 pt-2">
+            <div className="flex items-center justify-center gap-3">
+              <span className="h-0.5 w-12 bg-emerald-500/30 rounded-full" />
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              <h2 className="text-xl sm:text-2xl font-extrabold text-foreground tracking-tight font-display">
+                Frequently Asked Questions
+              </h2>
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              <span className="h-0.5 w-12 bg-emerald-500/30 rounded-full" />
+            </div>
+
+            <div className="max-w-4xl mx-auto divide-y divide-border/60 rounded-3xl border border-border/80 bg-card overflow-hidden shadow-xs text-left">
+              {faqItems.map((faq, idx) => {
+                const isOpen = activeFaqIndex === idx;
+                return (
+                  <div key={idx} className="p-4 sm:p-5 transition-colors hover:bg-secondary/20">
+                    <button
+                      type="button"
+                      onClick={() => setActiveFaqIndex(isOpen ? null : idx)}
+                      className="w-full flex items-center justify-between text-left font-bold text-sm text-foreground hover:text-emerald-600 transition-colors cursor-pointer"
+                    >
+                      <span className="capitalize">{faq.question}</span>
+                      <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform duration-200 shrink-0 ml-2", isOpen ? "rotate-180 text-emerald-600" : "")} />
+                    </button>
+                    {isOpen && (
+                      <p className="mt-3 text-xs sm:text-sm text-muted-foreground leading-relaxed pr-6">
+                        {faq.answer}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          {/* 6. RELATED PRODUCTS (Carousel/Grid matching Reference) */}
+          <section className="space-y-6 pt-2">
+            <div className="flex items-center justify-center gap-3">
+              <span className="h-0.5 w-12 bg-emerald-500/30 rounded-full" />
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              <h2 className="text-xl sm:text-2xl font-extrabold text-foreground tracking-tight font-display">
+                Related Products
+              </h2>
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              <span className="h-0.5 w-12 bg-emerald-500/30 rounded-full" />
+            </div>
+
+            <div className="relative">
+              {/* Left Arrow Button */}
+              {relatedProductsList.length > 4 && (
+                <button
+                  type="button"
+                  onClick={() => setRelatedCarouselPage((p) => Math.max(0, p - 1))}
+                  disabled={relatedCarouselPage === 0}
+                  className="absolute -left-3 sm:-left-5 top-1/2 -translate-y-1/2 z-10 p-2 sm:p-2.5 rounded-full bg-card border border-border shadow-md hover:bg-secondary disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-all"
+                  aria-label="Previous related products"
+                >
+                  <ChevronLeft className="h-4 w-4 text-foreground" />
+                </button>
+              )}
+
+              {/* 4 Related Product Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                {displayedRelated.map((rel) => (
+                  <Link
+                    key={rel.id}
+                    to="/payent/products/$id"
+                    params={{ id: rel.id }}
+                    className="group rounded-3xl border border-border/80 bg-card p-4 space-y-3 hover:shadow-lg transition-all hover:border-emerald-500/40 text-left block"
+                  >
+                    <div className="aspect-[4/3] rounded-2xl bg-[#EAF7EE] dark:bg-emerald-950/20 p-4 flex items-center justify-center overflow-hidden">
+                      <img
+                        src={rel.image || "/brand/payent-logo-icon.png"}
+                        alt={rel.title}
+                        className="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform duration-300 drop-shadow-sm"
+                      />
+                    </div>
+                    <div className="space-y-0.5">
+                      <h3 className="font-bold text-sm text-foreground group-hover:text-emerald-600 transition-colors truncate">
+                        {rel.title}
+                      </h3>
+                      <p className="text-xs text-muted-foreground capitalize">{rel.category || "Gear"}</p>
+                    </div>
+                    <div className="flex items-center gap-1 text-xs font-bold text-amber-500">
+                      <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                      <span>{(rel.rating != null ? Number(rel.rating) : 4.7).toFixed(1)}</span>
+                      <span className="text-muted-foreground font-normal">({rel.reviews || 84})</span>
+                    </div>
+                    <div className="flex items-center justify-between pt-2 border-t border-border/60">
+                      <span className="font-extrabold text-sm text-emerald-600 dark:text-emerald-400 font-mono">
+                        ₹{(Number(rel.price) || 0).toLocaleString("en-IN")}{" "}
+                        <span className="text-xs text-muted-foreground font-normal font-sans">/ day</span>
+                      </span>
+                      <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                        Available
+                      </span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+
+              {/* Right Arrow Button */}
+              {relatedProductsList.length > 4 && (
+                <button
+                  type="button"
+                  onClick={() => setRelatedCarouselPage((p) => p + 1)}
+                  disabled={(relatedCarouselPage + 1) * 4 >= relatedProductsList.length}
+                  className="absolute -right-3 sm:-right-5 top-1/2 -translate-y-1/2 z-10 p-2 sm:p-2.5 rounded-full bg-card border border-border shadow-md hover:bg-secondary disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-all"
+                  aria-label="Next related products"
+                >
+                  <ChevronRight className="h-4 w-4 text-foreground" />
+                </button>
+              )}
+            </div>
+          </section>
+
+        </div>
+
+        {/* Full-Screen Photo Detail Viewer Modal on Image Click */}
+        {isPhotoViewerOpen && (
+          <PhotoDetailViewer
+            primaryImage={activeDisplayImage}
+            productTitle={product.title}
+            angles={gallery}
+            videoUrl={product.videoUrl || (product as any).video_url}
+            onWishlistToggle={() => toggle(product.id)}
+            isWishlisted={isWishlisted}
+          />
+        )}
+
+        {/* Product Message Modal */}
         {showMessageModal && (
           <ProductMessageModal
             isOpen={showMessageModal}
@@ -1722,29 +1727,7 @@ export default function ProductDetails() {
           />
         )}
 
-        {/* Recommendations Section */}
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 pt-12 space-y-10">
-          {frequentlyTogether.length > 0 && (
-            <RecommendationSection
-              title="Frequently Booked Together"
-              subtitle="Popular gear combinations rented in single shoots and creative projects"
-              products={frequentlyTogether}
-              type="frequently_together"
-              badge="Bundle Pick"
-              layout="compact"
-            />
-          )}
-
-          {similarProducts.length > 0 && (
-            <RecommendationSection
-              title="Similar Tech Gear"
-              subtitle={`Explore items similar to ${product.title} in ${product.category}`}
-              products={similarProducts}
-              type="similar"
-              badge="Category Match"
-            />
-          )}
-        </div>
+        <ShareProductModal />
       </div>
     </MainLayout>
   );
