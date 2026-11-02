@@ -685,6 +685,28 @@ export default function ProductDetails() {
       }
 
       if (!res.ok) {
+        if (res.status === 404) {
+          // Unseeded showcase product: check against local active reservations
+          const localOrders = storage.get<Order[]>(STORAGE_KEYS.orders, []);
+          const activeOverlap = localOrders.some((o) => {
+            const pId = String(o.productId || (o as any).product_id || "");
+            if (pId !== String(id) || o.status === "cancelled") return false;
+            if (!o.startDate || !o.endDate) return false;
+            return !(checkEnd < o.startDate || startDate > o.endDate);
+          });
+          if (activeOverlap) {
+            setIsAvailableForDates(false);
+            setAvailabilityMessage("Selected dates conflict with an existing reservation.");
+            setAvailabilityChecked(true);
+            toast.error("Selected dates are already reserved.");
+            return;
+          }
+          setIsAvailableForDates(true);
+          setAvailabilityMessage("✓ Product and time slot available for selected dates!");
+          setAvailabilityChecked(true);
+          toast.success("Gear is available! Review booking summary below.");
+          return;
+        }
         setIsAvailableForDates(false);
         setAvailabilityMessage("Could not verify real-time availability with server. Please retry.");
         setAvailabilityChecked(true);
@@ -903,42 +925,7 @@ export default function ProductDetails() {
     };
   }, [product?.id, product?.category, user]);
 
-  if (productLoading && !product) {
-    return (
-      <MainLayout>
-        <div className="mx-auto max-w-7xl px-4 md:px-6 py-6 space-y-6">
-          <div className="grid lg:grid-cols-12 gap-8 items-start">
-            <div className="lg:col-span-6 space-y-3">
-              <div className="aspect-[4/3] w-full rounded-3xl bg-secondary/50 animate-pulse border border-border/80" />
-            </div>
-            <div className="lg:col-span-6 space-y-4">
-              <div className="h-96 w-full rounded-3xl bg-secondary/50 animate-pulse border border-border/80 p-5 space-y-4" />
-            </div>
-          </div>
-        </div>
-        <ShareProductModal />
-      </MainLayout>
-    );
-  }
-
-  if (!product) {
-    return (
-      <MainLayout>
-        <div className="mx-auto max-w-3xl px-4 md:px-6 py-24 text-center space-y-4">
-          <h1 className="text-3xl font-extrabold text-foreground">Product not found</h1>
-          <p className="text-sm text-muted-foreground">The equipment you requested may have been unlisted or moved.</p>
-          <Button
-            className="mt-4"
-            onClick={() => navigate({ to: "/browse" })}
-          >
-            Browse Explore Items
-          </Button>
-        </div>
-      </MainLayout>
-    );
-  }
-
-  const productSchema = {
+const productSchema = product ? {
     "@type": "Product",
     name: product.title,
     image: product.image,
@@ -963,9 +950,9 @@ export default function ProductDetails() {
       ratingValue: product.rating != null ? Number(product.rating) : 4.8,
       reviewCount: product.reviews || 124,
     },
-  };
+  } : null;
 
-  const breadcrumbSchema = {
+  const breadcrumbSchema = product ? {
     "@type": "BreadcrumbList",
     itemListElement: [
       {
@@ -987,7 +974,7 @@ export default function ProductDetails() {
         item: `https://payent.com/product/${product.id}`,
       },
     ],
-  };
+  } : null;
 
   // Gallery image assembly
   const gallery = useMemo(() => {
@@ -1035,10 +1022,10 @@ export default function ProductDetails() {
     return [prim, prim, prim, prim];
   }, [gallery, product?.image]);
 
-  const activeDisplayImage = gallery[selectedImageIndex] || thumbnails[selectedImageIndex] || product.image || "";
+  const activeDisplayImage = gallery[selectedImageIndex] || thumbnails[selectedImageIndex] || product?.image || "";
 
-  const brand = getProductBrand(product);
-  const isWishlisted = has(product.id);
+  const brand = product ? getProductBrand(product) : null;
+  const isWishlisted = product ? has(product.id) : false;
 
   // Customer Reviews Data (Reference matches Sneha Reddy, Rahul Kumar, Divya Sharma)
   const customerReviews = [
@@ -1114,6 +1101,42 @@ export default function ProductDetails() {
     }
     return slice;
   }, [relatedProductsList, relatedCarouselPage]);
+
+
+  if (productLoading && !product) {
+    return (
+      <MainLayout>
+        <div className="mx-auto max-w-7xl px-4 md:px-6 py-6 space-y-6">
+          <div className="grid lg:grid-cols-12 gap-8 items-start">
+            <div className="lg:col-span-6 space-y-3">
+              <div className="aspect-[4/3] w-full rounded-3xl bg-secondary/50 animate-pulse border border-border/80" />
+            </div>
+            <div className="lg:col-span-6 space-y-4">
+              <div className="h-96 w-full rounded-3xl bg-secondary/50 animate-pulse border border-border/80 p-5 space-y-4" />
+            </div>
+          </div>
+        </div>
+        <ShareProductModal />
+      </MainLayout>
+    );
+  }
+
+  if (!product) {
+    return (
+      <MainLayout>
+        <div className="mx-auto max-w-3xl px-4 md:px-6 py-24 text-center space-y-4">
+          <h1 className="text-3xl font-extrabold text-foreground">Product not found</h1>
+          <p className="text-sm text-muted-foreground">The equipment you requested may have been unlisted or moved.</p>
+          <Button
+            className="mt-4"
+            onClick={() => navigate({ to: "/browse" })}
+          >
+            Browse Explore Items
+          </Button>
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout>

@@ -104,18 +104,8 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
     }
   };
 
-  // Automatically attempt one clean page refresh if dynamic chunk or network connection was interrupted
-  useEffect(() => {
-    if (isChunkError && typeof window !== "undefined") {
-      const reloadKey = "chunk_auto_reload_" + window.location.pathname;
-      const lastReload = sessionStorage.getItem(reloadKey);
-      const now = Date.now();
-      if (!lastReload || now - Number(lastReload) > 15000) {
-        sessionStorage.setItem(reloadKey, String(now));
-        handleHardReload();
-      }
-    }
-  }, [isChunkError]);
+  // Prevent aggressive automatic reload loops ("blinking") — keep UI stable
+  // User can click "Reload page" button to perform a clean cache-busting reload
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">

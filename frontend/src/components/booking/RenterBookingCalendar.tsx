@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getApiBase } from "@/utils/api";
+import { storage, STORAGE_KEYS } from "@/utils/storage";
 
 export interface RenterBookingCalendarProps {
   productId: string | number;
@@ -210,6 +211,29 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
           );
 
           if (!res.ok) {
+            if (res.status === 404) {
+              // Gracefully handle unseeded showcase products: inspect local active orders
+              const localOrders = storage.get<any[]>(STORAGE_KEYS.orders, []);
+              const relevant = localOrders.filter(
+                (o) =>
+                  (String(o.productId || o.product_id) === String(productId)) &&
+                  o.status !== "cancelled"
+              );
+              const booked = new Set<string>();
+              for (const o of relevant) {
+                if (o.startDate && o.endDate) {
+                  const [sY, sM, sD] = String(o.startDate).split("-").map(Number);
+                  const [eY, eM, eD] = String(o.endDate).split("-").map(Number);
+                  const cur = new Date(sY, sM - 1, sD);
+                  const end = new Date(eY, eM - 1, eD);
+                  while (cur <= end) {
+                    booked.add(formatDateKey(cur.getFullYear(), cur.getMonth(), cur.getDate()));
+                    cur.setDate(cur.getDate() + 1);
+                  }
+                }
+              }
+              return { blocked: new Set<string>(), booked };
+            }
             throw new Error(`Availability check failed with status ${res.status}`);
           }
 

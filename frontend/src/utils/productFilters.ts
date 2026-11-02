@@ -15,7 +15,6 @@ export function isFakeOrDeletedProduct(product: any): boolean {
     desc.includes("fx3") ||
     title.includes("cinema line") ||
     (title.includes("sony") && price === 3499) ||
-    (title.includes("sony") && title.includes("cinema")) ||
     id === "prod-1790474939846-841" ||
     id === "prod-1790474367552-646" ||
     id === "p-custom-1791012883229" ||

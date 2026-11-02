@@ -348,12 +348,20 @@ export default function Categories() {
     api
       .getPublicProducts()
       .then((serverProducts) => {
-        if (Array.isArray(serverProducts) && serverProducts.length > 0) {
+        if (Array.isArray(serverProducts)) {
           const cleanList = serverProducts.filter((p) => !isFakeOrDeletedProduct(p));
-          if (cleanList.length > 0) {
-            setAllProductsList(cleanList);
-            storage.set("payent_server_products", cleanList);
+          // Merge live backend products with showcase products so categories never empty out
+          const merged = [...cleanList];
+          for (const fallback of INITIAL_FALLBACK_PRODUCTS) {
+            const exists = merged.some(
+              (p) => String(p.id).toLowerCase() === String(fallback.id).toLowerCase()
+            );
+            if (!exists) {
+              merged.push(fallback);
+            }
           }
+          setAllProductsList(merged);
+          storage.set("payent_server_products", merged);
         }
       })
       .catch((err) => {
