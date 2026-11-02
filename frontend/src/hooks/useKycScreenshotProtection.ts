@@ -1,139 +1,182 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { toast } from "sonner";
 
-interface UseKycScreenshotProtectionOptions {
+export interface UseKycScreenshotProtectionOptions {
   documentType?: string; // e.g. "PAN Card" or "Aadhaar Card"
   enabled?: boolean;
 }
 
 /**
- * Hook to enforce client-side Anti-Screenshot & Screen Capture Protection
- * for sensitive identity documents (Aadhaar & PAN).
+ * Hook to enforce page-specific Anti-Screenshot & Screen Capture Protection
+ * strictly scoped to Aadhaar and PAN KYC pages.
  *
- * Mechanisms:
- * 1. PrintScreen key interception: Prevents default & overwrites system clipboard.
- * 2. Snipping Tool & OS screen grab defense: Obscures form with a security shield on window blur/visibility change.
- * 3. Browser print protection: Disables Ctrl+P / Cmd+P and hides sensitive DOM elements via @media print.
- * 4. Anti-clipboard & anti-selection: Disables right-click context menu, copying, cutting, and dragging.
+ * Protection Mechanisms:
+ * 1. Synchronous Viewport Blanking: Adds a synchronous class to <html> on keydown/blur
+ *    so the browser repaints the blackout shield immediately without waiting for React re-render.
+ * 2. Instant Clipboard Sanitization: Overwrites OS clipboard with security warning text.
+ * 3. Snipping Tool & Screen Grab Defense: Triggers immediately on blur/visibilitychange without
+ *    any auto-unobscure timers that could reveal sensitive data during delayed capture.
+ * 4. Print Protection: Blocks Ctrl+P / Cmd+P and uses @media print CSS to hide content.
+ * 5. Lifecycle Scope: All listeners, DOM classes, and styles are completely cleaned up
+ *    on unmount when navigating away, restoring normal screenshot capability for all other pages.
  */
 export function useKycScreenshotProtection({
   documentType = "Identity Document",
   enabled = true,
 }: UseKycScreenshotProtectionOptions = {}) {
   const [isObscured, setIsObscured] = useState(false);
-  const isFileDialogOpen = useRef(false);
-  const flashTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isFileDialogActive = useRef(false);
+  const fileDialogTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const toastThrottleRef = useRef<number>(0);
 
-  // Mark when system file picker is opened so window blur doesn't falsely obscure
+  // Mark when system file picker is opened so native OS file picker does not falsely trigger shield
   const setFileDialogOpen = useCallback((open: boolean) => {
-    isFileDialogOpen.current = open;
+    isFileDialogActive.current = open;
+    if (open) {
+      if (fileDialogTimeoutRef.current) clearTimeout(fileDialogTimeoutRef.current);
+      fileDialogTimeoutRef.current = setTimeout(() => {
+        isFileDialogActive.current = false;
+      }, 60000);
+    }
   }, []);
 
   const unobscure = useCallback(() => {
+    if (typeof document !== "undefined") {
+      document.documentElement.classList.remove("kyc-screenshot-blocked");
+    }
     setIsObscured(false);
   }, []);
 
-  const triggerSecurityWarning = useCallback((_reason: string) => {
-    // Clear clipboard immediately to scrub any captured pixels or copied text
+  const blockAndNotify = useCallback((_reason?: string) => {
+    // 1. Immediately apply synchronous CSS blackout
+    if (typeof document !== "undefined") {
+      document.documentElement.classList.add("kyc-screenshot-blocked");
+    }
+    setIsObscured(true);
+
+    // 2. Overwrite system clipboard immediately to scrub any captured pixels or data
     try {
       if (typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText("Screenshots are not allowed in this app.").catch(() => {});
       }
     } catch {}
 
-    // Show warning toast
-    toast.error(
-      "🚫 Screenshots are not allowed in this app",
-      { duration: 4000 }
-    );
-
-    // Flash obscuring shield immediately
-    setIsObscured(true);
-    if (flashTimeoutRef.current) clearTimeout(flashTimeoutRef.current);
-    flashTimeoutRef.current = setTimeout(() => {
-      // Restore only if window is still focused
-      if (typeof document !== "undefined" && document.hasFocus() && document.visibilityState === "visible") {
-        setIsObscured(false);
-      }
-    }, 2000);
+    // 3. Display warning notification (throttled to avoid toast flood)
+    const now = Date.now();
+    if (now - toastThrottleRef.current > 2000) {
+      toastThrottleRef.current = now;
+      toast.error("🚫 Screenshots are not allowed in this app", {
+        description: `Screen capture and Snipping Tool are disabled to protect your ${documentType}.`,
+        duration: 4000,
+      });
+    }
   }, [documentType]);
 
   useEffect(() => {
     if (!enabled || typeof window === "undefined") return;
 
-    // 1. Intercept PrintScreen and screenshot / screen print shortcut keys
+    // 1. Track file input clicks so native OS file dialog does not trigger blackout
+    const handleDocumentClick = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (
+        (target?.tagName === "INPUT" && (target as HTMLInputElement).type === "file") ||
+        target?.closest('input[type="file"]') ||
+        target?.closest("label[for]") ||
+        target?.closest('[data-file-upload="true"]') ||
+        target?.closest('button[data-upload="true"]')
+      ) {
+        isFileDialogActive.current = true;
+        if (fileDialogTimeoutRef.current) clearTimeout(fileDialogTimeoutRef.current);
+        fileDialogTimeoutRef.current = setTimeout(() => {
+          isFileDialogActive.current = false;
+        }, 60000);
+      }
+    };
+
+    // 2. Intercept PrintScreen and screenshot shortcut keys
     const handleKeyDown = (e: KeyboardEvent) => {
       // PrintScreen key
       if (e.key === "PrintScreen" || e.code === "PrintScreen" || e.keyCode === 44) {
         e.preventDefault();
         e.stopPropagation();
-        triggerSecurityWarning("PrintScreen");
+        blockAndNotify("PrintScreen key");
         return;
       }
 
-      // Windows/Linux Snipping Tool / Mac screenshot shortcuts: Ctrl+Shift+S or Meta+Shift+S
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "S" || e.key === "s")) {
+      // Windows/Linux Snipping Tool & Mac screenshot shortcuts:
+      // Win+Shift+S, Ctrl+Shift+S, Meta+Shift+S, Meta+Shift+3, Meta+Shift+4, Meta+Shift+5
+      if (
+        ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "S" || e.key === "s" || e.key === "3" || e.key === "4" || e.key === "5")) ||
+        (e.altKey && (e.key === "PrintScreen" || e.code === "PrintScreen" || e.keyCode === 44))
+      ) {
         e.preventDefault();
         e.stopPropagation();
-        triggerSecurityWarning("Snipping Tool shortcut");
+        blockAndNotify("Snipping Tool shortcut");
         return;
       }
 
-      // Ctrl+P / Cmd+P (Print to PDF / paper)
+      // Browser print command: Ctrl+P / Cmd+P
       if ((e.ctrlKey || e.metaKey) && (e.key === "p" || e.key === "P")) {
         e.preventDefault();
         e.stopPropagation();
-        toast.error(`🚫 Printing ${documentType} details is disabled for data privacy.`);
+        blockAndNotify("Browser print");
         return;
       }
     };
 
+    // 3. Clear OS clipboard buffer on keyup of PrintScreen
     const handleKeyUp = (e: KeyboardEvent) => {
       if (e.key === "PrintScreen" || e.code === "PrintScreen" || e.keyCode === 44) {
-        // Clear clipboard again on keyup to ensure nothing remains in OS clipboard buffer
         try {
-          if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText("").catch(() => {});
+          if (typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText("Screenshots are not allowed in this app.").catch(() => {});
           }
         } catch {}
       }
     };
 
-    // 2. Window Blur: Triggers when Snipping Tool, screen grabber, or external tool unfocuses window
+    // 4. Window Blur Defense:
+    // When Snipping Tool, Win+Shift+S, or screen capture software launches, Windows unfocuses the browser window.
+    // Obscures instantly and leaves shield up until user focuses and clicks back into the window.
     const handleWindowBlur = () => {
-      // If user opened file picker dialog, do not obscure
-      if (isFileDialogOpen.current) return;
-      setIsObscured(true);
+      if (isFileDialogActive.current) return;
+      blockAndNotify("Window blur");
     };
 
-    // 3. Window Focus: Resumes when user clicks back into window
+    // 5. Window Focus: Resumes when user returns and window regains full active focus
     const handleWindowFocus = () => {
-      isFileDialogOpen.current = false;
-      setIsObscured(false);
-    };
-
-    // 4. Document visibility change
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "hidden") {
-        setIsObscured(true);
-      } else if (document.hasFocus()) {
+      isFileDialogActive.current = false;
+      if (document.hasFocus() && document.visibilityState === "visible") {
+        document.documentElement.classList.remove("kyc-screenshot-blocked");
         setIsObscured(false);
       }
     };
 
-    // 5. Inject CSS for @media print and anti-select
-    const styleId = "kyc-anti-screenshot-styles";
+    // 6. Visibility Change: Obscure if user minimizes or switches tab
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        blockAndNotify("Visibility hidden");
+      } else if (document.hasFocus()) {
+        document.documentElement.classList.remove("kyc-screenshot-blocked");
+        setIsObscured(false);
+      }
+    };
+
+    // 7. Inject synchronous CSS for instant full-viewport blanking & @media print
+    const styleId = "kyc-screenshot-protection-styles";
     let styleTag = document.getElementById(styleId) as HTMLStyleElement | null;
     if (!styleTag) {
       styleTag = document.createElement("style");
       styleTag.id = styleId;
       styleTag.innerHTML = `
+        html.kyc-screenshot-blocked #kyc-screen-capture-shield {
+          display: flex !important;
+          opacity: 1 !important;
+          visibility: visible !important;
+          pointer-events: auto !important;
+        }
         @media print {
-          .kyc-secure-container,
-          .kyc-screen-protected,
-          input[id*="pan"],
-          input[id*="aadhaar"],
-          form[data-kyc-form="true"] {
+          html, body {
             display: none !important;
             visibility: hidden !important;
             opacity: 0 !important;
@@ -143,21 +186,35 @@ export function useKycScreenshotProtection({
       document.head.appendChild(styleTag);
     }
 
+    // Attach capture-phase event listeners
+    document.addEventListener("click", handleDocumentClick, true);
     window.addEventListener("keydown", handleKeyDown, true);
     window.addEventListener("keyup", handleKeyUp, true);
     window.addEventListener("blur", handleWindowBlur);
     window.addEventListener("focus", handleWindowFocus);
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
+    // CLEANUP ON UNMOUNT (Navigating away from KYC page):
+    // Completely unregisters listeners and removes styles, restoring normal screenshot capability on other pages.
     return () => {
+      document.removeEventListener("click", handleDocumentClick, true);
       window.removeEventListener("keydown", handleKeyDown, true);
       window.removeEventListener("keyup", handleKeyUp, true);
       window.removeEventListener("blur", handleWindowBlur);
       window.removeEventListener("focus", handleWindowFocus);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-      if (flashTimeoutRef.current) clearTimeout(flashTimeoutRef.current);
+
+      if (fileDialogTimeoutRef.current) {
+        clearTimeout(fileDialogTimeoutRef.current);
+      }
+
+      document.documentElement.classList.remove("kyc-screenshot-blocked");
+      const existingStyle = document.getElementById(styleId);
+      if (existingStyle && existingStyle.parentNode) {
+        existingStyle.parentNode.removeChild(existingStyle);
+      }
     };
-  }, [enabled, triggerSecurityWarning, documentType]);
+  }, [enabled, blockAndNotify]);
 
   // Context menu and copy blockers for sensitive inputs
   const protectProps = {
@@ -182,3 +239,4 @@ export function useKycScreenshotProtection({
   };
 }
 
+export default useKycScreenshotProtection;

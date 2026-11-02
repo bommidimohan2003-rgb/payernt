@@ -1,45 +1,56 @@
 import React from "react";
 import { ShieldAlert, ShieldCheck, EyeOff } from "lucide-react";
 
-interface KycScreenShieldProps {
+export interface KycScreenShieldProps {
   isObscured: boolean;
   documentType: string;
   onDismiss?: () => void;
 }
 
 /**
- * Privacy Shield overlay that obscures sensitive Aadhaar & PAN details
- * when screen capture, Snipping Tool, or window unfocus is detected.
+ * Full-viewport Anti-Screenshot & Screen Capture Protection Shield.
+ *
+ * Scoped strictly to Aadhaar and PAN KYC pages.
+ * Obscures the entire viewport with an impenetrable blackout shield whenever:
+ * - PrintScreen key is pressed
+ * - Snipping Tool or screenshot shortcuts are used (Win+Shift+S, Cmd+Shift+3/4/5)
+ * - Window loses focus to an external capture application
+ * - Browser print dialog is triggered (Ctrl+P / Cmd+P)
  */
 export function KycScreenShield({
   isObscured,
   documentType,
   onDismiss,
 }: KycScreenShieldProps) {
-  if (!isObscured) return null;
-
   return (
     <div
+      id="kyc-screen-capture-shield"
       role="alert"
-      aria-label="KYC Privacy Protection Shield Active"
+      aria-live="assertive"
+      aria-label="Screenshots are not allowed in this app"
       onClick={onDismiss}
-      className="absolute inset-0 z-50 rounded-3xl bg-background/95 backdrop-blur-2xl flex flex-col items-center justify-center p-6 text-center select-none shadow-2xl border border-destructive/30 animate-in fade-in duration-150 cursor-pointer"
+      className={`fixed inset-0 z-[2147483647] bg-black/98 backdrop-blur-3xl flex flex-col items-center justify-center p-6 text-center select-none cursor-pointer transition-opacity duration-100 ${
+        isObscured ? "flex opacity-100 pointer-events-auto" : "hidden opacity-0 pointer-events-none"
+      }`}
+      style={{
+        display: isObscured ? "flex" : undefined,
+      }}
     >
-      <div className="h-14 w-14 rounded-2xl bg-destructive/10 text-destructive flex items-center justify-center mb-3 shadow-sm border border-destructive/20 animate-pulse">
-        <ShieldAlert className="h-7 w-7" />
+      <div className="h-20 w-20 rounded-3xl bg-red-500/10 text-red-500 border border-red-500/30 flex items-center justify-center mb-6 shadow-2xl animate-pulse">
+        <ShieldAlert className="h-10 w-10 stroke-[2.5]" />
       </div>
 
-      <h4 className="text-base font-bold text-foreground tracking-tight">
+      <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
         Screenshots are not allowed in this app
-      </h4>
+      </h1>
 
-      <p className="text-xs text-muted-foreground max-w-sm mt-1.5 leading-relaxed">
-        {documentType} numbers and sensitive document photos are obscured while screen capture, Snipping Tool, or window unfocus is detected.
+      <p className="text-sm text-neutral-400 max-w-md mt-3 leading-relaxed">
+        Screen capture, Snipping Tool, and recording are strictly prohibited to protect your {documentType} details and platform security.
       </p>
 
-      <div className="mt-4 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-secondary hover:bg-secondary/80 text-xs font-semibold text-foreground border border-border shadow-xs transition-colors">
-        <EyeOff className="h-3.5 w-3.5 text-muted-foreground" />
-        <span>Click to resume viewing</span>
+      <div className="mt-6 inline-flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-white text-black font-bold text-xs uppercase tracking-wider hover:bg-neutral-200 transition-all cursor-pointer shadow-lg active:scale-95">
+        <EyeOff className="h-4 w-4" />
+        <span>Click anywhere to resume</span>
       </div>
     </div>
   );
@@ -61,3 +72,4 @@ export function KycProtectionBadge({ documentType = "KYC" }: { documentType?: st
   );
 }
 
+export default KycScreenShield;

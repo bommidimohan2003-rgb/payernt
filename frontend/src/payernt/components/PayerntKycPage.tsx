@@ -38,10 +38,10 @@ export function PayerntKycPage() {
   const [rejectionReason, setRejectionReason] = useState<string | null>(null);
   const [allowResubmission, setAllowResubmission] = useState(true);
 
-  // Anti-Screenshot & Screen Capture Protection
+  // Anti-Screenshot & Screen Capture Protection (Page-Specific: applies across entry, submission, and verification)
   const { isObscured, unobscure, setFileDialogOpen, protectProps } = useKycScreenshotProtection({
     documentType: "Aadhaar Card",
-    enabled: kycStatus === "NOT_STARTED" || (kycStatus === "REJECTED" && !rejectionReason),
+    enabled: true,
   });
 
   // Form states
@@ -225,6 +225,7 @@ export function PayerntKycPage() {
 
   return (
     <div className="w-full max-w-4xl mx-auto space-y-6 text-left pb-16">
+      <KycScreenShield isObscured={isObscured} documentType="Aadhaar Card" onDismiss={unobscure} />
       {/* Top Navigation & Breadcrumb */}
       <div className="flex items-center justify-between border-b border-border/80 pb-4">
         <button
@@ -364,7 +365,6 @@ export function PayerntKycPage() {
               data-kyc-form="true"
               onContextMenu={protectProps.onContextMenu}
             >
-              <KycScreenShield isObscured={isObscured} documentType="Aadhaar Card" onDismiss={unobscure} />
               <div className="flex items-center justify-between border-b border-border/60 pb-4">
                 <div>
                   <h3 className="text-lg font-bold text-foreground">Submit Aadhaar Details</h3>

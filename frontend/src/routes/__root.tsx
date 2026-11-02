@@ -23,7 +23,6 @@ import { CartDrawer } from "@/components/cart/CartDrawer";
 import { AppPreloader } from "@/components/common/AppPreloader";
 import { Navigation4 } from "@/components/navigation/Navigation4";
 import { LanguageProvider } from "@/i18n";
-import { GlobalAntiScreenshotShield } from "@/components/security/GlobalAntiScreenshotShield";
 
 import appCss from "../styles.css?url";
 
@@ -240,7 +239,6 @@ function RootContent() {
 
   return (
     <>
-      <GlobalAntiScreenshotShield />
       <AppPreloader onComplete={handlePreloaderComplete} />
       {!hideMainNavigation && <Navigation4 />}
       <Outlet />

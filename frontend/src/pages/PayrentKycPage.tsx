@@ -39,10 +39,10 @@ export function PayrentKycPage() {
   const [rejectionReason, setRejectionReason] = useState<string | null>(null);
   const [allowResubmission, setAllowResubmission] = useState(true);
 
-  // Anti-Screenshot & Screen Capture Protection
+  // Anti-Screenshot & Screen Capture Protection (Page-Specific: applies across entry, submission, and verification)
   const { isObscured, unobscure, setFileDialogOpen, protectProps } = useKycScreenshotProtection({
     documentType: "PAN Card",
-    enabled: kycStatus === "NOT_STARTED" || (kycStatus === "REJECTED" && !rejectionReason),
+    enabled: true,
   });
 
   // PAN Input state
@@ -208,6 +208,7 @@ export function PayrentKycPage() {
 
   return (
     <DashboardLayout>
+      <KycScreenShield isObscured={isObscured} documentType="PAN Card" onDismiss={unobscure} />
       <div className="w-full max-w-4xl mx-auto space-y-6 text-left py-6 px-4 sm:px-6">
         {/* Navigation & Breadcrumb */}
         <div className="flex items-center justify-between border-b border-border/80 pb-4">
@@ -350,7 +351,6 @@ export function PayrentKycPage() {
                 data-kyc-form="true"
                 onContextMenu={protectProps.onContextMenu}
               >
-                <KycScreenShield isObscured={isObscured} documentType="PAN Card" onDismiss={unobscure} />
                 <div className="flex items-center justify-between border-b border-border/60 pb-4">
                   <div>
                     <h3 className="text-lg font-bold text-foreground">Submit PAN Card Details</h3>
