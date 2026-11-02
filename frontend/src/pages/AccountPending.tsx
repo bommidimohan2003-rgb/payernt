@@ -582,7 +582,10 @@ export default function AccountPending() {
                         value={resubmitAadhaar}
                         onChange={(e) => setResubmitAadhaar(e.target.value.replace(/\D/g, "").slice(0, 12))}
                         placeholder="12-digit Aadhaar number"
-                        className="w-full rounded-xl border border-border bg-background pl-10 pr-3 py-2 text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        className="w-full rounded-xl border border-border bg-background pl-10 pr-3 py-2 text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 select-none"
+                        onCopy={(e) => e.preventDefault()}
+                        onCut={(e) => e.preventDefault()}
+                        onContextMenu={(e) => e.preventDefault()}
                       />
                     </div>
                   </div>
@@ -597,7 +600,10 @@ export default function AccountPending() {
                         value={resubmitPan}
                         onChange={(e) => setResubmitPan(e.target.value.toUpperCase().replace(/\s+/g, ""))}
                         placeholder="ABCDE1234F"
-                        className="w-full rounded-xl border border-border bg-background pl-10 pr-3 py-2 text-xs font-mono uppercase text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        className="w-full rounded-xl border border-border bg-background pl-10 pr-3 py-2 text-xs font-mono uppercase text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 select-none"
+                        onCopy={(e) => e.preventDefault()}
+                        onCut={(e) => e.preventDefault()}
+                        onContextMenu={(e) => e.preventDefault()}
                       />
                     </div>
                   </div>

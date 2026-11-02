@@ -21,6 +21,8 @@ import { toast } from "sonner";
 import { api } from "@/utils/api";
 import { useAuth } from "@/hooks/useAuth";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
+import { useKycScreenshotProtection } from "@/hooks/useKycScreenshotProtection";
+import { KycScreenShield, KycProtectionBadge } from "@/components/security/KycScreenShield";
 
 export function PayrentKycPage() {
   const navigate = useNavigate();
@@ -36,6 +38,12 @@ export function PayrentKycPage() {
   const [submittedAt, setSubmittedAt] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState<string | null>(null);
   const [allowResubmission, setAllowResubmission] = useState(true);
+
+  // Anti-Screenshot & Screen Capture Protection
+  const { isObscured, unobscure, setFileDialogOpen, protectProps } = useKycScreenshotProtection({
+    documentType: "PAN Card",
+    enabled: kycStatus === "NOT_STARTED" || (kycStatus === "REJECTED" && !rejectionReason),
+  });
 
   // PAN Input state
   const [panRaw, setPanRaw] = useState("");
@@ -336,7 +344,13 @@ export function PayrentKycPage() {
 
             {/* Verification Form */}
             {(kycStatus === "NOT_STARTED" || (kycStatus === "REJECTED" && !rejectionReason)) && (
-              <form onSubmit={handleSubmit} className="rounded-3xl border border-border/80 bg-card p-6 sm:p-8 space-y-6 shadow-sm">
+              <form
+                onSubmit={handleSubmit}
+                className="relative rounded-3xl border border-border/80 bg-card p-6 sm:p-8 space-y-6 shadow-sm overflow-hidden kyc-secure-container select-none"
+                data-kyc-form="true"
+                onContextMenu={protectProps.onContextMenu}
+              >
+                <KycScreenShield isObscured={isObscured} documentType="PAN Card" onDismiss={unobscure} />
                 <div className="flex items-center justify-between border-b border-border/60 pb-4">
                   <div>
                     <h3 className="text-lg font-bold text-foreground">Submit PAN Card Details</h3>
@@ -344,9 +358,12 @@ export function PayrentKycPage() {
                       Enter your 10-character PAN number and attach a clear photo of your PAN Card.
                     </p>
                   </div>
-                  <div className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground font-mono">
-                    <Lock className="h-3.5 w-3.5 text-emerald-500" />
-                    <span>256-Bit Encrypted</span>
+                  <div className="flex items-center gap-2">
+                    <KycProtectionBadge documentType="PAN" />
+                    <div className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground font-mono">
+                      <Lock className="h-3.5 w-3.5 text-emerald-500" />
+                      <span>256-Bit Encrypted</span>
+                    </div>
                   </div>
                 </div>
 
@@ -373,8 +390,10 @@ export function PayrentKycPage() {
                       maxLength={10}
                       value={panRaw}
                       onChange={handlePanChange}
+                      onCopy={protectProps.onCopy}
+                      onCut={protectProps.onCut}
                       placeholder="ABCDE1234F"
-                      className="flex-1 bg-transparent outline-none text-sm font-mono uppercase tracking-wider text-foreground placeholder:text-muted-foreground"
+                      className="flex-1 bg-transparent outline-none text-sm font-mono uppercase tracking-wider text-foreground placeholder:text-muted-foreground select-none"
                       autoComplete="off"
                     />
                     <button
@@ -409,7 +428,7 @@ export function PayrentKycPage() {
 
                   {!selectedFile ? (
                     <div
-                      onClick={() => fileInputRef.current?.click()}
+                      onClick={() => { setFileDialogOpen(true); fileInputRef.current?.click(); }}
                       className={`border-2 border-dashed rounded-3xl p-8 flex flex-col items-center justify-center gap-3 cursor-pointer transition-all hover:bg-secondary/40 text-center ${
                         fileError ? "border-destructive/80 bg-destructive/5" : "border-border bg-secondary/15"
                       }`}
@@ -450,7 +469,7 @@ export function PayrentKycPage() {
                         <div className="flex items-center gap-2 shrink-0">
                           <button
                             type="button"
-                            onClick={() => fileInputRef.current?.click()}
+                            onClick={() => { setFileDialogOpen(true); fileInputRef.current?.click(); }}
                             className="px-3 py-1.5 rounded-xl border border-border bg-card text-foreground hover:bg-secondary text-xs font-semibold cursor-pointer"
                           >
                             Replace Photo
@@ -483,7 +502,11 @@ export function PayrentKycPage() {
                     ref={fileInputRef}
                     type="file"
                     accept="image/jpeg,image/png,image/jpg,application/pdf"
-                    onChange={handleFileChange}
+                    onChange={(e) => {
+                      setFileDialogOpen(false);
+                      handleFileChange(e);
+                    }}
+                    onCancel={() => setFileDialogOpen(false)}
                     className="hidden"
                   />
 

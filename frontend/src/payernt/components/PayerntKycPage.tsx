@@ -20,6 +20,8 @@ import {
 import { toast } from "sonner";
 import payerntApi from "@/payernt/payerntApiService";
 import { usePayernt } from "@/payernt/context";
+import { useKycScreenshotProtection } from "@/hooks/useKycScreenshotProtection";
+import { KycScreenShield, KycProtectionBadge } from "@/components/security/KycScreenShield";
 
 export function PayerntKycPage() {
   const navigate = useNavigate();
@@ -35,6 +37,12 @@ export function PayerntKycPage() {
   const [submittedAt, setSubmittedAt] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState<string | null>(null);
   const [allowResubmission, setAllowResubmission] = useState(true);
+
+  // Anti-Screenshot & Screen Capture Protection
+  const { isObscured, unobscure, setFileDialogOpen, protectProps } = useKycScreenshotProtection({
+    documentType: "Aadhaar Card",
+    enabled: kycStatus === "NOT_STARTED" || (kycStatus === "REJECTED" && !rejectionReason),
+  });
 
   // Form states
   const [aadhaarRaw, setAadhaarRaw] = useState("");
@@ -350,7 +358,13 @@ export function PayerntKycPage() {
 
           {/* Verification Form (Active when NOT_STARTED or after clicking resubmit) */}
           {(kycStatus === "NOT_STARTED" || (kycStatus === "REJECTED" && !rejectionReason)) && (
-            <form onSubmit={handleSubmit} className="rounded-3xl border border-border/80 bg-card p-6 sm:p-8 space-y-6 shadow-sm">
+            <form
+              onSubmit={handleSubmit}
+              className="relative rounded-3xl border border-border/80 bg-card p-6 sm:p-8 space-y-6 shadow-sm overflow-hidden kyc-secure-container select-none"
+              data-kyc-form="true"
+              onContextMenu={protectProps.onContextMenu}
+            >
+              <KycScreenShield isObscured={isObscured} documentType="Aadhaar Card" onDismiss={unobscure} />
               <div className="flex items-center justify-between border-b border-border/60 pb-4">
                 <div>
                   <h3 className="text-lg font-bold text-foreground">Submit Aadhaar Details</h3>
@@ -358,9 +372,12 @@ export function PayerntKycPage() {
                     Enter your 12-digit Aadhaar number and attach a clear image of the card.
                   </p>
                 </div>
-                <div className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground font-mono">
-                  <Lock className="h-3.5 w-3.5 text-emerald-500" />
-                  <span>256-Bit Encrypted</span>
+                <div className="flex items-center gap-2">
+                  <KycProtectionBadge documentType="Aadhaar" />
+                  <div className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground font-mono">
+                    <Lock className="h-3.5 w-3.5 text-emerald-500" />
+                    <span>256-Bit Encrypted</span>
+                  </div>
                 </div>
               </div>
 
@@ -388,8 +405,10 @@ export function PayerntKycPage() {
                     maxLength={14}
                     value={showAadhaar ? formatAadhaarInput(aadhaarRaw) : aadhaarRaw}
                     onChange={handleAadhaarChange}
+                    onCopy={protectProps.onCopy}
+                    onCut={protectProps.onCut}
                     placeholder="1234 5678 9012"
-                    className="flex-1 bg-transparent outline-none text-sm font-mono tracking-wider text-foreground placeholder:text-muted-foreground"
+                    className="flex-1 bg-transparent outline-none text-sm font-mono tracking-wider text-foreground placeholder:text-muted-foreground select-none"
                     autoComplete="off"
                   />
                   <button
@@ -425,7 +444,7 @@ export function PayerntKycPage() {
                 {/* Upload Area / Preview Box */}
                 {!selectedFile ? (
                   <div
-                    onClick={() => fileInputRef.current?.click()}
+                    onClick={() => { setFileDialogOpen(true); fileInputRef.current?.click(); }}
                     className={`border-2 border-dashed rounded-3xl p-8 flex flex-col items-center justify-center gap-3 cursor-pointer transition-all hover:bg-secondary/40 text-center ${
                       fileError ? "border-destructive/80 bg-destructive/5" : "border-border bg-secondary/15"
                     }`}
@@ -466,7 +485,7 @@ export function PayerntKycPage() {
                       <div className="flex items-center gap-2 shrink-0">
                         <button
                           type="button"
-                          onClick={() => fileInputRef.current?.click()}
+                          onClick={() => { setFileDialogOpen(true); fileInputRef.current?.click(); }}
                           className="px-3 py-1.5 rounded-xl border border-border bg-card text-foreground hover:bg-secondary text-xs font-semibold cursor-pointer"
                         >
                           Replace Photo
@@ -499,7 +518,11 @@ export function PayerntKycPage() {
                   ref={fileInputRef}
                   type="file"
                   accept="image/jpeg,image/png,image/jpg,application/pdf"
-                  onChange={handleFileChange}
+                  onChange={(e) => {
+                    setFileDialogOpen(false);
+                    handleFileChange(e);
+                  }}
+                  onCancel={() => setFileDialogOpen(false)}
                   className="hidden"
                 />
 
