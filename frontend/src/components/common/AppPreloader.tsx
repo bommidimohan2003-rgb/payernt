@@ -58,6 +58,10 @@ export function AppPreloader({
       // Check query param ?preload=true for instant replay testing
       const urlParams = new URLSearchParams(window.location.search);
       const replay = urlParams.get("preload") === "true";
+      if (urlParams.get("nopreloader") === "true") {
+        if (onComplete) onComplete();
+        return;
+      }
       hasSeen =
         !replay &&
         !forceShow &&
