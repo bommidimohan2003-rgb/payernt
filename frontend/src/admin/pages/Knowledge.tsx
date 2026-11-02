@@ -57,6 +57,45 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
+// 13 Official Canonical Categories from PAYENT_AGENT_QA_KNOWLEDGE_GUIDE.docx
+export const OFFICIAL_KNOWLEDGE_CATEGORIES = [
+  "Account and registration",
+  "Booking and rental",
+  "Delivery and tracking",
+  "Delivery partner",
+  "General information",
+  "KYC verification",
+  "Payment and refunds",
+  "Privacy and security",
+  "Product discovery — renters",
+  "Product listing — equipment owners",
+  "Returns, damage and product issues",
+  "Secret PIN and OTP safety",
+  "Support and complaints",
+] as const;
+
+// Legacy / Historical System Categories for backward compatibility
+export const LEGACY_KNOWLEDGE_CATEGORIES = [
+  "BOOKING",
+  "PAYMENT",
+  "CANCELLATION",
+  "REFUND",
+  "KYC",
+  "DELIVERY",
+  "ACCOUNT",
+  "SECURITY",
+  "DISPUTE",
+  "PLATFORM",
+  "COMPLIANCE",
+  "POLICY",
+  "GENERAL",
+] as const;
+
+export const ALL_KNOWLEDGE_CATEGORIES = [
+  ...OFFICIAL_KNOWLEDGE_CATEGORIES,
+  ...LEGACY_KNOWLEDGE_CATEGORIES,
+] as const;
+
 // Markdown preview component
 function MarkdownPreview({ content }: { content: string }) {
   const hasVerifyMarker = /\[VERIFY(?:\s+IN\s+PAYENT)?\]/i.test(content);
@@ -856,18 +895,23 @@ export default function Knowledge() {
               className="px-2.5 py-1.5 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] text-[#F5F5F5] text-xs cursor-pointer font-medium"
             >
               <option value="all">All Categories</option>
-              <option value="BOOKING">BOOKING</option>
-              <option value="PAYMENT">PAYMENT</option>
-              <option value="CANCELLATION">CANCELLATION</option>
-              <option value="REFUND">REFUND</option>
-              <option value="KYC">KYC</option>
-              <option value="DELIVERY">DELIVERY</option>
-              <option value="ACCOUNT">ACCOUNT</option>
-              <option value="SECURITY">SECURITY</option>
-              <option value="DISPUTE">DISPUTE</option>
-              <option value="PLATFORM">PLATFORM</option>
-              <option value="COMPLIANCE">COMPLIANCE</option>
-              <option value="GENERAL">GENERAL</option>
+              {categoryFilter !== "all" && !ALL_KNOWLEDGE_CATEGORIES.includes(categoryFilter as any) && (
+                <option value={categoryFilter}>{categoryFilter}</option>
+              )}
+              <optgroup label="Official Guide Categories">
+                {OFFICIAL_KNOWLEDGE_CATEGORIES.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="Legacy Categories">
+                {LEGACY_KNOWLEDGE_CATEGORIES.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+              </optgroup>
             </select>
 
             {/* Status filter */}
@@ -1118,18 +1162,24 @@ export default function Knowledge() {
                 onChange={(e) => setFormCategory(e.target.value)}
                 className="w-full px-3 py-2 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] text-[#F5F5F5] text-xs font-medium"
               >
-                <option value="BOOKING">BOOKING</option>
-                <option value="PAYMENT">PAYMENT</option>
-                <option value="CANCELLATION">CANCELLATION</option>
-                <option value="REFUND">REFUND</option>
-                <option value="KYC">KYC</option>
-                <option value="DELIVERY">DELIVERY</option>
-                <option value="ACCOUNT">ACCOUNT</option>
-                <option value="SECURITY">SECURITY</option>
-                <option value="DISPUTE">DISPUTE</option>
-                <option value="PLATFORM">PLATFORM</option>
-                <option value="COMPLIANCE">COMPLIANCE</option>
-                <option value="GENERAL">GENERAL</option>
+                {/* Dynamic injection for any unrecognized category so stored category is never altered */}
+                {formCategory && !ALL_KNOWLEDGE_CATEGORIES.includes(formCategory as any) && (
+                  <option value={formCategory}>{formCategory}</option>
+                )}
+                <optgroup label="Official Guide Categories">
+                  {OFFICIAL_KNOWLEDGE_CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Legacy Categories">
+                  {LEGACY_KNOWLEDGE_CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </optgroup>
               </select>
             </div>
 
@@ -1326,18 +1376,23 @@ export default function Knowledge() {
                 onChange={(e) => setDraftCategory(e.target.value)}
                 className="w-full px-3 py-1.5 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] text-[#F5F5F5] text-xs"
               >
-                <option value="BOOKING">BOOKING</option>
-                <option value="PAYMENT">PAYMENT</option>
-                <option value="CANCELLATION">CANCELLATION</option>
-                <option value="REFUND">REFUND</option>
-                <option value="KYC">KYC</option>
-                <option value="DELIVERY">DELIVERY</option>
-                <option value="ACCOUNT">ACCOUNT</option>
-                <option value="SECURITY">SECURITY</option>
-                <option value="DISPUTE">DISPUTE</option>
-                <option value="PLATFORM">PLATFORM</option>
-                <option value="COMPLIANCE">COMPLIANCE</option>
-                <option value="GENERAL">GENERAL</option>
+                {draftCategory && !ALL_KNOWLEDGE_CATEGORIES.includes(draftCategory as any) && (
+                  <option value={draftCategory}>{draftCategory}</option>
+                )}
+                <optgroup label="Official Guide Categories">
+                  {OFFICIAL_KNOWLEDGE_CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Legacy Categories">
+                  {LEGACY_KNOWLEDGE_CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </optgroup>
               </select>
             </div>
 
