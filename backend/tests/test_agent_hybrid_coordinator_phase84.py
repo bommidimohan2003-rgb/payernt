@@ -171,13 +171,15 @@ def populated_knowledge_manager() -> KnowledgeManager:
     )
     km.publish_entry(e_refund["id"], approved_by="admin@payent.in")
 
-    # 3. Published & Verified KYC Guide
+    # 3. Published & Verified KYC Guide (Official Knowledge Guide entry)
     e_kyc = km.create_entry(
         category="KYC verification",
         canonical_question="What is KYC?",
         answer_markdown="KYC means Know Your Customer. Renters submit a valid PAN card to unlock equipment bookings and zero deposit eligibility.",
         retrieval_type="guide",
         synonyms=["KYC requirements", "How to complete KYC", "Identity verification", "Identity verification guide", "KYC ante enti", "Explain KYC"],
+        custom_id="KB-DOCX-011-A20B0658",
+        source_document="PAYENT_AGENT_QA_KNOWLEDGE_GUIDE.docx",
     )
     km.publish_entry(e_kyc["id"], approved_by="admin@payent.in")
 
@@ -707,6 +709,8 @@ def test_32_phase896_generic_kyc_explanation_routes_to_guide_retrieval(coordinat
         assert res["tool_result"] is not None
         assert res["tool_result"]["success"] is True
         assert res["tool_result"]["retrieval_type"] == "guide"
+        assert res["tool_result"]["knowledge_id"] == "KB-DOCX-011-A20B0658"
+        assert res["tool_result"]["source_reference"] == "PAYENT_AGENT_QA_KNOWLEDGE_GUIDE.docx"
         assert res["requires_auth"] is False
 
         # Must not contain unrelated live context or personal status
@@ -756,3 +760,115 @@ def test_34_phase896_unauthenticated_personal_kyc_status_requires_auth(coordinat
         assert res["tool_result"]["requires_auth"] is True
         assert "sign in" in res["response_text"].lower()
 
+
+def test_35_phase897_hybrid_identity_verification_approved(coordinator: HybridQueryCoordinator, mock_users_and_orders):
+    """Phase 8.9.7: Combined KYC Guide + personal identity status queries route to HYBRID."""
+    data = mock_users_and_orders
+    ctx = from_user_dict({"email": data["renter_email"], "role": "customer"})
+
+    hybrid_queries = [
+        "What is KYC and what is my KYC status?",
+        "Explain KYC and tell me whether my identity verification is approved.",
+        "What is KYC and has my account verification been completed?",
+    ]
+
+    for q in hybrid_queries:
+        res = coordinator.coordinate_query(q, ctx)
+        assert res["query_type"] == QueryType.HYBRID.value, f"Query '{q}' classified as {res['query_type']}"
+        assert res["tool_called"] == "hybrid_retrieval", f"Query '{q}' called {res['tool_called']}"
+        assert res["requires_auth"] is False
+        tr = res["tool_result"]
+        assert tr is not None
+        assert tr.get("live_tool") == "kyc_lookup", f"Query '{q}' live_tool was {tr.get('live_tool')}"
+        assert tr.get("knowledge_id") == "KB-DOCX-011-A20B0658"
+        assert tr.get("source_reference") == "PAYENT_AGENT_QA_KNOWLEDGE_GUIDE.docx"
+
+        resp_text = res["response_text"]
+        assert "### Your KYC Status" in resp_text
+        assert "APPROVED" in resp_text
+        assert "• \n" not in resp_text, f"Query '{q}' leaked trailing empty bullet"
+        assert "### Policy & Guidelines" in resp_text
+        assert "KYC means Know Your Customer" in resp_text
+        # Ensure zero leakage of unrelated domains
+        assert "Booking Status" not in resp_text
+        assert "Recent Bookings" not in resp_text
+        assert "Delivery Status" not in resp_text
+        assert "Refund Status" not in resp_text
+
+
+def test_36_phase897_guide_preservation(coordinator: HybridQueryCoordinator):
+    """Phase 8.9.7: Generic informational questions remain strictly GUIDE without live database calls."""
+    ctx = from_user_dict({"email": "renter@payent.test", "role": "customer"})
+    guide_queries = [
+        "What is KYC?",
+        "Explain identity verification.",
+        "Tell me about KYC.",
+        "KYC ante enti?",
+    ]
+
+    for q in guide_queries:
+        res = coordinator.coordinate_query(q, ctx)
+        assert res["query_type"] == QueryType.GUIDE.value, f"Query '{q}' classified as {res['query_type']}"
+        assert res["requires_auth"] is False
+        assert "Booking Status" not in res["response_text"]
+        assert "Your KYC Status" not in res["response_text"]
+
+
+def test_37_phase897_live_db_identity_verification_preservation(coordinator: HybridQueryCoordinator, mock_users_and_orders):
+    """Phase 8.9.7: Pure personal identity status checks route to LIVE_DB using kyc_lookup."""
+    data = mock_users_and_orders
+    ctx = from_user_dict({"email": data["renter_email"], "role": "customer"})
+
+    live_queries = [
+        "What is my KYC status?",
+        "Is my identity verification approved?",
+        "Has my KYC been completed?",
+        "Na KYC approve ayyinda?",
+        "My identity verification status.",
+        "Whether my identity verification is approved.",
+        "Has my identity verification been completed?",
+        "Is my identity verification rejected?",
+        "My KYC approval status.",
+        "Na identity verification approve ayyinda?",
+    ]
+
+    for q in live_queries:
+        res = coordinator.coordinate_query(q, ctx)
+        assert res["query_type"] == QueryType.LIVE_DB.value, f"Query '{q}' classified as {res['query_type']}"
+        assert res["tool_called"] == "kyc_lookup", f"Query '{q}' called {res['tool_called']}"
+        assert res["tool_result"]["success"] is True
+        assert "APPROVED" in res["response_text"]
+
+
+def test_38_phase897_domain_specific_guest_signin_prompt(coordinator: HybridQueryCoordinator):
+    """Phase 8.9.7: Unauthenticated hybrid requests receive domain-specific sign-in prompts."""
+    guest = create_guest_context()
+
+    # KYC Hybrid
+    res_kyc = coordinator.coordinate_query("Explain KYC and tell me whether my identity verification is approved.", guest)
+    assert res_kyc["query_type"] == QueryType.HYBRID.value
+    assert res_kyc["requires_auth"] is True
+    assert res_kyc["tool_result"]["live_tool"] == "kyc_lookup"
+    assert res_kyc["tool_result"]["knowledge_id"] == "KB-DOCX-011-A20B0658"
+    assert res_kyc["tool_result"]["source_reference"] == "PAYENT_AGENT_QA_KNOWLEDGE_GUIDE.docx"
+    assert "### KYC Verification Status" in res_kyc["response_text"]
+    assert "identity verification and KYC status" in res_kyc["response_text"]
+    assert "booking" not in res_kyc["response_text"].split("### Policy")[0].lower()
+    assert "delivery" not in res_kyc["response_text"].split("### Policy")[0].lower()
+    assert "### Policy & Guidelines" in res_kyc["response_text"]
+
+    # Booking Hybrid
+    res_booking = coordinator.coordinate_query("What is my booking status and what is the cancellation policy?", guest)
+    assert res_booking["query_type"] == QueryType.HYBRID.value
+    assert res_booking["requires_auth"] is True
+    assert res_booking["tool_result"]["live_tool"] == "booking_lookup"
+    assert "### Booking Status" in res_booking["response_text"]
+    assert "booking details alongside this policy" in res_booking["response_text"]
+
+    # Delivery Hybrid
+    res_delivery = coordinator.coordinate_query("Explain delivery tracking and show my current delivery status.", guest)
+    assert res_delivery["query_type"] == QueryType.HYBRID.value
+    assert res_delivery["requires_auth"] is True
+    assert res_delivery["tool_result"]["live_tool"] == "delivery_lookup"
+    assert "### Delivery Status" in res_delivery["response_text"]
+    assert "delivery and tracking status alongside this policy" in res_delivery["response_text"]

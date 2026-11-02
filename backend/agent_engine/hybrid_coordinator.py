@@ -125,8 +125,12 @@ class HybridQueryCoordinator:
         # 3. Personal indicator patterns (English and Telugu-English)
         personal_patterns = [
             r"\b(my|mine|i|me|naa|na|nenu|ma|maa)\s+(booking|bookings|order|orders|rentals?|payment|payments|refund|refunds|kyc|delivery|account|tickets?)\b",
+            r"\b(my|mine|naa|na|nenu|ma|maa)\s+(identity\s+verification|identity|documents?|kyc\s+approval)\b",
             r"\b(where is my|show my|check my|track my|cancel my|all my)\b",
+            r"\b(whether|if|has|is)\s+(my|na|naa)\s+(identity\s+verification|identity|kyc|account(\s+verification)?|documents?)\b",
+            r"\b(my|na|naa)\s+(identity\s+verification|identity|kyc)\s+(approval\s+status|status|approved|rejected|completed|pending|verified)\b",
             r"\b(naa\s+booking|na\s+booking|naa\s+kyc|na\s+kyc|naa\s+payment|naa\s+delivery|naa\s+refund)\b",
+            r"\b(na|naa)\s+(identity\s+verification|identity)\s+(approve\s+ayyinda|pending(\s+lo\s+undi)?|status\s+enti)\b",
             r"\b(naa\s+bookings\s+chupinchu|nenu\s+enni\s+rentals)\b",
             r"\b(my\s+bookings|my\s+orders|show\s+bookings)\b",
         ]
@@ -207,7 +211,10 @@ class HybridQueryCoordinator:
 
         # 4. Pure Live DB status checks take precedence over KB hybrid match
         # (e.g. "Is my KYC rejected?", "Has my KYC been approved?", "What is my KYC status?")
-        if re.search(r"\b(is|has)\s+(my|na|naa)\s+kyc\s+(been\s+)?(approved|rejected|verified|pending)\b", message.lower()):
+        if not has_policy and re.search(
+            r"\b(is|has)\s+(my|na|naa)\s+(kyc|identity\s+verification|documents?)\s+(been\s+)?(approved|verified|rejected|declined|pending|completed)\b",
+            message.lower()
+        ):
             return QueryType.LIVE_DB
 
         # 5. Hybrid detection: both live and policy indicators present
@@ -708,7 +715,10 @@ class HybridQueryCoordinator:
                     suggestions = ["Support", "My Bookings"]
 
         # 5. KYC STATUS & REJECTION
-        elif intent in ("KYC_STATUS", "KYC_REJECTION"):
+        elif intent in ("KYC_STATUS", "KYC_REJECTION") or (
+            ("kyc" in message.lower() or "identity" in message.lower())
+            and any(w in message.lower() for w in ("status", "approved", "rejected", "completed", "pending", "approve ayyinda", "verification"))
+        ):
             tool_called = "kyc_lookup"
             if not context.is_authenticated:
                 requires_auth = True
@@ -858,7 +868,7 @@ class HybridQueryCoordinator:
             policy_query = "refund policy"
         elif "delivery" in msg_lower and "delay" in msg_lower:
             policy_query = "delivery delayed"
-        elif "kyc" in msg_lower:
+        elif "kyc" in msg_lower or "identity" in msg_lower:
             policy_query = "KYC requirements"
 
         retriever = self.index_manager.get_retriever()
@@ -875,11 +885,41 @@ class HybridQueryCoordinator:
         # 2. Fetch Personal Account / Live DB Section
         if not context.is_authenticated:
             requires_auth = True
-            account_section = (
-                "### Account Status\n"
-                "To view your specific booking, payment, or delivery details alongside this policy, "
-                "please sign in to your Payent account."
-            )
+            if "kyc" in msg_lower or "identity" in msg_lower or "verification" in msg_lower:
+                live_tool_called = "kyc_lookup"
+                account_section = (
+                    "### KYC Verification Status\n"
+                    "To view your specific identity verification and KYC status alongside this policy, "
+                    "please sign in to your Payent account."
+                )
+            elif "delivery" in msg_lower:
+                live_tool_called = "delivery_lookup"
+                account_section = (
+                    "### Delivery Status\n"
+                    "To view your specific delivery and tracking status alongside this policy, "
+                    "please sign in to your Payent account."
+                )
+            elif "refund" in msg_lower or "payment" in msg_lower:
+                live_tool_called = "refund_lookup"
+                account_section = (
+                    "### Refund Status\n"
+                    "To view your payment or refund status alongside this policy, "
+                    "please sign in to your Payent account."
+                )
+            elif booking_id or any(w in msg_lower for w in ("booking", "order", "rental", "reservation", "cancel")):
+                live_tool_called = "booking_lookup"
+                account_section = (
+                    "### Booking Status\n"
+                    "To view your specific booking details alongside this policy, "
+                    "please sign in to your Payent account."
+                )
+            else:
+                live_tool_called = None
+                account_section = (
+                    "### Account Status\n"
+                    "To view your personal account details alongside this policy, "
+                    "please sign in to your Payent account."
+                )
             suggestions = ["Sign In"] + suggestions
             live_tool_result = {"success": False, "requires_auth": True}
         else:
@@ -913,17 +953,17 @@ class HybridQueryCoordinator:
                         account_section = "### Refund Status\nNotice: Live refund records are temporarily unavailable due to a database connection delay."
                     else:
                         account_section = f"### Refund Status\nNotice: {live_tool_result.get('error', 'Could not retrieve live refund data.')}"
-            elif "kyc" in msg_lower or "identity" in msg_lower:
+            elif "kyc" in msg_lower or "identity" in msg_lower or "verification" in msg_lower:
                 live_tool_called = "kyc_lookup"
                 live_tool_result = get_kyc_status_tool(context)
                 if live_tool_result.get("success"):
                     kyc_data = live_tool_result.get("kyc", {})
                     st = kyc_data.get("status", "NOT_STARTED").upper()
-                    account_section = (
-                        f"### Your KYC Status\n"
-                        f"• Status: **{st}**\n"
-                        f"• {kyc_data.get('status_description', '')}"
-                    )
+                    desc = kyc_data.get("status_description") or live_tool_result.get("guidance")
+                    if desc and str(desc).strip():
+                        account_section = f"### Your KYC Status\n• Status: **{st}**\n• {str(desc).strip()}"
+                    else:
+                        account_section = f"### Your KYC Status\n• Status: **{st}**"
                 else:
                     if live_tool_result.get("database_error"):
                         account_section = "### KYC Status\nNotice: Live KYC records are temporarily unavailable due to a database connection delay."
