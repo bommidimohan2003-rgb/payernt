@@ -218,12 +218,22 @@ export default function ProductDetails() {
   // Stale-While-Revalidate: load latest product details in background
   useEffect(() => {
     let isMounted = true;
-    const cached = api.getCachedProduct(id);
-    if (cached && isMounted) {
-      setProduct(cached);
-      setProductLoading(false);
+    setSelectedImageIndex(0);
+    setAvailabilityChecked(false);
+    setIsAvailableForDates(null);
+    setAvailabilityMessage("");
+
+    const initial = initialCachedProduct || api.getCachedProduct(id);
+    if (initial) {
+      if (isMounted) {
+        setProduct(initial);
+        setProductLoading(false);
+      }
     } else {
-      setProductLoading(true);
+      if (isMounted) {
+        setProduct(null);
+        setProductLoading(true);
+      }
     }
 
     async function loadTargetProduct() {
