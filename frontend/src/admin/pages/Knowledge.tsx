@@ -96,9 +96,17 @@ export const ALL_KNOWLEDGE_CATEGORIES = [
   ...LEGACY_KNOWLEDGE_CATEGORIES,
 ] as const;
 
+// Helper to extract all [VERIFY ...] markers from text
+function extractVerifyMarkers(text: string): string[] {
+  if (!text) return [];
+  const matches = text.match(/\[VERIFY[^\]]*\]/gi);
+  return matches || [];
+}
+
 // Markdown preview component
 function MarkdownPreview({ content }: { content: string }) {
-  const hasVerifyMarker = /\[VERIFY(?:\s+IN\s+PAYENT)?\]/i.test(content);
+  const verifyMarkers = extractVerifyMarkers(content);
+  const hasVerifyMarker = verifyMarkers.length > 0;
   const lines = content.split("\n");
 
   return (
@@ -107,7 +115,7 @@ function MarkdownPreview({ content }: { content: string }) {
         <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2 mb-3">
           <AlertTriangle className="h-4 w-4 shrink-0" />
           <span>
-            <strong>Policy Placeholder:</strong> Contains <code>[VERIFY IN PAYENT]</code>. Must be replaced before publication.
+            <strong>Policy Placeholder:</strong> Contains <code>{verifyMarkers.join(", ")}</code>. Must be replaced before publication.
           </span>
         </div>
       )}
@@ -158,8 +166,8 @@ function MarkdownPreview({ content }: { content: string }) {
 }
 
 function renderInlineMarkdown(text: string): React.ReactNode {
-  // Bold **bold**
-  const parts = text.split(/(\*\*[^*]+\*\*|\[VERIFY(?:\s+IN\s+PAYENT)?\])/gi);
+  // Bold **bold** and [VERIFY ...] placeholders
+  const parts = text.split(/(\*\*[^*]+\*\*|\[VERIFY[^\]]*\])/gi);
   return parts.map((part, pIdx) => {
     if (part.startsWith("**") && part.endsWith("**")) {
       return (
@@ -168,11 +176,11 @@ function renderInlineMarkdown(text: string): React.ReactNode {
         </strong>
       );
     }
-    if (/^\[VERIFY(?:\s+IN\s+PAYENT)?\]$/i.test(part)) {
+    if (/^\[VERIFY[^\]]*\]$/i.test(part)) {
       return (
         <span
           key={pIdx}
-          className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono text-[10px] border border-amber-500/40"
+          className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono text-[10px] border border-amber-500/40 inline-block my-0.5"
         >
           {part}
         </span>
@@ -220,8 +228,18 @@ export default function Knowledge() {
   const [formAnswer, setFormAnswer] = useState("");
   const [formRetrievalType, setFormRetrievalType] = useState("GUIDE");
   const [formSynonyms, setFormSynonyms] = useState("");
+  const [formVerificationNotes, setFormVerificationNotes] = useState("");
   const [formChangeReason, setFormChangeReason] = useState("");
   const [savingEntry, setSavingEntry] = useState(false);
+
+  // Resolve [VERIFY] marker workflow modal state
+  const [resolveModalOpen, setResolveModalOpen] = useState(false);
+  const [resolvingEntry, setResolvingEntry] = useState<KnowledgeEntry | null>(null);
+  const [resolveAnswer, setResolveAnswer] = useState("");
+  const [resolveNotes, setResolveNotes] = useState("");
+  const [resolveChangeReason, setResolveChangeReason] = useState("");
+  const [resolvingSaving, setResolvingSaving] = useState(false);
+  const [resolvingVerifying, setResolvingVerifying] = useState(false);
 
   // Version history modal state
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -343,6 +361,7 @@ export default function Knowledge() {
       setFormAnswer(entry.answer_markdown);
       setFormRetrievalType(entry.retrieval_type);
       setFormSynonyms(entry.synonyms ? entry.synonyms.join(", ") : "");
+      setFormVerificationNotes(entry.verification_notes || "");
       setFormChangeReason("");
     } else {
       setEditingEntry(null);
@@ -351,6 +370,7 @@ export default function Knowledge() {
       setFormAnswer("");
       setFormRetrievalType("GUIDE");
       setFormSynonyms("");
+      setFormVerificationNotes("");
       setFormChangeReason("");
     }
     setEditorOpen(true);
@@ -378,6 +398,7 @@ export default function Knowledge() {
           answer_markdown: formAnswer.trim(),
           retrieval_type: formRetrievalType,
           synonyms: parsedSynonyms,
+          verification_notes: formVerificationNotes.trim() || undefined,
           change_reason: formChangeReason.trim() || "Admin update",
         });
         toast.success(`Updated "${editingEntry.id}" (new version created)`);
@@ -388,6 +409,7 @@ export default function Knowledge() {
           answer_markdown: formAnswer.trim(),
           retrieval_type: formRetrievalType,
           synonyms: parsedSynonyms,
+          verification_notes: formVerificationNotes.trim() || undefined,
         });
         toast.success("Created new knowledge entry in pending review");
       }
@@ -401,19 +423,111 @@ export default function Knowledge() {
     }
   };
 
-  // Verify Entry
-  const handleVerify = async (entry: KnowledgeEntry) => {
-    if (/\[VERIFY(?:\s+IN\s+PAYENT)?\]/i.test(entry.answer_markdown)) {
-      toast.error("Cannot verify: Entry contains [VERIFY IN PAYENT] placeholder.");
+  // Open Resolve [VERIFY] Marker Modal
+  const handleOpenResolveModal = (entry: KnowledgeEntry) => {
+    setResolvingEntry(entry);
+    setResolveAnswer(entry.answer_markdown || "");
+    setResolveNotes(entry.verification_notes || "");
+    setResolveChangeReason("Resolved [VERIFY] marker with confirmed policy");
+    setResolveModalOpen(true);
+  };
+
+  // Save Draft Resolution (keep status pending_review)
+  const handleSaveDraftResolution = async () => {
+    if (!resolvingEntry) return;
+    if (!resolveAnswer.trim()) {
+      toast.error("Answer cannot be empty.");
       return;
     }
     try {
-      await verifyKnowledgeEntry(entry.id, "Verified by admin");
+      setResolvingSaving(true);
+      await updateKnowledgeEntry(resolvingEntry.id, {
+        answer_markdown: resolveAnswer.trim(),
+        verification_notes: resolveNotes.trim() || undefined,
+        change_reason: resolveChangeReason.trim() || "Saved draft resolution for [VERIFY] marker",
+      });
+      toast.success("Draft updated successfully. Entry remains in pending review.");
+      setResolveModalOpen(false);
+      loadEntries();
+      loadStats();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || "Failed to save draft resolution.");
+    } finally {
+      setResolvingSaving(false);
+    }
+  };
+
+  // Complete Resolution & Verify Entry
+  const handleCompleteVerificationResolution = async () => {
+    if (!resolvingEntry) return;
+    if (!resolveAnswer.trim()) {
+      toast.error("Answer cannot be empty.");
+      return;
+    }
+    const remainingMarkers = extractVerifyMarkers(resolveAnswer);
+    if (remainingMarkers.length > 0) {
+      toast.error(
+        `Cannot verify: The answer still contains ${remainingMarkers.join(", ")}. Please replace all placeholder markers before verifying.`
+      );
+      return;
+    }
+    if (!resolveNotes.trim()) {
+      toast.error("Verification evidence notes are required to verify this entry.");
+      return;
+    }
+
+    try {
+      setResolvingVerifying(true);
+      // 1. Update the entry answer markdown and verification notes
+      await updateKnowledgeEntry(resolvingEntry.id, {
+        answer_markdown: resolveAnswer.trim(),
+        verification_notes: resolveNotes.trim(),
+        change_reason: resolveChangeReason.trim() || "Resolved [VERIFY] marker and confirmed policy",
+      });
+
+      // 2. Re-fetch the saved knowledge record to confirm state in database
+      const refetched = await getKnowledgeEntry(resolvingEntry.id);
+      const refetchedAnswer = refetched?.data?.answer_markdown || "";
+      const refetchedMarkers = extractVerifyMarkers(refetchedAnswer);
+      if (refetchedMarkers.length > 0) {
+        throw new Error(`Saved record still contains ${refetchedMarkers.join(", ")}.`);
+      }
+
+      // 3. Complete verification call
+      await verifyKnowledgeEntry(resolvingEntry.id, resolveNotes.trim());
+      toast.success(`Entry "${resolvingEntry.id}" verified with resolution evidence!`);
+      setResolveModalOpen(false);
+      loadEntries();
+      loadStats();
+      loadIndexHealth();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || err?.message || "Failed to complete verification.");
+    } finally {
+      setResolvingVerifying(false);
+    }
+  };
+
+  // Verify Entry
+  const handleVerify = async (entry: KnowledgeEntry) => {
+    const markers = extractVerifyMarkers(entry.answer_markdown);
+    if (markers.length > 0 || entry.has_verify_marker) {
+      handleOpenResolveModal(entry);
+      toast.info(`Entry contains unresolved marker ${markers[0] || "[VERIFY]"}. Please resolve it before verifying.`);
+      return;
+    }
+    try {
+      await verifyKnowledgeEntry(entry.id, entry.verification_notes || "Verified by admin");
       toast.success(`Entry "${entry.id}" verified!`);
       loadEntries();
       loadStats();
     } catch (err: any) {
-      toast.error(err?.response?.data?.detail || "Failed to verify entry.");
+      const errorDetail = err?.response?.data?.detail || err?.message || "";
+      if (typeof errorDetail === "string" && /\[VERIFY/i.test(errorDetail)) {
+        handleOpenResolveModal(entry);
+        toast.error(errorDetail);
+      } else {
+        toast.error(errorDetail || "Failed to verify entry.");
+      }
     }
   };
 
@@ -435,8 +549,9 @@ export default function Knowledge() {
       toast.error("Cannot publish: Entry must be explicitly verified first.");
       return;
     }
-    if (/\[VERIFY(?:\s+IN\s+PAYENT)?\]/i.test(entry.answer_markdown)) {
-      toast.error("Cannot publish: Entry contains [VERIFY IN PAYENT] placeholder.");
+    const markers = extractVerifyMarkers(entry.answer_markdown);
+    if (markers.length > 0 || entry.has_verify_marker) {
+      toast.error(`Cannot publish: Entry contains ${markers[0] || "[VERIFY]"} placeholder.`);
       return;
     }
     try {
@@ -613,15 +728,16 @@ export default function Knowledge() {
       key: "canonical_question",
       label: "Canonical Question & Answers",
       render: (row) => {
-        const hasMarker = row.has_verify_marker || /\[VERIFY(?:\s+IN\s+PAYENT)?\]/i.test(row.answer_markdown);
+        const markers = extractVerifyMarkers(row.answer_markdown);
+        const hasMarker = row.has_verify_marker || markers.length > 0;
         return (
           <div className="space-y-1 max-w-md">
             <p className="text-xs font-semibold text-[#F5F5F5] line-clamp-1">{row.canonical_question}</p>
             <p className="text-[11px] text-[#A1A1AA] line-clamp-2">{row.answer_markdown}</p>
             {hasMarker && (
-              <span className="inline-flex items-center gap-1 text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/30 px-1.5 py-0.2 rounded font-mono">
+              <span className="inline-flex items-center gap-1 text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/30 px-1.5 py-0.5 rounded font-mono">
                 <AlertTriangle className="h-3 w-3" />
-                [VERIFY IN PAYENT]
+                {markers[0] || "[VERIFY]"}
               </span>
             )}
           </div>
@@ -683,35 +799,42 @@ export default function Knowledge() {
       key: "actions",
       label: "Actions",
       align: "right",
-      render: (row) => (
-        <div className="flex items-center justify-end gap-1.5">
-          {/* Edit */}
-          <button
-            onClick={() => handleOpenEditor(row)}
-            title="Edit Entry"
-            className="p-1.5 rounded-lg bg-[#171C23] hover:bg-neutral-800 text-[#F5F5F5] border border-[rgba(161,161,170,0.18)] transition-colors cursor-pointer"
-          >
-            <Edit3 className="h-3.5 w-3.5" />
-          </button>
+      render: (row) => {
+        const rowHasMarker = row.has_verify_marker || extractVerifyMarkers(row.answer_markdown).length > 0;
+        return (
+          <div className="flex items-center justify-end gap-1.5">
+            {/* Edit */}
+            <button
+              onClick={() => handleOpenEditor(row)}
+              title="Edit Entry"
+              className="p-1.5 rounded-lg bg-[#171C23] hover:bg-neutral-800 text-[#F5F5F5] border border-[rgba(161,161,170,0.18)] transition-colors cursor-pointer"
+            >
+              <Edit3 className="h-3.5 w-3.5" />
+            </button>
 
-          {/* Verification toggle */}
-          {row.is_verified ? (
-            <button
-              onClick={() => handleRevoke(row)}
-              title="Revoke Verification"
-              className="p-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 transition-colors cursor-pointer"
-            >
-              <XSquare className="h-3.5 w-3.5" />
-            </button>
-          ) : (
-            <button
-              onClick={() => handleVerify(row)}
-              title="Verify Entry"
-              className="p-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 transition-colors cursor-pointer"
-            >
-              <CheckSquare className="h-3.5 w-3.5" />
-            </button>
-          )}
+            {/* Verification toggle */}
+            {row.is_verified ? (
+              <button
+                onClick={() => handleRevoke(row)}
+                title="Revoke Verification"
+                className="p-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 transition-colors cursor-pointer"
+              >
+                <XSquare className="h-3.5 w-3.5" />
+              </button>
+            ) : (
+              <button
+                onClick={() => handleVerify(row)}
+                title={rowHasMarker ? "Resolve [VERIFY] Marker & Verify Entry" : "Verify Entry"}
+                className={cn(
+                  "p-1.5 rounded-lg border transition-colors cursor-pointer",
+                  rowHasMarker
+                    ? "bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border-amber-500/30"
+                    : "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+                )}
+              >
+                <CheckSquare className="h-3.5 w-3.5" />
+              </button>
+            )}
 
           {/* Publish / Unpublish */}
           {row.status === "published" ? (
@@ -742,9 +865,10 @@ export default function Knowledge() {
             <History className="h-3.5 w-3.5" />
           </button>
         </div>
-      ),
+      );
     },
-  ];
+  },
+];
 
   return (
     <div className="space-y-6">
@@ -814,7 +938,7 @@ export default function Knowledge() {
           title="Needs Policy Verification"
           value={stats?.needs_verification ?? 0}
           icon={AlertTriangle}
-          subtext="Has [VERIFY IN PAYENT]"
+          subtext="Has [VERIFY] marker"
           loading={statsLoading}
         />
         <StatsCard
@@ -1251,6 +1375,19 @@ export default function Knowledge() {
             </div>
           </div>
 
+          <div>
+            <label className="text-xs font-semibold text-[#A1A1AA] mb-1 block">
+              Verification Notes & Evidence (Audit log reference)
+            </label>
+            <input
+              type="text"
+              value={formVerificationNotes}
+              onChange={(e) => setFormVerificationNotes(e.target.value)}
+              placeholder="e.g. Verified against Operations SOP v2 or ticket reference..."
+              className="w-full px-3 py-2 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] text-[#F5F5F5] text-xs font-medium focus:outline-none focus:border-emerald-400"
+            />
+          </div>
+
           {editingEntry && (
             <div>
               <label className="text-xs font-semibold text-[#A1A1AA] mb-1 block">
@@ -1490,6 +1627,180 @@ export default function Knowledge() {
             >
               {processingDraft ? "Approving..." : "Approve & Convert to Knowledge Entry"}
             </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* MODAL 4: RESOLVE [VERIFY] MARKER WORKFLOW */}
+      <Modal
+        isOpen={resolveModalOpen}
+        onClose={() => setResolveModalOpen(false)}
+        title={`Resolve Verification Marker — ${resolvingEntry?.id || ""}`}
+        size="xl"
+      >
+        <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+          {/* Context Banner */}
+          {(() => {
+            const remainingMarkers = extractVerifyMarkers(resolveAnswer);
+            const isResolved = remainingMarkers.length === 0;
+            return isResolved ? (
+              <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-start gap-2.5">
+                <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-emerald-200">All [VERIFY] markers resolved</p>
+                  <p className="text-[11px] text-emerald-300/80 mt-0.5">
+                    No unresolved placeholder markers remain in the answer text. Enter verification evidence notes below to verify this entry for publication.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-start gap-2.5">
+                <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-amber-200">
+                    Unresolved Marker Detected: <code className="bg-amber-500/20 px-1 py-0.5 rounded font-mono">{remainingMarkers.join(", ")}</code>
+                  </p>
+                  <p className="text-[11px] text-amber-300/80 mt-0.5">
+                    This knowledge entry cannot be verified while containing unconfirmed policy placeholders. Edit the answer text to reflect confirmed production policy before completing verification.
+                  </p>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Canonical Question Reference */}
+          <div className="p-3 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] space-y-1.5">
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="font-semibold text-[#A1A1AA] uppercase tracking-wider">Canonical Question</span>
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded bg-neutral-800 text-[#A1A1AA] text-[10px] font-mono">
+                  {resolvingEntry?.category}
+                </span>
+                <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/30 text-[10px] font-mono">
+                  {resolvingEntry?.retrieval_type}
+                </span>
+              </div>
+            </div>
+            <p className="text-xs font-semibold text-[#F5F5F5]">
+              {resolvingEntry?.canonical_question}
+            </p>
+          </div>
+
+          {/* Answer Editor & Live Markdown Preview */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-semibold text-[#A1A1AA] block">
+                  Corrected Answer Markdown
+                </label>
+                <span className="text-[10px] text-[#A1A1AA]">
+                  {extractVerifyMarkers(resolveAnswer).length > 0 ? (
+                    <span className="text-amber-400 font-mono">Contains [VERIFY]</span>
+                  ) : (
+                    <span className="text-emerald-400 font-medium">Clean</span>
+                  )}
+                </span>
+              </div>
+              <textarea
+                value={resolveAnswer}
+                onChange={(e) => setResolveAnswer(e.target.value)}
+                placeholder="Enter confirmed production policy markdown..."
+                rows={11}
+                className="w-full px-3 py-2 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] text-[#F5F5F5] text-xs font-mono focus:outline-none focus:border-emerald-400 leading-relaxed"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-[#A1A1AA] mb-1 block">Live Markdown Preview</label>
+              <div className="p-3 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] h-[245px] overflow-y-auto">
+                {resolveAnswer.trim() ? (
+                  <MarkdownPreview content={resolveAnswer} />
+                ) : (
+                  <span className="text-xs text-[#A1A1AA]">Markdown preview will render here...</span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Verification Notes / Evidence Input */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-semibold text-[#A1A1AA] block">
+                Verification Notes & Evidence <span className="text-amber-400">*</span>
+              </label>
+              <span className="text-[10px] text-[#A1A1AA]">Required for verification approval</span>
+            </div>
+            <textarea
+              value={resolveNotes}
+              onChange={(e) => setResolveNotes(e.target.value)}
+              placeholder="e.g. Verified with Operations and confirmed Thursday delivery payout schedule per Delivery Partner Agreement v2..."
+              rows={3}
+              className="w-full px-3 py-2 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] text-[#F5F5F5] text-xs focus:outline-none focus:border-emerald-400"
+            />
+            <p className="text-[10px] text-[#A1A1AA] mt-1">
+              Document the policy confirmation source, ticket ID, or business stakeholder approval. Stored in immutable audit logs.
+            </p>
+          </div>
+
+          {/* Audit Change Reason */}
+          <div>
+            <label className="text-xs font-semibold text-[#A1A1AA] mb-1 block">
+              Audit Change Reason (Version history log)
+            </label>
+            <input
+              type="text"
+              value={resolveChangeReason}
+              onChange={(e) => setResolveChangeReason(e.target.value)}
+              placeholder="e.g. Resolved [VERIFY] marker with confirmed policy"
+              className="w-full px-3 py-2 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] text-[#F5F5F5] text-xs font-medium focus:outline-none focus:border-emerald-400"
+            />
+          </div>
+
+          {/* Modal Actions */}
+          <div className="flex items-center justify-between pt-4 border-t border-[rgba(161,161,170,0.1)]">
+            <button
+              type="button"
+              onClick={() => setResolveModalOpen(false)}
+              className="px-4 py-2 rounded-lg bg-[#171C23] hover:bg-[#171C23]/80 text-[#F5F5F5] text-xs font-medium transition-colors border border-[rgba(161,161,170,0.18)] cursor-pointer"
+            >
+              Cancel
+            </button>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleSaveDraftResolution}
+                disabled={resolvingSaving || resolvingVerifying || !resolveAnswer.trim()}
+                title="Save changes to draft while keeping status pending_review"
+                className="px-4 py-2 rounded-lg bg-[#171C23] hover:bg-neutral-800 text-amber-400 border border-amber-500/30 text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
+              >
+                {resolvingSaving ? "Saving Draft..." : "Save Draft (Keep Pending)"}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleCompleteVerificationResolution}
+                disabled={
+                  resolvingVerifying ||
+                  resolvingSaving ||
+                  !resolveAnswer.trim() ||
+                  !resolveNotes.trim() ||
+                  extractVerifyMarkers(resolveAnswer).length > 0
+                }
+                title={
+                  extractVerifyMarkers(resolveAnswer).length > 0
+                    ? "Resolve the [VERIFY] marker in the answer before verifying"
+                    : !resolveNotes.trim()
+                    ? "Verification notes are required"
+                    : "Save confirmed policy and verify entry"
+                }
+                className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-xs transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+              >
+                <ShieldCheck className="h-3.5 w-3.5" />
+                {resolvingVerifying ? "Verifying..." : "Confirm & Verify Entry"}
+              </button>
+            </div>
           </div>
         </div>
       </Modal>

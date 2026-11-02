@@ -1104,3 +1104,230 @@ def test_42_production_database_failure_returns_503_never_mock():
         assert "temporarily unavailable" in detail.lower()
         # Ensure no mock statistics or leak
         assert "MOCK" not in str(res.json())
+
+
+# ============================================================================
+# 10. RESOLUTION WORKFLOW & VERIFY MARKER COMPREHENSIVE TESTS
+# ============================================================================
+
+def test_43_verify_entry_rejects_contextual_verify_marker_kb_docx_062():
+    """Verifying an entry with contextual [VERIFY production policy.] returns 400."""
+    token = make_admin_token()
+    mgr = KnowledgeManager.get_instance()
+    entry = mgr.create_entry(
+        category="DELIVERY",
+        canonical_question="When are delivery earnings transferred?",
+        answer_markdown="Earnings are transferred every Thursday [VERIFY production policy.] via direct deposit.",
+        created_by="editor_lead",
+    )
+
+    res = client.post(
+        f"/api/admin/agent-knowledge/{entry.id}/verify",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"verification_notes": "Attempting verification on placeholder"},
+    )
+    assert res.status_code == 400
+    detail = res.json().get("detail", "")
+    assert "[VERIFY" in detail
+    assert entry.id in detail
+
+
+def test_44_admin_resolution_workflow_for_verify_marker():
+    """
+    Full resolution workflow:
+    1. Entry has [VERIFY production policy.]
+    2. Admin verify attempt is rejected with 400
+    3. Admin saves corrected answer and verification evidence via PUT
+    4. Refetched entry confirms clean answer, updated verification notes, and bumped version
+    5. Admin completes verification with 200 OK
+    """
+    admin_token = make_admin_token()
+    mgr = KnowledgeManager.get_instance()
+    entry = mgr.create_entry(
+        category="DELIVERY",
+        canonical_question="When are delivery earnings transferred to rider bank accounts?",
+        answer_markdown="Earnings are transferred every Thursday [VERIFY production policy.] through NEFT.",
+        created_by="ops_editor",
+    )
+    assert entry.version == 1
+    assert entry.is_verified is False
+
+    # Step 2: Attempting verification is blocked with 400
+    verify_res_1 = client.post(
+        f"/api/admin/agent-knowledge/{entry.id}/verify",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={"verification_notes": "Attempting verification"},
+    )
+    assert verify_res_1.status_code == 400
+    assert "[VERIFY" in verify_res_1.json().get("detail", "")
+
+    # Step 3: Admin corrects the answer and supplies verification notes via PUT
+    confirmed_answer = "Earnings are transferred every Thursday through automated NEFT batch processing."
+    confirmed_notes = "Verified against Delivery Operations Payout Runbook v2.4 (OPS-1092)."
+    update_res = client.put(
+        f"/api/admin/agent-knowledge/{entry.id}",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={
+            "answer_markdown": confirmed_answer,
+            "verification_notes": confirmed_notes,
+            "change_reason": "Resolved [VERIFY] marker with confirmed payout schedule",
+        },
+    )
+    assert update_res.status_code == 200
+    updated_data = update_res.json()["data"]
+    assert updated_data["answer_markdown"] == confirmed_answer
+    assert updated_data["verification_notes"] == confirmed_notes
+    assert updated_data["version"] == 2
+    assert updated_data["is_verified"] is False  # Must not auto-verify on edit!
+
+    # Step 4: Re-fetch the saved record and validate clean content
+    get_res = client.get(
+        f"/api/admin/agent-knowledge/{entry.id}",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert get_res.status_code == 200
+    refetched = get_res.json()["data"]
+    assert "[VERIFY" not in refetched["answer_markdown"]
+    assert refetched["answer_markdown"] == confirmed_answer
+    assert refetched["verification_notes"] == confirmed_notes
+    assert refetched["version"] == 2
+
+    # Step 5: Admin completes verification call
+    verify_res_2 = client.post(
+        f"/api/admin/agent-knowledge/{entry.id}/verify",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={"verification_notes": confirmed_notes},
+    )
+    assert verify_res_2.status_code == 200
+    verified_data = verify_res_2.json()["data"]
+    assert verified_data["is_verified"] is True
+    assert verified_data["verified_by"] == ADMIN_EMAIL
+    assert verified_data["status"] == "pending_review"  # Stays pending until explicit publish!
+
+
+def test_45_unsupported_policy_entry_stays_pending_and_cannot_publish():
+    """
+    Entries with unresolved [VERIFY] markers remain pending_review and
+    cannot be verified or published.
+    """
+    admin_token = make_admin_token()
+    mgr = KnowledgeManager.get_instance()
+    entry = mgr.create_entry(
+        category="DELIVERY",
+        canonical_question="What are delivery partner insurance payout guidelines?",
+        answer_markdown="Insurance coverage applies [VERIFY current production requirements and privacy policy.] for active orders.",
+        created_by="ops_editor",
+    )
+    assert entry.status == "pending_review"
+    assert entry.is_verified is False
+
+    # Verification blocked
+    res_verify = client.post(
+        f"/api/admin/agent-knowledge/{entry.id}/verify",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={"verification_notes": "Attempt"},
+    )
+    assert res_verify.status_code == 400
+
+    # Publication blocked
+    res_publish = client.post(
+        f"/api/admin/agent-knowledge/{entry.id}/publish",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert res_publish.status_code == 400
+    assert "Cannot publish" in res_publish.json().get("detail", "")
+
+    # Status remains pending_review
+    current = mgr.get_entry(entry.id)
+    assert current["status"] == "pending_review"
+    assert current["is_verified"] is False
+
+
+def test_46_unauthorized_users_cannot_edit_or_verify_knowledge():
+    """Non-admin users (customer and vendor roles) are rejected with 403 on edit and verify."""
+    mgr = KnowledgeManager.get_instance()
+    entry = mgr.create_entry(
+        category="GENERAL",
+        canonical_question="Can customers edit agent knowledge directly?",
+        answer_markdown="No, only authorized admins can edit or verify knowledge base entries.",
+        created_by="admin",
+    )
+
+    cust_token = make_customer_token()
+    vend_token = make_vendor_token()
+
+    # Customer cannot update
+    res_cust_put = client.put(
+        f"/api/admin/agent-knowledge/{entry.id}",
+        headers={"Authorization": f"Bearer {cust_token}"},
+        json={"answer_markdown": "Hacked answer."},
+    )
+    assert res_cust_put.status_code == 403
+
+    # Customer cannot verify
+    res_cust_ver = client.post(
+        f"/api/admin/agent-knowledge/{entry.id}/verify",
+        headers={"Authorization": f"Bearer {cust_token}"},
+        json={"verification_notes": "Rogue verify"},
+    )
+    assert res_cust_ver.status_code == 403
+
+    # Vendor cannot update
+    res_vend_put = client.put(
+        f"/api/admin/agent-knowledge/{entry.id}",
+        headers={"Authorization": f"Bearer {vend_token}"},
+        json={"answer_markdown": "Vendor updated answer."},
+    )
+    assert res_vend_put.status_code == 403
+
+    # Vendor cannot verify
+    res_vend_ver = client.post(
+        f"/api/admin/agent-knowledge/{entry.id}/verify",
+        headers={"Authorization": f"Bearer {vend_token}"},
+        json={"verification_notes": "Vendor verify"},
+    )
+    assert res_vend_ver.status_code == 403
+
+
+def test_47_published_entries_untouched_and_require_explicit_publish():
+    """
+    Verification does not automatically publish or alter existing published entries.
+    """
+    admin_token = make_admin_token()
+    mgr = KnowledgeManager.get_instance()
+
+    # 1. Existing published entry
+    pub_entry = mgr.create_entry(
+        category="POLICY",
+        canonical_question="What is the refund processing window?",
+        answer_markdown="Refunds are processed within 5-7 business days to the original payment method.",
+        created_by="finance_lead",
+    )
+    mgr.verify_entry(pub_entry.id, "finance_lead")
+    mgr.publish_entry(pub_entry.id, "finance_lead")
+
+    initial_published = mgr.get_entry(pub_entry.id)
+    assert initial_published["status"] == "published"
+    assert initial_published["is_verified"] is True
+
+    # 2. Separate entry undergoing resolution and verification
+    new_entry = mgr.create_entry(
+        category="POLICY",
+        canonical_question="Can late delivery compensation be claimed?",
+        answer_markdown="Late delivery claims can be filed via support within 24 hours of scheduled arrival.",
+        created_by="ops_editor",
+    )
+    verify_res = client.post(
+        f"/api/admin/agent-knowledge/{new_entry.id}/verify",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={"verification_notes": "Confirmed with Customer Experience Lead"},
+    )
+    assert verify_res.status_code == 200
+    assert verify_res.json()["data"]["status"] == "pending_review"  # NOT published!
+
+    # 3. Confirm initial published entry was completely untouched
+    after_published = mgr.get_entry(pub_entry.id)
+    assert after_published["status"] == "published"
+    assert after_published["version"] == initial_published["version"]
+    assert after_published["canonical_question"] == initial_published["canonical_question"]
+    assert after_published["answer_markdown"] == initial_published["answer_markdown"]

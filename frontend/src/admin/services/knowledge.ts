@@ -17,6 +17,7 @@ export interface KnowledgeEntry {
   updated_at?: string | null;
   synonyms?: string[];
   has_verify_marker?: boolean;
+  verification_notes?: string | null;
 }
 
 export interface KnowledgeVersion {
@@ -144,10 +145,16 @@ export const updateKnowledgeEntry = async (
     answer_markdown?: string;
     retrieval_type?: string;
     synonyms?: string[];
+    verification_notes?: string;
     change_reason?: string;
+    change_summary?: string;
   }
 ): Promise<{ success: boolean; data: KnowledgeEntry }> => {
-  const res = await adminApi.put(`/agent-knowledge/${knowledgeId}`, data);
+  const payload = {
+    ...data,
+    change_summary: data.change_summary || data.change_reason,
+  };
+  const res = await adminApi.put(`/agent-knowledge/${knowledgeId}`, payload);
   return res.data;
 };
 

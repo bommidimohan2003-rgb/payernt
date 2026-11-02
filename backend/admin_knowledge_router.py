@@ -134,6 +134,7 @@ class KnowledgeEntryUpdateSchema(BaseModel):
     synonyms: Optional[List[str]] = None
     verification_notes: Optional[str] = None
     change_summary: Optional[str] = Field(None, max_length=500)
+    change_reason: Optional[str] = Field(None, max_length=500)
 
 
 class VerifyEntrySchema(BaseModel):
@@ -358,7 +359,7 @@ def update_knowledge_entry(
             detail=f"Knowledge entry '{knowledge_id}' not found.",
         )
 
-    summary = data.change_summary or f"Revised by {admin['email']}"
+    summary = data.change_summary or data.change_reason or f"Revised by {admin['email']}"
     updated = _km.update_entry(
         knowledge_id=knowledge_id,
         canonical_question=data.canonical_question,
