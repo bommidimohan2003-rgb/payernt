@@ -32,6 +32,8 @@ AUXILIARY_STOP_WORDS = {
     # Telugu auxiliary and conversational particles
     "enti", "ela", "eppudu", "cheyali", "kavali", "unda", "undi", "avtundi",
     "cheyyocha", "ante", "kuda", "kosam", "enni", "ekkada", "enduku", "naku",
+    # Conversational carrier / query framing words
+    "tell", "about", "explain", "please", "describe", "gurinchi",
 }
 PROTECTED_DOMAIN_TERMS = {"payrent", "payernt", "payent"}
 
@@ -252,7 +254,7 @@ class AgentKnowledgeRetriever:
         has_changes = False
 
         for token in tokens:
-            if token.lower() in PROTECTED_DOMAIN_TERMS:
+            if token.lower() in PROTECTED_DOMAIN_TERMS or token.lower() in AUXILIARY_STOP_WORDS:
                 corrected.append(token)
                 continue
             if token in self.vocabulary or len(token) <= 2:
@@ -472,7 +474,7 @@ class AgentKnowledgeRetriever:
                 for st in field_dict["synonyms"]:
                     doc_all_terms.update(st)
                 doc_content = doc_all_terms - AUXILIARY_STOP_WORDS
-                unsatisfied = [t for t in q_content if not (t in doc_content or any(syn in doc_content for syn in self.synonym_registry.get_synonyms(t)))]
+                unsatisfied = [t for t in q_content if t not in PROTECTED_DOMAIN_TERMS and not (t in doc_content or any(syn in doc_content for syn in self.synonym_registry.get_synonyms(t)))]
                 if unsatisfied:
                     final_score *= (1.0 - (len(unsatisfied) / len(set(q_content))))
 
@@ -484,7 +486,7 @@ class AgentKnowledgeRetriever:
                 norm_query_terms = set(raw_query_tokens) - AUXILIARY_STOP_WORDS
                 if norm_query_terms:
                     matching_norm = set(all_matched_terms) & (norm_query_terms | q_content_expanded)
-                    sat_norm = sum(1 for t in norm_query_terms if (t in matching_norm or any(syn in matching_norm for syn in self.synonym_registry.get_synonyms(t))))
+                    sat_norm = sum(1 for t in norm_query_terms if (t in matching_norm or (t in PROTECTED_DOMAIN_TERMS and len(norm_query_terms) > 1) or any(syn in matching_norm for syn in self.synonym_registry.get_synonyms(t))))
                     coverage = sat_norm / len(norm_query_terms)
                     final_score *= coverage
                 else:

@@ -201,24 +201,43 @@ DEFAULT_INTENT_DEFINITIONS: List[IntentDefinition] = [
     # 6. KYC Status Check
     IntentDefinition(
         canonical_name="KYC_STATUS",
-        description="User is asking about the status of their KYC verification (pending, approved, submitted).",
-        english_keywords=("kyc", "verification", "aadhaar", "pan", "documents", "identity", "verify identity", "kyc status", "kyc pending"),
-        telugu_keywords=("na kyc pending lo undi", "kyc approve ayyinda", "documents submit chesanu", "kyc status enti"),
-        synonyms=("check my kyc", "is my kyc verified", "kyc review time", "how to verify kyc"),
+        description="User is asking about the personal status of their KYC verification (pending, approved, submitted, rejected).",
+        english_keywords=(
+            "kyc status", "my kyc", "kyc approved", "kyc pending", "kyc verified",
+            "check kyc", "identity verification status", "document status",
+            "aadhaar status", "pan status", "kyc review", "my documents"
+        ),
+        telugu_keywords=(
+            "na kyc pending lo undi", "na kyc approve ayyinda", "kyc approve ayyinda",
+            "na kyc status enti", "documents submit chesanu", "na documents status"
+        ),
+        synonyms=(
+            "check my kyc", "is my kyc verified", "my kyc status",
+            "is my kyc approved", "check my kyc status"
+        ),
         exact_phrases=(
             "check my kyc status",
             "is my kyc approved",
             "my kyc is pending",
-            "how long does kyc take",
             "na kyc pending lo undi",
+            "na kyc approve ayyinda",
             "kyc approve ayyinda",
             "documents submit chesanu",
             "kyc status enti",
+            "what is my kyc status",
+            "is my kyc rejected",
+            "has my kyc been approved",
+            "check my kyc verification status",
         ),
         regex_patterns=(
-            r"\b(kyc|identity\s+verification|documents?)\s+(status|pending|approved|check|inquiry)\b",
-            r"\b(check|what\s+is)\s+(my\s+)?kyc\b",
-            r"\bkyc\s+(pending(\s+lo\s+undi)?|approve\s+ayyinda)\b",
+            r"\b(check|what\s+is)\s+my\s+kyc(\s+status)?\b",
+            r"\bwhat\s+is\s+(the\s+)?status\s+of\s+(my\s+)?kyc\b",
+            r"\b(has|is)\s+my\s+kyc\s+(been\s+)?(approved|verified|rejected|declined|cleared|submitted)\b",
+            r"\bcheck\s+(my\s+)?(kyc|identity\s+verification)\s+status\b",
+            r"\bmy\s+(kyc|identity\s+verification|documents?)\s+(status|pending|approved|check|inquiry)\b",
+            r"\b(kyc|identity\s+verification)\s+status\b",
+            r"\b(na|naa)\s+kyc\s+(approve\s+ayyinda|pending(\s+lo\s+undi)?|status\s+enti)\b",
+            r"\bkyc\s+(approve\s+ayyinda|pending(\s+lo\s+undi)?)\b",
         ),
         priority=78,
         confidence_threshold=0.65,
@@ -691,7 +710,58 @@ DEFAULT_INTENT_DEFINITIONS: List[IntentDefinition] = [
         response_template_key="about_payent_response",
     ),
 
-    # 24. Unknown Intent (Fallback Default)
+    # 24. KYC Information / Guide Query
+    IntentDefinition(
+        canonical_name="KYC_INFO",
+        description="General questions explaining what KYC is, identity verification requirements, or document guidelines.",
+        english_keywords=(
+            "what is kyc", "explain kyc", "explain identity verification",
+            "can you explain identity verification", "tell me about kyc",
+            "about kyc", "kyc explanation", "identity verification explanation",
+            "kyc guidelines", "what is identity verification", "verify identity",
+            "identity verification", "what does kyc mean", "kyc info",
+        ),
+        telugu_keywords=(
+            "kyc ante enti", "kyc ante emiti", "identity verification ante enti",
+            "identity verification ante emiti", "kyc gurinchi", "kyc gurinchi cheppandi",
+            "kyc ela cheyali", "identity verification ela cheyali", "kyc ante what",
+        ),
+        synonyms=(
+            "what is kyc", "explain identity verification", "tell me about kyc",
+            "what is identity verification", "kyc meaning", "about kyc",
+            "identity verification in payent", "how kyc works",
+        ),
+        exact_phrases=(
+            "what is kyc",
+            "what is identity verification",
+            "explain identity verification",
+            "can you explain identity verification in payent",
+            "can you explain identity verification",
+            "tell me about kyc",
+            "tell me about identity verification",
+            "kyc ante enti",
+            "kyc ante emiti",
+            "identity verification ante enti",
+            "identity verification ante emiti",
+            "kyc gurinchi cheppu",
+            "kyc gurinchi cheppandi",
+            "kyc meaning",
+        ),
+        regex_patterns=(
+            r"\b(what\s+is|explain|tell\s+me\s+about|describe)\s+(the\s+)?(kyc|identity\s+verification)\b",
+            r"\b(can\s+you\s+)?explain\s+(identity\s+verification|kyc)(\s+in\s+payent)?\b",
+            r"\b(kyc|identity\s+verification)\s+ante\s+(enti|emiti|what)\b",
+            r"\b(kyc|identity\s+verification)\s+gurinchi(\s+cheppandi|\s+cheppu)?\b",
+            r"\bwhat\s+does\s+kyc\s+mean\b",
+            r"\b(tell\s+me|know)\s+about\s+(kyc|identity\s+verification)\b",
+        ),
+        priority=76,
+        confidence_threshold=0.65,
+        clarification_message="Are you looking for information on KYC and identity verification requirements?",
+        response_template_key="kyc_info_response",
+    ),
+
+    # 25. Unknown Intent (Fallback Default)
     IntentDefinition(
         canonical_name="UNKNOWN_INTENT",
         description="Input does not match any recognized customer support pattern with sufficient confidence.",

@@ -103,7 +103,8 @@ SYNONYM_GROUPS: Dict[str, Dict[str, List[str]]] = {
         "kyc": [
             "identity verification", "id verification", "document verification",
             "aadhaar verification", "pan verification", "id proof", "documents",
-            "government id", "profile verification", "submitted id"
+            "government id", "profile verification", "submitted id", "explain kyc",
+            "about kyc", "kyc explanation", "identity verification explanation"
         ],
         "kyc_rejected": [
             "kyc rejection", "verification failed", "document rejected",
@@ -194,6 +195,9 @@ TENGLISH_CONCEPT_MAP: List[Tuple[re.Pattern, str]] = [
     (re.compile(r"\b(nenu\s+)?enni\s+(rentals|bookings)\s+(teesukunnanu|chesanu)\b", re.IGNORECASE), "how many bookings rental history"),
     
     # KYC
+    (re.compile(r"\bkyc\s+ante\s+(enti|emiti)\b", re.IGNORECASE), "what is kyc"),
+    (re.compile(r"\bidentity\s+verification\s+ante\s+(enti|emiti)\b", re.IGNORECASE), "what is identity verification"),
+    (re.compile(r"\b(kyc|identity\s+verification)\s+gurinchi\b", re.IGNORECASE), "about kyc"),
     (re.compile(r"\b(na\s+)?kyc\s+(approve|confirm)\s+ayyinda\b", re.IGNORECASE), "kyc status approved"),
     (re.compile(r"\bkyc\s+(reject|fail)\s+ayyindi\b", re.IGNORECASE), "kyc rejected resubmit"),
     (re.compile(r"\bkyc\s+pending(\s+lo\s+undi)?\b", re.IGNORECASE), "kyc pending status"),

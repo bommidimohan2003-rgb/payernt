@@ -177,7 +177,7 @@ def populated_knowledge_manager() -> KnowledgeManager:
         canonical_question="What is KYC?",
         answer_markdown="KYC means Know Your Customer. Renters submit a valid PAN card to unlock equipment bookings and zero deposit eligibility.",
         retrieval_type="guide",
-        synonyms=["KYC requirements", "How to complete KYC", "Identity verification guide", "KYC ante enti"],
+        synonyms=["KYC requirements", "How to complete KYC", "Identity verification", "Identity verification guide", "KYC ante enti", "Explain KYC"],
     )
     km.publish_entry(e_kyc["id"], approved_by="admin@payent.in")
 
@@ -681,4 +681,78 @@ def test_31_about_payent_deterministic_response():
         assert res["confidence"] >= 0.70
         assert res["response_text"] == expected_msg
         assert res["suggestions"] == ["Browse Equipment", "List Gear", "How It Works", "Help Center"]
+
+
+def test_32_phase896_generic_kyc_explanation_routes_to_guide_retrieval(coordinator: HybridQueryCoordinator, populated_knowledge_manager: KnowledgeManager, mock_users_and_orders):
+    """Phase 8.9.6: Generic KYC and identity verification queries retrieve the guide entry without calling live DB."""
+    data = mock_users_and_orders
+    ctx = from_user_dict({"email": data["renter_email"], "role": "customer"})
+
+    # Ensure knowledge index is fresh with populated entries
+    coordinator.index_manager.refresh_index()
+
+    generic_queries = [
+        "What is KYC?",
+        "Explain identity verification.",
+        "Can you explain identity verification in Payent?",
+        "Tell me about KYC.",
+        "KYC ante enti?",
+        "Identity verification ante enti?",
+    ]
+
+    for q in generic_queries:
+        res = coordinator.coordinate_query(q, ctx)
+        assert res["query_type"] == QueryType.GUIDE.value, f"Query '{q}' was classified as {res['query_type']}"
+        assert res["tool_called"] == "knowledge_retrieval", f"Query '{q}' called tool {res['tool_called']}"
+        assert res["tool_result"] is not None
+        assert res["tool_result"]["success"] is True
+        assert res["tool_result"]["retrieval_type"] == "guide"
+        assert res["requires_auth"] is False
+
+        # Must not contain unrelated live context or personal status
+        resp_text = res["response_text"]
+        assert "Booking Status" not in resp_text, f"Query '{q}' leaked Booking Status"
+        assert "Recent Bookings" not in resp_text, f"Query '{q}' leaked Recent Bookings"
+        assert "NOT_STARTED" not in resp_text, f"Query '{q}' leaked personal NOT_STARTED status"
+        assert "KYC means Know Your Customer" in resp_text or "identity" in resp_text.lower()
+
+
+def test_33_phase896_personal_kyc_status_routes_to_live_db(coordinator: HybridQueryCoordinator, mock_users_and_orders):
+    """Phase 8.9.6: Personal KYC status questions use authenticated LIVE_DB."""
+    data = mock_users_and_orders
+    ctx = from_user_dict({"email": data["renter_email"], "role": "customer"})
+
+    personal_queries = [
+        "What is my KYC status?",
+        "Has my KYC been approved?",
+        "Is my KYC rejected?",
+        "Na KYC approve ayyinda?",
+        "Check my KYC verification status.",
+    ]
+
+    for q in personal_queries:
+        res = coordinator.coordinate_query(q, ctx)
+        assert res["query_type"] == QueryType.LIVE_DB.value, f"Personal query '{q}' classified as {res['query_type']}"
+        assert res["tool_called"] == "kyc_lookup", f"Personal query '{q}' called {res['tool_called']}"
+        assert res["tool_result"]["success"] is True
+        assert "APPROVED" in res["response_text"]
+
+
+def test_34_phase896_unauthenticated_personal_kyc_status_requires_auth(coordinator: HybridQueryCoordinator):
+    """Phase 8.9.6: Unauthenticated personal status requests require authentication."""
+    guest = create_guest_context()
+    personal_queries = [
+        "What is my KYC status?",
+        "Has my KYC been approved?",
+        "Is my KYC rejected?",
+        "Na KYC approve ayyinda?",
+        "Check my KYC verification status.",
+    ]
+
+    for q in personal_queries:
+        res = coordinator.coordinate_query(q, guest)
+        assert res["query_type"] == QueryType.LIVE_DB.value
+        assert res["requires_auth"] is True
+        assert res["tool_result"]["requires_auth"] is True
+        assert "sign in" in res["response_text"].lower()
 

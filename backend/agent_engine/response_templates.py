@@ -283,6 +283,18 @@ TEMPLATES: Dict[str, ResponseTemplate] = {
             "Help Center",
         ],
     ),
+
+    # 25. KYC Information Guide
+    "kyc_info_response": ResponseTemplate(
+        key="kyc_info_response",
+        message="KYC (Know Your Customer) is an identity verification process required by Payent to protect equipment owners and renters. You can verify your identity by uploading a valid government ID such as Aadhaar, PAN, Driving License, or Passport.",
+        suggested_chips=[
+            "Accepted Documents",
+            "How long does KYC take?",
+            "Check my KYC status",
+            "Help Center",
+        ],
+    ),
 }
 
 

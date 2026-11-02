@@ -89,7 +89,21 @@ class HybridQueryCoordinator:
         text_lower = text.lower()
 
         # If it is explicitly a general policy or FAQ query without personal possessives, it's not personal
-        if any(p in text_lower for p in ("policy", "policies", "rules", "guidelines", "procedure", "how does", "how do i")):
+        if any(p in text_lower for p in (
+            "policy", "policies", "rules", "guidelines", "procedure", "how does", "how do i",
+            "what is", "tell me about", "explain", "can you explain", "ante enti", "ante emiti", "gurinchi"
+        )):
+            personal_possessives = ("my", "mine", "naa", "na", "nenu", "ma", "maa")
+            if not any(re.search(rf"\b{p}\b", text_lower) for p in personal_possessives):
+                return False
+
+        # If intent is an explicit guide intent, it is NOT personal unless personal possessives exist
+        guide_intents = {
+            "FAQ_QUERY", "HOW_IT_WORKS", "CANCELLATION_POLICY",
+            "SECURITY_DEPOSIT", "DAMAGE_PROTECTION", "KYC_INFO",
+            "PAYMENT_OPTIONS", "PIN_SAFETY", "ABOUT_PAYENT"
+        }
+        if intent in guide_intents:
             personal_possessives = ("my", "mine", "naa", "na", "nenu", "ma", "maa")
             if not any(re.search(rf"\b{p}\b", text_lower) for p in personal_possessives):
                 return False
@@ -116,7 +130,6 @@ class HybridQueryCoordinator:
             r"\b(naa\s+bookings\s+chupinchu|nenu\s+enni\s+rentals)\b",
             r"\b(my\s+bookings|my\s+orders|show\s+bookings)\b",
         ]
-        text_lower = text.lower()
         return any(re.search(pat, text_lower) for pat in personal_patterns)
 
     def _has_policy_intent(self, text: str, intent: str) -> bool:
@@ -136,15 +149,15 @@ class HybridQueryCoordinator:
             return True
 
         # Telugu-English policy markers
-        if any(w in text_lower for w in ("kuda cheppu", "kuda cheppandi", "ante enti", "ela cheyali")):
+        if any(w in text_lower for w in ("kuda cheppu", "kuda cheppandi", "ante enti", "ante emiti", "ela cheyali", "gurinchi")):
             return True
 
         # Advice/guidance phrases
         if any(w in text_lower for w in ("what should i do", "what if", "can i cancel", "how do i return", "how to return")):
             return True
 
-        # General definitions "what is X" ONLY if not asking for personal status or records
-        if re.search(r"\bwhat\s+is\s+(?!(the\s+)?([a-z]+\s+)?status\b|my\b|naa\b|na\b)", text_lower):
+        # General definitions "what is X", "explain X", "tell me about X" ONLY if not asking for personal status or records
+        if re.search(r"\b(what\s+is|explain|tell\s+me\s+about|describe|can\s+you\s+explain)\s+(?!(the\s+)?([a-z]+\s+)?status\b|my\b|naa\b|na\b)", text_lower):
             return True
 
         # How to / how does
@@ -183,23 +196,38 @@ class HybridQueryCoordinator:
         has_live = self._has_personal_intent(message, intent)
         has_policy = self._has_policy_intent(message, intent)
 
-        # 3. Hybrid detection: both live and policy indicators present
+        # 3. If KB match is strongly a verified GUIDE document and query has no personal intent, route to GUIDE
+        if (
+            kb_match
+            and kb_match.retrieval_type == "guide"
+            and kb_match.retrieval_confidence in ("HIGH", "MEDIUM")
+            and not has_live
+        ):
+            return QueryType.GUIDE
+
+        # 4. Pure Live DB status checks take precedence over KB hybrid match
+        # (e.g. "Is my KYC rejected?", "Has my KYC been approved?", "What is my KYC status?")
+        if re.search(r"\b(is|has)\s+(my|na|naa)\s+kyc\s+(been\s+)?(approved|rejected|verified|pending)\b", message.lower()):
+            return QueryType.LIVE_DB
+
+        # 5. Hybrid detection: both live and policy indicators present
         if has_live and has_policy:
             return QueryType.HYBRID
 
-        # 4. Pure Policy / Guide
+        # 6. Pure Policy / Guide
         if has_policy and not has_live:
             return QueryType.GUIDE
 
-        # 5. Knowledge base hybrid typing: KB document explicitly flagged as 'hybrid'
+        # 7. Knowledge base hybrid typing: KB document explicitly flagged as 'hybrid'
         if kb_match and kb_match.retrieval_type == "hybrid" and kb_match.retrieval_confidence in ("HIGH", "MEDIUM"):
-            return QueryType.HYBRID
+            if has_policy or not has_live or any(w in message.lower() for w in ("what should i do", "how to", "why", "what if", "resubmit", "fix")):
+                return QueryType.HYBRID
 
-        # 6. Pure Live DB
+        # 8. Pure Live DB
         if has_live or intent in ("BOOKING_STATUS", "BOOKING_DETAILS", "BOOKING_CANCELLATION", "PAYMENT_STATUS", "REFUND_STATUS", "KYC_STATUS", "DELIVERY_STATUS", "SUPPORT_STATUS"):
             return QueryType.LIVE_DB
 
-        # 7. Default Guide
+        # 9. Default Guide
         return QueryType.GUIDE
 
     # =========================================================================
@@ -885,8 +913,24 @@ class HybridQueryCoordinator:
                         account_section = "### Refund Status\nNotice: Live refund records are temporarily unavailable due to a database connection delay."
                     else:
                         account_section = f"### Refund Status\nNotice: {live_tool_result.get('error', 'Could not retrieve live refund data.')}"
-            else:
-                # Default to booking status
+            elif "kyc" in msg_lower or "identity" in msg_lower:
+                live_tool_called = "kyc_lookup"
+                live_tool_result = get_kyc_status_tool(context)
+                if live_tool_result.get("success"):
+                    kyc_data = live_tool_result.get("kyc", {})
+                    st = kyc_data.get("status", "NOT_STARTED").upper()
+                    account_section = (
+                        f"### Your KYC Status\n"
+                        f"• Status: **{st}**\n"
+                        f"• {kyc_data.get('status_description', '')}"
+                    )
+                else:
+                    if live_tool_result.get("database_error"):
+                        account_section = "### KYC Status\nNotice: Live KYC records are temporarily unavailable due to a database connection delay."
+                    else:
+                        account_section = "### KYC Status\nNotice: Could not retrieve live KYC status."
+            elif booking_id or any(w in msg_lower for w in ("booking", "order", "rental", "reservation")):
+                # Booking lookup ONLY when booking/order is explicitly queried
                 live_tool_called = "booking_lookup"
                 if booking_id:
                     live_tool_result = get_booking_details_tool(context, booking_id)
@@ -913,9 +957,15 @@ class HybridQueryCoordinator:
                             account_section = "### Booking Status\nYou currently have no active or previous bookings."
                     else:
                         account_section = "### Booking Status\nNotice: We could not retrieve your live bookings at this moment due to a connection delay."
+            else:
+                # No relevant live domain requested; do not append unrelated booking status
+                account_section = ""
 
         # 3. Combine Sections
-        response_text = f"{account_section}\n\n{policy_section}".strip()
+        if account_section:
+            response_text = f"{account_section}\n\n{policy_section}".strip()
+        else:
+            response_text = policy_section.strip()
 
         combined_tool_result = {
             "success": True,

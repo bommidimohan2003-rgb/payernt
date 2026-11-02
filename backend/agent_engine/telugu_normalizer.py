@@ -118,11 +118,17 @@ class TeluguNormalizer:
         (re.compile(r"\b(refund|dabulu|amount|money)\s+(eppudu\s+vastundi|return\s+eppudu\s+vastundi)\b", re.IGNORECASE), "refund status when return"),
         (re.compile(r"\b((na|naa)\s+money|(na|naa)\s+dabulu|(na|naa)\s+amount)\s+return\s+(cheyyandi|kavali)\b", re.IGNORECASE), "refund request return money"),
         (re.compile(r"\b(amount|refund|money)\s+inka\s+raledu\b", re.IGNORECASE), "refund delayed not received"),
-        # KYC Verification
+        # KYC Verification (Personal Status)
         (re.compile(r"\b((na|naa|maa|my)\s+)?kyc\s+pending(\s+lo\s+undi)?\b", re.IGNORECASE), "kyc status pending check"),
         (re.compile(r"\bkyc\s+reject\s+ayyindi\b", re.IGNORECASE), "kyc rejection issue"),
-        (re.compile(r"\bkyc\s+approve\s+ayyinda\b", re.IGNORECASE), "kyc approval check"),
+        (re.compile(r"\b((na|naa|maa|my)\s+)?kyc\s+approve\s+ayyinda\b", re.IGNORECASE), "kyc approval check"),
+        (re.compile(r"\b((na|naa|maa|my)\s+)?kyc\s+(status\s+)?enti\b", re.IGNORECASE), "my kyc status check"),
         (re.compile(r"\bdocuments?\s+submit\s+chesanu\b", re.IGNORECASE), "kyc documents submitted status"),
+        # KYC Explanation & Guidelines (Informational)
+        (re.compile(r"\bkyc\s+ante\s+(enti|emiti)\b", re.IGNORECASE), "what is kyc"),
+        (re.compile(r"\bidentity\s+verification\s+ante\s+(enti|emiti)\b", re.IGNORECASE), "what is identity verification"),
+        (re.compile(r"\b(kyc|identity\s+verification)\s+gurinchi(\s+cheppandi|\s+cheppu)?\b", re.IGNORECASE), "about kyc explanation"),
+        (re.compile(r"\b(kyc|identity\s+verification)\s+ela\s+cheyali\b", re.IGNORECASE), "how to do kyc verification"),
         # Delivery & Tracking
         (re.compile(r"\b(order|delivery)\s+deliver(ed)?\s+ayyinda\b", re.IGNORECASE), "delivery status tracking delivered check"),
         (re.compile(r"\bdelivery\s+ek+ada\s+undi\b", re.IGNORECASE), "delivery status location track"),
@@ -141,12 +147,12 @@ class TeluguNormalizer:
 
     # Individual Tenglish words indicating vernacular context
     TELUGU_INDICATOR_WORDS: Set[str] = {
-        "na", "naa", "maa", "enti", "yenti", "ekkada", "ekada", "eppudu", "epudu",
+        "na", "naa", "maa", "enti", "yenti", "emiti", "ekkada", "ekada", "eppudu", "epudu",
         "kavali", "cheyali", "cheyyandi", "cheyyi", "chesanu", "ayyinda",
         "ayyindi", "aindi", "raledu", "undi", "undhi", "unnaru", "unnadu",
         "vachinda", "vastundi",
         "dabulu", "dabbulu", "paisalu", "matladali", "vadhu", "oddu", "inka",
-        "namaste", "namaskaram", "bagunnara", "tho", "lo", "kosam"
+        "namaste", "namaskaram", "bagunnara", "tho", "lo", "kosam", "gurinchi", "ante"
     }
 
     # Direct translation of semantic core terms for hybrid parsing
@@ -158,11 +164,13 @@ class TeluguNormalizer:
         "eppudu": "when",
         "epudu": "when",
         "enti": "what",
+        "emiti": "what",
         "kavali": "need",
         "raledu": "not_received",
         "vadhu": "cancel",
         "matladali": "talk",
         "chesanu": "submitted",
+        "gurinchi": "about",
     }
 
     def __init__(self):
