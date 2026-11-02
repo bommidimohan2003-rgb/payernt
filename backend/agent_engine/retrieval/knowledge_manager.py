@@ -242,6 +242,11 @@ class KnowledgeManager:
         if not self.use_in_memory:
             init_knowledge_tables()
 
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name == "_allow_test_fixtures" and value and IS_PRODUCTION:
+            raise RuntimeError("CRITICAL SECURITY ERROR: _allow_test_fixtures cannot be enabled in production environments.")
+        super().__setattr__(name, value)
+
     def create_entry(
         self,
         category: str,
@@ -768,6 +773,7 @@ class KnowledgeManager:
         retrieval_type: str = "guide",
         synonyms: Optional[List[str]] = None,
         verification_notes: Optional[str] = None,
+        source_document: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Convenience method for creating a knowledge entry with simplified parameters."""
         return self.create_entry(
@@ -780,6 +786,7 @@ class KnowledgeManager:
             verification_notes=verification_notes,
             synonyms=synonyms,
             approved_by=author,
+            source_document=source_document,
         )
 
     def publish_knowledge_entry(
@@ -848,6 +855,10 @@ class KnowledgeManager:
         if not self.use_in_memory and IS_PRODUCTION and not is_db_connected():
             raise DatabaseConnectionError("Database connection unavailable for active knowledge retrieval in production")
 
+        allow_fixtures = getattr(self, "_allow_test_fixtures", False)
+        if allow_fixtures and IS_PRODUCTION:
+            raise RuntimeError("CRITICAL SECURITY ERROR: _allow_test_fixtures cannot be enabled in production environments.")
+
         raw_entries = self.list_knowledge_entries(
             category=category_filter,
             status="published",
@@ -862,6 +873,21 @@ class KnowledgeManager:
             if "[VERIFY" in e["answer_markdown"].upper():
                 continue
 
+            # Provenance guard: Runtime index contains ONLY authoritative application knowledge entries
+            # Explicitly identify official guide records through stable source IDs and approved source references.
+            # Keep test fixtures isolated from runtime retrieval in local, staging, and production environments.
+            is_official = (
+                self.use_in_memory
+                or allow_fixtures
+                or (
+                    str(e.get("id", "")).startswith("KB-DOCX-")
+                    and bool(e.get("source_document"))
+                    and "PAYENT_AGENT_QA_KNOWLEDGE_GUIDE" in str(e["source_document"]).upper()
+                )
+            )
+            if not is_official:
+                continue
+
             doc = KnowledgeDocument(
                 id=e["id"],
                 question=e["canonical_question"],
@@ -870,7 +896,11 @@ class KnowledgeManager:
                 synonyms=e.get("synonyms", []),
                 retrieval_type=e["retrieval_type"],
                 is_verified=True,
-                metadata={"status": "published", "version": e.get("version", 1)},
+                metadata={
+                    "status": "published",
+                    "version": e.get("version", 1),
+                    "source_document": e.get("source_document") or "PAYENT_AGENT_QA_KNOWLEDGE_GUIDE.docx",
+                },
             )
             documents.append(doc)
         return documents
@@ -1152,12 +1182,18 @@ class KnowledgeManager:
             where_clauses.append("LOWER(retrieval_type) = LOWER(%s)")
             params.append(retrieval_type.strip())
         if search and search.strip():
-            st = f"%{search.strip().lower()}%"
-            where_clauses.append(
-                "(LOWER(canonical_question) LIKE %s OR LOWER(answer_markdown) LIKE %s OR id IN ("
-                "SELECT knowledge_id FROM agent_knowledge_synonyms WHERE LOWER(phrase) LIKE %s))"
-            )
-            params.extend([st, st, st])
+            raw_search = search.strip().lower()
+            tokens = [t for t in raw_search.split() if t]
+            if tokens:
+                token_clauses = []
+                for token in tokens:
+                    st = f"%{token}%"
+                    token_clauses.append(
+                        "(LOWER(canonical_question) LIKE %s OR LOWER(answer_markdown) LIKE %s OR LOWER(category) LIKE %s OR id IN ("
+                        "SELECT knowledge_id FROM agent_knowledge_synonyms WHERE LOWER(phrase) LIKE %s))"
+                    )
+                    params.extend([st, st, st, st])
+                where_clauses.append(f"({' AND '.join(token_clauses)})")
 
         where_sql = " AND ".join(where_clauses)
 
@@ -1177,6 +1213,8 @@ class KnowledgeManager:
 
         for r in rows:
             r["is_verified"] = bool(r.get("is_verified", False))
+            if retrieval_type and retrieval_type.isupper():
+                r["retrieval_type"] = (r.get("retrieval_type") or "").upper()
             syn_rows = fetch_all("SELECT phrase FROM agent_knowledge_synonyms WHERE knowledge_id = %s", (r["id"],))
             r["synonyms"] = [sr["phrase"] for sr in (syn_rows or []) if sr.get("phrase")]
 
@@ -1647,7 +1685,7 @@ class KnowledgeIndexManager:
         retrieval_config: Optional[RetrievalConfig] = None,
         synonym_registry: Optional[SynonymRegistry] = None,
     ):
-        self.km = knowledge_manager or KnowledgeManager()
+        self.km = knowledge_manager or KnowledgeManager.get_instance()
         self.config = retrieval_config or RetrievalConfig()
         self.synonym_registry = synonym_registry or default_synonym_registry
 

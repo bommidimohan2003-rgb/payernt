@@ -172,17 +172,29 @@ def import_knowledge_guide(
     file_path: Optional[str] = None,
     dry_run: bool = False,
     km: Optional[KnowledgeManager] = None,
+    target: str = "local",
+    confirm_production: bool = False,
 ) -> Dict[str, Any]:
     """
     Executes the ingestion pipeline.
     Parses DOCX, validates entries, and inserts or previews records.
     Guarantees idempotency and safety.
+    Strictly requires explicit target='production' and confirm_production=True to write to production TiDB.
     """
     actual_path = file_path or find_default_docx_path()
     logger.info(f"Initiating knowledge guide import from: {actual_path}")
 
     entries = parse_docx_knowledge_guide(actual_path)
     manager = km or KnowledgeManager()
+
+    # Explicit production target safety check
+    from config import IS_PRODUCTION
+    if (target == "production" or IS_PRODUCTION) and not getattr(manager, "use_in_memory", False):
+        if not dry_run and not confirm_production:
+            raise ValueError(
+                "CRITICAL SECURITY GUARD: Modifying production TiDB Cloud requires explicit "
+                "target='production' and confirm_production=True. Aborting to protect production."
+            )
 
     # Pre-calculate category & retrieval statistics
     categories = sorted(list(set(e["category"] for e in entries)))
@@ -289,10 +301,17 @@ def main():
     parser = argparse.ArgumentParser(description="Ingest PAYENT_AGENT_QA_KNOWLEDGE_GUIDE.docx into Payent Agent Knowledge DB.")
     parser.add_argument("--file", "-f", type=str, default=None, help="Path to PAYENT_AGENT_QA_KNOWLEDGE_GUIDE.docx")
     parser.add_argument("--dry-run", "-d", action="store_true", help="Parse and preview without database modifications.")
+    parser.add_argument("--target", choices=["local", "production"], default="local", help="Target database environment (default: local).")
+    parser.add_argument("--confirm-production", action="store_true", help="Explicit safety confirmation required when targeting production TiDB Cloud.")
     args = parser.parse_args()
 
     try:
-        stats = import_knowledge_guide(file_path=args.file, dry_run=args.dry_run)
+        stats = import_knowledge_guide(
+            file_path=args.file,
+            dry_run=args.dry_run,
+            target=args.target,
+            confirm_production=args.confirm_production,
+        )
         print_summary(stats)
     except Exception as e:
         logger.error(f"Import failed: {e}", exc_info=True)

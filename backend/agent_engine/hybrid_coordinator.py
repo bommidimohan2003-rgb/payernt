@@ -411,6 +411,7 @@ class HybridQueryCoordinator:
                     "tool_result": {
                         "success": True,
                         "knowledge_id": top_kb.knowledge_id,
+                        "source_reference": getattr(top_kb, "source_reference", None) or "PAYENT_AGENT_QA_KNOWLEDGE_GUIDE.docx",
                         "score": round(top_kb.similarity_score, 4),
                         "category": top_kb.category,
                         "retrieval_type": top_kb.retrieval_type,
@@ -921,6 +922,7 @@ class HybridQueryCoordinator:
             "live_tool": live_tool_called,
             "live_result": live_tool_result,
             "knowledge_id": policy_doc.knowledge_id if policy_doc else None,
+            "source_reference": (getattr(policy_doc, "source_reference", None) or "PAYENT_AGENT_QA_KNOWLEDGE_GUIDE.docx") if policy_doc else None,
             "knowledge_score": round(policy_doc.similarity_score, 4) if policy_doc else None,
         }
 

@@ -19,6 +19,23 @@ from agent_engine.retrieval.synonym_dict import SynonymRegistry, default_synonym
 from search_ml import levenshtein_distance, tokenize as search_ml_tokenize
 
 
+AUXILIARY_STOP_WORDS = {
+    "does", "do", "did", "is", "are", "was", "were", "be", "been", "being",
+    "have", "has", "had", "can", "could", "shall", "should", "will", "would",
+    "the", "a", "an", "and", "or", "in", "on", "at", "to", "for", "of", "with",
+    "what", "how", "why", "when", "where", "which", "who", "whom",
+    # English personal & possessive pronouns
+    "i", "me", "my", "myself", "we", "our", "ours", "ourselves",
+    "you", "your", "yours", "yourself", "yourselves",
+    "he", "him", "his", "himself", "she", "her", "hers", "herself",
+    "it", "its", "itself", "they", "them", "their", "theirs", "themselves",
+    # Telugu auxiliary and conversational particles
+    "enti", "ela", "eppudu", "cheyali", "kavali", "unda", "undi", "avtundi",
+    "cheyyocha", "ante", "kuda", "kosam", "enni", "ekkada", "enduku", "naku",
+}
+PROTECTED_DOMAIN_TERMS = {"payrent", "payernt", "payent"}
+
+
 @dataclass
 class KnowledgeDocument:
     """Represents an indexable knowledge base article or Q&A pair."""
@@ -72,6 +89,7 @@ class RetrievalResult:
     is_verified: bool = True
     competing_candidates: List[Dict[str, Any]] = field(default_factory=list)
     did_you_mean: Optional[str] = None
+    source_reference: Optional[str] = "PAYENT_AGENT_QA_KNOWLEDGE_GUIDE.docx"
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -88,6 +106,7 @@ class RetrievalResult:
             "is_verified": self.is_verified,
             "competing_candidates": self.competing_candidates,
             "did_you_mean": self.did_you_mean,
+            "source_reference": self.source_reference,
         }
 
 
@@ -233,6 +252,9 @@ class AgentKnowledgeRetriever:
         has_changes = False
 
         for token in tokens:
+            if token.lower() in PROTECTED_DOMAIN_TERMS:
+                corrected.append(token)
+                continue
             if token in self.vocabulary or len(token) <= 2:
                 corrected.append(token)
                 continue
@@ -280,13 +302,14 @@ class AgentKnowledgeRetriever:
 
         dot_product = 0.0
         for t in common:
-            idf_val = self.idf.get(t, 1.0)
+            raw_idf = self.idf.get(t, 1.0)
+            idf_val = 0.25 if t in AUXILIARY_STOP_WORDS else raw_idf
             tf_q = 1.0 + math.log(c_q[t])
             tf_d = 1.0 + math.log(c_d[t])
             dot_product += (tf_q * idf_val) * (tf_d * idf_val)
 
-        norm_q = math.sqrt(sum(((1.0 + math.log(c)) * self.idf.get(t, 1.0)) ** 2 for t, c in c_q.items()))
-        norm_d = math.sqrt(sum(((1.0 + math.log(c)) * self.idf.get(t, 1.0)) ** 2 for t, c in c_d.items()))
+        norm_q = math.sqrt(sum(((1.0 + math.log(c)) * (0.25 if t in AUXILIARY_STOP_WORDS else self.idf.get(t, 1.0))) ** 2 for t, c in c_q.items()))
+        norm_d = math.sqrt(sum(((1.0 + math.log(c)) * (0.25 if t in AUXILIARY_STOP_WORDS else self.idf.get(t, 1.0))) ** 2 for t, c in c_d.items()))
 
         if norm_q == 0.0 or norm_d == 0.0:
             return 0.0, []
@@ -352,6 +375,11 @@ class AgentKnowledgeRetriever:
         w_c = self.config.weight_category
         w_a = self.config.weight_answer
 
+        q_content = [t for t in raw_query_tokens if t not in AUXILIARY_STOP_WORDS]
+        q_content_expanded = set(q_content)
+        for t in q_content:
+            q_content_expanded.update(self.synonym_registry.get_synonyms(t))
+
         for doc_id, doc in self.documents.items():
             if category_filter and doc.category.lower() != category_filter.lower():
                 continue
@@ -360,12 +388,27 @@ class AgentKnowledgeRetriever:
 
             # Field similarity evaluations
             sim_q, c_q = self.compute_field_cosine(expanded_tokens, field_dict["question"])
-            
+            if len(q_content) >= 2:
+                q_in_question = sum(1 for t in q_content if (t in c_q or any(syn in c_q for syn in self.synonym_registry.get_synonyms(t))))
+                q_cov_q = q_in_question / len(set(q_content))
+                if q_cov_q < 0.50:
+                    sim_q *= q_cov_q
+
             # Synonyms: test both raw and expanded tokens, take max
             sim_s = 0.0
             c_s: List[str] = []
             for st in field_dict["synonyms"]:
                 s_sim, s_common = self.compute_field_cosine(expanded_tokens, st)
+                st_content = set(st) - AUXILIARY_STOP_WORDS
+                if st_content and len(s_common) < len(st):
+                    s_comm_content = set(s_common) - AUXILIARY_STOP_WORDS
+                    ratio = len(s_comm_content) / len(st_content)
+                    s_sim *= min(1.0, max(0.40, ratio))
+                if len(q_content) >= 2:
+                    q_in_syn = sum(1 for t in q_content if (t in s_common or any(syn in s_common for syn in self.synonym_registry.get_synonyms(t))))
+                    q_cov_s = q_in_syn / len(set(q_content))
+                    if q_cov_s < 0.50:
+                        s_sim *= q_cov_s
                 if s_sim > sim_s:
                     sim_s = s_sim
                     c_s = s_common
@@ -375,13 +418,35 @@ class AgentKnowledgeRetriever:
 
             # Exact or near-exact question / synonym match bonuses
             doc_q_clean = doc.question.lower().strip(" ?!.,")
+            is_exact = False
             if clean_raw_lower == doc_q_clean or (len(clean_raw_lower) >= 10 and clean_raw_lower in doc_q_clean):
                 sim_q = max(sim_q, 0.95)
+                is_exact = True
             elif any(clean_raw_lower == s.lower().strip(" ?!.,") for s in doc.synonyms):
                 sim_s = max(sim_s, 0.92)
+                is_exact = True
 
             best_title_sim = max(sim_q, sim_s)
             best_title_w = w_q if sim_q >= sim_s else w_s
+
+            # Title coverage check across all title variants (question + synonyms)
+            if len(q_content) >= 2 and not is_exact:
+                title_terms = set(field_dict["question"])
+                for st in field_dict["synonyms"]:
+                    title_terms.update(st)
+                title_content = title_terms - AUXILIARY_STOP_WORDS
+                if title_content:
+                    matched_title = q_content_expanded & title_content
+                    satisfied = sum(1 for t in q_content if (t in matched_title or any(syn in matched_title for syn in self.synonym_registry.get_synonyms(t))))
+                    cov = satisfied / len(set(q_content))
+                    if cov < 0.60:
+                        best_title_sim *= cov
+
+            # Title-gating on category and answer:
+            # Category and answer text cannot lift an unrelated article (weak title match < 0.45) into high score
+            if best_title_sim < 0.45:
+                sim_c *= (best_title_sim / 0.45)
+                sim_a *= (best_title_sim / 0.45)
 
             # Weighted field synthesis
             active_weights = best_title_w
@@ -400,21 +465,37 @@ class AgentKnowledgeRetriever:
             # Preserve strong title matches
             final_score = max(combined_score, best_title_sim * 0.95)
 
-            # Query Coverage Damping:
-            # Prevents out-of-vocabulary collapse for queries where only 1 or 2 stray words match
-            # Only damp if not already a strong title/synonym match and query has sufficient length
-            all_matched_terms = set(c_q) | set(c_s) | set(c_c) | set(c_a)
+            # Missing operative term penalty across the entire document:
+            # Damps candidate if operative query content terms are completely absent from document
+            if len(q_content) >= 2 and not is_exact and best_title_sim < 0.50:
+                doc_all_terms = set(field_dict["question"]) | set(field_dict["category"]) | set(field_dict["answer"])
+                for st in field_dict["synonyms"]:
+                    doc_all_terms.update(st)
+                doc_content = doc_all_terms - AUXILIARY_STOP_WORDS
+                unsatisfied = [t for t in q_content if not (t in doc_content or any(syn in doc_content for syn in self.synonym_registry.get_synonyms(t)))]
+                if unsatisfied:
+                    final_score *= (1.0 - (len(unsatisfied) / len(set(q_content))))
+
+            all_matched_terms = list(set(c_q) | set(c_s) | set(c_c) | set(c_a))
+
+            # Query Coverage Damping (with transliteration and stop-word awareness)
             query_eval_terms = unique_original_terms | set(raw_query_tokens)
-            if query_eval_terms and len(query_eval_terms) >= 4 and best_title_sim < 0.80:
-                matched_eval = all_matched_terms & query_eval_terms
-                coverage = len(matched_eval) / len(query_eval_terms)
-                if coverage < 0.30:
+            if query_eval_terms and len(query_eval_terms) >= 3 and best_title_sim < 0.85:
+                norm_query_terms = set(raw_query_tokens) - AUXILIARY_STOP_WORDS
+                if norm_query_terms:
+                    matching_norm = set(all_matched_terms) & (norm_query_terms | q_content_expanded)
+                    sat_norm = sum(1 for t in norm_query_terms if (t in matching_norm or any(syn in matching_norm for syn in self.synonym_registry.get_synonyms(t))))
+                    coverage = sat_norm / len(norm_query_terms)
+                    final_score *= coverage
+                else:
+                    matching_orig = set(all_matched_terms) & unique_original_terms
+                    coverage = len(matching_orig) / len(unique_original_terms)
                     final_score *= coverage
 
             if final_score <= 0.0001:
                 continue
 
-            scored_candidates.append((doc, final_score, sorted(list(all_matched_terms))))
+            scored_candidates.append((doc, final_score, sorted(all_matched_terms)))
 
         if not scored_candidates:
             return []
@@ -473,6 +554,7 @@ class AgentKnowledgeRetriever:
                     is_verified=doc.is_verified,
                     competing_candidates=competing_list if (rank == 1 and is_ambiguous) else [],
                     did_you_mean=did_you_mean_phrase if rank == 1 else None,
+                    source_reference=(doc.metadata.get("source_document") if (doc.metadata and isinstance(doc.metadata, dict)) else "PAYENT_AGENT_QA_KNOWLEDGE_GUIDE.docx") or "PAYENT_AGENT_QA_KNOWLEDGE_GUIDE.docx",
                 )
             )
 

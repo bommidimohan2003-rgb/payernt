@@ -347,3 +347,71 @@ def test_dev_mode_preserves_mock_fixtures(monkeypatch):
         order = get_order_by_id("ord_secret_999")
         assert order is not None
         assert order["id"] == "ord_secret_999"
+
+
+def test_allow_test_fixtures_forbidden_in_production(monkeypatch):
+    """Verifies that _allow_test_fixtures cannot be enabled or executed in production."""
+    monkeypatch.setattr("agent_engine.retrieval.knowledge_manager.IS_PRODUCTION", True)
+    km = KnowledgeManager(use_in_memory=True)
+
+    # Attempting to assign _allow_test_fixtures in production must raise RuntimeError
+    with pytest.raises(RuntimeError, match="cannot be enabled in production"):
+        km._allow_test_fixtures = True
+
+    # Even if somehow present on instance, get_active_knowledge_documents must abort
+    object.__setattr__(km, "_allow_test_fixtures", True)
+    with pytest.raises(RuntimeError, match="cannot be enabled in production"):
+        km.get_active_knowledge_documents()
+
+
+def test_runtime_provenance_strictly_isolates_test_fixtures(monkeypatch):
+    """Verifies that arbitrary records without official KB-DOCX- ID and source_document are excluded."""
+    monkeypatch.setattr("agent_engine.retrieval.knowledge_manager.IS_PRODUCTION", False)
+    km = KnowledgeManager(use_in_memory=False)
+
+    # Mock list_knowledge_entries returning a mix of official, test fixture, and custom entries
+    mock_entries = [
+        {
+            "id": "KB-DOCX-001",
+            "category": "ABOUT",
+            "canonical_question": "What is Payent?",
+            "answer_markdown": "Payent is a verified equipment rental marketplace.",
+            "status": "published",
+            "is_verified": True,
+            "retrieval_type": "GUIDE",
+            "source_document": "PAYENT_AGENT_QA_KNOWLEDGE_GUIDE.docx",
+            "version": 1,
+            "synonyms": [],
+        },
+        {
+            "id": "KB-TEST-999",
+            "category": "TEST",
+            "canonical_question": "Test fixture question?",
+            "answer_markdown": "Test fixture answer.",
+            "status": "published",
+            "is_verified": True,
+            "retrieval_type": "GUIDE",
+            "source_document": "test_mock.docx",
+            "version": 1,
+            "synonyms": [],
+        },
+        {
+            "id": "KB-DOCX-099",
+            "category": "UNAPPROVED_SOURCE",
+            "canonical_question": "Question with wrong source?",
+            "answer_markdown": "Answer with wrong source.",
+            "status": "published",
+            "is_verified": True,
+            "retrieval_type": "GUIDE",
+            "source_document": "random_source.pdf",
+            "version": 1,
+            "synonyms": [],
+        },
+    ]
+
+    with patch.object(km, "list_knowledge_entries", return_value=mock_entries):
+        docs = km.get_active_knowledge_documents()
+        doc_ids = [d.id for d in docs]
+        assert "KB-DOCX-001" in doc_ids
+        assert "KB-TEST-999" not in doc_ids, "Test fixtures must be isolated from runtime retrieval"
+        assert "KB-DOCX-099" not in doc_ids, "Entries without approved source document must be isolated"

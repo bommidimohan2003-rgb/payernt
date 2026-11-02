@@ -570,32 +570,38 @@ def test_sec_24_unresolved_verify_marker_excluded():
 def test_sec_25_unpublishing_removes_content_after_refresh():
     """Boundary 29: Unpublishing an entry removes it from future retrieval after index refresh."""
     km = KnowledgeManager()
+    km._allow_test_fixtures = True
     admin = get_admin_ctx()
 
-    entry = km.create_knowledge_entry(
-        question="How do I get discount coupons on Payent?",
-        answer="Use coupon code PAYENT10 at checkout.",
-        category="General",
-        author=admin.clean_email,
-        is_verified=True,
-        status="published"
-    )
-    eid = entry["id"]
+    try:
+        entry = km.create_knowledge_entry(
+            question="How do I get discount coupons on Payent?",
+            answer="Use coupon code PAYENT10 at checkout.",
+            category="General",
+            author=admin.clean_email,
+            is_verified=True,
+            status="published",
+            source_document="PAYENT_AGENT_QA_KNOWLEDGE_GUIDE.docx",
+        )
+        eid = entry["id"]
 
-    im = KnowledgeIndexManager(knowledge_manager=km)
-    im.refresh_index()
+        im = KnowledgeIndexManager(knowledge_manager=km)
+        im.refresh_index()
 
-    # Verify present in retrieval
-    match1 = im.get_retriever().retrieve("discount coupons on Payent")
-    assert any(m.knowledge_id == eid for m in match1)
+        # Verify present in retrieval
+        match1 = im.get_retriever().retrieve("discount coupons on Payent")
+        assert any(m.knowledge_id == eid for m in match1)
 
-    # Unpublish entry
-    km.unpublish_knowledge_entry(eid, unpublished_by=admin.clean_email, is_admin=True)
-    im.refresh_index()
+        # Unpublish entry
+        km.unpublish_knowledge_entry(eid, unpublished_by=admin.clean_email, is_admin=True)
+        im.refresh_index()
 
-    # Verify removed from future retrieval
-    match2 = im.get_retriever().retrieve("discount coupons on Payent")
-    assert all(m.knowledge_id != eid for m in match2)
+        # Verify removed from future retrieval
+        match2 = im.get_retriever().retrieve("discount coupons on Payent")
+        assert all(m.knowledge_id != eid for m in match2)
+    finally:
+        km._allow_test_fixtures = False
+        KnowledgeIndexManager.get_instance().refresh_index()
 
 
 def test_sec_26_failed_refresh_preserves_previous_valid_index():

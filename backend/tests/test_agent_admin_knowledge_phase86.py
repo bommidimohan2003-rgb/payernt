@@ -397,6 +397,9 @@ def test_14_knowledge_filter_status():
     for it in res_pen.json()["items"]:
         assert it["status"] == "pending_review"
 
+    # Cleanup test entry
+    mgr.unpublish_entry(e1.id, "test_teardown")
+
 
 def test_15_knowledge_filter_verification_and_retrieval_type():
     """Filter by is_verified and retrieval_type."""
@@ -680,56 +683,67 @@ def test_27_publish_verified_entry_succeeds_and_indexes():
     """Publishing a clean, verified entry updates status to published and loads into index."""
     token = make_admin_token(email="publisher_lead@payent.com")
     mgr = KnowledgeManager.get_instance()
-    entry = mgr.create_entry(
-        category="DELIVERY",
-        canonical_question="What is the delivery handover verification protocol?",
-        answer_markdown="Both customer and delivery agent must confirm the 8-digit secure PIN.",
-        created_by="editor",
-    )
-    mgr.verify_entry(entry.id, "reviewer@payent.com")
+    mgr._allow_test_fixtures = True
+    try:
+        entry = mgr.create_entry(
+            category="DELIVERY",
+            canonical_question="What is the delivery handover verification protocol?",
+            answer_markdown="Both customer and delivery agent must confirm the 8-digit secure PIN.",
+            created_by="editor",
+        )
+        mgr.verify_entry(entry.id, "reviewer@payent.com")
 
-    res = client.post(
-        f"/api/admin/agent-knowledge/{entry.id}/publish",
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    assert res.status_code == 200
-    data = res.json()["data"]
-    assert data["status"] == "published"
-    assert data["published_by"] == "publisher_lead@payent.com"
-    assert res.json()["index_refreshed"] is True
+        res = client.post(
+            f"/api/admin/agent-knowledge/{entry.id}/publish",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert res.status_code == 200
+        data = res.json()["data"]
+        assert data["status"] == "published"
+        assert data["published_by"] == "publisher_lead@payent.com"
+        assert res.json()["index_refreshed"] is True
 
-    # Document is in retrieval index
-    idx = KnowledgeIndexManager.get_instance()
-    docs = idx.get_all_documents()
-    assert any(d["id"] == entry.id for d in docs)
+        # Document is in retrieval index
+        idx = KnowledgeIndexManager.get_instance()
+        docs = idx.get_all_documents()
+        assert any(d["id"] == entry.id for d in docs)
+    finally:
+        mgr.unpublish_entry(entry.id, "test_teardown")
+        mgr._allow_test_fixtures = False
+        KnowledgeIndexManager.get_instance().refresh_index()
 
 
 def test_28_unpublish_removes_entry_from_index():
     """Unpublishing removes the entry from active retrieval index."""
     token = make_admin_token()
     mgr = KnowledgeManager.get_instance()
-    entry = mgr.create_entry(
-        category="PLATFORM",
-        canonical_question="What happens if a tool is returned damaged?",
-        answer_markdown="Report damage immediately during check-in.",
-        created_by="editor",
-    )
-    mgr.verify_entry(entry.id, "reviewer@payent.com")
-    mgr.publish_entry(entry.id, "admin")
+    mgr._allow_test_fixtures = True
+    try:
+        entry = mgr.create_entry(
+            category="PLATFORM",
+            canonical_question="What happens if a tool is returned damaged?",
+            answer_markdown="Report damage immediately during check-in.",
+            created_by="editor",
+        )
+        mgr.verify_entry(entry.id, "reviewer@payent.com")
+        mgr.publish_entry(entry.id, "admin")
 
-    idx = KnowledgeIndexManager.get_instance()
-    assert any(d["id"] == entry.id for d in idx.get_all_documents())
+        idx = KnowledgeIndexManager.get_instance()
+        assert any(d["id"] == entry.id for d in idx.get_all_documents())
 
-    res = client.post(
-        f"/api/admin/agent-knowledge/{entry.id}/unpublish",
-        headers={"Authorization": f"Bearer {token}"},
-        json={"reason": "Temporary content audit"},
-    )
-    assert res.status_code == 200
-    assert res.json()["data"]["status"] in ["pending_review", "unpublished", "archived"]
+        res = client.post(
+            f"/api/admin/agent-knowledge/{entry.id}/unpublish",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"reason": "Temporary content audit"},
+        )
+        assert res.status_code == 200
+        assert res.json()["data"]["status"] in ["pending_review", "unpublished", "archived"]
 
-    # Entry is gone from active index
-    assert not any(d["id"] == entry.id for d in idx.get_all_documents())
+        # Entry is gone from active index
+        assert not any(d["id"] == entry.id for d in idx.get_all_documents())
+    finally:
+        mgr._allow_test_fixtures = False
+        KnowledgeIndexManager.get_instance().refresh_index()
 
 
 # ============================================================================
@@ -1067,6 +1081,9 @@ def test_41_manual_index_refresh_succeeds_for_admin():
     body = res.json()
     assert body["success"] is True
     assert body["data"]["total_indexed"] >= 1
+
+    # Cleanup test entry
+    mgr.unpublish_entry(e.id, "test_teardown")
 
 
 # ============================================================================

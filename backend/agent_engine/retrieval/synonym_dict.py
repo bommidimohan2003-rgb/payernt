@@ -17,7 +17,8 @@ SYNONYM_GROUPS: Dict[str, Dict[str, List[str]]] = {
     "BOOKING": {
         "booking": [
             "reservation", "order", "rental", "book", "hire", "rent",
-            "renting", "rented", "reservation order", "equipment rental", "gear booking"
+            "renting", "rented", "reservation order", "equipment rental", "gear booking",
+            "gear reservation"
         ],
         "extend": [
             "extend rental", "change dates", "reschedule", "prolong", "extension",
@@ -66,11 +67,21 @@ SYNONYM_GROUPS: Dict[str, Dict[str, List[str]]] = {
         "delivery": [
             "shipping", "dispatch", "courier", "rider", "courier boy",
             "delivery boy", "delivery partner", "delivery person", "pickup",
-            "handover", "tracking", "courier tracking", "logistics"
+            "handover", "tracking", "courier tracking", "logistics", "shipment"
         ],
         "delivery_delayed": [
             "delivery late", "partner not arrived", "courier delay",
             "item not arrived", "delayed shipment"
+        ],
+        "otp": [
+            "passcode", "one-time password", "one time password", "handover pin",
+            "verification passcode", "delivery pin", "pin", "otp"
+        ],
+        "lender": [
+            "owner", "equipment owner", "item owner", "equipment lender", "lender"
+        ],
+        "rider_payout": [
+            "delivery fees", "payouts", "rider payout", "trip payments", "rider earnings", "rider fees"
         ],
     },
 
@@ -92,15 +103,16 @@ SYNONYM_GROUPS: Dict[str, Dict[str, List[str]]] = {
         "kyc": [
             "identity verification", "id verification", "document verification",
             "aadhaar verification", "pan verification", "id proof", "documents",
-            "government id", "profile verification"
+            "government id", "profile verification", "submitted id"
         ],
         "kyc_rejected": [
             "kyc rejection", "verification failed", "document rejected",
-            "kyc declined", "resubmit kyc", "kyc disapproval"
+            "kyc declined", "resubmit kyc", "kyc disapproval", "documents declined",
+            "identity documents declined"
         ],
         "kyc_pending": [
             "kyc in review", "verification pending", "kyc waiting",
-            "document under review"
+            "document under review", "awaiting approval"
         ],
     },
 
@@ -118,11 +130,14 @@ SYNONYM_GROUPS: Dict[str, Dict[str, List[str]]] = {
         "human_support": [
             "customer care", "customer support", "live agent", "real person",
             "support representative", "support executive", "helpdesk",
-            "support specialist", "talk to human", "call support", "speak to someone"
+            "support specialist", "talk to human", "call support", "speak to someone",
+            "live customer service", "real customer service", "customer service representative"
         ],
         "ticket": [
             "support ticket", "complaint ticket", "service request",
-            "case number", "help ticket", "ticket status"
+            "case number", "help ticket", "ticket status", "formal complaint",
+            "formal help request", "inquiry ticket", "service grievance", "raised ticket",
+            "lodge complaint", "help request ticket"
         ],
     },
 
@@ -134,11 +149,11 @@ SYNONYM_GROUPS: Dict[str, Dict[str, List[str]]] = {
         ],
         "wrong_product": [
             "different item received", "wrong gear delivered", "incorrect product",
-            "mismatched equipment"
+            "mismatched equipment", "item does not match", "wrong item", "different item"
         ],
         "missing_accessory": [
             "missing charger", "parts not included", "missing cable",
-            "battery missing", "accessories missing"
+            "battery missing", "accessories missing", "parts absent", "bundled parts absent"
         ],
     },
 
@@ -151,6 +166,12 @@ SYNONYM_GROUPS: Dict[str, Dict[str, List[str]]] = {
         "password_reset": [
             "forgot password", "reset password", "change password",
             "password recovery", "update password"
+        ],
+        "register": [
+            "registration", "sign up", "create account", "new user", "new account", "register"
+        ],
+        "restrictions": [
+            "restricted", "platform capabilities restricted", "account restricted", "limitations", "boundaries"
         ],
     },
 }

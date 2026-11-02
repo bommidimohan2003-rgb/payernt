@@ -120,10 +120,12 @@ DEV_LOCAL_ORIGINS = [
 ]
 
 ALLOWED_ORIGINS_RAW = os.getenv("ALLOWED_ORIGINS", "")
+ALLOWED_ORIGINS = list(DEFAULT_TRUSTED_ORIGINS)
 if ALLOWED_ORIGINS_RAW and ALLOWED_ORIGINS_RAW.strip() != "*":
-    ALLOWED_ORIGINS = [origin.strip() for origin in ALLOWED_ORIGINS_RAW.split(",") if origin.strip() and origin.strip() != "*"]
-else:
-    ALLOWED_ORIGINS = list(DEFAULT_TRUSTED_ORIGINS)
+    for origin in ALLOWED_ORIGINS_RAW.split(","):
+        clean_o = origin.strip()
+        if clean_o and clean_o != "*" and clean_o not in ALLOWED_ORIGINS:
+            ALLOWED_ORIGINS.append(clean_o)
 
 if not IS_PRODUCTION:
     for dev_origin in DEV_LOCAL_ORIGINS:
