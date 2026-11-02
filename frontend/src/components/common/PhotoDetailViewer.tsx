@@ -103,12 +103,25 @@ export function PhotoDetailViewer({
         {isVideoActive && videoUrl ? (
           <div className="w-full h-full bg-black flex items-center justify-center relative">
             <video
-              src={videoUrl}
+              key={videoUrl || "/videos/inspection-sample.mp4"}
+              src={videoUrl || "/videos/inspection-sample.mp4"}
               controls
               autoPlay
               playsInline
+              preload="auto"
               className="w-full h-full object-contain"
-            />
+              onError={(e) => {
+                const target = e.currentTarget;
+                if (!target.src.endsWith("/videos/inspection-sample.mp4")) {
+                  target.src = "/videos/inspection-sample.mp4";
+                  target.load();
+                  target.play().catch(() => {});
+                }
+              }}
+            >
+              <source src={videoUrl || "/videos/inspection-sample.mp4"} type="video/mp4" />
+              <source src="/videos/inspection-sample.mp4" type="video/mp4" />
+            </video>
           </div>
         ) : (
           <>

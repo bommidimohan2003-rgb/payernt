@@ -1044,7 +1044,10 @@ const productSchema = product ? {
   }, [gallery, product?.image]);
 
   const activeDisplayImage = gallery[selectedImageIndex] || thumbnails[selectedImageIndex] || product?.image || "";
-  const activeVideoUrl = product?.videoUrl || (product as any)?.video_url || "https://assets.mixkit.co/videos/preview/mixkit-camera-zoom-lens-focusing-41551-large.mp4";
+  const rawVideoUrl = product?.videoUrl || (product as any)?.video_url;
+  const activeVideoUrl = (rawVideoUrl && !rawVideoUrl.includes("mixkit.co"))
+    ? rawVideoUrl
+    : "/videos/inspection-sample.mp4";
 
   const brand = product ? getProductBrand(product) : null;
   const isWishlisted = product ? has(product.id) : false;
@@ -1226,13 +1229,25 @@ const productSchema = product ? {
                 {isVideoActive ? (
                   <div className="w-full h-full min-h-[300px] sm:min-h-[380px] rounded-2xl overflow-hidden bg-black flex flex-col items-center justify-center relative shadow-inner">
                     <video
+                      key={activeVideoUrl}
                       src={activeVideoUrl}
                       controls
                       autoPlay
                       playsInline
-                      preload="metadata"
+                      preload="auto"
                       className="w-full h-full max-h-[360px] object-contain rounded-2xl"
-                    />
+                      onError={(e) => {
+                        const target = e.currentTarget;
+                        if (!target.src.endsWith("/videos/inspection-sample.mp4")) {
+                          target.src = "/videos/inspection-sample.mp4";
+                          target.load();
+                          target.play().catch(() => {});
+                        }
+                      }}
+                    >
+                      <source src={activeVideoUrl} type="video/mp4" />
+                      <source src="/videos/inspection-sample.mp4" type="video/mp4" />
+                    </video>
                     <div className="absolute bottom-2 left-2 px-2.5 py-0.5 rounded-full bg-black/70 backdrop-blur-md text-[10px] text-emerald-400 font-bold border border-emerald-500/30 flex items-center gap-1 select-none pointer-events-none">
                       <ShieldCheck className="h-3 w-3" />
                       <span>Verified 10s Inspection Video</span>
