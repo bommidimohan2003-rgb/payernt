@@ -20,6 +20,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy backend source code
 COPY backend/ ./backend/
+COPY PAYENT_AGENT_QA_KNOWLEDGE_GUIDE.docx ./PAYENT_AGENT_QA_KNOWLEDGE_GUIDE.docx
 
 WORKDIR /app/backend
 
