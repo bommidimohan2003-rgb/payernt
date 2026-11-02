@@ -154,8 +154,27 @@ export default {
 
     try {
       const handler = await getServerEntry();
-      const response = await handler.fetch(request, env, ctx);
-      return await normalizeCatastrophicSsrResponse(response);
+      const rawResponse = await handler.fetch(request, env, ctx);
+      const response = await normalizeCatastrophicSsrResponse(rawResponse);
+
+      // Prevent stale bundle caching: ensure HTML documents are always fetched fresh
+      const contentType = response.headers.get("content-type") || "";
+      if (contentType.includes("text/html")) {
+        const freshHeaders = new Headers(response.headers);
+        freshHeaders.set(
+          "Cache-Control",
+          "no-cache, no-store, must-revalidate, max-age=0, s-maxage=0"
+        );
+        freshHeaders.set("Pragma", "no-cache");
+        freshHeaders.set("Expires", "0");
+        return new Response(response.body, {
+          status: response.status,
+          statusText: response.statusText,
+          headers: freshHeaders,
+        });
+      }
+
+      return response;
     } catch (error) {
       console.error(error);
       return new Response(renderErrorPage(), {

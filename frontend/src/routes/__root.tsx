@@ -66,29 +66,38 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
   console.error(error);
   const router = useRouter();
 
+  const errorObj = error as any;
+  const errorName = errorObj?.name || "";
   const errorMessage =
-    (error as any)?.message || (typeof error === "string" ? error : "");
+    errorObj?.message || (typeof error === "string" ? error : "");
+  const errorStack = errorObj?.stack || "";
+  const fullError = `${errorName} ${errorMessage} ${errorStack}`.toLowerCase();
+
   const isChunkError =
-    errorMessage.includes("dynamically imported module") ||
-    errorMessage.includes("Failed to fetch dynamically imported module") ||
-    errorMessage.includes("Importing a module script failed") ||
-    errorMessage.includes("ERR_CONNECTION_CLOSED") ||
-    errorMessage.includes("Failed to fetch") ||
-    errorMessage.includes("before initialization") ||
-    errorMessage.includes("ReferenceError");
+    fullError.includes("dynamically imported module") ||
+    fullError.includes("failed to fetch") ||
+    fullError.includes("importing a module script failed") ||
+    fullError.includes("err_connection") ||
+    fullError.includes("before initialization") ||
+    fullError.includes("referenceerror") ||
+    fullError.includes("loading chunk") ||
+    fullError.includes("chunkloaderror") ||
+    fullError.includes("categories-") ||
+    fullError.includes("productdetails");
 
   const handleHardReload = () => {
     if (typeof window !== "undefined") {
       try {
         sessionStorage.clear();
+        localStorage.removeItem("payent_server_products");
         if ("caches" in window) {
           caches.keys().then((names) => {
             names.forEach((name) => caches.delete(name));
           });
         }
         const url = new URL(window.location.href);
-        url.searchParams.set("_reload", String(Date.now()));
-        window.location.href = url.toString();
+        url.searchParams.set("_v", String(Date.now()));
+        window.location.replace(url.toString());
       } catch {
         window.location.reload();
       }

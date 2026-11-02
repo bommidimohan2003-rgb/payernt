@@ -52,7 +52,6 @@ import { useUserLocation } from "@/hooks/useUserLocation";
 import { useWishlist } from "@/hooks/useWishlist";
 import { useUnreadMessages } from "@/hooks/useUnreadMessages";
 import { INITIAL_FALLBACK_PRODUCTS } from "@/utils/fallbackProducts";
-export { INITIAL_FALLBACK_PRODUCTS } from "@/utils/fallbackProducts";
 
 import cameraImg from "@/assets/images/camera.webp";
 import droneImg from "@/assets/images/drone.webp";

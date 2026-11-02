@@ -24,7 +24,6 @@ import {
   Package,
   KeyRound,
   Video,
-  Share2,
   ChevronRight,
   ChevronLeft,
   ChevronDown,
@@ -57,7 +56,6 @@ import { formatOwnerAddress } from "@/utils/formatters";
 import type { Product, Order } from "@/types";
 import { ProfilePhoto } from "@/components/common/ProfilePhoto";
 import { ProductMessageModal } from "@/components/browse/ProductMessageModal";
-import { shareRentalProduct } from "@/utils/productSharing";
 import { ShareProductModal } from "@/components/common/ShareProductModal";
 import { rentalSecurityService } from "@/services/rentalSecurityService";
 import type { RentalSecurity } from "@/types";
@@ -159,25 +157,6 @@ export default function ProductDetails() {
     restricted: boolean;
     message: string;
   } | null>(null);
-  const [copiedLink, setCopiedLink] = useState(false);
-
-  // Redesign Visual UI States
-  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
-  const [activeFaqIndex, setActiveFaqIndex] = useState<number | null>(0);
-  const [showFullCalendar, setShowFullCalendar] = useState(false);
-  const [relatedCarouselPage, setRelatedCarouselPage] = useState(0);
-  const [isPhotoViewerOpen, setIsPhotoViewerOpen] = useState(false);
-
-  const handleShare = async () => {
-    if (!product && !id) return;
-    const item = product || { id, title: typeof document !== "undefined" ? document.title : "Gear Rental" };
-    const res = await shareRentalProduct(item);
-    if (res.success && res.method === "clipboard") {
-      setCopiedLink(true);
-      setTimeout(() => setCopiedLink(false), 2500);
-    }
-  };
-
   // Instant cache lookup for zero-latency initial render
   const initialCachedProduct = useMemo(() => {
     if (!id) return null;
@@ -193,6 +172,13 @@ export default function ProductDetails() {
   }, [id]);
   const [product, setProduct] = useState<Product | null>(initialCachedProduct);
   const [productLoading, setProductLoading] = useState<boolean>(!initialCachedProduct);
+
+  // Redesign Visual UI States
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [activeFaqIndex, setActiveFaqIndex] = useState<number | null>(0);
+  const [showFullCalendar, setShowFullCalendar] = useState(false);
+  const [relatedCarouselPage, setRelatedCarouselPage] = useState(0);
+  const [isPhotoViewerOpen, setIsPhotoViewerOpen] = useState(false);
 
   // Date Selection & Availability States
   const todayStr = useMemo(() => toDateInputValue(new Date()), []);
