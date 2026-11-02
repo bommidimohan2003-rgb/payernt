@@ -2261,7 +2261,7 @@ def create_order(email: str, order: dict):
         start = str(order.get("startDate") or order.get("start_date") or "Today").strip()
         end = str(order.get("endDate") or order.get("end_date") or start).strip()
         created = order.get("createdAt") or order.get("created_at") or dt.now(timezone.utc).isoformat()
-        status = order.get("status") or "active"
+        status = order.get("status") or "confirmed"
         client_total = float(order.get("total", 0))
 
         time_slot = (order.get("time_slot") or order.get("timeSlot") or "full_day").strip().lower()

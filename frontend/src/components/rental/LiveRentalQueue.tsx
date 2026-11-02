@@ -272,8 +272,9 @@ export function getMilestoneIndex(
   timestamps?: Record<string, string | null>
 ): number {
   const norm = (status || "").toLowerCase().trim().replace(/\s+/g, "_");
+
+  // 1. Cancelled Bookings: Return historical reached milestone or -1
   if (norm === "cancelled" || norm === "canceled") {
-    // For cancelled bookings, check historical completed milestones based on timestamps
     if (timestamps) {
       if (timestamps.completed_at) return 7;
       if (timestamps.awaiting_inspection_at) return 6;
@@ -285,32 +286,63 @@ export function getMilestoneIndex(
     }
     return -1;
   }
-  switch (norm) {
-    case "order_confirmed":
-    case "confirmed":
-      return 0;
-    case "ready_for_pickup":
-    case "ready":
-      return 1;
-    case "picked_up":
-      return 2;
-    case "rental_in_progress":
-    case "active":
-      return 3;
-    case "return_initiated":
+
+  // 2. Authoritative Timestamp-Driven Progression:
+  // A milestone is strictly tied to verified actions and timestamps.
+  // Bookings with status="active" NEVER skip ahead to "rental_in_progress" without physical pickup!
+  if (timestamps) {
+    if (timestamps.completed_at || norm === "completed" || norm === "rental_completed") {
+      return 7;
+    }
+    if (timestamps.awaiting_inspection_at || norm === "awaiting_inspection" || norm === "awaiting_owner_inspection" || norm === "inspection") {
+      return 6;
+    }
+    if (timestamps.handed_back_at || norm === "handed_back" || norm === "item_handed_back" || norm === "item_handed_back_to_owner" || norm === "returned") {
+      return 5;
+    }
+    if (timestamps.return_initiated_at || norm === "return_initiated") {
       return 4;
+    }
+    // Only reach stage 2 or 3 if equipment was physically picked up
+    if (timestamps.picked_up_at) {
+      return norm === "picked_up" ? 2 : 3;
+    }
+    // Only reach stage 1 if lender has actually marked gear ready for pickup
+    if (timestamps.ready_for_pickup_at || norm === "ready_for_pickup" || norm === "ready") {
+      return 1;
+    }
+    // Default to Stage 0 (Order Confirmed) when gear is not yet ready or picked up
+    return 0;
+  }
+
+  // 3. Fallback when timestamps object is not provided
+  switch (norm) {
+    case "completed":
+    case "rental_completed":
+      return 7;
+    case "awaiting_owner_inspection":
+    case "awaiting_inspection":
+    case "inspection":
+      return 6;
     case "item_handed_back_to_owner":
     case "item_handed_back":
     case "handed_back":
     case "returned":
       return 5;
-    case "awaiting_owner_inspection":
-    case "awaiting_inspection":
-    case "inspection":
-      return 6;
-    case "rental_completed":
-    case "completed":
-      return 7;
+    case "return_initiated":
+      return 4;
+    case "rental_in_progress":
+      return 3;
+    case "picked_up":
+      return 2;
+    case "ready_for_pickup":
+    case "ready":
+      return 1;
+    case "order_confirmed":
+    case "confirmed":
+    case "accepted":
+    case "active":
+    case "pending":
     default:
       return 0;
   }
