@@ -73,7 +73,27 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
     errorMessage.includes("Failed to fetch dynamically imported module") ||
     errorMessage.includes("Importing a module script failed") ||
     errorMessage.includes("ERR_CONNECTION_CLOSED") ||
-    errorMessage.includes("Failed to fetch");
+    errorMessage.includes("Failed to fetch") ||
+    errorMessage.includes("before initialization") ||
+    errorMessage.includes("ReferenceError");
+
+  const handleHardReload = () => {
+    if (typeof window !== "undefined") {
+      try {
+        sessionStorage.clear();
+        if ("caches" in window) {
+          caches.keys().then((names) => {
+            names.forEach((name) => caches.delete(name));
+          });
+        }
+        const url = new URL(window.location.href);
+        url.searchParams.set("_reload", String(Date.now()));
+        window.location.href = url.toString();
+      } catch {
+        window.location.reload();
+      }
+    }
+  };
 
   // Automatically attempt one clean page refresh if dynamic chunk or network connection was interrupted
   useEffect(() => {
@@ -83,7 +103,7 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
       const now = Date.now();
       if (!lastReload || now - Number(lastReload) > 15000) {
         sessionStorage.setItem(reloadKey, String(now));
-        window.location.reload();
+        handleHardReload();
       }
     }
   }, [isChunkError]);
@@ -99,11 +119,14 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
             ? "A newer version of the platform was deployed or the connection was interrupted. Please reload to load the latest version."
             : "Something went wrong on our end. You can try refreshing or head back home."}
         </p>
+        {errorMessage && !isChunkError && (
+          <p className="mt-3 text-xs font-mono text-rose-400 bg-rose-500/10 border border-rose-500/20 p-2.5 rounded-xl break-all">
+            {errorMessage}
+          </p>
+        )}
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
-            onClick={() => {
-              window.location.reload();
-            }}
+            onClick={handleHardReload}
             className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 cursor-pointer"
           >
             Reload page

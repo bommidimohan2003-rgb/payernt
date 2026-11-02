@@ -153,6 +153,17 @@ export function ProductCard({
       return;
     }
 
+    const isPayentRoute = typeof window !== "undefined" && window.location.pathname.startsWith("/payent");
+    if (isPayentRoute) {
+      try {
+        navigate({ to: "/payent/products/$id", params: { id: String(product.id) } });
+        return;
+      } catch {
+        navigate({ to: `/payent/products/${product.id}` as any });
+        return;
+      }
+    }
+
     try {
       navigate({ to: "/product/$id", params: { id: String(product.id) } });
     } catch {
