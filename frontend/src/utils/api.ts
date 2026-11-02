@@ -2170,6 +2170,13 @@ export const api = {
     );
   },
 
+    async getRecommendations(productId: string, type: "similar" | "frequently_together" = "similar"): Promise<Product[]> {
+    if (type === "frequently_together") {
+      return this.getFrequentlyTogetherRecommendations(productId);
+    }
+    return this.getSimilarRecommendations(productId);
+  },
+
   async getFrequentlyTogetherRecommendations(
     productId: string,
   ): Promise<Product[]> {

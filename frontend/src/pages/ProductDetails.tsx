@@ -43,7 +43,7 @@ import { useCart } from "@/hooks/useCart";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { JsonLd } from "@/components/common/JsonLd";
-import { INITIAL_FALLBACK_PRODUCTS } from "./Categories";
+import { INITIAL_FALLBACK_PRODUCTS, findFallbackProduct } from "@/utils/fallbackProducts";
 import cameraImg from "@/assets/images/camera.webp";
 import { PhotoDetailViewer } from "@/components/common/PhotoDetailViewer";
 import { ProductRotationViewer } from "@/components/common/ProductRotationViewer";
@@ -840,13 +840,24 @@ export default function ProductDetails() {
 
     let isMounted = true;
     async function loadRecommendations() {
-      const [similar, together] = await Promise.all([
-        api.getRecommendations(currentId, "similar").catch(() => []),
-        api.getRecommendations(currentId, "frequently_together").catch(() => []),
-      ]);
-      if (isMounted) {
-        setSimilarProducts(Array.isArray(similar) ? similar : []);
-        setFrequentlyTogether(Array.isArray(together) ? together : []);
+      try {
+        const [similar, together] = await Promise.all([
+          api.getSimilarRecommendations
+            ? api.getSimilarRecommendations(String(currentId)).catch(() => [])
+            : Promise.resolve([]),
+          api.getFrequentlyTogetherRecommendations
+            ? api.getFrequentlyTogetherRecommendations(String(currentId)).catch(() => [])
+            : Promise.resolve([]),
+        ]);
+        if (isMounted) {
+          setSimilarProducts(Array.isArray(similar) ? similar : []);
+          setFrequentlyTogether(Array.isArray(together) ? together : []);
+        }
+      } catch {
+        if (isMounted) {
+          setSimilarProducts([]);
+          setFrequentlyTogether([]);
+        }
       }
     }
     loadRecommendations();
