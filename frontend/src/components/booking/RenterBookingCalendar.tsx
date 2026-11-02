@@ -17,12 +17,21 @@ export interface RenterBookingCalendarProps {
   productId: string | number;
   selectedStartDate: string; // YYYY-MM-DD
   selectedEndDate: string; // YYYY-MM-DD
-  onDateChange: (startDate: string, endDate: string) => void;
+  onDateChange?: (startDate: string, endDate: string) => void;
+  onSelectStartDate?: (startDate: string) => void;
+  onSelectEndDate?: (endDate: string) => void;
   durationMode?: "single" | "custom" | string;
   minDate?: string; // YYYY-MM-DD, defaults to today
   disabled?: boolean;
   className?: string;
   session?: "morning" | "afternoon" | "full_day" | string;
+  selectedSlot?: string;
+  onSelectDurationMode?: (mode: string) => void;
+  onSelectSlot?: (slot: string) => void;
+  productTitle?: string;
+  pricePerDay?: number;
+  productAvailable?: boolean;
+  [key: string]: any;
 }
 
 const MONTH_NAMES = [
@@ -83,12 +92,21 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
   selectedStartDate,
   selectedEndDate,
   onDateChange,
+  onSelectStartDate,
+  onSelectEndDate,
   durationMode = "single",
   minDate,
   disabled = false,
   className,
   session = "full_day",
+  selectedSlot,
+  ...rest
 }) => {
+  const handleDatesUpdate = useCallback((start: string, end: string) => {
+    if (onDateChange) onDateChange(start, end);
+    if (onSelectStartDate) onSelectStartDate(start);
+    if (onSelectEndDate) onSelectEndDate(end);
+  }, [onDateChange, onSelectStartDate, onSelectEndDate]);
   const todayKey = useMemo(() => getTodayKey(), []);
   const effectiveMinDate = minDate || todayKey;
 
@@ -407,7 +425,7 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
 
     // Single-day mode
     if (durationMode !== "custom") {
-      onDateChange(dateKey, dateKey);
+      handleDatesUpdate(dateKey, dateKey);
       setIsPickingEnd(false);
       return;
     }
@@ -415,7 +433,7 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
     // Multi-day custom mode
     if (!isPickingEnd || !selectedStartDate) {
       // Pick start date
-      onDateChange(dateKey, dateKey);
+      handleDatesUpdate(dateKey, dateKey);
       setIsPickingEnd(true);
       return;
     }
@@ -423,14 +441,14 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
     // We are picking the return / end date
     if (dateKey < selectedStartDate) {
       // User clicked an earlier date, seamlessly restart range from here
-      onDateChange(dateKey, dateKey);
+      handleDatesUpdate(dateKey, dateKey);
       setIsPickingEnd(true);
       return;
     }
 
     if (dateKey === selectedStartDate) {
       // Clicking same date finishes single-day span
-      onDateChange(selectedStartDate, selectedStartDate);
+      handleDatesUpdate(selectedStartDate, selectedStartDate);
       setIsPickingEnd(false);
       return;
     }
@@ -451,7 +469,7 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
     }
 
     // Valid range selected!
-    onDateChange(selectedStartDate, dateKey);
+    handleDatesUpdate(selectedStartDate, dateKey);
     setIsPickingEnd(false);
     setHoveredDate(null);
   };
@@ -750,7 +768,7 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
           <button
             type="button"
             onClick={() => {
-              onDateChange("", "");
+              handleDatesUpdate("", "");
               setIsPickingEnd(false);
               setConflictMessage(null);
             }}

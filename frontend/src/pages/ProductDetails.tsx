@@ -1477,6 +1477,10 @@ export default function ProductDetails() {
               <div className="pt-4 border-t border-border/60">
                 <RenterBookingCalendar
                   productId={product.id}
+                  onDateChange={(start, end) => {
+                    handleStartDateChange(start);
+                    handleEndDateChange(end);
+                  }}
                   productTitle={product.title}
                   pricePerDay={Number(product.price) || 0}
                   productAvailable={product.available}
