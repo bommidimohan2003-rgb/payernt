@@ -8,7 +8,7 @@ const USER_SPECIFIC_KEYS = new Set([
   "payent:orders",
 ]);
 
-export const PAYENT_CACHE_VERSION = "v10_purge_fx3_final";
+export const PAYENT_CACHE_VERSION = "v14_slot_dynamic_pricing_50";
 
 export function resetPayentCache(): void {
   if (typeof window === "undefined") return;

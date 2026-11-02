@@ -660,7 +660,7 @@ export function LenderProductDetails({ productId: propId }: { productId?: string
 
                   <div className="pt-2 border-t border-border/40 space-y-1">
                     <label className="text-[10px] font-bold text-muted-foreground block">
-                      Custom Half-Day Rate (Leave empty for default 60% of daily rate)
+                      Custom Half-Day Rate (Leave empty for default 50% of daily rate)
                     </label>
                     <div className="relative">
                       <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground">
@@ -668,7 +668,7 @@ export function LenderProductDetails({ productId: propId }: { productId?: string
                       </span>
                       <input
                         type="number"
-                        placeholder={String(Math.round(resolveProductDailyRate(product, 0) * 0.6))}
+                        placeholder={String(Math.round(resolveProductDailyRate(product, 0) * 0.5))}
                         value={halfDayRate}
                         onChange={(e) => setHalfDayRate(e.target.value)}
                         className="w-full pl-6 pr-3 py-1.5 rounded-lg border border-border bg-background text-xs font-bold text-foreground focus:outline-none focus:ring-1 focus:ring-primary"

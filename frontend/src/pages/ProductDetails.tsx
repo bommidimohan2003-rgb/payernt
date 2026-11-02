@@ -507,12 +507,7 @@ export default function ProductDetails() {
     if (!product) return 0;
     const baseDailyPrice = Number(product.price) || 0;
     if (durationMode === "half_day_morning" || durationMode === "half_day_afternoon") {
-      const activeSlot = daySlots.find(
-        (s) => s.id === (durationMode === "half_day_morning" ? "morning" : "afternoon")
-      );
-      if (activeSlot && activeSlot.price) return activeSlot.price;
-      const configuredHalf = (product as any).halfDayRate || (product as any).half_day_rate;
-      return configuredHalf ? Number(configuredHalf) : Math.round(baseDailyPrice * 0.6);
+      return Math.round(baseDailyPrice * 0.5);
     }
     if (durationMode === "full_day") {
       const fullSlot = daySlots.find((s) => s.id === "full_day");
@@ -1493,9 +1488,13 @@ export default function ProductDetails() {
                               const isBlocked = slot.status === "blocked" || (slot as any).isBlocked;
                               const isNotOffered = slot.status === "not_available";
                               const isClickable = !isBooked && !isBlocked && !isNotOffered;
-                              const slotRate = Number(
-                                slot.price ?? slot.rate ?? (slot.id === "full_day" ? Number(product.price || 0) : Math.round(Number(product.price || 0) * 0.6))
+                              const baseFullPrice = Number(
+                                product?.dailyRate ?? product?.daily_rate ?? product?.price ??
+                                daySlots.find((s: any) => s.id === "full_day")?.price ??
+                                daySlots.find((s: any) => s.id === "full_day")?.rate ??
+                                1000
                               );
+                              const slotRate = slot.id === "full_day" ? baseFullPrice : Math.round(baseFullPrice * 0.5);
 
                               return (
                                 <button

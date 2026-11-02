@@ -2282,7 +2282,7 @@ def create_order(email: str, order: dict):
         buffer_min = DEFAULT_BUFFER_MINUTES
         if product_rec:
             daily_rate = float(product_rec.get("daily_rate") or product_rec.get("price") or 2499)
-            half_day_rate = float(product_rec.get("half_day_rate") or round(daily_rate * 0.6))
+            half_day_rate = float(get_slot_price("morning", product_rec))
             buffer_min = int(product_rec.get("buffer_minutes") or DEFAULT_BUFFER_MINUTES)
 
         # 3. Canonical Rental Interval Calculation
@@ -6028,6 +6028,30 @@ def find_authoritative_product(product_id: str) -> Optional[Dict[str, Any]]:
 
     return None
 
+def get_slot_price(slot_id: str, product: Optional[dict] = None) -> int:
+    """
+    Centralized dynamic pricing rule for rental slots:
+    - Morning Price = Full Day Price * 0.5
+    - Afternoon Price = Full Day Price * 0.5
+    - Full Day: retains configured product daily rate (product.price / daily_rate)
+    """
+    s_key = (slot_id or "full_day").strip().lower()
+    full_day_price = 2499
+    if product:
+        p_val = product.get("daily_rate") or product.get("price") or product.get("dailyRate")
+        if p_val is not None:
+            try:
+                full_day_price = int(round(float(p_val)))
+            except Exception:
+                pass
+
+    if s_key in ("morning", "half_day_morning", "afternoon", "half_day_afternoon"):
+        return int(round(full_day_price * 0.5))
+    else:
+        return full_day_price
+
+DEFAULT_SLOT_PRICE = 500
+
 DEFAULT_TIME_SLOTS = {
     "morning": {
         "id": "morning",
@@ -6380,8 +6404,10 @@ def get_product_slots_for_date(
     """
     prod = product if product is not None else find_authoritative_product(product_id)
 
-    daily_rate = 2499
-    half_day_rate = None
+    daily_rate = get_slot_price("full_day", prod)
+    morning_rate = get_slot_price("morning", prod)
+    afternoon_rate = get_slot_price("afternoon", prod)
+    half_day_rate = morning_rate
     buffer_min = DEFAULT_BUFFER_MINUTES
     allow_half_day = True
     morning_enabled = True
@@ -6389,18 +6415,11 @@ def get_product_slots_for_date(
     full_day_enabled = True
 
     if prod:
-        daily_rate = int(float(prod.get("daily_rate") or prod.get("price") or 2499))
-        half_day_rate = prod.get("half_day_rate")
         buffer_min = int(prod.get("buffer_minutes") or DEFAULT_BUFFER_MINUTES)
         allow_half_day = bool(prod.get("allow_half_day", True))
         morning_enabled = bool(prod.get("morning_slot_enabled", True)) and allow_half_day
         afternoon_enabled = bool(prod.get("afternoon_slot_enabled", True)) and allow_half_day
         full_day_enabled = bool(prod.get("full_day_slot_enabled", True))
-
-    if not half_day_rate:
-        half_day_rate = int(round(daily_rate * 0.6))
-    else:
-        half_day_rate = int(half_day_rate)
 
     d = parse_date_safely(date_str)
     if not d:
@@ -6414,8 +6433,8 @@ def get_product_slots_for_date(
     slots_out = []
 
     slot_configs = [
-        ("morning", "Half Day — Morning", "08:00", "12:00", "Morning — 8:00 AM to 12:00 PM", morning_enabled, half_day_rate),
-        ("afternoon", "Half Day — Afternoon", "13:00", "17:00", "Afternoon — 1:00 PM to 5:00 PM", afternoon_enabled, half_day_rate),
+        ("morning", "Half Day — Morning", "08:00", "12:00", "Morning — 8:00 AM to 12:00 PM", morning_enabled, morning_rate),
+        ("afternoon", "Half Day — Afternoon", "13:00", "17:00", "Afternoon — 1:00 PM to 5:00 PM", afternoon_enabled, afternoon_rate),
         ("full_day", "Full Day", "08:00", "08:00", "Full Day — 24 Hours", full_day_enabled, daily_rate),
     ]
 
@@ -6458,6 +6477,7 @@ def get_product_slots_for_date(
             "status": status,
             "statusLabel": status_label,
             "rate": rate,
+            "price": rate,
             "rateFormatted": f"₹{rate:,}",
             "enabled": enabled
         })

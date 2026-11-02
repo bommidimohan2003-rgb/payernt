@@ -2386,7 +2386,7 @@ def get_product_availability_config_endpoint(
     daily = float(product.get("daily_rate") or product.get("price") or 2499)
     half_day = product.get("half_day_rate")
     if not half_day:
-        half_day = round(daily * 0.6)
+        half_day = int(round(daily * 0.5))
     else:
         half_day = float(half_day)
         
@@ -2663,7 +2663,7 @@ def create_booking_with_security(
     if norm_dur == "half_day":
         half_rate = product.get("half_day_rate") if product else None
         if not half_rate:
-            half_rate = round(daily_rate * 0.6)
+            half_rate = int(round(daily_rate * 0.5))
         booking_total = float(data.total) if data.total else float(half_rate)
     else:
         d_count = max(1, (e_dt.date() - s_dt.date()).days + 1)

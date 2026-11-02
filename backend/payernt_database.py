@@ -1124,7 +1124,7 @@ def create_payernt_product(
     morning_slot_val = 1 if bool(data.get("morning_slot_enabled", data.get("morningSlotEnabled", True))) else 0
     afternoon_slot_val = 1 if bool(data.get("afternoon_slot_enabled", data.get("afternoonSlotEnabled", True))) else 0
     full_day_slot_val = 1 if bool(data.get("full_day_slot_enabled", data.get("fullDaySlotEnabled", True))) else 0
-    half_day_rate_val = int(data.get("half_day_rate") or data.get("halfDayRate") or round(daily_val * 0.6))
+    half_day_rate_val = int(round(daily_val * 0.5))
     buffer_min_val = int(data.get("buffer_minutes") or data.get("bufferMinutes") or ((data.get("availability") or {}).get("bufferDaysBetweenRentals", 0) * 1440) or 60)
 
     avail_from = data.get("available_from_date") or data.get("availableFromDate") or (data.get("availability", {}).get("availableFromDate") if isinstance(data.get("availability"), dict) else "")
@@ -1303,7 +1303,7 @@ def _normalize_payernt_product_dict(row: Dict[str, Any], include_pin: bool = Fal
 
     raw_daily = clean.get("daily_rate") if clean.get("daily_rate") is not None else clean.get("dailyRate") if clean.get("dailyRate") is not None else clean.get("price") if clean.get("price") is not None else clean.get("pricePerDay")
     daily = int(float(raw_daily)) if raw_daily is not None else 2499
-    half_day = clean.get("half_day_rate") if clean.get("half_day_rate") is not None else clean.get("halfDayRate") if clean.get("halfDayRate") is not None else round(daily * 0.6)
+    half_day = int(round(daily * 0.5))
     clean["daily_rate"] = daily
     clean["dailyRate"] = daily
     clean["price"] = daily
