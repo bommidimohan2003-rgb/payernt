@@ -38,7 +38,7 @@ export function PayerntKycPage() {
 
   // Form states
   const [aadhaarRaw, setAadhaarRaw] = useState("");
-  const [showAadhaar, setShowAadhaar] = useState(false);
+  const [showAadhaar, setShowAadhaar] = useState(true);
   const [numberError, setNumberError] = useState<string | null>(null);
 
   // Document photo states
@@ -386,7 +386,7 @@ export function PayerntKycPage() {
                     type={showAadhaar ? "text" : "password"}
                     inputMode="numeric"
                     maxLength={14}
-                    value={showAadhaar ? formatAadhaarInput(aadhaarRaw) : getDisplayedAadhaar()}
+                    value={showAadhaar ? formatAadhaarInput(aadhaarRaw) : aadhaarRaw}
                     onChange={handleAadhaarChange}
                     placeholder="1234 5678 9012"
                     className="flex-1 bg-transparent outline-none text-sm font-mono tracking-wider text-foreground placeholder:text-muted-foreground"

@@ -39,7 +39,7 @@ export function PayrentKycPage() {
 
   // PAN Input state
   const [panRaw, setPanRaw] = useState("");
-  const [showPan, setShowPan] = useState(false);
+  const [showPan, setShowPan] = useState(true);
   const [panError, setPanError] = useState<string | null>(null);
 
   // File upload state
@@ -371,7 +371,7 @@ export function PayrentKycPage() {
                       id="pan-number-input"
                       type={showPan ? "text" : "password"}
                       maxLength={10}
-                      value={showPan ? panRaw : getDisplayedPan()}
+                      value={panRaw}
                       onChange={handlePanChange}
                       placeholder="ABCDE1234F"
                       className="flex-1 bg-transparent outline-none text-sm font-mono uppercase tracking-wider text-foreground placeholder:text-muted-foreground"
