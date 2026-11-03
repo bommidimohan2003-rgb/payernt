@@ -196,10 +196,10 @@ export function HelpChatbot() {
     <>
       {/* Floating Launcher Button */}
       <motion.button
-        whileHover={{ scale: 1.05 }}
+        whileHover={{ scale: 1.05, y: -2 }}
         whileTap={{ scale: 0.95 }}
         onClick={() => setIsOpen((prev) => !prev)}
-        className="fixed bottom-5 sm:bottom-6 right-4 sm:right-6 z-40 h-13 w-13 sm:h-14 sm:w-14 rounded-full bg-[#17191C] text-white shadow-2xl flex items-center justify-center border border-[#17191C]/80 hover:bg-[#252930] transition-colors focus:outline-none focus:ring-2 focus:ring-[#16A36A] focus:ring-offset-2 cursor-pointer"
+        className="fixed bottom-5 sm:bottom-6 right-4 sm:right-6 z-40 h-14 w-14 rounded-2xl bg-[#17191C] text-white shadow-[0_12px_32px_-4px_rgba(23,25,28,0.38)] flex items-center justify-center border border-white/10 hover:bg-[#252930] transition-colors focus:outline-none focus:ring-2 focus:ring-[#16A36A] focus:ring-offset-2 cursor-pointer"
         aria-label="Payent Support Assistant"
       >
         <AnimatePresence mode="wait">
@@ -220,8 +220,11 @@ export function HelpChatbot() {
               exit={{ rotate: 90, opacity: 0 }}
               className="relative flex items-center justify-center"
             >
-              <PayentAgentIcon size={28} />
-              <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 bg-[#16A36A] border-2 border-[#17191C] rounded-full animate-pulse" />
+              <PayentAgentIcon size={30} />
+              <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#16A36A] opacity-75" />
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-[#16A36A] border-2 border-[#17191C]" />
+              </span>
             </motion.div>
           )}
         </AnimatePresence>
@@ -231,23 +234,26 @@ export function HelpChatbot() {
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, y: 25, scale: 0.96 }}
+            initial={{ opacity: 0, y: 20, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 25, scale: 0.96 }}
-            transition={{ duration: 0.18, ease: "easeOut" }}
-            className="fixed bottom-20 sm:bottom-24 right-3 sm:right-6 z-50 w-[410px] max-w-[calc(100vw-1.5rem)] h-[580px] max-h-[calc(100vh-6.5rem)] rounded-2xl bg-[#FFFFFF] border border-[#E1E4E8] shadow-2xl flex flex-col overflow-hidden"
+            exit={{ opacity: 0, y: 20, scale: 0.97 }}
+            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+            className="fixed inset-x-3 bottom-3 sm:inset-auto sm:bottom-24 sm:right-6 z-50 w-auto sm:w-[420px] max-w-[calc(100vw-1.5rem)] h-[calc(100dvh-1.5rem)] sm:h-[620px] max-h-[calc(100vh-6.5rem)] rounded-2xl bg-white border border-[#E1E4E8] shadow-[0_24px_64px_-12px_rgba(23,25,28,0.28)] flex flex-col overflow-hidden"
           >
-            {/* Header: Premium Black (#17191C) with Custom Agent Symbol & Payent Agent text */}
-            <div className="px-4 py-3 bg-[#17191C] text-white flex items-center justify-between border-b border-[#252930] shrink-0">
+            {/* Header: Premium Dark Charcoal (#17191C) with Custom P Symbol & Payent Agent */}
+            <div className="px-4 py-3.5 bg-[#17191C] text-white flex items-center justify-between border-b border-white/10 shrink-0">
               <div className="flex items-center gap-2.5 min-w-0">
-                <PayentAgentIcon size={28} />
-                <span className="font-semibold text-sm text-white tracking-tight truncate">
-                  Payent Agent
-                </span>
+                <PayentAgentIcon size={26} />
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="font-semibold text-sm text-white tracking-tight truncate">
+                    Payent Agent
+                  </span>
+                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#16A36A]" />
+                </div>
               </div>
               <button
                 onClick={() => setIsOpen(false)}
-                className="hover:bg-white/10 p-1.5 rounded-lg transition-colors text-white/80 hover:text-white focus:outline-none focus:ring-1 focus:ring-[#16A36A] cursor-pointer"
+                className="hover:bg-white/10 p-1.5 rounded-lg transition-colors text-white/70 hover:text-white focus:outline-none focus:ring-1 focus:ring-[#16A36A] cursor-pointer"
                 aria-label="Close Chat"
               >
                 <X className="h-4 w-4" />
@@ -255,7 +261,7 @@ export function HelpChatbot() {
             </div>
 
             {/* Conversation Area */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-[#FFFFFF] scrollbar-thin">
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-white scrollbar-thin">
               {messages.map((m) => {
                 if (m.sender === "user") {
                   return (
@@ -290,9 +296,9 @@ export function HelpChatbot() {
               <AnimatePresence>
                 {isTyping && (
                   <motion.div
-                    initial={{ opacity: 0, scale: 0.9, y: 6 }}
+                    initial={{ opacity: 0, scale: 0.92, y: 8 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.9, y: -4 }}
+                    exit={{ opacity: 0, scale: 0.92, y: -6 }}
                     transition={{ duration: 0.22, ease: "easeOut" }}
                     className="flex items-start justify-start pl-1 py-1"
                   >
@@ -304,14 +310,14 @@ export function HelpChatbot() {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Suggested Prompt Buttons */}
+            {/* Suggested Prompt Buttons (Refined Geometric Micro-Actions) */}
             <SuggestedPrompts
               suggestions={activeSuggestions}
               onSelect={(prompt) => handleSend(prompt)}
               disabled={isTyping}
             />
 
-            {/* Chat Input Area */}
+            {/* Chat Input Area (Architectural Message Composer) */}
             <ChatInput
               input={input}
               setInput={setInput}
