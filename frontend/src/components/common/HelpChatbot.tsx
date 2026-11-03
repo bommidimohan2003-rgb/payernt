@@ -302,7 +302,7 @@ export function HelpChatbot() {
                     transition={{ duration: 0.22, ease: "easeOut" }}
                     className="flex items-start justify-start pl-1 py-1"
                   >
-                    <DeliveryBoyLoader size={84} />
+                    <DeliveryBoyLoader size={96} className="h-[84px] w-[84px] sm:h-[96px] sm:w-[96px]" />
                   </motion.div>
                 )}
               </AnimatePresence>
