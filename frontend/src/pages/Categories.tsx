@@ -12,6 +12,12 @@ import {
   Camera,
   Laptop,
   Plane,
+  Drone,
+  Headphones,
+  Speaker,
+  Drill,
+  BatteryCharging,
+  Lightbulb,
   Bike,
   Hammer,
   Zap,
@@ -53,13 +59,7 @@ import { useWishlist } from "@/hooks/useWishlist";
 import { useUnreadMessages } from "@/hooks/useUnreadMessages";
 import { INITIAL_FALLBACK_PRODUCTS } from "@/utils/fallbackProducts";
 
-import cameraImg from "@/assets/images/camera.webp";
-import droneImg from "@/assets/images/drone.webp";
-import laptopImg from "@/assets/images/laptop.webp";
-import bikeImg from "@/assets/images/re_classic350.webp";
-import toolImg from "@/assets/images/tool.webp";
-import powerbankImg from "@/assets/images/powerbank.webp";
-import audioImg from "@/assets/images/audio.jpg";
+// Category images removed in favor of clean modern icons
 
 type SortOption = "featured" | "newest" | "price_asc" | "price_desc" | "rating";
 
@@ -77,20 +77,22 @@ const categoryIconMap: Record<
   React.ComponentType<{ className?: string }>
 > = {
   all: Layers,
-  cameras: Camera,
-  camera: Camera,
   laptops: Laptop,
   laptop: Laptop,
-  drones: Plane,
-  drone: Plane,
-  audio: Mic,
-  sound: Mic,
-  lighting: Sun,
-  light: Sun,
+  cameras: Camera,
+  camera: Camera,
+  drones: Drone,
+  drone: Drone,
+  audio: Headphones,
+  sound: Speaker,
+  tools: Drill,
+  tool: Drill,
+  powerbanks: BatteryCharging,
+  power: BatteryCharging,
+  lighting: Lightbulb,
+  light: Lightbulb,
   bikes: Bike,
   bike: Bike,
-  tools: Hammer,
-  powerbanks: Zap,
 };
 
 const matchCategory = (productCat: string, targetId: string) => {
@@ -134,8 +136,13 @@ const matchCategory = (productCat: string, targetId: string) => {
   if ((tId === "drones" || tId === "drone") && pCat.includes("drone"))
     return true;
   if (
-    (tId === "audio" || tId === "sound") &&
-    (pCat.includes("audio") || pCat.includes("mic") || pCat.includes("sound"))
+    (tId === "audio") &&
+    (pCat.includes("audio") || pCat.includes("headphone") || pCat.includes("mic") || pCat.includes("sound"))
+  )
+    return true;
+  if (
+    (tId === "sound" || tId === "sound-equipment") &&
+    (pCat.includes("sound") || pCat.includes("speaker") || pCat.includes("audio") || pCat.includes("mic") || pCat.includes("mixer"))
   )
     return true;
   if (
@@ -169,83 +176,74 @@ interface ExploreCategoryCard {
   name: string;
   tagline: string;
   description: string;
-  image: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number | string }>;
   accentColor: string;
 }
 
 const EXPLORE_CATEGORY_CARDS: ExploreCategoryCard[] = [
   {
+    id: "laptops",
+    name: "Laptops / PCs",
+    tagline: "Creator Workstations & PCs",
+    description: "MacBook Pro, editing workstations & high-performance rigs",
+    icon: Laptop,
+    accentColor: "hover:border-neutral-400 dark:hover:border-neutral-600",
+  },
+  {
     id: "cameras",
-    name: "Cameras & Cinema",
-    tagline: "DSLR, Mirrorless & Cinema",
-    description: "Sony Alpha, Canon EOS, RED & cinema prime lenses",
-    image: cameraImg,
+    name: "Cameras",
+    tagline: "Mirrorless, Cinema & Lenses",
+    description: "Sony Alpha, Canon EOS, cinema bodies & prime cinema lenses",
     icon: Camera,
-    accentColor: "hover:border-emerald-500",
+    accentColor: "hover:border-neutral-400 dark:hover:border-neutral-600",
   },
   {
     id: "drones",
-    name: "Drones & Aerial",
-    tagline: "4K Video & FPV Rigs",
-    description: "DJI Mavic 3, Mini 3/4 Pro, Avata & smart remotes",
-    image: droneImg,
-    icon: Plane,
-    accentColor: "hover:border-emerald-500",
-  },
-  {
-    id: "laptops",
-    name: "Laptops & PCs",
-    tagline: "Creator Workstations",
-    description: "Apple MacBook Pro M3, editing rigs & workstations",
-    image: laptopImg,
-    icon: Laptop,
-    accentColor: "hover:border-emerald-500",
+    name: "Drones",
+    tagline: "4K Aerial & FPV Systems",
+    description: "DJI Mavic 3, Mini 4 Pro, Avata & pro controller kits",
+    icon: Drone,
+    accentColor: "hover:border-neutral-400 dark:hover:border-neutral-600",
   },
   {
     id: "audio",
-    name: "Audio & Sound",
-    tagline: "Microphones & Monitors",
-    description: "RODE Wireless PRO, Sennheiser mics & studio audio",
-    image: audioImg,
-    icon: Mic,
-    accentColor: "hover:border-emerald-500",
+    name: "Audio",
+    tagline: "Headphones & Monitoring",
+    description: "Studio reference headphones, monitoring gear & DACs",
+    icon: Headphones,
+    accentColor: "hover:border-neutral-400 dark:hover:border-neutral-600",
   },
   {
-    id: "bikes",
-    name: "Bikes & Rides",
-    tagline: "Motorcycles & Touring",
-    description: "Royal Enfield Classic 350, cruisers & city rides",
-    image: bikeImg,
-    icon: Bike,
-    accentColor: "hover:border-emerald-500",
+    id: "sound",
+    name: "Sound Equipment",
+    tagline: "PA Speakers, Mics & Mixers",
+    description: "RODE wireless mics, PA sound systems & audio consoles",
+    icon: Speaker,
+    accentColor: "hover:border-neutral-400 dark:hover:border-neutral-600",
   },
   {
     id: "tools",
-    name: "Drilling & Tools",
-    tagline: "Power & Hand Tools",
-    description: "Hammer drills, impact wrenches & repair tools",
-    image: toolImg,
-    icon: Hammer,
-    accentColor: "hover:border-emerald-500",
+    name: "Drills & Tools",
+    tagline: "Power Drills & Hardware",
+    description: "Heavy-duty hammer drills, impact drivers & toolkits",
+    icon: Drill,
+    accentColor: "hover:border-neutral-400 dark:hover:border-neutral-600",
   },
   {
     id: "powerbanks",
-    name: "Power & Stations",
-    tagline: "High-Capacity Power",
-    description: "Anker PowerCore, V-Mount batteries & power banks",
-    image: powerbankImg,
-    icon: Zap,
-    accentColor: "hover:border-emerald-500",
+    name: "Power Stations",
+    tagline: "Battery Generators & Packs",
+    description: "High-output power stations, portable generators & batteries",
+    icon: BatteryCharging,
+    accentColor: "hover:border-neutral-400 dark:hover:border-neutral-600",
   },
   {
     id: "lighting",
     name: "Studio Lighting",
-    tagline: "LED Panels & Softboxes",
-    description: "Continuous video lights, RGB bars & light stands",
-    image: cameraImg,
-    icon: Sun,
-    accentColor: "hover:border-emerald-500",
+    tagline: "Continuous Lights & Softboxes",
+    description: "Daylight LED fixtures, RGB studio bars & softbox diffusers",
+    icon: Lightbulb,
+    accentColor: "hover:border-neutral-400 dark:hover:border-neutral-600",
   },
 ];
 
@@ -731,8 +729,8 @@ export default function Categories() {
                 </p>
               </div>
 
-              {/* 8-Category Cards Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+              {/* 8-Category Cards Grid (Icon-Based Minimalist Design) */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-5 lg:gap-6">
                 {EXPLORE_CATEGORY_CARDS.map((cat) => {
                   const IconComp = cat.icon;
                   const count = categoryCounts[cat.id] || 0;
@@ -741,46 +739,43 @@ export default function Categories() {
                       key={cat.id}
                       onClick={() => handleCategorySelect(cat.id)}
                       className={cn(
-                        "group relative rounded-3xl border border-neutral-200/90 dark:border-neutral-800 bg-white dark:bg-[#0D151D] p-5 cursor-pointer transition-all duration-300 hover:shadow-xl hover:-translate-y-1 overflow-hidden",
+                        "group relative rounded-2xl sm:rounded-3xl border border-neutral-200/90 dark:border-neutral-800",
+                        "bg-white dark:bg-[#0D151D] p-5 sm:p-7 cursor-pointer",
+                        "transition-all duration-300 ease-out",
+                        "hover:shadow-xl hover:-translate-y-1 hover:border-neutral-400/90 dark:hover:border-neutral-600/90",
+                        "flex flex-col items-center justify-center text-center overflow-hidden select-none",
                         cat.accentColor
                       )}
                     >
-                      {/* Top icon and gear count badge */}
-                      <div className="relative flex items-center justify-between mb-4">
-                        <div className="w-10 h-10 rounded-2xl bg-neutral-100 dark:bg-white/5 flex items-center justify-center text-emerald-600 dark:text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-                          <IconComp className="h-5 w-5" />
-                        </div>
-                        <span className="text-[11px] font-bold font-mono px-2.5 py-1 rounded-full bg-neutral-100 dark:bg-white/10 text-neutral-600 dark:text-neutral-400">
+                      {/* Top Right Gear Count Badge */}
+                      <div className="absolute top-2.5 right-2.5 sm:top-3.5 sm:right-3.5">
+                        <span className="text-[10px] sm:text-[11px] font-bold font-mono px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full bg-neutral-100 dark:bg-white/10 text-neutral-600 dark:text-neutral-400 border border-neutral-200/40 dark:border-white/5">
                           {count} {count === 1 ? "gear" : "gears"}
                         </span>
                       </div>
 
-                      {/* Equipment Image Preview */}
-                      <div className="relative aspect-[4/3] rounded-2xl bg-neutral-50 dark:bg-neutral-900/60 p-3 mb-4 flex items-center justify-center overflow-hidden">
-                        <img
-                          src={cat.image}
-                          alt={cat.name}
-                          className="max-h-[120px] w-auto max-w-full object-contain group-hover:scale-108 transition-transform duration-300"
+                      {/* Large Centered Modern Icon Container */}
+                      <div className="w-16 h-16 sm:w-20 sm:h-20 md:w-22 md:h-22 rounded-2xl sm:rounded-3xl bg-neutral-100/90 dark:bg-white/[0.06] border border-neutral-200/50 dark:border-white/[0.08] flex items-center justify-center mt-2 mb-3.5 sm:mb-4 transition-all duration-300 group-hover:scale-108 group-hover:bg-neutral-200/60 dark:group-hover:bg-white/[0.12] group-hover:border-neutral-300 dark:group-hover:border-white/20 group-hover:shadow-sm">
+                        <IconComp
+                          className="h-9 w-9 sm:h-10 sm:w-10 md:h-11 md:w-11 text-[var(--foreground,#000000)] dark:text-[var(--foreground,#ffffff)] transition-colors duration-200"
+                          strokeWidth={1.5}
                         />
                       </div>
 
-                      {/* Title & Description */}
-                      <div className="relative space-y-1">
-                        <h3 className="text-base font-extrabold text-neutral-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-                          {cat.name}
-                        </h3>
-                        <p className="text-xs font-semibold text-neutral-500 dark:text-neutral-400">
-                          {cat.tagline}
-                        </p>
-                        <p className="text-[11px] text-neutral-400 dark:text-neutral-500 line-clamp-1 pt-0.5">
-                          {cat.description}
-                        </p>
-                      </div>
+                      {/* Category Name Below the Icon */}
+                      <h3 className="text-sm sm:text-base font-bold text-[var(--foreground,#000000)] dark:text-[var(--foreground,#ffffff)] tracking-tight group-hover:text-black dark:group-hover:text-white transition-colors">
+                        {cat.name}
+                      </h3>
 
-                      {/* Action Row */}
-                      <div className="relative mt-4 pt-3 border-t border-neutral-100 dark:border-neutral-800/80 flex items-center justify-between text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                        <span>Browse Products</span>
-                        <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                      {/* Tagline / Subtitle */}
+                      <p className="text-[11px] sm:text-xs text-neutral-500 dark:text-neutral-400 font-medium line-clamp-1 mt-1">
+                        {cat.tagline}
+                      </p>
+
+                      {/* Subtle Explore Action Indicator */}
+                      <div className="mt-3.5 pt-2.5 border-t border-neutral-100 dark:border-neutral-800/80 w-full flex items-center justify-center gap-1.5 text-[11px] sm:text-xs font-semibold text-neutral-600 dark:text-neutral-400 group-hover:text-[var(--foreground)] dark:group-hover:text-white transition-colors">
+                        <span>Explore</span>
+                        <ArrowRight className="h-3 w-3 sm:h-3.5 sm:w-3.5 transition-transform duration-300 group-hover:translate-x-1" />
                       </div>
                     </div>
                   );
