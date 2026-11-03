@@ -1046,10 +1046,10 @@ const productSchema = product ? {
 
   const activeDisplayImage = gallery[selectedImageIndex] || thumbnails[selectedImageIndex] || product?.image || "";
   const rawVideoUrl = product?.videoUrl || (product as any)?.video_url;
-  const activeVideoUrl = (rawVideoUrl && !rawVideoUrl.includes("mixkit.co"))
+  const activeVideoUrl = (rawVideoUrl && !rawVideoUrl.includes("mixkit.co") && !rawVideoUrl.includes("gv4p8hu7ccji2cie9xdk"))
     ? rawVideoUrl
     : (product?.id === "prod-1792662405953" || (product?.title === "Acer" && product?.category === "computers"))
-    ? "https://res.cloudinary.com/dvyendk6j/video/upload/v1793643488/gv4p8hu7ccji2cie9xdk.mp4"
+    ? "https://res.cloudinary.com/dvyendk6j/video/upload/v1793724284/l2vmxn9hwk6p0cs4ajoz.mp4"
     : "/videos/inspection-sample.mp4";
 
   const brand = product ? getProductBrand(product) : null;
@@ -1235,7 +1235,6 @@ const productSchema = product ? {
                   <div className="w-full h-full min-h-[300px] sm:min-h-[380px] rounded-2xl overflow-hidden bg-black flex flex-col items-center justify-center relative shadow-inner">
                     <video
                       key={activeVideoUrl}
-                      src={activeVideoUrl}
                       poster={activeDisplayImage || product?.image}
                       controls
                       autoPlay
@@ -1245,13 +1244,16 @@ const productSchema = product ? {
                       className="w-full h-full max-h-[360px] object-contain rounded-2xl"
                       onError={(e) => {
                         const target = e.currentTarget;
-                        if (!target.src.endsWith("/videos/inspection-sample.mp4")) {
-                          target.src = "/videos/inspection-sample.mp4";
+                        if (!target.currentSrc?.includes("l2vmxn9hwk6p0cs4ajoz")) {
+                          target.src = "https://res.cloudinary.com/dvyendk6j/video/upload/v1793724284/l2vmxn9hwk6p0cs4ajoz.mp4";
                           target.load();
                           target.play().catch(() => {});
                         }
                       }}
-                    />
+                    >
+                      <source src={activeVideoUrl} type="video/mp4" />
+                      <source src={activeVideoUrl.replace(/\.mp4$/, ".webm")} type="video/webm" />
+                    </video>
                     <div className="absolute bottom-2 left-2 px-2.5 py-0.5 rounded-full bg-black/70 backdrop-blur-md text-[10px] text-emerald-400 font-bold border border-emerald-500/30 flex items-center gap-1 select-none pointer-events-none">
                       <ShieldCheck className="h-3 w-3" />
                       <span>Verified 10s Inspection Video</span>
