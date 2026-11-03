@@ -435,7 +435,7 @@ export default function Reviews() {
             <p className="mt-1 text-xs sm:text-sm text-neutral-500 dark:text-[#A8B1BA] max-w-md">
               {ratingFilter
                 ? `There are currently no ${ratingFilter}-star reviews available matching your filter.`
-                : "Be the first creator to share your experience after completing a rental."}
+                : "Be the first to share your experience with PAYENT."}
             </p>
             <button
               onClick={handleOpenWriteModal}

@@ -18,9 +18,6 @@ export function Testimonials() {
 
   const reviews = data?.reviews || [];
 
-  if (!isLoading && reviews.length === 0) {
-    return null;
-  }
 
   const scroll = (direction: "left" | "right") => {
     if (scrollRef.current) {
@@ -105,23 +102,10 @@ export function Testimonials() {
           </div>
         )}
 
-        {/* Error State */}
-        {!isLoading && isError && (
-          <div className="rounded-2xl bg-neutral-50 dark:bg-[#0D151D] border border-black/10 dark:border-white/10 p-8 text-center">
-            <p className="text-sm text-neutral-600 dark:text-[#A8B1BA] mb-3">
-              Unable to load reviews right now.
-            </p>
-            <button
-              onClick={() => refetch()}
-              className="px-4 py-1.5 text-xs font-semibold rounded-lg bg-neutral-900 text-white dark:bg-white dark:text-black hover:opacity-90 transition-opacity cursor-pointer"
-            >
-              Try Again
-            </button>
-          </div>
-        )}
+        
 
         {/* Empty State */}
-        {!isLoading && !isError && reviews.length === 0 && (
+        {!isLoading && (reviews.length === 0 || isError) && (
           <div className="rounded-2xl bg-neutral-50/50 dark:bg-[#0D151D]/60 border border-dashed border-black/15 dark:border-white/15 p-8 sm:p-12 text-center flex flex-col items-center justify-center">
             <div className="h-12 w-12 rounded-2xl bg-primary/10 text-primary dark:bg-white/10 dark:text-white flex items-center justify-center mb-4">
               <MessageSquareQuote className="h-6 w-6" />
@@ -130,7 +114,7 @@ export function Testimonials() {
               No reviews yet.
             </h3>
             <p className="mt-1 text-xs sm:text-sm text-neutral-500 dark:text-[#A8B1BA] max-w-md">
-              Be the first creator to share your experience after completing a rental.
+              Be the first to share your experience with PAYENT.
             </p>
             <Link
               to="/reviews"

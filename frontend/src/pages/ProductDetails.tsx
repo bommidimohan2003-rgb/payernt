@@ -3,6 +3,7 @@ import {
   Check,
   Truck,
   MessageSquare,
+  MessageSquareQuote,
   MapPin,
   Star,
   ArrowRight,
@@ -52,12 +53,13 @@ import { RenterBookingCalendar } from "@/components/booking/RenterBookingCalenda
 import { tracker } from "@/utils/eventTracker";
 import { api, getApiBase } from "@/utils/api";
 import { storage, STORAGE_KEYS } from "@/utils/storage";
-import { formatOwnerAddress } from "@/utils/formatters";
+import { formatOwnerAddress, formatRelativeTime } from "@/utils/formatters";
 import type { Product, Order } from "@/types";
 import { ProfilePhoto } from "@/components/common/ProfilePhoto";
 import { ProductMessageModal } from "@/components/browse/ProductMessageModal";
 import { ShareProductModal } from "@/components/common/ShareProductModal";
 import { rentalSecurityService } from "@/services/rentalSecurityService";
+import { reviewsApi, type ReviewItem } from "@/services/api";
 import type { RentalSecurity } from "@/types";
 
 const KNOWN_BRANDS = [
@@ -180,6 +182,36 @@ export default function ProductDetails() {
   const [relatedCarouselPage, setRelatedCarouselPage] = useState(0);
   const [isPhotoViewerOpen, setIsPhotoViewerOpen] = useState(false);
   const [isVideoActive, setIsVideoActive] = useState(false);
+
+  // Dynamic Genuine Reviews State
+  const [genuineReviews, setGenuineReviews] = useState<ReviewItem[]>([]);
+  const [isReviewsLoading, setIsReviewsLoading] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (!product?.id) {
+      setGenuineReviews([]);
+      return;
+    }
+    setIsReviewsLoading(true);
+    reviewsApi
+      .getReviews({ product_id: product.id, limit: 6 })
+      .then((res) => {
+        if (isMounted) {
+          setGenuineReviews(res?.reviews || []);
+          setIsReviewsLoading(false);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setGenuineReviews([]);
+          setIsReviewsLoading(false);
+        }
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [product?.id]);
 
   // Date Selection & Availability States
   const todayStr = useMemo(() => toDateInputValue(new Date()), []);
@@ -1055,31 +1087,6 @@ const productSchema = product ? {
   const brand = product ? getProductBrand(product) : null;
   const isWishlisted = product ? has(product.id) : false;
 
-  // Customer Reviews Data (Reference matches Sneha Reddy, Rahul Kumar, Divya Sharma)
-  const customerReviews = [
-    {
-      name: "Sneha Reddy",
-      avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&h=120&fit=crop&crop=faces",
-      rating: 5,
-      comment: "Amazing camera! Great experience.",
-      date: "Oct 20, 2026",
-    },
-    {
-      name: "Rahul Kumar",
-      avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&h=120&fit=crop&crop=faces",
-      rating: 5,
-      comment: "Super easy booking and smooth pickup.",
-      date: "Oct 18, 2026",
-    },
-    {
-      name: "Divya Sharma",
-      avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&h=120&fit=crop&crop=faces",
-      rating: 5,
-      comment: "Loved the rental service!",
-      date: "Oct 15, 2026",
-    },
-  ];
-
   // Frequently Asked Questions
   const faqItems = [
     {
@@ -1329,15 +1336,36 @@ const productSchema = product ? {
               </div>
 
               {/* Star Rating & Reviews Count */}
-              <div className="flex items-center gap-2 text-sm">
-                <div className="flex items-center gap-1 font-bold text-foreground">
-                  <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-                  <span>{(product.rating != null ? Number(product.rating) : 4.8).toFixed(1)}</span>
-                </div>
-                <span className="text-muted-foreground font-medium">
-                  ({product.reviews || 124} reviews)
-                </span>
-              </div>
+              {(() => {
+                const totalCount = genuineReviews.length > 0 ? genuineReviews.length : (product.reviews ? Number(product.reviews) : 0);
+                const avgRating = totalCount > 0 && product.rating != null ? Number(product.rating) : (totalCount > 0 ? 5.0 : null);
+
+                if (totalCount > 0 && avgRating != null) {
+                  return (
+                    <div className="flex items-center gap-2 text-sm">
+                      <div className="flex items-center gap-1 font-bold text-foreground">
+                        <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                        <span>{avgRating.toFixed(1)}</span>
+                      </div>
+                      <span className="text-muted-foreground font-medium">
+                        ({totalCount} {totalCount === 1 ? "review" : "reviews"})
+                      </span>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="flex items-center gap-2 text-sm">
+                    <div className="flex items-center gap-1 font-semibold text-muted-foreground">
+                      <Star className="h-4 w-4 text-muted-foreground/40" />
+                      <span>No ratings yet</span>
+                    </div>
+                    <span className="text-muted-foreground font-medium">
+                      (0 reviews)
+                    </span>
+                  </div>
+                );
+              })()}
 
               {/* Price Display */}
               <div className="flex items-baseline gap-1.5">
@@ -1706,7 +1734,7 @@ const productSchema = product ? {
             </div>
           </section>
 
-          {/* 4. CUSTOMER REVIEWS (3 Reviews Cards) */}
+          {/* 4. CUSTOMER REVIEWS */}
           <section className="space-y-6 text-center pt-2">
             <div className="flex items-center justify-center gap-3">
               <span className="h-0.5 w-12 bg-emerald-500/30 rounded-full" />
@@ -1718,29 +1746,85 @@ const productSchema = product ? {
               <span className="h-0.5 w-12 bg-emerald-500/30 rounded-full" />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
-              {customerReviews.map((rev, idx) => (
-                <div key={idx} className="p-6 rounded-3xl bg-card border border-border/80 shadow-xs space-y-3.5">
-                  <div className="flex items-center gap-3">
-                    <img src={rev.avatar} alt={rev.name} className="h-11 w-11 rounded-full object-cover border border-emerald-500/20 shadow-xs" />
-                    <div>
-                      <h4 className="font-bold text-sm text-foreground">{rev.name}</h4>
-                      <div className="flex items-center text-amber-400">
-                        {[...Array(rev.rating)].map((_, i) => (
-                          <Star key={i} className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                        ))}
+            {genuineReviews.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
+                {genuineReviews.map((rev) => {
+                  const ratingVal = Math.max(1, Math.min(5, Math.round(rev.rating || 5)));
+                  const photo = rev.userProfilePhotoUrl || rev.user_profile_photo_url || rev.userAvatar;
+                  return (
+                    <div
+                      key={rev.id}
+                      className="p-6 rounded-3xl bg-card border border-border/80 shadow-xs space-y-3.5 flex flex-col justify-between transition-all hover:border-emerald-500/40"
+                    >
+                      <div className="space-y-3.5">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-3 min-w-0">
+                            {photo ? (
+                              <img
+                                src={photo}
+                                alt={rev.userName}
+                                className="h-11 w-11 rounded-full object-cover border border-emerald-500/20 shadow-xs shrink-0"
+                              />
+                            ) : (
+                              <div className="h-11 w-11 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold flex items-center justify-center border border-emerald-500/20 shadow-xs shrink-0 text-sm">
+                                {(rev.userName || "U").charAt(0).toUpperCase()}
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <h4 className="font-bold text-sm text-foreground truncate">{rev.userName}</h4>
+                              {rev.isVerified && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                                  <CheckCircle2 className="h-2.5 w-2.5" />
+                                  <span>Verified Rental</span>
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center text-amber-400 shrink-0">
+                            {[...Array(5)].map((_, i) => (
+                              <Star
+                                key={i}
+                                className={cn(
+                                  "h-3.5 w-3.5",
+                                  i < ratingVal
+                                    ? "fill-amber-400 text-amber-400"
+                                    : "fill-neutral-200 text-neutral-200 dark:fill-neutral-800 dark:text-neutral-800"
+                                )}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                        <p className="text-xs text-muted-foreground leading-relaxed italic">
+                          &ldquo;{rev.comment}&rdquo;
+                        </p>
+                      </div>
+                      <div className="text-[11px] text-muted-foreground/75 font-medium pt-2 border-t border-border/40">
+                        {formatRelativeTime(rev.createdAt)}
                       </div>
                     </div>
-                  </div>
-                  <p className="text-xs text-muted-foreground leading-relaxed italic">
-                    "{rev.comment}"
-                  </p>
-                  <div className="text-[11px] text-muted-foreground/75 font-medium">
-                    {rev.date}
-                  </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="max-w-2xl mx-auto p-8 sm:p-12 rounded-3xl bg-card border border-dashed border-border/80 text-center flex flex-col items-center justify-center space-y-3 shadow-xs">
+                <div className="h-12 w-12 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                  <MessageSquareQuote className="h-6 w-6" />
                 </div>
-              ))}
-            </div>
+                <h3 className="text-base sm:text-lg font-bold text-foreground">
+                  Customer Reviews
+                </h3>
+                <p className="text-xs sm:text-sm text-muted-foreground max-w-md">
+                  Be the first to share your experience with PAYENT.
+                </p>
+                <Link
+                  to="/reviews"
+                  className="mt-2 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition-all cursor-pointer shadow-xs"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  <span>Write a Review</span>
+                </Link>
+              </div>
+            )}
           </section>
 
           {/* 5. FREQUENTLY ASKED QUESTIONS (Accordion) */}
