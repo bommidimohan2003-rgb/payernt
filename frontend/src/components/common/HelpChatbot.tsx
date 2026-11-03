@@ -1,11 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  MessageSquare,
   X,
   Send,
-  Bot,
-  AlertCircle,
   RefreshCw,
   LogIn,
   CheckCircle2,
@@ -15,6 +12,8 @@ import { Link } from "@tanstack/react-router";
 import { api } from "@/utils/api";
 import { storage, STORAGE_KEYS } from "@/utils/storage";
 import { Button } from "@/components/common/Button";
+import { PayentAgentIcon } from "@/components/common/PayentAgentIcon";
+import { DeliveryBoyWalking } from "@/components/common/DeliveryBoyWalking";
 
 interface ChatMessage {
   id: string;
@@ -209,25 +208,47 @@ export function HelpChatbot() {
     if (!text) return null;
     const lines = text.split("\n");
     return (
-      <div className="space-y-1">
+      <div className="space-y-1.5 text-sm leading-relaxed">
         {lines.map((line, lIdx) => {
-          if (!line.trim()) return <div key={lIdx} className="h-1.5" />;
+          const trimmed = line.trim();
+          if (!trimmed) return <div key={lIdx} className="h-1" />;
 
-          // Parse basic bold markdown: **bold**
-          const parts = line.split(/(\*\*[^*]+\*\*)/g);
+          // Check if line is a header (### or ##)
+          if (trimmed.startsWith("### ") || trimmed.startsWith("## ")) {
+            const headingText = trimmed.replace(/^#+\s*/, "");
+            return (
+              <h5
+                key={lIdx}
+                className="font-semibold text-[#17191C] text-xs uppercase tracking-wider pt-1.5 pb-0.5 border-b border-[#E1E4E8]/60"
+              >
+                {headingText}
+              </h5>
+            );
+          }
+
+          // Check if line is a bullet item (• or - or *)
+          const isBullet = trimmed.startsWith("• ") || trimmed.startsWith("- ") || trimmed.startsWith("* ");
+          const content = isBullet ? trimmed.replace(/^[•\-\*]\s*/, "") : line;
+
+          const parts = content.split(/(\*\*[^*]+\*\*)/g);
           return (
-            <p key={lIdx} className="leading-relaxed">
-              {parts.map((part, pIdx) => {
-                if (part.startsWith("**") && part.endsWith("**")) {
-                  return (
-                    <strong key={pIdx} className="font-semibold text-foreground">
-                      {part.slice(2, -2)}
-                    </strong>
-                  );
-                }
-                return <span key={pIdx}>{part}</span>;
-              })}
-            </p>
+            <div key={lIdx} className={`flex items-start gap-1.5 ${isBullet ? "pl-1.5" : ""}`}>
+              {isBullet && (
+                <span className="text-[#16A36A] font-bold text-xs select-none mt-0.5 shrink-0">•</span>
+              )}
+              <p className="flex-1">
+                {parts.map((part, pIdx) => {
+                  if (part.startsWith("**") && part.endsWith("**")) {
+                    return (
+                      <strong key={pIdx} className="font-semibold text-[#17191C]">
+                        {part.slice(2, -2)}
+                      </strong>
+                    );
+                  }
+                  return <span key={pIdx}>{part}</span>;
+                })}
+              </p>
+            </div>
           );
         })}
       </div>
@@ -241,7 +262,7 @@ export function HelpChatbot() {
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         onClick={() => setIsOpen((prev) => !prev)}
-        className="fixed bottom-6 right-6 z-40 h-14 w-14 rounded-full bg-foreground text-background shadow-2xl flex items-center justify-center border border-border/80 hover:bg-foreground/90 transition-colors"
+        className="fixed bottom-5 sm:bottom-6 right-4 sm:right-6 z-40 h-13 w-13 sm:h-14 sm:w-14 rounded-full bg-[#17191C] text-white shadow-2xl flex items-center justify-center border border-[#17191C]/80 hover:bg-[#252930] transition-colors focus:outline-none focus:ring-2 focus:ring-[#16A36A] focus:ring-offset-2"
         aria-label="Payent Support Assistant"
       >
         <AnimatePresence mode="wait">
@@ -252,7 +273,7 @@ export function HelpChatbot() {
               animate={{ rotate: 0, opacity: 1 }}
               exit={{ rotate: 90, opacity: 0 }}
             >
-              <X className="h-6 w-6" />
+              <X className="h-5 w-5 text-white" />
             </motion.div>
           ) : (
             <motion.div
@@ -260,10 +281,10 @@ export function HelpChatbot() {
               initial={{ rotate: 90, opacity: 0 }}
               animate={{ rotate: 0, opacity: 1 }}
               exit={{ rotate: 90, opacity: 0 }}
-              className="relative"
+              className="relative flex items-center justify-center"
             >
-              <MessageSquare className="h-6 w-6" />
-              <span className="absolute -top-1 -right-1 h-3 w-3 bg-emerald-500 border-2 border-background rounded-full animate-pulse" />
+              <PayentAgentIcon size={28} />
+              <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 bg-[#16A36A] border-2 border-[#17191C] rounded-full animate-pulse" />
             </motion.div>
           )}
         </AnimatePresence>
@@ -273,31 +294,23 @@ export function HelpChatbot() {
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, y: 30, scale: 0.95 }}
+            initial={{ opacity: 0, y: 25, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 30, scale: 0.95 }}
-            transition={{ duration: 0.2 }}
-            className="fixed bottom-24 right-4 sm:right-6 z-50 w-[390px] max-w-[calc(100vw-2rem)] h-[560px] max-h-[calc(100vh-7.5rem)] rounded-2xl bg-card border border-border shadow-2xl flex flex-col overflow-hidden"
+            exit={{ opacity: 0, y: 25, scale: 0.96 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
+            className="fixed bottom-20 sm:bottom-24 right-3 sm:right-6 z-50 w-[400px] max-w-[calc(100vw-1.5rem)] h-[570px] max-h-[calc(100vh-6.5rem)] rounded-2xl bg-[#FFFFFF] border border-[#E1E4E8] shadow-2xl flex flex-col overflow-hidden"
           >
-            {/* Header */}
-            <div className="p-3.5 bg-foreground text-background flex items-center justify-between border-b border-border/40">
-              <div className="flex items-center gap-2.5">
-                <div className="h-9 w-9 rounded-xl bg-background/10 grid place-items-center border border-background/20">
-                  <Bot className="h-5 w-5 text-background" />
-                </div>
-                <div>
-                  <h4 className="font-semibold text-sm leading-tight flex items-center gap-1.5">
-                    Payent Agent
-                  </h4>
-                  <div className="flex items-center gap-1.5 text-[11px] text-background/70">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                    <span>Deterministic Assistant • Telugu & English</span>
-                  </div>
-                </div>
+            {/* Header: Premium Dark Charcoal (#17191C) with Custom Agent Symbol & Payent Agent text */}
+            <div className="px-4 py-3.5 bg-[#17191C] text-white flex items-center justify-between border-b border-[#252930] shrink-0">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <PayentAgentIcon size={28} />
+                <span className="font-semibold text-sm text-white tracking-tight truncate">
+                  Payent Agent
+                </span>
               </div>
               <button
                 onClick={() => setIsOpen(false)}
-                className="hover:bg-background/10 p-1.5 rounded-lg transition-colors text-background"
+                className="hover:bg-white/10 p-1.5 rounded-lg transition-colors text-white/80 hover:text-white focus:outline-none focus:ring-1 focus:ring-[#16A36A]"
                 aria-label="Close Chat"
               >
                 <X className="h-4 w-4" />
@@ -305,7 +318,7 @@ export function HelpChatbot() {
             </div>
 
             {/* Chat Body */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-background/60 scrollbar-thin">
+            <div className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-[#FFFFFF] scrollbar-thin">
               {messages.map((m) => {
                 const isUser = m.sender === "user";
                 const toolRes = m.toolResult;
@@ -321,75 +334,90 @@ export function HelpChatbot() {
                     className={`flex flex-col ${isUser ? "items-end" : "items-start"}`}
                   >
                     <div
-                      className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm shadow-sm ${
-                        isUser
-                          ? "bg-foreground text-background rounded-tr-none font-medium"
-                          : "bg-secondary/70 border border-border text-foreground rounded-tl-none"
+                      className={`flex items-start gap-2 max-w-[88%] ${
+                        isUser ? "justify-end" : "justify-start"
                       }`}
                     >
-                      {renderFormattedText(m.text)}
+                      {!isUser && (
+                        <div className="shrink-0 mt-0.5">
+                          <PayentAgentIcon size={24} />
+                        </div>
+                      )}
+                      <div
+                        className={`rounded-2xl px-4 py-2.5 text-sm shadow-2xs ${
+                          isUser
+                            ? "bg-[#17191C] text-white rounded-tr-xs font-normal"
+                            : "bg-[#F5F6F8] border border-[#E1E4E8] text-[#252930] rounded-tl-xs"
+                        }`}
+                      >
+                        {renderFormattedText(m.text)}
 
-                      {/* Created Support Ticket Card */}
-                      {hasCreatedTicket && (
-                        <div className="mt-3 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-foreground">
-                          <div className="flex items-center justify-between font-semibold text-emerald-600 dark:text-emerald-400 mb-1.5">
-                            <span className="flex items-center gap-1">
-                              <CheckCircle2 className="h-3.5 w-3.5" />
-                              Support Ticket Confirmed
-                            </span>
-                            <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-[10px] font-bold uppercase tracking-wider">
-                              {toolRes.status || "OPEN"}
-                            </span>
+                        {/* Created Support Ticket Card */}
+                        {hasCreatedTicket && (
+                          <div className="mt-3 p-3 rounded-xl bg-[#16A36A]/10 border border-[#16A36A]/25 text-xs text-[#252930]">
+                            <div className="flex items-center justify-between font-semibold text-[#16A36A] mb-1.5">
+                              <span className="flex items-center gap-1">
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                Support Ticket Confirmed
+                              </span>
+                              <span className="px-2 py-0.5 rounded-md bg-[#16A36A]/20 text-[10px] font-bold uppercase tracking-wider text-[#16A36A]">
+                                {toolRes.status || "OPEN"}
+                              </span>
+                            </div>
+                            <div className="font-mono text-[11px] text-[#17191C] font-semibold">
+                              Ticket #{toolRes.ticket_id}
+                            </div>
+                            <div className="text-[#707780] text-[11px] mt-0.5">
+                              Category: {toolRes.category || "General Help"}
+                            </div>
+                            <div className="mt-2 pt-2 border-t border-[#16A36A]/20 flex gap-2">
+                              <Link
+                                to="/support"
+                                className="text-xs text-[#16A36A] font-medium hover:underline flex items-center gap-1"
+                                onClick={() => setIsOpen(false)}
+                              >
+                                <Headphones className="h-3 w-3" />
+                                View in Support Messages
+                              </Link>
+                            </div>
                           </div>
-                          <div className="font-mono text-[11px] text-foreground font-semibold">
-                            Ticket #{toolRes.ticket_id}
-                          </div>
-                          <div className="text-muted-foreground text-[11px] mt-0.5">
-                            Category: {toolRes.category || "General Help"}
-                          </div>
-                          <div className="mt-2 pt-2 border-t border-emerald-500/20 flex gap-2">
+                        )}
+
+                        {/* Sign In Required Callout */}
+                        {m.requiresAuth && (
+                          <div className="mt-2.5 pt-2 border-t border-[#E1E4E8] flex items-center gap-2">
                             <Link
-                              to="/support"
-                              className="text-xs text-emerald-600 dark:text-emerald-400 font-medium hover:underline flex items-center gap-1"
+                              to="/login"
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#17191C] text-white text-xs font-semibold hover:bg-[#252930] transition-colors"
                               onClick={() => setIsOpen(false)}
                             >
-                              <Headphones className="h-3 w-3" />
-                              View in Support Messages
+                              <LogIn className="h-3.5 w-3.5" />
+                              Sign In to Payent
                             </Link>
                           </div>
-                        </div>
-                      )}
+                        )}
 
-                      {/* Sign In Required Callout */}
-                      {m.requiresAuth && (
-                        <div className="mt-2.5 pt-2 border-t border-border flex items-center gap-2">
-                          <Link
-                            to="/login"
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-foreground text-background text-xs font-semibold hover:bg-foreground/90 transition-colors"
-                            onClick={() => setIsOpen(false)}
-                          >
-                            <LogIn className="h-3.5 w-3.5" />
-                            Sign In to Payent
-                          </Link>
-                        </div>
-                      )}
-
-                      {/* Retry on Error */}
-                      {m.isError && m.lastUserQuery && (
-                        <div className="mt-2 pt-2 border-t border-border">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleSend(m.lastUserQuery!)}
-                            className="h-7 text-xs flex items-center gap-1.5"
-                          >
-                            <RefreshCw className="h-3 w-3" />
-                            Retry Query
-                          </Button>
-                        </div>
-                      )}
+                        {/* Retry on Error */}
+                        {m.isError && m.lastUserQuery && (
+                          <div className="mt-2 pt-2 border-t border-[#E1E4E8]">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleSend(m.lastUserQuery!)}
+                              className="h-7 text-xs flex items-center gap-1.5 border-[#E1E4E8] text-[#17191C] hover:bg-[#F5F6F8]"
+                            >
+                              <RefreshCw className="h-3 w-3" />
+                              Retry Query
+                            </Button>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <span className="text-[10px] text-muted-foreground/70 mt-1 px-1">
+                    <span
+                      className={`text-[10px] text-[#707780] mt-1 px-1 ${
+                        isUser ? "text-right mr-1" : "text-left ml-8"
+                      }`}
+                    >
                       {new Date(m.timestamp).toLocaleTimeString([], {
                         hour: "2-digit",
                         minute: "2-digit",
@@ -399,22 +427,14 @@ export function HelpChatbot() {
                 );
               })}
 
-              {/* Typing indicator */}
+              {/* Delivery Boy Walking Animation (Active only while AI is generating response) */}
               {isTyping && (
-                <div className="flex justify-start">
-                  <div className="bg-secondary/70 border border-border text-foreground rounded-2xl rounded-tl-none px-4 py-2.5 flex items-center gap-1.5">
-                    <span
-                      className="h-2 w-2 rounded-full bg-foreground/60 animate-bounce"
-                      style={{ animationDelay: "0ms" }}
-                    />
-                    <span
-                      className="h-2 w-2 rounded-full bg-foreground/60 animate-bounce"
-                      style={{ animationDelay: "150ms" }}
-                    />
-                    <span
-                      className="h-2 w-2 rounded-full bg-foreground/60 animate-bounce"
-                      style={{ animationDelay: "300ms" }}
-                    />
+                <div className="flex items-start gap-2 max-w-[92%]">
+                  <div className="shrink-0 mt-0.5">
+                    <PayentAgentIcon size={24} />
+                  </div>
+                  <div className="flex-1">
+                    <DeliveryBoyWalking statusText="Verifying platform records & policy..." />
                   </div>
                 </div>
               )}
@@ -424,7 +444,7 @@ export function HelpChatbot() {
 
             {/* Dynamic Suggestion Chips */}
             {activeSuggestions.length > 0 && (
-              <div className="px-3.5 py-2 border-t border-border/60 bg-secondary/30 flex flex-wrap gap-1.5">
+              <div className="px-3.5 py-2.5 border-t border-[#E1E4E8] bg-[#F5F6F8] flex flex-wrap gap-1.5 shrink-0">
                 {activeSuggestions.map((suggestion, sIdx) => {
                   const isConfirm = suggestion.toLowerCase().includes("confirm");
                   return (
@@ -433,10 +453,10 @@ export function HelpChatbot() {
                       type="button"
                       disabled={isTyping}
                       onClick={() => handleSend(suggestion)}
-                      className={`text-xs px-2.5 py-1 rounded-lg border transition-all text-left font-medium ${
+                      className={`text-xs px-3 py-1.5 rounded-full border transition-all text-left font-medium shadow-2xs ${
                         isConfirm
-                          ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 font-semibold"
-                          : "bg-card border-border hover:border-foreground/40 text-foreground/80 hover:text-foreground"
+                          ? "bg-[#16A36A]/10 border-[#16A36A]/30 text-[#16A36A] hover:bg-[#16A36A]/20 font-semibold"
+                          : "bg-[#FFFFFF] border-[#E1E4E8] hover:border-[#17191C]/40 text-[#252930] hover:text-[#17191C] hover:bg-[#F5F6F8]"
                       }`}
                     >
                       {suggestion}
@@ -452,7 +472,7 @@ export function HelpChatbot() {
                 e.preventDefault();
                 handleSend(input);
               }}
-              className="p-3 border-t border-border bg-card flex gap-2 items-center"
+              className="p-3 border-t border-[#E1E4E8] bg-[#FFFFFF] flex gap-2 items-center shrink-0"
             >
               <input
                 ref={inputRef}
@@ -462,15 +482,16 @@ export function HelpChatbot() {
                 placeholder="Ask in English or Telugu (T-English)..."
                 disabled={isTyping}
                 maxLength={2000}
-                className="flex-1 h-10 px-3.5 rounded-xl border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-foreground transition-all"
+                className="flex-1 h-10 px-3.5 rounded-xl border border-[#E1E4E8] bg-[#F5F6F8] text-sm text-[#252930] placeholder:text-[#707780] focus:outline-none focus:border-[#17191C] focus:bg-[#FFFFFF] transition-all"
               />
               <Button
                 type="submit"
                 size="icon"
                 disabled={!input.trim() || isTyping}
-                className="shrink-0 h-10 w-10 rounded-xl bg-foreground text-background hover:bg-foreground/90 disabled:opacity-40"
+                className="shrink-0 h-10 w-10 rounded-xl bg-[#17191C] text-white hover:bg-[#252930] disabled:opacity-30 disabled:hover:bg-[#17191C] transition-all"
+                aria-label="Send message"
               >
-                <Send className="h-4 w-4" />
+                <Send className="h-4 w-4 text-white" />
               </Button>
             </form>
           </motion.div>
@@ -479,3 +500,5 @@ export function HelpChatbot() {
     </>
   );
 }
+
+export default HelpChatbot;
