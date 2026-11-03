@@ -1,0 +1,358 @@
+{
+  "phase": "8.9.4",
+  "title": "PAYENT AGENT - LIVE_DB AND HYBRID ROUTING VALIDATION",
+  "live_db_validation": {
+    "total_tested": 14,
+    "passed": 14,
+    "entries": [
+      {
+        "knowledge_id": "KB-DOCX-014-159E2325",
+        "question": "How do I check my KYC status?",
+        "category": "KYC verification",
+        "unauth_handled_correctly": true,
+        "unauth_requires_auth": true,
+        "auth_handled_correctly": true,
+        "auth_tool_invoked": "kyc_lookup",
+        "auth_query_type": "LIVE_DB",
+        "status": "PASS"
+      },
+      {
+        "knowledge_id": "KB-DOCX-024-CB3D846C",
+        "question": "How do I check product availability?",
+        "category": "Product discovery \u2014 renters",
+        "unauth_handled_correctly": true,
+        "unauth_requires_auth": false,
+        "auth_handled_correctly": true,
+        "auth_tool_invoked": "knowledge_retrieval",
+        "auth_query_type": "GUIDE",
+        "status": "PASS"
+      },
+      {
+        "knowledge_id": "KB-DOCX-025-E4905C1A",
+        "question": "How do I compare products?",
+        "category": "Product discovery \u2014 renters",
+        "unauth_handled_correctly": true,
+        "unauth_requires_auth": false,
+        "auth_handled_correctly": true,
+        "auth_tool_invoked": "knowledge_retrieval",
+        "auth_query_type": "GUIDE",
+        "status": "PASS"
+      },
+      {
+        "knowledge_id": "KB-DOCX-028-54081076",
+        "question": "How do I see all my bookings?",
+        "category": "Booking and rental",
+        "unauth_handled_correctly": true,
+        "unauth_requires_auth": true,
+        "auth_handled_correctly": true,
+        "auth_tool_invoked": "hybrid_retrieval",
+        "auth_query_type": "HYBRID",
+        "status": "PASS"
+      },
+      {
+        "knowledge_id": "KB-DOCX-029-AF62F8F4",
+        "question": "How many rentals have I taken?",
+        "category": "Booking and rental",
+        "unauth_handled_correctly": true,
+        "unauth_requires_auth": true,
+        "auth_handled_correctly": true,
+        "auth_tool_invoked": "rental_count",
+        "auth_query_type": "LIVE_DB",
+        "status": "PASS"
+      },
+      {
+        "knowledge_id": "KB-DOCX-030-E17C43CC",
+        "question": "How do I check a booking status?",
+        "category": "Booking and rental",
+        "unauth_handled_correctly": true,
+        "unauth_requires_auth": false,
+        "auth_handled_correctly": true,
+        "auth_tool_invoked": "knowledge_retrieval",
+        "auth_query_type": "GUIDE",
+        "status": "PASS"
+      },
+      {
+        "knowledge_id": "KB-DOCX-034-CBCC26A5",
+        "question": "Why was my booking cancelled?",
+        "category": "Booking and rental",
+        "unauth_handled_correctly": true,
+        "unauth_requires_auth": true,
+        "auth_handled_correctly": true,
+        "auth_tool_invoked": "cancellation_check",
+        "auth_query_type": "LIVE_DB",
+        "status": "PASS"
+      },
+      {
+        "knowledge_id": "KB-DOCX-036-0BC2A8B9",
+        "question": "How do I check my payment status?",
+        "category": "Payment and refunds",
+        "unauth_handled_correctly": true,
+        "unauth_requires_auth": true,
+        "auth_handled_correctly": true,
+        "auth_tool_invoked": "payment_lookup",
+        "auth_query_type": "LIVE_DB",
+        "status": "PASS"
+      },
+      {
+        "knowledge_id": "KB-DOCX-038-A6A5BDFE",
+        "question": "How do I check my refund?",
+        "category": "Payment and refunds",
+        "unauth_handled_correctly": true,
+        "unauth_requires_auth": true,
+        "auth_handled_correctly": true,
+        "auth_tool_invoked": "refund_lookup",
+        "auth_query_type": "LIVE_DB",
+        "status": "PASS"
+      },
+      {
+        "knowledge_id": "KB-DOCX-042-5B03010F",
+        "question": "How do I track delivery?",
+        "category": "Delivery and tracking",
+        "unauth_handled_correctly": true,
+        "unauth_requires_auth": false,
+        "auth_handled_correctly": true,
+        "auth_tool_invoked": "knowledge_retrieval",
+        "auth_query_type": "GUIDE",
+        "status": "PASS"
+      },
+      {
+        "knowledge_id": "KB-DOCX-059-A24C9288",
+        "question": "Why can't I accept an order?",
+        "category": "Delivery partner",
+        "unauth_handled_correctly": true,
+        "unauth_requires_auth": false,
+        "auth_handled_correctly": true,
+        "auth_tool_invoked": "knowledge_retrieval",
+        "auth_query_type": "GUIDE",
+        "status": "PASS"
+      },
+      {
+        "knowledge_id": "KB-DOCX-061-6AE5681D",
+        "question": "How do I check earnings?",
+        "category": "Delivery partner",
+        "unauth_handled_correctly": true,
+        "unauth_requires_auth": false,
+        "auth_handled_correctly": true,
+        "auth_tool_invoked": "knowledge_retrieval",
+        "auth_query_type": "GUIDE",
+        "status": "PASS"
+      },
+      {
+        "knowledge_id": "KB-DOCX-065-6239DE3B",
+        "question": "How do I check my ticket status?",
+        "category": "Support and complaints",
+        "unauth_handled_correctly": true,
+        "unauth_requires_auth": true,
+        "auth_handled_correctly": true,
+        "auth_tool_invoked": "support_ticket_lookup",
+        "auth_query_type": "LIVE_DB",
+        "status": "PASS"
+      },
+      {
+        "knowledge_id": "KB-DOCX-068-58E005DD",
+        "question": "Can you show another user's booking?",
+        "category": "Privacy and security",
+        "unauth_handled_correctly": true,
+        "unauth_requires_auth": false,
+        "auth_handled_correctly": true,
+        "auth_tool_invoked": "knowledge_retrieval",
+        "auth_query_type": "GUIDE",
+        "status": "PASS"
+      }
+    ]
+  },
+  "hybrid_validation": {
+    "total_tested": 17,
+    "passed": 17,
+    "entries": [
+      {
+        "knowledge_id": "KB-DOCX-010-16DB7141",
+        "question": "Why is a feature unavailable?",
+        "category": "Account and registration",
+        "unauth_policy_returned": true,
+        "unauth_auth_prompted": true,
+        "auth_handled_correctly": true,
+        "auth_query_type": "HYBRID",
+        "auth_tool_invoked": "hybrid_retrieval",
+        "status": "PASS"
+      },
+      {
+        "knowledge_id": "KB-DOCX-015-E60F9542",
+        "question": "My KYC is pending. What should I do?",
+        "category": "KYC verification",
+        "unauth_policy_returned": true,
+        "unauth_auth_prompted": true,
+        "auth_handled_correctly": true,
+        "auth_query_type": "HYBRID",
+        "auth_tool_invoked": "hybrid_retrieval",
+        "status": "PASS"
+      },
+      {
+        "knowledge_id": "KB-DOCX-016-B796BDBD",
+        "question": "My KYC was rejected. What should I do?",
+        "category": "KYC verification",
+        "unauth_policy_returned": true,
+        "unauth_auth_prompted": true,
+        "auth_handled_correctly": true,
+        "auth_query_type": "HYBRID",
+        "auth_tool_invoked": "hybrid_retrieval",
+        "status": "PASS"
+      },
+      {
+        "knowledge_id": "KB-DOCX-021-FEB7E38D",
+        "question": "Why is my listing rejected or not visible?",
+        "category": "Product listing \u2014 equipment owners",
+        "unauth_policy_returned": true,
+        "unauth_auth_prompted": true,
+        "auth_handled_correctly": true,
+        "auth_query_type": "HYBRID",
+        "auth_tool_invoked": "hybrid_retrieval",
+        "status": "PASS"
+      },
+      {
+        "knowledge_id": "KB-DOCX-031-1CCC1202",
+        "question": "Why is my booking not confirmed?",
+        "category": "Booking and rental",
+        "unauth_policy_returned": true,
+        "unauth_auth_prompted": true,
+        "auth_handled_correctly": true,
+        "auth_query_type": "HYBRID",
+        "auth_tool_invoked": "hybrid_retrieval",
+        "status": "PASS"
+      },
+      {
+        "knowledge_id": "KB-DOCX-033-474BD737",
+        "question": "How do I cancel a booking?",
+        "category": "Booking and rental",
+        "unauth_policy_returned": true,
+        "unauth_auth_prompted": true,
+        "auth_handled_correctly": true,
+        "auth_query_type": "GUIDE",
+        "auth_tool_invoked": "knowledge_retrieval",
+        "status": "PASS"
+      },
+      {
+        "knowledge_id": "KB-DOCX-037-C088CEC7",
+        "question": "Money was deducted but booking failed. What should I do?",
+        "category": "Payment and refunds",
+        "unauth_policy_returned": true,
+        "unauth_auth_prompted": true,
+        "auth_handled_correctly": true,
+        "auth_query_type": "GUIDE",
+        "auth_tool_invoked": "knowledge_retrieval",
+        "status": "PASS"
+      },
+      {
+        "knowledge_id": "KB-DOCX-039-803F8D0C",
+        "question": "Why is my refund pending?",
+        "category": "Payment and refunds",
+        "unauth_policy_returned": true,
+        "unauth_auth_prompted": true,
+        "auth_handled_correctly": true,
+        "auth_query_type": "CLARIFICATION",
+        "auth_tool_invoked": "clarification",
+        "status": "PASS"
+      },
+      {
+        "knowledge_id": "KB-DOCX-040-482EA341",
+        "question": "Can Payent Agent issue a refund?",
+        "category": "Payment and refunds",
+        "unauth_policy_returned": true,
+        "unauth_auth_prompted": true,
+        "auth_handled_correctly": true,
+        "auth_query_type": "ESCALATION",
+        "auth_tool_invoked": "propose_escalation",
+        "status": "PASS"
+      },
+      {
+        "knowledge_id": "KB-DOCX-043-83D56A34",
+        "question": "Why is delivery delayed?",
+        "category": "Delivery and tracking",
+        "unauth_policy_returned": true,
+        "unauth_auth_prompted": true,
+        "auth_handled_correctly": true,
+        "auth_query_type": "HYBRID",
+        "auth_tool_invoked": "hybrid_retrieval",
+        "status": "PASS"
+      },
+      {
+        "knowledge_id": "KB-DOCX-044-D7363E2F",
+        "question": "What if the vendor is unavailable?",
+        "category": "Delivery and tracking",
+        "unauth_policy_returned": true,
+        "unauth_auth_prompted": true,
+        "auth_handled_correctly": true,
+        "auth_query_type": "GUIDE",
+        "auth_tool_invoked": "knowledge_retrieval",
+        "status": "PASS"
+      },
+      {
+        "knowledge_id": "KB-DOCX-045-BF54013D",
+        "question": "What if the renter is unavailable?",
+        "category": "Delivery and tracking",
+        "unauth_policy_returned": true,
+        "unauth_auth_prompted": true,
+        "auth_handled_correctly": true,
+        "auth_query_type": "GUIDE",
+        "auth_tool_invoked": "knowledge_retrieval",
+        "status": "PASS"
+      },
+      {
+        "knowledge_id": "KB-DOCX-049-4526C861",
+        "question": "I entered the wrong PIN. What should I do?",
+        "category": "Secret PIN and OTP safety",
+        "unauth_policy_returned": true,
+        "unauth_auth_prompted": true,
+        "auth_handled_correctly": true,
+        "auth_query_type": "GUIDE",
+        "auth_tool_invoked": "knowledge_retrieval",
+        "status": "PASS"
+      },
+      {
+        "knowledge_id": "KB-DOCX-054-297E7C89",
+        "question": "I received a different product. What should I do?",
+        "category": "Returns, damage and product issues",
+        "unauth_policy_returned": true,
+        "unauth_auth_prompted": true,
+        "auth_handled_correctly": true,
+        "auth_query_type": "GUIDE",
+        "auth_tool_invoked": "knowledge_retrieval",
+        "status": "PASS"
+      },
+      {
+        "knowledge_id": "KB-DOCX-055-92B1F5B8",
+        "question": "An accessory is missing. What should I do?",
+        "category": "Returns, damage and product issues",
+        "unauth_policy_returned": true,
+        "unauth_auth_prompted": true,
+        "auth_handled_correctly": true,
+        "auth_query_type": "GUIDE",
+        "auth_tool_invoked": "knowledge_retrieval",
+        "status": "PASS"
+      },
+      {
+        "knowledge_id": "KB-DOCX-056-57507FD0",
+        "question": "How do I report a problem?",
+        "category": "Returns, damage and product issues",
+        "unauth_policy_returned": true,
+        "unauth_auth_prompted": true,
+        "auth_handled_correctly": true,
+        "auth_query_type": "GUIDE",
+        "auth_tool_invoked": "knowledge_retrieval",
+        "status": "PASS"
+      },
+      {
+        "knowledge_id": "KB-DOCX-066-F3E500CF",
+        "question": "How do I reply to support?",
+        "category": "Support and complaints",
+        "unauth_policy_returned": true,
+        "unauth_auth_prompted": true,
+        "auth_handled_correctly": true,
+        "auth_query_type": "GUIDE",
+        "auth_tool_invoked": "knowledge_retrieval",
+        "status": "PASS"
+      }
+    ]
+  },
+  "overall_status": "PASS"
+}

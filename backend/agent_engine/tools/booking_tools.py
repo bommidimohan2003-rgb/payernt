@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 
 from agent_engine.context import AgentSessionContext
 from agent_engine.privacy import sanitize_booking_record
+from config import IS_PRODUCTION
 from database import DatabaseConnectionError, get_orders, get_order_by_id
 from payernt_database import get_payernt_vendor_bookings
 
@@ -56,6 +57,11 @@ def get_user_bookings_tool(context: AgentSessionContext, limit: int = 10) -> Dic
         }
 
     sanitized = [sanitize_booking_record(b) for b in raw_bookings[:limit]]
+    if IS_PRODUCTION:
+        sanitized = [
+            b for b in sanitized
+            if not any(p in str(b.get("booking_id") or "").lower() for p in ("ord_test_", "ord_coord_", "mock_", "fixture_"))
+        ]
     return {
         "success": True,
         "count": len(sanitized),
@@ -82,6 +88,12 @@ def get_booking_details_tool(context: AgentSessionContext, booking_id: str) -> D
         return {
             "success": False,
             "error": "Please provide a valid booking or order ID."
+        }
+
+    if IS_PRODUCTION and any(prefix in clean_bid.lower() for prefix in ("ord_test_", "ord_coord_", "mock_", "fixture_")):
+        return {
+            "success": False,
+            "error": f"No booking found with ID '{clean_bid}' in your account records."
         }
 
     try:
@@ -138,6 +150,12 @@ def check_cancellation_eligibility_tool(context: AgentSessionContext, booking_id
         return {
             "success": False,
             "error": "Please provide a booking ID to evaluate cancellation eligibility."
+        }
+
+    if IS_PRODUCTION and any(prefix in clean_bid.lower() for prefix in ("ord_test_", "ord_coord_", "mock_", "fixture_")):
+        return {
+            "success": False,
+            "error": f"Booking '{clean_bid}' was not found in our records."
         }
 
     try:

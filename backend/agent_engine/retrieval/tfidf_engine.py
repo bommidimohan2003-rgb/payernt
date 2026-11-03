@@ -369,7 +369,7 @@ class AgentKnowledgeRetriever:
 
         # 5. Score Candidates
         scored_candidates: List[Tuple[KnowledgeDocument, float, List[str]]] = []
-        clean_raw_lower = cleaned_query.lower().strip(" ?!.,")
+        clean_raw_lower = re.sub(r"\s+", " ", cleaned_query.lower()).strip(" ?!.,")
         unique_original_terms = set(self.tokenize_text(cleaned_query))
 
         w_q = self.config.weight_question
@@ -419,13 +419,16 @@ class AgentKnowledgeRetriever:
             sim_a, c_a = self.compute_field_cosine(expanded_tokens, field_dict["answer"])
 
             # Exact or near-exact question / synonym match bonuses
-            doc_q_clean = doc.question.lower().strip(" ?!.,")
+            doc_q_clean = re.sub(r"\s+", " ", doc.question.lower()).strip(" ?!.,")
             is_exact = False
-            if clean_raw_lower == doc_q_clean or (len(clean_raw_lower) >= 10 and clean_raw_lower in doc_q_clean):
+            if clean_raw_lower == doc_q_clean:
+                sim_q = 1.0
+                is_exact = True
+            elif len(clean_raw_lower) >= 10 and clean_raw_lower in doc_q_clean:
                 sim_q = max(sim_q, 0.95)
                 is_exact = True
-            elif any(clean_raw_lower == s.lower().strip(" ?!.,") for s in doc.synonyms):
-                sim_s = max(sim_s, 0.92)
+            elif any(clean_raw_lower == re.sub(r"\s+", " ", s.lower()).strip(" ?!.,") for s in doc.synonyms):
+                sim_s = max(sim_s, 0.95)
                 is_exact = True
 
             best_title_sim = max(sim_q, sim_s)
@@ -465,7 +468,10 @@ class AgentKnowledgeRetriever:
             combined_score = weighted_sum / active_weights if active_weights > 0 else 0.0
 
             # Preserve strong title matches
-            final_score = max(combined_score, best_title_sim * 0.95)
+            if clean_raw_lower == doc_q_clean:
+                final_score = max(combined_score, 0.98)
+            else:
+                final_score = max(combined_score, best_title_sim * 0.95)
 
             # Missing operative term penalty across the entire document:
             # Damps candidate if operative query content terms are completely absent from document
@@ -514,9 +520,14 @@ class AgentKnowledgeRetriever:
             top1_doc, top1_score, _ = top_candidates[0]
             top2_doc, top2_score, _ = top_candidates[1]
 
+            is_top1_exact = (
+                clean_raw_lower == re.sub(r"\s+", " ", top1_doc.question.lower()).strip(" ?!.,")
+                or any(clean_raw_lower == re.sub(r"\s+", " ", s.lower()).strip(" ?!.,") for s in top1_doc.synonyms)
+            )
             delta = top1_score - top2_score
             if (
-                top1_score >= self.config.min_ambiguity_threshold
+                not is_top1_exact
+                and top1_score >= self.config.min_ambiguity_threshold
                 and delta <= self.config.ambiguity_delta
                 and top1_doc.id != top2_doc.id
                 and top1_doc.question.strip().lower() != top2_doc.question.strip().lower()

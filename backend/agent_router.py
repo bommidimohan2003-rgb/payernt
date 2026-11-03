@@ -7,6 +7,7 @@ Enforces conversation ownership, input length validation, and tenant isolation.
 """
 
 import logging
+import time
 import uuid
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Header, HTTPException, Request, status
@@ -31,6 +32,32 @@ agent_router = APIRouter(prefix="/api/agent", tags=["Payent Agent"])
 
 # Singleton router instance for deterministic pipeline processing
 _tool_router = AgentToolRouter()
+
+# In-memory sliding window rate limiter
+_AGENT_RATE_LIMITS: Dict[str, List[float]] = {}
+RATE_LIMIT_AUTH_PER_MINUTE = 60
+RATE_LIMIT_GUEST_PER_MINUTE = 30
+
+def reset_agent_rate_limits() -> None:
+    """Resets in-memory rate limiting stores (used by tests)."""
+    _AGENT_RATE_LIMITS.clear()
+
+def check_agent_rate_limit(key: str, is_authenticated: bool) -> bool:
+    """
+    Sliding window rate limiter: allows up to limit requests per 60 seconds.
+    Prunes timestamps older than 60 seconds.
+    """
+    now = time.time()
+    limit = RATE_LIMIT_AUTH_PER_MINUTE if is_authenticated else RATE_LIMIT_GUEST_PER_MINUTE
+    window = 60.0
+
+    history = [t for t in _AGENT_RATE_LIMITS.get(key, []) if now - t < window]
+    if len(history) >= limit:
+        _AGENT_RATE_LIMITS[key] = history
+        return False
+    history.append(now)
+    _AGENT_RATE_LIMITS[key] = history
+    return True
 
 
 # ============================================================================
@@ -75,7 +102,7 @@ def resolve_agent_context(
     2. Otherwise, securely defaults to an unauthenticated guest context.
     Never trusts user identity or role from request body.
     """
-    if authorization and authorization.strip():
+    if authorization and isinstance(authorization, str) and authorization.strip():
         token = authorization.strip()
         if token.lower().startswith("bearer "):
             token = token[7:].strip()
@@ -108,6 +135,14 @@ def agent_chat_endpoint(
         )
 
     context = resolve_agent_context(authorization, session_id=payload.session_id)
+
+    # Rate Limiting & Abuse Protection
+    rate_key = context.clean_email if context.is_authenticated and context.clean_email else f"guest_{context.session_id}"
+    if not check_agent_rate_limit(rate_key, context.is_authenticated):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many requests. Please wait a moment before sending another message."
+        )
 
     try:
         result = _tool_router.process_message(

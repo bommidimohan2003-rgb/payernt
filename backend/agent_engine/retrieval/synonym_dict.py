@@ -30,7 +30,8 @@ SYNONYM_GROUPS: Dict[str, Dict[str, List[str]]] = {
     "CANCELLATION": {
         "cancel": [
             "cancellation", "abort", "terminate", "withdraw", "drop",
-            "cancel booking", "cancel order", "stop rental", "revoke"
+            "cancel booking", "cancel order", "stop rental", "revoke",
+            "cancellation policy", "cancel rules", "booking cancellation"
         ],
     },
 
@@ -81,7 +82,12 @@ SYNONYM_GROUPS: Dict[str, Dict[str, List[str]]] = {
             "owner", "equipment owner", "item owner", "equipment lender", "lender"
         ],
         "rider_payout": [
-            "delivery fees", "payouts", "rider payout", "trip payments", "rider earnings", "rider fees"
+            "delivery fees", "payouts", "rider payout", "trip payments", "rider earnings", "rider fees",
+            "delivery earnings", "earnings transferred", "payout day", "partner payout"
+        ],
+        "delivery_partner": [
+            "become delivery partner", "delivery partner registration", "delivery partner", "join as courier",
+            "delivery registration", "become rider"
         ],
     },
 
@@ -102,7 +108,7 @@ SYNONYM_GROUPS: Dict[str, Dict[str, List[str]]] = {
     "KYC": {
         "kyc": [
             "identity verification", "id verification", "document verification",
-            "aadhaar verification", "pan verification", "id proof", "documents",
+            "aadhaar verification", "pan verification", "id proof",
             "government id", "profile verification", "submitted id", "explain kyc",
             "about kyc", "kyc explanation", "identity verification explanation"
         ],

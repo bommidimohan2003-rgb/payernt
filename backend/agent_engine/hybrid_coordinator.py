@@ -23,6 +23,13 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 
 from agent_engine.context import AgentSessionContext
+from agent_engine.concise_formatter import (
+    ResponseDepth,
+    determine_response_depth,
+    format_guide_response,
+    format_hybrid_response,
+    format_live_status_first,
+)
 from agent_engine.escalation import (
     create_support_ticket,
     get_support_ticket_detail,
@@ -125,12 +132,13 @@ class HybridQueryCoordinator:
         # 3. Personal indicator patterns (English and Telugu-English)
         personal_patterns = [
             r"\b(my|mine|i|me|naa|na|nenu|ma|maa)\s+(booking|bookings|order|orders|rentals?|payment|payments|refund|refunds|kyc|delivery|account|tickets?)\b",
-            r"\b(my|mine|naa|na|nenu|ma|maa)\s+(identity\s+verification|identity|documents?|kyc\s+approval)\b",
+            r"\b(my|mine|naa|na|nenu|ma|maa)\s+(identity\s+verification|identity|documents?|kyc\s+approval|verification|verifications?)\b",
             r"\b(where is my|show my|check my|track my|cancel my|all my)\b",
-            r"\b(whether|if|has|is)\s+(my|na|naa)\s+(identity\s+verification|identity|kyc|account(\s+verification)?|documents?)\b",
-            r"\b(my|na|naa)\s+(identity\s+verification|identity|kyc)\s+(approval\s+status|status|approved|rejected|completed|pending|verified)\b",
+            r"\b(whether|if|has|is)\s+(my|na|naa)\s+(identity\s+verification|identity|kyc|account(\s+verification)?|documents?|verification)\b",
+            r"\b(my|na|naa)\s+(identity\s+verification|identity|kyc|verification)\s+(approval\s+status|status|approved|rejected|completed|pending|verified)\b",
+            r"\b(my|na|naa)\s+(current\s+)?status\b",
             r"\b(naa\s+booking|na\s+booking|naa\s+kyc|na\s+kyc|naa\s+payment|naa\s+delivery|naa\s+refund)\b",
-            r"\b(na|naa)\s+(identity\s+verification|identity)\s+(approve\s+ayyinda|pending(\s+lo\s+undi)?|status\s+enti)\b",
+            r"\b(na|naa)\s+(identity\s+verification|identity|verification)\s+(approve\s+ayyinda|pending(\s+lo\s+undi)?|status\s+enti)\b",
             r"\b(naa\s+bookings\s+chupinchu|nenu\s+enni\s+rentals)\b",
             r"\b(my\s+bookings|my\s+orders|show\s+bookings)\b",
         ]
@@ -157,7 +165,7 @@ class HybridQueryCoordinator:
             return True
 
         # Advice/guidance phrases
-        if any(w in text_lower for w in ("what should i do", "what if", "can i cancel", "how do i return", "how to return")):
+        if any(w in text_lower for w in ("what should i do", "what if", "can i cancel", "how do i return", "how to return", "what happens after", "what happens next")):
             return True
 
         # General definitions "what is X", "explain X", "tell me about X" ONLY if not asking for personal status or records
@@ -340,8 +348,12 @@ class HybridQueryCoordinator:
                     intent = "BOOKING_DETAILS"
 
         # C. Resolve pending escalation confirmation follow-up
-        is_simple_affirmation = clean_msg.lower().strip(" .!?,") in (
-            "yes", "yes please", "sure", "proceed", "confirm", "ok", "please connect me", "yep", "ha", "avunu"
+        is_simple_affirmation = (
+            clean_msg.lower().strip(" .!?,") in (
+                "yes", "yes please", "sure", "proceed", "confirm", "ok", "please connect me", "yep", "ha", "avunu",
+                "yes please connect me", "confirm support ticket", "proceed with ticket", "please proceed", "please connect"
+            )
+            or any(clean_msg.lower().strip(" .!?,").startswith(p) for p in ("yes", "proceed", "confirm", "please connect"))
         )
         if last_agent_msg and is_simple_affirmation:
             prev_tool = (last_agent_msg.get("tool_result") or {})
@@ -432,11 +444,19 @@ class HybridQueryCoordinator:
         top_kb: Optional[RetrievalResult],
     ) -> Dict[str, Any]:
         """Handles static guide, FAQ, policy, and greeting questions."""
+        depth = determine_response_depth(message)
+
         # Check if Knowledge Retrieval provides a high or medium confidence match
         if top_kb and top_kb.retrieval_confidence in ("HIGH", "MEDIUM") and top_kb.is_verified:
             # Guard against unresolved verify markers
             if "[VERIFY" not in top_kb.answer.upper():
                 suggestions = self._get_suggestions_for_category(top_kb.category)
+                formatted_response = format_guide_response(
+                    query=message,
+                    canonical_question=top_kb.question,
+                    full_answer=top_kb.answer,
+                    depth=depth,
+                )
                 return {
                     "intent": intent,
                     "confidence": max(classification.confidence, top_kb.similarity_score),
@@ -450,8 +470,11 @@ class HybridQueryCoordinator:
                         "score": round(top_kb.similarity_score, 4),
                         "category": top_kb.category,
                         "retrieval_type": top_kb.retrieval_type,
+                        "canonical_answer": top_kb.answer,
+                        "full_answer": top_kb.answer,
+                        "response_depth": depth.value,
                     },
-                    "response_text": top_kb.answer,
+                    "response_text": formatted_response,
                     "suggestions": suggestions,
                     "entities": entities_dict,
                     "session_id": context.session_id,
@@ -464,7 +487,13 @@ class HybridQueryCoordinator:
         tpl_key = classification.response_template_key
         tpl = TEMPLATES.get(tpl_key) or TEMPLATES.get(intent.lower()) or get_response_template(tpl_key)
         if tpl:
-            response_text = tpl.message
+            raw_text = tpl.message
+            response_text = format_guide_response(
+                query=message,
+                canonical_question=intent,
+                full_answer=raw_text,
+                depth=depth,
+            )
             suggestions = list(tpl.suggested_chips)
         else:
             response_text = (
@@ -639,8 +668,18 @@ class HybridQueryCoordinator:
                 if tool_result.get("success"):
                     bookings = tool_result.get("bookings", [])
                     if bookings:
+                        latest = bookings[0]
+                        b_status = str(latest.get("status", "confirmed")).upper()
                         b_list = "\n".join([f"• **#{b.get('booking_id')}** - {b.get('product_title')} ({b.get('status').upper()})" for b in bookings[:3]])
-                        response_text = f"Here are your latest bookings:\n{b_list}\n\nWould you like details on a specific order?"
+                        if len(bookings) == 1:
+                            response_text = (
+                                f"Your booking **#{latest.get('booking_id')}** for **{latest.get('product_title')}** is currently **{b_status}**."
+                            )
+                        else:
+                            response_text = (
+                                f"Your latest booking **#{latest.get('booking_id')}** for **{latest.get('product_title')}** is currently **{b_status}**.\n\n"
+                                f"Recent bookings:\n{b_list}\n\nWould you like details on a specific order?"
+                            )
                         suggestions = [f"Status #{b.get('booking_id')}" for b in bookings[:2]] + ["All Bookings"]
                     else:
                         response_text = "You currently have no active or previous bookings."
@@ -658,14 +697,23 @@ class HybridQueryCoordinator:
                 suggestions = ["Sign In", "Accepted Payment Methods"]
                 tool_result = {"success": False, "requires_auth": True}
             else:
-                tool_result = get_payment_status_tool(context, booking_id)
+                target_bid = booking_id
+                if not target_bid:
+                    try:
+                        from database import get_orders
+                        uo = get_orders(context.clean_email)
+                        if uo:
+                            target_bid = uo[0].get("id") or uo[0].get("booking_id")
+                    except Exception:
+                        pass
+                tool_result = get_payment_status_tool(context, target_bid)
                 if tool_result.get("success"):
-                    if booking_id:
+                    if target_bid:
                         st = tool_result.get("payment_status", "PENDING")
                         amt = tool_result.get("total_amount", 0.0)
                         guidance = tool_result.get("guidance", "")
                         response_text = (
-                            f"Payment for booking #{booking_id} is **{st}** (Amount: ₹{amt:,.2f}).\n"
+                            f"Payment for booking #{target_bid} is **{st}** (Amount: ₹{amt:,.2f}).\n"
                             f"{guidance}"
                         )
                         suggestions = ["Download Invoice", "Booking Details", "Help"]
@@ -749,14 +797,27 @@ class HybridQueryCoordinator:
                 suggestions = ["Sign In", "Delivery Zones"]
                 tool_result = {"success": False, "requires_auth": True}
             else:
-                tool_result = get_delivery_status_tool(context, booking_id=booking_id)
+                target_bid = booking_id
+                if not target_bid:
+                    try:
+                        from database import get_orders
+                        uo = get_orders(context.clean_email)
+                        if uo:
+                            target_bid = uo[0].get("id") or uo[0].get("booking_id")
+                    except Exception:
+                        pass
+                tool_result = get_delivery_status_tool(context, booking_id=target_bid)
                 if tool_result.get("success"):
                     msg = tool_result.get("status_message") or tool_result.get("message", "")
-                    response_text = f"Delivery Tracking for #{booking_id or 'your booking'}:\n• {msg}"
+                    response_text = f"Delivery Tracking for #{target_bid or 'your booking'}:\n• {msg}"
                     del_data = tool_result.get("delivery")
                     if del_data:
                         stage = del_data.get("stage", "AWAITING_DISPATCH")
                         response_text += f"\n• Stage: {stage.replace('_', ' ').title()}"
+                        if del_data.get("status"):
+                            response_text += f"\n• Status: {del_data.get('status')}"
+                        if del_data.get("tracking_number"):
+                            response_text += f"\n• Tracking ID: {del_data.get('tracking_number')}"
                     suggestions = ["Contact Courier", "Pickup Instructions", "Booking Details"]
                 else:
                     response_text = tool_result.get("error", "No delivery tracking found for this booking.")
@@ -875,8 +936,16 @@ class HybridQueryCoordinator:
         kb_matches = retriever.retrieve(policy_query, top_k=2)
         policy_doc = kb_matches[0] if kb_matches else top_kb
 
+        depth = determine_response_depth(message)
+
         if policy_doc and policy_doc.is_verified and "[VERIFY" not in policy_doc.answer.upper():
-            policy_section = f"### Policy & Guidelines\n{policy_doc.answer}"
+            formatted_policy = format_guide_response(
+                query=policy_query,
+                canonical_question=policy_doc.question,
+                full_answer=policy_doc.answer,
+                depth=depth,
+            )
+            policy_section = f"### Policy & Guidelines\n{formatted_policy}"
             suggestions = self._get_suggestions_for_category(policy_doc.category)
         else:
             # Fallback policy statement if KB has no match
@@ -1002,10 +1071,12 @@ class HybridQueryCoordinator:
                 account_section = ""
 
         # 3. Combine Sections
-        if account_section:
-            response_text = f"{account_section}\n\n{policy_section}".strip()
-        else:
-            response_text = policy_section.strip()
+        response_text = format_hybrid_response(
+            query=message,
+            account_section=account_section,
+            policy_section=policy_section,
+            depth=depth,
+        )
 
         combined_tool_result = {
             "success": True,
@@ -1014,6 +1085,9 @@ class HybridQueryCoordinator:
             "knowledge_id": policy_doc.knowledge_id if policy_doc else None,
             "source_reference": (getattr(policy_doc, "source_reference", None) or "PAYENT_AGENT_QA_KNOWLEDGE_GUIDE.docx") if policy_doc else None,
             "knowledge_score": round(policy_doc.similarity_score, 4) if policy_doc else None,
+            "canonical_answer": policy_doc.answer if policy_doc else None,
+            "full_answer": policy_doc.answer if policy_doc else None,
+            "response_depth": depth.value,
         }
 
         return self._build_turn_result(
@@ -1044,7 +1118,7 @@ class HybridQueryCoordinator:
                 w in msg_clean
                 for w in (
                     "confirm support ticket", "confirm ticket", "proceed with ticket",
-                    "yes please create", "yes connect me",
+                    "yes please create", "yes connect me", "yes please connect me", "please connect me", "please connect",
                 )
             )
         )

@@ -1,0 +1,152 @@
+{
+  "phase": "8.9",
+  "title": "PAYENT AGENT SAFE KNOWLEDGE INGESTION & CONTROLLED PUBLICATION",
+  "audit_timestamp": "2026-11-01T19:38:00+05:30",
+  "database_identity": {
+    "local_target": {
+      "engine": "MySQL 8.0.41",
+      "host": "localhost:3306",
+      "database": "payent_marketplace_db",
+      "user": "root",
+      "status": "connected_and_active"
+    },
+    "production_target": {
+      "engine": "TiDB Cloud Serverless (TLS 1.3 CERT_REQUIRED)",
+      "host": "gateway01.ap-southeast-1.prod.aws.tidbcloud.com:4000",
+      "database": "payent_marketplace_db",
+      "app_url": "https://payernt-production.up.railway.app",
+      "app_version": "1.6.2",
+      "status": "online_read_only_accessible"
+    },
+    "discrepancy_resolution": {
+      "issue": "Previous reports indicated 4 conversations and 42 messages while audit showed 0.",
+      "root_cause": "The 4 conversations and 42 messages were rows in the production TiDB P2P marketplace messaging tables (`conversations`, `messages`, `conversation_members`), while the local audit script queried the newly created empty local MySQL database (`localhost:3306`). The agent conversational tables (`agent_conversations`, `agent_messages`) are dedicated agent chat sessions, distinct from user-to-user marketplace messaging."
+    }
+  },
+  "source_knowledge_guide": {
+    "source_file": "PAYENT_AGENT_QA_KNOWLEDGE_GUIDE.docx",
+    "total_questions": 70,
+    "total_categories": 13,
+    "classification_breakdown": {
+      "GUIDE": 36,
+      "HYBRID": 20,
+      "LIVE_DB": 14
+    },
+    "original_verify_markers": 26,
+    "clean_entries": 44
+  },
+  "database_state": {
+    "total_entries": 146,
+    "published_entries": 51,
+    "pending_review_entries": 95,
+    "draft_entries": 0,
+    "verified_entries": 58,
+    "unverified_entries": 88,
+    "entries_with_verify_markers": 29,
+    "total_synonyms": 187,
+    "total_version_records": 276,
+    "total_draft_records": 16,
+    "retrieval_type_breakdown": {
+      "guide": 109,
+      "hybrid": 23,
+      "live_db": 14
+    },
+    "category_breakdown": {
+      "PAYMENT": 6,
+      "CANCELLATION": 6,
+      "REFUND": 4,
+      "GENERAL": 26,
+      "SECURITY": 2,
+      "POLICY": 8,
+      "DELIVERY": 5,
+      "KYC": 4,
+      "SEC": 4,
+      "PLATFORM": 2,
+      "DISPUTE": 3,
+      "ACCOUNT": 2,
+      "BOOKING": 2,
+      "COMPLIANCE": 2,
+      "General information": 5,
+      "Account and registration": 5,
+      "KYC verification": 6,
+      "Product listing \u2014 equipment owners": 6,
+      "Product discovery \u2014 renters": 4,
+      "Booking and rental": 8,
+      "Payment and refunds": 6,
+      "Delivery and tracking": 7,
+      "Secret PIN and OTP safety": 4,
+      "Returns, damage and product issues": 5,
+      "Delivery partner": 6,
+      "Support and complaints": 5,
+      "Privacy and security": 3
+    }
+  },
+  "active_retrieval_index": {
+    "is_indexed": true,
+    "total_indexed_documents": 51,
+    "vocabulary_size": 462,
+    "index_timestamp": "2026-11-01T14:13:30.535307+00:00"
+  },
+  "verification_workflow_summary": {
+    "quarantined_verify_entries": 25,
+    "admin_reviewed_verified_entries": 1,
+    "quarantine_rule": "Entries with [VERIFY markers fail closed and are blocked from verification or publication until an admin explicitly provides verified content.",
+    "review_csv_path": "reports/PAYENT_26_PENDING_VERIFICATION.csv"
+  },
+  "retrieval_verification_samples": [
+    {
+      "query": "What is Payent?",
+      "intent": "ABOUT_PAYENT",
+      "mode": "GUIDE",
+      "retrieved_from_db": true,
+      "knowledge_id": "KB-DOCX-001-F9741D4E",
+      "source_reference": "PAYENT_AGENT_QA_KNOWLEDGE_GUIDE.docx",
+      "status": "PASS"
+    },
+    {
+      "query": "Can I cancel my rental booking before dispatch?",
+      "intent": "HYBRID_CHECK",
+      "mode": "HYBRID",
+      "retrieved_from_db": true,
+      "source_reference": "PAYENT_AGENT_QA_KNOWLEDGE_GUIDE.docx",
+      "status": "PASS"
+    },
+    {
+      "query": "Payrent meaning enti?",
+      "intent": "KNOWLEDGE_RETRIEVAL",
+      "mode": "GUIDE",
+      "language": "Tenglish",
+      "retrieved_from_db": true,
+      "source_reference": "PAYENT_AGENT_QA_KNOWLEDGE_GUIDE.docx",
+      "status": "PASS"
+    },
+    {
+      "query": "Show my pending orders",
+      "intent": "LIVE_DB_CHECK",
+      "mode": "LIVE_DB",
+      "auth_boundary_preserved": true,
+      "status": "PASS"
+    }
+  ],
+  "test_results": {
+    "test_suite": "backend/tests/test_agent_ingestion_phase89.py",
+    "tests_run": 10,
+    "tests_passed": 10,
+    "tests_failed": 0,
+    "admin_suite": "backend/tests/test_agent_admin_knowledge_phase86.py",
+    "admin_tests_run": 43,
+    "admin_tests_passed": 43,
+    "regression_suite": "backend/tests/test_agent_hybrid_coordinator_phase84.py, test_agent_retrieval_engine_phase82.py, test_agent_intents.py",
+    "regression_tests_run": 136,
+    "regression_tests_passed": 136,
+    "frontend_build": "SUCCESS (built in 1.91s)"
+  },
+  "production_safety_checks": {
+    "drop_truncate_executed": false,
+    "conversations_messages_deleted": false,
+    "unverified_bulk_published": false,
+    "external_ai_apis_called": false,
+    "fail_closed_on_db_error": true,
+    "fail_closed_on_unauthorized_admin": true
+  }
+}

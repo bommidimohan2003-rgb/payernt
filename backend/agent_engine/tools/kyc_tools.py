@@ -49,7 +49,7 @@ def get_kyc_status_tool(
     curr_st = sanitized.get("status", "NOT_STARTED")
 
     if curr_st == "APPROVED":
-        guidance = "Your KYC identity verification is approved and active. You have full access to marketplace rentals and listings."
+        guidance = "Your KYC identity verification is approved and active for your account."
         action = None
     elif curr_st == "PENDING":
         guidance = "Your identity documents have been submitted and are currently awaiting administrative review."

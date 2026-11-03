@@ -1,0 +1,163 @@
+{
+  "phase": "8.9.2",
+  "title": "PAYENT AGENT - RETRIEVAL CORRECTNESS HARDENING & RELEASE READINESS",
+  "timestamp": "2026-11-02T03:35:46Z",
+  "environment": {
+    "database_type": "MySQL Local",
+    "database_name": "payent_local",
+    "host": "localhost",
+    "port": 3306,
+    "active_runtime_index_size": 45,
+    "total_knowledge_entries": 461,
+    "canonical_guide_entries": 70,
+    "test_fixtures_in_db": 391,
+    "test_fixtures_in_runtime_index": 0
+  },
+  "retrieval_identity_verification": {
+    "What is Payent?": {
+      "query": "What is Payent?",
+      "expected_id": "KB-DOCX-001-F9741D4E",
+      "reference_retrieved_id": "KB-DOCX-001-F9741D4E",
+      "reference_rank_1_match": true,
+      "reference_score": 0.95,
+      "runtime_retrieved_id": "KB-DOCX-001-F9741D4E",
+      "runtime_score": 0.95,
+      "runtime_verdict": "CORRECT_MATCH"
+    },
+    "How does Payent work?": {
+      "query": "How does Payent work?",
+      "expected_id": "KB-DOCX-002-B2452F15",
+      "reference_retrieved_id": "KB-DOCX-002-B2452F15",
+      "reference_rank_1_match": true,
+      "reference_score": 1.0,
+      "runtime_retrieved_id": "KB-DOCX-001-F9741D4E",
+      "runtime_score": 0.0916,
+      "runtime_verdict": "SAFE_NO_FALSE_POSITIVE"
+    },
+    "Payrent meaning enti?": {
+      "query": "Payrent meaning enti?",
+      "expected_id": "KB-DOCX-003-0E4E4448",
+      "reference_retrieved_id": "KB-DOCX-003-0E4E4448",
+      "reference_rank_1_match": true,
+      "reference_score": 0.9481,
+      "runtime_retrieved_id": null,
+      "runtime_score": 0.0,
+      "runtime_verdict": "SAFE_NO_FALSE_POSITIVE"
+    }
+  },
+  "retrieval_performance_metrics": {
+    "exact": {
+      "total_queries": 70,
+      "recall_at_1": 1.0,
+      "recall_at_3": 1.0,
+      "recall_at_5": 1.0,
+      "mrr": 1.0
+    },
+    "paraphrase": {
+      "total_queries": 70,
+      "recall_at_1": 0.5,
+      "recall_at_3": 0.7143,
+      "recall_at_5": 0.8143,
+      "mrr": 0.6157
+    },
+    "tenglish": {
+      "total_queries": 70,
+      "recall_at_1": 0.6857,
+      "recall_at_3": 0.8571,
+      "recall_at_5": 0.9143,
+      "mrr": 0.7645
+    },
+    "synonym": {
+      "total_queries": 70,
+      "recall_at_1": 0.3429,
+      "recall_at_3": 0.5143,
+      "recall_at_5": 0.5429,
+      "mrr": 0.4224
+    },
+    "context": {
+      "total_queries": 70,
+      "recall_at_1": 0.9286,
+      "recall_at_3": 0.9714,
+      "recall_at_5": 0.9714,
+      "mrr": 0.9476
+    },
+    "overall": {
+      "total_queries": 350,
+      "recall_at_1": 0.6914,
+      "recall_at_3": 0.8114,
+      "recall_at_5": 0.8486,
+      "mrr": 0.75
+    }
+  },
+  "publication_safeguards": {
+    "total_published_entries": 45,
+    "published_with_verify_markers": 0,
+    "unverified_entries_in_index": 0,
+    "test_fixtures_in_index": 0,
+    "quarantined_verify_entries_count": 25,
+    "guide_routing_preserved": true,
+    "hybrid_routing_preserved": true,
+    "live_db_routing_preserved": true
+  },
+  "test_fixture_reconciliation": {
+    "total_db_entries": 461,
+    "official_guide_entries": 70,
+    "published_clean_guide_entries": 44,
+    "published_reviewed_guide_entries": 1,
+    "total_official_published_index": 45,
+    "unverified_guide_entries_quarantined": 25,
+    "test_fixture_entries_in_db": 391,
+    "test_fixtures_indexed": 0,
+    "explanation": "Phase 8.9.1 reported 51 indexed entries because 6 test fixture records (two duplicate pairs from repeated test runs) were marked published in local MySQL. After provenance filtering and test teardown cleanup, exactly 45 official guide entries are indexed in runtime."
+  },
+  "regression_suite": {
+    "test_agent_ingestion_phase89": {
+      "status": "PASSED",
+      "passed": 10,
+      "failed": 0
+    },
+    "test_agent_admin_knowledge_phase86": {
+      "status": "PASSED",
+      "passed": 43,
+      "failed": 0
+    },
+    "test_agent_hybrid_coordinator_phase84": {
+      "status": "PASSED",
+      "passed": 31,
+      "failed": 0
+    },
+    "test_agent_retrieval_engine_phase82": {
+      "status": "PASSED",
+      "passed": 34,
+      "failed": 0
+    },
+    "test_agent_intents": {
+      "status": "PASSED",
+      "passed": 71,
+      "failed": 0
+    },
+    "test_agent_telugu": {
+      "status": "PASSED",
+      "passed": 10,
+      "failed": 0
+    },
+    "test_agent_security_phase85": {
+      "status": "PASSED",
+      "passed": 28,
+      "failed": 0
+    },
+    "test_agent_production_safety_phase85": {
+      "status": "PASSED",
+      "passed": 16,
+      "failed": 0
+    },
+    "frontend_build": {
+      "status": "PASSED",
+      "command": "npm run build",
+      "code": 0
+    }
+  },
+  "leakage_safeguard_failures_count": 0,
+  "identity_mismatches_count": 0,
+  "status": "RELEASE_READY"
+}
