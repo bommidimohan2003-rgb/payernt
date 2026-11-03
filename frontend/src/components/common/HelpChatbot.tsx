@@ -287,11 +287,19 @@ export function HelpChatbot() {
               })}
 
               {/* Delivery Boy Walking Animation (Displayed ALONE on LEFT side while AI processes request) */}
-              {isTyping && (
-                <div className="flex items-start justify-start pl-1 py-1">
-                  <DeliveryBoyLoader size={74} />
-                </div>
-              )}
+              <AnimatePresence>
+                {isTyping && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9, y: 6 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.9, y: -4 }}
+                    transition={{ duration: 0.22, ease: "easeOut" }}
+                    className="flex items-start justify-start pl-1 py-1"
+                  >
+                    <DeliveryBoyLoader size={84} />
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               <div ref={messagesEndRef} />
             </div>
