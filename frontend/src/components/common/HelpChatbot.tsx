@@ -4,7 +4,7 @@ import { X } from "lucide-react";
 import { api } from "@/utils/api";
 import { storage, STORAGE_KEYS } from "@/utils/storage";
 import { PayentAgentIcon } from "@/components/common/PayentAgentIcon";
-import { DeliveryBoyLoader } from "@/components/common/DeliveryBoyLoader";
+import { TypingIndicator } from "@/components/common/TypingIndicator";
 import { AgentMessage } from "@/components/common/AgentMessage";
 import { UserMessage } from "@/components/common/UserMessage";
 import { SuggestedPrompts } from "@/components/common/SuggestedPrompts";
@@ -292,19 +292,9 @@ export function HelpChatbot() {
                 );
               })}
 
-              {/* Delivery Boy Walking Animation (Displayed ALONE on LEFT side while AI processes request) */}
+              {/* Assistant Message Bubble with Animated Typing Dots */}
               <AnimatePresence>
-                {isTyping && (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.92, y: 8 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.92, y: -6 }}
-                    transition={{ duration: 0.22, ease: "easeOut" }}
-                    className="flex items-start justify-start pl-1 py-1"
-                  >
-                    <DeliveryBoyLoader size={96} className="h-[84px] w-[84px] sm:h-[96px] sm:w-[96px]" />
-                  </motion.div>
-                )}
+                {isTyping && <TypingIndicator key="typing_indicator" />}
               </AnimatePresence>
 
               <div ref={messagesEndRef} />
