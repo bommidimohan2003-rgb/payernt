@@ -489,3 +489,72 @@ def test_ownership_enforcement_cross_user_isolation():
     res = get_booking_details_tool(user_a, order_b_id)
     assert res["success"] is False
     assert "Access denied" in res["error"]
+
+
+# ============================================================================
+# 11. MULTI-STEP LIST & PROCEDURAL INTEGRITY TESTS
+# ============================================================================
+
+def test_multistep_list_response_never_truncated_to_step_1():
+    """Multi-step procedural guides must never be truncated after only Step 1."""
+    password_steps = (
+        "If you forget your Payent account password, follow these steps:\n\n"
+        "1. Open the Payent login page.\n"
+        "2. Click on the 'Forgot Password?' link below the login form.\n"
+        "3. Enter your registered email address or mobile number.\n"
+        "4. Follow the password reset link sent to your email or SMS.\n"
+        "5. Set your new secure password."
+    )
+    formatted = format_guide_response(
+        query="I forgot my password. What should I do?",
+        canonical_question="Forgot password recovery",
+        full_answer=password_steps,
+        depth=ResponseDepth.CONCISE,
+    )
+    assert "1. Open the Payent login page." in formatted
+    assert "2. Click on the 'Forgot Password?' link" in formatted
+    assert "3. Enter your registered email address" in formatted
+    assert "4. Follow the password reset link" in formatted
+    assert "5. Set your new secure password." in formatted
+
+
+def test_password_recovery_end_to_end(populated_km):
+    """End-to-end coordinator query for password reset preserves all procedural steps."""
+    populated_km.create_entry(
+        category="Account and profile",
+        canonical_question="I forgot my password. What should I do?",
+        answer_markdown=(
+            "If you forget your Payent account password, follow these steps:\n\n"
+            "1. Open the Payent login page.\n"
+            "2. Click on the 'Forgot Password?' link.\n"
+            "3. Enter your registered email address.\n"
+            "4. Follow the instructions sent to your email to reset your password."
+        ),
+        retrieval_type="guide",
+        synonyms=["forgot password", "reset password", "password marchipoyanu"],
+        custom_id="KB-DOCX-099-PASS",
+    )
+    populated_km.publish_entry("KB-DOCX-099-PASS", approved_by="admin@payent.in")
+
+    coord = HybridQueryCoordinator(knowledge_manager=populated_km)
+    coord.index_manager.refresh_index()
+
+    ctx = create_guest_context(session_id="pass_guest_1")
+    res = coord.coordinate_query("I forgot my password. What should I do?", ctx)
+
+    assert res["query_type"] == QueryType.GUIDE.value
+    ans = res["response_text"]
+    assert "1. Open the Payent login page." in ans
+    assert "2. Click on the 'Forgot Password?' link." in ans
+    assert "3. Enter your registered email address." in ans
+    assert "4. Follow the instructions sent to your email" in ans
+
+
+def test_sentence_splitter_preserves_abbreviations_and_steps():
+    """Sentence splitting must not break on currency, abbreviations, or numbered step labels."""
+    text = "Renters deposit Rs. 500 for gear. KYC requires ID proof e.g. PAN card. Step 1: Submit photos."
+    sentences = split_into_sentences(text)
+    assert len(sentences) == 3
+    assert sentences[0] == "Renters deposit Rs. 500 for gear."
+    assert sentences[1] == "KYC requires ID proof e.g. PAN card."
+    assert sentences[2] == "Step 1: Submit photos."

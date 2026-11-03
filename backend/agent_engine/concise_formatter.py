@@ -89,10 +89,113 @@ def split_into_sentences(text: str) -> List[str]:
     clean = clean_knowledge_text(text)
     if not clean:
         return []
+
+    # Protect digit-period patterns so "1. ", "2. " etc. are not split
+    protected = re.sub(r"(\b\d+)\.\s+", r"\1___DOT___ ", clean)
+
+    # Protect common abbreviations: e.g., i.e., vs., Rs., No., Dr., Mr., Ms.
+    protected = re.sub(
+        r"\b(e\.g|i\.e|vs|rs|no|dr|mr|ms)\.\s+",
+        r"\1___ABBR___ ",
+        protected,
+        flags=re.IGNORECASE,
+    )
+
     # Split by period, exclamation, or question mark followed by space or end of string
-    parts = re.split(r"(?<=[.!?])\s+", clean)
-    sentences = [p.strip() for p in parts if p.strip()]
+    parts = re.split(r"(?<=[.!?])\s+", protected)
+    sentences = []
+    for p in parts:
+        restored = p.replace("___DOT___", ".").replace("___ABBR___", ".").strip()
+        if restored:
+            sentences.append(restored)
     return sentences
+
+
+def _has_list_or_steps(text: str) -> bool:
+    """
+    Checks if text contains structured numbered steps, bullet points,
+    or list items that must not be sliced mid-list.
+    """
+    if not text:
+        return False
+    # Matches numbered lines like "1. ", "1) ", "Step 1:"
+    if re.search(r"(?:^|\n)\s*(?:\d+[\.\)]|step\s*\d+[:\.\)])\s+", text, re.IGNORECASE):
+        return True
+    # Matches bullet lines like "- ", "* ", "• "
+    if re.search(r"(?:^|\n)\s*[•\-\*]\s+", text):
+        return True
+    # Matches procedural headers ending in colon like "steps:\n", "instructions:\n"
+    if re.search(r"(?:steps?|following|instructions?|process|procedure|options?|rules?):\s*(?:\n|$)", text, re.IGNORECASE):
+        return True
+    return False
+
+
+def _extract_list_items(text: str) -> Tuple[str, List[str]]:
+    """
+    Separates the introductory header text from individual list items or steps.
+    """
+    lines = text.split("\n")
+    intro_lines: List[str] = []
+    items: List[str] = []
+    current_item: List[str] = []
+    in_list = False
+
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        is_item_start = bool(re.match(r"^(?:\d+[\.\)]|step\s*\d+[:\.\)]|[•\-\*])\s+", stripped, re.IGNORECASE))
+        if is_item_start:
+            in_list = True
+            if current_item:
+                items.append(" ".join(current_item))
+                current_item = []
+            current_item.append(stripped)
+        elif in_list:
+            current_item.append(stripped)
+        else:
+            intro_lines.append(stripped)
+
+    if current_item:
+        items.append(" ".join(current_item))
+
+    return "\n".join(intro_lines).strip(), items
+
+
+def format_list_response(clean_ans: str, depth: ResponseDepth) -> str:
+    """
+    Formats multi-step or list-based responses cleanly without truncating mid-list
+    or abandoning the user after only Step 1.
+    """
+    if depth == ResponseDepth.DETAILED:
+        return clean_ans
+
+    total_words = len(clean_ans.split())
+    # Procedural/list answers under ~95 words are already compact and complete
+    if total_words <= 95:
+        return clean_ans
+
+    intro, items = _extract_list_items(clean_ans)
+    if not items:
+        return clean_ans
+
+    # If long list (>95 words), preserve at least 3-4 key steps
+    limit = 5 if depth == ResponseDepth.EXPLANATION else 4
+    kept_items = items[:limit]
+
+    # Ensure we never produce a dangling single item from a multi-item list
+    if len(items) > 1 and len(kept_items) < 2:
+        kept_items = items[:min(len(items), 2)]
+
+    out_parts: List[str] = []
+    if intro:
+        out_parts.append(intro)
+    out_parts.append("\n".join(kept_items))
+
+    if len(items) > len(kept_items):
+        out_parts.append("For additional steps or assistance, contact Payent support.")
+
+    return "\n\n".join(out_parts).strip()
 
 
 # ============================================================================
@@ -163,6 +266,10 @@ def format_guide_response(
     if _is_damaged_product_query(query, full_answer):
         return "Use Report a Problem in the Payent app before confirming the handover. Describe the damage and attach evidence where supported."
 
+    # 5. Multi-step / structured list preservation: never truncate after Step 1 or mid-list
+    if _has_list_or_steps(clean_ans):
+        return format_list_response(clean_ans, depth)
+
     # If the answer is already concise (<= 40 words), return it directly
     total_words = len(clean_ans.split())
     if depth == ResponseDepth.CONCISE and total_words <= 40:
@@ -181,6 +288,13 @@ def format_guide_response(
         # Target: 1-2 sentences, ~15-40 words
         s1 = sentences[0]
         s1_words = len(s1.split())
+
+        # If s1 ends with a colon, it cannot stand alone as a complete sentence
+        if s1.rstrip().endswith(":") and len(sentences) > 1:
+            combined = f"{s1} {sentences[1]}"
+            if len(sentences) > 2 and len(combined.split()) < 25:
+                combined = f"{combined} {sentences[2]}"
+            return combined
 
         if s1_words >= 15:
             return s1
