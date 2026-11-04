@@ -515,7 +515,7 @@ export default function Categories() {
               </div>
             </div>
 
-            {/* CATEGORY SYMBOLS BAR — Positioned directly after searchbar & location */}
+            {/* CATEGORY SYMBOLS BAR — Only symbols with 10% increased size */}
             <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
               {categoryChips.map((c) => {
                 const Icon = c.icon;
@@ -525,34 +525,24 @@ export default function Categories() {
                     key={c.id}
                     type="button"
                     onClick={() => handleCategorySelect(c.id)}
+                    title={`${c.name} (${c.count})`}
+                    aria-label={`${c.name} (${c.count})`}
                     className={cn(
-                      "group inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-200 cursor-pointer shrink-0 border",
+                      "group inline-flex items-center justify-center w-9 h-9 rounded-full transition-all duration-200 cursor-pointer shrink-0 border",
                       isActive
-                        ? "bg-neutral-900 text-white border-neutral-900 dark:bg-white dark:text-neutral-900 dark:border-white shadow-xs font-bold"
-                        : "bg-neutral-100/90 dark:bg-white/5 text-neutral-700 dark:text-neutral-300 border-neutral-200/80 dark:border-white/10 hover:bg-neutral-200/80 dark:hover:bg-white/10 hover:text-neutral-900 dark:hover:text-white"
+                        ? "bg-neutral-900 text-white border-neutral-900 dark:bg-white dark:text-neutral-900 dark:border-white shadow-xs ring-2 ring-emerald-500/20"
+                        : "bg-neutral-100/90 dark:bg-white/5 text-neutral-700 dark:text-neutral-300 border-neutral-200/80 dark:border-white/10 hover:bg-neutral-200/80 dark:hover:bg-white/10 hover:text-neutral-900 dark:hover:text-white hover:border-neutral-300 dark:hover:border-white/20"
                     )}
                   >
                     <Icon
                       className={cn(
-                        "h-4 w-4 shrink-0 transition-colors",
+                        "w-[18px] h-[18px] shrink-0 transition-colors",
                         isActive
                           ? "text-emerald-400 dark:text-emerald-600"
-                          : "text-neutral-500 dark:text-neutral-400 group-hover:text-emerald-500"
+                          : "text-neutral-600 dark:text-neutral-400 group-hover:text-emerald-500"
                       )}
+                      strokeWidth={2.1}
                     />
-                    <span>{c.name}</span>
-                    {c.count !== undefined && (
-                      <span
-                        className={cn(
-                          "text-[11px] font-mono",
-                          isActive
-                            ? "text-white/80 dark:text-neutral-700 font-bold"
-                            : "text-neutral-400 dark:text-neutral-500"
-                        )}
-                      >
-                        ({c.count})
-                      </span>
-                    )}
                   </button>
                 );
               })}
