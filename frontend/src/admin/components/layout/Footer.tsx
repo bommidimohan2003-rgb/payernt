@@ -8,12 +8,12 @@ export function Footer() {
           © 2026 Payent Inc. All rights reserved.
         </span>
         <div className="flex items-center gap-6 text-xs font-semibold text-muted-foreground">
-          <a href="#" className="hover:text-foreground transition-colors">
+          <Link to="/privacy" className="hover:text-foreground transition-colors">
             Terms of Service
-          </a>
-          <a href="#" className="hover:text-foreground transition-colors">
+          </Link>
+          <Link to="/privacy" className="hover:text-foreground transition-colors">
             Privacy Policy
-          </a>
+          </Link>
           <span className="text-muted-foreground/60 select-none">v2.0 Enterprise</span>
         </div>
       </div>

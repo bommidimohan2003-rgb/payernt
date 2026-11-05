@@ -440,6 +440,11 @@ export function PayrentKycPage() {
                       </div>
                       <button
                         type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setFileDialogOpen(true);
+                          fileInputRef.current?.click();
+                        }}
                         className="px-4 py-2 rounded-xl border border-border bg-card text-foreground font-bold text-xs hover:bg-secondary cursor-pointer"
                       >
                         Browse File

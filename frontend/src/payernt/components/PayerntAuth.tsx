@@ -788,13 +788,13 @@ export function PayerntAuth({
                           <AnimatedCircleCheck checked={termsAccepted} />
                           <span className="text-muted-foreground text-[11px] leading-tight group-hover:text-foreground transition-colors">
                             I accept the{" "}
-                            <a href="#" className="text-foreground hover:underline font-bold">
+                            <Link to="/privacy" target="_blank" className="text-foreground hover:underline font-bold">
                               Lender Terms
-                            </a>{" "}
+                            </Link>{" "}
                             and{" "}
-                            <a href="#" className="text-foreground hover:underline font-bold">
+                            <Link to="/privacy" target="_blank" className="text-foreground hover:underline font-bold">
                               Equipment Policy
-                            </a>
+                            </Link>
                           </span>
                         </label>
                         {registerErrors.terms && (

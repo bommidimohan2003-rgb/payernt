@@ -132,6 +132,8 @@ export default function Profile() {
         <div className="flex items-center gap-2">
           <div className="flex items-center p-0.5 bg-[#10151B] rounded-lg border border-[rgba(161,161,170,0.18)] text-xs font-medium">
             <button
+              type="button"
+              onClick={() => navigate({ to: "/admin/profile" })}
               className="px-3 py-1.5 rounded-md bg-white text-black font-semibold shadow-xs cursor-pointer text-xs"
             >
               Profile

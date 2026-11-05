@@ -486,13 +486,13 @@ export function RegisterForm() {
           <AnimatedCircleCheck checked={!!watchTerms} />
           <span className="text-muted-foreground text-[11px] leading-tight group-hover:text-foreground transition-colors">
             I accept the{" "}
-            <a href="#" className="text-foreground hover:underline font-bold">
+            <Link to="/privacy" target="_blank" className="text-foreground hover:underline font-bold">
               Terms of Service
-            </a>{" "}
+            </Link>{" "}
             and{" "}
-            <a href="#" className="text-foreground hover:underline font-bold">
+            <Link to="/privacy" target="_blank" className="text-foreground hover:underline font-bold">
               Privacy Policy
-            </a>
+            </Link>
           </span>
         </label>
         {errors.terms && (
