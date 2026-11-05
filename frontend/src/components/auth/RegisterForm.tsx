@@ -18,6 +18,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "@/components/common/Button";
 import { Input } from "@/components/common/Input";
+import { AnimatedCircleCheck } from "@/components/common/AnimatedCircleCheck";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/utils/api";
 import { payrentApi } from "@/services/payrentApi";
@@ -79,7 +80,7 @@ function isValidInternalRedirect(url: string | null | undefined, currentPath: st
 }
 
 export function RegisterForm() {
-  const { user } = useAuth();
+  const { user, ready } = useAuth();
   const navigate = useNavigate();
   const [showPw, setShowPw] = useState(false);
   const [showConfirmPw, setShowConfirmPw] = useState(false);
@@ -90,30 +91,38 @@ export function RegisterForm() {
   useEffect(() => {
     if (hasNavigatedRef.current) return;
 
-    if (user) {
-      const searchParams =
-        typeof window !== "undefined"
-          ? new URLSearchParams(window.location.search)
-          : null;
-      const redirectUrl =
-        searchParams?.get("redirect") ||
-        searchParams?.get("returnUrl");
+    const isSignedOut =
+      typeof window !== "undefined" &&
+      localStorage.getItem("payent:signed_out") === "true";
+    const token =
+      typeof window !== "undefined"
+        ? storage.get<string | null>(STORAGE_KEYS.token, null)
+        : null;
 
-      // CRITICAL LOOP GUARD: If user arrived with a redirect query param, stay on register form
-      if (redirectUrl) {
-        return;
-      }
+    if (!ready || !user || !token || isSignedOut) return;
 
-      const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
-      hasNavigatedRef.current = true;
+    const searchParams =
+      typeof window !== "undefined"
+        ? new URLSearchParams(window.location.search)
+        : null;
+    const redirectUrl =
+      searchParams?.get("redirect") ||
+      searchParams?.get("returnUrl");
 
-      if (user.role === "admin" && currentPath !== "/admin/dashboard") {
-        navigate({ to: "/admin/dashboard", replace: true });
-      } else if (currentPath !== "/categories") {
-        navigate({ to: "/categories", replace: true });
-      }
+    // CRITICAL LOOP GUARD: If user arrived with a redirect query param, stay on register form
+    if (redirectUrl) {
+      return;
     }
-  }, [user, navigate]);
+
+    const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
+    hasNavigatedRef.current = true;
+
+    if (user.role === "admin" && currentPath !== "/admin/dashboard") {
+      navigate({ to: "/admin/dashboard", replace: true });
+    } else if (currentPath !== "/categories") {
+      navigate({ to: "/categories", replace: true });
+    }
+  }, [ready, user, navigate]);
 
   const {
     register,
@@ -125,6 +134,14 @@ export function RegisterForm() {
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     mode: "onBlur",
+    defaultValues: {
+      fullName: "",
+      email: "",
+      phone: "",
+      password: "",
+      confirm: "",
+      terms: false as any,
+    },
   });
 
   const handleCheckUser = async () => {
@@ -180,6 +197,7 @@ export function RegisterForm() {
   const hasSpecial = /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?~`]/.test(pw);
   const isPasswordValid = hasMinLen && hasUppercase && hasLowercase && hasNumber && hasSpecial;
   const watchIsAdmin = watch("isAdmin") ?? false;
+  const watchTerms = watch("terms") ?? false;
 
   const showAdminOption = useMemo(() => {
     if (typeof window === "undefined") return false;
@@ -307,11 +325,10 @@ export function RegisterForm() {
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 text-left">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-3 text-left">
       {/* 1. Full Name */}
       <Input
         label="Full Name"
-        placeholder="e.g. Rahul Sharma"
         autoComplete="name"
         icon={<User className="h-4 w-4" />}
         error={errors.fullName?.message}
@@ -319,13 +336,12 @@ export function RegisterForm() {
       />
 
       {/* 2. Mobile Number & Check button */}
-      <div className="space-y-1.5">
-        <div className="flex items-end gap-2">
+      <div>
+        <div className="flex items-start gap-2">
           <div className="flex-1">
             <Input
               label="Mobile Number"
               type="tel"
-              placeholder="9876543210"
               autoComplete="tel"
               icon={<Phone className="h-4 w-4" />}
               error={errors.phone?.message}
@@ -336,7 +352,7 @@ export function RegisterForm() {
             type="button"
             onClick={handleCheckUser}
             disabled={isChecking}
-            className="h-12 px-3.5 rounded-xl border border-border bg-secondary hover:bg-secondary/80 text-foreground font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shrink-0 disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-1.5"
+            className="mt-1.5 h-10.5 sm:h-11 px-3.5 rounded-xl border border-neutral-400/80 dark:border-neutral-600 bg-secondary hover:bg-secondary/80 text-foreground font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shrink-0 disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-1.5"
             title="Check existing account records"
           >
             {isChecking ? (
@@ -352,7 +368,6 @@ export function RegisterForm() {
       <Input
         label="Email Address"
         type="email"
-        placeholder="rahul@example.com"
         autoComplete="email"
         icon={<Mail className="h-4 w-4" />}
         error={errors.email?.message}
@@ -365,13 +380,12 @@ export function RegisterForm() {
           label="Password"
           type={showPw ? "text" : "password"}
           autoComplete="new-password"
-          placeholder="••••••••"
           icon={<Lock className="h-4 w-4" />}
           rightAdornment={
             <button
               type="button"
               onClick={() => setShowPw((v) => !v)}
-              className="p-1 text-muted-foreground hover:text-foreground cursor-pointer"
+              className="p-1 -mr-1 text-muted-foreground hover:text-foreground cursor-pointer focus:outline-none transition-colors shrink-0 flex items-center justify-center"
               aria-label={showPw ? "Hide password" : "Show password"}
             >
               {showPw ? (
@@ -389,13 +403,12 @@ export function RegisterForm() {
           label="Confirm Password"
           type={showConfirmPw ? "text" : "password"}
           autoComplete="new-password"
-          placeholder="••••••••"
           icon={<Lock className="h-4 w-4" />}
           rightAdornment={
             <button
               type="button"
               onClick={() => setShowConfirmPw((v) => !v)}
-              className="p-1 text-muted-foreground hover:text-foreground cursor-pointer"
+              className="p-1 -mr-1 text-muted-foreground hover:text-foreground cursor-pointer focus:outline-none transition-colors shrink-0 flex items-center justify-center"
               aria-label={showConfirmPw ? "Hide password" : "Show password"}
             >
               {showConfirmPw ? (
@@ -447,7 +460,6 @@ export function RegisterForm() {
           {watchIsAdmin && (
             <Input
               label="Admin Setup Code"
-              placeholder="Enter admin authorization key"
               icon={<Lock className="h-4 w-4" />}
               error={errors.adminCode?.message}
               {...register("adminCode")}
@@ -463,15 +475,16 @@ export function RegisterForm() {
         </div>
       )}
 
-      {/* Terms & Conditions Checkbox */}
+      {/* Terms & Conditions Checkbox with Animated Circle Tick */}
       <div className="pt-2">
-        <label className="flex items-center gap-2 text-xs cursor-pointer select-none">
+        <label className="flex items-center gap-2.5 text-xs cursor-pointer select-none group">
           <input
             type="checkbox"
-            className="rounded border-border text-foreground focus:ring-foreground h-4 w-4 cursor-pointer"
+            className="sr-only"
             {...register("terms")}
           />
-          <span className="text-muted-foreground text-[11px] leading-tight">
+          <AnimatedCircleCheck checked={!!watchTerms} />
+          <span className="text-muted-foreground text-[11px] leading-tight group-hover:text-foreground transition-colors">
             I accept the{" "}
             <a href="#" className="text-foreground hover:underline font-bold">
               Terms of Service
@@ -492,7 +505,7 @@ export function RegisterForm() {
       {/* Primary Action Button: Create Payrent Account */}
       <Button
         type="submit"
-        className="w-full font-extrabold h-12 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-lg active:scale-98 flex items-center justify-center gap-2 cursor-pointer mt-2"
+        className="w-full font-extrabold h-10.5 sm:h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-lg active:scale-98 flex items-center justify-center gap-2 cursor-pointer mt-2"
         loading={isSubmitting}
         disabled={isSubmitting}
       >

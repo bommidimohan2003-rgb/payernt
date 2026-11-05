@@ -59,6 +59,7 @@ export interface Product {
   city?: string;
   area?: string;
   owner: {
+    id?: string;
     name: string;
     avatar: string;
     profilePhotoUrl?: string;
@@ -73,6 +74,13 @@ export interface Product {
     status?: string;
   };
   ownerId?: string;
+  owner_id?: string;
+  owner_email?: string;
+  ownerEmail?: string;
+  user_email?: string;
+  userEmail?: string;
+  owner_name?: string;
+  is_vendor_product?: boolean;
   ownerAccountType?: "paye₹nt";
   vendorSecretPin?: string;
 }

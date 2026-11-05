@@ -74,7 +74,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
   /* ============================================================
      LIGHT THEME PALETTE (Approved Design System)
      ============================================================ */
-  --background: #F7F8FA;
+  --background: #F7F7F7;
   --foreground: #17191C;
   --surface-navigation: #FFFFFF;
   --surface-card: #FFFFFF;
@@ -132,7 +132,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
     inset 0 -1px 0 0 rgba(0, 0, 0, 0.04);
 
   /* PAYENT Palette Tokens - Light Mode */
-  --payent-bg: #F7F8FA;
+  --payent-bg: #F7F7F7;
   --payent-surface: #FFFFFF;
   --payent-surface-elevated: #FFFFFF;
   --payent-accent: #2868E8;
@@ -164,7 +164,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
   /* ============================================================
      DARK THEME PALETTE (Exact Approved Graphite + Electric Blue)
      ============================================================ */
-  --background: #121212;
+  --background: #1E1E1E;
   --foreground: #FFFFFF;
   --surface-navigation: #1E1E1E;
   --surface-card: #2A2A2A;
@@ -239,7 +239,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
   --dark-button-outline-hover: #4D8DFF;
   --dark-button-outline-hover-text: #FFFFFF;
 
-  --payent-bg: #121212;
+  --payent-bg: #1E1E1E;
   --payent-surface: #2A2A2A;
   --payent-surface-elevated: #353535;
   --payent-accent: #4D8DFF;
@@ -249,7 +249,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
   --payent-text-muted: #808080;
 
   /* Admin Design System Tokens - Dark Theme */
-  --admin-bg: #121212;
+  --admin-bg: #1E1E1E;
   --admin-sidebar: #1E1E1E;
   --admin-elevated: #2A2A2A;
   --admin-card: #2A2A2A;

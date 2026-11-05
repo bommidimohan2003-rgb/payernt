@@ -5544,7 +5544,8 @@ def format_product_dict(p: dict, is_summary: bool = False, booked_pids_set: Opti
     owner_name = p.get("owner_full_name") or p.get("owner_name") or owner_info.get("name") or "Lender"
     owner_avatar = p.get("owner_avatar") or owner_info.get("avatar") or ""
     owner_rating = float(p.get("owner_rating") or owner_info.get("rating") or 5.0)
-    owner_email = str(p.get("user_email") or p.get("userEmail") or owner_info.get("email") or "").strip().lower()
+    owner_email = str(p.get("user_email") or p.get("userEmail") or p.get("owner_email") or p.get("ownerEmail") or owner_info.get("email") or "").strip().lower()
+    owner_id_val = str(p.get("owner_id") or p.get("ownerId") or p.get("user_id") or p.get("userId") or owner_info.get("id") or "").strip()
     owner_status = str(p.get("owner_status") or owner_info.get("status") or "active").strip()
 
     city = str(p.get("owner_city") or owner_info.get("city") or p.get("city") or "").strip()
@@ -5622,8 +5623,9 @@ def format_product_dict(p: dict, is_summary: bool = False, booked_pids_set: Opti
         "city": city or None,
         "area": str(p.get("area") or ""),
         "owner": {
+            "id": owner_id_val or None,
             "name": owner_name,
-            "email": None if is_public else (owner_email or None),
+            "email": owner_email or None,
             "avatar": owner_avatar,
             "rating": owner_rating,
             "city": city or None,
@@ -5632,7 +5634,14 @@ def format_product_dict(p: dict, is_summary: bool = False, booked_pids_set: Opti
             "pincode": None if is_public else (pincode or None),
             "location": location_str,
             "status": owner_status
-        }
+        },
+        "owner_id": owner_id_val or None,
+        "ownerId": owner_id_val or None,
+        "owner_email": owner_email or None,
+        "ownerEmail": owner_email or None,
+        "user_email": owner_email or None,
+        "userEmail": owner_email or None,
+        "is_vendor_product": bool(p.get("is_vendor_product") or p.get("is_payernt_product") or (owner_id_val and owner_id_val.startswith("PAYERNT_"))),
     }
 
 @app.get("/api/products/custom")
@@ -5650,11 +5659,33 @@ def fetch_user_listings(email: str = Depends(get_current_user_email)):
 def fetch_public_listings(
     response: Response,
     limit: Optional[int] = Query(None, ge=1, le=100),
-    page: Optional[int] = Query(1, ge=1)
+    page: Optional[int] = Query(1, ge=1),
+    authorization: Optional[str] = Header(None)
 ):
     response.headers["Cache-Control"] = "public, max-age=30, stale-while-revalidate=120"
     offset = (page - 1) * limit if limit is not None else 0
     cache_key = f"public_custom_products:p{page}:l{limit}" if limit is not None else "public_custom_products"
+
+    # Identify caller if authorization header is provided
+    caller_email = None
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.split(" ")[1].strip()
+        if token:
+            if HAS_FIREBASE and firebase_admin and firebase_admin._apps:
+                try:
+                    decoded = firebase_auth.verify_id_token(token)
+                    if decoded and decoded.get("email"):
+                        caller_email = str(decoded["email"]).strip().lower()
+                except Exception:
+                    pass
+            if not caller_email:
+                try:
+                    payload = decode_access_token(token, expected_type="access")
+                    if payload and payload.get("sub"):
+                        caller_email = str(payload["sub"]).strip().lower()
+                except Exception:
+                    pass
+
     def _load():
         listings = get_all_approved_custom_products(limit=limit, offset=offset) or []
         try:
@@ -5702,12 +5733,20 @@ def fetch_public_listings(
                         "rating": 4.9,
                         "reviews": 12,
                         "available": p.get("available", True),
+                        "owner_id": p.get("owner_id"),
+                        "ownerId": p.get("owner_id"),
+                        "owner_email": p.get("owner_email"),
+                        "ownerEmail": p.get("owner_email"),
+                        "user_email": p.get("owner_email"),
+                        "userEmail": p.get("owner_email"),
                         "owner_name": p.get("owner_name", "Payent Verified Vendor"),
                         "owner_avatar": p.get("owner_avatar") or "",
                         "owner_rating": 4.9,
                         "created_at": p.get("created_at"),
                         "status": "approved",
                         "featured": True,
+                        "is_vendor_product": True,
+                        "is_payernt_product": True,
                     })
         except Exception:
             pass
@@ -5731,7 +5770,14 @@ def fetch_public_listings(
         today_str = dt.now(timezone.utc).strftime("%Y-%m-%d")
         booked_set = set(check_products_booking_conflicts(pids, today_str, today_str)) if pids else set()
         return [format_product_dict(p, is_summary=True, booked_pids_set=booked_set, is_public=True) for p in listings]
-    return get_cached(cache_key, 30, _load)
+
+    all_listings = get_cached(cache_key, 30, _load)
+    if caller_email and all_listings:
+        return [
+            p for p in all_listings
+            if str(p.get("owner_email") or p.get("user_email") or (p.get("owner") or {}).get("email") or "").strip().lower() != caller_email
+        ]
+    return all_listings
 
 @app.get("/api/products/custom/{id}")
 @app.get("/api/products/{id}")

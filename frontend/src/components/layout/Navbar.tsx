@@ -17,6 +17,14 @@ export function Navbar() {
   const { theme, toggle } = useTheme();
   const { tCommon } = useLanguage();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const isAuthPage =
+    pathname === "/login" ||
+    pathname === "/register" ||
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/register") ||
+    pathname === "/payernt/auth" ||
+    pathname === "/forgot-password" ||
+    pathname === "/reset-password";
   useEffect(() => {
     setMounted(true);
     const onScroll = () => setScrolled(window.scrollY > 15);
@@ -138,7 +146,7 @@ export function Navbar() {
                   </span>
                 </Link>
               </div>
-            ) : (
+            ) : isAuthPage ? null : (
               <div className="flex items-center gap-2 sm:gap-3">
                 <Link
                   to="/login"

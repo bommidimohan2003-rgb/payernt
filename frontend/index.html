@@ -6,13 +6,16 @@
   <title>Payent — Rent premium tech gear</title>
   <script>
     try {
-      var theme = localStorage.getItem('payent:theme') || 'system';
+      var stored = localStorage.getItem('payent:theme');
+      var theme = stored ? (stored.startsWith('"') ? JSON.parse(stored) : stored) : 'system';
       if (theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
         document.documentElement.classList.add('dark');
       } else {
         document.documentElement.classList.remove('dark');
       }
-    } catch (e) {}
+    } catch (e) {
+      if (stored === 'dark') document.documentElement.classList.add('dark');
+    }
   </script>
 </head>
 <body>

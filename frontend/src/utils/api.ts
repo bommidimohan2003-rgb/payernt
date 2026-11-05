@@ -1676,9 +1676,14 @@ export const api = {
         let items: Product[] = [];
         if (API_BASE) {
           try {
+            const token = storage.get<string | null>(STORAGE_KEYS.token, null);
+            const headers: Record<string, string> = {};
+            if (token) {
+              headers["Authorization"] = `Bearer ${token}`;
+            }
             const res = await fetchWithTimeout(
               `${API_BASE}/api/products/custom/public`,
-              { method: "GET" },
+              { method: "GET", headers },
               8000
             );
             if (res.ok) {
@@ -1714,7 +1719,7 @@ export const api = {
         }
         return items;
       },
-      { ttlMs: 30000, staleWhileRevalidate: true }
+      { ttlMs: 30000, userIsolated: true, staleWhileRevalidate: true }
     );
   },
 

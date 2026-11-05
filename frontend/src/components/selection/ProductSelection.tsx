@@ -34,7 +34,6 @@ import {
  */
 function GatewayTopNav() {
   const { theme, toggle } = useTheme();
-  const { user } = useAuth();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -58,32 +57,6 @@ function GatewayTopNav() {
             <Moon className="h-4 w-4 sm:h-[18px] sm:w-[18px] stroke-[1.6]" />
           )}
         </button>
-      )}
-
-      {mounted && user ? (
-        <Link
-          to="/dashboard"
-          className="px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold rounded-full bg-neutral-950 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-100 shadow-sm transition-all duration-200 cursor-pointer active:scale-95"
-        >
-          Dashboard &rarr;
-        </Link>
-      ) : (
-        <div className="flex items-center gap-2 sm:gap-3">
-          <Link
-            to="/login"
-            className="px-2.5 sm:px-3 py-1.5 text-xs sm:text-sm font-semibold text-neutral-800 dark:text-neutral-200 hover:text-neutral-950 dark:hover:text-white transition-colors cursor-pointer select-none"
-          >
-            Log in
-          </Link>
-
-          <Link
-            to="/register"
-            className="inline-flex items-center gap-1.5 px-4 sm:px-5 py-2 text-xs sm:text-sm font-bold sm:font-semibold rounded-full bg-neutral-950 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-100 shadow-sm transition-all duration-200 cursor-pointer active:scale-95 select-none"
-          >
-            <span>Sign up</span>
-            <ArrowRight className="h-3.5 w-3.5 stroke-[2.2]" />
-          </Link>
-        </div>
       )}
     </div>
   );

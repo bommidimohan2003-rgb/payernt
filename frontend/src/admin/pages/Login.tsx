@@ -17,6 +17,7 @@ import {
 import { motion } from "framer-motion";
 import { authService } from "../services/auth";
 import { toast } from "sonner";
+import { AnimatedCircleCheck } from "@/components/common/AnimatedCircleCheck";
 
 const loginSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -255,17 +256,18 @@ export default function Login() {
               </div>
 
               <div className="flex items-center">
-                <input
-                  id="rememberMe"
-                  type="checkbox"
-                  {...loginForm.register("rememberMe")}
-                  className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary/20 accent-primary"
-                />
                 <label
                   htmlFor="rememberMe"
-                  className="ml-2 text-xs font-semibold text-muted-foreground select-none"
+                  className="inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors cursor-pointer select-none group"
                 >
-                  Remember me for 30 days
+                  <input
+                    id="rememberMe"
+                    type="checkbox"
+                    {...loginForm.register("rememberMe")}
+                    className="sr-only"
+                  />
+                  <AnimatedCircleCheck checked={!!loginForm.watch("rememberMe")} size={18} />
+                  <span>Remember me for 30 days</span>
                 </label>
               </div>
 

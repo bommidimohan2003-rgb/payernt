@@ -301,7 +301,7 @@ export function ForgotPassword() {
   // -------------------------------------------------------------
   if (step === "PASSWORD_ENTRY") {
     return (
-      <form onSubmit={handleUpdatePassword} className="space-y-5">
+      <form onSubmit={handleUpdatePassword} className="space-y-3">
         {/* Account Status Badges */}
         <div className="flex items-center justify-between p-3 bg-muted/40 border border-border/50 rounded-xl text-xs">
           <div className="flex items-center space-x-2 truncate">
@@ -317,64 +317,62 @@ export function ForgotPassword() {
 
         {/* New Password Field (Masked by default) */}
         <div className="space-y-1.5">
-          <div className="relative">
-            <Input
-              label="New Password"
-              type={showNewPassword ? "text" : "password"}
-              placeholder="Enter new password"
-              value={newPassword}
-              onChange={(e) => {
-                setNewPassword(e.target.value);
-                setPasswordError(null);
-              }}
-              icon={<Lock className="h-4 w-4 text-muted-foreground" />}
-              autoComplete="new-password"
-              required
-            />
-            <button
-              type="button"
-              onClick={() => setShowNewPassword(!showNewPassword)}
-              aria-label={showNewPassword ? "Hide password" : "Show password"}
-              className="absolute right-3 top-[38px] text-muted-foreground hover:text-foreground p-1 cursor-pointer transition-colors"
-            >
-              {showNewPassword ? (
-                <EyeOff className="h-4 w-4" />
-              ) : (
-                <Eye className="h-4 w-4" />
-              )}
-            </button>
-          </div>
+          <Input
+            label="New Password"
+            type={showNewPassword ? "text" : "password"}
+            value={newPassword}
+            onChange={(e) => {
+              setNewPassword(e.target.value);
+              setPasswordError(null);
+            }}
+            icon={<Lock className="h-4 w-4 text-muted-foreground" />}
+            autoComplete="new-password"
+            required
+            rightAdornment={
+              <button
+                type="button"
+                onClick={() => setShowNewPassword(!showNewPassword)}
+                aria-label={showNewPassword ? "Hide password" : "Show password"}
+                className="p-1 -mr-1 text-muted-foreground hover:text-foreground cursor-pointer focus:outline-none transition-colors shrink-0 flex items-center justify-center"
+              >
+                {showNewPassword ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </button>
+            }
+          />
         </div>
 
         {/* Confirm New Password Field (Masked by default) */}
         <div className="space-y-1.5">
-          <div className="relative">
-            <Input
-              label="Confirm New Password"
-              type={showConfirmPassword ? "text" : "password"}
-              placeholder="Confirm new password"
-              value={confirmPassword}
-              onChange={(e) => {
-                setConfirmPassword(e.target.value);
-                setPasswordError(null);
-              }}
-              icon={<Lock className="h-4 w-4 text-muted-foreground" />}
-              autoComplete="new-password"
-              required
-            />
-            <button
-              type="button"
-              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-              aria-label={showConfirmPassword ? "Hide password" : "Show password"}
-              className="absolute right-3 top-[38px] text-muted-foreground hover:text-foreground p-1 cursor-pointer transition-colors"
-            >
-              {showConfirmPassword ? (
-                <EyeOff className="h-4 w-4" />
-              ) : (
-                <Eye className="h-4 w-4" />
-              )}
-            </button>
-          </div>
+          <Input
+            label="Confirm New Password"
+            type={showConfirmPassword ? "text" : "password"}
+            value={confirmPassword}
+            onChange={(e) => {
+              setConfirmPassword(e.target.value);
+              setPasswordError(null);
+            }}
+            icon={<Lock className="h-4 w-4 text-muted-foreground" />}
+            autoComplete="new-password"
+            required
+            rightAdornment={
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                className="p-1 -mr-1 text-muted-foreground hover:text-foreground cursor-pointer focus:outline-none transition-colors shrink-0 flex items-center justify-center"
+              >
+                {showConfirmPassword ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </button>
+            }
+          />
         </div>
 
         {/* Single-line password requirement hint when not yet fulfilling all rules */}
@@ -409,11 +407,10 @@ export function ForgotPassword() {
   // STATE 5: Email Entry Form (Step 1)
   // -------------------------------------------------------------
   return (
-    <form onSubmit={handleCheckAccountAndRecovery} className="space-y-5">
+    <form onSubmit={handleCheckAccountAndRecovery} className="space-y-3">
       <Input
         label="Account Email"
         type="email"
-        placeholder="you@example.com"
         value={email}
         onChange={(e) => {
           setEmail(e.target.value);

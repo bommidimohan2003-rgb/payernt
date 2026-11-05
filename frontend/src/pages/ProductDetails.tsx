@@ -54,6 +54,7 @@ import { RenterBookingCalendar } from "@/components/booking/RenterBookingCalenda
 import { tracker } from "@/utils/eventTracker";
 import { api, getApiBase } from "@/utils/api";
 import { storage, STORAGE_KEYS } from "@/utils/storage";
+import { isFakeOrDeletedProduct, isUserOwnProduct } from "@/utils/productFilters";
 import { formatOwnerAddress, formatRelativeTime } from "@/utils/formatters";
 import type { Product, Order } from "@/types";
 import { ProfilePhoto } from "@/components/common/ProfilePhoto";
@@ -395,7 +396,7 @@ export default function ProductDetails() {
     (product as any)?.user_id ||
     product?.owner?.email ||
     "";
-  const ownerEmail = product?.owner?.email?.toLowerCase().trim() || "";
+  const ownerEmail = ((product as any)?.owner_email || (product as any)?.user_email || product?.owner?.email || "").toLowerCase().trim();
   const userEmail = user?.email?.toLowerCase().trim() || "";
   const ownerName = (
     product?.owner?.name ||
@@ -408,7 +409,8 @@ export default function ProductDetails() {
     user &&
     product &&
     !product.isReference &&
-    ((ownerId && currentUserId && ownerId === currentUserId) ||
+    (isUserOwnProduct(product, user) ||
+      (ownerId && currentUserId && ownerId === currentUserId) ||
       (ownerEmail && userEmail && ownerEmail === userEmail) ||
       (ownerName && userFullName && ownerName === userFullName))
   );
@@ -1144,18 +1146,29 @@ const productSchema = product ? {
     if (!product) return [];
     const currentId = product.id;
     const list = [...similarProducts, ...frequentlyTogether].filter(
-      (p, i, arr) => p && p.id !== currentId && arr.findIndex((x) => x.id === p.id) === i
+      (p, i, arr) =>
+        p &&
+        p.id !== currentId &&
+        !isFakeOrDeletedProduct(p) &&
+        !isUserOwnProduct(p, user) &&
+        arr.findIndex((x) => x.id === p.id) === i
     );
     if (list.length >= 4) return list;
     const catalog = storage.get<Product[]>("payent_server_products", []);
     for (const p of catalog) {
-      if (p && p.id !== currentId && !list.some((x) => x.id === p.id)) {
+      if (
+        p &&
+        p.id !== currentId &&
+        !isFakeOrDeletedProduct(p) &&
+        !isUserOwnProduct(p, user) &&
+        !list.some((x) => x.id === p.id)
+      ) {
         list.push(p);
       }
       if (list.length >= 8) break;
     }
     return list;
-  }, [similarProducts, frequentlyTogether, product?.id]);
+  }, [similarProducts, frequentlyTogether, product?.id, user]);
 
   const displayedRelated = useMemo(() => {
     if (relatedProductsList.length <= 4) return relatedProductsList;

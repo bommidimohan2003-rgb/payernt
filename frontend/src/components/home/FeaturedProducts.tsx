@@ -17,7 +17,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import type { Product } from "@/types";
 import { getOptimizedImageUrl, getResponsiveImageSrcSet } from "@/utils/images";
-import { isFakeOrDeletedProduct } from "@/utils/productFilters";
+import { isFakeOrDeletedProduct, isUserOwnProduct } from "@/utils/productFilters";
 import { shareRentalProduct } from "@/utils/productSharing";
 
 interface DisplayProduct {
@@ -40,7 +40,7 @@ export function FeaturedProducts() {
     const cached = storage.get<Product[]>("payent_server_products", []);
     const seen = new Set<string>();
     const unique = cached.filter((p) => {
-      if (!p || !p.id || !p.title || seen.has(p.id) || isFakeOrDeletedProduct(p)) return false;
+      if (!p || !p.id || !p.title || seen.has(p.id) || isFakeOrDeletedProduct(p) || isUserOwnProduct(p, user)) return false;
       seen.add(p.id);
       return p.status === "approved" || !p.status;
     });
@@ -78,10 +78,10 @@ export function FeaturedProducts() {
         realListings = cachedServer;
       }
 
-      // Deduplicate by ID and only accept real approved items (no fake hardcoded items)
+      // Deduplicate by ID and only accept real approved items (excluding fake or own vendor products)
       const seen = new Set<string>();
       const uniqueReal = realListings.filter((p) => {
-        if (!p || !p.id || !p.title || seen.has(p.id) || isFakeOrDeletedProduct(p)) return false;
+        if (!p || !p.id || !p.title || seen.has(p.id) || isFakeOrDeletedProduct(p) || isUserOwnProduct(p, user)) return false;
         seen.add(p.id);
         return p.status === "approved" || !p.status;
       });
@@ -107,7 +107,7 @@ export function FeaturedProducts() {
     } finally {
       setIsLoading(false);
     }
-  }, [products.length]);
+  }, [user]);
 
   useEffect(() => {
     loadRealProducts();

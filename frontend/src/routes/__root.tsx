@@ -205,25 +205,22 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 );
 
 function RootShell({ children }: { children: ReactNode }) {
+  // When executing in the browser (client-side mounting into #root),
+  // do not render <html>, <head>, or <body> inside the container <div>.
+  // HeadContent will hoist document metadata (<title>, <meta>, <link>) cleanly via React 19.
+  if (typeof document !== "undefined") {
+    return (
+      <>
+        <HeadContent />
+        {children}
+      </>
+    );
+  }
+
+  // When executing on the server (SSR), render the full document shell.
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `(function(){
-  try {
-    var stored = localStorage.getItem("payent:theme");
-    var mode = stored ? JSON.parse(stored) : "system";
-    var isDark = mode === "dark" || (mode === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-    if (isDark) {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
-  } catch (e) {}
-})();`,
-          }}
-        />
         <HeadContent />
       </head>
       <body suppressHydrationWarning>

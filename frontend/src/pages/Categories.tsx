@@ -32,7 +32,7 @@ import { useSearch, useNavigate, Link, useRouterState } from "@tanstack/react-ro
 import { tracker } from "@/utils/eventTracker";
 import { storage } from "@/utils/storage";
 import { api } from "@/utils/api";
-import { isFakeOrDeletedProduct } from "@/utils/productFilters";
+import { isFakeOrDeletedProduct, isUserOwnProduct } from "@/utils/productFilters";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserLocation } from "@/hooks/useUserLocation";
 import { useWishlist } from "@/hooks/useWishlist";
@@ -334,14 +334,6 @@ export default function Categories() {
       list = advancedSearch(list, q.trim());
     }
 
-    const activeDemoUserId =
-      typeof window !== "undefined"
-        ? localStorage.getItem("payent_active_demo_user") || "user_001"
-        : "user_001";
-    const currentUserId = user?.id || activeDemoUserId;
-    const currentUserEmail = user?.email?.toLowerCase().trim() || "";
-    const currentUserName = (user?.fullName || "").toLowerCase().trim();
-
     list = list.filter((p: any) => {
       if (isFakeOrDeletedProduct(p)) return false;
       const isApproved =
@@ -350,20 +342,7 @@ export default function Categories() {
         p.verificationStatus === "verified" ||
         p.available === true;
 
-      const pOwnerId = p.ownerId || p.owner?.id;
-      const pOwnerEmail = p.owner?.email?.toLowerCase().trim();
-      const pOwnerName = (
-        p.owner?.name ||
-        p.owner?.fullName ||
-        p.verificationDocs?.ownerFullName
-      )?.toLowerCase().trim();
-
-      const isOwnProduct = Boolean(
-        (pOwnerId && (pOwnerId === currentUserId || pOwnerId === activeDemoUserId)) ||
-          (currentUserEmail && pOwnerEmail && pOwnerEmail === currentUserEmail) ||
-          (currentUserName && pOwnerName && pOwnerName === currentUserName)
-      );
-
+      const isOwnProduct = isUserOwnProduct(p, user);
       return isApproved && !isOwnProduct;
     });
 
@@ -391,18 +370,28 @@ export default function Categories() {
     user,
   ]);
 
-  // Real Category Counts
+  // Real Category Counts (excluding user's own vendor products)
   const categoryCounts = useMemo(() => {
     const map: Record<string, number> = {};
+    const validProducts = allProductsList.filter((p: any) => {
+      if (isFakeOrDeletedProduct(p)) return false;
+      const isApproved =
+        p.status === "approved" ||
+        p.verificationStatus === "approved" ||
+        p.verificationStatus === "verified" ||
+        p.available === true;
+      return isApproved && !isUserOwnProduct(p, user);
+    });
+
     PRIMARY_CATEGORIES.forEach((c) => {
       if (c.id === "all") {
-        map["all"] = allProductsList.length;
+        map["all"] = validProducts.length;
       } else {
-        map[c.id] = allProductsList.filter((p) => matchCategory(p.category, c.id)).length;
+        map[c.id] = validProducts.filter((p) => matchCategory(p.category, c.id)).length;
       }
     });
     return map;
-  }, [allProductsList]);
+  }, [allProductsList, user]);
 
   // Category filter chips with symbols from original category cards
   const categoryChips = useMemo(() => {

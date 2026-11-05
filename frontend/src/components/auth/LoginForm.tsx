@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "@/components/common/Button";
 import { Input } from "@/components/common/Input";
+import { AnimatedCircleCheck } from "@/components/common/AnimatedCircleCheck";
 import { useAuth } from "@/hooks/useAuth";
 import { storage, STORAGE_KEYS } from "@/utils/storage";
 import { toast } from "sonner";
@@ -92,6 +93,7 @@ export function LoginForm() {
   const {
     register,
     handleSubmit,
+    watch,
     setError,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
@@ -99,6 +101,8 @@ export function LoginForm() {
     mode: "onBlur",
     defaultValues: { remember: true },
   });
+
+  const watchRemember = watch("remember");
 
   const onSubmit = async (data: FormValues) => {
     setErrorState(null);
@@ -209,13 +213,12 @@ export function LoginForm() {
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 text-left">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-3 text-left">
       {/* Email Address Field with Persistent Label */}
       <Input
         label="Email address"
         type="email"
         autoComplete="email"
-        placeholder="you@example.com"
         icon={<Mail className="h-4 w-4" />}
         error={errors.email?.message}
         {...register("email")}
@@ -226,13 +229,12 @@ export function LoginForm() {
         label="Password"
         type={showPw ? "text" : "password"}
         autoComplete="current-password"
-        placeholder="••••••••"
         icon={<Lock className="h-4 w-4" />}
         rightAdornment={
           <button
             type="button"
             onClick={() => setShowPw((v) => !v)}
-            className="p-1 text-muted-foreground hover:text-foreground cursor-pointer focus:outline-none transition-colors"
+            className="p-1 -mr-1 text-muted-foreground hover:text-foreground cursor-pointer focus:outline-none transition-colors shrink-0 flex items-center justify-center"
             aria-label={showPw ? "Hide password" : "Show password"}
           >
             {showPw ? (
@@ -248,12 +250,13 @@ export function LoginForm() {
 
       {/* Remember Me & Forgot Password Row */}
       <div className="flex items-center justify-between text-xs sm:text-sm pt-1">
-        <label className="inline-flex items-center gap-2 cursor-pointer text-muted-foreground hover:text-foreground transition-colors select-none">
+        <label className="inline-flex items-center gap-2 cursor-pointer text-muted-foreground hover:text-foreground transition-colors select-none group">
           <input
             type="checkbox"
-            className="rounded border-border text-foreground focus:ring-foreground h-4 w-4 cursor-pointer"
+            className="sr-only"
             {...register("remember")}
           />
+          <AnimatedCircleCheck checked={!!watchRemember} size={18} />
           <span>Remember me</span>
         </label>
         <button
@@ -275,7 +278,7 @@ export function LoginForm() {
       {/* Primary Action Button: Sign in to Payrent */}
       <Button
         type="submit"
-        className="w-full font-extrabold h-12 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-lg active:scale-98 flex items-center justify-center gap-2 cursor-pointer mt-2"
+        className="w-full font-extrabold h-10.5 sm:h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-lg active:scale-98 flex items-center justify-center gap-2 cursor-pointer mt-2"
         loading={isSubmitting}
         disabled={isSubmitting}
       >

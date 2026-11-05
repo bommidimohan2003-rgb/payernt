@@ -22,6 +22,8 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { useNavigate, Link } from "@tanstack/react-router";
+import { AnimatedCircleCheck } from "@/components/common/AnimatedCircleCheck";
+import { AuthGearShowcase } from "@/components/auth/AuthGearShowcase";
 import type { PayerntAccount } from "../types";
 import { payerntApi } from "../payerntApiService";
 import { useTheme } from "@/hooks/useTheme";
@@ -309,33 +311,18 @@ export function PayerntAuth({
       {/* Top Header Navigation */}
       <header className="w-full border-b border-border/80 bg-background/90 backdrop-blur-xl sticky top-0 z-40">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <button
-            type="button"
-            onClick={() => navigate({ to: "/" })}
-            className="group flex items-center gap-2 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-            aria-label="Return to Selection Gateway"
-          >
-            <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
-            <span className="hidden sm:inline">Back to Experience Selection</span>
-            <span className="sm:hidden">Back</span>
-          </button>
-
-          {/* Brand Center */}
+          {/* Left: Brand Identity (Payernt) in Top-Left Corner */}
           <Link
             to="/"
-            className="flex items-center gap-2.5 focus:outline-none select-none cursor-pointer"
+            className="flex items-center gap-2.5 focus:outline-none select-none cursor-pointer group transition-transform active:scale-98"
+            aria-label="Payernt Home"
           >
             <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-neutral-950 dark:bg-white text-white dark:text-neutral-950 font-black text-sm tracking-tight shadow-xs font-display">
               P
             </div>
-            <div className="flex flex-col text-left">
-              <span className="font-extrabold tracking-tight text-base sm:text-lg text-foreground leading-none font-display">
-                Payent
-              </span>
-              <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground leading-none mt-0.5">
-                Payernt Platform
-              </span>
-            </div>
+            <span className="font-sans font-black tracking-tight text-xl text-neutral-950 dark:text-white leading-none">
+              Payernt
+            </span>
           </Link>
 
           {/* Theme Toggle Button */}
@@ -361,77 +348,23 @@ export function PayerntAuth({
         <div className="absolute bottom-1/3 right-1/4 w-[400px] h-[280px] bg-accent/5 dark:bg-emerald-500/10 rounded-full blur-[130px] opacity-40" />
       </div>
 
-      {/* Main Two-Column Composition: Left minimal branding, Right adjusted form */}
-      <main className="flex-1 w-full max-w-6xl mx-auto flex items-center justify-center px-4 py-8 sm:px-6 md:px-8 lg:py-16 z-10">
-        <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-14 items-center">
-          {/* Left Section — Only "Welcome to Payent" branding at the top */}
-          <div className="lg:col-span-5 flex flex-col justify-center space-y-4 text-left">
-            {/* Clean Payent Logo */}
-            <Link
-              to="/"
-              className="inline-flex items-center gap-3 group select-none cursor-pointer focus:outline-none w-fit"
-              aria-label="Payent Home"
-            >
-              <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-neutral-950 dark:bg-white p-1.5 shadow-sm transition-transform group-hover:scale-105">
-                <img
-                  src="/brand/payent-logo-icon.webp"
-                  alt="Payent Logo"
-                  className="h-full w-full object-contain rounded-xl"
-                />
-              </div>
-              <span className="font-display font-black tracking-tight text-2xl text-foreground leading-none">
-                Payent
-              </span>
-            </Link>
-
-            {/* Single Headline at Top of Left Side */}
-            <div className="space-y-2 pt-1">
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-foreground tracking-tight font-display leading-[1.15]">
-                Welcome to Payent
-              </h1>
-              <p className="text-sm sm:text-base text-muted-foreground font-normal leading-relaxed max-w-md">
-                List your products and earn by renting them out.
-              </p>
-            </div>
+      {/* Main Two-Column Composition: Left Gear Showcase from image, Right adjusted form */}
+      <main className="flex-1 w-full max-w-6xl mx-auto flex items-start justify-center px-4 pt-1 pb-8 sm:px-6 md:px-8 lg:pt-3 lg:pb-12 z-10">
+        <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
+          {/* Left Section — Gear Showcase matching user image exactly in both themes */}
+          <div className="lg:col-span-6 xl:col-span-6 flex flex-col justify-start">
+            <AuthGearShowcase
+              title="Welcome to Payent"
+              subtitle="List your products and earn by renting them out."
+              badgeLabel="Payernt"
+            />
           </div>
 
           {/* Right Section — Authentication Form Card */}
-          <div className="lg:col-span-7 flex justify-center lg:justify-end">
-            <div className="w-full max-w-xl card-premium p-6 sm:p-8 shadow-xl border border-border/80 bg-card/95 dark:bg-slate-900/95 backdrop-blur-2xl rounded-3xl space-y-5 transition-all duration-300">
-              {/* Header Switcher Tabs: Sign In / Create Account */}
-              <div className="flex items-center rounded-2xl bg-secondary/80 p-1.5 border border-border/80">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMode("login");
-                    setLoginErrors({});
-                  }}
-                  className={`flex-1 py-2.5 text-xs font-extrabold rounded-xl transition-all duration-200 text-center cursor-pointer ${
-                    mode === "login"
-                      ? "bg-background text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  Sign In
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMode("register");
-                    setRegisterErrors({});
-                  }}
-                  className={`flex-1 py-2.5 text-xs font-extrabold rounded-xl transition-all duration-200 text-center cursor-pointer ${
-                    mode === "register"
-                      ? "bg-background text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  Create Account
-                </button>
-              </div>
-
-              {/* Form Heading on Mobile (when left column collapses) */}
-              <div className="lg:hidden space-y-1 text-center sm:text-left pb-1">
+          <div className="lg:col-span-6 xl:col-span-6 flex justify-center lg:justify-end">
+            <div className="w-full max-w-lg card-premium p-5 sm:p-6.5 shadow-xl border border-border/80 bg-card/95 dark:bg-[#1E1E1E] dark:border-[#2D2D2D] backdrop-blur-2xl rounded-2xl space-y-3.5 sm:space-y-4 transition-all duration-300">
+              {/* Form Heading */}
+              <div className="space-y-1 text-left pb-1">
                 <h2 className="text-xl sm:text-2xl font-black text-foreground tracking-tight font-display">
                   {mode === "login" ? "Sign In to Payernt" : "Create Payernt Account"}
                 </h2>
@@ -451,7 +384,7 @@ export function PayerntAuth({
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -8 }}
                     transition={{ duration: 0.2 }}
-                    className="space-y-4 text-left"
+                    className="space-y-3 text-left"
                   >
                     {/* General Error Notice */}
                     {loginErrors.general && (
@@ -461,21 +394,23 @@ export function PayerntAuth({
                       </div>
                     )}
 
-                    <form onSubmit={handleLoginSubmit} className="space-y-4">
-                      {/* Email Address */}
-                      <div className="w-full">
-                        <label
-                          htmlFor="payernt-login-email"
-                          className="mb-1.5 block text-sm font-medium text-foreground"
-                        >
-                          Email address
-                        </label>
+                    <form onSubmit={handleLoginSubmit} className="space-y-3">
+                      {/* Email address */}
+                      <div className="w-full relative pt-1.5">
                         <div
-                          className={`flex items-center gap-2 rounded-xl border bg-card px-4 h-12 transition-colors border-border focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/40 ${
+                          className={`group relative flex items-center gap-2 rounded-xl border bg-card px-3 sm:px-3.5 h-10.5 sm:h-11 transition-colors border-neutral-400/80 dark:border-neutral-600 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/40 ${
                             loginErrors.email ? "border-destructive focus-within:ring-destructive/30" : ""
                           }`}
                         >
-                          <span className="text-muted-foreground">
+                          <label
+                            htmlFor="payernt-login-email"
+                            className={`absolute -top-2.5 left-3.5 px-1.5 bg-card text-[11px] font-semibold tracking-tight transition-colors pointer-events-none select-none z-10 ${
+                              loginErrors.email ? "text-destructive" : "text-muted-foreground group-focus-within:text-primary"
+                            }`}
+                          >
+                            Email address
+                          </label>
+                          <span className="text-muted-foreground shrink-0 flex items-center justify-center">
                             <Mail className="h-4 w-4" />
                           </span>
                           <input
@@ -487,29 +422,30 @@ export function PayerntAuth({
                               setLoginEmail(e.target.value);
                               if (loginErrors.email) setLoginErrors((prev) => ({ ...prev, email: undefined }));
                             }}
-                            placeholder="owner@example.com"
-                            className="flex-1 bg-transparent outline-none text-sm placeholder:text-muted-foreground text-foreground"
+                            className="flex-1 min-w-0 w-full bg-transparent outline-none text-sm placeholder:text-muted-foreground text-foreground"
                           />
                         </div>
                         {loginErrors.email && (
-                          <p className="mt-1.5 text-xs text-destructive">{loginErrors.email}</p>
+                          <p className="mt-1 text-xs text-destructive">{loginErrors.email}</p>
                         )}
                       </div>
 
                       {/* Password */}
-                      <div className="w-full">
-                        <label
-                          htmlFor="payernt-login-password"
-                          className="mb-1.5 block text-sm font-medium text-foreground"
-                        >
-                          Password
-                        </label>
+                      <div className="w-full relative pt-1.5">
                         <div
-                          className={`flex items-center gap-2 rounded-xl border bg-card px-4 h-12 transition-colors border-border focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/40 ${
+                          className={`group relative flex items-center gap-2 rounded-xl border bg-card px-3 sm:px-3.5 h-10.5 sm:h-11 transition-colors border-neutral-400/80 dark:border-neutral-600 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/40 ${
                             loginErrors.password ? "border-destructive focus-within:ring-destructive/30" : ""
                           }`}
                         >
-                          <span className="text-muted-foreground">
+                          <label
+                            htmlFor="payernt-login-password"
+                            className={`absolute -top-2.5 left-3.5 px-1.5 bg-card text-[11px] font-semibold tracking-tight transition-colors pointer-events-none select-none z-10 ${
+                              loginErrors.password ? "text-destructive" : "text-muted-foreground group-focus-within:text-primary"
+                            }`}
+                          >
+                            Password
+                          </label>
+                          <span className="text-muted-foreground shrink-0 flex items-center justify-center">
                             <Lock className="h-4 w-4" />
                           </span>
                           <input
@@ -521,32 +457,32 @@ export function PayerntAuth({
                               setLoginPassword(e.target.value);
                               if (loginErrors.password) setLoginErrors((prev) => ({ ...prev, password: undefined }));
                             }}
-                            placeholder="••••••••"
-                            className="flex-1 bg-transparent outline-none text-sm placeholder:text-muted-foreground text-foreground"
+                            className="flex-1 min-w-0 w-full bg-transparent outline-none text-sm placeholder:text-muted-foreground text-foreground"
                           />
                           <button
                             type="button"
                             onClick={() => setShowLoginPassword(!showLoginPassword)}
-                            className="p-1 text-muted-foreground hover:text-foreground cursor-pointer focus:outline-none transition-colors"
+                            className="p-1 -mr-1 text-muted-foreground hover:text-foreground cursor-pointer focus:outline-none transition-colors shrink-0 flex items-center justify-center"
                             aria-label={showLoginPassword ? "Hide password" : "Show password"}
                           >
                             {showLoginPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                           </button>
                         </div>
                         {loginErrors.password && (
-                          <p className="mt-1.5 text-xs text-destructive">{loginErrors.password}</p>
+                          <p className="mt-1 text-xs text-destructive">{loginErrors.password}</p>
                         )}
                       </div>
 
                       {/* Remember Me & Forgot Password Row */}
                       <div className="flex items-center justify-between text-xs sm:text-sm pt-1">
-                        <label className="inline-flex items-center gap-2 cursor-pointer text-muted-foreground hover:text-foreground transition-colors select-none">
+                        <label className="inline-flex items-center gap-2 cursor-pointer text-muted-foreground hover:text-foreground transition-colors select-none group">
                           <input
                             type="checkbox"
                             checked={rememberMe}
                             onChange={(e) => setRememberMe(e.target.checked)}
-                            className="rounded border-border text-foreground focus:ring-foreground h-4 w-4 cursor-pointer"
+                            className="sr-only"
                           />
+                          <AnimatedCircleCheck checked={rememberMe} size={18} />
                           <span>Remember me</span>
                         </label>
                         <button
@@ -562,7 +498,7 @@ export function PayerntAuth({
                       <button
                         type="submit"
                         disabled={isLoggingIn}
-                        className="w-full font-extrabold h-12 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-lg active:scale-98 flex items-center justify-center gap-2 cursor-pointer mt-2 disabled:opacity-50"
+                        className="w-full font-extrabold h-10.5 sm:h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-lg active:scale-98 flex items-center justify-center gap-2 cursor-pointer mt-2 disabled:opacity-50"
                       >
                         {isLoggingIn ? (
                           <div className="flex items-center gap-2">
@@ -602,23 +538,25 @@ export function PayerntAuth({
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -8 }}
                     transition={{ duration: 0.2 }}
-                    className="space-y-4 text-left"
+                    className="space-y-3 text-left"
                   >
-                    <form onSubmit={handleRegisterSubmit} className="space-y-4">
+                    <form onSubmit={handleRegisterSubmit} className="space-y-3">
                       {/* 1. Full Name */}
-                      <div className="w-full">
-                        <label
-                          htmlFor="payernt-register-name"
-                          className="mb-1.5 block text-sm font-medium text-foreground"
-                        >
-                          Full Name <span className="text-destructive">*</span>
-                        </label>
+                      <div className="w-full relative pt-1.5">
                         <div
-                          className={`flex items-center gap-2 rounded-xl border bg-card px-4 h-12 transition-colors border-border focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/40 ${
+                          className={`group relative flex items-center gap-2 rounded-xl border bg-card px-3 sm:px-3.5 h-10.5 sm:h-11 transition-colors border-neutral-400/80 dark:border-neutral-600 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/40 ${
                             registerErrors.name ? "border-destructive focus-within:ring-destructive/30" : ""
                           }`}
                         >
-                          <span className="text-muted-foreground">
+                          <label
+                            htmlFor="payernt-register-name"
+                            className={`absolute -top-2.5 left-3.5 px-1.5 bg-card text-[11px] font-semibold tracking-tight transition-colors pointer-events-none select-none z-10 ${
+                              registerErrors.name ? "text-destructive" : "text-muted-foreground group-focus-within:text-primary"
+                            }`}
+                          >
+                            Full Name <span className="text-destructive">*</span>
+                          </label>
+                          <span className="text-muted-foreground shrink-0 flex items-center justify-center">
                             <User className="h-4 w-4" />
                           </span>
                           <input
@@ -630,30 +568,31 @@ export function PayerntAuth({
                               setName(e.target.value);
                               if (registerErrors.name) setRegisterErrors((prev) => ({ ...prev, name: undefined }));
                             }}
-                            placeholder="e.g. Mohan Bommidi"
-                            className="flex-1 bg-transparent outline-none text-sm placeholder:text-muted-foreground text-foreground"
+                            className="flex-1 min-w-0 w-full bg-transparent outline-none text-sm placeholder:text-muted-foreground text-foreground"
                           />
                         </div>
                         {registerErrors.name && (
-                          <p className="mt-1.5 text-xs text-destructive">{registerErrors.name}</p>
+                          <p className="mt-1 text-xs text-destructive">{registerErrors.name}</p>
                         )}
                       </div>
 
                       {/* 2. Mobile Number & Check button */}
-                      <div className="space-y-1.5">
-                        <label
-                          htmlFor="payernt-register-phone"
-                          className="block text-sm font-medium text-foreground"
-                        >
-                          Mobile Number <span className="text-destructive">*</span>
-                        </label>
-                        <div className="flex items-center gap-2">
+                      <div className="w-full relative pt-1.5">
+                        <div className="flex items-start gap-2">
                           <div
-                            className={`flex-1 flex items-center gap-2 rounded-xl border bg-card px-4 h-12 transition-colors border-border focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/40 ${
+                            className={`group relative flex-1 flex items-center gap-2 rounded-xl border bg-card px-3 sm:px-3.5 h-10.5 sm:h-11 transition-colors border-neutral-400/80 dark:border-neutral-600 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/40 ${
                               registerErrors.phone ? "border-destructive focus-within:ring-destructive/30" : ""
                             }`}
                           >
-                            <span className="text-xs font-bold text-muted-foreground select-none">
+                            <label
+                              htmlFor="payernt-register-phone"
+                              className={`absolute -top-2.5 left-3.5 px-1.5 bg-card text-[11px] font-semibold tracking-tight transition-colors pointer-events-none select-none z-10 ${
+                                registerErrors.phone ? "text-destructive" : "text-muted-foreground group-focus-within:text-primary"
+                              }`}
+                            >
+                              Mobile Number <span className="text-destructive">*</span>
+                            </label>
+                            <span className="text-xs font-bold text-muted-foreground select-none shrink-0">
                               +91
                             </span>
                             <input
@@ -667,15 +606,14 @@ export function PayerntAuth({
                                 setPhone(val);
                                 if (registerErrors.phone) setRegisterErrors((prev) => ({ ...prev, phone: undefined }));
                               }}
-                              placeholder="9876543210"
-                              className="flex-1 bg-transparent outline-none text-sm placeholder:text-muted-foreground text-foreground"
+                              className="flex-1 min-w-0 w-full bg-transparent outline-none text-sm placeholder:text-muted-foreground text-foreground"
                             />
                           </div>
                           <button
                             type="button"
                             onClick={handleCheckUser}
                             disabled={isChecking}
-                            className="h-12 px-3.5 rounded-xl border border-border bg-secondary hover:bg-secondary/80 text-foreground font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shrink-0 disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-1.5"
+                            className="h-10.5 sm:h-11 px-3.5 rounded-xl border border-neutral-400/80 dark:border-neutral-600 bg-secondary hover:bg-secondary/80 text-foreground font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shrink-0 disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-1.5"
                             title="Check existing account records"
                           >
                             {isChecking ? (
@@ -686,24 +624,26 @@ export function PayerntAuth({
                           </button>
                         </div>
                         {registerErrors.phone && (
-                          <p className="mt-1.5 text-xs text-destructive">{registerErrors.phone}</p>
+                          <p className="mt-1 text-xs text-destructive">{registerErrors.phone}</p>
                         )}
                       </div>
 
                       {/* 3. Email Address */}
-                      <div className="w-full">
-                        <label
-                          htmlFor="payernt-register-email"
-                          className="mb-1.5 block text-sm font-medium text-foreground"
-                        >
-                          Email Address <span className="text-destructive">*</span>
-                        </label>
+                      <div className="w-full relative pt-1.5">
                         <div
-                          className={`flex items-center gap-2 rounded-xl border bg-card px-4 h-12 transition-colors border-border focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/40 ${
+                          className={`group relative flex items-center gap-2 rounded-xl border bg-card px-3 sm:px-3.5 h-10.5 sm:h-11 transition-colors border-neutral-400/80 dark:border-neutral-600 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/40 ${
                             registerErrors.email ? "border-destructive focus-within:ring-destructive/30" : ""
                           }`}
                         >
-                          <span className="text-muted-foreground">
+                          <label
+                            htmlFor="payernt-register-email"
+                            className={`absolute -top-2.5 left-3.5 px-1.5 bg-card text-[11px] font-semibold tracking-tight transition-colors pointer-events-none select-none z-10 ${
+                              registerErrors.email ? "text-destructive" : "text-muted-foreground group-focus-within:text-primary"
+                            }`}
+                          >
+                            Email Address <span className="text-destructive">*</span>
+                          </label>
+                          <span className="text-muted-foreground shrink-0 flex items-center justify-center">
                             <Mail className="h-4 w-4" />
                           </span>
                           <input
@@ -715,31 +655,32 @@ export function PayerntAuth({
                               setEmail(e.target.value);
                               if (registerErrors.email) setRegisterErrors((prev) => ({ ...prev, email: undefined }));
                             }}
-                            placeholder="mohan@example.com"
-                            className="flex-1 bg-transparent outline-none text-sm placeholder:text-muted-foreground text-foreground"
+                            className="flex-1 min-w-0 w-full bg-transparent outline-none text-sm placeholder:text-muted-foreground text-foreground"
                           />
                         </div>
                         {registerErrors.email && (
-                          <p className="mt-1.5 text-xs text-destructive">{registerErrors.email}</p>
+                          <p className="mt-1 text-xs text-destructive">{registerErrors.email}</p>
                         )}
                       </div>
 
                       {/* Password & Confirm Password */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {/* Password */}
-                        <div className="w-full">
-                          <label
-                            htmlFor="payernt-register-password"
-                            className="mb-1.5 block text-sm font-medium text-foreground"
-                          >
-                            Password <span className="text-destructive">*</span>
-                          </label>
+                        <div className="w-full relative pt-1.5">
                           <div
-                            className={`flex items-center gap-2 rounded-xl border bg-card px-4 h-12 transition-colors border-border focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/40 ${
+                            className={`group relative flex items-center gap-2 rounded-xl border bg-card px-3 sm:px-3.5 h-10.5 sm:h-11 transition-colors border-neutral-400/80 dark:border-neutral-600 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/40 ${
                               registerErrors.password ? "border-destructive focus-within:ring-destructive/30" : ""
                             }`}
                           >
-                            <span className="text-muted-foreground">
+                            <label
+                              htmlFor="payernt-register-password"
+                              className={`absolute -top-2.5 left-3.5 px-1.5 bg-card text-[11px] font-semibold tracking-tight transition-colors pointer-events-none select-none z-10 ${
+                                registerErrors.password ? "text-destructive" : "text-muted-foreground group-focus-within:text-primary"
+                              }`}
+                            >
+                              Password <span className="text-destructive">*</span>
+                            </label>
+                            <span className="text-muted-foreground shrink-0 flex items-center justify-center">
                               <Lock className="h-4 w-4" />
                             </span>
                             <input
@@ -751,37 +692,38 @@ export function PayerntAuth({
                                 setPassword(e.target.value);
                                 if (registerErrors.password) setRegisterErrors((prev) => ({ ...prev, password: undefined }));
                               }}
-                              placeholder="••••••••"
-                              className="flex-1 bg-transparent outline-none text-sm placeholder:text-muted-foreground text-foreground"
+                              className="flex-1 min-w-0 w-full bg-transparent outline-none text-sm placeholder:text-muted-foreground text-foreground"
                             />
                             <button
                               type="button"
                               onClick={() => setShowPassword(!showPassword)}
-                              className="p-1 text-muted-foreground hover:text-foreground cursor-pointer focus:outline-none transition-colors"
+                              className="p-1 -mr-1 text-muted-foreground hover:text-foreground cursor-pointer focus:outline-none transition-colors shrink-0 flex items-center justify-center"
                               aria-label={showPassword ? "Hide password" : "Show password"}
                             >
                               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                             </button>
                           </div>
                           {registerErrors.password && (
-                            <p className="mt-1.5 text-xs text-destructive">{registerErrors.password}</p>
+                            <p className="mt-1 text-xs text-destructive">{registerErrors.password}</p>
                           )}
                         </div>
 
                         {/* Confirm Password */}
-                        <div className="w-full">
-                          <label
-                            htmlFor="payernt-register-confirm"
-                            className="mb-1.5 block text-sm font-medium text-foreground"
-                          >
-                            Confirm Password <span className="text-destructive">*</span>
-                          </label>
+                        <div className="w-full relative pt-1.5">
                           <div
-                            className={`flex items-center gap-2 rounded-xl border bg-card px-4 h-12 transition-colors border-border focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/40 ${
+                            className={`group relative flex items-center gap-2 rounded-xl border bg-card px-3 sm:px-3.5 h-10.5 sm:h-11 transition-colors border-neutral-400/80 dark:border-neutral-600 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/40 ${
                               registerErrors.confirmPassword ? "border-destructive focus-within:ring-destructive/30" : ""
                             }`}
                           >
-                            <span className="text-muted-foreground">
+                            <label
+                              htmlFor="payernt-register-confirm"
+                              className={`absolute -top-2.5 left-3.5 px-1.5 bg-card text-[11px] font-semibold tracking-tight transition-colors pointer-events-none select-none z-10 ${
+                                registerErrors.confirmPassword ? "text-destructive" : "text-muted-foreground group-focus-within:text-primary"
+                              }`}
+                            >
+                              Confirm Password <span className="text-destructive">*</span>
+                            </label>
+                            <span className="text-muted-foreground shrink-0 flex items-center justify-center">
                               <Lock className="h-4 w-4" />
                             </span>
                             <input
@@ -793,20 +735,19 @@ export function PayerntAuth({
                                 setConfirmPassword(e.target.value);
                                 if (registerErrors.confirmPassword) setRegisterErrors((prev) => ({ ...prev, confirmPassword: undefined }));
                               }}
-                              placeholder="••••••••"
-                              className="flex-1 bg-transparent outline-none text-sm placeholder:text-muted-foreground text-foreground"
+                              className="flex-1 min-w-0 w-full bg-transparent outline-none text-sm placeholder:text-muted-foreground text-foreground"
                             />
                             <button
                               type="button"
                               onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                              className="p-1 text-muted-foreground hover:text-foreground cursor-pointer focus:outline-none transition-colors"
+                              className="p-1 -mr-1 text-muted-foreground hover:text-foreground cursor-pointer focus:outline-none transition-colors shrink-0 flex items-center justify-center"
                               aria-label={showConfirmPassword ? "Hide password" : "Show password"}
                             >
                               {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                             </button>
                           </div>
                           {registerErrors.confirmPassword && (
-                            <p className="mt-1.5 text-xs text-destructive">{registerErrors.confirmPassword}</p>
+                            <p className="mt-1 text-xs text-destructive">{registerErrors.confirmPassword}</p>
                           )}
                         </div>
                       </div>
@@ -832,9 +773,9 @@ export function PayerntAuth({
                         </div>
                       )}
 
-                      {/* Terms & Conditions Checkbox */}
+                      {/* Terms & Conditions Checkbox with Animated Circle Tick */}
                       <div className="pt-2">
-                        <label className="flex items-center gap-2 text-xs cursor-pointer select-none">
+                        <label className="flex items-center gap-2.5 text-xs cursor-pointer select-none group">
                           <input
                             type="checkbox"
                             checked={termsAccepted}
@@ -842,9 +783,10 @@ export function PayerntAuth({
                               setTermsAccepted(e.target.checked);
                               if (registerErrors.terms) setRegisterErrors((prev) => ({ ...prev, terms: undefined }));
                             }}
-                            className="rounded border-border text-foreground focus:ring-foreground h-4 w-4 cursor-pointer"
+                            className="sr-only"
                           />
-                          <span className="text-muted-foreground text-[11px] leading-tight">
+                          <AnimatedCircleCheck checked={termsAccepted} />
+                          <span className="text-muted-foreground text-[11px] leading-tight group-hover:text-foreground transition-colors">
                             I accept the{" "}
                             <a href="#" className="text-foreground hover:underline font-bold">
                               Lender Terms
@@ -866,7 +808,7 @@ export function PayerntAuth({
                       <button
                         type="submit"
                         disabled={isRegistering}
-                        className="w-full font-extrabold h-12 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-lg active:scale-98 flex items-center justify-center gap-2 cursor-pointer mt-2 disabled:opacity-50"
+                        className="w-full font-extrabold h-10.5 sm:h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-lg active:scale-98 flex items-center justify-center gap-2 cursor-pointer mt-2 disabled:opacity-50"
                       >
                         {isRegistering ? (
                           <div className="flex items-center gap-2">
