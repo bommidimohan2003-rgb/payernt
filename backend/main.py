@@ -78,7 +78,13 @@ import hmac
 import hashlib
 import uuid
 import math
-import razorpay
+try:
+    import razorpay
+    HAS_RAZORPAY = True
+except ImportError:
+    razorpay = None
+    HAS_RAZORPAY = False
+    logger.warning("Notice: razorpay module not installed; Razorpay client SDK disabled or fallback active.")
 
 from database import (
     init_db,
@@ -272,7 +278,7 @@ from config import (
 )
 
 razorpay_client = None
-if RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET:
+if HAS_RAZORPAY and razorpay and RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET:
     try:
         razorpay_client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
         logger.info("Razorpay Client SDK initialized successfully.")
