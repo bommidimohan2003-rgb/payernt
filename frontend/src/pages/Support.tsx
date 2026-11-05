@@ -31,6 +31,7 @@ import {
   ThumbsDown,
 } from "lucide-react";
 import { MainLayout } from "@/layouts/MainLayout";
+import { BackButton } from "@/components/common/BackButton";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/utils/api";
 import { cn } from "@/lib/utils";
@@ -741,8 +742,9 @@ export default function Support() {
       <MainLayout hideFooter={true}>
         <div className="min-h-[calc(100vh-80px)] bg-background text-foreground transition-colors duration-200 flex flex-col justify-center py-12 sm:py-16 lg:py-20">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
-            {/* Centered Heading */}
-            <div className="text-center mb-8 sm:mb-12 lg:mb-16">
+            {/* Centered Heading with Back Button */}
+            <div className="flex flex-col items-center mb-8 sm:mb-12 lg:mb-16">
+              <BackButton fallback="/" className="mb-4" />
               <h1
                 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-foreground"
                 data-testid="support-heading"
@@ -819,7 +821,7 @@ export default function Support() {
     <MainLayout>
       <div className="min-h-screen bg-background text-foreground transition-colors duration-200 pb-20">
         {/* CATEGORY HERO SECTION */}
-        <section className="relative overflow-hidden pt-8 pb-8 sm:pt-12 sm:pb-10 border-b border-border bg-card/40">
+        <section className="relative overflow-hidden pt-8 pb-8 sm:pt-12 sm:pb-10 bg-card/40">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
             {/* Back to All Categories & Breadcrumb */}
             <div className="flex items-center justify-between gap-4 mb-6">

@@ -9,7 +9,6 @@ import { useLanguage } from "@/i18n";
 import { storage, STORAGE_KEYS } from "@/utils/storage";
 import { api } from "@/utils/api";
 import { ProfilePhoto } from "@/components/common/ProfilePhoto";
-
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -18,7 +17,6 @@ export function Navbar() {
   const { theme, toggle } = useTheme();
   const { tCommon } = useLanguage();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-
   useEffect(() => {
     setMounted(true);
     const onScroll = () => setScrolled(window.scrollY > 15);
@@ -26,7 +24,6 @@ export function Navbar() {
     window.addEventListener("scroll", onScroll);
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
-
   useEffect(() => {
     if (!user) {
       setUnreadNotifsCount(0);
@@ -34,7 +31,6 @@ export function Navbar() {
     }
     const token = storage.get<string | null>(STORAGE_KEYS.token, null);
     if (!token) return;
-
     const checkNotifs = async () => {
       try {
         const notifs = await api.getNotifications(token);
@@ -44,33 +40,29 @@ export function Navbar() {
         }
       } catch {}
     };
-
     checkNotifs();
     const interval = setInterval(checkNotifs, 30000);
     window.addEventListener("payent_orders_updated", checkNotifs);
     window.addEventListener("payent_notifications_updated", checkNotifs);
-
     return () => {
       clearInterval(interval);
       window.removeEventListener("payent_orders_updated", checkNotifs);
       window.removeEventListener("payent_notifications_updated", checkNotifs);
     };
   }, [user]);
-
   const isButton2Home = pathname === "/payant" || pathname === "/payent" || pathname === "/payent/";
   const isHome = pathname === "/" || isButton2Home;
-
   return (
     <>
       <header
         className={cn(
-          "sticky top-0 z-40 w-full transition-all duration-300",
+          "sticky top-0 z-40 w-full transition-all duration-300 border-none border-b-0 shadow-none",
           pathname === "/" && "-mb-16 sm:-mb-[68px]",
           scrolled
-            ? "bg-surface-navigation/90 backdrop-blur-xl shadow-elevation-1 border-b border-border"
+            ? "bg-background/90 backdrop-blur-xl"
             : pathname === "/"
               ? "bg-transparent shadow-none"
-              : "bg-surface-navigation/80 backdrop-blur-xl border-b border-border/80"
+              : "bg-background/80 backdrop-blur-xl"
         )}
       >
         <div className="mx-auto flex h-16 sm:h-[68px] w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
@@ -86,26 +78,24 @@ export function Navbar() {
               <LogoIcon showTagline={false} />
             </Link>
           </div>
-
           {/* Right: Theme Toggle & Auth / Profile Controls */}
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Theme Toggle Button matching Dock Container Icon Style */}
+            {/* Theme Toggle Button matching Payent Theme (Circular outline) */}
             {mounted && (
               <button
                 type="button"
                 onClick={toggle}
                 aria-label="Toggle Color Theme"
                 title={theme === "dark" ? tCommon.switchToLight : tCommon.switchToDark}
-                className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-secondary/80 hover:bg-secondary text-text-secondary hover:text-text-primary border border-border flex items-center justify-center transition-all cursor-pointer shrink-0 active:scale-96 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="w-9 h-9 sm:w-10 sm:h-10 rounded-full border border-neutral-300 dark:border-neutral-700/80 hover:border-neutral-400 dark:hover:border-neutral-500 bg-transparent hover:bg-neutral-100 dark:hover:bg-white/5 text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white flex items-center justify-center transition-all cursor-pointer shrink-0 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 {theme === "dark" ? (
-                  <Sun className="h-4 w-4 sm:h-[17px] sm:w-[17px] stroke-[1.6]" />
+                  <Sun className="h-4 w-4 sm:h-[18px] sm:w-[18px] stroke-[1.6]" />
                 ) : (
-                  <Moon className="h-4 w-4 sm:h-[17px] sm:w-[17px] stroke-[1.6]" />
+                  <Moon className="h-4 w-4 sm:h-[18px] sm:w-[18px] stroke-[1.6]" />
                 )}
               </button>
             )}
-
             {mounted && user ? (
               <div className="flex items-center gap-2">
                 {(user.role === "admin" || user.role === "superadmin") && (
@@ -123,7 +113,7 @@ export function Navbar() {
                   id="nav-notifications-btn"
                   aria-label="Notifications"
                   title="Notifications"
-                  className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10 text-neutral-700 hover:text-neutral-950 dark:text-neutral-300 dark:hover:text-white border border-black/5 dark:border-white/10 flex items-center justify-center transition-all cursor-pointer shrink-0 active:scale-96"
+                  className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10 text-neutral-700 hover:text-neutral-950 dark:text-neutral-300 dark:hover:text-white border border-neutral-300 dark:border-neutral-700/80 flex items-center justify-center transition-all cursor-pointer shrink-0 active:scale-95"
                 >
                   <Bell className="h-4 w-4 sm:h-[17px] sm:w-[17px] stroke-[1.6]" />
                   {unreadNotifsCount > 0 && (
@@ -135,7 +125,7 @@ export function Navbar() {
                 <Link
                   to={user.role === "admin" || user.role === "superadmin" ? "/admin/dashboard" : "/profile"}
                   id="nav-profile-avatar"
-                  className="flex items-center gap-2 p-1.5 pl-2 pr-3 sm:pr-4 rounded-xl border border-black/10 dark:border-white/15 bg-white/80 dark:bg-[#0D151D]/80 hover:border-black/20 dark:hover:border-white/30 shadow-xs hover:shadow-sm transition-all active:scale-96"
+                  className="flex items-center gap-2 p-1.5 pl-2 pr-3 sm:pr-4 rounded-full border border-black/10 dark:border-white/15 bg-white/80 dark:bg-[#0D151D]/80 hover:border-black/20 dark:hover:border-white/30 shadow-xs hover:shadow-sm transition-all active:scale-95"
                 >
                   <ProfilePhoto
                     src={user.profilePhotoUrl || user.profile_photo_url || user.avatar}
@@ -149,22 +139,21 @@ export function Navbar() {
                 </Link>
               </div>
             ) : (
-              <div className="flex items-center gap-1.5 sm:gap-2.5">
+              <div className="flex items-center gap-2 sm:gap-3">
                 <Link
                   to="/login"
                   id="nav-login-btn"
-                  className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white rounded-xl hover:bg-black/5 dark:hover:bg-white/10 transition-all cursor-pointer active:scale-96"
+                  className="px-2.5 sm:px-3 py-1.5 text-xs sm:text-sm font-semibold text-neutral-800 dark:text-neutral-200 hover:text-neutral-950 dark:hover:text-white transition-colors cursor-pointer select-none"
                 >
                   {tCommon.login}
                 </Link>
-
                 <Link
                   to="/register"
                   id="nav-signup-btn"
-                  className="inline-flex items-center gap-1.5 px-3.5 sm:px-5 py-2 text-xs sm:text-sm font-bold text-white bg-neutral-950 hover:bg-neutral-800 dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-100 rounded-xl shadow-xs hover:shadow active:scale-96 transition-all cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-4 sm:px-5 py-2 text-xs sm:text-sm font-bold sm:font-semibold rounded-full bg-neutral-950 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-100 shadow-sm transition-all duration-200 cursor-pointer active:scale-95 select-none"
                 >
                   <span>{tCommon.signup}</span>
-                  <ArrowRight className="h-3.5 w-3.5" />
+                  <ArrowRight className="h-3.5 w-3.5 stroke-[2.2]" />
                 </Link>
               </div>
             )}
@@ -174,5 +163,4 @@ export function Navbar() {
     </>
   );
 }
-
 export default Navbar;

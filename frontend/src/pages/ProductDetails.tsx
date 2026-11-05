@@ -29,8 +29,9 @@ import {
   ChevronLeft,
   ChevronDown,
   Sun,
-  Coins,
-  Lock,
+  Maximize2,
+  X,
+  LayoutGrid,
 } from "lucide-react";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -58,6 +59,7 @@ import type { Product, Order } from "@/types";
 import { ProfilePhoto } from "@/components/common/ProfilePhoto";
 import { ProductMessageModal } from "@/components/browse/ProductMessageModal";
 import { ShareProductModal } from "@/components/common/ShareProductModal";
+import { TermsAndConditionsModal } from "@/components/common/TermsAndConditionsModal";
 import { rentalSecurityService } from "@/services/rentalSecurityService";
 import { reviewsApi, type ReviewItem } from "@/services/api";
 import type { RentalSecurity } from "@/types";
@@ -177,11 +179,28 @@ export default function ProductDetails() {
 
   // Redesign Visual UI States
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
-  const [activeFaqIndex, setActiveFaqIndex] = useState<number | null>(0);
   const [showFullCalendar, setShowFullCalendar] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
   const [relatedCarouselPage, setRelatedCarouselPage] = useState(0);
   const [isPhotoViewerOpen, setIsPhotoViewerOpen] = useState(false);
+  const [isFullscreenGridView, setIsFullscreenGridView] = useState(false);
+  const [isFullscreenVideoActive, setIsFullscreenVideoActive] = useState(false);
   const [isVideoActive, setIsVideoActive] = useState(false);
+
+  // Close full screen viewer on Escape key
+  useEffect(() => {
+    if (!isPhotoViewerOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsPhotoViewerOpen(false);
+        setIsFullscreenGridView(false);
+        setIsFullscreenVideoActive(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isPhotoViewerOpen]);
 
   // Dynamic Genuine Reviews State
   const [genuineReviews, setGenuineReviews] = useState<ReviewItem[]>([]);
@@ -227,6 +246,7 @@ export default function ProductDetails() {
   const [isAvailableForDates, setIsAvailableForDates] = useState<boolean | null>(null);
   const [availabilityMessage, setAvailabilityMessage] = useState<string>("");
   const [isCreatingBooking, setIsCreatingBooking] = useState<boolean>(false);
+  const [isCheckingAvailability, setIsCheckingAvailability] = useState<boolean>(false);
 
   // Flexible Rental Duration & Time Slot State
   type DurationMode = "half_day_morning" | "half_day_afternoon" | "full_day" | "custom";
@@ -712,6 +732,7 @@ export default function ProductDetails() {
     }
 
     // Backend authoritative availability verification for requested date span and session
+    setIsCheckingAvailability(true);
     try {
       const checkEnd = durationMode === "custom" ? endDate : startDate;
       const effectiveSession = durationMode === "custom" ? "full_day" : selectedSlot;
@@ -800,6 +821,8 @@ export default function ProductDetails() {
       );
       setAvailabilityChecked(true);
       return;
+    } finally {
+      setIsCheckingAvailability(false);
     }
   };
 
@@ -820,6 +843,11 @@ export default function ProductDetails() {
 
     if (isOwner) {
       toast.error("You cannot rent your own product.");
+      return;
+    }
+
+    if (!termsAccepted) {
+      toast.error("Please accept the terms and conditions to proceed.");
       return;
     }
 
@@ -853,6 +881,10 @@ export default function ProductDetails() {
   const handleBookNowAction = async () => {
     if (isOwner) {
       toast.error("You cannot rent your own product.");
+      return;
+    }
+    if (!termsAccepted) {
+      toast.error("Please accept the terms and conditions to proceed.");
       return;
     }
     if (isAvailableForDates) {
@@ -1030,7 +1062,7 @@ const productSchema = product ? {
     ],
   } : null;
 
-  // Gallery image assembly
+  // Gallery image assembly — collects all product photos, angle views, and rotation frames
   const gallery = useMemo(() => {
     if (!product) return [];
     let imgs: string[] = [];
@@ -1046,19 +1078,39 @@ const productSchema = product ? {
         imgs = [rawImgs];
       }
     }
-    imgs = imgs.filter(Boolean);
+
+    // Include angleImages if available
+    if (Array.isArray(product.angleImages) && product.angleImages.length > 0) {
+      product.angleImages.forEach((a: any) => {
+        const url = typeof a === "string" ? a : a?.image || a?.url;
+        if (url && !imgs.includes(url)) imgs.push(url);
+      });
+    }
+
+    // Include rotationFrames if available
+    if (Array.isArray(product.rotationFrames) && product.rotationFrames.length > 0) {
+      product.rotationFrames.forEach((rf: any) => {
+        if (typeof rf === "string" && rf && !imgs.includes(rf)) imgs.push(rf);
+      });
+    }
+
     const prim = product.image || (product as any).primary_image;
     if (prim && !imgs.includes(prim)) {
       imgs = [prim, ...imgs];
     } else if (!imgs.length && prim) {
       imgs = [prim];
     }
-    if (imgs.length === 0 && Array.isArray(product.rotationFrames) && product.rotationFrames.length > 0) {
-      imgs = product.rotationFrames.filter(Boolean);
+
+    imgs = imgs.filter(Boolean);
+
+    // If fewer than 4 images, expand so all 4 card views/angles are browseable in full screen
+    if (imgs.length > 0 && imgs.length < 4) {
+      const base = [...imgs];
+      while (imgs.length < 4) {
+        imgs.push(base[imgs.length % base.length]);
+      }
     }
-    if (imgs.length === 0 && Array.isArray(product.angleImages) && product.angleImages.length > 0) {
-      imgs = product.angleImages.filter(Boolean);
-    }
+
     return imgs.length > 0 ? imgs : (prim ? [prim] : []);
   }, [product]);
 
@@ -1086,30 +1138,6 @@ const productSchema = product ? {
 
   const brand = product ? getProductBrand(product) : null;
   const isWishlisted = product ? has(product.id) : false;
-
-  // Frequently Asked Questions
-  const faqItems = [
-    {
-      question: "how does renting work?",
-      answer: "Browse the catalog, select your gear, pick your rental dates or morning/afternoon slot, verify identity via quick KYC, and confirm booking. Pick up from verified lenders or opt for express delivery.",
-    },
-    {
-      question: "How do I book this product?",
-      answer: "Choose your date, select your slot (Morning, Afternoon, or Full Day), verify slot availability with 'Check Slot Availability', and click 'BOOK NOW' to review and confirm your booking.",
-    },
-    {
-      question: "What happens after booking confirmation?",
-      answer: "You receive a secure 6-digit handover PIN. When meeting the equipment host, inspect the gear, test all functions, share your PIN to activate rental, and start shooting.",
-    },
-    {
-      question: "What is the pickup and return process?",
-      answer: "Meet the equipment host at the designated pickup address or receive doorstep delivery. Return the equipment on schedule in original condition using the digital return PIN.",
-    },
-    {
-      question: "Can I cancel my booking?",
-      answer: "Yes, you can cancel your rental booking directly from your Renter Dashboard prior to pickup. Instant full refunds apply per standard platform cancellation policies.",
-    },
-  ];
 
   // Related Products
   const relatedProductsList = useMemo(() => {
@@ -1143,13 +1171,15 @@ const productSchema = product ? {
   if (productLoading && !product) {
     return (
       <MainLayout>
-        <div className="mx-auto max-w-7xl px-4 md:px-6 py-6 space-y-6">
-          <div className="grid lg:grid-cols-12 gap-8 items-start">
-            <div className="lg:col-span-6 space-y-3">
-              <div className="aspect-[4/3] w-full rounded-3xl bg-secondary/50 animate-pulse border border-border/80" />
-            </div>
-            <div className="lg:col-span-6 space-y-4">
-              <div className="h-96 w-full rounded-3xl bg-secondary/50 animate-pulse border border-border/80 p-5 space-y-4" />
+        <div className="min-h-screen bg-[#FAFBF9] dark:bg-[#070C12] text-neutral-900 dark:text-neutral-100">
+          <div className="mx-auto max-w-7xl px-4 md:px-6 py-6 space-y-6">
+            <div className="grid lg:grid-cols-12 gap-8 items-start">
+              <div className="lg:col-span-6 space-y-3">
+                <div className="aspect-[4/3] w-full rounded-3xl bg-neutral-200/60 dark:bg-[#0D151D] animate-pulse border border-black/10 dark:border-white/10" />
+              </div>
+              <div className="lg:col-span-6 space-y-4">
+                <div className="h-96 w-full rounded-3xl bg-neutral-200/60 dark:bg-[#0D151D] animate-pulse border border-black/10 dark:border-white/10 p-5 space-y-4" />
+              </div>
             </div>
           </div>
         </div>
@@ -1180,8 +1210,43 @@ const productSchema = product ? {
       <JsonLd schema={productSchema} />
       <JsonLd schema={breadcrumbSchema} />
 
-      <div className="min-h-screen bg-background text-foreground pb-24 selection:bg-emerald-500/20">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-6 space-y-12">
+      <div className="min-h-screen bg-[#FAFBF9] dark:bg-[#070C12] text-neutral-900 dark:text-neutral-100 pb-24 transition-colors duration-300 selection:bg-emerald-500/20">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 space-y-8">
+
+          {/* Back Navigation Bar & Category Breadcrumb */}
+          <div className="flex items-center justify-between pb-1">
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof window !== "undefined" && window.history.length > 1) {
+                  window.history.back();
+                } else {
+                  navigate({ to: "/categories" });
+                }
+              }}
+              className="group inline-flex items-center gap-2 text-xs sm:text-sm font-semibold text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white px-3.5 py-1.5 sm:py-2 rounded-full bg-white dark:bg-[#0D151D] border border-black/10 dark:border-white/10 shadow-xs hover:border-black/20 dark:hover:border-white/20 transition-all cursor-pointer active:scale-95"
+              aria-label="Go back to previous page"
+            >
+              <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1 text-neutral-600 dark:text-neutral-400 group-hover:text-neutral-950 dark:group-hover:text-white" />
+              <span>Back</span>
+            </button>
+
+            {product?.category && (
+              <div className="hidden sm:flex items-center gap-2 text-xs text-neutral-500 dark:text-[#A8B1BA]">
+                <Link to="/categories" className="hover:text-neutral-900 dark:hover:text-white transition-colors">
+                  Categories
+                </Link>
+                <span>/</span>
+                <Link
+                  to="/categories"
+                  search={{ cat: product.category }}
+                  className="capitalize hover:text-neutral-900 dark:hover:text-white transition-colors font-medium text-neutral-800 dark:text-neutral-200"
+                >
+                  {product.category}
+                </Link>
+              </div>
+            )}
+          </div>
           
           {/* 1. TOP HERO: PRODUCT GALLERY & DETAILS (2-Column Grid matching Reference) */}
           <section className="grid lg:grid-cols-12 gap-8 lg:gap-12 items-start">
@@ -1218,17 +1283,83 @@ const productSchema = product ? {
                       <ShieldCheck className="h-3.5 w-3.5" />
                       <span>Verified 10s Inspection Video</span>
                     </div>
+                    {/* Full Screen Video Overlay Button */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsFullscreenVideoActive(true);
+                        setIsPhotoViewerOpen(true);
+                      }}
+                      title="Watch video in full screen"
+                      className="absolute top-3 right-3 px-3 py-1.5 rounded-full bg-black/70 hover:bg-black/90 text-white backdrop-blur-md border border-white/20 transition-all cursor-pointer z-10 hover:scale-105 active:scale-95 shadow-md flex items-center gap-1.5 text-xs font-semibold"
+                    >
+                      <Maximize2 className="h-3.5 w-3.5 text-emerald-400" />
+                      <span>Full Screen</span>
+                    </button>
                   </div>
                 ) : (
                   <div className="relative w-full h-full min-h-[380px] sm:min-h-[460px] overflow-hidden flex items-center justify-center">
                     <img
                       src={activeDisplayImage}
                       alt={product.title}
-                      onClick={() => setIsPhotoViewerOpen(true)}
+                      onClick={() => {
+                        setIsFullscreenVideoActive(false);
+                        setIsPhotoViewerOpen(true);
+                      }}
                       className="w-full h-full min-h-[380px] sm:min-h-[460px] max-h-[520px] object-cover object-center transition-transform duration-500 ease-out group-hover:scale-105 cursor-pointer"
                     />
                     {/* Top gradient overlay to ensure wording & badge legibility directly on the image */}
                     <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/60 via-black/20 to-transparent pointer-events-none" />
+                    {/* Bottom gradient overlay for title & category legibility on the image */}
+                    <div className="absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-black/85 via-black/40 to-transparent pointer-events-none" />
+                  </div>
+                )}
+
+                {/* Bottom Overlays: Title & Category on Left, Reviews / Rating on Right Bottom Overlap */}
+                {!isVideoActive && (
+                  <div className="absolute bottom-4 sm:bottom-5 left-4 sm:left-5 right-4 sm:right-5 z-10 flex items-end justify-between gap-3">
+                    {/* Bottom-Left: Title & Category / Brand */}
+                    <div className="text-left pointer-events-none space-y-1 min-w-0 max-w-[65%]">
+                      <h1 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-white tracking-tight drop-shadow-md font-display line-clamp-2">
+                        {product.title}
+                      </h1>
+                      <p className="text-xs sm:text-sm font-semibold text-neutral-200 drop-shadow-sm flex items-center gap-1.5 capitalize truncate">
+                        <span className="text-emerald-400 font-bold">{product.category || "Gear"}</span>
+                        {brand && (
+                          <>
+                            <span className="text-neutral-400">•</span>
+                            <span>{brand}</span>
+                          </>
+                        )}
+                      </p>
+                    </div>
+
+                    {/* Bottom-Right: Review / Rating Badge Overlapping on Product Image */}
+                    {(() => {
+                      const totalCount = genuineReviews.length > 0 ? genuineReviews.length : (product.reviews ? Number(product.reviews) : 0);
+                      const avgRating = totalCount > 0 && product.rating != null ? Number(product.rating) : (totalCount > 0 ? 5.0 : null);
+
+                      return (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            document.getElementById("customer-reviews-section")?.scrollIntoView({ behavior: "smooth" });
+                          }}
+                          title="View Customer Reviews"
+                          className="pointer-events-auto shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/65 dark:bg-black/75 hover:bg-black/80 text-white backdrop-blur-md border border-white/20 shadow-md transition-all hover:scale-105 active:scale-95 cursor-pointer text-xs select-none"
+                        >
+                          <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                          <span className="font-bold text-amber-300 font-mono">
+                            {avgRating != null ? avgRating.toFixed(1) : "5.0"}
+                          </span>
+                          <span className="text-neutral-300 font-medium text-[11px]">
+                            ({totalCount} {totalCount === 1 ? "review" : "reviews"})
+                          </span>
+                        </button>
+                      );
+                    })()}
                   </div>
                 )}
 
@@ -1266,18 +1397,36 @@ const productSchema = product ? {
                   </button>
                 </div>
 
-                {/* Top-Right: Heart Wishlist Button — overlapping directly on the image */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    toggle(product.id);
-                    toast.success(isWishlisted ? "Removed from favourites" : "Saved to favourites!");
-                  }}
-                  aria-label={isWishlisted ? "Remove from favourites" : "Add to favourites"}
-                  className="absolute top-4 right-4 z-10 p-2.5 rounded-full bg-black/60 dark:bg-black/75 hover:bg-black/80 text-white hover:text-rose-500 hover:scale-110 active:scale-95 transition-all shadow-md border border-white/20 backdrop-blur-md cursor-pointer pointer-events-auto"
-                >
-                  <Heart className={cn("h-5 w-5 transition-colors", isWishlisted ? "fill-rose-500 text-rose-500" : "")} />
-                </button>
+                {/* Top-Right: Fullscreen Button & Heart Wishlist Button — overlapping directly on the image */}
+                <div className="absolute top-4 right-4 z-10 flex items-center gap-2 pointer-events-auto">
+                  {/* Fullscreen Symbol Button */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsFullscreenVideoActive(isVideoActive);
+                      setIsPhotoViewerOpen(true);
+                    }}
+                    title={isVideoActive ? "View Video Full Screen" : "View Image Full Screen"}
+                    aria-label={isVideoActive ? "View Video Full Screen" : "View Image Full Screen"}
+                    className="p-2.5 rounded-full bg-black/60 dark:bg-black/75 hover:bg-black/80 text-white hover:text-emerald-400 hover:scale-110 active:scale-95 transition-all shadow-md border border-white/20 backdrop-blur-md cursor-pointer"
+                  >
+                    <Maximize2 className="h-4.5 w-4.5 sm:h-5 sm:w-5" />
+                  </button>
+
+                  {/* Heart Wishlist Button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      toggle(product.id);
+                      toast.success(isWishlisted ? "Removed from favourites" : "Saved to favourites!");
+                    }}
+                    aria-label={isWishlisted ? "Remove from favourites" : "Add to favourites"}
+                    className="p-2.5 rounded-full bg-black/60 dark:bg-black/75 hover:bg-black/80 text-white hover:text-rose-500 hover:scale-110 active:scale-95 transition-all shadow-md border border-white/20 backdrop-blur-md cursor-pointer pointer-events-auto"
+                  >
+                    <Heart className={cn("h-4.5 w-4.5 sm:h-5 sm:w-5 transition-colors", isWishlisted ? "fill-rose-500 text-rose-500" : "")} />
+                  </button>
+                </div>
               </div>
 
               {/* 5-Thumbnail Media Strip (Photos + 10s Video Option) */}
@@ -1325,429 +1474,656 @@ const productSchema = product ? {
                   <span className="text-[10px] font-bold tracking-tight text-neutral-200">10s Video</span>
                 </button>
               </div>
-            </div>
 
-            {/* Right Column: Product Information & Purchase Action (6 cols) */}
-            <div className="lg:col-span-6 space-y-6 text-left">
-              {/* Title & Subtitle */}
-              <div className="space-y-1">
-                <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground font-display">
-                  {product.title}
-                </h1>
-                <p className="text-sm font-semibold text-muted-foreground">
-                  {product.category || "Gear"} {brand ? `• ${brand}` : ""}
+              {/* Product Details (Under the product card) */}
+              <div className="rounded-3xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#0D151D] p-6 shadow-xs space-y-5 text-left">
+                {/* 1. Product Description moved to top of this section */}
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {product.description ||
+                    `Capture stunning photos and videos with the ${product.title}. Perfect for events, travel and professional shoots.`}
                 </p>
-              </div>
 
-              {/* Star Rating & Reviews Count */}
-              {(() => {
-                const totalCount = genuineReviews.length > 0 ? genuineReviews.length : (product.reviews ? Number(product.reviews) : 0);
-                const avgRating = totalCount > 0 && product.rating != null ? Number(product.rating) : (totalCount > 0 ? 5.0 : null);
-
-                if (totalCount > 0 && avgRating != null) {
-                  return (
-                    <div className="flex items-center gap-2 text-sm">
-                      <div className="flex items-center gap-1 font-bold text-foreground">
-                        <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-                        <span>{avgRating.toFixed(1)}</span>
-                      </div>
-                      <span className="text-muted-foreground font-medium">
-                        ({totalCount} {totalCount === 1 ? "review" : "reviews"})
-                      </span>
-                    </div>
-                  );
-                }
-
-                return (
-                  <div className="flex items-center gap-2 text-sm">
-                    <div className="flex items-center gap-1 font-semibold text-muted-foreground">
-                      <Star className="h-4 w-4 text-muted-foreground/40" />
-                      <span>No ratings yet</span>
-                    </div>
-                    <span className="text-muted-foreground font-medium">
-                      (0 reviews)
+                {/* 2. Price Display */}
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-3xl sm:text-4xl font-black text-emerald-600 dark:text-emerald-400 font-display font-mono">
+                      ₹{(Number(product.price) || 0).toLocaleString("en-IN")}
                     </span>
+                    <span className="text-sm font-semibold text-muted-foreground">/ day</span>
                   </div>
-                );
-              })()}
+                  <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-xs font-semibold">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
+                    <span>{product.available ? "Available for Rent" : "Currently Reserved"}</span>
+                  </div>
+                </div>
 
-              {/* Price Display */}
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-3xl sm:text-4xl font-black text-emerald-600 dark:text-emerald-400 font-display font-mono">
-                  ₹{(Number(product.price) || 0).toLocaleString("en-IN")}
-                </span>
-                <span className="text-sm font-semibold text-muted-foreground">/ day</span>
-              </div>
+                {/* 3. Condition, Location, Lender all on one line */}
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pt-3 border-t border-border/60 text-xs sm:text-sm">
+                  <div className="flex items-center gap-1.5 text-foreground">
+                    <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
+                    <span className="font-medium text-muted-foreground">Condition:</span>
+                    <span className="font-bold">{(product as any).condition || "Like New"}</span>
+                  </div>
 
-              {/* Rental Duration Preset Pills */}
-              <div className="space-y-1.5">
-                <div className="flex flex-wrap gap-2.5">
-                  {[
-                    { label: "1 Day", days: 1 },
-                    { label: "3 Days", days: 3 },
-                    { label: "1 Week", days: 7 },
-                    { label: "2 Weeks", days: 14 },
-                  ].map((preset) => {
-                    const isSelected =
-                      (preset.days === 1 && durationMode !== "custom") ||
-                      (durationMode === "custom" && rentalDays === preset.days);
-                    return (
-                      <button
-                        key={preset.days}
-                        type="button"
-                        onClick={() => {
-                          if (preset.days === 1) {
-                            handleDurationModeChange("full_day");
-                          } else {
-                            handleSelectPresetDuration(preset.days);
-                          }
-                        }}
-                        className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold border transition-all cursor-pointer ${
-                          isSelected
-                            ? "border-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 shadow-xs"
-                            : "border-border/80 bg-card hover:bg-secondary text-muted-foreground"
-                        }`}
+                  <span className="hidden sm:inline text-neutral-300 dark:text-neutral-700">•</span>
+
+                  <div className="flex items-center gap-1.5 text-foreground">
+                    <MapPin className="h-4 w-4 text-emerald-600 shrink-0" />
+                    <span className="font-medium text-muted-foreground">Location:</span>
+                    <span className="font-bold">{formatOwnerAddress(product) || "Bengaluru"}</span>
+                  </div>
+
+                  <span className="hidden sm:inline text-neutral-300 dark:text-neutral-700">•</span>
+
+                  <div className="flex items-center gap-1.5 text-foreground">
+                    <User className="h-4 w-4 text-emerald-600 shrink-0" />
+                    <span className="font-medium text-muted-foreground">Lender:</span>
+                    <span className="font-bold">{product.owner?.name || "Arun Kumar"}</span>
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 fill-emerald-500/20 shrink-0" />
+                  </div>
+                </div>
+
+                {/* Action Row: Terms and Conditions Checkbox & BOOK NOW */}
+                <div className="pt-3 flex items-center justify-between flex-wrap gap-3 border-t border-border/40 mt-1">
+                  {/* Circular Button with Image 2 Animated Swoosh & Protruding Tick + Clickable Terms Text */}
+                  <div className="flex items-center gap-2.5 select-none py-1">
+                    {/* Circle Toggle Button: Animates to Image 2 curved arrow + protruding tick when active */}
+                    <button
+                      type="button"
+                      role="checkbox"
+                      aria-checked={termsAccepted}
+                      onClick={() => setTermsAccepted((prev) => !prev)}
+                      className="relative flex h-7 w-7 items-center justify-center cursor-pointer transition-transform active:scale-90 focus:outline-hidden group"
+                      aria-label="Toggle terms and conditions acceptance"
+                    >
+                      <AnimatePresence mode="wait">
+                        {termsAccepted ? (
+                          <motion.svg
+                            key="checked-swoosh-icon"
+                            width="28"
+                            height="28"
+                            viewBox="0 0 40 40"
+                            className="overflow-visible shrink-0 drop-shadow-xs"
+                            initial={{ scale: 0.5, rotate: -30, opacity: 0 }}
+                            animate={{ scale: 1, rotate: 0, opacity: 1 }}
+                            exit={{ scale: 0.5, rotate: -30, opacity: 0 }}
+                            transition={{ type: "spring", stiffness: 450, damping: 20 }}
+                          >
+                            {/* Upper-left circular arrow arc */}
+                            <motion.path
+                              d="M 28 8.5 A 13.5 13.5 0 0 0 11.5 29.5"
+                              stroke="#059669"
+                              strokeWidth="3.2"
+                              strokeLinecap="round"
+                              fill="none"
+                              initial={{ pathLength: 0 }}
+                              animate={{ pathLength: 1 }}
+                              transition={{ duration: 0.35, ease: "easeOut" }}
+                            />
+                            {/* Arrowhead at bottom left pointing left */}
+                            <motion.polygon
+                              points="6,31.5 15,25 14,35"
+                              fill="#059669"
+                              initial={{ scale: 0 }}
+                              animate={{ scale: 1 }}
+                              transition={{ delay: 0.12, duration: 0.2 }}
+                            />
+                            {/* Lower-right arc */}
+                            <motion.path
+                              d="M 16 33.5 A 13.5 13.5 0 0 0 32.5 22"
+                              stroke="#059669"
+                              strokeWidth="3.2"
+                              strokeLinecap="round"
+                              fill="none"
+                              initial={{ pathLength: 0 }}
+                              animate={{ pathLength: 1 }}
+                              transition={{ duration: 0.3, ease: "easeOut" }}
+                            />
+                            {/* Bold checkmark extending OUTSIDE the circular perimeter */}
+                            <motion.path
+                              d="M 11.5 21 L 18 27.5 L 34.5 8"
+                              stroke="#059669"
+                              strokeWidth="4.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              fill="none"
+                              initial={{ pathLength: 0 }}
+                              animate={{ pathLength: 1 }}
+                              transition={{
+                                type: "spring",
+                                stiffness: 420,
+                                damping: 22,
+                                delay: 0.08,
+                              }}
+                            />
+                          </motion.svg>
+                        ) : (
+                          <motion.svg
+                            key="unchecked-circle"
+                            width="28"
+                            height="28"
+                            viewBox="0 0 40 40"
+                            className="overflow-visible shrink-0"
+                            initial={{ scale: 0.8, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.8, opacity: 0 }}
+                          >
+                            <circle
+                              cx="20"
+                              cy="20"
+                              r="13.5"
+                              stroke="currentColor"
+                              strokeWidth="2.5"
+                              fill="none"
+                              className="text-neutral-400 dark:text-neutral-500 group-hover:text-emerald-500 transition-colors"
+                            />
+                          </motion.svg>
+                        )}
+                      </AnimatePresence>
+                    </button>
+
+                    {/* Text: Clicking opens the Terms & Conditions popup modal */}
+                    <button
+                      type="button"
+                      onClick={() => setShowTermsModal(true)}
+                      className="text-left text-xs sm:text-[13px] font-medium text-foreground hover:text-emerald-600 transition-colors cursor-pointer group flex items-center gap-1.5 focus:outline-hidden"
+                    >
+                      <span
+                        className={cn(
+                          "underline decoration-neutral-300 dark:decoration-neutral-600 group-hover:decoration-emerald-500 transition-all",
+                          termsAccepted && "text-emerald-600 dark:text-emerald-400 font-semibold decoration-emerald-500"
+                        )}
                       >
-                        {preset.label}
+                        terms&condtion will apply
+                      </span>
+                      <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-secondary text-muted-foreground group-hover:text-foreground group-hover:bg-emerald-500/10 transition-colors">
+                        view
+                      </span>
+                    </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    id="product-details-book-now-btn"
+                    onClick={handleBookNowAction}
+                    disabled={categoryRestriction?.restricted}
+                    className={`py-2.5 sm:py-3 px-6 rounded-full font-bold text-xs sm:text-sm shadow-sm transition-all duration-200 inline-flex items-center justify-center gap-2 cursor-pointer active:scale-95 ${
+                      categoryRestriction?.restricted
+                        ? "bg-amber-900/40 text-amber-300 border border-amber-500/30 cursor-not-allowed opacity-80"
+                        : "bg-neutral-950 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-100"
+                    }`}
+                  >
+                    <ShoppingBag className="h-4 w-4 shrink-0" />
+                    <span>BOOK NOW</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column: Interactive Booking Calendar & Action (In place of details) */}
+            <div id="rental-booking-section" className="lg:col-span-6 space-y-4 text-left lg:sticky lg:top-24">
+              <div className="rounded-2xl sm:rounded-3xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#0D151D] p-4 sm:p-5 shadow-xs space-y-3.5">
+                <div className="flex items-center justify-between pb-1 flex-wrap gap-2.5">
+                  <div className="flex items-center gap-2">
+                    <div className="h-8 w-8 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
+                      <Calendar className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <h2 className="text-sm sm:text-base font-bold text-foreground">Rental Booking</h2>
+                      <p className="text-[11px] text-muted-foreground">Select date, choose time slot, and verify availability.</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Calendar Dropdown Selector */}
+                <div className="space-y-1.5">
+                  <label className="block text-[11px] font-bold text-foreground uppercase tracking-wider">
+                    Rental Date
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowFullCalendar((prev) => !prev)}
+                    className="w-full p-2.5 sm:p-3 rounded-xl border border-black/10 dark:border-white/10 bg-neutral-100/70 dark:bg-[#121C26] hover:bg-neutral-100 dark:hover:bg-[#162330] transition-all flex items-center justify-between cursor-pointer group"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="h-8 w-8 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
+                        <Calendar className="h-4 w-4" />
+                      </div>
+                      <div className="text-left truncate">
+                        <span className="text-xs sm:text-sm font-bold text-foreground font-mono block truncate">
+                          {startDate ? (
+                            durationMode === "custom" && endDate && endDate !== startDate
+                              ? `${startDate} → ${endDate}`
+                              : startDate
+                          ) : (
+                            "Select date on calendar"
+                          )}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground font-medium block">
+                          {showFullCalendar ? "Click to collapse calendar" : "Click to select date on calendar"}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 shrink-0">
+                      <span>{showFullCalendar ? "Close" : "Open Calendar"}</span>
+                      <ChevronDown className={cn("h-3.5 w-3.5 transition-transform duration-200", showFullCalendar ? "rotate-180" : "")} />
+                    </div>
+                  </button>
+
+                  {/* Dropdown Calendar Panel */}
+                  {showFullCalendar && (
+                    <div className="pt-2 animate-in fade-in slide-in-from-top-2 duration-200 max-w-sm sm:max-w-md mx-auto">
+                      <RenterBookingCalendar
+                        productId={product.id}
+                        selectedStartDate={startDate}
+                        selectedEndDate={endDate}
+                        onDateChange={(start, end) => {
+                          handleStartDateChange(start);
+                          handleEndDateChange(end);
+                        }}
+                        productTitle={product.title}
+                        pricePerDay={Number(product.price) || 0}
+                        productAvailable={product.available}
+                        durationMode={durationMode}
+                        selectedSlot={selectedSlot}
+                        session={selectedSlot}
+                        onSelectStartDate={handleStartDateChange}
+                        onSelectEndDate={handleEndDateChange}
+                        onSelectDurationMode={handleDurationModeChange}
+                        onSelectSlot={handleSlotSelect}
+                        onCheckAvailability={handleCheckAvailability}
+                        isCheckingAvailability={isCheckingAvailability}
+                        availabilityChecked={availabilityChecked}
+                        isAvailableForDates={isAvailableForDates}
+                        availabilityMessage={availabilityMessage}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Choose Slot */}
+                <div className="space-y-1.5 pt-0.5">
+                  <label className="block text-[11px] font-bold text-foreground uppercase tracking-wider">
+                    Choose Time Slot
+                  </label>
+                  <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
+                    {/* Morning */}
+                    <button
+                      type="button"
+                      onClick={() => handleSlotSelect("morning")}
+                      className={`p-2 sm:p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                        selectedSlot === "morning" && durationMode === "half_day_morning"
+                          ? "border-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 ring-2 ring-emerald-500/20 shadow-xs"
+                          : "border-black/10 dark:border-white/10 bg-neutral-100/60 dark:bg-[#121C26] hover:bg-neutral-100 dark:hover:bg-[#162330]"
+                      }`}
+                    >
+                      <div className="flex items-center gap-1 mb-0.5">
+                        <Sun className="h-3 w-3 text-amber-500" />
+                        <span className="text-[11px] sm:text-xs font-bold text-foreground">Morning</span>
+                      </div>
+                      <div className="text-[9px] sm:text-[10px] text-muted-foreground">8:00 AM - 12:00 PM</div>
+                      <div className="mt-1 text-[11px] sm:text-xs font-extrabold text-emerald-600 dark:text-emerald-400">
+                        ₹{morningPrice}
+                      </div>
+                    </button>
+
+                    {/* Afternoon */}
+                    <button
+                      type="button"
+                      onClick={() => handleSlotSelect("afternoon")}
+                      className={`p-2 sm:p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                        selectedSlot === "afternoon" && durationMode === "half_day_afternoon"
+                          ? "border-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 ring-2 ring-emerald-500/20 shadow-xs"
+                          : "border-black/10 dark:border-white/10 bg-neutral-100/60 dark:bg-[#121C26] hover:bg-neutral-100 dark:hover:bg-[#162330]"
+                      }`}
+                    >
+                      <div className="flex items-center gap-1 mb-0.5">
+                        <Sun className="h-3 w-3 text-orange-500" />
+                        <span className="text-[11px] sm:text-xs font-bold text-foreground">Afternoon</span>
+                      </div>
+                      <div className="text-[9px] sm:text-[10px] text-muted-foreground">1:00 PM - 5:00 PM</div>
+                      <div className="mt-1 text-[11px] sm:text-xs font-extrabold text-emerald-600 dark:text-emerald-400">
+                        ₹{afternoonPrice}
+                      </div>
+                    </button>
+
+                    {/* Full Day */}
+                    <button
+                      type="button"
+                      onClick={() => handleSlotSelect("full_day")}
+                      className={`p-2 sm:p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                        selectedSlot === "full_day" && durationMode === "full_day"
+                          ? "border-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 ring-2 ring-emerald-500/20 shadow-xs"
+                          : "border-black/10 dark:border-white/10 bg-neutral-100/60 dark:bg-[#121C26] hover:bg-neutral-100 dark:hover:bg-[#162330]"
+                      }`}
+                    >
+                      <div className="flex items-center gap-1 mb-0.5">
+                        <Calendar className="h-3 w-3 text-emerald-500" />
+                        <span className="text-[11px] sm:text-xs font-bold text-foreground">Full Day</span>
+                      </div>
+                      <div className="text-[9px] sm:text-[10px] text-muted-foreground">24 Elapsed Hours</div>
+                      <div className="mt-1 text-[11px] sm:text-xs font-extrabold text-emerald-600 dark:text-emerald-400">
+                        ₹{fullDayPrice}
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Booking Summary */}
+                <div className="p-2.5 sm:p-3 rounded-xl bg-neutral-100/70 dark:bg-[#121C26] border border-black/10 dark:border-white/10 flex items-center justify-between gap-3">
+                  <div>
+                    <span className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                      Booking Summary
+                    </span>
+                    <div className="text-xs font-semibold text-foreground">
+                      {durationMode === "half_day_morning"
+                        ? "1 Day • Morning Slot"
+                        : durationMode === "half_day_afternoon"
+                        ? "1 Day • Afternoon Slot"
+                        : durationMode === "full_day"
+                        ? "1 Day • Full Day"
+                        : `${rentalDays} Days Rental`}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                      Estimated Total
+                    </span>
+                    <div className="text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono">
+                      ₹{estimatedTotal.toLocaleString("en-IN")}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Slot Availability Banner & Direct Confirmation / Check Availability */}
+                {availabilityChecked && isAvailableForDates ? (
+                  <div className="space-y-3">
+                    <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-700 dark:text-emerald-300 text-xs font-bold flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                      <span>Available on your selected dates!</span>
+                    </div>
+                    <div className="flex items-center justify-between flex-wrap gap-3 pt-1">
+                      {/* Circular Button with Image 2 Animated Swoosh & Protruding Tick + Clickable Terms Text */}
+                      <div className="flex items-center gap-2.5 select-none py-1">
+                        <button
+                          type="button"
+                          role="checkbox"
+                          aria-checked={termsAccepted}
+                          onClick={() => setTermsAccepted((prev) => !prev)}
+                          className="relative flex h-7 w-7 items-center justify-center cursor-pointer transition-transform active:scale-90 focus:outline-hidden group"
+                          aria-label="Toggle terms and conditions acceptance"
+                        >
+                          <AnimatePresence mode="wait">
+                            {termsAccepted ? (
+                              <motion.svg
+                                key="checked-swoosh-icon-right"
+                                width="28"
+                                height="28"
+                                viewBox="0 0 40 40"
+                                className="overflow-visible shrink-0 drop-shadow-xs"
+                                initial={{ scale: 0.5, rotate: -30, opacity: 0 }}
+                                animate={{ scale: 1, rotate: 0, opacity: 1 }}
+                                exit={{ scale: 0.5, rotate: -30, opacity: 0 }}
+                                transition={{ type: "spring", stiffness: 450, damping: 20 }}
+                              >
+                                <motion.path
+                                  d="M 28 8.5 A 13.5 13.5 0 0 0 11.5 29.5"
+                                  stroke="#059669"
+                                  strokeWidth="3.2"
+                                  strokeLinecap="round"
+                                  fill="none"
+                                  initial={{ pathLength: 0 }}
+                                  animate={{ pathLength: 1 }}
+                                  transition={{ duration: 0.35, ease: "easeOut" }}
+                                />
+                                <motion.polygon
+                                  points="6,31.5 15,25 14,35"
+                                  fill="#059669"
+                                  initial={{ scale: 0 }}
+                                  animate={{ scale: 1 }}
+                                  transition={{ delay: 0.12, duration: 0.2 }}
+                                />
+                                <motion.path
+                                  d="M 16 33.5 A 13.5 13.5 0 0 0 32.5 22"
+                                  stroke="#059669"
+                                  strokeWidth="3.2"
+                                  strokeLinecap="round"
+                                  fill="none"
+                                  initial={{ pathLength: 0 }}
+                                  animate={{ pathLength: 1 }}
+                                  transition={{ duration: 0.3, ease: "easeOut" }}
+                                />
+                                <motion.path
+                                  d="M 11.5 21 L 18 27.5 L 34.5 8"
+                                  stroke="#059669"
+                                  strokeWidth="4.5"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  fill="none"
+                                  initial={{ pathLength: 0 }}
+                                  animate={{ pathLength: 1 }}
+                                  transition={{
+                                    type: "spring",
+                                    stiffness: 420,
+                                    damping: 22,
+                                    delay: 0.08,
+                                  }}
+                                />
+                              </motion.svg>
+                            ) : (
+                              <motion.svg
+                                key="unchecked-circle-right"
+                                width="28"
+                                height="28"
+                                viewBox="0 0 40 40"
+                                className="overflow-visible shrink-0"
+                                initial={{ scale: 0.8, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                exit={{ scale: 0.8, opacity: 0 }}
+                              >
+                                <circle
+                                  cx="20"
+                                  cy="20"
+                                  r="13.5"
+                                  stroke="currentColor"
+                                  strokeWidth="2.5"
+                                  fill="none"
+                                  className="text-neutral-400 dark:text-neutral-500 group-hover:text-emerald-500 transition-colors"
+                                />
+                              </motion.svg>
+                            )}
+                          </AnimatePresence>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setShowTermsModal(true)}
+                          className="text-left text-xs sm:text-[13px] font-medium text-foreground hover:text-emerald-600 transition-colors cursor-pointer group flex items-center gap-1.5 focus:outline-hidden"
+                        >
+                          <span
+                            className={cn(
+                              "underline decoration-neutral-300 dark:decoration-neutral-600 group-hover:decoration-emerald-500 transition-all",
+                              termsAccepted && "text-emerald-600 dark:text-emerald-400 font-semibold decoration-emerald-500"
+                            )}
+                          >
+                            terms&condtion will apply
+                          </span>
+                          <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-secondary text-muted-foreground group-hover:text-foreground group-hover:bg-emerald-500/10 transition-colors">
+                            view
+                          </span>
+                        </button>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleProceedToCheckout}
+                        disabled={categoryRestriction?.restricted}
+                        className="py-2 sm:py-2.5 px-5 rounded-full font-bold text-xs sm:text-sm shadow-sm transition-all duration-200 inline-flex items-center justify-center gap-2 cursor-pointer active:scale-95 bg-neutral-950 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-100"
+                      >
+                        <ShoppingBag className="h-4 w-4 shrink-0" />
+                        <span>Confirm Booking & Rent (₹{estimatedTotal.toLocaleString("en-IN")})</span>
                       </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Description */}
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                {product.description ||
-                  `Capture stunning photos and videos with the ${product.title}. Perfect for events, travel and professional shoots.`}
-              </p>
-
-              {/* Product Key Details with Icons */}
-              <div className="space-y-2.5 pt-2 border-t border-border/60 text-sm">
-                <div className="flex items-center gap-2.5 text-foreground">
-                  <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
-                  <span className="font-medium text-muted-foreground">Condition:</span>
-                  <span className="font-bold">{(product as any).condition || "Excellent"}</span>
-                </div>
-
-                <div className="flex items-center gap-2.5 text-foreground">
-                  <MapPin className="h-4 w-4 text-emerald-600 shrink-0" />
-                  <span className="font-medium text-muted-foreground">Location:</span>
-                  <span className="font-bold">{formatOwnerAddress(product) || "Vizag, AP"}</span>
-                </div>
-
-                <div className="flex items-center gap-2.5 text-foreground">
-                  <User className="h-4 w-4 text-emerald-600 shrink-0" />
-                  <span className="font-medium text-muted-foreground">Lender:</span>
-                  <span className="font-bold">{product.owner?.name || "Sai Teja"}</span>
-                  <CheckCircle2 className="h-4 w-4 text-emerald-500 fill-emerald-500/20 shrink-0" />
-                </div>
-
-                <div className="flex items-center gap-2.5 text-foreground">
-                  <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
-                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                    {product.available ? "Available for Rent" : "Currently Reserved"}
-                  </span>
-                </div>
-              </div>
-
-              {/* Action Buttons: BOOK NOW & ADD TO FAVOURITES */}
-              <div className="space-y-3 pt-3">
-                <button
-                  type="button"
-                  id="product-details-book-now-btn"
-                  onClick={handleBookNowAction}
-                  disabled={categoryRestriction?.restricted}
-                  className={`w-full py-4 px-6 rounded-2xl font-extrabold text-sm sm:text-base shadow-md transition-all flex items-center justify-center gap-2.5 cursor-pointer active:scale-98 ${
-                    categoryRestriction?.restricted
-                      ? "bg-amber-900/40 text-amber-300 border border-amber-500/30 cursor-not-allowed opacity-80"
-                      : "bg-[#059669] hover:bg-[#047857] text-white"
-                  }`}
-                >
-                  <Calendar className="h-5 w-5 shrink-0" />
-                  <span>BOOK NOW</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    toggle(product.id);
-                    toast.success(isWishlisted ? "Removed from favourites" : "Saved to favourites!");
-                  }}
-                  className="w-full py-3.5 px-6 rounded-2xl font-bold text-sm border-2 border-emerald-600 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98"
-                >
-                  <Heart className={cn("h-4 w-4", isWishlisted ? "fill-rose-500 text-rose-500" : "")} />
-                  <span>{isWishlisted ? "REMOVE FROM FAVOURITES" : "ADD TO FAVOURITES"}</span>
-                </button>
-              </div>
-            </div>
-          </section>
-
-          {/* 2. RENTAL BOOKING INLINE TERMINAL */}
-          <section id="rental-booking-section" className="rounded-3xl border border-border/80 bg-card p-6 sm:p-8 space-y-6 shadow-xs text-left">
-            <div className="flex items-center justify-between border-b border-border/60 pb-4 flex-wrap gap-3">
-              <div className="flex items-center gap-2.5">
-                <div className="h-9 w-9 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
-                  <Calendar className="h-5 w-5" />
-                </div>
-                <div>
-                  <h2 className="text-base sm:text-lg font-bold text-foreground">Rental Booking</h2>
-                  <p className="text-xs text-muted-foreground">Select date, choose time slot, and verify slot availability.</p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setShowFullCalendar(!showFullCalendar)}
-                className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
-              >
-                <span>{showFullCalendar ? "Hide Full Calendar" : "View Full Monthly Calendar"}</span>
-                <ChevronRight className={cn("h-3.5 w-3.5 transition-transform", showFullCalendar ? "rotate-90" : "")} />
-              </button>
-            </div>
-
-            {/* 3-Column Configuration Grid */}
-            <div className="grid md:grid-cols-12 gap-6 items-start">
-              {/* Column 1: Select Date */}
-              <div className="md:col-span-3 space-y-2">
-                <label className="block text-xs font-bold text-foreground uppercase tracking-wider">
-                  Select Date
-                </label>
-                <div className="relative">
-                  <input
-                    type="date"
-                    min={todayStr}
-                    value={startDate}
-                    onChange={(e) => handleStartDateChange(e.target.value)}
-                    className="w-full h-12 px-3.5 pl-10 rounded-2xl border border-border bg-secondary/30 text-xs sm:text-sm font-semibold text-foreground focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20 outline-none cursor-pointer"
-                  />
-                  <Calendar className="h-4 w-4 text-emerald-600 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                </div>
-                {durationMode === "custom" && (
-                  <div className="space-y-1 pt-1">
-                    <label className="block text-[11px] font-bold text-muted-foreground">Return Date</label>
-                    <input
-                      type="date"
-                      min={startDate || todayStr}
-                      value={endDate}
-                      onChange={(e) => handleEndDateChange(e.target.value)}
-                      className="w-full h-10 px-3 rounded-xl border border-border bg-secondary/30 text-xs font-semibold text-foreground"
-                    />
+                    </div>
+                  </div>
+                ) : availabilityChecked && isAvailableForDates === false ? (
+                  <div className="space-y-3">
+                    <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs font-bold flex items-center gap-2">
+                      <CalendarX className="h-4 w-4 shrink-0" />
+                      <span>{availabilityMessage}</span>
+                    </div>
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={handleCheckAvailability}
+                        disabled={isCheckingAvailability}
+                        className="py-2.5 sm:py-3 px-5 rounded-xl font-bold text-xs bg-secondary hover:bg-secondary/80 text-foreground transition-all cursor-pointer inline-flex items-center justify-center gap-2"
+                      >
+                        {isCheckingAvailability ? (
+                          <>
+                            <span className="h-3.5 w-3.5 border-2 border-foreground border-t-transparent rounded-full animate-spin" />
+                            <span>Checking...</span>
+                          </>
+                        ) : (
+                          <span>Re-check Availability</span>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex justify-end pt-1">
+                    <button
+                      type="button"
+                      onClick={handleCheckAvailability}
+                      disabled={isCheckingAvailability || categoryRestriction?.restricted}
+                      className="py-2.5 sm:py-3 px-6 rounded-full font-bold text-xs sm:text-sm shadow-sm transition-all duration-200 inline-flex items-center justify-center gap-2 cursor-pointer active:scale-95 bg-neutral-950 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-100 disabled:opacity-75 disabled:cursor-not-allowed"
+                    >
+                      {isCheckingAvailability ? (
+                        <>
+                          <span className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          <span>Checking Availability...</span>
+                        </>
+                      ) : (
+                        <>
+                          <CalendarCheck className="h-4 w-4 shrink-0" />
+                          <span>CHECK AVAILABILITY</span>
+                        </>
+                      )}
+                    </button>
                   </div>
                 )}
               </div>
-
-              {/* Column 2: Choose Slot */}
-              <div className="md:col-span-6 space-y-2">
-                <label className="block text-xs font-bold text-foreground uppercase tracking-wider">
-                  Choose Slot
-                </label>
-                <div className="grid grid-cols-3 gap-2.5">
-                  {/* Morning */}
-                  <button
-                    type="button"
-                    onClick={() => handleSlotSelect("morning")}
-                    className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
-                      selectedSlot === "morning" && durationMode === "half_day_morning"
-                        ? "border-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 ring-2 ring-emerald-500/20 shadow-xs"
-                        : "border-border/80 bg-secondary/20 hover:bg-secondary/40"
-                    }`}
-                  >
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <Sun className="h-3.5 w-3.5 text-amber-500" />
-                      <span className="text-xs font-bold text-foreground">Morning</span>
-                    </div>
-                    <div className="text-[10px] text-muted-foreground">8:00 AM to 12:00 PM</div>
-                    <div className="mt-2 text-xs font-extrabold text-emerald-600 dark:text-emerald-400">
-                      ₹{morningPrice}
-                    </div>
-                  </button>
-
-                  {/* Afternoon */}
-                  <button
-                    type="button"
-                    onClick={() => handleSlotSelect("afternoon")}
-                    className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
-                      selectedSlot === "afternoon" && durationMode === "half_day_afternoon"
-                        ? "border-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 ring-2 ring-emerald-500/20 shadow-xs"
-                        : "border-border/80 bg-secondary/20 hover:bg-secondary/40"
-                    }`}
-                  >
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <Sun className="h-3.5 w-3.5 text-orange-500" />
-                      <span className="text-xs font-bold text-foreground">Afternoon</span>
-                    </div>
-                    <div className="text-[10px] text-muted-foreground">1:00 PM to 5:00 PM</div>
-                    <div className="mt-2 text-xs font-extrabold text-emerald-600 dark:text-emerald-400">
-                      ₹{afternoonPrice}
-                    </div>
-                  </button>
-
-                  {/* Full Day */}
-                  <button
-                    type="button"
-                    onClick={() => handleSlotSelect("full_day")}
-                    className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
-                      selectedSlot === "full_day" && durationMode === "full_day"
-                        ? "border-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 ring-2 ring-emerald-500/20 shadow-xs"
-                        : "border-border/80 bg-secondary/20 hover:bg-secondary/40"
-                    }`}
-                  >
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <Calendar className="h-3.5 w-3.5 text-emerald-500" />
-                      <span className="text-xs font-bold text-foreground">Full Day</span>
-                    </div>
-                    <div className="text-[10px] text-muted-foreground">24 Elapsed Hours</div>
-                    <div className="mt-2 text-xs font-extrabold text-emerald-600 dark:text-emerald-400">
-                      ₹{fullDayPrice}
-                    </div>
-                  </button>
-                </div>
-              </div>
-
-              {/* Column 3: Booking Summary */}
-              <div className="md:col-span-3 space-y-2 p-3.5 rounded-2xl bg-secondary/30 border border-border/70">
-                <span className="block text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                  Booking Summary
-                </span>
-                <div className="text-xs font-semibold text-foreground">
-                  {durationMode === "half_day_morning"
-                    ? "1 Day • Morning Slot"
-                    : durationMode === "half_day_afternoon"
-                    ? "1 Day • Afternoon Slot"
-                    : durationMode === "full_day"
-                    ? "1 Day • Full Day"
-                    : `${rentalDays} Days Rental`}
-                </div>
-                <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono">
-                  ₹{estimatedTotal.toLocaleString("en-IN")}
-                </div>
-              </div>
-            </div>
-
-            {/* Slot Availability Banner & Direct Confirmation */}
-            {availabilityChecked && isAvailableForDates ? (
-              <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-700 dark:text-emerald-300 text-xs sm:text-sm font-bold flex flex-wrap items-center justify-between gap-3">
-                <span className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-                  <span>Available on your selected date!</span>
-                </span>
-                <button
-                  type="button"
-                  onClick={handleProceedToCheckout}
-                  className="px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-bold text-xs hover:bg-emerald-700 active:scale-95 transition-all shadow-sm cursor-pointer"
-                >
-                  Confirm Booking (₹{estimatedTotal.toLocaleString("en-IN")})
-                </button>
-              </div>
-            ) : availabilityChecked && isAvailableForDates === false ? (
-              <div className="p-3.5 rounded-2xl bg-destructive/10 border border-destructive/20 text-destructive text-xs font-bold flex items-center gap-2">
-                <CalendarX className="h-4 w-4 shrink-0" />
-                <span>{availabilityMessage}</span>
-              </div>
-            ) : (
-              <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-                <p className="text-xs text-muted-foreground">Click below to verify real-time slot availability before booking.</p>
-                <button
-                  type="button"
-                  onClick={handleCheckAvailability}
-                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-sm"
-                >
-                  Check Slot Availability
-                </button>
-              </div>
-            )}
-
-            {/* Expandable Monthly Calendar */}
-            {showFullCalendar && (
-              <div className="pt-4 border-t border-border/60">
-                <RenterBookingCalendar
-                  productId={product.id}
-                  onDateChange={(start, end) => {
-                    handleStartDateChange(start);
-                    handleEndDateChange(end);
-                  }}
-                  productTitle={product.title}
-                  pricePerDay={Number(product.price) || 0}
-                  productAvailable={product.available}
-                  selectedStartDate={startDate}
-                  selectedEndDate={endDate}
-                  durationMode={durationMode}
-                  selectedSlot={selectedSlot}
-                  onSelectStartDate={handleStartDateChange}
-                  onSelectEndDate={handleEndDateChange}
-                  onSelectDurationMode={handleDurationModeChange}
-                  onSelectSlot={handleSlotSelect}
-                  onCheckAvailability={handleCheckAvailability}
-                  isCheckingAvailability={false}
-                  availabilityChecked={availabilityChecked}
-                  isAvailableForDates={isAvailableForDates}
-                  availabilityMessage={availabilityMessage}
-                />
-              </div>
-            )}
-          </section>
-
-          {/* 3. WHY RENT THROUGH PAYENT? (4-Card Feature Grid) */}
-          <section className="space-y-6 text-center pt-2">
-            <div className="flex items-center justify-center gap-3">
-              <span className="h-0.5 w-12 bg-emerald-500/30 rounded-full" />
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-              <h2 className="text-xl sm:text-2xl font-extrabold text-foreground tracking-tight font-display">
-                Why Rent Through PAYENT?
-              </h2>
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-              <span className="h-0.5 w-12 bg-emerald-500/30 rounded-full" />
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 text-center">
-              {/* Feature 1 */}
-              <div className="p-6 rounded-3xl bg-card border border-border/80 shadow-xs space-y-3 flex flex-col items-center">
-                <div className="h-12 w-12 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shadow-xs">
-                  <Coins className="h-6 w-6" />
-                </div>
-                <h3 className="font-bold text-foreground text-sm">Affordable Rentals</h3>
-                <p className="text-xs text-muted-foreground">Save more, rent smart.</p>
-              </div>
-
-              {/* Feature 2 */}
-              <div className="p-6 rounded-3xl bg-card border border-border/80 shadow-xs space-y-3 flex flex-col items-center">
-                <div className="h-12 w-12 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shadow-xs">
-                  <ShieldCheck className="h-6 w-6" />
-                </div>
-                <h3 className="font-bold text-foreground text-sm">Verified Lenders</h3>
-                <p className="text-xs text-muted-foreground">Rent with confidence.</p>
-              </div>
-
-              {/* Feature 3 */}
-              <div className="p-6 rounded-3xl bg-card border border-border/80 shadow-xs space-y-3 flex flex-col items-center">
-                <div className="h-12 w-12 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shadow-xs">
-                  <Calendar className="h-6 w-6" />
-                </div>
-                <h3 className="font-bold text-foreground text-sm">Flexible Booking</h3>
-                <p className="text-xs text-muted-foreground">Choose your time.</p>
-              </div>
-
-              {/* Feature 4 */}
-              <div className="p-6 rounded-3xl bg-card border border-border/80 shadow-xs space-y-3 flex flex-col items-center">
-                <div className="h-12 w-12 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shadow-xs">
-                  <Lock className="h-6 w-6" />
-                </div>
-                <h3 className="font-bold text-foreground text-sm">Secure Rental Experience</h3>
-                <p className="text-xs text-muted-foreground">Your trust, our priority.</p>
-              </div>
             </div>
           </section>
 
-          {/* 4. CUSTOMER REVIEWS */}
-          <section className="space-y-6 text-center pt-2">
-            <div className="flex items-center justify-center gap-3">
-              <span className="h-0.5 w-12 bg-emerald-500/30 rounded-full" />
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+          {/* 2. RELATED PRODUCTS (Left-aligned title with overlapping details on image) */}
+          <section className="space-y-6 pt-2">
+            <div className="flex items-center justify-start gap-2.5">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
               <h2 className="text-xl sm:text-2xl font-extrabold text-foreground tracking-tight font-display">
-                Customer Reviews
+                Related Products
               </h2>
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-              <span className="h-0.5 w-12 bg-emerald-500/30 rounded-full" />
+            </div>
+
+            <div className="relative">
+              {/* Left Arrow Button */}
+              {relatedProductsList.length > 4 && (
+                <button
+                  type="button"
+                  onClick={() => setRelatedCarouselPage((p) => Math.max(0, p - 1))}
+                  disabled={relatedCarouselPage === 0}
+                  className="absolute -left-3 sm:-left-5 top-1/2 -translate-y-1/2 z-10 p-2 sm:p-2.5 rounded-full bg-card border border-border shadow-md hover:bg-secondary disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-all"
+                  aria-label="Previous related products"
+                >
+                  <ChevronLeft className="h-4 w-4 text-foreground" />
+                </button>
+              )}
+
+              {/* 4 Related Product Cards - Clean Edge-to-Edge Cards without Background Divs */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                {displayedRelated.map((rel) => (
+                  <Link
+                    key={rel.id}
+                    to="/payent/products/$id"
+                    params={{ id: rel.id }}
+                    className="group relative aspect-[4/3] rounded-3xl overflow-hidden bg-neutral-950 border border-neutral-800/80 hover:border-emerald-500/50 shadow-md hover:shadow-xl transition-all block text-left"
+                  >
+                    {/* Edge-to-Edge Product Image */}
+                    <img
+                      src={rel.image || "/brand/payent-logo-icon.png"}
+                      alt={rel.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+
+                    {/* Smooth dark gradient overlay for text readability */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent pointer-events-none" />
+
+                    {/* Overlap: Top Rating Badge */}
+                    <div className="absolute top-3 right-3 flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/15 text-[11px] font-bold text-amber-400 shadow-sm pointer-events-none">
+                      <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                      <span>{(rel.rating != null ? Number(rel.rating) : 4.7).toFixed(1)}</span>
+                      <span className="text-white/60 font-normal text-[10px]">({rel.reviews || 84})</span>
+                    </div>
+
+                    {/* Overlap: Bottom Details */}
+                    <div className="absolute inset-x-0 bottom-0 p-3.5 sm:p-4 space-y-1">
+                      <div>
+                        <h3 className="font-bold text-sm sm:text-base text-white group-hover:text-emerald-400 transition-colors truncate drop-shadow-sm">
+                          {rel.title}
+                        </h3>
+                        <p className="text-xs text-neutral-300 capitalize truncate">
+                          {rel.category || "Gear"}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-1.5 border-t border-white/15">
+                        <span className="font-extrabold text-sm text-emerald-400 font-mono drop-shadow-sm">
+                          ₹{(Number(rel.price) || 0).toLocaleString("en-IN")}{" "}
+                          <span className="text-[11px] text-neutral-300 font-normal font-sans">/ day</span>
+                        </span>
+                        <span className="text-[11px] font-semibold text-emerald-400 flex items-center gap-1 drop-shadow-sm">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                          Available
+                        </span>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+
+              {/* Right Arrow Button */}
+              {relatedProductsList.length > 4 && (
+                <button
+                  type="button"
+                  onClick={() => setRelatedCarouselPage((p) => p + 1)}
+                  disabled={(relatedCarouselPage + 1) * 4 >= relatedProductsList.length}
+                  className="absolute -right-3 sm:-right-5 top-1/2 -translate-y-1/2 z-10 p-2 sm:p-2.5 rounded-full bg-card border border-border shadow-md hover:bg-secondary disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-all"
+                  aria-label="Next related products"
+                >
+                  <ChevronRight className="h-4 w-4 text-foreground" />
+                </button>
+              )}
+            </div>
+          </section>
+
+          {/* 3. CUSTOMER REVIEWS (Left-aligned title with modern Payent theme card) */}
+          <section id="customer-reviews-section" className="space-y-6 pt-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-left">
+              <div className="flex items-center gap-2.5">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                <h2 className="text-xl sm:text-2xl font-extrabold text-foreground tracking-tight font-display">
+                  Customer Reviews
+                </h2>
+                <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-secondary text-muted-foreground">
+                  {genuineReviews.length} {genuineReviews.length === 1 ? "review" : "reviews"}
+                </span>
+              </div>
+              <Link
+                to="/reviews"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-neutral-950 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-100 text-xs sm:text-sm font-bold shadow-sm active:scale-95 transition-all self-start sm:self-auto cursor-pointer"
+              >
+                <Sparkles className="h-3.5 w-3.5 text-emerald-400" />
+                <span>Write a Review</span>
+              </Link>
             </div>
 
             {genuineReviews.length > 0 ? (
@@ -1758,7 +2134,7 @@ const productSchema = product ? {
                   return (
                     <div
                       key={rev.id}
-                      className="p-6 rounded-3xl bg-card border border-border/80 shadow-xs space-y-3.5 flex flex-col justify-between transition-all hover:border-emerald-500/40"
+                      className="p-6 rounded-3xl bg-white dark:bg-[#0D151D] border border-black/10 dark:border-white/10 shadow-xs space-y-3.5 flex flex-col justify-between transition-all hover:border-emerald-500/40"
                     >
                       <div className="space-y-3.5">
                         <div className="flex items-center justify-between gap-3">
@@ -1810,157 +2186,326 @@ const productSchema = product ? {
                 })}
               </div>
             ) : (
-              <div className="max-w-2xl mx-auto p-8 sm:p-12 rounded-3xl bg-card border border-dashed border-border/80 text-center flex flex-col items-center justify-center space-y-3 shadow-xs">
-                <div className="h-12 w-12 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-                  <MessageSquareQuote className="h-6 w-6" />
+              <div className="w-full rounded-3xl border border-black/10 dark:border-white/10 bg-white/80 dark:bg-[#0D151D]/90 backdrop-blur-sm p-8 sm:p-12 text-center flex flex-col items-center justify-center space-y-5 shadow-xs relative overflow-hidden">
+                {/* Subtle emerald ambient aura */}
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-80 h-28 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
+
+                {/* Product Preview Card */}
+                {product && (
+                  <div className="flex items-center gap-3.5 px-4 py-2.5 rounded-2xl bg-neutral-100/80 dark:bg-[#121C26] border border-black/10 dark:border-white/10 backdrop-blur-md max-w-sm w-full text-left">
+                    <div className="h-12 w-12 flex items-center justify-center shrink-0">
+                      <img
+                        src={product.image || "/brand/payent-logo-icon.png"}
+                        alt={product.title}
+                        className="max-h-full max-w-full object-contain"
+                      />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h4 className="text-xs font-bold text-foreground truncate">{product.title}</h4>
+                      <p className="text-[11px] text-muted-foreground capitalize truncate">{product.category || "Gear"}</p>
+                    </div>
+                    <div className="flex items-center gap-1 text-xs font-bold text-amber-500 shrink-0">
+                      <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                      <span>{(product.rating != null ? Number(product.rating) : 4.9).toFixed(1)}</span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-1.5 max-w-md">
+                  <h3 className="text-base sm:text-lg font-bold text-foreground">
+                    Be the First to Review
+                  </h3>
+                  <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+                    Have you rented this gear through PAYENT? Share your verified feedback to help other creators in the community.
+                  </p>
                 </div>
-                <h3 className="text-base sm:text-lg font-bold text-foreground">
-                  Customer Reviews
-                </h3>
-                <p className="text-xs sm:text-sm text-muted-foreground max-w-md">
-                  Be the first to share your experience with PAYENT.
-                </p>
+
                 <Link
                   to="/reviews"
-                  className="mt-2 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition-all cursor-pointer shadow-xs"
+                  className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-neutral-950 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-100 text-xs sm:text-sm font-bold shadow-sm transition-all active:scale-95 cursor-pointer"
                 >
-                  <Sparkles className="h-3.5 w-3.5" />
+                  <Sparkles className="h-4 w-4" />
                   <span>Write a Review</span>
                 </Link>
               </div>
             )}
           </section>
 
-          {/* 5. FREQUENTLY ASKED QUESTIONS (Accordion) */}
-          <section className="space-y-6 pt-2">
-            <div className="flex items-center justify-center gap-3">
-              <span className="h-0.5 w-12 bg-emerald-500/30 rounded-full" />
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-              <h2 className="text-xl sm:text-2xl font-extrabold text-foreground tracking-tight font-display">
-                Frequently Asked Questions
-              </h2>
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-              <span className="h-0.5 w-12 bg-emerald-500/30 rounded-full" />
-            </div>
-
-            <div className="max-w-4xl mx-auto divide-y divide-border/60 rounded-3xl border border-border/80 bg-card overflow-hidden shadow-xs text-left">
-              {faqItems.map((faq, idx) => {
-                const isOpen = activeFaqIndex === idx;
-                return (
-                  <div key={idx} className="p-4 sm:p-5 transition-colors hover:bg-secondary/20">
-                    <button
-                      type="button"
-                      onClick={() => setActiveFaqIndex(isOpen ? null : idx)}
-                      className="w-full flex items-center justify-between text-left font-bold text-sm text-foreground hover:text-emerald-600 transition-colors cursor-pointer"
-                    >
-                      <span className="capitalize">{faq.question}</span>
-                      <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform duration-200 shrink-0 ml-2", isOpen ? "rotate-180 text-emerald-600" : "")} />
-                    </button>
-                    {isOpen && (
-                      <p className="mt-3 text-xs sm:text-sm text-muted-foreground leading-relaxed pr-6">
-                        {faq.answer}
-                      </p>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-
-          {/* 6. RELATED PRODUCTS (Carousel/Grid matching Reference) */}
-          <section className="space-y-6 pt-2">
-            <div className="flex items-center justify-center gap-3">
-              <span className="h-0.5 w-12 bg-emerald-500/30 rounded-full" />
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-              <h2 className="text-xl sm:text-2xl font-extrabold text-foreground tracking-tight font-display">
-                Related Products
-              </h2>
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-              <span className="h-0.5 w-12 bg-emerald-500/30 rounded-full" />
-            </div>
-
-            <div className="relative">
-              {/* Left Arrow Button */}
-              {relatedProductsList.length > 4 && (
-                <button
-                  type="button"
-                  onClick={() => setRelatedCarouselPage((p) => Math.max(0, p - 1))}
-                  disabled={relatedCarouselPage === 0}
-                  className="absolute -left-3 sm:-left-5 top-1/2 -translate-y-1/2 z-10 p-2 sm:p-2.5 rounded-full bg-card border border-border shadow-md hover:bg-secondary disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-all"
-                  aria-label="Previous related products"
-                >
-                  <ChevronLeft className="h-4 w-4 text-foreground" />
-                </button>
-              )}
-
-              {/* 4 Related Product Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                {displayedRelated.map((rel) => (
-                  <Link
-                    key={rel.id}
-                    to="/payent/products/$id"
-                    params={{ id: rel.id }}
-                    className="group rounded-3xl border border-border/80 bg-card p-4 space-y-3 hover:shadow-lg transition-all hover:border-emerald-500/40 text-left block"
-                  >
-                    <div className="aspect-[4/3] rounded-2xl bg-neutral-100 dark:bg-neutral-900/60 p-4 flex items-center justify-center overflow-hidden">
-                      <img
-                        src={rel.image || "/brand/payent-logo-icon.png"}
-                        alt={rel.title}
-                        className="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform duration-300 drop-shadow-sm"
-                      />
-                    </div>
-                    <div className="space-y-0.5">
-                      <h3 className="font-bold text-sm text-foreground group-hover:text-emerald-600 transition-colors truncate">
-                        {rel.title}
-                      </h3>
-                      <p className="text-xs text-muted-foreground capitalize">{rel.category || "Gear"}</p>
-                    </div>
-                    <div className="flex items-center gap-1 text-xs font-bold text-amber-500">
-                      <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-                      <span>{(rel.rating != null ? Number(rel.rating) : 4.7).toFixed(1)}</span>
-                      <span className="text-muted-foreground font-normal">({rel.reviews || 84})</span>
-                    </div>
-                    <div className="flex items-center justify-between pt-2 border-t border-border/60">
-                      <span className="font-extrabold text-sm text-emerald-600 dark:text-emerald-400 font-mono">
-                        ₹{(Number(rel.price) || 0).toLocaleString("en-IN")}{" "}
-                        <span className="text-xs text-muted-foreground font-normal font-sans">/ day</span>
-                      </span>
-                      <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                        Available
-                      </span>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-
-              {/* Right Arrow Button */}
-              {relatedProductsList.length > 4 && (
-                <button
-                  type="button"
-                  onClick={() => setRelatedCarouselPage((p) => p + 1)}
-                  disabled={(relatedCarouselPage + 1) * 4 >= relatedProductsList.length}
-                  className="absolute -right-3 sm:-right-5 top-1/2 -translate-y-1/2 z-10 p-2 sm:p-2.5 rounded-full bg-card border border-border shadow-md hover:bg-secondary disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-all"
-                  aria-label="Next related products"
-                >
-                  <ChevronRight className="h-4 w-4 text-foreground" />
-                </button>
-              )}
-            </div>
-          </section>
-
         </div>
 
-        {/* Full-Screen Photo Detail Viewer Modal on Image Click */}
+        {/* Full-Screen Photo Detail Viewer Lightbox Modal (Supports Photos & 10s Video) */}
         {isPhotoViewerOpen && (
-          <PhotoDetailViewer
-            primaryImage={activeDisplayImage}
-            productTitle={product.title}
-            angles={gallery}
-            videoUrl={activeVideoUrl}
-            onWishlistToggle={() => toggle(product.id)}
-            isWishlisted={isWishlisted}
-          />
+          <div
+            className="fixed inset-0 z-50 flex flex-col items-center justify-between bg-black/95 backdrop-blur-md p-4 sm:p-6 animate-in fade-in duration-200 select-none"
+            onClick={() => {
+              setIsPhotoViewerOpen(false);
+              setIsFullscreenGridView(false);
+              setIsFullscreenVideoActive(false);
+            }}
+          >
+            {/* Top Bar with Title, Counter, Video/Photo Toggle, Grid/Single Toggle and Close Button */}
+            <div
+              className="w-full max-w-6xl flex items-center justify-between gap-4 pb-3 border-b border-white/10 text-white z-10"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="px-3 py-1 rounded-full bg-white/10 text-xs font-semibold backdrop-blur-md border border-white/20 shrink-0 font-mono">
+                  {isFullscreenVideoActive
+                    ? "Verified 10s Video"
+                    : isFullscreenGridView
+                    ? `All Photos (${gallery.length})`
+                    : `Photo ${selectedImageIndex + 1} of ${gallery.length}`}
+                </span>
+                <h3 className="text-sm sm:text-base font-bold text-white truncate max-w-md">
+                  {product.title}
+                </h3>
+              </div>
+
+              <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+                {/* Watch 10s Video Toggle button if video is available */}
+                {activeVideoUrl && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsFullscreenVideoActive((prev) => !prev);
+                      setIsFullscreenGridView(false);
+                    }}
+                    className={cn(
+                      "px-3 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer backdrop-blur-md border flex items-center gap-1.5",
+                      isFullscreenVideoActive
+                        ? "bg-emerald-600 text-white border-emerald-500 ring-2 ring-emerald-500/30 shadow-md"
+                        : "bg-white/10 hover:bg-white/20 text-white border-white/20"
+                    )}
+                  >
+                    <Video className="h-3.5 w-3.5 text-emerald-400" />
+                    <span>{isFullscreenVideoActive ? "Show Photos" : "10s Video"}</span>
+                  </button>
+                )}
+
+                {/* Toggle Grid View to see ALL product photos at once */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsFullscreenGridView((prev) => !prev);
+                    setIsFullscreenVideoActive(false);
+                  }}
+                  className={cn(
+                    "px-3 py-1.5 rounded-full text-xs font-semibold text-white transition-all cursor-pointer backdrop-blur-md border flex items-center gap-1.5",
+                    isFullscreenGridView
+                      ? "bg-emerald-600 border-emerald-500"
+                      : "bg-white/10 hover:bg-white/20 border-white/20"
+                  )}
+                >
+                  <LayoutGrid className="h-3.5 w-3.5" />
+                  <span>{isFullscreenGridView ? "Single View" : "All Photos"}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsPhotoViewerOpen(false);
+                    setIsFullscreenGridView(false);
+                    setIsFullscreenVideoActive(false);
+                  }}
+                  className="p-2 sm:p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all cursor-pointer backdrop-blur-md border border-white/20 shadow-md"
+                  aria-label="Close full screen viewer"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Content: Grid of All Photos/Video OR Single Large Photo/Video */}
+            {isFullscreenGridView ? (
+              <div
+                className="w-full max-w-5xl flex-1 overflow-y-auto py-6 px-2 grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-4 items-center my-auto"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* 10s Video Card in Grid View */}
+                {activeVideoUrl && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsFullscreenVideoActive(true);
+                      setIsFullscreenGridView(false);
+                    }}
+                    className={cn(
+                      "group relative aspect-[4/3] rounded-2xl overflow-hidden bg-black/60 border-2 transition-all cursor-pointer shadow-lg hover:scale-[1.03] p-2 flex flex-col items-center justify-center",
+                      isFullscreenVideoActive
+                        ? "border-emerald-500 ring-2 ring-emerald-500/30"
+                        : "border-white/20 hover:border-emerald-500/50"
+                    )}
+                  >
+                    <div className="relative w-full h-full rounded-xl overflow-hidden bg-black flex items-center justify-center">
+                      <video
+                        src={activeVideoUrl}
+                        poster={activeDisplayImage || product?.image}
+                        className="w-full h-full object-cover opacity-60 group-hover:opacity-80 transition-opacity pointer-events-none"
+                        muted
+                        playsInline
+                      />
+                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-black/40">
+                        <div className="h-10 w-10 rounded-full bg-emerald-600/90 text-white flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                          <Video className="h-5 w-5" />
+                        </div>
+                        <span className="px-2.5 py-0.5 rounded-full bg-black/80 text-emerald-400 text-[11px] font-bold border border-emerald-500/30">
+                          10s Video
+                        </span>
+                      </div>
+                    </div>
+                    <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded-md bg-black/70 text-emerald-400 text-[10px] font-bold">
+                      Video
+                    </span>
+                  </button>
+                )}
+
+                {gallery.map((src, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      setSelectedImageIndex(idx);
+                      setIsFullscreenVideoActive(false);
+                      setIsFullscreenGridView(false);
+                    }}
+                    className={cn(
+                      "group relative aspect-[4/3] rounded-2xl overflow-hidden bg-black/50 border-2 transition-all cursor-pointer shadow-lg hover:scale-[1.03] p-2 flex items-center justify-center",
+                      !isFullscreenVideoActive && idx === selectedImageIndex
+                        ? "border-emerald-500 ring-2 ring-emerald-500/30"
+                        : "border-white/20 hover:border-emerald-500/50"
+                    )}
+                  >
+                    <img src={src} alt="" className="w-full h-full object-contain" />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <span className="px-3 py-1 rounded-full bg-emerald-600 text-white text-[11px] font-bold shadow-md">
+                        Photo #{idx + 1}
+                      </span>
+                    </div>
+                    <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded-md bg-black/70 text-white text-[10px] font-mono">
+                      #{idx + 1}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <>
+                {/* Central Stage: High-Res Video or High-Res Image with Nav Chevrons */}
+                <div
+                  className="relative w-full max-w-5xl flex-1 flex items-center justify-center min-h-0 my-auto py-2"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {isFullscreenVideoActive && activeVideoUrl ? (
+                    <div className="relative w-full max-w-4xl max-h-[72vh] flex items-center justify-center">
+                      <video
+                        key={activeVideoUrl}
+                        src={activeVideoUrl}
+                        poster={activeDisplayImage || product?.image}
+                        controls
+                        autoPlay
+                        playsInline
+                        className="max-h-[72vh] max-w-full rounded-2xl shadow-2xl bg-black border border-white/20"
+                        onError={(e) => {
+                          const target = e.currentTarget;
+                          if (!target.currentSrc?.includes("l2vmxn9hwk6p0cs4ajoz")) {
+                            target.src = "https://res.cloudinary.com/dvyendk6j/video/upload/v1793724284/l2vmxn9hwk6p0cs4ajoz.mp4";
+                            target.load();
+                            target.play().catch(() => {});
+                          }
+                        }}
+                      >
+                        <source src={activeVideoUrl} type="video/mp4" />
+                        <source src={activeVideoUrl.replace(/\.mp4$/, ".webm")} type="video/webm" />
+                      </video>
+                      <div className="absolute top-3 left-3 px-3 py-1 rounded-full bg-black/70 backdrop-blur-md text-[11px] text-emerald-400 font-bold border border-emerald-500/30 flex items-center gap-1.5 select-none pointer-events-none">
+                        <ShieldCheck className="h-3.5 w-3.5" />
+                        <span>Verified 10s Inspection Video</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <img
+                        src={gallery[selectedImageIndex] || activeDisplayImage}
+                        alt={product.title}
+                        className="max-h-[70vh] max-w-full object-contain rounded-2xl drop-shadow-2xl"
+                      />
+
+                      {gallery.length > 1 && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedImageIndex((prev) => (prev > 0 ? prev - 1 : gallery.length - 1));
+                            }}
+                            className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-black/60 hover:bg-black/90 text-white border border-white/20 transition-all cursor-pointer backdrop-blur-md shadow-xl"
+                            aria-label="Previous image"
+                          >
+                            <ChevronLeft className="h-6 w-6" />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedImageIndex((prev) => (prev < gallery.length - 1 ? prev + 1 : 0));
+                            }}
+                            className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-black/60 hover:bg-black/90 text-white border border-white/20 transition-all cursor-pointer backdrop-blur-md shadow-xl"
+                            aria-label="Next image"
+                          >
+                            <ChevronRight className="h-6 w-6" />
+                          </button>
+                        </>
+                      )}
+                    </>
+                  )}
+                </div>
+
+                {/* Bottom Thumbnails Row — ALWAYS shows all product images + 10s video option! */}
+                <div
+                  className="flex items-center justify-center gap-2.5 pt-2 max-w-full overflow-x-auto z-10 pb-1"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {/* 10s Video Thumbnail Button */}
+                  {activeVideoUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setIsFullscreenVideoActive(true)}
+                      className={cn(
+                        "h-14 w-14 sm:h-16 sm:w-16 rounded-xl overflow-hidden border-2 transition-all p-1 bg-black/60 shrink-0 cursor-pointer flex flex-col items-center justify-center gap-0.5 relative group",
+                        isFullscreenVideoActive
+                          ? "border-emerald-500 ring-2 ring-emerald-500/30 scale-105"
+                          : "border-white/20 hover:border-white/50 opacity-70 hover:opacity-100"
+                      )}
+                      title="Watch 10s Inspection Video"
+                    >
+                      <Video className={cn("h-5 w-5", isFullscreenVideoActive ? "text-emerald-400" : "text-white")} />
+                      <span className="text-[9px] font-bold text-white uppercase tracking-tight">Video</span>
+                    </button>
+                  )}
+
+                  {/* Photo Thumbnails */}
+                  {gallery.map((src, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => {
+                        setIsFullscreenVideoActive(false);
+                        setSelectedImageIndex(idx);
+                      }}
+                      className={cn(
+                        "h-14 w-14 sm:h-16 sm:w-16 rounded-xl overflow-hidden border-2 transition-all p-1 bg-black/40 shrink-0 cursor-pointer",
+                        !isFullscreenVideoActive && idx === selectedImageIndex
+                          ? "border-emerald-500 ring-2 ring-emerald-500/30 scale-105"
+                          : "border-white/20 opacity-60 hover:opacity-100"
+                      )}
+                    >
+                      <img src={src} alt="" className="h-full w-full object-contain" />
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
         )}
 
         {/* Product Message Modal */}
@@ -1971,6 +2516,18 @@ const productSchema = product ? {
             product={product}
           />
         )}
+
+        {/* Terms & Conditions Popup Modal */}
+        <TermsAndConditionsModal
+          open={showTermsModal}
+          onClose={() => setShowTermsModal(false)}
+          onAccept={() => {
+            setTermsAccepted(true);
+            toast.success("Terms & conditions accepted!");
+          }}
+          productTitle={product?.title}
+          isAccepted={termsAccepted}
+        />
 
         <ShareProductModal />
       </div>

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Heart } from "lucide-react";
 import { MainLayout } from "@/layouts/MainLayout";
 import { ProductCard } from "@/components/common/ProductCard";
+import { BackButton } from "@/components/common/BackButton";
 import { Button } from "@/components/common/Button";
 import { useWishlist } from "@/hooks/useWishlist";
 import { storage, STORAGE_KEYS } from "@/utils/storage";
@@ -31,7 +32,8 @@ export default function Wishlist() {
 
   return (
     <MainLayout>
-      <section className="mx-auto max-w-7xl px-4 md:px-6 py-10">
+      <section className="mx-auto max-w-7xl px-4 md:px-6 py-8 sm:py-10">
+        <BackButton fallback="/categories" className="mb-4" />
         <h1 className="text-3xl md:text-4xl font-bold flex items-center gap-3">
           <Heart className="h-7 w-7 text-foreground fill-foreground" /> Your
           wishlist

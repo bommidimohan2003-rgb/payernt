@@ -20,6 +20,7 @@ import {
 import { toast } from "sonner";
 import { useNavigate } from "@tanstack/react-router";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
+import { BackButton } from "@/components/common/BackButton";
 import { useAuth } from "@/hooks/useAuth";
 import { STORAGE_KEYS, storage } from "@/utils/storage";
 import { api } from "@/utils/api";
@@ -142,6 +143,7 @@ export default function LenderPortal() {
   return (
     <DashboardLayout>
       <div className="space-y-8">
+        <BackButton fallback="/dashboard" className="mb-2" />
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
@@ -216,7 +218,7 @@ export default function LenderPortal() {
         </div>
 
         {/* Navigation Tabs */}
-        <div className="flex border-b border-border">
+        <div className="flex">
           <button
             onClick={() => setActiveTab("listings")}
             className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all cursor-pointer ${

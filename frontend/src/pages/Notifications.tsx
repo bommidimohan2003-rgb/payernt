@@ -2,6 +2,7 @@ import { Bell, Check, CheckCheck, Package, Hash, ExternalLink, Filter, Calendar 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { MainLayout } from "@/layouts/MainLayout";
+import { BackButton } from "@/components/common/BackButton";
 import { Button } from "@/components/common/Button";
 import { STORAGE_KEYS, storage } from "@/utils/storage";
 import { api } from "@/utils/api";
@@ -149,8 +150,9 @@ export default function Notifications() {
     <MainLayout>
       <section className="mx-auto max-w-4xl px-4 md:px-6 py-10">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-border">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4">
           <div className="flex items-center gap-3">
+            <BackButton fallback="/categories" />
             <div className="h-12 w-12 rounded-2xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center shrink-0">
               <Bell className="h-6 w-6" />
             </div>

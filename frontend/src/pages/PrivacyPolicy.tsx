@@ -1,10 +1,12 @@
 import { MainLayout } from "@/layouts/MainLayout";
+import { BackButton } from "@/components/common/BackButton";
 import { Shield, Eye, Database, Lock, UserCheck } from "lucide-react";
 
 export function PrivacyPolicy() {
   return (
     <MainLayout>
       <div className="max-w-4xl mx-auto px-4 md:px-6 py-12 md:py-16">
+        <BackButton fallback="/" className="mb-6" />
         {/* Header */}
         <div className="text-center space-y-4 mb-12">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold uppercase tracking-wider">

@@ -28,6 +28,7 @@ import {
 import { useMemo, useState, useRef, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { MainLayout } from "@/layouts/MainLayout";
+import { BackButton } from "@/components/common/BackButton";
 import { Button } from "@/components/common/Button";
 import { Input } from "@/components/common/Input";
 import { Modal } from "@/components/common/Modal";
@@ -862,6 +863,7 @@ export default function Checkout() {
   return (
     <MainLayout>
       <section className="mx-auto max-w-5xl px-4 md:px-6 py-10">
+        <BackButton fallback="/cart" className="mb-4" />
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>

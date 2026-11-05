@@ -12,6 +12,7 @@ import {
   Package,
 } from "lucide-react";
 import { MainLayout } from "@/layouts/MainLayout";
+import { BackButton } from "@/components/common/BackButton";
 import { useCart } from "@/hooks/useCart";
 import { getOptimizedImageUrl } from "@/utils/images";
 
@@ -40,23 +41,26 @@ export default function Cart() {
     <MainLayout>
       <div className="min-h-screen bg-neutral-50/50 dark:bg-[#05090D] text-neutral-900 dark:text-white transition-colors py-8 sm:py-12">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          {/* Breadcrumb Navigation */}
-          <nav className="flex items-center gap-2 text-xs text-neutral-500 dark:text-[#8D98A3] mb-6">
-            <Link to="/" className="hover:text-black dark:hover:text-white transition-colors">
-              Home
-            </Link>
-            <ChevronRight className="h-3 w-3" />
-            <Link to="/browse" className="hover:text-black dark:hover:text-white transition-colors">
-              Browse Gear
-            </Link>
-            <ChevronRight className="h-3 w-3" />
-            <span className="font-semibold text-neutral-900 dark:text-white">
-              Rental Cart
-            </span>
-          </nav>
+          {/* Back Button & Breadcrumb Navigation */}
+          <div className="flex items-center gap-3 mb-6">
+            <BackButton fallback="/categories" />
+            <nav className="flex items-center gap-2 text-xs text-neutral-500 dark:text-[#8D98A3]">
+              <Link to="/" className="hover:text-black dark:hover:text-white transition-colors">
+                Home
+              </Link>
+              <ChevronRight className="h-3 w-3" />
+              <Link to="/browse" className="hover:text-black dark:hover:text-white transition-colors">
+                Browse Gear
+              </Link>
+              <ChevronRight className="h-3 w-3" />
+              <span className="font-semibold text-neutral-900 dark:text-white">
+                Rental Cart
+              </span>
+            </nav>
+          </div>
 
           {/* Page Title & Count Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-black/10 dark:border-white/10 mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 mb-8">
             <div>
               <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
                 Your Rental Cart

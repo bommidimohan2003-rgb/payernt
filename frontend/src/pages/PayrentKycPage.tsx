@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { api } from "@/utils/api";
 import { useAuth } from "@/hooks/useAuth";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
+import { BackButton } from "@/components/common/BackButton";
 import { useKycScreenshotProtection } from "@/hooks/useKycScreenshotProtection";
 import { KycScreenShield, KycProtectionBadge } from "@/components/security/KycScreenShield";
 
@@ -211,15 +212,8 @@ export function PayrentKycPage() {
       <KycScreenShield isObscured={isObscured} documentType="PAN Card" onDismiss={unobscure} />
       <div className="w-full max-w-4xl mx-auto space-y-6 text-left py-6 px-4 sm:px-6">
         {/* Navigation & Breadcrumb */}
-        <div className="flex items-center justify-between border-b border-border/80 pb-4">
-          <button
-            type="button"
-            onClick={() => navigate({ to: "/payent/profile" })}
-            className="inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            <span>Back to Renter Profile</span>
-          </button>
+        <div className="flex items-center justify-between pb-2">
+          <BackButton fallback="/profile" label="Back to Renter Profile" />
 
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary border border-primary/20 text-xs font-bold uppercase tracking-wider">
             <ShieldCheck className="h-3.5 w-3.5" />

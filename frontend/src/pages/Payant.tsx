@@ -41,7 +41,7 @@ export default function Payant() {
   return (
     <div className="min-h-screen bg-[#050505] text-white selection:bg-white selection:text-black">
       {/* Top Glass Navigation Bar */}
-      <header className="sticky top-0 z-40 backdrop-blur-xl bg-black/60 border-b border-white/10 px-4 sm:px-8 py-4 flex items-center justify-between">
+      <header className="sticky top-0 z-40 backdrop-blur-xl bg-black/60 border-none border-b-0 shadow-none px-4 sm:px-8 py-4 flex items-center justify-between">
         <div className="flex items-center gap-6">
           <Link
             to="/"
@@ -145,7 +145,7 @@ export default function Payant() {
       </section>
 
       {/* Interactive Yield Calculator */}
-      <section id="calculator" className="relative py-16 px-4 sm:px-8 max-w-6xl mx-auto border-t border-white/10">
+      <section id="calculator" className="relative py-16 px-4 sm:px-8 max-w-6xl mx-auto ">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* Controls */}
           <div className="lg:col-span-7 bg-neutral-950/80 border border-white/10 rounded-2xl p-6 sm:p-8 backdrop-blur-xl space-y-6">
@@ -277,7 +277,7 @@ export default function Payant() {
       </section>
 
       {/* Protocol Features Grid */}
-      <section className="py-16 px-4 sm:px-8 max-w-6xl mx-auto border-t border-white/10">
+      <section className="py-16 px-4 sm:px-8 max-w-6xl mx-auto">
         <div className="text-center max-w-xl mx-auto mb-12 space-y-2">
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
             Architecture for Tech Asset Monetization
@@ -321,7 +321,7 @@ export default function Payant() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-white/10 py-8 px-4 sm:px-8 text-center text-xs text-neutral-500 flex flex-col sm:flex-row items-center justify-between max-w-6xl mx-auto gap-4">
+      <footer className="py-8 px-4 sm:px-8 text-center text-xs text-neutral-500 flex flex-col sm:flex-row items-center justify-between max-w-6xl mx-auto gap-4">
         <div>© 2026 Payent Platforms Inc. — pay₹ent Protocol</div>
         <div className="flex items-center gap-6">
           <Link to="/" className="hover:text-white transition-colors">

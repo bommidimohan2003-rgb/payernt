@@ -14,6 +14,7 @@ import {
   CircleHelp,
 } from "lucide-react";
 import { MainLayout } from "@/layouts/MainLayout";
+import { BackButton } from "@/components/common/BackButton";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/utils/api";
 import { cn } from "@/lib/utils";
@@ -133,6 +134,7 @@ export default function Contact() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
             {/* Left: Headline & Introduction */}
             <div className="lg:col-span-7">
+              <BackButton fallback="/categories" className="mb-4" />
               {/* Eyebrow */}
               <div className="flex items-center gap-2 mb-3">
                 <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" />

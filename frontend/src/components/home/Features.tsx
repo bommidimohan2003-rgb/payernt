@@ -80,7 +80,7 @@ export function Features() {
     <section
       id="features"
       ref={ref}
-      className="relative py-12 px-4 sm:px-6 overflow-hidden bg-background text-foreground border-t border-border"
+      className="relative py-12 px-4 sm:px-6 overflow-hidden bg-background text-foreground"
     >
 
       <div className="relative max-w-7xl mx-auto">

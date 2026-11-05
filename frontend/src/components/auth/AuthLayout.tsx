@@ -1,5 +1,6 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import { MainLayout } from "@/layouts/MainLayout";
+import { BackButton } from "@/components/common/BackButton";
 import { CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -33,6 +34,7 @@ export function AuthLayout({
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-14 items-center">
             {/* Left Section — Only "Welcome to Payent" branding at the top */}
             <div className="lg:col-span-5 flex flex-col justify-center space-y-4 text-left">
+              <BackButton fallback="/" className="w-fit mb-1" />
               {/* Clean Payent Logo */}
               <Link
                 to="/"

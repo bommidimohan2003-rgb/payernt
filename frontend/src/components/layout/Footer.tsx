@@ -19,7 +19,7 @@ const socials = [
 
 export function Footer() {
   return (
-    <footer className="bg-white dark:bg-[#05090D] border-t border-black/10 dark:border-white/10 text-neutral-900 dark:text-white py-8 sm:py-10 transition-colors duration-300">
+    <footer className="bg-white dark:bg-[#05090D] text-neutral-900 dark:text-white py-8 sm:py-10 transition-colors duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col lg:flex-row items-center justify-between gap-6 lg:gap-8">
           {/* Left: Brand Monogram & Tagline */}

@@ -36,6 +36,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
+import { BackButton } from "@/components/common/BackButton";
 import { Button } from "@/components/common/Button";
 import { Input } from "@/components/common/Input";
 import { useAuth } from "@/hooks/useAuth";
@@ -426,19 +427,22 @@ export default function Profile() {
 
         {/* Top Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-3xl font-extrabold text-foreground font-display tracking-tight">
-                Profile & Identity
-              </h1>
-              <span className="px-2.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 text-xs font-bold uppercase tracking-wider flex items-center gap-1">
-                <Sparkles className="h-3 w-3" />
-                <span>{isPendingApproval ? "Pending Verification" : "Verified Account"}</span>
-              </span>
+          <div className="flex items-center gap-3">
+            <BackButton fallback="/categories" />
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-3xl font-extrabold text-foreground font-display tracking-tight">
+                  Profile & Identity
+                </h1>
+                <span className="px-2.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 text-xs font-bold uppercase tracking-wider flex items-center gap-1">
+                  <Sparkles className="h-3 w-3" />
+                  <span>{isPendingApproval ? "Pending Verification" : "Verified Account"}</span>
+                </span>
+              </div>
+              <p className="text-sm text-muted-foreground mt-1 font-medium">
+                Manage your personal identity, device camera profile picture, payout channels, and security.
+              </p>
             </div>
-            <p className="text-sm text-muted-foreground mt-1 font-medium">
-              Manage your personal identity, device camera profile picture, payout channels, and security.
-            </p>
           </div>
 
           <Button

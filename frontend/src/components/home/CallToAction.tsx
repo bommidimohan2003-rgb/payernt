@@ -11,7 +11,7 @@ export function CallToAction() {
     <section
       id="cta"
       ref={ref}
-      className="relative py-24 px-4 sm:px-6 overflow-hidden bg-white dark:bg-[#070A10] text-foreground dark:text-white border-t border-border dark:border-white/10"
+      className="relative py-24 px-4 sm:px-6 overflow-hidden bg-white dark:bg-[#070A10] text-foreground dark:text-white"
     >
       {/* Background Ambient Lighting */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[350px] bg-gradient-to-r from-primary/10 via-purple-500/10 to-amber-500/10 dark:from-primary/20 dark:via-purple-500/20 dark:to-amber-500/20 rounded-full blur-[140px] pointer-events-none" />

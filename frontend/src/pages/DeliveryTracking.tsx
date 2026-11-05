@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { MainLayout } from "@/layouts/MainLayout";
+import { BackButton } from "@/components/common/BackButton";
 import { Button } from "@/components/common/Button";
 import { DeliveryMap } from "@/components/delivery/DeliveryMap";
 import { api } from "@/utils/api";
@@ -546,14 +547,9 @@ export default function DeliveryTracking() {
     <MainLayout>
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Top Breadcrumb & Title */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4">
           <div>
-            <Link
-              to={isCustomer ? "/orders" : "/lender-portal"}
-              className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mb-2 transition-colors cursor-pointer"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" /> Back to {isCustomer ? "My Orders" : "Lender Portal"}
-            </Link>
+            <BackButton fallback={isCustomer ? "/orders" : "/lender-portal"} label={`Back to ${isCustomer ? "My Orders" : "Lender Portal"}`} className="mb-2" />
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight flex items-center gap-2.5">
               <Truck className="h-7 w-7 text-primary" />
               Live Delivery Tracking

@@ -15,6 +15,7 @@ import {
   Plus,
 } from "lucide-react";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
+import { BackButton } from "@/components/common/BackButton";
 import { Button } from "@/components/common/Button";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/hooks/useAuth";
@@ -94,13 +95,16 @@ export default function Settings() {
   return (
     <DashboardLayout>
       <div className="space-y-6 max-w-4xl pb-16">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-neutral-900 dark:text-white font-display tracking-tight">
-            {tCommon.settings}
-          </h1>
-          <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 mt-1">
-            {tCommon.settings} &bull; paYent Security & Account Preferences
-          </p>
+        <div className="flex items-center gap-3">
+          <BackButton fallback="/categories" />
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-neutral-900 dark:text-white font-display tracking-tight">
+              {tCommon.settings}
+            </h1>
+            <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 mt-1">
+              {tCommon.settings} &bull; paYent Security & Account Preferences
+            </p>
+          </div>
         </div>
 
         {/* ========================================================================= */}

@@ -534,21 +534,21 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
   return (
     <div
       className={cn(
-        "rounded-2xl border border-border bg-card shadow-sm overflow-hidden p-4 space-y-4",
+        "rounded-2xl border border-border bg-card shadow-sm overflow-hidden p-3 sm:p-3.5 space-y-2.5 sm:space-y-3",
         className
       )}
     >
       {/* Month & Year Navigation Header */}
-      <div className="flex items-center justify-between gap-2 border-b border-border/60 pb-3">
+      <div className="flex items-center justify-between gap-2 pb-2">
         <div className="flex items-center gap-2">
-          <div className="p-2 rounded-xl bg-primary/10 text-primary">
-            <CalendarIcon className="w-4 h-4" />
+          <div className="p-1.5 rounded-xl bg-primary/10 text-primary">
+            <CalendarIcon className="w-3.5 h-3.5" />
           </div>
           <div>
-            <h4 className="text-sm font-bold text-foreground tracking-tight">
+            <h4 className="text-xs sm:text-sm font-bold text-foreground tracking-tight">
               {MONTH_NAMES[viewMonth]} {viewYear}
             </h4>
-            <span className="text-[10px] text-muted-foreground block font-medium">
+            <span className="text-[9px] sm:text-[10px] text-muted-foreground block font-medium">
               {durationMode === "custom"
                 ? isPickingEnd
                   ? "Select return date"
@@ -562,7 +562,7 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
           <button
             type="button"
             onClick={handleTodayJump}
-            className="px-2 py-1 text-[11px] font-semibold text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-colors cursor-pointer"
+            className="px-2 py-0.5 text-[10px] font-semibold text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-colors cursor-pointer"
             title="Jump to today"
           >
             Today
@@ -571,18 +571,18 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
             type="button"
             onClick={handlePrevMonth}
             disabled={isPrevDisabled}
-            className="p-1.5 rounded-lg border border-border hover:bg-secondary disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer text-foreground"
+            className="p-1 rounded-lg border border-border hover:bg-secondary disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer text-foreground"
             title="Previous month"
           >
-            <ChevronLeft className="w-4 h-4" />
+            <ChevronLeft className="w-3.5 h-3.5" />
           </button>
           <button
             type="button"
             onClick={handleNextMonth}
-            className="p-1.5 rounded-lg border border-border hover:bg-secondary transition-colors cursor-pointer text-foreground"
+            className="p-1 rounded-lg border border-border hover:bg-secondary transition-colors cursor-pointer text-foreground"
             title="Next month"
           >
-            <ChevronRight className="w-4 h-4" />
+            <ChevronRight className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
@@ -660,7 +660,7 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
             return (
               <div
                 key={cell.dateKey}
-                className="h-9 sm:h-10 rounded-xl bg-transparent"
+                className="h-8 sm:h-8.5 rounded-xl bg-transparent"
               />
             );
           }
@@ -710,7 +710,7 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
                   : `Available: ${cell.dateKey}`
               }
               className={cn(
-                "relative h-9 sm:h-10 flex flex-col items-center justify-center rounded-xl text-xs font-semibold transition-all select-none",
+                "relative h-8 sm:h-8.5 flex flex-col items-center justify-center rounded-xl text-xs font-semibold transition-all select-none",
                 // Available Normal
                 cellState === "available" &&
                   "bg-card hover:bg-primary/10 hover:border-primary/50 text-foreground border border-border/80 cursor-pointer",
@@ -750,7 +750,7 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
               {/* Status indicator pin/dot */}
               {(isBlocked || isBooked) && (
                 <span
-                  className="w-1.5 h-1.5 rounded-full bg-red-600 dark:bg-red-400 absolute bottom-1"
+                  className="w-1 h-1 rounded-full bg-red-600 dark:bg-red-400 absolute bottom-1"
                   aria-label={isBlocked ? "Blocked by owner" : "Already booked"}
                 />
               )}

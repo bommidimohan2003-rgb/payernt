@@ -275,7 +275,7 @@ export default function AccountPending() {
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-primary/5 rounded-full blur-[140px] pointer-events-none" />
 
       {/* Header Navigation */}
-      <header className="relative z-10 w-full max-w-4xl mx-auto flex items-center justify-between pb-6 border-b border-border/70">
+      <header className="relative z-10 w-full max-w-4xl mx-auto flex items-center justify-between pb-4">
         <Link to="/" className="flex items-center gap-2 group">
           <LogoIcon showTagline={true} />
         </Link>
@@ -639,7 +639,7 @@ export default function AccountPending() {
       </AnimatePresence>
 
       {/* Footer */}
-      <footer className="relative z-10 w-full max-w-4xl mx-auto pt-6 border-t border-border/70 text-center">
+      <footer className="relative z-10 w-full max-w-4xl mx-auto pt-4 text-center">
         <p className="text-xs text-muted-foreground">
           paYent Security Guard • Verified peer-to-peer equipment rentals
         </p>

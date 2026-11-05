@@ -17,7 +17,7 @@ export function Newsletter() {
     <section
       id="newsletter"
       ref={ref}
-      className="relative py-20 px-4 sm:px-6 overflow-hidden bg-white dark:bg-[#070A10] text-foreground dark:text-white border-t border-border dark:border-white/10"
+      className="relative py-20 px-4 sm:px-6 overflow-hidden bg-white dark:bg-[#070A10] text-foreground dark:text-white"
     >
       <div className="relative max-w-3xl mx-auto">
         <motion.div

@@ -6,8 +6,9 @@ import {
   useSpring,
   AnimatePresence,
 } from "framer-motion";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, Link } from "@tanstack/react-router";
 import { useTheme } from "@/hooks/useTheme";
+import { useAuth } from "@/hooks/useAuth";
 import {
   Coins,
   ShoppingBag,
@@ -18,6 +19,9 @@ import {
   ShieldCheck,
   Zap,
   Sparkles,
+  ArrowRight,
+  Sun,
+  Moon,
 } from "lucide-react";
 
 // ============================================================================
@@ -28,109 +32,59 @@ import {
  * Minimal Premium Monochrome Theme Switcher
  * Fixed at the top-right corner with smooth Light / Dark / System popover menu
  */
-function GatewayThemeSwitcher() {
-  const { themeMode, setThemeMode } = useTheme();
-  const [isOpen, setIsOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+function GatewayTopNav() {
+  const { theme, toggle } = useTheme();
+  const { user } = useAuth();
+  const [mounted, setMounted] = useState(false);
 
-  // Close on outside click & Escape key
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setIsOpen(false);
-    };
-
-    if (isOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-      document.addEventListener("keydown", handleKeyDown);
-    }
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isOpen]);
-
-  // Current icon indicator
-  const currentIcon = themeMode === "light" ? "☀" : themeMode === "dark" ? "☾" : "◐";
+    setMounted(true);
+  }, []);
 
   return (
-    <div ref={containerRef} className="fixed top-5 right-5 sm:top-6 sm:right-8 z-50 select-none">
-      <button
-        type="button"
-        onClick={() => setIsOpen((prev) => !prev)}
-        aria-label={`Theme Switcher (currently ${themeMode} mode)`}
-        aria-expanded={isOpen}
-        className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-md border border-border/70 bg-background/80 hover:bg-muted/40 hover:border-foreground/30 active:scale-95 transition-all duration-150 backdrop-blur-md text-foreground/80 hover:text-foreground text-xs font-mono shadow-xs focus-visible:ring-1 focus-visible:ring-foreground/40 outline-none cursor-pointer"
-      >
-        <span className="text-sm sm:text-base leading-none">{currentIcon}</span>
-      </button>
+    <div className="fixed top-4 right-4 sm:top-5 sm:right-8 z-50 select-none flex items-center gap-2 sm:gap-3">
+      {/* Theme Toggle Button matching Payent Theme (Circular outline) */}
+      {mounted && (
+        <button
+          type="button"
+          onClick={toggle}
+          aria-label="Toggle Color Theme"
+          title={`Switch to ${theme === "dark" ? "Light" : "Dark"} Mode`}
+          className="w-9 h-9 sm:w-10 sm:h-10 rounded-full border border-neutral-300 dark:border-neutral-700/80 hover:border-neutral-400 dark:hover:border-neutral-500 bg-background/80 hover:bg-neutral-100 dark:hover:bg-white/5 text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white flex items-center justify-center transition-all cursor-pointer shrink-0 active:scale-95 backdrop-blur-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          {theme === "dark" ? (
+            <Sun className="h-4 w-4 sm:h-[18px] sm:w-[18px] stroke-[1.6]" />
+          ) : (
+            <Moon className="h-4 w-4 sm:h-[18px] sm:w-[18px] stroke-[1.6]" />
+          )}
+        </button>
+      )}
 
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: -4, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -4, scale: 0.96 }}
-            transition={{ duration: 0.15, ease: "easeOut" }}
-            className="absolute right-0 mt-1.5 w-32 py-1 bg-background/95 backdrop-blur-md border border-border/80 rounded-md shadow-md text-[11px] font-mono tracking-wider overflow-hidden z-50"
+      {mounted && user ? (
+        <Link
+          to="/dashboard"
+          className="px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold rounded-full bg-neutral-950 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-100 shadow-sm transition-all duration-200 cursor-pointer active:scale-95"
+        >
+          Dashboard &rarr;
+        </Link>
+      ) : (
+        <div className="flex items-center gap-2 sm:gap-3">
+          <Link
+            to="/login"
+            className="px-2.5 sm:px-3 py-1.5 text-xs sm:text-sm font-semibold text-neutral-800 dark:text-neutral-200 hover:text-neutral-950 dark:hover:text-white transition-colors cursor-pointer select-none"
           >
-            <button
-              type="button"
-              onClick={() => {
-                setThemeMode("light");
-                setIsOpen(false);
-              }}
-              className={`w-full flex items-center justify-between px-3 py-1.5 text-left transition-colors duration-150 hover:bg-muted/50 cursor-pointer ${themeMode === "light"
-                ? "text-foreground font-semibold bg-muted/30"
-                : "text-muted-foreground hover:text-foreground"
-                }`}
-            >
-              <span className="flex items-center gap-2">
-                <span className="text-xs">☀</span> Light
-              </span>
-              {themeMode === "light" && <span className="text-[10px] text-foreground">●</span>}
-            </button>
+            Log in
+          </Link>
 
-            <button
-              type="button"
-              onClick={() => {
-                setThemeMode("dark");
-                setIsOpen(false);
-              }}
-              className={`w-full flex items-center justify-between px-3 py-1.5 text-left transition-colors duration-150 hover:bg-muted/50 cursor-pointer ${themeMode === "dark"
-                ? "text-foreground font-semibold bg-muted/30"
-                : "text-muted-foreground hover:text-foreground"
-                }`}
-            >
-              <span className="flex items-center gap-2">
-                <span className="text-xs">☾</span> Dark
-              </span>
-              {themeMode === "dark" && <span className="text-[10px] text-foreground">●</span>}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setThemeMode("system");
-                setIsOpen(false);
-              }}
-              className={`w-full flex items-center justify-between px-3 py-1.5 text-left transition-colors duration-150 hover:bg-muted/50 cursor-pointer ${themeMode === "system"
-                ? "text-foreground font-semibold bg-muted/30"
-                : "text-muted-foreground hover:text-foreground"
-                }`}
-            >
-              <span className="flex items-center gap-2">
-                <span className="text-xs">◐</span> System
-              </span>
-              {themeMode === "system" && <span className="text-[10px] text-foreground">●</span>}
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          <Link
+            to="/register"
+            className="inline-flex items-center gap-1.5 px-4 sm:px-5 py-2 text-xs sm:text-sm font-bold sm:font-semibold rounded-full bg-neutral-950 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-100 shadow-sm transition-all duration-200 cursor-pointer active:scale-95 select-none"
+          >
+            <span>Sign up</span>
+            <ArrowRight className="h-3.5 w-3.5 stroke-[2.2]" />
+          </Link>
+        </div>
+      )}
     </div>
   );
 }
@@ -267,7 +221,7 @@ export function ProductSelection() {
   return (
     <div className="relative min-h-screen h-screen w-screen bg-background text-foreground flex flex-col justify-between overflow-hidden selection:bg-foreground/15 select-none transition-colors duration-200">
       <CinematicBackground shouldReduceMotion={shouldReduceMotion} />
-      <GatewayThemeSwitcher />
+      <GatewayTopNav />
 
       {/* TOP-LEFT CORNER BRAND MARK (MOBILE ONLY) */}
       <div className="fixed top-5 left-5 sm:top-6 sm:left-8 z-40 md:hidden select-none">

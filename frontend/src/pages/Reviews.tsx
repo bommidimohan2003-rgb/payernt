@@ -20,6 +20,8 @@ import { reviewsApi, type ReviewItem } from "@/services/api";
 import { formatRelativeTime } from "@/utils/formatters";
 import { getOptimizedImageUrl } from "@/utils/images";
 import { ProfilePhoto } from "@/components/common/ProfilePhoto";
+import { MainLayout } from "@/layouts/MainLayout";
+import { BackButton } from "@/components/common/BackButton";
 
 export default function Reviews() {
   const queryClient = useQueryClient();
@@ -195,9 +197,11 @@ export default function Reviews() {
   const totalPages = reviewsData?.pagination.totalPages || 1;
 
   return (
-    <div className="min-h-screen bg-white dark:bg-[#05090D] text-neutral-900 dark:text-white transition-colors duration-300 pt-20 pb-24">
+    <MainLayout>
+      <div className="min-h-screen bg-white dark:bg-[#05090D] text-neutral-900 dark:text-white transition-colors duration-300 pt-6 sm:pt-8 pb-24">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Header Breadcrumb & Title */}
+        <BackButton fallback="/categories" className="mb-4" />
         <div className="mb-8">
           <div className="flex items-center gap-2 text-xs font-semibold text-neutral-500 dark:text-[#A8B1BA] mb-2">
             <Link to="/" className="hover:text-black dark:hover:text-white transition-colors">
@@ -896,5 +900,6 @@ export default function Reviews() {
         </div>
       )}
     </div>
+    </MainLayout>
   );
 }

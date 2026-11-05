@@ -23,6 +23,7 @@ import {
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { toast } from "sonner";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
+import { BackButton } from "@/components/common/BackButton";
 import { ProfilePhoto, isRealProfilePhoto } from "@/components/common/ProfilePhoto";
 import { useAuth } from "@/hooks/useAuth";
 import { useWishlist } from "@/hooks/useWishlist";
@@ -247,6 +248,8 @@ export default function Dashboard() {
 
         {/* Authoritative Dual-Side KYC Status Banner */}
         <KycStatusBanner role="renter" className="mb-4" />
+
+        <BackButton fallback="/categories" className="mb-4" />
 
         {/* 1. WELCOME & COMMAND HEADER */}
         <div className="rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#10151B] p-6 sm:p-8 shadow-sm">

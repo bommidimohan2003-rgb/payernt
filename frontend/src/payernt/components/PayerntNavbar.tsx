@@ -10,7 +10,6 @@ import type { LenderNotification, DemoUser, PayerntAccount } from "../types";
 import { useTheme } from "@/hooks/useTheme";
 import { useLanguage } from "@/i18n";
 import { ProfilePhoto } from "@/components/common/ProfilePhoto";
-
 interface PayerntNavbarProps {
   activeTab?: string;
   onTabChange?: (tab: any) => void;
@@ -24,7 +23,6 @@ interface PayerntNavbarProps {
   onLogout?: () => void;
   onToggleSidebar?: () => void;
 }
-
 export function PayerntNavbar({
   activeTab,
   onTabChange,
@@ -43,17 +41,14 @@ export function PayerntNavbar({
   const { tCommon } = useLanguage();
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
-
   const isHome =
     (pathname === "/payernt" ||
       pathname === "/payernt/" ||
       pathname === "/paye₹nt" ||
       pathname === "/paye₹nt/") &&
     (!activeTab || activeTab === "home");
-
   const handleBrandClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
-
     if (isHome) {
       navigate({ to: "/" as any });
     } else {
@@ -63,10 +58,8 @@ export function PayerntNavbar({
       navigate({ to: "/payernt" as any });
     }
   };
-
   const displayName = activeAccount?.name || activeUser?.fullName || activeUser?.name || "Lender";
   const unreadCount = notifications.filter((n) => !n.read).length;
-
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
@@ -76,10 +69,9 @@ export function PayerntNavbar({
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
   return (
     <>
-      <header className="sticky top-0 z-40 w-full border-b border-border bg-surface-navigation/85 backdrop-blur-2xl shadow-elevation-1 transition-colors duration-200">
+      <header className="sticky top-0 z-40 w-full border-none border-b-0 shadow-none bg-background/85 backdrop-blur-2xl transition-colors duration-200">
         <div className="w-full px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           {/* Left: Brand Name Only (No Logo, No Online Pill) */}
           <div className="flex items-center">
@@ -95,25 +87,22 @@ export function PayerntNavbar({
               </span>
             </button>
           </div>
-
           {/* Right: Theme Toggle, Notifications, Profile Avatar */}
           <div className="flex items-center gap-2 sm:gap-3">
-
             {/* Theme Toggle Button */}
             <button
               type="button"
               onClick={toggleTheme}
-              className="flex h-9 w-9 items-center justify-center rounded-xl text-text-secondary hover:text-text-primary hover:bg-secondary transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-neutral-300 dark:border-neutral-700/80 hover:border-neutral-400 dark:hover:border-neutral-500 bg-transparent hover:bg-neutral-100 dark:hover:bg-white/5 text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               aria-label={`Switch to ${theme === "dark" ? "Light" : "Dark"} Mode`}
               title={`Switch to ${theme === "dark" ? "Light" : "Dark"} Mode`}
             >
               {theme === "dark" ? (
-                <Sun className="h-4 w-4 text-text-secondary hover:text-text-primary transition-transform" />
+                <Sun className="h-4 w-4 text-neutral-300 hover:text-white transition-transform" />
               ) : (
-                <Moon className="h-4 w-4 text-text-secondary hover:text-text-primary transition-transform" />
+                <Moon className="h-4 w-4 text-neutral-700 hover:text-neutral-950 transition-transform" />
               )}
             </button>
-
             {/* Notification Icon */}
             <div className="relative" ref={notifRef}>
               <button
@@ -130,7 +119,6 @@ export function PayerntNavbar({
                   </span>
                 )}
               </button>
-
               {/* Notification Drawer Popover */}
               <AnimatePresence>
                 {isNotifOpen && (
@@ -152,7 +140,6 @@ export function PayerntNavbar({
                         </button>
                       )}
                     </div>
-
                     <div className="max-h-64 overflow-y-auto space-y-2 pr-1">
                       {notifications.length === 0 ? (
                         <p className="text-xs text-text-secondary text-center py-4">
@@ -191,7 +178,6 @@ export function PayerntNavbar({
                         ))
                       )}
                     </div>
-
                     <div className="pt-2 border-t border-neutral-200/80 dark:border-white/10 text-center">
                       <button
                         type="button"
@@ -208,7 +194,6 @@ export function PayerntNavbar({
                 )}
               </AnimatePresence>
             </div>
-
             {/* Real User Profile Photo */}
             <button
               type="button"
@@ -237,5 +222,4 @@ export function PayerntNavbar({
     </>
   );
 }
-
 export default PayerntNavbar;

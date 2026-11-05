@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MainLayout } from "@/layouts/MainLayout";
+import { BackButton } from "@/components/common/BackButton";
 import { Button } from "@/components/common/Button";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/utils/api";
@@ -597,16 +598,19 @@ export default function Messages() {
       <section className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8 py-5 sm:py-8">
         {/* Top Header Bar */}
         <div className="flex items-center justify-between gap-4 mb-4">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-[11px] font-extrabold uppercase tracking-wider text-muted-foreground">
-                P2P Rental Workspace
-              </span>
+          <div className="flex items-center gap-3">
+            <BackButton fallback="/categories" />
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-[11px] font-extrabold uppercase tracking-wider text-muted-foreground">
+                  P2P Rental Workspace
+                </span>
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground flex items-center gap-2.5">
+                <span>Messages & Coordination</span>
+              </h1>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground flex items-center gap-2.5">
-              <span>Messages & Coordination</span>
-            </h1>
           </div>
 
           <div className="flex items-center gap-2">

@@ -16,6 +16,7 @@ import {
   Lock,
 } from "lucide-react";
 import { MainLayout } from "@/layouts/MainLayout";
+import { BackButton } from "@/components/common/BackButton";
 import { Button } from "@/components/common/Button";
 import { deviceService, PublicDeviceVerification } from "@/services/deviceService";
 
@@ -56,13 +57,7 @@ export const DeviceVerificationPage: React.FC = () => {
         <div className="w-full max-w-xl space-y-6">
           {/* Back link */}
           <div>
-            <Link
-              to="/"
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-neutral-500 hover:text-neutral-900 dark:hover:text-white transition-colors"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" />
-              Return to paYent
-            </Link>
+            <BackButton fallback="/" label="Return to paYent" />
           </div>
 
           {loading ? (

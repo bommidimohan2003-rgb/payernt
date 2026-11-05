@@ -27,6 +27,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/common/Button";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
+import { BackButton } from "@/components/common/BackButton";
 import { STORAGE_KEYS, storage } from "@/utils/storage";
 import { api } from "@/utils/api";
 import type { Order } from "@/types";
@@ -506,14 +507,17 @@ export default function Orders() {
       <div className="max-w-6xl mx-auto space-y-6">
         {/* Page Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-black font-display flex items-center gap-2.5 text-[#F5F5F5] tracking-tight">
-              <Package className="h-7 w-7 text-[#A1A1AA]" />
-              <span>Booking History</span>
-            </h1>
-            <p className="mt-1.5 text-xs sm:text-sm text-[#A1A1AA]">
-              View, track, and manage all your gear rentals and handover PIN credentials in one place.
-            </p>
+          <div className="flex items-center gap-3">
+            <BackButton fallback="/categories" />
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-black font-display flex items-center gap-2.5 text-[#F5F5F5] tracking-tight">
+                <Package className="h-7 w-7 text-[#A1A1AA]" />
+                <span>Booking History</span>
+              </h1>
+              <p className="mt-1.5 text-xs sm:text-sm text-[#A1A1AA]">
+                View, track, and manage all your gear rentals and handover PIN credentials in one place.
+              </p>
+            </div>
           </div>
 
           {/* Quick Return to Marketplace */}

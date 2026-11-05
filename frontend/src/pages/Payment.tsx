@@ -13,6 +13,7 @@ import {
   Building,
 } from "lucide-react";
 import { MainLayout } from "@/layouts/MainLayout";
+import { BackButton } from "@/components/common/BackButton";
 import { Button } from "@/components/common/Button";
 import { STORAGE_KEYS, storage } from "@/utils/storage";
 import { api } from "@/utils/api";
@@ -278,20 +279,13 @@ export default function Payment() {
   return (
     <MainLayout>
       <section className="mx-auto max-w-4xl px-4 md:px-6 py-10">
-        <button
-          onClick={() =>
-            navigate({ to: `/checkout`, search: { id: product.id } as never })
-          }
-          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" /> Back to Checkout
-        </button>
+        <BackButton fallback={`/checkout`} label="Back to Checkout" className="mb-6" />
 
         <div className="grid lg:grid-cols-[1fr_340px] gap-8">
           {/* Left: Payment Gateway options */}
           <div className="space-y-6">
             <div className="card-premium p-6 border-primary/20 bg-gradient-to-b from-primary/5 via-card to-card">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/60 pb-5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3">
                 <div className="flex items-center gap-3">
                   <div className="h-10 w-10 rounded-xl bg-primary/10 grid place-items-center">
                     <ShieldCheck className="h-5 w-5 text-primary" />

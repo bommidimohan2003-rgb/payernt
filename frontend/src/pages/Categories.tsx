@@ -19,10 +19,11 @@ import {
   RotateCcw,
   LayoutGrid,
   Heart,
-  User,
+  MessageSquare,
 } from "lucide-react";
 import { MainLayout } from "@/layouts/MainLayout";
 import { ProductCard } from "@/components/common/ProductCard";
+import { BackButton } from "@/components/common/BackButton";
 import { advancedSearch } from "@/utils/searchEngine";
 import { searchWithML } from "@/utils/smartSearch";
 import type { Product, Category } from "@/types";
@@ -35,6 +36,7 @@ import { isFakeOrDeletedProduct } from "@/utils/productFilters";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserLocation } from "@/hooks/useUserLocation";
 import { useWishlist } from "@/hooks/useWishlist";
+import { useUnreadMessages } from "@/hooks/useUnreadMessages";
 import { INITIAL_FALLBACK_PRODUCTS } from "@/utils/fallbackProducts";
 
 type SortOption = "featured" | "newest" | "price_asc" | "price_desc" | "rating";
@@ -182,6 +184,7 @@ export default function Categories() {
 
   const sortRef = useRef<HTMLDivElement>(null);
   const { wishlistCount } = useWishlist();
+  const { unreadCount } = useUnreadMessages();
 
   // User location detection
   const {
@@ -448,51 +451,56 @@ export default function Categories() {
         {/* ================================================================= */}
         {/* TOP SEARCH & UTILITY BAR + CATEGORY SYMBOLS BAR                   */}
         {/* ================================================================= */}
-        <section className="bg-white/90 dark:bg-[#090F16]/90 backdrop-blur-md border-b border-black/5 dark:border-white/5 sticky top-0 z-30 pt-3.5 pb-3 transition-all shadow-xs">
+        <section className="bg-white/90 dark:bg-[#090F16]/90 backdrop-blur-md sticky top-0 z-30 pt-3.5 pb-3 transition-all">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-3">
-            {/* Search Input + Location Badge + User Links */}
+            {/* Back Button + Search Input + Location Badge + User Links */}
             <div className="flex items-center justify-between gap-3 sm:gap-4">
-              {/* Search Bar */}
-              <form onSubmit={handleSearchSubmit} className="relative flex-1 max-w-md">
-                <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400" />
-                <input
-                  type="text"
-                  value={q}
-                  onChange={(e) => setLocalQ(e.target.value)}
-                  placeholder="Search gear, cameras, drones, laptops..."
-                  className="w-full pl-10 pr-9 py-2 text-xs sm:text-sm rounded-full bg-neutral-100 dark:bg-white/5 border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-white placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-xs transition-all"
-                />
-                {q && (
+              {/* Left Group: Back Button + Search Bar + Location Badge positioned together on the left */}
+              <div className="flex items-center gap-2 sm:gap-3 flex-1 max-w-2xl">
+                <BackButton fallback="/" />
+
+                {/* Search Bar */}
+                <form onSubmit={handleSearchSubmit} className="relative flex-1 max-w-md">
+                  <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400" />
+                  <input
+                    type="text"
+                    value={q}
+                    onChange={(e) => setLocalQ(e.target.value)}
+                    placeholder="Search gear, cameras, drones, laptops..."
+                    className="w-full pl-10 pr-9 py-2 text-xs sm:text-sm rounded-full bg-neutral-100 dark:bg-white/5 border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-white placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-xs transition-all"
+                  />
+                  {q && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLocalQ("");
+                        navigate({ to: targetRoute, search: (prev: any) => ({ ...prev, q: undefined }) });
+                      }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 cursor-pointer"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </form>
+
+                {/* Location Badge - now on the left beside search */}
+                <div className="hidden sm:flex items-center gap-1.5 px-3.5 py-1.5 bg-neutral-100 dark:bg-white/5 rounded-full border border-neutral-200 dark:border-white/10 text-xs text-neutral-700 dark:text-neutral-300 shrink-0">
+                  <MapPin className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                  <span className="font-semibold">{isDetecting ? "Locating..." : isLocationActive ? detectedCity : "Hyderabad"}</span>
                   <button
                     type="button"
-                    onClick={() => {
-                      setLocalQ("");
-                      navigate({ to: targetRoute, search: (prev: any) => ({ ...prev, q: undefined }) });
-                    }}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 cursor-pointer"
+                    onClick={() => detectLocation()}
+                    disabled={isDetecting}
+                    className="p-0.5 text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer"
+                    title="Detect current location"
                   >
-                    <X className="h-3.5 w-3.5" />
+                    <RotateCcw className={cn("h-3 w-3", isDetecting && "animate-spin")} />
                   </button>
-                )}
-              </form>
-
-              {/* Location Badge */}
-              <div className="hidden sm:flex items-center gap-1.5 px-3.5 py-1.5 bg-neutral-100 dark:bg-white/5 rounded-full border border-neutral-200 dark:border-white/10 text-xs text-neutral-700 dark:text-neutral-300">
-                <MapPin className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-                <span className="font-semibold">{isDetecting ? "Locating..." : isLocationActive ? detectedCity : "Hyderabad"}</span>
-                <button
-                  type="button"
-                  onClick={() => detectLocation()}
-                  disabled={isDetecting}
-                  className="p-0.5 text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer"
-                  title="Detect current location"
-                >
-                  <RotateCcw className={cn("h-3 w-3", isDetecting && "animate-spin")} />
-                </button>
+                </div>
               </div>
 
               {/* Right Quick Links */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 shrink-0">
                 <Link
                   to="/wishlist"
                   className="p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-200 transition-colors relative"
@@ -506,17 +514,22 @@ export default function Categories() {
                   )}
                 </Link>
                 <Link
-                  to="/profile"
-                  className="p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-200 transition-colors"
-                  aria-label="User Profile"
+                  to="/messages"
+                  className="p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-200 transition-colors relative"
+                  aria-label="Messages"
                 >
-                  <User className="h-5 w-5" />
+                  <MessageSquare className="h-5 w-5" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-emerald-600 text-white text-[10px] font-bold flex items-center justify-center">
+                      {unreadCount}
+                    </span>
+                  )}
                 </Link>
               </div>
             </div>
 
-            {/* CATEGORY SYMBOLS BAR — Only symbols with 10% increased size */}
-            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+            {/* CATEGORY SYMBOLS BAR — Spaced out circular category icons */}
+            <div className="flex items-center gap-4 sm:gap-5 overflow-x-auto no-scrollbar py-2">
               {categoryChips.map((c) => {
                 const Icon = c.icon;
                 const isActive = activeCategory === c.id;
@@ -555,7 +568,7 @@ export default function Categories() {
         {/* ================================================================= */}
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 sm:py-8 pb-32 space-y-6">
           {/* Catalog Header & Sort Controls */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-neutral-200 dark:border-neutral-800">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
             <div>
               <h2 className="text-xl sm:text-2xl font-extrabold text-neutral-900 dark:text-white tracking-tight flex items-center gap-2">
                 <span>{q ? `Search: "${q}"` : activeCategoryTitle}</span>

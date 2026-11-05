@@ -29,6 +29,7 @@ import {
   User,
 } from "lucide-react";
 import { MainLayout } from "@/layouts/MainLayout";
+import { BackButton } from "@/components/common/BackButton";
 import { Button } from "@/components/common/Button";
 import { Input } from "@/components/common/Input";
 import { useNavigate, useSearch } from "@tanstack/react-router";
@@ -293,6 +294,7 @@ export default function BecomeLender() {
         <div className="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-[450px] bg-gradient-to-br from-primary/20 via-purple-500/10 to-emerald-500/10 blur-[130px] rounded-full -z-10" />
 
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-12">
+          <BackButton fallback="/dashboard" className="mb-2" />
           {/* PERKS GRID SECTION */}
           <div className="space-y-6">
             <div className="text-left">
@@ -416,7 +418,7 @@ export default function BecomeLender() {
                 {/* Form Side (7 cols desktop) */}
                 <div className="lg:col-span-7 rounded-3xl border border-border/80 dark:border-white/10 bg-card/60 dark:bg-card/40 backdrop-blur-2xl p-6 sm:p-10 space-y-8 shadow-xl">
                   {/* Stepper Navigation */}
-                  <div className="space-y-4 border-b border-border/80 pb-6">
+                  <div className="space-y-4 pb-4">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-primary">
                         Step {currentStep} of 3
