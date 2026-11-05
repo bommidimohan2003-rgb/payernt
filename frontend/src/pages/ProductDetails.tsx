@@ -1188,17 +1188,59 @@ const productSchema = product ? {
             
             {/* Left Column: Image Gallery & 10s Video Showcase (6 cols) */}
             <div className="lg:col-span-6 space-y-4">
-              {/* Main Product Showcase Card with soft mint tint */}
-              <div className="relative rounded-3xl overflow-hidden bg-[#EAF7EE] dark:bg-emerald-950/25 border border-emerald-500/20 p-8 sm:p-12 flex items-center justify-center min-h-[380px] sm:min-h-[460px] shadow-sm group">
-                {/* Top Controls: Status Badge & 10s Video Badge */}
-                <div className="absolute top-4 left-4 z-10 flex items-center gap-2">
+              {/* Main Product Showcase Card with edge-to-edge image & floating overlay badges */}
+              <div className="relative rounded-3xl overflow-hidden bg-neutral-950 border border-neutral-200/80 dark:border-neutral-800 aspect-[4/3] sm:aspect-[16/11] min-h-[380px] sm:min-h-[460px] max-h-[520px] w-full flex items-center justify-center shadow-md group">
+                {/* Center Showcase: 10s Video Player or High-Resolution Photo */}
+                {isVideoActive ? (
+                  <div className="w-full h-full min-h-[380px] sm:min-h-[460px] rounded-3xl overflow-hidden bg-black flex flex-col items-center justify-center relative shadow-inner">
+                    <video
+                      key={activeVideoUrl}
+                      poster={activeDisplayImage || product?.image}
+                      controls
+                      autoPlay
+                      muted
+                      playsInline
+                      preload="auto"
+                      className="w-full h-full max-h-[460px] object-contain rounded-3xl"
+                      onError={(e) => {
+                        const target = e.currentTarget;
+                        if (!target.currentSrc?.includes("l2vmxn9hwk6p0cs4ajoz")) {
+                          target.src = "https://res.cloudinary.com/dvyendk6j/video/upload/v1793724284/l2vmxn9hwk6p0cs4ajoz.mp4";
+                          target.load();
+                          target.play().catch(() => {});
+                        }
+                      }}
+                    >
+                      <source src={activeVideoUrl} type="video/mp4" />
+                      <source src={activeVideoUrl.replace(/\.mp4$/, ".webm")} type="video/webm" />
+                    </video>
+                    <div className="absolute bottom-3 left-3 px-3 py-1 rounded-full bg-black/70 backdrop-blur-md text-[11px] text-emerald-400 font-bold border border-emerald-500/30 flex items-center gap-1.5 select-none pointer-events-none">
+                      <ShieldCheck className="h-3.5 w-3.5" />
+                      <span>Verified 10s Inspection Video</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="relative w-full h-full min-h-[380px] sm:min-h-[460px] overflow-hidden flex items-center justify-center">
+                    <img
+                      src={activeDisplayImage}
+                      alt={product.title}
+                      onClick={() => setIsPhotoViewerOpen(true)}
+                      className="w-full h-full min-h-[380px] sm:min-h-[460px] max-h-[520px] object-cover object-center transition-transform duration-500 ease-out group-hover:scale-105 cursor-pointer"
+                    />
+                    {/* Top gradient overlay to ensure wording & badge legibility directly on the image */}
+                    <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/60 via-black/20 to-transparent pointer-events-none" />
+                  </div>
+                )}
+
+                {/* Top Controls: Status Badge & 10s Video Badge — overlapping directly on the image */}
+                <div className="absolute top-4 left-4 z-10 flex items-center gap-2 pointer-events-auto">
                   {product.available ? (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/95 dark:bg-black/70 text-emerald-700 dark:text-emerald-400 font-semibold text-xs shadow-xs backdrop-blur-md border border-emerald-500/20 select-none">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/60 dark:bg-black/75 text-emerald-400 font-semibold text-xs shadow-md backdrop-blur-md border border-emerald-500/30 select-none">
                       <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
                       Available
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/95 dark:bg-black/70 text-rose-600 dark:text-rose-400 font-semibold text-xs shadow-xs backdrop-blur-md border border-rose-500/20 select-none">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/60 dark:bg-black/75 text-rose-400 font-semibold text-xs shadow-md backdrop-blur-md border border-rose-500/30 select-none">
                       <span className="h-2 w-2 rounded-full bg-rose-500" />
                       Reserved
                     </span>
@@ -1213,18 +1255,18 @@ const productSchema = product ? {
                     }}
                     title="Watch 10-second verified equipment inspection video"
                     className={cn(
-                      "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all shadow-xs backdrop-blur-md border cursor-pointer active:scale-95",
+                      "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all shadow-md backdrop-blur-md border cursor-pointer active:scale-95",
                       isVideoActive
                         ? "bg-emerald-600 text-white border-emerald-500 ring-2 ring-emerald-500/30"
-                        : "bg-white/95 dark:bg-black/70 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+                        : "bg-black/60 dark:bg-black/75 hover:bg-black/80 text-white border-white/20 hover:border-emerald-500/40"
                     )}
                   >
-                    <Video className="h-3.5 w-3.5" />
+                    <Video className="h-3.5 w-3.5 text-emerald-400" />
                     <span>{isVideoActive ? "Show Photos" : "10s Video"}</span>
                   </button>
                 </div>
 
-                {/* Top-Right: Heart Wishlist Button */}
+                {/* Top-Right: Heart Wishlist Button — overlapping directly on the image */}
                 <button
                   type="button"
                   onClick={() => {
@@ -1232,48 +1274,10 @@ const productSchema = product ? {
                     toast.success(isWishlisted ? "Removed from favourites" : "Saved to favourites!");
                   }}
                   aria-label={isWishlisted ? "Remove from favourites" : "Add to favourites"}
-                  className="absolute top-4 right-4 z-10 p-2.5 rounded-full bg-white/95 dark:bg-black/70 text-neutral-600 dark:text-neutral-300 hover:text-rose-500 hover:scale-110 active:scale-95 transition-all shadow-xs border border-neutral-200/60 dark:border-neutral-700/60 backdrop-blur-md cursor-pointer"
+                  className="absolute top-4 right-4 z-10 p-2.5 rounded-full bg-black/60 dark:bg-black/75 hover:bg-black/80 text-white hover:text-rose-500 hover:scale-110 active:scale-95 transition-all shadow-md border border-white/20 backdrop-blur-md cursor-pointer pointer-events-auto"
                 >
                   <Heart className={cn("h-5 w-5 transition-colors", isWishlisted ? "fill-rose-500 text-rose-500" : "")} />
                 </button>
-
-                {/* Center Showcase: 10s Video Player or High-Resolution Photo */}
-                {isVideoActive ? (
-                  <div className="w-full h-full min-h-[300px] sm:min-h-[380px] rounded-2xl overflow-hidden bg-black flex flex-col items-center justify-center relative shadow-inner">
-                    <video
-                      key={activeVideoUrl}
-                      poster={activeDisplayImage || product?.image}
-                      controls
-                      autoPlay
-                      muted
-                      playsInline
-                      preload="auto"
-                      className="w-full h-full max-h-[360px] object-contain rounded-2xl"
-                      onError={(e) => {
-                        const target = e.currentTarget;
-                        if (!target.currentSrc?.includes("l2vmxn9hwk6p0cs4ajoz")) {
-                          target.src = "https://res.cloudinary.com/dvyendk6j/video/upload/v1793724284/l2vmxn9hwk6p0cs4ajoz.mp4";
-                          target.load();
-                          target.play().catch(() => {});
-                        }
-                      }}
-                    >
-                      <source src={activeVideoUrl} type="video/mp4" />
-                      <source src={activeVideoUrl.replace(/\.mp4$/, ".webm")} type="video/webm" />
-                    </video>
-                    <div className="absolute bottom-2 left-2 px-2.5 py-0.5 rounded-full bg-black/70 backdrop-blur-md text-[10px] text-emerald-400 font-bold border border-emerald-500/30 flex items-center gap-1 select-none pointer-events-none">
-                      <ShieldCheck className="h-3 w-3" />
-                      <span>Verified 10s Inspection Video</span>
-                    </div>
-                  </div>
-                ) : (
-                  <img
-                    src={activeDisplayImage}
-                    alt={product.title}
-                    onClick={() => setIsPhotoViewerOpen(true)}
-                    className="max-h-[300px] sm:max-h-[380px] w-auto max-w-full object-contain drop-shadow-2xl transition-transform duration-300 group-hover:scale-105 cursor-pointer"
-                  />
-                )}
               </div>
 
               {/* 5-Thumbnail Media Strip (Photos + 10s Video Option) */}
@@ -1898,7 +1902,7 @@ const productSchema = product ? {
                     params={{ id: rel.id }}
                     className="group rounded-3xl border border-border/80 bg-card p-4 space-y-3 hover:shadow-lg transition-all hover:border-emerald-500/40 text-left block"
                   >
-                    <div className="aspect-[4/3] rounded-2xl bg-[#EAF7EE] dark:bg-emerald-950/20 p-4 flex items-center justify-center overflow-hidden">
+                    <div className="aspect-[4/3] rounded-2xl bg-neutral-100 dark:bg-neutral-900/60 p-4 flex items-center justify-center overflow-hidden">
                       <img
                         src={rel.image || "/brand/payent-logo-icon.png"}
                         alt={rel.title}
