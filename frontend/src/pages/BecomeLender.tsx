@@ -432,7 +432,7 @@ export default function BecomeLender() {
 
                     {/* Step Timeline Stepper Indicator */}
                     <nav aria-label="Listing Progress">
-                      <ol className="grid grid-cols-3 gap-2">
+                      <ol className="grid grid-cols-3 gap-1.5 sm:gap-2">
                         {[
                           { num: 1, label: "Name & Specs" },
                           { num: 2, label: "Photos" },
@@ -448,7 +448,7 @@ export default function BecomeLender() {
                                   setCurrentStep(step.num as 1 | 2 | 3)
                                 }
                                 aria-current={isActive ? "step" : undefined}
-                                className={`w-full py-2.5 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                                className={`w-full py-2 sm:py-2.5 px-1.5 sm:px-3 rounded-xl border text-[11px] sm:text-xs font-semibold flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 transition-all cursor-pointer ${
                                   isActive
                                     ? "border-primary bg-primary/10 text-primary ring-1 ring-primary shadow-xs"
                                     : isCompleted

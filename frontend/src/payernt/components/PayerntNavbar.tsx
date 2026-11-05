@@ -126,7 +126,7 @@ export function PayerntNavbar({
                     initial={{ opacity: 0, y: 6, scale: 0.95 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 6, scale: 0.95 }}
-                    className="absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl border border-border bg-surface-modal shadow-elevation-3 p-4 z-50 text-left space-y-3"
+                    className="absolute right-0 mt-2 w-80 sm:w-96 max-w-[calc(100vw-2rem)] rounded-2xl border border-border bg-surface-modal shadow-elevation-3 p-4 z-50 text-left space-y-3"
                   >
                     <div className="flex items-center justify-between border-b border-border pb-2">
                       <span className="font-bold text-xs text-foreground">{tCommon.notifications}</span>

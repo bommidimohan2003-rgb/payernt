@@ -246,21 +246,21 @@ export default function About() {
                 </div>
 
                 {/* Creator Categories Visual Strip */}
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="flex flex-col items-center p-2 rounded-xl bg-neutral-50 dark:bg-white/[0.03] border border-black/5 dark:border-white/5 text-center">
-                    <Camera className="w-4 h-4 text-emerald-500 mb-1" />
-                    <span className="text-[11px] font-semibold text-neutral-800 dark:text-neutral-200">Cameras</span>
-                    <span className="text-[9px] text-neutral-400">Cinema & FX</span>
+                <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
+                  <div className="flex flex-col items-center p-1.5 sm:p-2 rounded-xl bg-neutral-50 dark:bg-white/[0.03] border border-black/5 dark:border-white/5 text-center min-w-0">
+                    <Camera className="w-4 h-4 text-emerald-500 mb-1 shrink-0" />
+                    <span className="text-[10px] sm:text-[11px] font-semibold text-neutral-800 dark:text-neutral-200 truncate max-w-full">Cameras</span>
+                    <span className="text-[8.5px] sm:text-[9px] text-neutral-400 truncate max-w-full">Cinema & FX</span>
                   </div>
-                  <div className="flex flex-col items-center p-2 rounded-xl bg-neutral-50 dark:bg-white/[0.03] border border-black/5 dark:border-white/5 text-center">
-                    <Plane className="w-4 h-4 text-emerald-500 mb-1" />
-                    <span className="text-[11px] font-semibold text-neutral-800 dark:text-neutral-200">Drones</span>
-                    <span className="text-[9px] text-neutral-400">DJI & Aerial</span>
+                  <div className="flex flex-col items-center p-1.5 sm:p-2 rounded-xl bg-neutral-50 dark:bg-white/[0.03] border border-black/5 dark:border-white/5 text-center min-w-0">
+                    <Plane className="w-4 h-4 text-emerald-500 mb-1 shrink-0" />
+                    <span className="text-[10px] sm:text-[11px] font-semibold text-neutral-800 dark:text-neutral-200 truncate max-w-full">Drones</span>
+                    <span className="text-[8.5px] sm:text-[9px] text-neutral-400 truncate max-w-full">DJI & Aerial</span>
                   </div>
-                  <div className="flex flex-col items-center p-2 rounded-xl bg-neutral-50 dark:bg-white/[0.03] border border-black/5 dark:border-white/5 text-center">
-                    <Monitor className="w-4 h-4 text-emerald-500 mb-1" />
-                    <span className="text-[11px] font-semibold text-neutral-800 dark:text-neutral-200">Laptops</span>
-                    <span className="text-[9px] text-neutral-400">M3 Studio</span>
+                  <div className="flex flex-col items-center p-1.5 sm:p-2 rounded-xl bg-neutral-50 dark:bg-white/[0.03] border border-black/5 dark:border-white/5 text-center min-w-0">
+                    <Monitor className="w-4 h-4 text-emerald-500 mb-1 shrink-0" />
+                    <span className="text-[10px] sm:text-[11px] font-semibold text-neutral-800 dark:text-neutral-200 truncate max-w-full">Laptops</span>
+                    <span className="text-[8.5px] sm:text-[9px] text-neutral-400 truncate max-w-full">M3 Studio</span>
                   </div>
                 </div>
 

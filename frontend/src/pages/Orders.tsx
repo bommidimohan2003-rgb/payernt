@@ -1276,7 +1276,7 @@ export default function Orders() {
                 <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
                   Fulfillment Method
                 </label>
-                <div className="grid grid-cols-3 gap-2 bg-neutral-100 dark:bg-white/5 p-1 rounded-xl text-xs font-semibold">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 bg-neutral-100 dark:bg-white/5 p-1 rounded-xl text-xs font-semibold">
                   <button
                     type="button"
                     onClick={() => setEditMethod("delivery")}

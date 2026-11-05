@@ -605,7 +605,7 @@ export default function DeliveryTracking() {
                 <span className="text-xs text-muted-foreground font-normal">Last updated: {lastUpdated}</span>
               </h3>
 
-              <div className="grid grid-cols-4 gap-2 pt-2">
+              <div className="grid grid-cols-4 gap-1.5 sm:gap-2 pt-2">
                 {[
                   { key: "PENDING", label: "Confirmed" },
                   { key: "READY", label: "Packaged" },
@@ -622,7 +622,7 @@ export default function DeliveryTracking() {
                       : delivery.status === step.key;
 
                   return (
-                    <div key={step.key} className="flex flex-col items-center text-center gap-1.5">
+                    <div key={step.key} className="flex flex-col items-center text-center gap-1.5 min-w-0">
                       <div
                         className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
                           isDone
@@ -634,7 +634,7 @@ export default function DeliveryTracking() {
                       >
                         {isDone ? <Check className="h-3.5 w-3.5" /> : idx + 1}
                       </div>
-                      <span className={`text-[11px] font-medium leading-tight ${isDone ? "text-foreground font-semibold" : "text-muted-foreground"}`}>
+                      <span className={`text-[10px] sm:text-[11px] font-medium leading-tight truncate max-w-full ${isDone ? "text-foreground font-semibold" : "text-muted-foreground"}`}>
                         {step.label}
                       </span>
                     </div>

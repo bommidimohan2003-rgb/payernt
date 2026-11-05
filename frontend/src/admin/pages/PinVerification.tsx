@@ -476,7 +476,7 @@ export default function PinVerification() {
                       Product ID: #{verificationResult.product.id}
                     </div>
 
-                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-[rgba(161,161,170,0.18)] text-xs">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-[rgba(161,161,170,0.18)] text-xs">
                       <div>
                         <span className="text-[10px] text-[#A1A1AA] uppercase">Category</span>
                         <div className="font-semibold text-[#F5F5F5]">

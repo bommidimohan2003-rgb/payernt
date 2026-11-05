@@ -832,7 +832,7 @@ export default function Users() {
                             </span>
                           </div>
 
-                          <div className="grid grid-cols-2 gap-3 text-xs">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                             <div>
                               <span className="text-muted-foreground block text-[11px]">Vendor Name</span>
                               <span className="font-semibold text-foreground">{selectedUser.payerntAccount.name}</span>
@@ -922,7 +922,7 @@ export default function Users() {
                             </span>
                           </div>
 
-                          <div className="grid grid-cols-2 gap-3 text-xs">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                             <div>
                               <span className="text-muted-foreground block text-[11px]">Customer Name</span>
                               <span className="font-semibold text-foreground">{selectedUser.payrentAccount.fullName}</span>

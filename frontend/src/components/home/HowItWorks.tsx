@@ -127,7 +127,7 @@ export function HowItWorks() {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true, amount: 0.2 }}
-          className="grid grid-cols-3 gap-2.5 sm:gap-4 mb-5 sm:mb-6"
+          className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4 mb-5 sm:mb-6"
         >
           {workflowSteps.map((s, idx) => {
             const isActive = idx === activeStep;

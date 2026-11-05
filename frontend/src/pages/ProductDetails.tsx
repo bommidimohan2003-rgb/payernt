@@ -1443,7 +1443,7 @@ const productSchema = product ? {
               </div>
 
               {/* 5-Thumbnail Media Strip (Photos + 10s Video Option) */}
-              <div className="grid grid-cols-5 gap-2 sm:gap-3">
+              <div className="grid grid-cols-5 gap-1.5 sm:gap-3">
                 {thumbnails.map((thumb, idx) => {
                   const isActive = !isVideoActive && idx === selectedImageIndex;
                   const isFourth = idx === 3;
@@ -1759,7 +1759,7 @@ const productSchema = product ? {
                   <label className="block text-[11px] font-bold text-foreground uppercase tracking-wider">
                     Choose Time Slot
                   </label>
-                  <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     {/* Morning */}
                     <button
                       type="button"

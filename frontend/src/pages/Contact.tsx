@@ -201,7 +201,7 @@ export default function Contact() {
                 </div>
 
                 {/* Support Disciplines */}
-                <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-center">
                   <div className="p-2.5 rounded-xl bg-neutral-50 dark:bg-white/[0.03] border border-black/5 dark:border-white/5">
                     <div className="text-[11px] font-bold text-neutral-900 dark:text-white">Rental Help</div>
                     <div className="text-[9px] text-neutral-400 mt-0.5">Gear booking & handoff</div>

@@ -1278,7 +1278,7 @@ export default function Knowledge() {
         size="xl"
       >
         <form onSubmit={handleSaveEntry} className="space-y-4 p-6">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="text-xs font-semibold text-[#A1A1AA] mb-1 block">Category</label>
               <select

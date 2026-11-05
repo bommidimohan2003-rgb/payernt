@@ -1371,7 +1371,7 @@ export default function Checkout() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4 pt-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 pt-2">
                     <Input
                       type="date"
                       label="Rental Start Date"
@@ -1395,7 +1395,7 @@ export default function Checkout() {
                     Payment Method Selection
                   </h3>
 
-                  <div className="grid grid-cols-2 gap-2 bg-secondary p-1 rounded-xl text-xs font-semibold">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-secondary p-1 rounded-xl text-xs font-semibold">
                     <button
                       type="button"
                       onClick={() => setPaymentMethod("card")}

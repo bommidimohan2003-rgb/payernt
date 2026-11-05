@@ -658,8 +658,8 @@ export default function Messages() {
                 )}
               </div>
 
-              {/* Filter Tabs */}
-              <div className="grid grid-cols-4 gap-1 p-1 bg-secondary/60 rounded-xl text-[11px] font-bold">
+              {/* Filter Tabs - Responsive grid (2 cols on small mobile, 4 on desktop/tablet) */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 p-1 bg-secondary/60 rounded-xl text-[11px] font-bold">
                 <button
                   onClick={() => setActiveTab("ALL")}
                   className={cn(

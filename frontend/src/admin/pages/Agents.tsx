@@ -410,7 +410,7 @@ export default function Agents() {
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
               <div className="p-3 rounded-xl bg-secondary/40 border border-border/60">
                 <span className="text-muted-foreground block text-[10px] uppercase font-bold">Listings</span>
                 <span className="text-base font-black font-mono mt-1 block">{selectedAgent.productsCount || 0}</span>

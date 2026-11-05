@@ -684,7 +684,7 @@ export default function KycApplicationDetails() {
               </span>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
               <div className="p-3 rounded-xl bg-secondary/30 border border-border/60">
                 <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
                   Document Type

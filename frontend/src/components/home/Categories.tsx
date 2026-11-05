@@ -192,8 +192,8 @@ export function Categories() {
           </Link>
         </div>
 
-        {/* Category Showcase Grid: All cards in 1 row on large screen (lg:grid-cols-7), 3 cards per row on small screens (grid-cols-3) */}
-        <div className="grid grid-cols-3 lg:grid-cols-7 gap-2 sm:gap-3 lg:gap-3.5">
+        {/* Category Showcase Grid: Responsive columns across all screen sizes (2 on mobile, 3 on tablet, 7 on desktop) */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2 sm:gap-3 lg:gap-3.5">
           {categories.map((cat) => {
             const imgSrc =
               cat.image ||

@@ -2106,7 +2106,7 @@ export function ListProductWizard({
                         <label className="text-xs font-bold text-foreground">
                           Physical Dimensions (Height, Width, Weight)
                         </label>
-                        <div className="grid grid-cols-3 gap-2.5">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-2.5">
                           <div>
                             <span className="text-[10px] text-muted-foreground">Height (cm)</span>
                             <input

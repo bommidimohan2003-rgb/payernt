@@ -192,7 +192,7 @@ export function ProductSelection() {
   };
 
   return (
-    <div className="relative min-h-screen h-screen w-screen bg-background text-foreground flex flex-col justify-between overflow-hidden selection:bg-foreground/15 select-none transition-colors duration-200">
+    <div className="relative min-h-[100dvh] h-[100dvh] w-full bg-background text-foreground flex flex-col justify-between overflow-hidden selection:bg-foreground/15 select-none transition-colors duration-200">
       <CinematicBackground shouldReduceMotion={shouldReduceMotion} />
       <GatewayTopNav />
 
@@ -665,7 +665,7 @@ export function ProductSelection() {
       {/* ================================================================== */}
       {/* MOBILE / SMALL-SCREEN PARENT → TWO CHILDREN GATEWAY (< 768px)       */}
       {/* ================================================================== */}
-      <div className="flex md:hidden min-h-screen h-screen w-full flex-col items-center justify-center p-4 relative z-10 overflow-hidden">
+      <div className="flex md:hidden min-h-[100dvh] h-[100dvh] w-full flex-col items-center justify-center p-3 sm:p-4 relative z-10 overflow-hidden">
         <AnimatePresence mode="wait">
           {/* INITIAL CLOSED STATE: ONLY CENTERED PARENT NODE */}
           {!isMobileOpen ? (
@@ -728,7 +728,7 @@ export function ProductSelection() {
                   }
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.35, ease: smoothEase }}
-                  className="shrink-0 z-20 cursor-pointer outline-none select-none text-left p-3.5 sm:p-4 border border-border/80 hover:border-foreground/60 rounded-2xl bg-card/60 active:scale-95 transition-all backdrop-blur-md focus-visible:ring-1 focus-visible:ring-foreground/40 shadow-sm group"
+                  className="shrink-0 z-20 cursor-pointer outline-none select-none text-left p-2.5 sm:p-4 border border-border/80 hover:border-foreground/60 rounded-2xl bg-card/60 active:scale-95 transition-all backdrop-blur-md focus-visible:ring-1 focus-visible:ring-foreground/40 shadow-sm group"
                 >
                   <BrandTitle className="text-xl sm:text-2xl font-extrabold tracking-tight text-foreground" />
                   <div className="text-[7.5px] sm:text-[8px] font-mono tracking-widest text-muted-foreground/60 group-hover:text-foreground/80 transition-colors uppercase mt-1">
@@ -740,7 +740,7 @@ export function ProductSelection() {
                 <div
                   className="relative shrink-0 z-10 pointer-events-none"
                   style={{
-                    width: "clamp(32px, 10vw, 48px)",
+                    width: "clamp(20px, 7vw, 44px)",
                     height: "280px",
                   }}
                 >
@@ -795,7 +795,7 @@ export function ProductSelection() {
                 <div
                   className="flex flex-col justify-between shrink-0 z-20"
                   style={{
-                    width: "clamp(152px, 48vw, 205px)",
+                    width: "clamp(136px, 45vw, 205px)",
                     height: "280px",
                   }}
                 >
@@ -812,7 +812,7 @@ export function ProductSelection() {
                     }
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.35, delay: 0.18, ease: smoothEase }}
-                    className="group cursor-pointer outline-none select-none text-left p-3.5 sm:p-4 border border-border/80 hover:border-foreground/60 rounded-2xl bg-card/60 active:scale-95 transition-all focus-visible:ring-1 focus-visible:ring-foreground/40 flex flex-col justify-between backdrop-blur-md shadow-sm"
+                    className="group cursor-pointer outline-none select-none text-left p-2.5 sm:p-4 border border-border/80 hover:border-foreground/60 rounded-2xl bg-card/60 active:scale-95 transition-all focus-visible:ring-1 focus-visible:ring-foreground/40 flex flex-col justify-between backdrop-blur-md shadow-sm"
                     style={{ minHeight: "130px" }}
                   >
                     <div>
@@ -861,7 +861,7 @@ export function ProductSelection() {
                     }
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.35, delay: 0.24, ease: smoothEase }}
-                    className="group cursor-pointer outline-none select-none text-left p-3.5 sm:p-4 border border-border/80 hover:border-foreground/60 rounded-2xl bg-card/60 active:scale-95 transition-all focus-visible:ring-1 focus-visible:ring-foreground/40 flex flex-col justify-between backdrop-blur-md shadow-sm"
+                    className="group cursor-pointer outline-none select-none text-left p-2.5 sm:p-4 border border-border/80 hover:border-foreground/60 rounded-2xl bg-card/60 active:scale-95 transition-all focus-visible:ring-1 focus-visible:ring-foreground/40 flex flex-col justify-between backdrop-blur-md shadow-sm"
                     style={{ minHeight: "130px" }}
                   >
                     <div>

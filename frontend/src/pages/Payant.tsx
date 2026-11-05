@@ -216,7 +216,7 @@ export default function Payant() {
               </div>
             </div>
 
-            <div className="pt-2 grid grid-cols-3 gap-3 border-t border-white/10 text-center">
+            <div className="pt-2 grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 border-t border-white/10 text-center">
               <div className="p-3 rounded-xl bg-white/5 border border-white/5">
                 <div className="text-[10px] text-neutral-400 uppercase font-semibold">Annual APY</div>
                 <div className="text-base font-bold text-amber-400 font-mono mt-0.5">{currentRate}%</div>

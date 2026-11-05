@@ -598,7 +598,7 @@ export default function Bookings() {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="p-3 rounded-xl bg-secondary/40 border border-border/60 space-y-1">
                   <span className="text-muted-foreground text-[10px] uppercase font-bold block">Customer / Renter</span>
                   <span className="font-bold text-foreground block">{selectedBooking.customerName}</span>

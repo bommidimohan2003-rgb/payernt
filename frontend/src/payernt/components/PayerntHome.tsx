@@ -625,8 +625,8 @@ export function PayerntHome({
             </div>
           </div>
 
-          {/* 2. Top 4 Metric Cards in One Line (4 Cols) */}
-          <div className="relative z-10 grid grid-cols-4 gap-4 mt-8">
+          {/* 2. Top 4 Metric Cards in One Line (Responsive: 1 col on mobile, 2 on tablet, 4 on desktop) */}
+          <div className="relative z-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mt-6 sm:mt-8">
             {/* Metric 1: Available Balance */}
             <button
               type="button"
@@ -788,10 +788,10 @@ export function PayerntHome({
             </button>
           </div>
 
-          {/* 3. Middle Section: Upcoming Bookings (8 Cols) & Your Products (4 Cols) */}
-          <div className="relative z-10 grid grid-cols-12 gap-5 mt-5">
-            {/* Upcoming Bookings (Wide Card - 8 Cols) */}
-            <div className="col-span-8 p-6 rounded-2xl bg-neutral-50/90 border-neutral-200/90 dark:bg-[#10141d]/90 dark:border-white/[0.07] border flex flex-col justify-between shadow-sm dark:shadow-lg min-h-[220px]">
+          {/* 3. Middle Section: Upcoming Bookings (8 Cols on desktop) & Your Products (4 Cols on desktop) */}
+          <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-5 mt-5">
+            {/* Upcoming Bookings (Wide Card - 8 Cols on desktop, full width on mobile) */}
+            <div className="col-span-1 lg:col-span-8 p-4 sm:p-6 rounded-2xl bg-neutral-50/90 border-neutral-200/90 dark:bg-[#10141d]/90 dark:border-white/[0.07] border flex flex-col justify-between shadow-sm dark:shadow-lg min-h-[220px]">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="p-2 rounded-xl bg-white dark:bg-white/[0.05] border border-neutral-200 dark:border-white/10 text-neutral-700 dark:text-neutral-200">
@@ -853,8 +853,8 @@ export function PayerntHome({
               )}
             </div>
 
-            {/* Your Products (Compact Card - 4 Cols) */}
-            <div className="col-span-4 p-6 rounded-2xl bg-neutral-50/90 border-neutral-200/90 dark:bg-[#10141d]/90 dark:border-white/[0.07] border flex flex-col justify-between shadow-sm dark:shadow-lg min-h-[220px]">
+            {/* Your Products (Compact Card - 4 Cols on desktop, full width on mobile) */}
+            <div className="col-span-1 lg:col-span-4 p-4 sm:p-6 rounded-2xl bg-neutral-50/90 border-neutral-200/90 dark:bg-[#10141d]/90 dark:border-white/[0.07] border flex flex-col justify-between shadow-sm dark:shadow-lg min-h-[220px]">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="p-2 rounded-xl bg-white dark:bg-white/[0.05] border border-neutral-200 dark:border-white/10 text-neutral-700 dark:text-neutral-200">
@@ -932,10 +932,10 @@ export function PayerntHome({
           </div>
 
 
-          {/* 4. Lower Row: Quick Actions (8 Cols) & Wallet Card (4 Cols) */}
-          <div className="relative z-10 grid grid-cols-12 gap-5 mt-5">
-            {/* Quick Action Tiles (6 Tiles - 8 Cols) */}
-            <div className="col-span-8 grid grid-cols-6 gap-3">
+          {/* 4. Lower Row: Quick Actions (8 Cols on desktop) & Wallet Card (4 Cols on desktop) */}
+          <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-5 mt-5">
+            {/* Quick Action Tiles (6 Tiles - 8 Cols on desktop, 3 cols on mobile) */}
+            <div className="col-span-1 lg:col-span-8 grid grid-cols-3 sm:grid-cols-6 gap-2.5 sm:gap-3">
               {/* 1. Add Product Tile (Elevated Soft Highlight) */}
               <button
                 type="button"
@@ -999,10 +999,10 @@ export function PayerntHome({
               </button>
             </div>
 
-            {/* Wallet Summary Card (4 Cols) */}
+            {/* Wallet Summary Card (4 Cols on desktop, full width on mobile) */}
             <div
               onClick={() => onNavigate("wallet")}
-              className="col-span-4 p-5 rounded-2xl bg-neutral-50/90 hover:bg-neutral-100/90 border-neutral-200/90 dark:bg-[#10141d]/90 dark:hover:bg-[#141924] dark:border-white/[0.07] border flex flex-col justify-between shadow-sm dark:shadow-lg transition-all cursor-pointer group"
+              className="col-span-1 lg:col-span-4 p-4 sm:p-5 rounded-2xl bg-neutral-50/90 hover:bg-neutral-100/90 border-neutral-200/90 dark:bg-[#10141d]/90 dark:hover:bg-[#141924] dark:border-white/[0.07] border flex flex-col justify-between shadow-sm dark:shadow-lg transition-all cursor-pointer group"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
