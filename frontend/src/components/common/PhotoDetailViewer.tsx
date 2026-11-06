@@ -128,7 +128,7 @@ export function PhotoDetailViewer({
             {!activeSrc || activeSrc.trim() === "" || activeSrc === "/placeholder.png" || imageErrorMap[activeSrc] ? (
               <div className="h-full w-full flex flex-col items-center justify-center bg-gradient-to-br from-secondary/60 via-card to-secondary/30 p-8 text-center select-none relative overflow-hidden">
                 <div className="absolute -top-24 -right-24 w-72 h-72 rounded-full bg-primary/10 blur-3xl pointer-events-none" />
-                <div className="absolute -bottom-24 -left-24 w-72 h-72 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
+                <div className="absolute -bottom-24 -left-24 w-72 h-72 rounded-full bg-primary/5 blur-3xl pointer-events-none" />
                 <div className="relative z-10 space-y-3 max-w-sm flex flex-col items-center">
                   <div className="h-20 w-20 rounded-3xl bg-secondary/80 border border-border flex items-center justify-center shadow-lg text-primary">
                     <ImageIcon className="h-10 w-10 stroke-[1.5]" />
@@ -209,7 +209,7 @@ export function PhotoDetailViewer({
                   : "bg-black/60 text-white hover:bg-black/85 border-white/20"
               )}
             >
-              <Video className="h-3.5 w-3.5 text-emerald-400" />
+              <Video className={cn("h-3.5 w-3.5", isVideoActive ? "text-primary-foreground" : "text-primary")} />
               <span>{isVideoActive ? "Show Photos" : "Play 10s Video"}</span>
             </button>
           </div>
@@ -260,12 +260,12 @@ export function PhotoDetailViewer({
               className={cn(
                 "relative aspect-square w-16 sm:w-20 rounded-2xl overflow-hidden border-2 transition-all spatial-surface cursor-pointer bg-neutral-950 flex flex-col items-center justify-center text-white shrink-0",
                 isVideoActive
-                  ? "border-emerald-500 ring-2 ring-emerald-500/30 scale-105 opacity-100 shadow-md"
-                  : "border-border/40 opacity-75 hover:opacity-100 hover:border-emerald-500/50",
+                  ? "border-primary ring-2 ring-primary/30 scale-105 opacity-100 shadow-md"
+                  : "border-border/40 opacity-75 hover:opacity-100 hover:border-primary/50",
               )}
             >
-              <Video className="h-6 w-6 text-emerald-400 mb-1" />
-              <span className="text-[9px] font-extrabold uppercase tracking-wider text-emerald-300">
+              <Video className="h-6 w-6 text-primary mb-1" />
+              <span className="text-[9px] font-extrabold uppercase tracking-wider text-primary">
                 10s Video
               </span>
             </button>

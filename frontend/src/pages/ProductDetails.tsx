@@ -1184,7 +1184,7 @@ const productSchema = product ? {
   if (productLoading && !product) {
     return (
       <MainLayout>
-        <div className="min-h-screen bg-[#FAFBF9] dark:bg-[#1E1E1E] text-neutral-900 dark:text-neutral-100">
+        <div className="min-h-screen bg-background text-neutral-900 dark:text-neutral-100">
           <div className="mx-auto max-w-7xl px-4 md:px-6 py-6 space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start w-full min-w-0">
               <div className="lg:col-span-6 space-y-3 min-w-0 w-full">
@@ -1223,7 +1223,7 @@ const productSchema = product ? {
       <JsonLd schema={productSchema} />
       <JsonLd schema={breadcrumbSchema} />
 
-      <div className="min-h-screen bg-[#FAFBF9] dark:bg-[#1E1E1E] text-neutral-900 dark:text-neutral-100 pb-24 transition-colors duration-300 selection:bg-emerald-500/20">
+      <div className="min-h-screen bg-background text-neutral-900 dark:text-neutral-100 pb-24 transition-colors duration-300 selection:bg-foreground/15">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 space-y-8">
 
           {/* Back Navigation Bar & Category Breadcrumb */}
@@ -1292,7 +1292,7 @@ const productSchema = product ? {
                       <source src={activeVideoUrl} type="video/mp4" />
                       <source src={activeVideoUrl.replace(/\.mp4$/, ".webm")} type="video/webm" />
                     </video>
-                    <div className="absolute bottom-3 left-3 px-3 py-1 rounded-full bg-black/70 backdrop-blur-md text-[11px] text-emerald-400 font-bold border border-emerald-500/30 flex items-center gap-1.5 select-none pointer-events-none">
+                    <div className="absolute bottom-3 left-3 px-3 py-1 rounded-full bg-black/70 backdrop-blur-md text-[11px] text-primary font-bold border border-primary/30 flex items-center gap-1.5 select-none pointer-events-none">
                       <ShieldCheck className="h-3.5 w-3.5" />
                       <span>Verified 10s Inspection Video</span>
                     </div>
@@ -1307,7 +1307,7 @@ const productSchema = product ? {
                       title="Watch video in full screen"
                       className="absolute top-3 right-3 px-3 py-1.5 rounded-full bg-black/70 hover:bg-black/90 text-white backdrop-blur-md border border-white/20 transition-all cursor-pointer z-10 hover:scale-105 active:scale-95 shadow-md flex items-center gap-1.5 text-xs font-semibold"
                     >
-                      <Maximize2 className="h-3.5 w-3.5 text-emerald-400" />
+                      <Maximize2 className="h-3.5 w-3.5 text-primary" />
                       <span>Full Screen</span>
                     </button>
                   </div>
@@ -1338,7 +1338,7 @@ const productSchema = product ? {
                         {product.title}
                       </h1>
                       <p className="text-xs sm:text-sm font-semibold text-neutral-200 drop-shadow-sm flex items-center gap-1.5 capitalize truncate">
-                        <span className="text-emerald-400 font-bold">{product.category || "Gear"}</span>
+                        <span className="text-primary font-bold">{product.category || "Gear"}</span>
                         {brand && (
                           <>
                             <span className="text-neutral-400">•</span>
@@ -1379,8 +1379,8 @@ const productSchema = product ? {
                 {/* Top Controls: Status Badge & 10s Video Badge — overlapping directly on the image */}
                 <div className="absolute top-4 left-4 z-10 flex items-center gap-2 pointer-events-auto">
                   {product.available ? (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/60 dark:bg-black/75 text-emerald-400 font-semibold text-xs shadow-md backdrop-blur-md border border-emerald-500/30 select-none">
-                      <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/60 dark:bg-black/75 text-primary font-semibold text-xs shadow-md backdrop-blur-md border border-primary/30 select-none">
+                      <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
                       Available
                     </span>
                   ) : (
@@ -1401,11 +1401,11 @@ const productSchema = product ? {
                     className={cn(
                       "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all shadow-md backdrop-blur-md border cursor-pointer active:scale-95",
                       isVideoActive
-                        ? "bg-emerald-600 text-white border-emerald-500 ring-2 ring-emerald-500/30"
-                        : "bg-black/60 dark:bg-black/75 hover:bg-black/80 text-white border-white/20 hover:border-emerald-500/40"
+                        ? "bg-primary text-white border-primary ring-2 ring-primary/30"
+                        : "bg-black/60 dark:bg-black/75 hover:bg-black/80 text-white border-white/20 hover:border-primary/40"
                     )}
                   >
-                    <Video className="h-3.5 w-3.5 text-emerald-400" />
+                    <Video className="h-3.5 w-3.5 text-primary" />
                     <span>{isVideoActive ? "Show Photos" : "10s Video"}</span>
                   </button>
                 </div>
@@ -1422,7 +1422,7 @@ const productSchema = product ? {
                     }}
                     title={isVideoActive ? "View Video Full Screen" : "View Image Full Screen"}
                     aria-label={isVideoActive ? "View Video Full Screen" : "View Image Full Screen"}
-                    className="p-2.5 rounded-full bg-black/60 dark:bg-black/75 hover:bg-black/80 text-white hover:text-emerald-400 hover:scale-110 active:scale-95 transition-all shadow-md border border-white/20 backdrop-blur-md cursor-pointer"
+                    className="p-2.5 rounded-full bg-black/60 dark:bg-black/75 hover:bg-black/80 text-white hover:text-primary hover:scale-110 active:scale-95 transition-all shadow-md border border-white/20 backdrop-blur-md cursor-pointer"
                   >
                     <Maximize2 className="h-4.5 w-4.5 sm:h-5 sm:w-5" />
                   </button>
@@ -1458,8 +1458,8 @@ const productSchema = product ? {
                       }}
                       className={`relative aspect-square rounded-2xl overflow-hidden border-2 transition-all cursor-pointer p-1 sm:p-2 flex items-center justify-center bg-card min-w-0 ${
                         isActive
-                          ? "border-emerald-600 ring-2 ring-emerald-500/20 shadow-xs"
-                          : "border-border/80 hover:border-emerald-500/50"
+                          ? "border-primary ring-2 ring-primary/20 shadow-xs"
+                          : "border-border/80 hover:border-primary/50"
                       }`}
                     >
                       <img src={thumb} alt="" className="w-full h-full object-contain" />
@@ -1479,11 +1479,11 @@ const productSchema = product ? {
                   title="Play 10s Inspection Video"
                   className={`relative aspect-square rounded-2xl overflow-hidden border-2 transition-all cursor-pointer p-1 sm:p-2 flex flex-col items-center justify-center bg-neutral-950 text-white min-w-0 ${
                     isVideoActive
-                      ? "border-emerald-500 ring-2 ring-emerald-500/30 shadow-xs"
-                      : "border-border/80 hover:border-emerald-500/50"
+                      ? "border-primary ring-2 ring-primary/30 shadow-xs"
+                      : "border-border/80 hover:border-primary/50"
                   }`}
                 >
-                  <Video className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-400 mb-0.5 sm:mb-1 shrink-0" />
+                  <Video className="h-4 w-4 sm:h-5 sm:w-5 text-primary mb-0.5 sm:mb-1 shrink-0" />
                   <span className="text-[8.5px] sm:text-[10px] font-bold tracking-tight text-neutral-200 truncate max-w-full">10s Video</span>
                 </button>
               </div>
@@ -1495,7 +1495,7 @@ const productSchema = product ? {
               <div className="rounded-2xl sm:rounded-3xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#1E1E1E] p-4 sm:p-5 shadow-xs space-y-3.5">
                 <div className="flex items-center justify-between pb-1 flex-wrap gap-2.5">
                   <div className="flex items-center gap-2">
-                    <div className="h-8 w-8 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
+                    <div className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
                       <Calendar className="h-4 w-4" />
                     </div>
                     <div>
@@ -1513,10 +1513,10 @@ const productSchema = product ? {
                   <button
                     type="button"
                     onClick={() => setShowFullCalendar((prev) => !prev)}
-                    className="w-full p-2.5 sm:p-3 rounded-xl border border-black/10 dark:border-white/10 bg-neutral-100/70 dark:bg-[#1E1E1E] hover:bg-neutral-100 dark:hover:bg-[#162330] transition-all flex items-center justify-between cursor-pointer group"
+                    className="w-full p-2.5 sm:p-3 rounded-xl border border-black/10 dark:border-white/10 bg-neutral-100/70 dark:bg-[#1E1E1E] hover:bg-neutral-100 dark:hover:bg-white/10 transition-all flex items-center justify-between cursor-pointer group"
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="h-8 w-8 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
+                      <div className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
                         <Calendar className="h-4 w-4" />
                       </div>
                       <div className="text-left truncate">
@@ -1534,7 +1534,7 @@ const productSchema = product ? {
                         </span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 shrink-0">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-primary shrink-0">
                       <span>{showFullCalendar ? "Close" : "Open Calendar"}</span>
                       <ChevronDown className={cn("h-3.5 w-3.5 transition-transform duration-200", showFullCalendar ? "rotate-180" : "")} />
                     </div>
@@ -1583,8 +1583,8 @@ const productSchema = product ? {
                       onClick={() => handleSlotSelect("morning")}
                       className={`p-1.5 xs:p-2 sm:p-2.5 rounded-xl border text-left transition-all cursor-pointer min-w-0 flex flex-col justify-between ${
                         selectedSlot === "morning" && durationMode === "half_day_morning"
-                          ? "border-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 ring-2 ring-emerald-500/20 shadow-xs"
-                          : "border-black/10 dark:border-white/10 bg-neutral-100/60 dark:bg-[#1E1E1E] hover:bg-neutral-100 dark:hover:bg-[#162330]"
+                          ? "border-primary bg-primary/10 dark:bg-primary/15 ring-2 ring-primary/20 shadow-xs"
+                          : "border-black/10 dark:border-white/10 bg-neutral-100/60 dark:bg-[#1E1E1E] hover:bg-neutral-100 dark:hover:bg-white/10"
                       }`}
                     >
                       <div className="min-w-0">
@@ -1596,7 +1596,7 @@ const productSchema = product ? {
                           8 AM - 12 PM
                         </div>
                       </div>
-                      <div className="mt-1 text-[10px] xs:text-[11px] sm:text-xs font-extrabold text-emerald-600 dark:text-emerald-400 font-mono">
+                      <div className="mt-1 text-[10px] xs:text-[11px] sm:text-xs font-extrabold text-primary font-mono">
                         ₹{morningPrice}
                       </div>
                     </button>
@@ -1607,8 +1607,8 @@ const productSchema = product ? {
                       onClick={() => handleSlotSelect("afternoon")}
                       className={`p-1.5 xs:p-2 sm:p-2.5 rounded-xl border text-left transition-all cursor-pointer min-w-0 flex flex-col justify-between ${
                         selectedSlot === "afternoon" && durationMode === "half_day_afternoon"
-                          ? "border-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 ring-2 ring-emerald-500/20 shadow-xs"
-                          : "border-black/10 dark:border-white/10 bg-neutral-100/60 dark:bg-[#1E1E1E] hover:bg-neutral-100 dark:hover:bg-[#162330]"
+                          ? "border-primary bg-primary/10 dark:bg-primary/15 ring-2 ring-primary/20 shadow-xs"
+                          : "border-black/10 dark:border-white/10 bg-neutral-100/60 dark:bg-[#1E1E1E] hover:bg-neutral-100 dark:hover:bg-white/10"
                       }`}
                     >
                       <div className="min-w-0">
@@ -1620,7 +1620,7 @@ const productSchema = product ? {
                           1 PM - 5 PM
                         </div>
                       </div>
-                      <div className="mt-1 text-[10px] xs:text-[11px] sm:text-xs font-extrabold text-emerald-600 dark:text-emerald-400 font-mono">
+                      <div className="mt-1 text-[10px] xs:text-[11px] sm:text-xs font-extrabold text-primary font-mono">
                         ₹{afternoonPrice}
                       </div>
                     </button>
@@ -1631,20 +1631,20 @@ const productSchema = product ? {
                       onClick={() => handleSlotSelect("full_day")}
                       className={`p-1.5 xs:p-2 sm:p-2.5 rounded-xl border text-left transition-all cursor-pointer min-w-0 flex flex-col justify-between ${
                         selectedSlot === "full_day" && durationMode === "full_day"
-                          ? "border-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 ring-2 ring-emerald-500/20 shadow-xs"
-                          : "border-black/10 dark:border-white/10 bg-neutral-100/60 dark:bg-[#1E1E1E] hover:bg-neutral-100 dark:hover:bg-[#162330]"
+                          ? "border-primary bg-primary/10 dark:bg-primary/15 ring-2 ring-primary/20 shadow-xs"
+                          : "border-black/10 dark:border-white/10 bg-neutral-100/60 dark:bg-[#1E1E1E] hover:bg-neutral-100 dark:hover:bg-white/10"
                       }`}
                     >
                       <div className="min-w-0">
                         <div className="flex items-center gap-1 mb-0.5 min-w-0">
-                          <Calendar className="h-3 w-3 text-emerald-500 shrink-0" />
+                          <Calendar className="h-3 w-3 text-primary shrink-0" />
                           <span className="text-[10px] xs:text-[11px] sm:text-xs font-bold text-foreground truncate">Full Day</span>
                         </div>
                         <div className="text-[8px] xs:text-[8.5px] sm:text-[10px] text-muted-foreground truncate leading-tight">
                           24 Hours
                         </div>
                       </div>
-                      <div className="mt-1 text-[10px] xs:text-[11px] sm:text-xs font-extrabold text-emerald-600 dark:text-emerald-400 font-mono">
+                      <div className="mt-1 text-[10px] xs:text-[11px] sm:text-xs font-extrabold text-primary font-mono">
                         ₹{fullDayPrice}
                       </div>
                     </button>
@@ -1671,7 +1671,7 @@ const productSchema = product ? {
                     <span className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                       Estimated Total
                     </span>
-                    <div className="text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono">
+                    <div className="text-xl sm:text-2xl font-black text-primary font-mono">
                       ₹{estimatedTotal.toLocaleString("en-IN")}
                     </div>
                   </div>
@@ -1680,8 +1680,8 @@ const productSchema = product ? {
                 {/* Slot Availability Banner & Direct Confirmation / Check Availability */}
                 {availabilityChecked && isAvailableForDates ? (
                   <div className="space-y-3">
-                    <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-700 dark:text-emerald-300 text-xs font-bold flex items-center gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                    <div className="p-3 rounded-xl bg-primary/10 border border-primary/25 text-primary text-xs font-bold flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
                       <span>Available on your selected dates!</span>
                     </div>
                     <div className="flex items-center justify-between flex-wrap gap-3 pt-1">
@@ -1702,7 +1702,7 @@ const productSchema = product ? {
                                 width="28"
                                 height="28"
                                 viewBox="0 0 40 40"
-                                className="overflow-visible shrink-0 drop-shadow-xs"
+                                className="overflow-visible shrink-0 drop-shadow-xs text-primary"
                                 initial={{ scale: 0.5, rotate: -30, opacity: 0 }}
                                 animate={{ scale: 1, rotate: 0, opacity: 1 }}
                                 exit={{ scale: 0.5, rotate: -30, opacity: 0 }}
@@ -1710,7 +1710,7 @@ const productSchema = product ? {
                               >
                                 <motion.path
                                   d="M 28 8.5 A 13.5 13.5 0 0 0 11.5 29.5"
-                                  stroke="#059669"
+                                  stroke="currentColor"
                                   strokeWidth="3.2"
                                   strokeLinecap="round"
                                   fill="none"
@@ -1720,14 +1720,14 @@ const productSchema = product ? {
                                 />
                                 <motion.polygon
                                   points="6,31.5 15,25 14,35"
-                                  fill="#059669"
+                                  fill="currentColor"
                                   initial={{ scale: 0 }}
                                   animate={{ scale: 1 }}
                                   transition={{ delay: 0.12, duration: 0.2 }}
                                 />
                                 <motion.path
                                   d="M 16 33.5 A 13.5 13.5 0 0 0 32.5 22"
-                                  stroke="#059669"
+                                  stroke="currentColor"
                                   strokeWidth="3.2"
                                   strokeLinecap="round"
                                   fill="none"
@@ -1737,7 +1737,7 @@ const productSchema = product ? {
                                 />
                                 <motion.path
                                   d="M 11.5 21 L 18 27.5 L 34.5 8"
-                                  stroke="#059669"
+                                  stroke="currentColor"
                                   strokeWidth="4.5"
                                   strokeLinecap="round"
                                   strokeLinejoin="round"
@@ -1770,7 +1770,7 @@ const productSchema = product ? {
                                   stroke="currentColor"
                                   strokeWidth="2.5"
                                   fill="none"
-                                  className="text-neutral-400 dark:text-neutral-500 group-hover:text-emerald-500 transition-colors"
+                                  className="text-neutral-400 dark:text-neutral-500 group-hover:text-primary transition-colors"
                                 />
                               </motion.svg>
                             )}
@@ -1780,17 +1780,17 @@ const productSchema = product ? {
                         <button
                           type="button"
                           onClick={() => setShowTermsModal(true)}
-                          className="text-left text-xs sm:text-[13px] font-medium text-foreground hover:text-emerald-600 transition-colors cursor-pointer group flex items-center gap-1.5 focus:outline-hidden"
+                          className="text-left text-xs sm:text-[13px] font-medium text-foreground hover:text-primary transition-colors cursor-pointer group flex items-center gap-1.5 focus:outline-hidden"
                         >
                           <span
                             className={cn(
-                              "underline decoration-neutral-300 dark:decoration-neutral-600 group-hover:decoration-emerald-500 transition-all",
-                              termsAccepted && "text-emerald-600 dark:text-emerald-400 font-semibold decoration-emerald-500"
+                              "underline decoration-neutral-300 dark:decoration-neutral-600 group-hover:decoration-primary transition-all",
+                              termsAccepted && "text-primary font-semibold decoration-primary"
                             )}
                           >
                             terms&condtion will apply
                           </span>
-                          <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-secondary text-muted-foreground group-hover:text-foreground group-hover:bg-emerald-500/10 transition-colors">
+                          <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-secondary text-muted-foreground group-hover:text-foreground group-hover:bg-primary/10 transition-colors">
                             view
                           </span>
                         </button>
@@ -1868,13 +1868,13 @@ const productSchema = product ? {
                 {/* 2. Price Display */}
                 <div className="flex items-center justify-between gap-3 flex-wrap">
                   <div className="flex items-baseline gap-1.5">
-                    <span className="text-3xl sm:text-4xl font-black text-emerald-600 dark:text-emerald-400 font-display font-mono">
+                    <span className="text-3xl sm:text-4xl font-black text-foreground font-display font-mono">
                       ₹{(Number(product.price) || 0).toLocaleString("en-IN")}
                     </span>
                     <span className="text-sm font-semibold text-muted-foreground">/ day</span>
                   </div>
-                  <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-xs font-semibold">
-                    <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
+                  <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary border border-primary/20 text-xs font-semibold">
+                    <span className="h-2 w-2 rounded-full bg-primary shrink-0 animate-pulse" />
                     <span>{product.available ? "Available for Rent" : "Currently Reserved"}</span>
                   </div>
                 </div>
@@ -1882,7 +1882,7 @@ const productSchema = product ? {
                 {/* 3. Condition, Location, Lender all on one line */}
                 <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pt-3 border-t border-border/60 text-xs sm:text-sm">
                   <div className="flex items-center gap-1.5 text-foreground">
-                    <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
+                    <ShieldCheck className="h-4 w-4 text-primary shrink-0" />
                     <span className="font-medium text-muted-foreground">Condition:</span>
                     <span className="font-bold">{(product as any).condition || "Like New"}</span>
                   </div>
@@ -1890,7 +1890,7 @@ const productSchema = product ? {
                   <span className="hidden sm:inline text-neutral-300 dark:text-neutral-700">•</span>
 
                   <div className="flex items-center gap-1.5 text-foreground">
-                    <MapPin className="h-4 w-4 text-emerald-600 shrink-0" />
+                    <MapPin className="h-4 w-4 text-primary shrink-0" />
                     <span className="font-medium text-muted-foreground">Location:</span>
                     <span className="font-bold">{formatOwnerAddress(product) || "Bengaluru"}</span>
                   </div>
@@ -1898,10 +1898,10 @@ const productSchema = product ? {
                   <span className="hidden sm:inline text-neutral-300 dark:text-neutral-700">•</span>
 
                   <div className="flex items-center gap-1.5 text-foreground">
-                    <User className="h-4 w-4 text-emerald-600 shrink-0" />
+                    <User className="h-4 w-4 text-primary shrink-0" />
                     <span className="font-medium text-muted-foreground">Lender:</span>
                     <span className="font-bold">{product.owner?.name || "Arun Kumar"}</span>
-                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 fill-emerald-500/20 shrink-0" />
+                    <CheckCircle2 className="h-3.5 w-3.5 text-primary fill-primary/20 shrink-0" />
                   </div>
                 </div>
 
@@ -1925,7 +1925,7 @@ const productSchema = product ? {
                             width="28"
                             height="28"
                             viewBox="0 0 40 40"
-                            className="overflow-visible shrink-0 drop-shadow-xs"
+                            className="overflow-visible shrink-0 drop-shadow-xs text-primary"
                             initial={{ scale: 0.5, rotate: -30, opacity: 0 }}
                             animate={{ scale: 1, rotate: 0, opacity: 1 }}
                             exit={{ scale: 0.5, rotate: -30, opacity: 0 }}
@@ -1934,7 +1934,7 @@ const productSchema = product ? {
                             {/* Upper-left circular arrow arc */}
                             <motion.path
                               d="M 28 8.5 A 13.5 13.5 0 0 0 11.5 29.5"
-                              stroke="#059669"
+                              stroke="currentColor"
                               strokeWidth="3.2"
                               strokeLinecap="round"
                               fill="none"
@@ -1945,7 +1945,7 @@ const productSchema = product ? {
                             {/* Arrowhead at bottom left pointing left */}
                             <motion.polygon
                               points="6,31.5 15,25 14,35"
-                              fill="#059669"
+                              fill="currentColor"
                               initial={{ scale: 0 }}
                               animate={{ scale: 1 }}
                               transition={{ delay: 0.12, duration: 0.2 }}
@@ -1953,7 +1953,7 @@ const productSchema = product ? {
                             {/* Lower-right arc */}
                             <motion.path
                               d="M 16 33.5 A 13.5 13.5 0 0 0 32.5 22"
-                              stroke="#059669"
+                              stroke="currentColor"
                               strokeWidth="3.2"
                               strokeLinecap="round"
                               fill="none"
@@ -1964,7 +1964,7 @@ const productSchema = product ? {
                             {/* Bold checkmark extending OUTSIDE the circular perimeter */}
                             <motion.path
                               d="M 11.5 21 L 18 27.5 L 34.5 8"
-                              stroke="#059669"
+                              stroke="currentColor"
                               strokeWidth="4.5"
                               strokeLinecap="round"
                               strokeLinejoin="round"
@@ -1997,7 +1997,7 @@ const productSchema = product ? {
                               stroke="currentColor"
                               strokeWidth="2.5"
                               fill="none"
-                              className="text-neutral-400 dark:text-neutral-500 group-hover:text-emerald-500 transition-colors"
+                              className="text-neutral-400 dark:text-neutral-500 group-hover:text-primary transition-colors"
                             />
                           </motion.svg>
                         )}
@@ -2008,17 +2008,17 @@ const productSchema = product ? {
                     <button
                       type="button"
                       onClick={() => setShowTermsModal(true)}
-                      className="text-left text-xs sm:text-[13px] font-medium text-foreground hover:text-emerald-600 transition-colors cursor-pointer group flex items-center gap-1.5 focus:outline-hidden"
+                      className="text-left text-xs sm:text-[13px] font-medium text-foreground hover:text-primary transition-colors cursor-pointer group flex items-center gap-1.5 focus:outline-hidden"
                     >
                       <span
                         className={cn(
-                          "underline decoration-neutral-300 dark:decoration-neutral-600 group-hover:decoration-emerald-500 transition-all",
-                          termsAccepted && "text-emerald-600 dark:text-emerald-400 font-semibold decoration-emerald-500"
+                          "underline decoration-neutral-300 dark:decoration-neutral-600 group-hover:decoration-primary transition-all",
+                          termsAccepted && "text-primary font-semibold decoration-primary"
                         )}
                       >
                         terms&condtion will apply
                       </span>
-                      <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-secondary text-muted-foreground group-hover:text-foreground group-hover:bg-emerald-500/10 transition-colors">
+                      <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-secondary text-muted-foreground group-hover:text-foreground group-hover:bg-primary/10 transition-colors">
                         view
                       </span>
                     </button>
@@ -2046,7 +2046,7 @@ const productSchema = product ? {
           {/* 2. RELATED PRODUCTS (Left-aligned title with overlapping details on image) */}
           <section className="space-y-6 pt-2">
             <div className="flex items-center justify-start gap-2.5">
-              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              <span className="h-2 w-2 rounded-full bg-primary" />
               <h2 className="text-xl sm:text-2xl font-extrabold text-foreground tracking-tight font-display">
                 Related Products
               </h2>
@@ -2073,7 +2073,7 @@ const productSchema = product ? {
                     key={rel.id}
                     to="/payent/products/$id"
                     params={{ id: rel.id }}
-                    className="group relative aspect-[4/3] rounded-3xl overflow-hidden bg-neutral-950 border border-neutral-800/80 hover:border-emerald-500/50 shadow-md hover:shadow-xl transition-all block text-left"
+                    className="group relative aspect-[4/3] rounded-3xl overflow-hidden bg-neutral-950 border border-neutral-800/80 hover:border-primary/50 shadow-md hover:shadow-xl transition-all block text-left"
                   >
                     {/* Edge-to-Edge Product Image */}
                     <img
@@ -2095,7 +2095,7 @@ const productSchema = product ? {
                     {/* Overlap: Bottom Details */}
                     <div className="absolute inset-x-0 bottom-0 p-3.5 sm:p-4 space-y-1">
                       <div>
-                        <h3 className="font-bold text-sm sm:text-base text-white group-hover:text-emerald-400 transition-colors truncate drop-shadow-sm">
+                        <h3 className="font-bold text-sm sm:text-base text-white group-hover:text-primary transition-colors truncate drop-shadow-sm">
                           {rel.title}
                         </h3>
                         <p className="text-xs text-neutral-300 capitalize truncate">
@@ -2104,12 +2104,12 @@ const productSchema = product ? {
                       </div>
 
                       <div className="flex items-center justify-between pt-1.5 border-t border-white/15">
-                        <span className="font-extrabold text-sm text-emerald-400 font-mono drop-shadow-sm">
+                        <span className="font-extrabold text-sm text-white font-mono drop-shadow-sm">
                           ₹{(Number(rel.price) || 0).toLocaleString("en-IN")}{" "}
                           <span className="text-[11px] text-neutral-300 font-normal font-sans">/ day</span>
                         </span>
-                        <span className="text-[11px] font-semibold text-emerald-400 flex items-center gap-1 drop-shadow-sm">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                        <span className="text-[11px] font-semibold text-primary flex items-center gap-1 drop-shadow-sm">
+                          <span className="h-1.5 w-1.5 rounded-full bg-primary" />
                           Available
                         </span>
                       </div>
@@ -2137,7 +2137,7 @@ const productSchema = product ? {
           <section id="customer-reviews-section" className="space-y-6 pt-2">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-left">
               <div className="flex items-center gap-2.5">
-                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                <span className="h-2 w-2 rounded-full bg-primary" />
                 <h2 className="text-xl sm:text-2xl font-extrabold text-foreground tracking-tight font-display">
                   Customer Reviews
                 </h2>
@@ -2149,7 +2149,7 @@ const productSchema = product ? {
                 to="/reviews"
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-neutral-950 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-100 text-xs sm:text-sm font-bold shadow-sm active:scale-95 transition-all self-start sm:self-auto cursor-pointer"
               >
-                <Sparkles className="h-3.5 w-3.5 text-emerald-400" />
+                <Sparkles className="h-3.5 w-3.5 text-primary" />
                 <span>Write a Review</span>
               </Link>
             </div>
@@ -2162,7 +2162,7 @@ const productSchema = product ? {
                   return (
                     <div
                       key={rev.id}
-                      className="p-6 rounded-3xl bg-white dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 shadow-xs space-y-3.5 flex flex-col justify-between transition-all hover:border-emerald-500/40"
+                      className="p-6 rounded-3xl bg-white dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 shadow-xs space-y-3.5 flex flex-col justify-between transition-all hover:border-primary/40"
                     >
                       <div className="space-y-3.5">
                         <div className="flex items-center justify-between gap-3">
@@ -2171,17 +2171,17 @@ const productSchema = product ? {
                               <img
                                 src={photo}
                                 alt={rev.userName}
-                                className="h-11 w-11 rounded-full object-cover border border-emerald-500/20 shadow-xs shrink-0"
+                                className="h-11 w-11 rounded-full object-cover border border-primary/20 shadow-xs shrink-0"
                               />
                             ) : (
-                              <div className="h-11 w-11 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold flex items-center justify-center border border-emerald-500/20 shadow-xs shrink-0 text-sm">
+                              <div className="h-11 w-11 rounded-full bg-primary/10 text-primary font-bold flex items-center justify-center border border-primary/20 shadow-xs shrink-0 text-sm">
                                 {(rev.userName || "U").charAt(0).toUpperCase()}
                               </div>
                             )}
                             <div className="min-w-0">
                               <h4 className="font-bold text-sm text-foreground truncate">{rev.userName}</h4>
                               {rev.isVerified && (
-                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-primary">
                                   <CheckCircle2 className="h-2.5 w-2.5" />
                                   <span>Verified Rental</span>
                                 </span>
@@ -2215,8 +2215,8 @@ const productSchema = product ? {
               </div>
             ) : (
               <div className="w-full rounded-3xl border border-black/10 dark:border-white/10 bg-white/80 dark:bg-[#1E1E1E]/90 backdrop-blur-sm p-8 sm:p-12 text-center flex flex-col items-center justify-center space-y-5 shadow-xs relative overflow-hidden">
-                {/* Subtle emerald ambient aura */}
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-80 h-28 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
+                {/* Subtle ambient aura */}
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-80 h-28 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
 
                 {/* Product Preview Card */}
                 {product && (
@@ -2301,11 +2301,11 @@ const productSchema = product ? {
                     className={cn(
                       "px-3 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer backdrop-blur-md border flex items-center gap-1.5",
                       isFullscreenVideoActive
-                        ? "bg-emerald-600 text-white border-emerald-500 ring-2 ring-emerald-500/30 shadow-md"
+                        ? "bg-primary text-white border-primary ring-2 ring-primary/30 shadow-md"
                         : "bg-white/10 hover:bg-white/20 text-white border-white/20"
                     )}
                   >
-                    <Video className="h-3.5 w-3.5 text-emerald-400" />
+                    <Video className="h-3.5 w-3.5 text-primary" />
                     <span>{isFullscreenVideoActive ? "Show Photos" : "10s Video"}</span>
                   </button>
                 )}
@@ -2320,7 +2320,7 @@ const productSchema = product ? {
                   className={cn(
                     "px-3 py-1.5 rounded-full text-xs font-semibold text-white transition-all cursor-pointer backdrop-blur-md border flex items-center gap-1.5",
                     isFullscreenGridView
-                      ? "bg-emerald-600 border-emerald-500"
+                      ? "bg-primary border-primary"
                       : "bg-white/10 hover:bg-white/20 border-white/20"
                   )}
                 >
@@ -2360,8 +2360,8 @@ const productSchema = product ? {
                     className={cn(
                       "group relative aspect-[4/3] rounded-2xl overflow-hidden bg-black/60 border-2 transition-all cursor-pointer shadow-lg hover:scale-[1.03] p-2 flex flex-col items-center justify-center",
                       isFullscreenVideoActive
-                        ? "border-emerald-500 ring-2 ring-emerald-500/30"
-                        : "border-white/20 hover:border-emerald-500/50"
+                        ? "border-primary ring-2 ring-primary/30"
+                        : "border-white/20 hover:border-primary/50"
                     )}
                   >
                     <div className="relative w-full h-full rounded-xl overflow-hidden bg-black flex items-center justify-center">
@@ -2373,15 +2373,15 @@ const productSchema = product ? {
                         playsInline
                       />
                       <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-black/40">
-                        <div className="h-10 w-10 rounded-full bg-emerald-600/90 text-white flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                        <div className="h-10 w-10 rounded-full bg-primary/90 text-white flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
                           <Video className="h-5 w-5" />
                         </div>
-                        <span className="px-2.5 py-0.5 rounded-full bg-black/80 text-emerald-400 text-[11px] font-bold border border-emerald-500/30">
+                        <span className="px-2.5 py-0.5 rounded-full bg-black/80 text-primary text-[11px] font-bold border border-primary/30">
                           10s Video
                         </span>
                       </div>
                     </div>
-                    <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded-md bg-black/70 text-emerald-400 text-[10px] font-bold">
+                    <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded-md bg-black/70 text-primary text-[10px] font-bold">
                       Video
                     </span>
                   </button>
@@ -2399,13 +2399,13 @@ const productSchema = product ? {
                     className={cn(
                       "group relative aspect-[4/3] rounded-2xl overflow-hidden bg-black/50 border-2 transition-all cursor-pointer shadow-lg hover:scale-[1.03] p-2 flex items-center justify-center",
                       !isFullscreenVideoActive && idx === selectedImageIndex
-                        ? "border-emerald-500 ring-2 ring-emerald-500/30"
-                        : "border-white/20 hover:border-emerald-500/50"
+                        ? "border-primary ring-2 ring-primary/30"
+                        : "border-white/20 hover:border-primary/50"
                     )}
                   >
                     <img src={src} alt="" className="w-full h-full object-contain" />
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <span className="px-3 py-1 rounded-full bg-emerald-600 text-white text-[11px] font-bold shadow-md">
+                      <span className="px-3 py-1 rounded-full bg-primary text-white text-[11px] font-bold shadow-md">
                         Photo #{idx + 1}
                       </span>
                     </div>
@@ -2444,7 +2444,7 @@ const productSchema = product ? {
                         <source src={activeVideoUrl} type="video/mp4" />
                         <source src={activeVideoUrl.replace(/\.mp4$/, ".webm")} type="video/webm" />
                       </video>
-                      <div className="absolute top-3 left-3 px-3 py-1 rounded-full bg-black/70 backdrop-blur-md text-[11px] text-emerald-400 font-bold border border-emerald-500/30 flex items-center gap-1.5 select-none pointer-events-none">
+                      <div className="absolute top-3 left-3 px-3 py-1 rounded-full bg-black/70 backdrop-blur-md text-[11px] text-primary font-bold border border-primary/30 flex items-center gap-1.5 select-none pointer-events-none">
                         <ShieldCheck className="h-3.5 w-3.5" />
                         <span>Verified 10s Inspection Video</span>
                       </div>
@@ -2501,12 +2501,12 @@ const productSchema = product ? {
                       className={cn(
                         "h-14 w-14 sm:h-16 sm:w-16 rounded-xl overflow-hidden border-2 transition-all p-1 bg-black/60 shrink-0 cursor-pointer flex flex-col items-center justify-center gap-0.5 relative group",
                         isFullscreenVideoActive
-                          ? "border-emerald-500 ring-2 ring-emerald-500/30 scale-105"
+                          ? "border-primary ring-2 ring-primary/30 scale-105"
                           : "border-white/20 hover:border-white/50 opacity-70 hover:opacity-100"
                       )}
                       title="Watch 10s Inspection Video"
                     >
-                      <Video className={cn("h-5 w-5", isFullscreenVideoActive ? "text-emerald-400" : "text-white")} />
+                      <Video className={cn("h-5 w-5", isFullscreenVideoActive ? "text-primary" : "text-white")} />
                       <span className="text-[9px] font-bold text-white uppercase tracking-tight">Video</span>
                     </button>
                   )}
@@ -2523,7 +2523,7 @@ const productSchema = product ? {
                       className={cn(
                         "h-14 w-14 sm:h-16 sm:w-16 rounded-xl overflow-hidden border-2 transition-all p-1 bg-black/40 shrink-0 cursor-pointer",
                         !isFullscreenVideoActive && idx === selectedImageIndex
-                          ? "border-emerald-500 ring-2 ring-emerald-500/30 scale-105"
+                          ? "border-primary ring-2 ring-primary/30 scale-105"
                           : "border-white/20 opacity-60 hover:opacity-100"
                       )}
                     >
