@@ -862,12 +862,12 @@ export default function Checkout() {
 
   return (
     <MainLayout>
-      <section className="mx-auto max-w-5xl px-4 md:px-6 py-10">
+      <section className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         <BackButton fallback="/cart" className="mb-4" />
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-3xl md:text-4xl font-black tracking-tight font-display">
+            <h1 className="text-3xl md:text-4xl font-black tracking-tight font-display text-foreground">
               Payrent Order Checkout
             </h1>
             <p className="text-muted-foreground mt-1 text-sm">
@@ -916,8 +916,8 @@ export default function Checkout() {
           </div>
         </div>
 
-        <div className="mt-8 grid lg:grid-cols-[1fr_380px] gap-8">
-          <div className="space-y-6">
+        <div className="mt-8 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 xl:gap-10 items-start">
+          <div className="lg:col-span-7 xl:col-span-8 space-y-6">
             {/* STEP A: ADD / SELECT DELIVERY ADDRESS */}
             {activeStep === "address" && (
               <div
@@ -968,7 +968,7 @@ export default function Checkout() {
                     <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                       Select From Saved Addresses
                     </label>
-                    <div className="grid gap-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                       {savedAddresses.map((addr) => {
                         const isSelected = selectedAddressId === addr.id;
                         return (
@@ -1540,7 +1540,7 @@ export default function Checkout() {
           </div>
 
           {/* ASIDE: BOOKING SUMMARY, PRICE & CONFIRM ORDER BUTTON */}
-          <aside className="relative rounded-2xl sm:rounded-3xl border border-neutral-300/80 dark:border-neutral-700/80 bg-card dark:bg-[#1E1E1E] pt-5 sm:pt-6 p-6 h-fit space-y-6 sticky top-24 shadow-sm text-left">
+          <aside className="lg:col-span-5 xl:col-span-4 relative rounded-2xl sm:rounded-3xl border border-neutral-300/80 dark:border-neutral-700/80 bg-card dark:bg-[#1E1E1E] pt-5 sm:pt-6 p-6 sm:p-7 h-fit space-y-6 sticky top-24 shadow-sm text-left">
             <div className="absolute -top-3 left-4 px-2 bg-card dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
               <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
                 Booking Summary

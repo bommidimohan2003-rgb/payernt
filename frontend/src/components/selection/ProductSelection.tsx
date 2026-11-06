@@ -728,7 +728,7 @@ export function ProductSelection() {
                   }
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.35, ease: smoothEase }}
-                  className="shrink-0 flex-none z-20 cursor-pointer outline-none select-none text-left p-2 sm:p-2.5 border border-border/80 hover:border-foreground/60 rounded-2xl bg-card/80 active:scale-95 transition-all backdrop-blur-md focus-visible:ring-1 focus-visible:ring-foreground/40 shadow-xs group"
+                  className="shrink-0 flex-none self-center my-auto z-20 cursor-pointer outline-none select-none text-left p-2 sm:p-2.5 border border-border/80 hover:border-foreground/60 rounded-2xl bg-card/80 active:scale-95 transition-all backdrop-blur-md focus-visible:ring-1 focus-visible:ring-foreground/40 shadow-xs group -mr-[1px]"
                 >
                   <BrandTitle className="text-base xs:text-lg font-extrabold tracking-tight text-foreground" />
                   <div className="text-[7px] font-mono tracking-widest text-muted-foreground/70 group-hover:text-foreground/90 transition-colors uppercase mt-0.5">

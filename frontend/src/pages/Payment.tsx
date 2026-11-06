@@ -278,12 +278,12 @@ export default function Payment() {
 
   return (
     <MainLayout>
-      <section className="mx-auto max-w-4xl px-4 md:px-6 py-10">
+      <section className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         <BackButton fallback={`/checkout`} label="Back to Checkout" className="mb-6" />
 
-        <div className="grid lg:grid-cols-[1fr_340px] gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
           {/* Left: Payment Gateway options */}
-          <div className="space-y-6">
+          <div className="lg:col-span-7 xl:col-span-8 space-y-6">
             <div className="card-premium p-6 border-primary/20 bg-gradient-to-b from-primary/5 via-card to-card">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3">
                 <div className="flex items-center gap-3">
@@ -397,7 +397,7 @@ export default function Payment() {
           </div>
 
           {/* Right: Booking Summary Sidebar */}
-          <aside className="card-premium p-6 h-fit space-y-5">
+          <aside className="lg:col-span-5 xl:col-span-4 card-premium p-6 h-fit space-y-5 sticky top-24">
             <div>
               <h3 className="font-bold text-lg">Order Summary</h3>
               <div className="mt-4 flex gap-3">

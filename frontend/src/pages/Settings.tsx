@@ -94,7 +94,7 @@ export default function Settings() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6 max-w-4xl pb-16">
+      <div className="space-y-6 w-full max-w-7xl pb-16">
         <div className="flex items-center gap-3">
           <BackButton fallback="/categories" />
           <div>

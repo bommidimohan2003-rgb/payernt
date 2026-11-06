@@ -218,7 +218,7 @@ export default function Dashboard() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-8 max-w-6xl">
+      <div className="space-y-8 w-full max-w-7xl">
         {/* ADMIN OPERATIONS CALLOUT */}
         {(user?.role === "admin" || (user as any)?.role === "superadmin" || (typeof window !== "undefined" && Boolean(localStorage.getItem("payent:admin:current_user")))) && (
           <div className="rounded-2xl border border-blue-500/30 bg-blue-950/20 dark:bg-blue-950/40 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">

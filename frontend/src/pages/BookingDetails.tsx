@@ -380,11 +380,8 @@ export function BookingDetails() {
 
 
   if (loading) {
-
     return (
-
-      <div className="min-h-screen bg-background py-8 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto">
-
+      <div className="min-h-screen bg-background py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
         <div className="animate-pulse space-y-6">
 
           <div className="h-6 w-32 bg-muted/60 rounded-xl" />
@@ -522,12 +519,9 @@ export function BookingDetails() {
 
 
   return (
-
     <MainLayout>
-
       <div className="min-h-screen bg-background py-6 sm:py-10 px-4 sm:px-6 lg:px-8">
-
-      <div className="max-w-4xl mx-auto space-y-6 sm:space-y-8">
+        <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
 
         {/* Navigation & Header */}
 

@@ -213,13 +213,13 @@ export function LoginForm() {
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-3 text-left">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 text-left">
       {/* Email Address Field with Persistent Label */}
       <Input
         label="Email address"
         type="email"
         autoComplete="email"
-        icon={<Mail className="h-4 w-4" />}
+        icon={<Mail className="h-5 w-5 stroke-[1.6]" />}
         error={errors.email?.message}
         {...register("email")}
       />
@@ -229,18 +229,18 @@ export function LoginForm() {
         label="Password"
         type={showPw ? "text" : "password"}
         autoComplete="current-password"
-        icon={<Lock className="h-4 w-4" />}
+        icon={<Lock className="h-5 w-5 stroke-[1.6]" />}
         rightAdornment={
           <button
             type="button"
             onClick={() => setShowPw((v) => !v)}
-            className="p-1 -mr-1 text-muted-foreground hover:text-foreground cursor-pointer focus:outline-none transition-colors shrink-0 flex items-center justify-center"
+            className="p-1.5 -mr-1 text-muted-foreground/80 dark:text-[#BDBDBD] hover:text-foreground dark:hover:text-white cursor-pointer focus:outline-none transition-colors shrink-0 flex items-center justify-center"
             aria-label={showPw ? "Hide password" : "Show password"}
           >
             {showPw ? (
-              <EyeOff className="h-4 w-4" />
+              <EyeOff className="h-5 w-5 stroke-[1.6]" />
             ) : (
-              <Eye className="h-4 w-4" />
+              <Eye className="h-5 w-5 stroke-[1.6]" />
             )}
           </button>
         }

@@ -210,7 +210,7 @@ export function PayrentKycPage() {
   return (
     <DashboardLayout>
       <KycScreenShield isObscured={isObscured} documentType="PAN Card" onDismiss={unobscure} />
-      <div className="w-full max-w-4xl mx-auto space-y-6 text-left py-6 px-4 sm:px-6">
+      <div className="w-full max-w-5xl mx-auto space-y-6 text-left py-6 px-4 sm:px-6">
         {/* Navigation & Breadcrumb */}
         <div className="flex items-center justify-between pb-2">
           <BackButton fallback="/profile" label="Back to Renter Profile" />

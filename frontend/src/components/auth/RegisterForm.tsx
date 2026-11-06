@@ -330,7 +330,7 @@ export function RegisterForm() {
       <Input
         label="Full Name"
         autoComplete="name"
-        icon={<User className="h-4 w-4" />}
+        icon={<User className="h-5 w-5 stroke-[1.6]" />}
         error={errors.fullName?.message}
         {...register("fullName")}
       />
@@ -343,7 +343,7 @@ export function RegisterForm() {
               label="Mobile Number"
               type="tel"
               autoComplete="tel"
-              icon={<Phone className="h-4 w-4" />}
+              icon={<Phone className="h-5 w-5 stroke-[1.6]" />}
               error={errors.phone?.message}
               {...register("phone")}
             />
@@ -352,7 +352,7 @@ export function RegisterForm() {
             type="button"
             onClick={handleCheckUser}
             disabled={isChecking}
-            className="mt-1.5 h-10.5 sm:h-11 px-3.5 rounded-xl border border-neutral-400/80 dark:border-neutral-600 bg-secondary hover:bg-secondary/80 text-foreground font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shrink-0 disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-1.5"
+            className="mt-2 h-12 sm:h-13 px-4 rounded-full border border-neutral-300 dark:border-neutral-700/80 bg-secondary hover:bg-secondary/80 text-foreground font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shrink-0 disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-1.5"
             title="Check existing account records"
           >
             {isChecking ? (
@@ -369,7 +369,7 @@ export function RegisterForm() {
         label="Email Address"
         type="email"
         autoComplete="email"
-        icon={<Mail className="h-4 w-4" />}
+        icon={<Mail className="h-5 w-5 stroke-[1.6]" />}
         error={errors.email?.message}
         {...register("email")}
       />
@@ -380,18 +380,18 @@ export function RegisterForm() {
           label="Password"
           type={showPw ? "text" : "password"}
           autoComplete="new-password"
-          icon={<Lock className="h-4 w-4" />}
+          icon={<Lock className="h-5 w-5 stroke-[1.6]" />}
           rightAdornment={
             <button
               type="button"
               onClick={() => setShowPw((v) => !v)}
-              className="p-1 -mr-1 text-muted-foreground hover:text-foreground cursor-pointer focus:outline-none transition-colors shrink-0 flex items-center justify-center"
+              className="p-1.5 -mr-1 text-muted-foreground/80 dark:text-[#BDBDBD] hover:text-foreground dark:hover:text-white cursor-pointer focus:outline-none transition-colors shrink-0 flex items-center justify-center"
               aria-label={showPw ? "Hide password" : "Show password"}
             >
               {showPw ? (
-                <EyeOff className="h-4 w-4" />
+                <EyeOff className="h-5 w-5 stroke-[1.6]" />
               ) : (
-                <Eye className="h-4 w-4" />
+                <Eye className="h-5 w-5 stroke-[1.6]" />
               )}
             </button>
           }
@@ -403,18 +403,18 @@ export function RegisterForm() {
           label="Confirm Password"
           type={showConfirmPw ? "text" : "password"}
           autoComplete="new-password"
-          icon={<Lock className="h-4 w-4" />}
+          icon={<Lock className="h-5 w-5 stroke-[1.6]" />}
           rightAdornment={
             <button
               type="button"
               onClick={() => setShowConfirmPw((v) => !v)}
-              className="p-1 -mr-1 text-muted-foreground hover:text-foreground cursor-pointer focus:outline-none transition-colors shrink-0 flex items-center justify-center"
+              className="p-1.5 -mr-1 text-muted-foreground/80 dark:text-[#BDBDBD] hover:text-foreground dark:hover:text-white cursor-pointer focus:outline-none transition-colors shrink-0 flex items-center justify-center"
               aria-label={showConfirmPw ? "Hide password" : "Show password"}
             >
               {showConfirmPw ? (
-                <EyeOff className="h-4 w-4" />
+                <EyeOff className="h-5 w-5 stroke-[1.6]" />
               ) : (
-                <Eye className="h-4 w-4" />
+                <Eye className="h-5 w-5 stroke-[1.6]" />
               )}
             </button>
           }

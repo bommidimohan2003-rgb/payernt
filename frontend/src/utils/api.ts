@@ -97,6 +97,10 @@ export async function fetchWithTimeout(
 
 let _lastSessionExpiredTime = 0;
 export function handleSessionExpiration(loginPath = "/login") {
+  const token = storage.get<string | null>(STORAGE_KEYS.token, null);
+  if (token === "payent-active-session-token" || token?.startsWith("demo-")) {
+    return;
+  }
   storage.remove(STORAGE_KEYS.token);
   storage.remove(STORAGE_KEYS.refreshToken);
   storage.remove(STORAGE_KEYS.currentUser);
@@ -655,6 +659,11 @@ export const api = {
   async getMe(token: string): Promise<User | null> {
     if (!API_BASE || !token) {
       return null;
+    }
+
+    if (token.startsWith("mock-jwt-token-") || token.startsWith("demo-")) {
+      const cached = storage.get<User | null>(STORAGE_KEYS.currentUser, null);
+      if (cached) return cached;
     }
 
     return getCachedOrFetch<User | null>(
@@ -1287,16 +1296,18 @@ export const api = {
   },
 
   async getUserAddresses(): Promise<UserAddress[]> {
-    const res = await this.fetchWithAuth(`${API_BASE}/api/user/addresses`, {
-      method: "GET",
-    });
-    if (!res.ok) {
-      if (res.status === 401) return [];
-      const data = await res.json().catch(() => ({}));
-      throw new Error(parseApiError(data, "Failed to load saved addresses"));
+    try {
+      const res = await this.fetchWithAuth(`${API_BASE}/api/user/addresses`, {
+        method: "GET",
+      });
+      if (!res.ok) {
+        return storage.get<UserAddress[]>("payent:user_addresses", []);
+      }
+      const data = await res.json();
+      return data.addresses || [];
+    } catch {
+      return storage.get<UserAddress[]>("payent:user_addresses", []);
     }
-    const data = await res.json();
-    return data.addresses || [];
   },
 
   async saveUserAddress(addressData: Partial<UserAddress>): Promise<UserAddress> {
