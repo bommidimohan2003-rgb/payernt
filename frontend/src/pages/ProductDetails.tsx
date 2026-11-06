@@ -1702,7 +1702,7 @@ const productSchema = product ? {
                                 width="28"
                                 height="28"
                                 viewBox="0 0 40 40"
-                                className="overflow-visible shrink-0 drop-shadow-xs text-primary"
+                                className="overflow-visible shrink-0 drop-shadow-xs text-emerald-600 dark:text-emerald-400"
                                 initial={{ scale: 0.5, rotate: -30, opacity: 0 }}
                                 animate={{ scale: 1, rotate: 0, opacity: 1 }}
                                 exit={{ scale: 0.5, rotate: -30, opacity: 0 }}
@@ -1770,7 +1770,7 @@ const productSchema = product ? {
                                   stroke="currentColor"
                                   strokeWidth="2.5"
                                   fill="none"
-                                  className="text-neutral-400 dark:text-neutral-500 group-hover:text-primary transition-colors"
+                                  className="text-neutral-400 dark:text-neutral-500 group-hover:text-neutral-600 dark:group-hover:text-neutral-300 transition-colors"
                                 />
                               </motion.svg>
                             )}
@@ -1780,17 +1780,17 @@ const productSchema = product ? {
                         <button
                           type="button"
                           onClick={() => setShowTermsModal(true)}
-                          className="text-left text-xs sm:text-[13px] font-medium text-foreground hover:text-primary transition-colors cursor-pointer group flex items-center gap-1.5 focus:outline-hidden"
+                          className="text-left text-xs sm:text-[13px] font-medium text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors cursor-pointer group flex items-center gap-1.5 focus:outline-hidden"
                         >
                           <span
                             className={cn(
-                              "underline decoration-neutral-300 dark:decoration-neutral-600 group-hover:decoration-primary transition-all",
-                              termsAccepted && "text-primary font-semibold decoration-primary"
+                              "underline decoration-red-500/70 dark:decoration-red-400/70 group-hover:decoration-red-700 dark:group-hover:decoration-red-300 transition-all",
+                              termsAccepted ? "font-semibold" : "font-medium"
                             )}
                           >
                             terms&condtion will apply
                           </span>
-                          <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-secondary text-muted-foreground group-hover:text-foreground group-hover:bg-primary/10 transition-colors">
+                          <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-red-500/10 text-red-600 dark:text-red-400 group-hover:bg-red-500/20 transition-colors">
                             view
                           </span>
                         </button>
@@ -1925,7 +1925,7 @@ const productSchema = product ? {
                             width="28"
                             height="28"
                             viewBox="0 0 40 40"
-                            className="overflow-visible shrink-0 drop-shadow-xs text-primary"
+                            className="overflow-visible shrink-0 drop-shadow-xs text-emerald-600 dark:text-emerald-400"
                             initial={{ scale: 0.5, rotate: -30, opacity: 0 }}
                             animate={{ scale: 1, rotate: 0, opacity: 1 }}
                             exit={{ scale: 0.5, rotate: -30, opacity: 0 }}
@@ -1997,7 +1997,7 @@ const productSchema = product ? {
                               stroke="currentColor"
                               strokeWidth="2.5"
                               fill="none"
-                              className="text-neutral-400 dark:text-neutral-500 group-hover:text-primary transition-colors"
+                              className="text-neutral-400 dark:text-neutral-500 group-hover:text-neutral-600 dark:group-hover:text-neutral-300 transition-colors"
                             />
                           </motion.svg>
                         )}
@@ -2008,17 +2008,17 @@ const productSchema = product ? {
                     <button
                       type="button"
                       onClick={() => setShowTermsModal(true)}
-                      className="text-left text-xs sm:text-[13px] font-medium text-foreground hover:text-primary transition-colors cursor-pointer group flex items-center gap-1.5 focus:outline-hidden"
+                      className="text-left text-xs sm:text-[13px] font-medium text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors cursor-pointer group flex items-center gap-1.5 focus:outline-hidden"
                     >
                       <span
                         className={cn(
-                          "underline decoration-neutral-300 dark:decoration-neutral-600 group-hover:decoration-primary transition-all",
-                          termsAccepted && "text-primary font-semibold decoration-primary"
+                          "underline decoration-red-500/70 dark:decoration-red-400/70 group-hover:decoration-red-700 dark:group-hover:decoration-red-300 transition-all font-medium",
+                          termsAccepted ? "font-semibold" : "font-medium"
                         )}
                       >
                         terms&condtion will apply
                       </span>
-                      <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-secondary text-muted-foreground group-hover:text-foreground group-hover:bg-primary/10 transition-colors">
+                      <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-red-500/10 text-red-600 dark:text-red-400 group-hover:bg-red-500/20 transition-colors">
                         view
                       </span>
                     </button>
