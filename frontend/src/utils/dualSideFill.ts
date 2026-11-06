@@ -2,12 +2,19 @@
  * Global Dual-Side Button Fill Animation System
  *
  * Requirements:
- * 1. Animation starts simultaneously from LEFT and RIGHT edges moving towards the center.
- * 2. Processing color: #8FAF7E (Sage Green).
- * 3. Success state: Complete #8FAF7E fill + Checkmark, holds for 2 seconds, then resets.
- * 4. Failure state: Complete #FF7F7F fill + Error icon, holds for 2 seconds, then resets.
- * 5. Applies to EVERY functional button across the entire Payent application.
+ * 1. Mandatory animation duration: 2000ms (2 seconds).
+ * 2. Start the left and right fill panels simultaneously.
+ * 3. Both panels move inward toward the center (meeting at 50% each = 100% full fill).
+ * 4. Smooth cubic-bezier(0.22, 1, 0.36, 1) easing.
+ * 5. Processing color: #8FAF7E (Sage Green).
+ * 6. Success state: Complete #8FAF7E fill + Checkmark, holds for 2 seconds, then resets.
+ * 7. Failure state: Complete #FF7F7F fill + Error icon, holds for 2 seconds, then resets.
+ * 8. Applies to EVERY functional button across the entire Payent application.
  */
+
+export const DUAL_FILL_ANIMATION_DURATION_MS = 2000;
+export const DUAL_FILL_DISPLAY_HOLD_MS = 2000;
+export const DUAL_FILL_EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
 
 export type DualFillStatus = "idle" | "processing" | "success" | "error";
 
@@ -17,7 +24,7 @@ export type DualFillStatus = "idle" | "processing" | "success" | "error";
 export function triggerButtonDualFill(
   buttonEl: HTMLElement | null,
   status: DualFillStatus,
-  duration = 2000,
+  displayDuration = DUAL_FILL_DISPLAY_HOLD_MS,
   onComplete?: () => void
 ): () => void {
   if (!buttonEl) return () => {};
@@ -35,7 +42,7 @@ export function triggerButtonDualFill(
     const timer = setTimeout(() => {
       buttonEl.removeAttribute("data-dual-state");
       onComplete?.();
-    }, duration);
+    }, displayDuration);
 
     return () => clearTimeout(timer);
   }
@@ -49,24 +56,36 @@ export function triggerButtonDualFill(
 
 /**
  * Wrap an async operation with dual-side button fill lifecycle.
+ * Ensures the fill completes its 2000ms inward glide before showing final state.
  */
 export async function withDualSideFill<T>(
   buttonEl: HTMLElement | null,
   action: () => Promise<T>,
-  duration = 2000
+  displayDuration = DUAL_FILL_DISPLAY_HOLD_MS
 ): Promise<T> {
   if (!buttonEl) {
     return action();
   }
 
   triggerButtonDualFill(buttonEl, "processing");
+  const startTime = Date.now();
 
   try {
     const result = await action();
-    triggerButtonDualFill(buttonEl, "success", duration);
+    const elapsed = Date.now() - startTime;
+    const remainingTo2s = Math.max(0, DUAL_FILL_ANIMATION_DURATION_MS - elapsed);
+    if (remainingTo2s > 0) {
+      await new Promise((resolve) => setTimeout(resolve, remainingTo2s));
+    }
+    triggerButtonDualFill(buttonEl, "success", displayDuration);
     return result;
   } catch (error) {
-    triggerButtonDualFill(buttonEl, "error", duration);
+    const elapsed = Date.now() - startTime;
+    const remainingTo2s = Math.max(0, DUAL_FILL_ANIMATION_DURATION_MS - elapsed);
+    if (remainingTo2s > 0) {
+      await new Promise((resolve) => setTimeout(resolve, remainingTo2s));
+    }
+    triggerButtonDualFill(buttonEl, "error", displayDuration);
     throw error;
   }
 }
@@ -128,17 +147,17 @@ export function setupGlobalDualSideFillListener(): () => void {
     };
     window.addEventListener("error", onError, { once: true });
 
-    // Transition smoothly to success or error state
+    // Fill completes in exactly 2000ms (2 seconds)
     setTimeout(() => {
       window.removeEventListener("error", onError);
       const nextState = isFailed ? "error" : "success";
       button.setAttribute("data-dual-state", nextState);
 
-      // Hold for 2 seconds (2000ms), then return to original appearance
+      // Keep existing 2-second success/failure display and reset behavior unchanged
       setTimeout(() => {
         button.removeAttribute("data-dual-state");
-      }, 2000);
-    }, 450);
+      }, DUAL_FILL_DISPLAY_HOLD_MS);
+    }, DUAL_FILL_ANIMATION_DURATION_MS);
   };
 
   document.addEventListener("click", handleClick, { capture: true, passive: true });

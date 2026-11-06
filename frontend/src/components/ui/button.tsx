@@ -78,6 +78,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ) => {
     const [internalStatus, setInternalStatus] = React.useState<DualFillStatus>("idle");
     const timeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+    const loadingStartTimeRef = React.useRef<number>(0);
 
     const status = controlledStatus || internalStatus;
 
@@ -89,20 +90,28 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       if (prevLoadingRef.current !== loading) {
         if (loading) {
           if (timeoutRef.current) clearTimeout(timeoutRef.current);
+          loadingStartTimeRef.current = Date.now();
           setInternalStatus("processing");
         } else if (prevLoadingRef.current && !loading) {
           if (isError) {
+            if (timeoutRef.current) clearTimeout(timeoutRef.current);
             setInternalStatus("error");
             timeoutRef.current = setTimeout(() => {
               setInternalStatus("idle");
               onAnimationComplete?.("error");
-            }, successDuration);
+            }, 2000 + successDuration);
           } else {
-            setInternalStatus("success");
+            const elapsed = Date.now() - loadingStartTimeRef.current;
+            const remainingTo2s = Math.max(0, 2000 - elapsed);
+
+            if (timeoutRef.current) clearTimeout(timeoutRef.current);
             timeoutRef.current = setTimeout(() => {
-              setInternalStatus("idle");
-              onAnimationComplete?.("success");
-            }, successDuration);
+              setInternalStatus("success");
+              timeoutRef.current = setTimeout(() => {
+                setInternalStatus("idle");
+                onAnimationComplete?.("success");
+              }, successDuration);
+            }, remainingTo2s);
           }
         }
         prevLoadingRef.current = loading;
@@ -119,14 +128,14 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         timeoutRef.current = setTimeout(() => {
           setInternalStatus("idle");
           onAnimationComplete?.("success");
-        }, successDuration);
+        }, 2000 + successDuration);
       } else if (isError && status !== "error") {
         if (timeoutRef.current) clearTimeout(timeoutRef.current);
         setInternalStatus("error");
         timeoutRef.current = setTimeout(() => {
           setInternalStatus("idle");
           onAnimationComplete?.("error");
-        }, successDuration);
+        }, 2000 + successDuration);
       }
     }, [isSuccess, isError, status, successDuration, disableDualFill, asChild, onAnimationComplete]);
 
@@ -154,20 +163,26 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
           if (result && typeof (result as any).then === "function") {
             if (timeoutRef.current) clearTimeout(timeoutRef.current);
             setInternalStatus("processing");
+            const startTime = Date.now();
             try {
-              await result;
+              const res = await result;
+              const elapsed = Date.now() - startTime;
+              const remainingTo2s = Math.max(0, 2000 - elapsed);
+              if (remainingTo2s > 0) {
+                await new Promise((resolve) => setTimeout(resolve, remainingTo2s));
+              }
               setInternalStatus("success");
               timeoutRef.current = setTimeout(() => {
                 setInternalStatus("idle");
                 onAnimationComplete?.("success");
               }, successDuration);
+              return res;
             } catch (asyncErr) {
               setInternalStatus("error");
               timeoutRef.current = setTimeout(() => {
                 setInternalStatus("idle");
                 onAnimationComplete?.("error");
-              }, successDuration);
-              throw asyncErr;
+              }, 2000 + successDuration);
             }
           }
         } catch (syncErr) {
@@ -175,8 +190,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
           timeoutRef.current = setTimeout(() => {
             setInternalStatus("idle");
             onAnimationComplete?.("error");
-          }, successDuration);
-          throw syncErr;
+          }, 2000 + successDuration);
         }
       }
     };
@@ -219,7 +233,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
             <span
               aria-hidden="true"
               className={cn(
-                "pointer-events-none absolute inset-y-0 left-0 z-0 transition-all duration-450 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none",
+                "pointer-events-none absolute inset-y-0 left-0 z-0 will-change-[width,opacity] motion-reduce:transition-none",
                 !isAnimated && "w-0 opacity-0",
                 isProcessing && "w-1/2 opacity-100",
                 isSuccessState && "w-1/2 opacity-100",
@@ -227,6 +241,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
               )}
               style={{
                 backgroundColor: isErrorState ? "#FF7F7F" : "#8FAF7E",
+                transition: "width 2000ms cubic-bezier(0.22, 1, 0.36, 1), background-color 300ms ease, opacity 200ms ease",
               }}
             />
 
@@ -234,7 +249,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
             <span
               aria-hidden="true"
               className={cn(
-                "pointer-events-none absolute inset-y-0 right-0 z-0 transition-all duration-450 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none",
+                "pointer-events-none absolute inset-y-0 right-0 z-0 will-change-[width,opacity] motion-reduce:transition-none",
                 !isAnimated && "w-0 opacity-0",
                 isProcessing && "w-1/2 opacity-100",
                 isSuccessState && "w-1/2 opacity-100",
@@ -242,6 +257,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
               )}
               style={{
                 backgroundColor: isErrorState ? "#FF7F7F" : "#8FAF7E",
+                transition: "width 2000ms cubic-bezier(0.22, 1, 0.36, 1), background-color 300ms ease, opacity 200ms ease",
               }}
             />
 
