@@ -1331,10 +1331,10 @@ const productSchema = product ? {
 
                 {/* Bottom Overlays: Title & Category on Left, Reviews / Rating on Right Bottom Overlap */}
                 {!isVideoActive && (
-                  <div className="absolute bottom-4 sm:bottom-5 left-4 sm:left-5 right-4 sm:right-5 z-10 flex items-end justify-between gap-3">
+                  <div className="absolute bottom-3 sm:bottom-5 left-3 sm:left-5 right-3 sm:right-5 z-10 flex flex-col xs:flex-row xs:items-end justify-between gap-2 sm:gap-3">
                     {/* Bottom-Left: Title & Category / Brand */}
-                    <div className="text-left pointer-events-none space-y-1 min-w-0 max-w-[65%]">
-                      <h1 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-white tracking-tight drop-shadow-md font-display line-clamp-2">
+                    <div className="text-left pointer-events-none space-y-0.5 sm:space-y-1 min-w-0 max-w-full xs:max-w-[65%]">
+                      <h1 className="text-lg sm:text-2xl lg:text-3xl font-extrabold text-white tracking-tight drop-shadow-md font-display line-clamp-2">
                         {product.title}
                       </h1>
                       <p className="text-xs sm:text-sm font-semibold text-neutral-200 drop-shadow-sm flex items-center gap-1.5 capitalize truncate">
@@ -1361,7 +1361,7 @@ const productSchema = product ? {
                             document.getElementById("customer-reviews-section")?.scrollIntoView({ behavior: "smooth" });
                           }}
                           title="View Customer Reviews"
-                          className="pointer-events-auto shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/65 dark:bg-black/75 hover:bg-black/80 text-white backdrop-blur-md border border-white/20 shadow-md transition-all hover:scale-105 active:scale-95 cursor-pointer text-xs select-none"
+                          className="pointer-events-auto shrink-0 inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full bg-black/65 dark:bg-black/75 hover:bg-black/80 text-white backdrop-blur-md border border-white/20 shadow-md transition-all hover:scale-105 active:scale-95 cursor-pointer text-[11px] sm:text-xs select-none w-fit"
                         >
                           <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
                           <span className="font-bold text-amber-300 font-mono">

@@ -552,7 +552,7 @@ export default function Profile() {
           </div>
 
           {/* Marketplace Stats Row */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 mx-6 mb-6 rounded-2xl bg-secondary/30 border border-border/60 text-center backdrop-blur-md">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 p-3 sm:p-4 mx-3 sm:mx-6 mb-4 sm:mb-6 rounded-2xl bg-secondary/30 border border-border/60 text-center backdrop-blur-md">
             {/* Metric 1: Completed Rentals */}
             <div className="p-2 space-y-0.5">
               {loadingStats ? (

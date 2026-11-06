@@ -117,7 +117,7 @@ export function LoadingState({
       >
         <div className="lg:col-span-7 space-y-4">
           <div className="h-96 rounded-3xl bg-muted/70 w-full" />
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
             {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="h-20 rounded-xl bg-muted/50" />
             ))}

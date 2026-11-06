@@ -106,7 +106,7 @@ export const DeviceVerificationPage: React.FC = () => {
                   </span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 text-xs font-mono">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 text-xs font-mono">
                   <div>
                     <span className="text-[9px] uppercase tracking-wider text-neutral-400 block font-sans">
                       Device ID

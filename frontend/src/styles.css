@@ -57,6 +57,15 @@
   --font-display: "Outfit", "Inter", sans-serif;
 }
 
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 html, body {
   max-width: 100vw;
   overflow-x: hidden;
@@ -67,6 +76,11 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
   display: none;
   width: 0;
   height: 0;
+}
+
+img, video, canvas, svg {
+  max-width: 100%;
+  height: auto;
 }
 
 :root {

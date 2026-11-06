@@ -1505,7 +1505,7 @@ export default function Knowledge() {
             <p className="text-xs text-[#F5F5F5] font-medium">{selectedDraft?.customer_query}</p>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-semibold text-[#A1A1AA] mb-1 block">Category</label>
               <select
@@ -1578,7 +1578,7 @@ export default function Knowledge() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3 pt-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
             <div>
               <input
                 type="text"

@@ -24,7 +24,7 @@ export function AuthGearShowcase({
       {/* Main Branding Section: Floating Camera at top + [p] Payent Badge + Headline + Subtitle */}
       <div className="relative pt-0 pb-1 z-10">
         {/* Smooth Hand-drawn Camera Sketch positioned directly above the branding */}
-        <div className="w-28 sm:w-36 lg:w-44 ml-12 sm:ml-16 lg:ml-20 mb-1 pointer-events-none select-none transition-transform duration-300 hover:scale-105">
+        <div className="w-24 sm:w-36 lg:w-44 ml-6 sm:ml-16 lg:ml-20 mb-1 pointer-events-none select-none transition-transform duration-300 hover:scale-105">
           <img
             src="/illustrations/auth/camera-light.webp"
             srcSet="/illustrations/auth/camera-light.webp 1x, /illustrations/auth/camera-light@2x.webp 2x"
@@ -61,7 +61,7 @@ export function AuthGearShowcase({
 
         {/* Headline */}
         <div className="space-y-1">
-          <h1 className="text-3xl sm:text-4xl lg:text-[44px] font-black text-foreground tracking-tight font-display leading-[1.12]">
+          <h1 className="text-2xl sm:text-4xl lg:text-[44px] font-black text-foreground tracking-tight font-display leading-[1.12]">
             {title}
           </h1>
           <p className="text-[12px] sm:text-[13px] text-neutral-500 dark:text-neutral-400 font-normal leading-normal max-w-md pt-0.5">
@@ -71,9 +71,9 @@ export function AuthGearShowcase({
       </div>
 
       {/* Bottom Gear Section: Smooth Laptop at bottom-left, Smooth Tripod at bottom-right */}
-      <div className="relative flex items-end justify-between gap-4 pt-4 sm:pt-6 z-10">
+      <div className="relative flex items-end justify-between gap-3 sm:gap-4 pt-3 sm:pt-6 z-10">
         {/* Laptop Illustration */}
-        <div className="w-38 sm:w-48 lg:w-56 pointer-events-none select-none -ml-2 sm:-ml-3 transition-transform duration-300 hover:scale-105 shrink-0">
+        <div className="w-32 sm:w-48 lg:w-56 pointer-events-none select-none -ml-1 sm:-ml-3 transition-transform duration-300 hover:scale-105 shrink-0">
           <img
             src="/illustrations/auth/laptop-light.webp"
             srcSet="/illustrations/auth/laptop-light.webp 1x, /illustrations/auth/laptop-light@2x.webp 2x"
@@ -93,7 +93,7 @@ export function AuthGearShowcase({
         </div>
 
         {/* Tripod Illustration */}
-        <div className="w-26 sm:w-34 lg:w-40 pointer-events-none select-none -mr-1 sm:mr-0 transition-transform duration-300 hover:scale-105 shrink-0">
+        <div className="w-24 sm:w-34 lg:w-40 pointer-events-none select-none -mr-1 sm:mr-0 transition-transform duration-300 hover:scale-105 shrink-0">
           <img
             src="/illustrations/auth/tripod-light.webp"
             srcSet="/illustrations/auth/tripod-light.webp 1x, /illustrations/auth/tripod-light@2x.webp 2x"

@@ -756,7 +756,7 @@ export function PayerntAuth({
                       {password.length > 0 && !isPasswordValid && (
                         <div className="p-2.5 rounded-xl bg-secondary/80 border border-border/80 text-[11px] space-y-1 text-muted-foreground">
                           <p className="font-semibold text-foreground">Password requirements:</p>
-                          <div className="grid grid-cols-2 gap-1">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
                             <span className={hasMinLen ? "text-emerald-500 font-medium" : ""}>
                               • 8+ characters
                             </span>

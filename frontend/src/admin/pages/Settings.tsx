@@ -251,7 +251,7 @@ export default function Settings() {
                     <h3 className="text-sm font-semibold text-foreground">System Appearance Mode</h3>
                     <p className="text-[11px] text-muted-foreground mt-0.5">Toggle admin interface theme preferences.</p>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <button
                       type="button"
                       onClick={toggle}

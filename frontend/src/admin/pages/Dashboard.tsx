@@ -960,7 +960,7 @@ export function Dashboard() {
             </div>
 
             {/* Distribution Legend */}
-            <div className="grid grid-cols-2 gap-2 text-[11px] pt-2 border-t border-[#E6E4E9] dark:border-[#273244]">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] pt-2 border-t border-[#E6E4E9] dark:border-[#273244]">
               {bookingDistributionData.map((item) => (
                 <div key={item.name} className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5 truncate">

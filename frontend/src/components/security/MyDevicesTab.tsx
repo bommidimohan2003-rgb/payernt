@@ -156,7 +156,7 @@ export const MyDevicesTab: React.FC<MyDevicesTabProps> = ({
                   </div>
 
                   {/* Metadata fields */}
-                  <div className="grid grid-cols-2 gap-2 text-xs p-3 rounded-2xl bg-neutral-50 dark:bg-[#131E2A] border border-neutral-200/60 dark:border-white/5 font-mono">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs p-3 rounded-2xl bg-neutral-50 dark:bg-[#131E2A] border border-neutral-200/60 dark:border-white/5 font-mono">
                     <div>
                       <span className="text-[9px] uppercase tracking-wider text-neutral-400 block font-sans">
                         Device ID

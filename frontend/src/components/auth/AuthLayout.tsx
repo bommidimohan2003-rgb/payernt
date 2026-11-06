@@ -28,7 +28,7 @@ export function AuthLayout({
 
         {/* Clean Two-Column Composition: Left Gear Showcase from image, Right authentication form */}
         <div className="relative z-10 w-full max-w-6xl mx-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-12 items-start">
             {/* Left Section – Gear Showcase matching user image exactly in both themes */}
             <div className="lg:col-span-6 xl:col-span-6 flex flex-col justify-start">
               <AuthGearShowcase title={title} subtitle={subtitle} />

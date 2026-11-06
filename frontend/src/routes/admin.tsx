@@ -128,7 +128,7 @@ function AdminLayout() {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-background">
+      <div className="flex min-h-[100dvh] h-[100dvh] items-center justify-center bg-background">
         <LoadingState
           type="spinner"
           message="Validating admin authorization..."
@@ -152,7 +152,7 @@ function AdminLayout() {
   return (
     <Suspense
       fallback={
-        <div className="flex h-screen items-center justify-center bg-background">
+        <div className="flex min-h-[100dvh] h-[100dvh] items-center justify-center bg-background">
           <LoadingState type="spinner" message="Loading admin workspace..." />
         </div>
       }

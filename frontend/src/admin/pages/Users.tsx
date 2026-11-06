@@ -873,7 +873,7 @@ export default function Users() {
                               ₹{selectedUser.wallet.availableBalance.toLocaleString()}
                             </span>
                           </div>
-                          <div className="grid grid-cols-2 gap-2 text-[11px] text-muted-foreground pt-1 border-t border-border/40">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-muted-foreground pt-1 border-t border-border/40">
                             <div>Pending: <span className="font-mono text-foreground font-semibold">₹{selectedUser.wallet.pendingAmount.toLocaleString()}</span></div>
                             <div>Total Received: <span className="font-mono text-foreground font-semibold">₹{selectedUser.wallet.totalReceived.toLocaleString()}</span></div>
                           </div>
