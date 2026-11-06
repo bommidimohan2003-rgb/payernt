@@ -1262,10 +1262,10 @@ const productSchema = product ? {
           </div>
           
           {/* 1. TOP HERO: PRODUCT GALLERY & DETAILS (2-Column Grid matching Reference) */}
-          <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start w-full min-w-0">
+          <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-x-12 lg:gap-y-6 items-start w-full min-w-0">
             
-            {/* Left Column: Image Gallery & 10s Video Showcase (6 cols) */}
-            <div className="lg:col-span-6 space-y-4 min-w-0 w-full">
+            {/* 1. Left Top / Mobile 1st: Image Gallery & 10s Video Showcase */}
+            <div className="order-1 lg:order-1 lg:col-span-6 lg:col-start-1 lg:row-start-1 space-y-4 min-w-0 w-full">
               {/* Main Product Showcase Card with edge-to-edge image & floating overlay badges */}
               <div className="relative rounded-3xl overflow-hidden bg-neutral-950 border border-neutral-200/80 dark:border-neutral-800 aspect-[4/3] sm:aspect-[16/11] min-h-[380px] sm:min-h-[460px] max-h-[520px] w-full flex items-center justify-center shadow-md group">
                 {/* Center Showcase: 10s Video Player or High-Resolution Photo */}
@@ -1488,193 +1488,10 @@ const productSchema = product ? {
                 </button>
               </div>
 
-              {/* Product Details (Under the product card) */}
-              <div className="rounded-3xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#0D151D] p-6 shadow-xs space-y-5 text-left">
-                {/* 1. Product Description moved to top of this section */}
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  {product.description ||
-                    `Capture stunning photos and videos with the ${product.title}. Perfect for events, travel and professional shoots.`}
-                </p>
-
-                {/* 2. Price Display */}
-                <div className="flex items-center justify-between gap-3 flex-wrap">
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="text-3xl sm:text-4xl font-black text-emerald-600 dark:text-emerald-400 font-display font-mono">
-                      ₹{(Number(product.price) || 0).toLocaleString("en-IN")}
-                    </span>
-                    <span className="text-sm font-semibold text-muted-foreground">/ day</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-xs font-semibold">
-                    <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
-                    <span>{product.available ? "Available for Rent" : "Currently Reserved"}</span>
-                  </div>
-                </div>
-
-                {/* 3. Condition, Location, Lender all on one line */}
-                <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pt-3 border-t border-border/60 text-xs sm:text-sm">
-                  <div className="flex items-center gap-1.5 text-foreground">
-                    <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
-                    <span className="font-medium text-muted-foreground">Condition:</span>
-                    <span className="font-bold">{(product as any).condition || "Like New"}</span>
-                  </div>
-
-                  <span className="hidden sm:inline text-neutral-300 dark:text-neutral-700">•</span>
-
-                  <div className="flex items-center gap-1.5 text-foreground">
-                    <MapPin className="h-4 w-4 text-emerald-600 shrink-0" />
-                    <span className="font-medium text-muted-foreground">Location:</span>
-                    <span className="font-bold">{formatOwnerAddress(product) || "Bengaluru"}</span>
-                  </div>
-
-                  <span className="hidden sm:inline text-neutral-300 dark:text-neutral-700">•</span>
-
-                  <div className="flex items-center gap-1.5 text-foreground">
-                    <User className="h-4 w-4 text-emerald-600 shrink-0" />
-                    <span className="font-medium text-muted-foreground">Lender:</span>
-                    <span className="font-bold">{product.owner?.name || "Arun Kumar"}</span>
-                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 fill-emerald-500/20 shrink-0" />
-                  </div>
-                </div>
-
-                {/* Action Row: Terms and Conditions Checkbox & BOOK NOW */}
-                <div className="pt-3 flex items-center justify-between flex-wrap gap-3 border-t border-border/40 mt-1">
-                  {/* Circular Button with Image 2 Animated Swoosh & Protruding Tick + Clickable Terms Text */}
-                  <div className="flex items-center gap-2.5 select-none py-1">
-                    {/* Circle Toggle Button: Animates to Image 2 curved arrow + protruding tick when active */}
-                    <button
-                      type="button"
-                      role="checkbox"
-                      aria-checked={termsAccepted}
-                      onClick={() => setTermsAccepted((prev) => !prev)}
-                      className="relative flex h-7 w-7 items-center justify-center cursor-pointer transition-transform active:scale-90 focus:outline-hidden group"
-                      aria-label="Toggle terms and conditions acceptance"
-                    >
-                      <AnimatePresence mode="wait">
-                        {termsAccepted ? (
-                          <motion.svg
-                            key="checked-swoosh-icon"
-                            width="28"
-                            height="28"
-                            viewBox="0 0 40 40"
-                            className="overflow-visible shrink-0 drop-shadow-xs"
-                            initial={{ scale: 0.5, rotate: -30, opacity: 0 }}
-                            animate={{ scale: 1, rotate: 0, opacity: 1 }}
-                            exit={{ scale: 0.5, rotate: -30, opacity: 0 }}
-                            transition={{ type: "spring", stiffness: 450, damping: 20 }}
-                          >
-                            {/* Upper-left circular arrow arc */}
-                            <motion.path
-                              d="M 28 8.5 A 13.5 13.5 0 0 0 11.5 29.5"
-                              stroke="#059669"
-                              strokeWidth="3.2"
-                              strokeLinecap="round"
-                              fill="none"
-                              initial={{ pathLength: 0 }}
-                              animate={{ pathLength: 1 }}
-                              transition={{ duration: 0.35, ease: "easeOut" }}
-                            />
-                            {/* Arrowhead at bottom left pointing left */}
-                            <motion.polygon
-                              points="6,31.5 15,25 14,35"
-                              fill="#059669"
-                              initial={{ scale: 0 }}
-                              animate={{ scale: 1 }}
-                              transition={{ delay: 0.12, duration: 0.2 }}
-                            />
-                            {/* Lower-right arc */}
-                            <motion.path
-                              d="M 16 33.5 A 13.5 13.5 0 0 0 32.5 22"
-                              stroke="#059669"
-                              strokeWidth="3.2"
-                              strokeLinecap="round"
-                              fill="none"
-                              initial={{ pathLength: 0 }}
-                              animate={{ pathLength: 1 }}
-                              transition={{ duration: 0.3, ease: "easeOut" }}
-                            />
-                            {/* Bold checkmark extending OUTSIDE the circular perimeter */}
-                            <motion.path
-                              d="M 11.5 21 L 18 27.5 L 34.5 8"
-                              stroke="#059669"
-                              strokeWidth="4.5"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              fill="none"
-                              initial={{ pathLength: 0 }}
-                              animate={{ pathLength: 1 }}
-                              transition={{
-                                type: "spring",
-                                stiffness: 420,
-                                damping: 22,
-                                delay: 0.08,
-                              }}
-                            />
-                          </motion.svg>
-                        ) : (
-                          <motion.svg
-                            key="unchecked-circle"
-                            width="28"
-                            height="28"
-                            viewBox="0 0 40 40"
-                            className="overflow-visible shrink-0"
-                            initial={{ scale: 0.8, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.8, opacity: 0 }}
-                          >
-                            <circle
-                              cx="20"
-                              cy="20"
-                              r="13.5"
-                              stroke="currentColor"
-                              strokeWidth="2.5"
-                              fill="none"
-                              className="text-neutral-400 dark:text-neutral-500 group-hover:text-emerald-500 transition-colors"
-                            />
-                          </motion.svg>
-                        )}
-                      </AnimatePresence>
-                    </button>
-
-                    {/* Text: Clicking opens the Terms & Conditions popup modal */}
-                    <button
-                      type="button"
-                      onClick={() => setShowTermsModal(true)}
-                      className="text-left text-xs sm:text-[13px] font-medium text-foreground hover:text-emerald-600 transition-colors cursor-pointer group flex items-center gap-1.5 focus:outline-hidden"
-                    >
-                      <span
-                        className={cn(
-                          "underline decoration-neutral-300 dark:decoration-neutral-600 group-hover:decoration-emerald-500 transition-all",
-                          termsAccepted && "text-emerald-600 dark:text-emerald-400 font-semibold decoration-emerald-500"
-                        )}
-                      >
-                        terms&condtion will apply
-                      </span>
-                      <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-secondary text-muted-foreground group-hover:text-foreground group-hover:bg-emerald-500/10 transition-colors">
-                        view
-                      </span>
-                    </button>
-                  </div>
-
-                  <button
-                    type="button"
-                    id="product-details-book-now-btn"
-                    onClick={handleBookNowAction}
-                    disabled={categoryRestriction?.restricted}
-                    className={`py-2.5 sm:py-3 px-6 rounded-full font-bold text-xs sm:text-sm shadow-sm transition-all duration-200 inline-flex items-center justify-center gap-2 cursor-pointer active:scale-95 ${
-                      categoryRestriction?.restricted
-                        ? "bg-amber-900/40 text-amber-300 border border-amber-500/30 cursor-not-allowed opacity-80"
-                        : "bg-neutral-950 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-100"
-                    }`}
-                  >
-                    <ShoppingBag className="h-4 w-4 shrink-0" />
-                    <span>BOOK NOW</span>
-                  </button>
-                </div>
               </div>
-            </div>
 
-            {/* Right Column: Interactive Booking Calendar & Action (In place of details) */}
-            <div id="rental-booking-section" className="lg:col-span-6 space-y-4 text-left lg:sticky lg:top-24 min-w-0 w-full">
+            {/* 2. Check Availability & Rental Booking Section (Mobile/Tablet: 1st after gallery (order-2), Desktop: Right Column Sticky) */}
+            <div id="rental-booking-section" className="order-2 lg:order-3 lg:col-span-6 lg:col-start-7 lg:row-start-1 lg:row-span-2 space-y-4 text-left lg:sticky lg:top-24 min-w-0 w-full">
               <div className="rounded-2xl sm:rounded-3xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#0D151D] p-4 sm:p-5 shadow-xs space-y-3.5">
                 <div className="flex items-center justify-between pb-1 flex-wrap gap-2.5">
                   <div className="flex items-center gap-2">
@@ -1759,23 +1576,27 @@ const productSchema = product ? {
                   <label className="block text-[11px] font-bold text-foreground uppercase tracking-wider">
                     Choose Time Slot
                   </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <div className="grid grid-cols-3 gap-1.5 sm:gap-2 w-full min-w-0">
                     {/* Morning */}
                     <button
                       type="button"
                       onClick={() => handleSlotSelect("morning")}
-                      className={`p-2 sm:p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                      className={`p-1.5 xs:p-2 sm:p-2.5 rounded-xl border text-left transition-all cursor-pointer min-w-0 flex flex-col justify-between ${
                         selectedSlot === "morning" && durationMode === "half_day_morning"
                           ? "border-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 ring-2 ring-emerald-500/20 shadow-xs"
                           : "border-black/10 dark:border-white/10 bg-neutral-100/60 dark:bg-[#121C26] hover:bg-neutral-100 dark:hover:bg-[#162330]"
                       }`}
                     >
-                      <div className="flex items-center gap-1 mb-0.5">
-                        <Sun className="h-3 w-3 text-amber-500" />
-                        <span className="text-[11px] sm:text-xs font-bold text-foreground">Morning</span>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1 mb-0.5 min-w-0">
+                          <Sun className="h-3 w-3 text-amber-500 shrink-0" />
+                          <span className="text-[10px] xs:text-[11px] sm:text-xs font-bold text-foreground truncate">Morning</span>
+                        </div>
+                        <div className="text-[8px] xs:text-[8.5px] sm:text-[10px] text-muted-foreground truncate leading-tight">
+                          8 AM - 12 PM
+                        </div>
                       </div>
-                      <div className="text-[9px] sm:text-[10px] text-muted-foreground">8:00 AM - 12:00 PM</div>
-                      <div className="mt-1 text-[11px] sm:text-xs font-extrabold text-emerald-600 dark:text-emerald-400">
+                      <div className="mt-1 text-[10px] xs:text-[11px] sm:text-xs font-extrabold text-emerald-600 dark:text-emerald-400 font-mono">
                         ₹{morningPrice}
                       </div>
                     </button>
@@ -1784,18 +1605,22 @@ const productSchema = product ? {
                     <button
                       type="button"
                       onClick={() => handleSlotSelect("afternoon")}
-                      className={`p-2 sm:p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                      className={`p-1.5 xs:p-2 sm:p-2.5 rounded-xl border text-left transition-all cursor-pointer min-w-0 flex flex-col justify-between ${
                         selectedSlot === "afternoon" && durationMode === "half_day_afternoon"
                           ? "border-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 ring-2 ring-emerald-500/20 shadow-xs"
                           : "border-black/10 dark:border-white/10 bg-neutral-100/60 dark:bg-[#121C26] hover:bg-neutral-100 dark:hover:bg-[#162330]"
                       }`}
                     >
-                      <div className="flex items-center gap-1 mb-0.5">
-                        <Sun className="h-3 w-3 text-orange-500" />
-                        <span className="text-[11px] sm:text-xs font-bold text-foreground">Afternoon</span>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1 mb-0.5 min-w-0">
+                          <Sun className="h-3 w-3 text-orange-500 shrink-0" />
+                          <span className="text-[10px] xs:text-[11px] sm:text-xs font-bold text-foreground truncate">Afternoon</span>
+                        </div>
+                        <div className="text-[8px] xs:text-[8.5px] sm:text-[10px] text-muted-foreground truncate leading-tight">
+                          1 PM - 5 PM
+                        </div>
                       </div>
-                      <div className="text-[9px] sm:text-[10px] text-muted-foreground">1:00 PM - 5:00 PM</div>
-                      <div className="mt-1 text-[11px] sm:text-xs font-extrabold text-emerald-600 dark:text-emerald-400">
+                      <div className="mt-1 text-[10px] xs:text-[11px] sm:text-xs font-extrabold text-emerald-600 dark:text-emerald-400 font-mono">
                         ₹{afternoonPrice}
                       </div>
                     </button>
@@ -1804,18 +1629,22 @@ const productSchema = product ? {
                     <button
                       type="button"
                       onClick={() => handleSlotSelect("full_day")}
-                      className={`p-2 sm:p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                      className={`p-1.5 xs:p-2 sm:p-2.5 rounded-xl border text-left transition-all cursor-pointer min-w-0 flex flex-col justify-between ${
                         selectedSlot === "full_day" && durationMode === "full_day"
                           ? "border-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 ring-2 ring-emerald-500/20 shadow-xs"
                           : "border-black/10 dark:border-white/10 bg-neutral-100/60 dark:bg-[#121C26] hover:bg-neutral-100 dark:hover:bg-[#162330]"
                       }`}
                     >
-                      <div className="flex items-center gap-1 mb-0.5">
-                        <Calendar className="h-3 w-3 text-emerald-500" />
-                        <span className="text-[11px] sm:text-xs font-bold text-foreground">Full Day</span>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1 mb-0.5 min-w-0">
+                          <Calendar className="h-3 w-3 text-emerald-500 shrink-0" />
+                          <span className="text-[10px] xs:text-[11px] sm:text-xs font-bold text-foreground truncate">Full Day</span>
+                        </div>
+                        <div className="text-[8px] xs:text-[8.5px] sm:text-[10px] text-muted-foreground truncate leading-tight">
+                          24 Hours
+                        </div>
                       </div>
-                      <div className="text-[9px] sm:text-[10px] text-muted-foreground">24 Elapsed Hours</div>
-                      <div className="mt-1 text-[11px] sm:text-xs font-extrabold text-emerald-600 dark:text-emerald-400">
+                      <div className="mt-1 text-[10px] xs:text-[11px] sm:text-xs font-extrabold text-emerald-600 dark:text-emerald-400 font-mono">
                         ₹{fullDayPrice}
                       </div>
                     </button>
@@ -2024,6 +1853,192 @@ const productSchema = product ? {
                     </button>
                   </div>
                 )}
+              </div>
+            </div>
+
+            {/* 3. Product Details & Book Section (Mobile/Tablet: 2nd after check availability (order-3), Desktop: Left Column under Gallery (order-2)) */}
+            <div className="order-3 lg:order-2 lg:col-span-6 lg:col-start-1 lg:row-start-2 min-w-0 w-full">
+              <div className="rounded-3xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#0D151D] p-5 sm:p-6 shadow-xs space-y-5 text-left">
+                {/* 1. Product Description moved to top of this section */}
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {product.description ||
+                    `Capture stunning photos and videos with the ${product.title}. Perfect for events, travel and professional shoots.`}
+                </p>
+
+                {/* 2. Price Display */}
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-3xl sm:text-4xl font-black text-emerald-600 dark:text-emerald-400 font-display font-mono">
+                      ₹{(Number(product.price) || 0).toLocaleString("en-IN")}
+                    </span>
+                    <span className="text-sm font-semibold text-muted-foreground">/ day</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-xs font-semibold">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
+                    <span>{product.available ? "Available for Rent" : "Currently Reserved"}</span>
+                  </div>
+                </div>
+
+                {/* 3. Condition, Location, Lender all on one line */}
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pt-3 border-t border-border/60 text-xs sm:text-sm">
+                  <div className="flex items-center gap-1.5 text-foreground">
+                    <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
+                    <span className="font-medium text-muted-foreground">Condition:</span>
+                    <span className="font-bold">{(product as any).condition || "Like New"}</span>
+                  </div>
+
+                  <span className="hidden sm:inline text-neutral-300 dark:text-neutral-700">•</span>
+
+                  <div className="flex items-center gap-1.5 text-foreground">
+                    <MapPin className="h-4 w-4 text-emerald-600 shrink-0" />
+                    <span className="font-medium text-muted-foreground">Location:</span>
+                    <span className="font-bold">{formatOwnerAddress(product) || "Bengaluru"}</span>
+                  </div>
+
+                  <span className="hidden sm:inline text-neutral-300 dark:text-neutral-700">•</span>
+
+                  <div className="flex items-center gap-1.5 text-foreground">
+                    <User className="h-4 w-4 text-emerald-600 shrink-0" />
+                    <span className="font-medium text-muted-foreground">Lender:</span>
+                    <span className="font-bold">{product.owner?.name || "Arun Kumar"}</span>
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 fill-emerald-500/20 shrink-0" />
+                  </div>
+                </div>
+
+                {/* Action Row: Terms and Conditions Checkbox & BOOK NOW */}
+                <div className="pt-3 flex items-center justify-between flex-wrap gap-3 border-t border-border/40 mt-1">
+                  {/* Circular Button with Image 2 Animated Swoosh & Protruding Tick + Clickable Terms Text */}
+                  <div className="flex items-center gap-2.5 select-none py-1">
+                    {/* Circle Toggle Button: Animates to Image 2 curved arrow + protruding tick when active */}
+                    <button
+                      type="button"
+                      role="checkbox"
+                      aria-checked={termsAccepted}
+                      onClick={() => setTermsAccepted((prev) => !prev)}
+                      className="relative flex h-7 w-7 items-center justify-center cursor-pointer transition-transform active:scale-90 focus:outline-hidden group"
+                      aria-label="Toggle terms and conditions acceptance"
+                    >
+                      <AnimatePresence mode="wait">
+                        {termsAccepted ? (
+                          <motion.svg
+                            key="checked-swoosh-icon"
+                            width="28"
+                            height="28"
+                            viewBox="0 0 40 40"
+                            className="overflow-visible shrink-0 drop-shadow-xs"
+                            initial={{ scale: 0.5, rotate: -30, opacity: 0 }}
+                            animate={{ scale: 1, rotate: 0, opacity: 1 }}
+                            exit={{ scale: 0.5, rotate: -30, opacity: 0 }}
+                            transition={{ type: "spring", stiffness: 450, damping: 20 }}
+                          >
+                            {/* Upper-left circular arrow arc */}
+                            <motion.path
+                              d="M 28 8.5 A 13.5 13.5 0 0 0 11.5 29.5"
+                              stroke="#059669"
+                              strokeWidth="3.2"
+                              strokeLinecap="round"
+                              fill="none"
+                              initial={{ pathLength: 0 }}
+                              animate={{ pathLength: 1 }}
+                              transition={{ duration: 0.35, ease: "easeOut" }}
+                            />
+                            {/* Arrowhead at bottom left pointing left */}
+                            <motion.polygon
+                              points="6,31.5 15,25 14,35"
+                              fill="#059669"
+                              initial={{ scale: 0 }}
+                              animate={{ scale: 1 }}
+                              transition={{ delay: 0.12, duration: 0.2 }}
+                            />
+                            {/* Lower-right arc */}
+                            <motion.path
+                              d="M 16 33.5 A 13.5 13.5 0 0 0 32.5 22"
+                              stroke="#059669"
+                              strokeWidth="3.2"
+                              strokeLinecap="round"
+                              fill="none"
+                              initial={{ pathLength: 0 }}
+                              animate={{ pathLength: 1 }}
+                              transition={{ duration: 0.3, ease: "easeOut" }}
+                            />
+                            {/* Bold checkmark extending OUTSIDE the circular perimeter */}
+                            <motion.path
+                              d="M 11.5 21 L 18 27.5 L 34.5 8"
+                              stroke="#059669"
+                              strokeWidth="4.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              fill="none"
+                              initial={{ pathLength: 0 }}
+                              animate={{ pathLength: 1 }}
+                              transition={{
+                                type: "spring",
+                                stiffness: 420,
+                                damping: 22,
+                                delay: 0.08,
+                              }}
+                            />
+                          </motion.svg>
+                        ) : (
+                          <motion.svg
+                            key="unchecked-circle"
+                            width="28"
+                            height="28"
+                            viewBox="0 0 40 40"
+                            className="overflow-visible shrink-0"
+                            initial={{ scale: 0.8, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.8, opacity: 0 }}
+                          >
+                            <circle
+                              cx="20"
+                              cy="20"
+                              r="13.5"
+                              stroke="currentColor"
+                              strokeWidth="2.5"
+                              fill="none"
+                              className="text-neutral-400 dark:text-neutral-500 group-hover:text-emerald-500 transition-colors"
+                            />
+                          </motion.svg>
+                        )}
+                      </AnimatePresence>
+                    </button>
+
+                    {/* Text: Clicking opens the Terms & Conditions popup modal */}
+                    <button
+                      type="button"
+                      onClick={() => setShowTermsModal(true)}
+                      className="text-left text-xs sm:text-[13px] font-medium text-foreground hover:text-emerald-600 transition-colors cursor-pointer group flex items-center gap-1.5 focus:outline-hidden"
+                    >
+                      <span
+                        className={cn(
+                          "underline decoration-neutral-300 dark:decoration-neutral-600 group-hover:decoration-emerald-500 transition-all",
+                          termsAccepted && "text-emerald-600 dark:text-emerald-400 font-semibold decoration-emerald-500"
+                        )}
+                      >
+                        terms&condtion will apply
+                      </span>
+                      <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-secondary text-muted-foreground group-hover:text-foreground group-hover:bg-emerald-500/10 transition-colors">
+                        view
+                      </span>
+                    </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    id="product-details-book-now-btn"
+                    onClick={handleBookNowAction}
+                    disabled={categoryRestriction?.restricted}
+                    className={`py-2.5 sm:py-3 px-6 rounded-full font-bold text-xs sm:text-sm shadow-sm transition-all duration-200 inline-flex items-center justify-center gap-2 cursor-pointer active:scale-95 ${
+                      categoryRestriction?.restricted
+                        ? "bg-amber-900/40 text-amber-300 border border-amber-500/30 cursor-not-allowed opacity-80"
+                        : "bg-neutral-950 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-100"
+                    }`}
+                  >
+                    <ShoppingBag className="h-4 w-4 shrink-0" />
+                    <span>BOOK NOW</span>
+                  </button>
+                </div>
               </div>
             </div>
           </section>
