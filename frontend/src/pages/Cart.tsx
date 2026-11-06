@@ -39,7 +39,7 @@ export default function Cart() {
 
   return (
     <MainLayout>
-      <div className="min-h-screen bg-neutral-50/50 dark:bg-[#05090D] text-neutral-900 dark:text-white transition-colors py-8 sm:py-12">
+      <div className="min-h-screen bg-neutral-50/50 dark:bg-[#1E1E1E] text-neutral-900 dark:text-white transition-colors py-8 sm:py-12">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           {/* Back Button & Breadcrumb Navigation */}
           <div className="flex items-center gap-3 mb-6">
@@ -87,7 +87,7 @@ export default function Cart() {
 
           {/* Main Grid: Left Items + Right Summary */}
           {cartItems.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-neutral-200 dark:border-white/10 bg-white dark:bg-[#0D151D] p-12 sm:p-16 text-center shadow-sm">
+            <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-neutral-200 dark:border-white/10 bg-white dark:bg-[#1E1E1E] p-12 sm:p-16 text-center shadow-sm">
               <div className="flex h-20 w-20 items-center justify-center rounded-full bg-neutral-100 dark:bg-white/5 text-neutral-400 dark:text-neutral-500 mb-5">
                 <ShoppingBag className="h-10 w-10" />
               </div>
@@ -112,7 +112,7 @@ export default function Cart() {
                 {cartItems.map((item) => (
                   <div
                     key={item.id}
-                    className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-[#0D151D] shadow-sm transition-all"
+                    className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-[#1E1E1E] shadow-sm transition-all"
                   >
                     <div className="flex items-center gap-4 min-w-0 flex-1">
                       {/* Thumbnail */}
@@ -176,7 +176,7 @@ export default function Cart() {
 
               {/* Right Column: Order Summary Card */}
               <div className="lg:col-span-4 sticky top-[100px] space-y-4">
-                <div className="rounded-3xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-[#0D151D] p-6 shadow-sm">
+                <div className="rounded-3xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-[#1E1E1E] p-6 shadow-sm">
                   <h2 className="text-base font-extrabold tracking-tight pb-4 border-b border-neutral-100 dark:border-white/10">
                     Rental Summary
                   </h2>

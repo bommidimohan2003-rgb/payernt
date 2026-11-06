@@ -295,14 +295,14 @@ export default function Analytics() {
       <div className="space-y-4 max-w-[1520px] mx-auto pb-12 animate-pulse antialiased">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-[#E4E4E7] dark:border-[#27272A]">
           <div className="space-y-1.5">
-            <div className="h-6 w-32 bg-[#E4E4E7] dark:bg-[#1E2330] rounded-md" />
-            <div className="h-3.5 w-64 bg-[#E4E4E7] dark:bg-[#1E2330] rounded" />
+            <div className="h-6 w-32 bg-[#E4E4E7] dark:bg-[#1E1E1E] rounded-md" />
+            <div className="h-3.5 w-64 bg-[#E4E4E7] dark:bg-[#1E1E1E] rounded" />
           </div>
-          <div className="h-9 w-80 bg-[#E4E4E7] dark:bg-[#1E2330] rounded-lg" />
+          <div className="h-9 w-80 bg-[#E4E4E7] dark:bg-[#1E1E1E] rounded-lg" />
         </div>
-        <div className="h-10 rounded-lg bg-[#E4E4E7] dark:bg-[#1E2330]" />
-        <div className="h-24 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A]" />
-        <div className="h-96 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A]" />
+        <div className="h-10 rounded-lg bg-[#E4E4E7] dark:bg-[#1E1E1E]" />
+        <div className="h-24 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A]" />
+        <div className="h-96 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A]" />
       </div>
     );
   }
@@ -331,7 +331,7 @@ export default function Analytics() {
           {/* Compact Aligned Controls */}
           <div className="flex flex-wrap items-center gap-2">
             {/* Date-Range Selector */}
-            <div className="flex items-center rounded-lg bg-[#F4F4F5] dark:bg-[#1A1F2C] border border-[#E4E4E7] dark:border-[#27272A] p-0.5 text-xs font-medium">
+            <div className="flex items-center rounded-lg bg-[#F4F4F5] dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] p-0.5 text-xs font-medium">
               {(
                 [
                   { id: "today", label: "Today" },
@@ -346,7 +346,7 @@ export default function Analytics() {
                   className={cn(
                     "px-2.5 py-1 rounded-md transition-all cursor-pointer text-xs",
                     preset === opt.id
-                      ? "bg-white dark:bg-[#12161F] text-[#18181B] dark:text-[#FAFAFA] font-semibold shadow-xs"
+                      ? "bg-white dark:bg-[#1E1E1E] text-[#18181B] dark:text-[#FAFAFA] font-semibold shadow-xs"
                       : "text-[#71717A] dark:text-[#A1A1AA] hover:text-[#18181B] dark:hover:text-[#FAFAFA]"
                   )}
                 >
@@ -359,7 +359,7 @@ export default function Analytics() {
                 className={cn(
                   "px-2.5 py-1 rounded-md transition-all cursor-pointer flex items-center gap-1 text-xs",
                   preset === "custom"
-                    ? "bg-white dark:bg-[#12161F] text-[#18181B] dark:text-[#FAFAFA] font-semibold shadow-xs"
+                    ? "bg-white dark:bg-[#1E1E1E] text-[#18181B] dark:text-[#FAFAFA] font-semibold shadow-xs"
                     : "text-[#71717A] dark:text-[#A1A1AA] hover:text-[#18181B] dark:hover:text-[#FAFAFA]"
                 )}
               >
@@ -374,7 +374,7 @@ export default function Analytics() {
               className={cn(
                 "px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors cursor-pointer flex items-center gap-1.5",
                 comparePrevious
-                  ? "bg-white dark:bg-[#12161F] text-[#18181B] dark:text-[#FAFAFA] border-[#E4E4E7] dark:border-[#27272A] shadow-xs"
+                  ? "bg-white dark:bg-[#1E1E1E] text-[#18181B] dark:text-[#FAFAFA] border-[#E4E4E7] dark:border-[#27272A] shadow-xs"
                   : "bg-transparent text-[#71717A] dark:text-[#A1A1AA] border-[#E4E4E7] dark:border-[#27272A] opacity-70"
               )}
               title="Compare metrics with previous equivalent period"
@@ -387,7 +387,7 @@ export default function Analytics() {
             <button
               onClick={() => loadData(true)}
               disabled={refreshing}
-              className="p-1.5 rounded-lg bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] text-[#71717A] hover:text-[#18181B] dark:hover:text-[#FAFAFA] shadow-xs transition-colors cursor-pointer"
+              className="p-1.5 rounded-lg bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] text-[#71717A] hover:text-[#18181B] dark:hover:text-[#FAFAFA] shadow-xs transition-colors cursor-pointer"
               title="Refresh real-time telemetry"
             >
               <RefreshCw className={cn("h-3.5 w-3.5", refreshing && "animate-spin text-[#635BFF]")} />
@@ -397,14 +397,14 @@ export default function Analytics() {
             <div className="relative">
               <button
                 onClick={() => setShowExportMenu(!showExportMenu)}
-                className="px-2.5 py-1.5 rounded-lg bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] text-[#18181B] dark:text-[#FAFAFA] text-xs font-medium shadow-xs hover:bg-[#F4F4F5] dark:hover:bg-[#1A1F2C] transition-colors cursor-pointer flex items-center gap-1.5"
+                className="px-2.5 py-1.5 rounded-lg bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] text-[#18181B] dark:text-[#FAFAFA] text-xs font-medium shadow-xs hover:bg-[#F4F4F5] dark:hover:bg-[#1A1F2C] transition-colors cursor-pointer flex items-center gap-1.5"
               >
                 <Download className="h-3.5 w-3.5 text-[#635BFF]" />
                 <span>Export</span>
               </button>
 
               {showExportMenu && (
-                <div className="absolute right-0 mt-1.5 w-52 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-lg p-1.5 z-50 text-xs">
+                <div className="absolute right-0 mt-1.5 w-52 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-lg p-1.5 z-50 text-xs">
                   <button
                     onClick={handleExportBookings}
                     className="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-[#F4F4F5] dark:hover:bg-[#1A1F2C] text-[#18181B] dark:text-[#FAFAFA] flex items-center gap-2 cursor-pointer"
@@ -440,7 +440,7 @@ export default function Analytics() {
                 initial={{ opacity: 0, scale: 0.96 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.96 }}
-                className="w-full max-w-sm rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] p-5 shadow-xl space-y-4 text-xs"
+                className="w-full max-w-sm rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] p-5 shadow-xl space-y-4 text-xs"
               >
                 <div className="flex items-center justify-between pb-2 border-b border-[#E4E4E7] dark:border-[#27272A]">
                   <h3 className="font-semibold text-sm text-[#18181B] dark:text-[#FAFAFA]">
@@ -462,7 +462,7 @@ export default function Analytics() {
                       type="date"
                       value={customStart}
                       onChange={(e) => setCustomStart(e.target.value)}
-                      className="w-full px-3 py-1.5 rounded-lg bg-[#F4F4F5] dark:bg-[#1A1F2C] border border-[#E4E4E7] dark:border-[#27272A] text-[#18181B] dark:text-[#FAFAFA]"
+                      className="w-full px-3 py-1.5 rounded-lg bg-[#F4F4F5] dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] text-[#18181B] dark:text-[#FAFAFA]"
                     />
                   </div>
                   <div>
@@ -473,7 +473,7 @@ export default function Analytics() {
                       type="date"
                       value={customEnd}
                       onChange={(e) => setCustomEnd(e.target.value)}
-                      className="w-full px-3 py-1.5 rounded-lg bg-[#F4F4F5] dark:bg-[#1A1F2C] border border-[#E4E4E7] dark:border-[#27272A] text-[#18181B] dark:text-[#FAFAFA]"
+                      className="w-full px-3 py-1.5 rounded-lg bg-[#F4F4F5] dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] text-[#18181B] dark:text-[#FAFAFA]"
                     />
                   </div>
                 </div>
@@ -554,7 +554,7 @@ export default function Analytics() {
            ========================================================================= */}
         {kpis && (
           <div className="space-y-2">
-            <div className="rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs overflow-hidden">
+            <div className="rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs overflow-hidden">
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 divide-y md:divide-y-0 md:divide-x divide-[#E4E4E7] dark:divide-[#27272A]">
                 {/* 1. Total Bookings */}
                 <div className="p-3.5 sm:p-4 flex flex-col justify-between">
@@ -727,7 +727,7 @@ export default function Analytics() {
                 </div>
 
                 {/* 6. Platform Revenue (10% Take-rate) */}
-                <div className="p-3.5 sm:p-4 flex flex-col justify-between bg-[#FAFAFB] dark:bg-[#161B26]">
+                <div className="p-3.5 sm:p-4 flex flex-col justify-between bg-[#FAFAFB] dark:bg-[#1E1E1E]">
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-semibold text-[#635BFF]">
                       Platform Revenue
@@ -751,7 +751,7 @@ export default function Analytics() {
             </div>
 
             {/* Contextual Operational Summary Strip */}
-            <div className="flex flex-wrap items-center justify-between px-3.5 py-2 rounded-lg bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] text-xs text-[#71717A] dark:text-[#A1A1AA]">
+            <div className="flex flex-wrap items-center justify-between px-3.5 py-2 rounded-lg bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] text-xs text-[#71717A] dark:text-[#A1A1AA]">
               <div className="flex items-center gap-5">
                 <div className="flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-emerald-500" />
@@ -802,7 +802,7 @@ export default function Analytics() {
                -------------------------------------------------------------------- */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
               {/* Left Column (8 cols ~ 67%): Main Booking Trend Visual Focus */}
-              <div className="lg:col-span-8 p-5 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs flex flex-col justify-between">
+              <div className="lg:col-span-8 p-5 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs flex flex-col justify-between">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
                   <div>
                     <h3 className="text-xs font-bold text-[#18181B] dark:text-[#FAFAFA] uppercase tracking-wide">
@@ -874,7 +874,7 @@ export default function Analytics() {
               </div>
 
               {/* Right Column (4 cols ~ 33%): Performance Summary & Status Distribution */}
-              <div className="lg:col-span-4 p-5 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs flex flex-col justify-between">
+              <div className="lg:col-span-4 p-5 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs flex flex-col justify-between">
                 <div>
                   <h3 className="text-xs font-bold text-[#18181B] dark:text-[#FAFAFA] uppercase tracking-wide">
                     Performance & Status Summary
@@ -946,7 +946,7 @@ export default function Analytics() {
                             : 0}%
                         </span>
                       </div>
-                      <div className="h-1.5 w-full bg-[#F4F4F5] dark:bg-[#1A1F2C] rounded-full overflow-hidden">
+                      <div className="h-1.5 w-full bg-[#F4F4F5] dark:bg-[#1E1E1E] rounded-full overflow-hidden">
                         <div
                           className="h-full bg-[#16865C] rounded-full"
                           style={{
@@ -966,7 +966,7 @@ export default function Analytics() {
                 Short list of meaningful data-backed insights with supporting metrics.
                -------------------------------------------------------------------- */}
             {dataset?.insights && dataset.insights.length > 0 && (
-              <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs space-y-3">
+              <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Sparkles className="h-3.5 w-3.5 text-[#635BFF]" />
@@ -992,7 +992,7 @@ export default function Analytics() {
                             : (ins.tabTarget as TabType)
                         )
                       }
-                      className="p-3.5 rounded-lg bg-[#F7F7F8] dark:bg-[#1A1F2C] border border-[#E4E4E7] dark:border-[#27272A] hover:border-[#635BFF]/40 transition-colors cursor-pointer flex flex-col justify-between"
+                      className="p-3.5 rounded-lg bg-[#F7F7F8] dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] hover:border-[#635BFF]/40 transition-colors cursor-pointer flex flex-col justify-between"
                     >
                       <div className="space-y-1">
                         <div className="flex items-center justify-between">
@@ -1025,7 +1025,7 @@ export default function Analytics() {
                -------------------------------------------------------------------- */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
               {/* Left: Category Booking Performance */}
-              <div className="p-5 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs flex flex-col justify-between">
+              <div className="p-5 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs flex flex-col justify-between">
                 <div className="mb-4">
                   <h3 className="text-xs font-bold text-[#18181B] dark:text-[#FAFAFA] uppercase tracking-wide">
                     Category Booking Performance
@@ -1063,7 +1063,7 @@ export default function Analytics() {
               </div>
 
               {/* Right: Rental Performance Area Chart */}
-              <div className="p-5 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs flex flex-col justify-between">
+              <div className="p-5 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs flex flex-col justify-between">
                 <div className="mb-4">
                   <h3 className="text-xs font-bold text-[#18181B] dark:text-[#FAFAFA] uppercase tracking-wide">
                     Rental Turnover Progression
@@ -1126,7 +1126,7 @@ export default function Analytics() {
                 Booking Status, Rental Amount, Payment Status.
                 Preserves search, status filter, pagination, and links to /admin/bookings.
                -------------------------------------------------------------------- */}
-            <div className="p-5 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs space-y-3.5">
+            <div className="p-5 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs space-y-3.5">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <h3 className="text-xs font-bold text-[#18181B] dark:text-[#FAFAFA] uppercase tracking-wide">
@@ -1148,7 +1148,7 @@ export default function Analytics() {
                         setBookingSearch(e.target.value);
                         setBookingPage(1);
                       }}
-                      className="pl-7 pr-2.5 py-1 rounded-md bg-[#F4F4F5] dark:bg-[#1A1F2C] border border-[#E4E4E7] dark:border-[#27272A] text-xs text-[#18181B] dark:text-[#FAFAFA] placeholder:text-[#71717A] w-44 focus:outline-none focus:border-[#635BFF]"
+                      className="pl-7 pr-2.5 py-1 rounded-md bg-[#F4F4F5] dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] text-xs text-[#18181B] dark:text-[#FAFAFA] placeholder:text-[#71717A] w-44 focus:outline-none focus:border-[#635BFF]"
                     />
                   </div>
 
@@ -1158,7 +1158,7 @@ export default function Analytics() {
                       setBookingStatusFilter(e.target.value);
                       setBookingPage(1);
                     }}
-                    className="px-2.5 py-1 rounded-md bg-[#F4F4F5] dark:bg-[#1A1F2C] border border-[#E4E4E7] dark:border-[#27272A] text-xs text-[#18181B] dark:text-[#FAFAFA] cursor-pointer"
+                    className="px-2.5 py-1 rounded-md bg-[#F4F4F5] dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] text-xs text-[#18181B] dark:text-[#FAFAFA] cursor-pointer"
                   >
                     <option value="all">All Statuses</option>
                     <option value="confirmed">Confirmed</option>
@@ -1287,7 +1287,7 @@ export default function Analytics() {
             {/* Primary Asymmetric Workspace */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
               {/* Left Column (8 cols): Large Booking Trend Chart */}
-              <div className="lg:col-span-8 p-5 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs flex flex-col justify-between">
+              <div className="lg:col-span-8 p-5 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs flex flex-col justify-between">
                 <div className="flex items-center justify-between mb-4">
                   <div>
                     <h3 className="text-xs font-bold text-[#18181B] dark:text-[#FAFAFA] uppercase tracking-wide">
@@ -1351,7 +1351,7 @@ export default function Analytics() {
               </div>
 
               {/* Right Column (4 cols): Compact Status Summary */}
-              <div className="lg:col-span-4 p-5 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs flex flex-col justify-between">
+              <div className="lg:col-span-4 p-5 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs flex flex-col justify-between">
                 <div>
                   <h3 className="text-xs font-bold text-[#18181B] dark:text-[#FAFAFA] uppercase tracking-wide">
                     Confirmed vs Completed
@@ -1369,7 +1369,7 @@ export default function Analytics() {
                         {kpis?.confirmedBookings.current}
                       </span>
                     </div>
-                    <div className="h-2 w-full bg-[#F4F4F5] dark:bg-[#1A1F2C] rounded-full overflow-hidden">
+                    <div className="h-2 w-full bg-[#F4F4F5] dark:bg-[#1E1E1E] rounded-full overflow-hidden">
                       <div
                         className="h-full bg-blue-500 rounded-full"
                         style={{
@@ -1386,7 +1386,7 @@ export default function Analytics() {
                         {kpis?.completedRentals.current}
                       </span>
                     </div>
-                    <div className="h-2 w-full bg-[#F4F4F5] dark:bg-[#1A1F2C] rounded-full overflow-hidden">
+                    <div className="h-2 w-full bg-[#F4F4F5] dark:bg-[#1E1E1E] rounded-full overflow-hidden">
                       <div
                         className="h-full bg-purple-500 rounded-full"
                         style={{
@@ -1403,7 +1403,7 @@ export default function Analytics() {
                         {kpis?.cancelledBookings.current}
                       </span>
                     </div>
-                    <div className="h-2 w-full bg-[#F4F4F5] dark:bg-[#1A1F2C] rounded-full overflow-hidden">
+                    <div className="h-2 w-full bg-[#F4F4F5] dark:bg-[#1E1E1E] rounded-full overflow-hidden">
                       <div
                         className="h-full bg-[#DC4545] rounded-full"
                         style={{
@@ -1424,7 +1424,7 @@ export default function Analytics() {
             </div>
 
             {/* Expandable Advanced Analytics: Booking Funnel */}
-            <div className="rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs overflow-hidden">
+            <div className="rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs overflow-hidden">
               <button
                 onClick={() => setShowFunnelSection(!showFunnelSection)}
                 className="w-full p-4 flex items-center justify-between text-left cursor-pointer hover:bg-[#F7F7F8] dark:hover:bg-[#1A1F2C]/50 transition-colors"
@@ -1453,7 +1453,7 @@ export default function Analytics() {
                     {dataset.funnel.stages.map((stage, idx) => (
                       <div
                         key={stage.name}
-                        className="p-3 rounded-lg bg-[#F7F7F8] dark:bg-[#1A1F2C] border border-[#E4E4E7] dark:border-[#27272A] space-y-1.5"
+                        className="p-3 rounded-lg bg-[#F7F7F8] dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] space-y-1.5"
                       >
                         <div className="flex items-center justify-between">
                           <span className="text-[10px] font-mono font-semibold uppercase text-[#71717A]">
@@ -1469,7 +1469,7 @@ export default function Analytics() {
                         <div className="text-lg font-bold font-mono text-[#18181B] dark:text-[#FAFAFA]">
                           {stage.count.toLocaleString()}
                         </div>
-                        <div className="h-1.5 w-full bg-[#E4E4E7] dark:bg-[#27272A] rounded-full overflow-hidden mt-1">
+                        <div className="h-1.5 w-full bg-[#E4E4E7] dark:bg-[#1E1E1E] rounded-full overflow-hidden mt-1">
                           <div
                             className="h-full bg-[#635BFF] rounded-full"
                             style={{ width: `${Math.min(100, stage.conversionRate || 0)}%` }}
@@ -1484,7 +1484,7 @@ export default function Analytics() {
 
             {/* Secondary Visualizations for Bookings */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-              <div className="p-5 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs">
+              <div className="p-5 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs">
                 <h3 className="text-xs font-bold text-[#18181B] dark:text-[#FAFAFA] uppercase tracking-wide mb-1">
                   Booking Breakdown by Category
                 </h3>
@@ -1512,7 +1512,7 @@ export default function Analytics() {
                 </div>
               </div>
 
-              <div className="p-5 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs">
+              <div className="p-5 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs">
                 <h3 className="text-xs font-bold text-[#18181B] dark:text-[#FAFAFA] uppercase tracking-wide mb-1">
                   Daily Booking Density
                 </h3>
@@ -1548,7 +1548,7 @@ export default function Analytics() {
             </div>
 
             {/* Detailed Records Table */}
-            <div className="p-5 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs space-y-3.5">
+            <div className="p-5 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs space-y-3.5">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <h3 className="text-xs font-bold uppercase tracking-wide text-[#18181B] dark:text-[#FAFAFA]">
                   Detailed Booking Records
@@ -1563,7 +1563,7 @@ export default function Analytics() {
                       setBookingSearch(e.target.value);
                       setBookingPage(1);
                     }}
-                    className="pl-7 pr-2.5 py-1 rounded-md bg-[#F4F4F5] dark:bg-[#1A1F2C] border border-[#E4E4E7] dark:border-[#27272A] text-xs w-44"
+                    className="pl-7 pr-2.5 py-1 rounded-md bg-[#F4F4F5] dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] text-xs w-44"
                   />
                 </div>
               </div>
@@ -1614,7 +1614,7 @@ export default function Analytics() {
         {activeTab === "Products" && (
           <div className="space-y-5">
             {/* Utilization Metrics Strip */}
-            <div className="rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs overflow-hidden">
+            <div className="rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs overflow-hidden">
               <div className="grid grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-[#E4E4E7] dark:divide-[#27272A]">
                 <div className="p-4">
                   <span className="text-[11px] font-medium text-[#71717A]">Eligible Products</span>
@@ -1640,7 +1640,7 @@ export default function Analytics() {
                   <span className="text-[10px] text-[#71717A]">Days rented</span>
                 </div>
 
-                <div className="p-4 bg-[#FAFAFB] dark:bg-[#161B26]">
+                <div className="p-4 bg-[#FAFAFB] dark:bg-[#1E1E1E]">
                   <span className="text-[11px] font-medium text-[#635BFF]">Fleet Utilization Rate</span>
                   <div className="text-2xl font-bold font-mono text-[#635BFF] mt-1">
                     {dataset?.productUtilization.utilizationRate}%
@@ -1653,7 +1653,7 @@ export default function Analytics() {
             {/* Primary Asymmetric Workspace: Occupied vs Available Analysis */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
               {/* Left Column (8 cols): Occupied vs Available Capacity Trend */}
-              <div className="lg:col-span-8 p-5 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs flex flex-col justify-between">
+              <div className="lg:col-span-8 p-5 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs flex flex-col justify-between">
                 <div className="flex items-center justify-between mb-4">
                   <div>
                     <h3 className="text-xs font-bold text-[#18181B] dark:text-[#FAFAFA] uppercase tracking-wide">
@@ -1704,7 +1704,7 @@ export default function Analytics() {
               </div>
 
               {/* Right Column (4 cols): Category Comparison & Demand Distribution */}
-              <div className="lg:col-span-4 p-5 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs flex flex-col justify-between">
+              <div className="lg:col-span-4 p-5 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs flex flex-col justify-between">
                 <div>
                   <h3 className="text-xs font-bold text-[#18181B] dark:text-[#FAFAFA] uppercase tracking-wide">
                     Category Utilization
@@ -1723,7 +1723,7 @@ export default function Analytics() {
                           {cat.percentage}%
                         </span>
                       </div>
-                      <div className="h-1.5 w-full bg-[#F4F4F5] dark:bg-[#1A1F2C] rounded-full overflow-hidden">
+                      <div className="h-1.5 w-full bg-[#F4F4F5] dark:bg-[#1E1E1E] rounded-full overflow-hidden">
                         <div
                           className="h-full rounded-full"
                           style={{
@@ -1746,7 +1746,7 @@ export default function Analytics() {
             </div>
 
             {/* Product-Level Table */}
-            <div className="p-5 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs space-y-3">
+            <div className="p-5 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-xs font-bold uppercase tracking-wide text-[#18181B] dark:text-[#FAFAFA]">
                   Gear Utilization & Turnover Ledger
@@ -1761,7 +1761,7 @@ export default function Analytics() {
                       setProductSearch(e.target.value);
                       setProductPage(1);
                     }}
-                    className="pl-7 pr-2.5 py-1 rounded-md bg-[#F4F4F5] dark:bg-[#1A1F2C] border border-[#E4E4E7] dark:border-[#27272A] text-xs w-44"
+                    className="pl-7 pr-2.5 py-1 rounded-md bg-[#F4F4F5] dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] text-xs w-44"
                   />
                 </div>
               </div>
@@ -1810,7 +1810,7 @@ export default function Analytics() {
         {activeTab === "Users" && (
           <div className="space-y-5">
             {/* User Typology Strip */}
-            <div className="rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs overflow-hidden">
+            <div className="rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs overflow-hidden">
               <div className="grid grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-[#E4E4E7] dark:divide-[#27272A]">
                 <div className="p-4">
                   <span className="text-[11px] font-medium text-[#71717A]">Total Accounts</span>
@@ -1846,7 +1846,7 @@ export default function Analytics() {
             {/* Primary Asymmetric Workspace: Registration Trends vs Renter/Vendor Distribution */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
               {/* Left Column (8 cols): Registration Trends Line Chart */}
-              <div className="lg:col-span-8 p-5 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs flex flex-col justify-between">
+              <div className="lg:col-span-8 p-5 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs flex flex-col justify-between">
                 <div className="flex items-center justify-between mb-4">
                   <div>
                     <h3 className="text-xs font-bold text-[#18181B] dark:text-[#FAFAFA] uppercase tracking-wide">
@@ -1890,7 +1890,7 @@ export default function Analytics() {
               </div>
 
               {/* Right Column (4 cols): Renter vs Vendor Distribution */}
-              <div className="lg:col-span-4 p-5 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs flex flex-col justify-between">
+              <div className="lg:col-span-4 p-5 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs flex flex-col justify-between">
                 <div>
                   <h3 className="text-xs font-bold text-[#18181B] dark:text-[#FAFAFA] uppercase tracking-wide">
                     Renter vs Vendor Distribution
@@ -1901,7 +1901,7 @@ export default function Analytics() {
                 </div>
 
                 <div className="space-y-3.5 my-auto py-3">
-                  <div className="p-3 rounded-lg bg-[#F7F7F8] dark:bg-[#1A1F2C] border border-[#E4E4E7] dark:border-[#27272A] flex items-center justify-between">
+                  <div className="p-3 rounded-lg bg-[#F7F7F8] dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] flex items-center justify-between">
                     <div>
                       <span className="font-semibold text-xs block text-[#18181B] dark:text-[#FAFAFA]">
                         Verified Renters
@@ -1913,7 +1913,7 @@ export default function Analytics() {
                     </span>
                   </div>
 
-                  <div className="p-3 rounded-lg bg-[#F7F7F8] dark:bg-[#1A1F2C] border border-[#E4E4E7] dark:border-[#27272A] flex items-center justify-between">
+                  <div className="p-3 rounded-lg bg-[#F7F7F8] dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] flex items-center justify-between">
                     <div>
                       <span className="font-semibold text-xs block text-[#18181B] dark:text-[#FAFAFA]">
                         Verified Vendors
@@ -1925,7 +1925,7 @@ export default function Analytics() {
                     </span>
                   </div>
 
-                  <div className="p-3 rounded-lg bg-[#F7F7F8] dark:bg-[#1A1F2C] border border-[#E4E4E7] dark:border-[#27272A] flex items-center justify-between">
+                  <div className="p-3 rounded-lg bg-[#F7F7F8] dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] flex items-center justify-between">
                     <div>
                       <span className="font-semibold text-xs block text-[#18181B] dark:text-[#FAFAFA]">
                         Staff Administrators
@@ -1960,7 +1960,7 @@ export default function Analytics() {
         {activeTab === "Delivery" && (
           <div className="space-y-5">
             {/* Delivery Metric Strip */}
-            <div className="rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs overflow-hidden">
+            <div className="rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs overflow-hidden">
               <div className="grid grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-[#E4E4E7] dark:divide-[#27272A]">
                 <div className="p-4">
                   <span className="text-[11px] font-medium text-[#71717A]">Assigned Dispatches</span>
@@ -1983,7 +1983,7 @@ export default function Analytics() {
                   </div>
                   <span className="text-[10px] text-[#71717A]">En route dispatches</span>
                 </div>
-                <div className="p-4 bg-[#FAFAFB] dark:bg-[#161B26]">
+                <div className="p-4 bg-[#FAFAFB] dark:bg-[#1E1E1E]">
                   <span className="text-[11px] font-medium text-[#635BFF]">Dual-PIN Compliance</span>
                   <div className="text-2xl font-bold font-mono text-[#635BFF] mt-1">
                     {dataset?.deliveryMetrics.pinVerificationRate}%
@@ -1995,7 +1995,7 @@ export default function Analytics() {
 
             {/* Asymmetric Workspace: Performance Trend vs Pickup-vs-Handover Dual-PIN */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
-              <div className="lg:col-span-8 p-5 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs flex flex-col justify-between">
+              <div className="lg:col-span-8 p-5 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs flex flex-col justify-between">
                 <div className="flex items-center justify-between mb-4">
                   <div>
                     <h3 className="text-xs font-bold text-[#18181B] dark:text-[#FAFAFA] uppercase tracking-wide">
@@ -2035,7 +2035,7 @@ export default function Analytics() {
                 </div>
               </div>
 
-              <div className="lg:col-span-4 p-5 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs flex flex-col justify-between">
+              <div className="lg:col-span-4 p-5 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs flex flex-col justify-between">
                 <div>
                   <h3 className="text-xs font-bold text-[#18181B] dark:text-[#FAFAFA] uppercase tracking-wide">
                     Pickup vs Handover Verification
@@ -2051,7 +2051,7 @@ export default function Analytics() {
                       <span className="text-[#71717A]">Vendor Pickup PIN</span>
                       <span className="font-mono font-semibold text-[#16865C]">100% Compliant</span>
                     </div>
-                    <div className="h-2 w-full bg-[#F4F4F5] dark:bg-[#1A1F2C] rounded-full overflow-hidden">
+                    <div className="h-2 w-full bg-[#F4F4F5] dark:bg-[#1E1E1E] rounded-full overflow-hidden">
                       <div className="h-full bg-[#16865C] rounded-full w-full" />
                     </div>
                   </div>
@@ -2063,7 +2063,7 @@ export default function Analytics() {
                         {dataset?.deliveryMetrics.pinVerificationRate}% Compliant
                       </span>
                     </div>
-                    <div className="h-2 w-full bg-[#F4F4F5] dark:bg-[#1A1F2C] rounded-full overflow-hidden">
+                    <div className="h-2 w-full bg-[#F4F4F5] dark:bg-[#1E1E1E] rounded-full overflow-hidden">
                       <div
                         className="h-full bg-[#635BFF] rounded-full"
                         style={{ width: `${dataset?.deliveryMetrics.pinVerificationRate}%` }}
@@ -2080,7 +2080,7 @@ export default function Analytics() {
             </div>
 
             {/* Detailed Dispatch Audit Records Table */}
-            <div className="p-5 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs space-y-3">
+            <div className="p-5 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs space-y-3">
               <h3 className="text-xs font-bold uppercase tracking-wide text-[#18181B] dark:text-[#FAFAFA]">
                 Delivery Dispatch Audit Records
               </h3>
@@ -2130,7 +2130,7 @@ export default function Analytics() {
         {activeTab === "Finance" && (
           <div className="space-y-5">
             {/* Financial Summary Metric Strip */}
-            <div className="rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs overflow-hidden">
+            <div className="rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs overflow-hidden">
               <div className="grid grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-[#E4E4E7] dark:divide-[#27272A]">
                 <div className="p-4">
                   <span className="text-[11px] font-medium text-[#71717A]">Gross Rental Value</span>
@@ -2139,7 +2139,7 @@ export default function Analytics() {
                   </div>
                   <span className="text-[10px] text-[#71717A]">Gross rental turnover</span>
                 </div>
-                <div className="p-4 bg-[#FAFAFB] dark:bg-[#161B26]">
+                <div className="p-4 bg-[#FAFAFB] dark:bg-[#1E1E1E]">
                   <span className="text-[11px] font-semibold text-[#635BFF]">Platform Revenue (10%)</span>
                   <div className="text-2xl font-bold font-mono text-[#635BFF] mt-1">
                     ₹{dataset?.finance.platformRevenue.toLocaleString("en-IN")}
@@ -2165,7 +2165,7 @@ export default function Analytics() {
 
             {/* Asymmetric Workspace: Revenue Trend vs Payment & Settlement Breakdown */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
-              <div className="lg:col-span-8 p-5 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs flex flex-col justify-between">
+              <div className="lg:col-span-8 p-5 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs flex flex-col justify-between">
                 <div className="flex items-center justify-between mb-4">
                   <div>
                     <h3 className="text-xs font-bold text-[#18181B] dark:text-[#FAFAFA] uppercase tracking-wide">
@@ -2220,7 +2220,7 @@ export default function Analytics() {
                 </div>
               </div>
 
-              <div className="lg:col-span-4 p-5 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs flex flex-col justify-between">
+              <div className="lg:col-span-4 p-5 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs flex flex-col justify-between">
                 <div>
                   <h3 className="text-xs font-bold text-[#18181B] dark:text-[#FAFAFA] uppercase tracking-wide">
                     Payment & Settlement Breakdown
@@ -2231,7 +2231,7 @@ export default function Analytics() {
                 </div>
 
                 <div className="space-y-3.5 my-auto py-3">
-                  <div className="p-3 rounded-lg bg-[#F7F7F8] dark:bg-[#1A1F2C] border border-[#E4E4E7] dark:border-[#27272A] flex items-center justify-between">
+                  <div className="p-3 rounded-lg bg-[#F7F7F8] dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] flex items-center justify-between">
                     <div>
                       <span className="font-semibold text-xs block text-[#18181B] dark:text-[#FAFAFA]">
                         Vendor Settlements (90%)
@@ -2243,7 +2243,7 @@ export default function Analytics() {
                     </span>
                   </div>
 
-                  <div className="p-3 rounded-lg bg-[#F7F7F8] dark:bg-[#1A1F2C] border border-[#E4E4E7] dark:border-[#27272A] flex items-center justify-between">
+                  <div className="p-3 rounded-lg bg-[#F7F7F8] dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] flex items-center justify-between">
                     <div>
                       <span className="font-semibold text-xs block text-[#18181B] dark:text-[#FAFAFA]">
                         Platform Retained (10%)
@@ -2255,7 +2255,7 @@ export default function Analytics() {
                     </span>
                   </div>
 
-                  <div className="p-3 rounded-lg bg-[#F7F7F8] dark:bg-[#1A1F2C] border border-[#E4E4E7] dark:border-[#27272A] flex items-center justify-between">
+                  <div className="p-3 rounded-lg bg-[#F7F7F8] dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] flex items-center justify-between">
                     <div>
                       <span className="font-semibold text-xs block text-[#18181B] dark:text-[#FAFAFA]">
                         Refund Escrow
@@ -2276,7 +2276,7 @@ export default function Analytics() {
             </div>
 
             {/* Read-Only Financial Reconciliation Table */}
-            <div className="p-5 rounded-xl bg-white dark:bg-[#12161F] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs space-y-3">
+            <div className="p-5 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] shadow-xs space-y-3">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <h3 className="text-xs font-bold uppercase tracking-wide text-[#18181B] dark:text-[#FAFAFA]">
@@ -2296,7 +2296,7 @@ export default function Analytics() {
                       setReconciliationSearch(e.target.value);
                       setReconciliationPage(1);
                     }}
-                    className="pl-7 pr-2.5 py-1 rounded-md bg-[#F4F4F5] dark:bg-[#1A1F2C] border border-[#E4E4E7] dark:border-[#27272A] text-xs w-48"
+                    className="pl-7 pr-2.5 py-1 rounded-md bg-[#F4F4F5] dark:bg-[#1E1E1E] border border-[#E4E4E7] dark:border-[#27272A] text-xs w-48"
                   />
                 </div>
               </div>

@@ -76,7 +76,7 @@ export function TrustStrip() {
   };
 
   return (
-    <section className="relative overflow-hidden bg-neutral-100/70 dark:bg-[#05090E] py-4 sm:py-6 text-neutral-900 dark:text-white transition-colors duration-300 select-none">
+    <section className="relative overflow-hidden bg-neutral-100/70 dark:bg-[#1E1E1E] py-4 sm:py-6 text-neutral-900 dark:text-white transition-colors duration-300 select-none">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Clean Full-Width Showcase Stage with 5-Second Horizontal Slide Transitions */}
         <div

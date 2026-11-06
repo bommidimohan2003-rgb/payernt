@@ -133,7 +133,7 @@ export function Navbar() {
                 <Link
                   to={user.role === "admin" || user.role === "superadmin" ? "/admin/dashboard" : "/profile"}
                   id="nav-profile-avatar"
-                  className="flex items-center gap-2 p-1.5 pl-2 pr-3 sm:pr-4 rounded-full border border-black/10 dark:border-white/15 bg-white/80 dark:bg-[#0D151D]/80 hover:border-black/20 dark:hover:border-white/30 shadow-xs hover:shadow-sm transition-all active:scale-95"
+                  className="flex items-center gap-2 p-1.5 pl-2 pr-3 sm:pr-4 rounded-full border border-black/10 dark:border-white/15 bg-white/80 dark:bg-[#1E1E1E]/80 hover:border-black/20 dark:hover:border-white/30 shadow-xs hover:shadow-sm transition-all active:scale-95"
                 >
                   <ProfilePhoto
                     src={user.profilePhotoUrl || user.profile_photo_url || user.avatar}

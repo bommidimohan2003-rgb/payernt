@@ -67,23 +67,23 @@ export const SecurityHistoryTab: React.FC = () => {
       {loading ? (
         <div className="p-8 text-center text-xs text-neutral-400">Loading security audit history...</div>
       ) : history.length === 0 ? (
-        <div className="card-premium p-8 rounded-3xl bg-neutral-50 dark:bg-[#0D151D] border border-neutral-200 dark:border-white/10 text-center space-y-2">
+        <div className="card-premium p-8 rounded-3xl bg-neutral-50 dark:bg-[#1E1E1E] border border-neutral-200 dark:border-white/10 text-center space-y-2">
           <Clock className="h-8 w-8 text-neutral-400 mx-auto" />
           <p className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">
             No security events recorded yet.
           </p>
         </div>
       ) : (
-        <div className="card-premium p-4 sm:p-6 bg-white dark:bg-[#0D151D] border border-neutral-200 dark:border-white/10 rounded-3xl shadow-sm">
+        <div className="card-premium p-4 sm:p-6 bg-white dark:bg-[#1E1E1E] border border-neutral-200 dark:border-white/10 rounded-3xl shadow-sm">
           <div className="relative pl-6 space-y-6 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-neutral-200 dark:before:bg-neutral-800">
             {history.map((item) => (
               <div key={item.id} className="relative group">
                 {/* Timeline node */}
-                <div className="absolute -left-6 top-1 h-5 w-5 rounded-full bg-white dark:bg-[#0D151D] border-2 border-neutral-300 dark:border-neutral-700 flex items-center justify-center">
+                <div className="absolute -left-6 top-1 h-5 w-5 rounded-full bg-white dark:bg-[#1E1E1E] border-2 border-neutral-300 dark:border-neutral-700 flex items-center justify-center">
                   <div className="h-2 w-2 rounded-full bg-sky-500" />
                 </div>
 
-                <div className="p-3.5 rounded-2xl bg-neutral-50 dark:bg-[#131E2A] border border-neutral-200/70 dark:border-white/5 space-y-1.5 hover:border-neutral-300 dark:hover:border-white/15 transition-all">
+                <div className="p-3.5 rounded-2xl bg-neutral-50 dark:bg-[#1E1E1E] border border-neutral-200/70 dark:border-white/5 space-y-1.5 hover:border-neutral-300 dark:hover:border-white/15 transition-all">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                       <div className="p-1 rounded-lg bg-neutral-200/70 dark:bg-neutral-800">

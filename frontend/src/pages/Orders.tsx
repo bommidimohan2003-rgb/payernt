@@ -575,7 +575,7 @@ export default function Orders() {
             onAction={() => navigate({ to: "/categories" })}
           />
         ) : filteredOrders.length === 0 ? (
-          <div className="rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#10151B] p-8 sm:p-12 text-center space-y-4 shadow-xs">
+          <div className="rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#1E1E1E] p-8 sm:p-12 text-center space-y-4 shadow-xs">
             <div className="h-12 w-12 rounded-2xl bg-neutral-100 dark:bg-white/5 flex items-center justify-center mx-auto text-neutral-400">
               <Filter className="h-6 w-6" />
             </div>
@@ -623,8 +623,8 @@ export default function Orders() {
                   id={`booking-card-${o.id}`}
                   className={`rounded-3xl border transition-all ${
                     isCardExpanded
-                      ? "border-black/20 dark:border-[#A1A1AA]/35 bg-white dark:bg-[#10151B] p-5 sm:p-7 space-y-6 shadow-sm"
-                      : "border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#10151B] p-4 sm:p-4.5 shadow-xs hover:border-black/20 dark:hover:border-[#A1A1AA]/30"
+                      ? "border-black/20 dark:border-[#A1A1AA]/35 bg-white dark:bg-[#1E1E1E] p-5 sm:p-7 space-y-6 shadow-sm"
+                      : "border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#1E1E1E] p-4 sm:p-4.5 shadow-xs hover:border-black/20 dark:hover:border-[#A1A1AA]/30"
                   }`}
                 >
                   {/* 1. COMPACT ROW / CARD (Always visible) */}
@@ -766,7 +766,7 @@ export default function Orders() {
                       {/* Full Booking Details Grid */}
                       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         {/* Product & Schedule Card (Left 2 cols) */}
-                        <div className="lg:col-span-2 rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#10151B] p-5 sm:p-6 space-y-6 shadow-sm">
+                        <div className="lg:col-span-2 rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#1E1E1E] p-5 sm:p-6 space-y-6 shadow-sm">
                           <div className="flex flex-col sm:flex-row items-start gap-4">
                             {o.productImage || (o as any).product_image ? (
                               <img
@@ -997,7 +997,7 @@ export default function Orders() {
                         <div className="space-y-6">
                           {/* Equipment Handover PIN Card */}
                           {!isCancelled && (
-                            <div className="rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#10151B] p-5 space-y-3 shadow-xs">
+                            <div className="rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#1E1E1E] p-5 space-y-3 shadow-xs">
                               <div className="flex items-center justify-between">
                                 <h3 className="font-bold text-sm text-neutral-950 dark:text-[#F5F5F5] flex items-center gap-1.5">
                                   <Lock className="h-4 w-4 text-emerald-500" />
@@ -1039,7 +1039,7 @@ export default function Orders() {
                           )}
 
                           {/* Quick Actions Card */}
-                          <div className="rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#10151B] p-5 space-y-3 shadow-xs">
+                          <div className="rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#1E1E1E] p-5 space-y-3 shadow-xs">
                             <h3 className="font-bold text-sm text-neutral-950 dark:text-[#F5F5F5]">Quick Actions</h3>
 
                             <div className="flex flex-col gap-2">
@@ -1179,7 +1179,7 @@ export default function Orders() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 15 }}
               transition={{ type: "spring", damping: 25, stiffness: 350 }}
-              className="relative w-full max-w-md overflow-hidden rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#10151B] p-6 sm:p-7 shadow-2xl backdrop-blur-xl z-10"
+              className="relative w-full max-w-md overflow-hidden rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#1E1E1E] p-6 sm:p-7 shadow-2xl backdrop-blur-xl z-10"
             >
               <div className="flex flex-col gap-2">
                 <h3 className="text-xl font-bold text-neutral-950 dark:text-[#F5F5F5]">
@@ -1230,7 +1230,7 @@ export default function Orders() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 15 }}
               transition={{ type: "spring", damping: 25, stiffness: 350 }}
-              className="relative w-full max-w-lg overflow-hidden rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#10151B] p-6 sm:p-7 shadow-2xl backdrop-blur-xl z-10 space-y-5"
+              className="relative w-full max-w-lg overflow-hidden rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#1E1E1E] p-6 sm:p-7 shadow-2xl backdrop-blur-xl z-10 space-y-5"
             >
               <div className="flex items-center justify-between border-b border-black/5 dark:border-white/5 pb-3">
                 <div>
@@ -1282,7 +1282,7 @@ export default function Orders() {
                     onClick={() => setEditMethod("delivery")}
                     className={`py-2 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1 ${
                       editMethod === "delivery"
-                        ? "bg-white dark:bg-[#1A222D] text-neutral-950 dark:text-white shadow-xs font-bold"
+                        ? "bg-white dark:bg-[#1E1E1E] text-neutral-950 dark:text-white shadow-xs font-bold"
                         : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
                     }`}
                   >
@@ -1294,7 +1294,7 @@ export default function Orders() {
                     onClick={() => setEditMethod("pickup")}
                     className={`py-2 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1 ${
                       editMethod === "pickup"
-                        ? "bg-white dark:bg-[#1A222D] text-neutral-950 dark:text-white shadow-xs font-bold"
+                        ? "bg-white dark:bg-[#1E1E1E] text-neutral-950 dark:text-white shadow-xs font-bold"
                         : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
                     }`}
                   >
@@ -1306,7 +1306,7 @@ export default function Orders() {
                     onClick={() => setEditMethod("custom")}
                     className={`py-2 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1 ${
                       editMethod === "custom"
-                        ? "bg-white dark:bg-[#1A222D] text-neutral-950 dark:text-white shadow-xs font-bold"
+                        ? "bg-white dark:bg-[#1E1E1E] text-neutral-950 dark:text-white shadow-xs font-bold"
                         : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
                     }`}
                   >

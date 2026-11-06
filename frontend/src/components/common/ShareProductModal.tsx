@@ -96,7 +96,7 @@ export function ShareProductModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
             transition={{ duration: 0.2 }}
-            className="w-full max-w-md rounded-3xl bg-white dark:bg-[#0B0F14] border border-black/10 dark:border-white/10 shadow-2xl p-6 space-y-5"
+            className="w-full max-w-md rounded-3xl bg-white dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 shadow-2xl p-6 space-y-5"
           >
             {/* Header */}
             <div className="flex items-center justify-between">
@@ -144,7 +144,7 @@ export function ShareProductModal({
                   readOnly
                   value={shareUrl}
                   onClick={(e) => (e.target as HTMLInputElement).select()}
-                  className="flex-1 px-3.5 py-2.5 rounded-xl border border-black/10 dark:border-white/10 bg-neutral-50 dark:bg-[#050709] text-xs font-mono text-neutral-800 dark:text-neutral-200 focus:outline-hidden focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white/20 select-all"
+                  className="flex-1 px-3.5 py-2.5 rounded-xl border border-black/10 dark:border-white/10 bg-neutral-50 dark:bg-[#1E1E1E] text-xs font-mono text-neutral-800 dark:text-neutral-200 focus:outline-hidden focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white/20 select-all"
                 />
                 <button
                   type="button"

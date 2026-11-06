@@ -19,7 +19,7 @@ const socials = [
 
 export function Footer() {
   return (
-    <footer className="bg-white dark:bg-[#05090D] text-neutral-900 dark:text-white py-8 sm:py-10 transition-colors duration-300">
+    <footer className="bg-white dark:bg-[#1E1E1E] text-neutral-900 dark:text-white py-8 sm:py-10 transition-colors duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col lg:flex-row items-center justify-between gap-6 lg:gap-8">
           {/* Left: Brand Monogram & Tagline */}
@@ -57,7 +57,7 @@ export function Footer() {
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label={s.label}
-                    className="h-7 w-7 rounded-full bg-neutral-100 dark:bg-[#0D151D] border border-black/10 dark:border-white/15 text-neutral-600 dark:text-[#A8B1BA] hover:text-black dark:hover:text-white hover:border-black/30 dark:hover:border-white/30 flex items-center justify-center transition-colors"
+                    className="h-7 w-7 rounded-full bg-neutral-100 dark:bg-[#1E1E1E] border border-black/10 dark:border-white/15 text-neutral-600 dark:text-[#A8B1BA] hover:text-black dark:hover:text-white hover:border-black/30 dark:hover:border-white/30 flex items-center justify-center transition-colors"
                   >
                     <Icon className="h-3.5 w-3.5" />
                   </a>

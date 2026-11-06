@@ -969,7 +969,7 @@ export function RentalRequests({
         <div>
           <button
             onClick={onBack}
-            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border border-black/10 dark:border-[#A1A1AA]/25 bg-white dark:bg-[#10151B] hover:bg-neutral-100 dark:hover:bg-white/5 text-xs font-semibold text-neutral-800 dark:text-[#F5F5F5] transition-all cursor-pointer shadow-xs group"
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border border-black/10 dark:border-[#A1A1AA]/25 bg-white dark:bg-[#1E1E1E] hover:bg-neutral-100 dark:hover:bg-white/5 text-xs font-semibold text-neutral-800 dark:text-[#F5F5F5] transition-all cursor-pointer shadow-xs group"
           >
             <ArrowLeft className="h-3.5 w-3.5 group-hover:-translate-x-0.5 transition-transform text-[#A1A1AA]" />
             <span>Back to Home</span>
@@ -978,7 +978,7 @@ export function RentalRequests({
       )}
 
       {/* Header Banner */}
-      <div className="p-6 sm:p-8 rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#10151B] relative overflow-hidden shadow-sm">
+      <div className="p-6 sm:p-8 rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#1E1E1E] relative overflow-hidden shadow-sm">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
           <div className="space-y-2">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-neutral-100 dark:bg-white/[0.05] text-neutral-800 dark:text-[#A1A1AA] border border-black/5 dark:border-white/10 text-xs font-bold uppercase tracking-wider">
@@ -1011,7 +1011,7 @@ export function RentalRequests({
                     setIsRefreshing(false);
                   }
                 }}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#10151B] text-neutral-700 dark:text-[#F5F5F5] hover:bg-neutral-50 dark:hover:bg-white/5 font-bold text-xs shadow-sm active:scale-98 transition-all cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#1E1E1E] text-neutral-700 dark:text-[#F5F5F5] hover:bg-neutral-50 dark:hover:bg-white/5 font-bold text-xs shadow-sm active:scale-98 transition-all cursor-pointer"
                 title="Refresh booking requests"
               >
                 <RefreshCw
@@ -1059,7 +1059,7 @@ export function RentalRequests({
               className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer border flex items-center gap-2 active:scale-98 ${
                 isActive
                   ? "bg-neutral-900 text-white dark:bg-[#F5F5F5] dark:text-[#050709] border-transparent shadow-sm"
-                  : "bg-white dark:bg-[#10151B] text-neutral-600 dark:text-[#A1A1AA] border-black/10 dark:border-[#A1A1AA]/20 hover:text-black dark:hover:text-[#F5F5F5] hover:bg-neutral-50 dark:hover:bg-white/5"
+                  : "bg-white dark:bg-[#1E1E1E] text-neutral-600 dark:text-[#A1A1AA] border-black/10 dark:border-[#A1A1AA]/20 hover:text-black dark:hover:text-[#F5F5F5] hover:bg-neutral-50 dark:hover:bg-white/5"
               }`}
             >
               <span>{tab.label}</span>
@@ -1119,7 +1119,7 @@ export function RentalRequests({
               <button
                 type="button"
                 onClick={onBack}
-                className="px-4 py-2.5 rounded-2xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#10151B] text-neutral-700 dark:text-[#F5F5F5] text-xs font-semibold hover:bg-neutral-50 dark:hover:bg-white/5 transition-all cursor-pointer"
+                className="px-4 py-2.5 rounded-2xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#1E1E1E] text-neutral-700 dark:text-[#F5F5F5] text-xs font-semibold hover:bg-neutral-50 dark:hover:bg-white/5 transition-all cursor-pointer"
               >
                 Back to Home
               </button>
@@ -1131,7 +1131,7 @@ export function RentalRequests({
           {[1, 2, 3].map((i) => (
             <div
               key={i}
-              className="rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#10151B] p-5 shadow-xs animate-pulse space-y-3"
+              className="rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#1E1E1E] p-5 shadow-xs animate-pulse space-y-3"
             >
               <div className="flex items-center gap-4">
                 <div className="h-14 w-14 rounded-2xl bg-neutral-200 dark:bg-white/10 shrink-0" />
@@ -1192,8 +1192,8 @@ export function RentalRequests({
                 id={`rental-request-card-${req.id}`}
                 className={`rounded-3xl border transition-all ${
                   isExpanded
-                    ? "border-black/20 dark:border-[#A1A1AA]/35 bg-white dark:bg-[#10151B] p-5 sm:p-7 space-y-6 shadow-sm"
-                    : "border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#10151B] p-4 sm:p-4.5 shadow-xs hover:border-black/20 dark:hover:border-[#A1A1AA]/30"
+                    ? "border-black/20 dark:border-[#A1A1AA]/35 bg-white dark:bg-[#1E1E1E] p-5 sm:p-7 space-y-6 shadow-sm"
+                    : "border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#1E1E1E] p-4 sm:p-4.5 shadow-xs hover:border-black/20 dark:hover:border-[#A1A1AA]/30"
                 }`}
               >
                 {/* 1. COMPACT ROW / CARD (Always visible) */}
@@ -1203,7 +1203,7 @@ export function RentalRequests({
                     <img
                       src={req.productImage}
                       alt={req.productTitle}
-                      className="h-12 w-12 sm:h-14 sm:w-14 rounded-xl sm:rounded-2xl object-cover bg-neutral-100 dark:bg-[#050709] border border-black/10 dark:border-[#A1A1AA]/20 shrink-0 shadow-xs"
+                      className="h-12 w-12 sm:h-14 sm:w-14 rounded-xl sm:rounded-2xl object-cover bg-neutral-100 dark:bg-[#1E1E1E] border border-black/10 dark:border-[#A1A1AA]/20 shrink-0 shadow-xs"
                     />
                     <div className="min-w-0 space-y-0.5">
                       <h3 className="font-bold text-sm sm:text-base text-neutral-950 dark:text-[#F5F5F5] font-display truncate">
@@ -1403,7 +1403,7 @@ export function RentalRequests({
                     {/* Card Middle 3-Column Info Matrix */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
                       {/* Column 1: Borrower Profile */}
-                      <div className="p-4 rounded-2xl border border-black/5 dark:border-[#A1A1AA]/15 bg-neutral-50/50 dark:bg-[#050709]/50 space-y-3 shadow-xs">
+                      <div className="p-4 rounded-2xl border border-black/5 dark:border-[#A1A1AA]/15 bg-neutral-50/50 dark:bg-[#1E1E1E]/50 space-y-3 shadow-xs">
                         <div className="flex items-center justify-between">
                           <span className="text-[10px] font-bold text-neutral-500 dark:text-[#A1A1AA] uppercase tracking-wider">
                             Verified Borrower
@@ -1462,7 +1462,7 @@ export function RentalRequests({
                       </div>
 
                       {/* Column 2: Schedule & Duration */}
-                      <div className="p-4 rounded-2xl border border-black/5 dark:border-[#A1A1AA]/15 bg-neutral-50/50 dark:bg-[#050709]/50 space-y-3 shadow-xs">
+                      <div className="p-4 rounded-2xl border border-black/5 dark:border-[#A1A1AA]/15 bg-neutral-50/50 dark:bg-[#1E1E1E]/50 space-y-3 shadow-xs">
                         <span className="text-[10px] font-bold text-neutral-500 dark:text-[#A1A1AA] uppercase tracking-wider block">
                           Rental Schedule
                         </span>
@@ -1532,7 +1532,7 @@ export function RentalRequests({
                       </div>
 
                       {/* Column 3: Financial Settlement & Escrow */}
-                      <div className="p-4 rounded-2xl border border-black/5 dark:border-[#A1A1AA]/15 bg-neutral-50/50 dark:bg-[#050709]/50 space-y-3 shadow-xs">
+                      <div className="p-4 rounded-2xl border border-black/5 dark:border-[#A1A1AA]/15 bg-neutral-50/50 dark:bg-[#1E1E1E]/50 space-y-3 shadow-xs">
                         <span className="text-[10px] font-bold text-neutral-500 dark:text-[#A1A1AA] uppercase tracking-wider block">
                           Financial Summary
                         </span>
@@ -1666,7 +1666,7 @@ export function RentalRequests({
                           )}
 
                           {/* Confirmed Booking Location Card */}
-                          <div className="p-4 sm:p-5 rounded-2xl border border-black/5 dark:border-[#A1A1AA]/15 bg-neutral-50/70 dark:bg-[#050709]/60 space-y-4 shadow-xs">
+                          <div className="p-4 sm:p-5 rounded-2xl border border-black/5 dark:border-[#A1A1AA]/15 bg-neutral-50/70 dark:bg-[#1E1E1E]/60 space-y-4 shadow-xs">
                             {/* Location Section Header with Booking ID and Dates */}
                             <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-black/5 dark:border-white/5">
                               <div className="space-y-1">
@@ -2496,7 +2496,7 @@ export function RentalRequests({
               initial={{ scale: 0.95, opacity: 0, y: 15 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 15 }}
-              className="relative w-full max-w-lg rounded-3xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#10151B] p-6 shadow-2xl space-y-5 z-10"
+              className="relative w-full max-w-lg rounded-3xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#1E1E1E] p-6 shadow-2xl space-y-5 z-10"
             >
               <div className="flex items-center justify-between pb-3 border-b border-black/5 dark:border-white/10">
                 <div className="flex items-center gap-2.5">
@@ -2546,7 +2546,7 @@ export function RentalRequests({
                         error: null,
                       }))
                     }
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-black/10 dark:border-white/15 bg-neutral-50 dark:bg-[#050709] text-xs font-semibold text-neutral-950 dark:text-[#F5F5F5] focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-all cursor-pointer"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-black/10 dark:border-white/15 bg-neutral-50 dark:bg-[#1E1E1E] text-xs font-semibold text-neutral-950 dark:text-[#F5F5F5] focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-all cursor-pointer"
                   >
                     {CANCELLATION_REASONS.map((r) => (
                       <option key={r.code} value={r.code}>
@@ -2589,7 +2589,7 @@ export function RentalRequests({
                         error: null,
                       }))
                     }
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-black/10 dark:border-white/15 bg-neutral-50 dark:bg-[#050709] text-xs text-neutral-950 dark:text-[#F5F5F5] focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-all placeholder:text-neutral-400"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-black/10 dark:border-white/15 bg-neutral-50 dark:bg-[#1E1E1E] text-xs text-neutral-950 dark:text-[#F5F5F5] focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-all placeholder:text-neutral-400"
                   />
                 </div>
 
@@ -2670,7 +2670,7 @@ export function RentalRequests({
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white dark:bg-[#10151B] border border-black/10 dark:border-[#A1A1AA]/20 rounded-3xl p-6 sm:p-7 max-w-md w-full shadow-2xl space-y-5"
+              className="bg-white dark:bg-[#1E1E1E] border border-black/10 dark:border-[#A1A1AA]/20 rounded-3xl p-6 sm:p-7 max-w-md w-full shadow-2xl space-y-5"
             >
               {/* Header */}
               <div className="flex items-start justify-between gap-3">
@@ -2726,7 +2726,7 @@ export function RentalRequests({
                   value={declineReason}
                   onChange={(e) => setDeclineReason(e.target.value)}
                   disabled={Boolean(decisionProcessingId)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#050709] text-xs font-semibold text-neutral-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white/20"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#1E1E1E] text-xs font-semibold text-neutral-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white/20"
                 >
                   <option value="Product unavailable / Scheduling conflict">
                     Product unavailable / Scheduling conflict
@@ -2755,7 +2755,7 @@ export function RentalRequests({
                   disabled={Boolean(decisionProcessingId)}
                   placeholder="Provide any additional context or suggested alternate dates..."
                   rows={2}
-                  className="w-full px-3.5 py-2 rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#050709] text-xs text-neutral-900 dark:text-white placeholder:text-neutral-400 focus:outline-hidden focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white/20 resize-none"
+                  className="w-full px-3.5 py-2 rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#1E1E1E] text-xs text-neutral-900 dark:text-white placeholder:text-neutral-400 focus:outline-hidden focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white/20 resize-none"
                 />
               </div>
 

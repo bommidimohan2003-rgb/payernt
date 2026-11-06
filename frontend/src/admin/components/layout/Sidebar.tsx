@@ -162,7 +162,7 @@ export function Sidebar() {
       <div className="lg:hidden fixed top-3.5 left-4 z-50">
         <button
           onClick={() => setMobileOpen(!mobileOpen)}
-          className="p-2 rounded-xl bg-white dark:bg-[#10151B] border border-[#E6E4E9] dark:border-white/10 text-[#242424] dark:text-[#F5F5F5] shadow-xs hover:bg-[#F8F7F9] dark:hover:bg-white/5 transition-colors"
+          className="p-2 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-white/10 text-[#242424] dark:text-[#F5F5F5] shadow-xs hover:bg-[#F8F7F9] dark:hover:bg-white/5 transition-colors"
           aria-label="Toggle Navigation"
         >
           {mobileOpen ? (
@@ -189,7 +189,7 @@ export function Sidebar() {
       {/* Icon-Only Compact Navigation Rail (Symbols Only, No Names) */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 flex flex-col w-[72px] bg-white dark:bg-[#0D1524] border-r border-[#E6E4E9] dark:border-[#273244] transition-transform duration-200 ease-out lg:sticky lg:top-0 lg:h-screen shrink-0 select-none shadow-[2px_0_12px_rgba(0,0,0,0.02)]",
+          "fixed inset-y-0 left-0 z-40 flex flex-col w-[72px] bg-white dark:bg-[#1E1E1E] border-r border-[#E6E4E9] dark:border-[#273244] transition-transform duration-200 ease-out lg:sticky lg:top-0 lg:h-screen shrink-0 select-none shadow-[2px_0_12px_rgba(0,0,0,0.02)]",
           mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
         )}
       >
@@ -213,7 +213,7 @@ export function Sidebar() {
             <TooltipContent
               side="right"
               sideOffset={12}
-              className="bg-[#242424] text-white dark:bg-[#162238] dark:text-[#F8FAFC] text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-black/10 dark:border-[#273244] shadow-xl"
+              className="bg-[#242424] text-white dark:bg-[#1E1E1E] dark:text-[#F8FAFC] text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-black/10 dark:border-[#273244] shadow-xl"
             >
               Payent Admin Portal
             </TooltipContent>
@@ -229,7 +229,7 @@ export function Sidebar() {
             >
               {/* Subtle hairline between groups */}
               {gIdx > 0 && (
-                <div className="w-7 h-[1px] bg-[#E6E4E9] dark:bg-[#273244] my-1 opacity-70" />
+                <div className="w-7 h-[1px] bg-[#E6E4E9] dark:bg-[#1E1E1E] my-1 opacity-70" />
               )}
 
               {group.items.map((it) => {
@@ -257,7 +257,7 @@ export function Sidebar() {
                         className={cn(
                           "group relative flex items-center justify-center h-10 w-10 rounded-xl transition-all duration-150 cursor-pointer",
                           active
-                            ? "bg-[#242424] text-white dark:bg-[#162238] dark:text-[#F8FAFC] dark:border dark:border-[#3B82F6]/40 shadow-xs"
+                            ? "bg-[#242424] text-white dark:bg-[#1E1E1E] dark:text-[#F8FAFC] dark:border dark:border-[#3B82F6]/40 shadow-xs"
                             : "text-[#77757D] hover:text-[#242424] hover:bg-[#F8F7F9] dark:text-[#9AAAC2] dark:hover:text-[#F8FAFC] dark:hover:bg-[#162238]/60",
                         )}
                       >
@@ -279,7 +279,7 @@ export function Sidebar() {
                     <TooltipContent
                       side="right"
                       sideOffset={12}
-                      className="bg-[#242424] text-white dark:bg-[#162238] dark:text-[#F8FAFC] text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-black/10 dark:border-[#273244] shadow-xl flex items-center gap-2"
+                      className="bg-[#242424] text-white dark:bg-[#1E1E1E] dark:text-[#F8FAFC] text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-black/10 dark:border-[#273244] shadow-xl flex items-center gap-2"
                     >
                       <span>{it.label}</span>
                       {badgeVal > 0 && (
@@ -320,7 +320,7 @@ export function Sidebar() {
             <TooltipContent
               side="right"
               sideOffset={12}
-              className="bg-[#242424] text-white dark:bg-[#162238] dark:text-[#F8FAFC] text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-black/10 dark:border-[#273244] shadow-xl flex flex-col"
+              className="bg-[#242424] text-white dark:bg-[#1E1E1E] dark:text-[#F8FAFC] text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-black/10 dark:border-[#273244] shadow-xl flex flex-col"
             >
               <span>{currentUser?.fullName || "Administrator"}</span>
               <span className="text-[10px] text-[#9AAAC2] font-mono font-normal">
@@ -343,7 +343,7 @@ export function Sidebar() {
             <TooltipContent
               side="right"
               sideOffset={12}
-              className="bg-[#242424] text-white dark:bg-[#162238] dark:text-rose-400 text-xs font-semibold px-2.5 py-1 rounded-lg border border-black/10 dark:border-[#273244] shadow-xl"
+              className="bg-[#242424] text-white dark:bg-[#1E1E1E] dark:text-rose-400 text-xs font-semibold px-2.5 py-1 rounded-lg border border-black/10 dark:border-[#273244] shadow-xl"
             >
               Sign Out
             </TooltipContent>

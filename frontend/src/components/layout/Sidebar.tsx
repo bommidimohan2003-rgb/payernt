@@ -44,7 +44,7 @@ export function Sidebar() {
   return (
     <>
       <aside className="hidden lg:block w-64 shrink-0 sticky top-20 h-fit">
-        <nav className="card-premium p-3 space-y-1 bg-white/90 dark:bg-[#10151B] backdrop-blur-md border border-black/10 dark:border-white/10 rounded-3xl shadow-sm">
+        <nav className="card-premium p-3 space-y-1 bg-white/90 dark:bg-[#1E1E1E] backdrop-blur-md border border-black/10 dark:border-white/10 rounded-3xl shadow-sm">
           {/* Brand Area */}
           <div className="px-3 py-2.5 mb-2 border-b border-black/5 dark:border-white/5">
             <LogoIcon showTagline={true} />
@@ -78,7 +78,7 @@ export function Sidebar() {
                   <span className={cn(
                     "px-2 py-0.5 min-w-[20px] h-[20px] rounded-full text-[10px] font-bold flex items-center justify-center leading-none shadow-sm",
                     active
-                      ? "bg-black text-white dark:bg-[#050709] dark:text-[#F5F5F5]"
+                      ? "bg-black text-white dark:bg-[#1E1E1E] dark:text-[#F5F5F5]"
                       : "bg-neutral-900 text-white dark:bg-white/15 dark:text-[#F5F5F5]"
                   )}>
                     {unreadCount > 99 ? "99+" : unreadCount}

@@ -41,7 +41,7 @@ const brandValues = [
 
 export function WhyChoose() {
   return (
-    <section className="relative overflow-hidden bg-white dark:bg-[#0A0E17] py-16 md:py-24 text-foreground dark:text-white">
+    <section className="relative overflow-hidden bg-white dark:bg-[#1E1E1E] py-16 md:py-24 text-foreground dark:text-white">
       {/* Ambient Radial Spotlights */}
       <div className="absolute top-1/2 left-0 -translate-y-1/2 w-80 h-80 bg-primary/10 rounded-full blur-[140px] pointer-events-none" />
       <div className="absolute top-1/2 right-0 -translate-y-1/2 w-80 h-80 bg-amber-500/10 rounded-full blur-[140px] pointer-events-none" />

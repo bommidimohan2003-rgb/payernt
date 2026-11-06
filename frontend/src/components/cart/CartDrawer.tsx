@@ -67,7 +67,7 @@ export function CartDrawer() {
             aria-modal="true"
             aria-label="Rental Cart"
             id="cart-drawer-panel"
-            className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col bg-white dark:bg-[#0A1017] border-l border-neutral-200 dark:border-white/10 shadow-2xl text-neutral-900 dark:text-white"
+            className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col bg-white dark:bg-[#1E1E1E] border-l border-neutral-200 dark:border-white/10 shadow-2xl text-neutral-900 dark:text-white"
           >
             {/* Drawer Header */}
             <div className="flex items-center justify-between border-b border-neutral-200 dark:border-white/10 px-5 py-4 sm:px-6">
@@ -194,7 +194,7 @@ export function CartDrawer() {
 
             {/* Drawer Footer & Actions */}
             {cartItems.length > 0 && (
-              <div className="border-t border-neutral-200 dark:border-white/10 bg-neutral-50/80 dark:bg-[#070B10] p-5 sm:p-6 space-y-3">
+              <div className="border-t border-neutral-200 dark:border-white/10 bg-neutral-50/80 dark:bg-[#1E1E1E] p-5 sm:p-6 space-y-3">
                 {/* Note on checkout dates */}
                 <div className="flex items-center gap-1.5 text-[11px] text-neutral-500 dark:text-neutral-400 bg-black/5 dark:bg-white/5 rounded-lg p-2.5">
                   <ShieldCheck className="h-3.5 w-3.5 text-neutral-700 dark:text-neutral-300 shrink-0" />

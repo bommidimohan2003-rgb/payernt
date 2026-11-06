@@ -126,7 +126,7 @@ export default function Contact() {
   return (
     <MainLayout>
       {/* 1. CONTACT HERO (Section 39) */}
-      <section className="relative overflow-hidden bg-neutral-50/70 dark:bg-[#05090D] pt-16 pb-16 sm:pt-20 sm:pb-24 transition-colors duration-300">
+      <section className="relative overflow-hidden bg-neutral-50/70 dark:bg-[#1E1E1E] pt-16 pb-16 sm:pt-20 sm:pb-24 transition-colors duration-300">
         {/* Ambient background glow */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[350px] bg-gradient-to-b from-neutral-200/30 dark:from-[#0B1522] to-transparent rounded-full blur-[140px] pointer-events-none" />
 
@@ -187,7 +187,7 @@ export default function Contact() {
 
             {/* Right: Structured Support Categories & Direct Channels Panel */}
             <div className="lg:col-span-5">
-              <div className="rounded-3xl border border-black/10 dark:border-white/10 bg-white/80 dark:bg-[#0D151D]/90 backdrop-blur-xl p-5 sm:p-6 shadow-2xl space-y-4">
+              <div className="rounded-3xl border border-black/10 dark:border-white/10 bg-white/80 dark:bg-[#1E1E1E]/90 backdrop-blur-xl p-5 sm:p-6 shadow-2xl space-y-4">
                 <div className="flex items-center justify-between pb-3 border-b border-black/5 dark:border-white/5">
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -288,7 +288,7 @@ export default function Contact() {
             {/* Genuine Channel Cards */}
             <div className="space-y-4">
               {/* Email */}
-              <div className="p-5 rounded-2xl bg-white dark:bg-[#0D151D] border border-black/10 dark:border-white/10 shadow-sm flex items-start gap-4">
+              <div className="p-5 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 shadow-sm flex items-start gap-4">
                 <div className="h-10 w-10 rounded-xl bg-black/5 dark:bg-white/5 flex items-center justify-center text-primary shrink-0">
                   <Mail className="h-5 w-5" />
                 </div>
@@ -309,7 +309,7 @@ export default function Contact() {
               </div>
 
               {/* Phone */}
-              <div className="p-5 rounded-2xl bg-white dark:bg-[#0D151D] border border-black/10 dark:border-white/10 shadow-sm flex items-start gap-4">
+              <div className="p-5 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 shadow-sm flex items-start gap-4">
                 <div className="h-10 w-10 rounded-xl bg-black/5 dark:bg-white/5 flex items-center justify-center text-primary shrink-0">
                   <Phone className="h-5 w-5" />
                 </div>
@@ -330,7 +330,7 @@ export default function Contact() {
               </div>
 
               {/* Office / Hub */}
-              <div className="p-5 rounded-2xl bg-white dark:bg-[#0D151D] border border-black/10 dark:border-white/10 shadow-sm flex items-start gap-4">
+              <div className="p-5 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 shadow-sm flex items-start gap-4">
                 <div className="h-10 w-10 rounded-xl bg-black/5 dark:bg-white/5 flex items-center justify-center text-primary shrink-0">
                   <MapPin className="h-5 w-5" />
                 </div>
@@ -348,7 +348,7 @@ export default function Contact() {
               </div>
 
               {/* Operating Hours */}
-              <div className="p-5 rounded-2xl bg-white dark:bg-[#0D151D] border border-black/10 dark:border-white/10 shadow-sm flex items-start gap-4">
+              <div className="p-5 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 shadow-sm flex items-start gap-4">
                 <div className="h-10 w-10 rounded-xl bg-black/5 dark:bg-white/5 flex items-center justify-center text-primary shrink-0">
                   <Clock className="h-5 w-5" />
                 </div>
@@ -367,7 +367,7 @@ export default function Contact() {
             </div>
 
             {/* Helpful Links */}
-            <div className="p-5 rounded-2xl bg-neutral-100/60 dark:bg-[#081018] border border-black/5 dark:border-white/5 space-y-2.5">
+            <div className="p-5 rounded-2xl bg-neutral-100/60 dark:bg-[#1E1E1E] border border-black/5 dark:border-white/5 space-y-2.5">
               <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-400 dark:text-[#697680]">
                 Looking for something else?
               </span>
@@ -399,7 +399,7 @@ export default function Contact() {
 
           {/* RIGHT: INTERACTIVE CONTACT FORM (Sections 42-47) */}
           <div className="lg:col-span-7">
-            <div className="p-6 sm:p-8 rounded-3xl bg-white dark:bg-[#0D151D] border border-black/10 dark:border-white/10 shadow-xl">
+            <div className="p-6 sm:p-8 rounded-3xl bg-white dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 shadow-xl">
               {/* SUCCESS CONFIRMATION STATE (Section 46) */}
               {successData ? (
                 <div className="py-12 px-4 text-center space-y-4">
@@ -534,7 +534,7 @@ export default function Contact() {
                       <select
                         value={category}
                         onChange={(e) => setCategory(e.target.value)}
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-black/15 dark:border-white/15 bg-white dark:bg-[#111A22] text-xs text-neutral-900 dark:text-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-black/15 dark:border-white/15 bg-white dark:bg-[#1E1E1E] text-xs text-neutral-900 dark:text-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer"
                       >
                         {contactCategories.map((c) => (
                           <option key={c} value={c}>

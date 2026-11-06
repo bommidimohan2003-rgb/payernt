@@ -94,7 +94,7 @@ export function HowItWorks() {
   };
 
   return (
-    <section className="relative overflow-hidden bg-neutral-50/70 dark:bg-[#05090D] py-8 sm:py-10 text-neutral-900 dark:text-white transition-colors duration-300">
+    <section className="relative overflow-hidden bg-neutral-50/70 dark:bg-[#1E1E1E] py-8 sm:py-10 text-neutral-900 dark:text-white transition-colors duration-300">
       <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
 
         {/* Section Header with grouped Learn More link */}
@@ -144,8 +144,8 @@ export function HowItWorks() {
                 onClick={() => handleSelectStep(idx)}
                 className={`relative rounded-xl sm:rounded-2xl p-2.5 sm:p-3.5 text-left transition-all duration-300 border cursor-pointer flex items-center gap-2 sm:gap-3 overflow-hidden ${
                   isActive
-                    ? "bg-white dark:bg-[#0B1522] border-primary/60 shadow-md ring-1 ring-primary/30"
-                    : "bg-white/80 dark:bg-[#080E16]/70 border-neutral-200 dark:border-white/10 hover:border-neutral-400 dark:hover:border-white/25 opacity-75 hover:opacity-100"
+                    ? "bg-white dark:bg-[#1E1E1E] border-primary/60 shadow-md ring-1 ring-primary/30"
+                    : "bg-white/80 dark:bg-[#1E1E1E]/70 border-neutral-200 dark:border-white/10 hover:border-neutral-400 dark:hover:border-white/25 opacity-75 hover:opacity-100"
                 }`}
               >
                 <div
@@ -175,7 +175,7 @@ export function HowItWorks() {
           role="tabpanel"
           id={`step-panel-${step.id}`}
           aria-labelledby={`step-tab-${step.id}`}
-          className="relative rounded-2xl sm:rounded-3xl bg-white dark:bg-[#081018] border border-neutral-200 dark:border-white/10 p-5 sm:p-6 md:p-7 shadow-sm dark:shadow-md overflow-hidden transition-colors duration-300"
+          className="relative rounded-2xl sm:rounded-3xl bg-white dark:bg-[#1E1E1E] border border-neutral-200 dark:border-white/10 p-5 sm:p-6 md:p-7 shadow-sm dark:shadow-md overflow-hidden transition-colors duration-300"
         >
           <AnimatePresence mode="wait">
             <motion.div
@@ -244,7 +244,7 @@ export function HowItWorks() {
                   initial={{ opacity: 0, scale: 0.96 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1], delay: 0.1 }}
-                  className="w-full max-w-md rounded-xl bg-neutral-100/90 dark:bg-[#0C1622] border border-neutral-200 dark:border-white/15 p-4 sm:p-5 shadow-xs dark:shadow-inner"
+                  className="w-full max-w-md rounded-xl bg-neutral-100/90 dark:bg-[#1E1E1E] border border-neutral-200 dark:border-white/15 p-4 sm:p-5 shadow-xs dark:shadow-inner"
                 >
 
                   {activeStep === 0 && (
@@ -256,7 +256,7 @@ export function HowItWorks() {
                         </span>
                       </div>
 
-                      <div className="p-2.5 rounded-lg bg-white dark:bg-[#070D14] border border-neutral-200/80 dark:border-white/10 flex items-center justify-between shadow-xs">
+                      <div className="p-2.5 rounded-lg bg-white dark:bg-[#1E1E1E] border border-neutral-200/80 dark:border-white/10 flex items-center justify-between shadow-xs">
                         <div className="flex items-center gap-2">
                           <Search className="h-3.5 w-3.5 text-neutral-500 dark:text-neutral-400" />
                           <div>
@@ -269,7 +269,7 @@ export function HowItWorks() {
                         <span className="text-xs font-extrabold text-neutral-900 dark:text-white">₹2,800<span className="text-[10px] text-neutral-500 dark:text-neutral-400 font-normal">/day</span></span>
                       </div>
 
-                      <div className="p-2.5 rounded-lg bg-white/80 dark:bg-[#070D14]/70 border border-neutral-200/80 dark:border-white/10 flex items-center justify-between">
+                      <div className="p-2.5 rounded-lg bg-white/80 dark:bg-[#1E1E1E]/70 border border-neutral-200/80 dark:border-white/10 flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <Search className="h-3.5 w-3.5 text-neutral-500 dark:text-neutral-400" />
                           <div>
@@ -293,7 +293,7 @@ export function HowItWorks() {
                         </span>
                       </div>
 
-                      <div className="p-3 rounded-lg bg-white dark:bg-[#070D14] border border-neutral-200/80 dark:border-white/10 space-y-2">
+                      <div className="p-3 rounded-lg bg-white dark:bg-[#1E1E1E] border border-neutral-200/80 dark:border-white/10 space-y-2">
                         <div className="flex justify-between text-xs">
                           <span className="text-neutral-600 dark:text-neutral-400 flex items-center gap-1"><Calendar className="h-3 w-3 text-purple-600 dark:text-purple-400" /> Rental Dates</span>
                           <span className="font-bold text-neutral-900 dark:text-white">Fri, Jul 12 – Sun, 14 (3 Days)</span>
@@ -319,7 +319,7 @@ export function HowItWorks() {
                         </span>
                       </div>
 
-                      <div className="p-3 rounded-lg bg-white dark:bg-[#070D14] border border-neutral-200/80 dark:border-white/10 space-y-2">
+                      <div className="p-3 rounded-lg bg-white dark:bg-[#1E1E1E] border border-neutral-200/80 dark:border-white/10 space-y-2">
                         <div className="flex items-center gap-2.5">
                           <div className="w-8 h-8 rounded-lg bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
                             <Truck className="h-4 w-4" />

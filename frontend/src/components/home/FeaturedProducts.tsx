@@ -169,7 +169,7 @@ export function FeaturedProducts() {
   const displayedProducts = filteredProducts.slice(0, 8);
 
   return (
-    <section className="relative overflow-hidden bg-white dark:bg-[#05090D] py-12 sm:py-16 text-neutral-900 dark:text-white transition-colors duration-300">
+    <section className="relative overflow-hidden bg-white dark:bg-[#1E1E1E] py-12 sm:py-16 text-neutral-900 dark:text-white transition-colors duration-300">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-8">
@@ -188,14 +188,14 @@ export function FeaturedProducts() {
           {/* Interactive Filter Pills & View All Link */}
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             {categoryTabs.length > 1 && (
-              <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-xl bg-neutral-100 dark:bg-[#0A1017] border border-black/5 dark:border-white/10">
+              <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-xl bg-neutral-100 dark:bg-[#1E1E1E] border border-black/5 dark:border-white/10">
                 {categoryTabs.map((tab) => (
                   <button
                     key={tab}
                     type="button"
                     onClick={() => setSelectedCategory(tab)}
                     className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${selectedCategory === tab
-                        ? "bg-white dark:bg-[#141F2B] text-neutral-950 dark:text-white shadow-xs border border-black/5 dark:border-white/10"
+                        ? "bg-white dark:bg-[#1E1E1E] text-neutral-950 dark:text-white shadow-xs border border-black/5 dark:border-white/10"
                         : "text-neutral-500 dark:text-[#8B98A5] hover:text-neutral-900 dark:hover:text-white"
                       }`}
                   >
@@ -221,7 +221,7 @@ export function FeaturedProducts() {
             {[1, 2, 3, 4].map((i) => (
               <div
                 key={i}
-                className="rounded-2xl bg-neutral-100 dark:bg-[#0A1017] border border-black/5 dark:border-white/10 h-72 animate-pulse"
+                className="rounded-2xl bg-neutral-100 dark:bg-[#1E1E1E] border border-black/5 dark:border-white/10 h-72 animate-pulse"
               />
             ))}
           </div>
@@ -229,7 +229,7 @@ export function FeaturedProducts() {
 
         {/* Empty State (Only Real Items Allowed - Zero Fake Mock Data) */}
         {!isLoading && displayedProducts.length === 0 && (
-          <div className="rounded-2xl p-8 sm:p-12 border border-dashed border-black/15 dark:border-white/15 bg-neutral-50/50 dark:bg-[#070D13] text-center max-w-xl mx-auto flex flex-col items-center justify-center">
+          <div className="rounded-2xl p-8 sm:p-12 border border-dashed border-black/15 dark:border-white/15 bg-neutral-50/50 dark:bg-[#1E1E1E] text-center max-w-xl mx-auto flex flex-col items-center justify-center">
             <div className="h-12 w-12 rounded-full bg-primary/10 text-primary dark:bg-white/10 dark:text-white flex items-center justify-center mb-3">
               <Sparkles className="h-6 w-6" />
             </div>

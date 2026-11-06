@@ -90,7 +90,7 @@ export const MyDevicesTab: React.FC<MyDevicesTabProps> = ({
       </div>
 
       {devices.length === 0 ? (
-        <div className="card-premium p-8 rounded-3xl bg-neutral-50 dark:bg-[#0D151D] border border-neutral-200 dark:border-white/10 text-center space-y-3">
+        <div className="card-premium p-8 rounded-3xl bg-neutral-50 dark:bg-[#1E1E1E] border border-neutral-200 dark:border-white/10 text-center space-y-3">
           <div className="h-12 w-12 rounded-2xl bg-neutral-100 dark:bg-neutral-800 mx-auto flex items-center justify-center text-neutral-400">
             <Laptop className="h-6 w-6" />
           </div>
@@ -116,7 +116,7 @@ export const MyDevicesTab: React.FC<MyDevicesTabProps> = ({
             return (
               <div
                 key={dev.deviceId}
-                className="card-premium p-5 sm:p-6 bg-white dark:bg-[#0D151D] border border-neutral-200 dark:border-white/10 rounded-3xl shadow-sm space-y-4 flex flex-col justify-between hover:border-neutral-300 dark:hover:border-white/20 transition-all"
+                className="card-premium p-5 sm:p-6 bg-white dark:bg-[#1E1E1E] border border-neutral-200 dark:border-white/10 rounded-3xl shadow-sm space-y-4 flex flex-col justify-between hover:border-neutral-300 dark:hover:border-white/20 transition-all"
               >
                 <div className="space-y-3">
                   {/* Top Bar */}
@@ -156,7 +156,7 @@ export const MyDevicesTab: React.FC<MyDevicesTabProps> = ({
                   </div>
 
                   {/* Metadata fields */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs p-3 rounded-2xl bg-neutral-50 dark:bg-[#131E2A] border border-neutral-200/60 dark:border-white/5 font-mono">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs p-3 rounded-2xl bg-neutral-50 dark:bg-[#1E1E1E] border border-neutral-200/60 dark:border-white/5 font-mono">
                     <div>
                       <span className="text-[9px] uppercase tracking-wider text-neutral-400 block font-sans">
                         Device ID
@@ -273,7 +273,7 @@ export const MyDevicesTab: React.FC<MyDevicesTabProps> = ({
       {/* Transfer Modal */}
       {isTransferModalOpen && selectedDevice && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="w-full max-w-md bg-white dark:bg-[#0D151D] border border-neutral-200 dark:border-white/10 rounded-3xl p-6 shadow-2xl space-y-4">
+          <div className="w-full max-w-md bg-white dark:bg-[#1E1E1E] border border-neutral-200 dark:border-white/10 rounded-3xl p-6 shadow-2xl space-y-4">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-2xl bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0">
                 <ArrowRightLeft className="h-5 w-5" />
@@ -298,11 +298,11 @@ export const MyDevicesTab: React.FC<MyDevicesTabProps> = ({
                   value={transferTargetEmail}
                   onChange={(e) => setTransferTargetEmail(e.target.value)}
                   placeholder="newowner@example.com"
-                  className="w-full h-10 px-3 text-xs bg-neutral-50 dark:bg-[#131E2A] border border-neutral-300 dark:border-white/10 rounded-xl text-neutral-900 dark:text-white"
+                  className="w-full h-10 px-3 text-xs bg-neutral-50 dark:bg-[#1E1E1E] border border-neutral-300 dark:border-white/10 rounded-xl text-neutral-900 dark:text-white"
                 />
               </div>
 
-              <div className="p-3 rounded-xl bg-neutral-50 dark:bg-neutral-900/50 text-[11px] text-neutral-500 dark:text-neutral-400 border border-neutral-200 dark:border-white/5 space-y-1">
+              <div className="p-3 rounded-xl bg-neutral-50 dark:bg-[#1E1E1E]/50 text-[11px] text-neutral-500 dark:text-neutral-400 border border-neutral-200 dark:border-white/5 space-y-1">
                 <p>
                   <strong>Note:</strong> The physical QR sticker remains attached. Once accepted by the new owner, scanning the QR will resolve to their ownership record.
                 </p>

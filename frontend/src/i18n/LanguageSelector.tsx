@@ -34,7 +34,7 @@ export function LanguageSelector({
         </div>
       )}
 
-      <div className="rounded-2xl border border-neutral-200/90 dark:border-white/[0.08] bg-white dark:bg-[#10141d] overflow-hidden divide-y divide-neutral-100 dark:divide-white/[0.06] shadow-xs">
+      <div className="rounded-2xl border border-neutral-200/90 dark:border-white/[0.08] bg-white dark:bg-[#1E1E1E] overflow-hidden divide-y divide-neutral-100 dark:divide-white/[0.06] shadow-xs">
         {SUPPORTED_LANGUAGES.map((item) => {
           const isSelected = language === item.code;
           return (

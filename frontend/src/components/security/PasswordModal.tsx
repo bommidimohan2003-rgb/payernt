@@ -70,7 +70,7 @@ export const PasswordModal: React.FC<PasswordModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
       <div
-        className="w-full max-w-md bg-white dark:bg-[#0D151D] border border-neutral-200 dark:border-white/10 rounded-3xl p-6 sm:p-7 shadow-2xl space-y-5"
+        className="w-full max-w-md bg-white dark:bg-[#1E1E1E] border border-neutral-200 dark:border-white/10 rounded-3xl p-6 sm:p-7 shadow-2xl space-y-5"
         role="dialog"
         aria-modal="true"
         aria-labelledby="password-modal-title"
@@ -117,7 +117,7 @@ export const PasswordModal: React.FC<PasswordModalProps> = ({
                 placeholder="Enter your account password"
                 disabled={loading}
                 autoComplete="current-password"
-                className="w-full h-11 px-3.5 pr-11 text-sm bg-neutral-50 dark:bg-[#131E2A] border border-neutral-300 dark:border-white/10 rounded-2xl text-neutral-900 dark:text-white placeholder:text-neutral-400 dark:placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-sky-500/40 focus:border-sky-500 transition-all"
+                className="w-full h-11 px-3.5 pr-11 text-sm bg-neutral-50 dark:bg-[#1E1E1E] border border-neutral-300 dark:border-white/10 rounded-2xl text-neutral-900 dark:text-white placeholder:text-neutral-400 dark:placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-sky-500/40 focus:border-sky-500 transition-all"
               />
               <button
                 type="button"
@@ -131,7 +131,7 @@ export const PasswordModal: React.FC<PasswordModalProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2 p-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-900/50 text-[11px] text-neutral-500 dark:text-neutral-400 border border-neutral-200/60 dark:border-white/5">
+          <div className="flex items-center gap-2 p-2.5 rounded-xl bg-neutral-50 dark:bg-[#1E1E1E]/50 text-[11px] text-neutral-500 dark:text-neutral-400 border border-neutral-200/60 dark:border-white/5">
             <ShieldCheck className="h-4 w-4 text-emerald-500 shrink-0" />
             <span>Encrypted verification. Password is never stored on your device.</span>
           </div>

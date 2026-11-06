@@ -728,7 +728,7 @@ export function LiveRentalQueue({
       className={`w-full rounded-2xl border p-4 sm:p-5 shadow-sm space-y-5 transition-all text-left backdrop-blur-md ${
         isCancelled
           ? "border-red-500/30 bg-red-500/[0.03] dark:bg-red-950/[0.08]"
-          : "border-black/10 dark:border-[#A1A1AA]/20 bg-white/95 dark:bg-[#0E1318]/95"
+          : "border-black/10 dark:border-[#A1A1AA]/20 bg-white/95 dark:bg-[#1E1E1E]/95"
       }`}
     >
       {/* 1. Header & Live Status Badge */}
@@ -931,7 +931,7 @@ export function LiveRentalQueue({
           )}
 
       {/* 2. PERSISTENT RENTAL TIMER HUD */}
-      <div className="rounded-xl border border-black/5 dark:border-white/10 bg-neutral-50 dark:bg-[#050709]/80 p-4 sm:p-5 relative overflow-hidden">
+      <div className="rounded-xl border border-black/5 dark:border-white/10 bg-neutral-50 dark:bg-[#1E1E1E]/80 p-4 sm:p-5 relative overflow-hidden">
         {/* Subtle accent glow */}
         <div
           className={`absolute -right-10 -top-10 h-32 w-32 rounded-full blur-3xl pointer-events-none transition-all ${

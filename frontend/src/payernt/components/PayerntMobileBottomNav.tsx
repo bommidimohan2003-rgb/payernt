@@ -86,7 +86,7 @@ export function PayerntMobileBottomNav({
       {/* Floating Transparent Bottom Navigation Bar - Hovering on Screen */}
       <div className="fixed bottom-3 inset-x-3 sm:bottom-4 sm:inset-x-4 z-40 md:hidden pointer-events-none flex justify-center">
         <nav
-          className="pointer-events-auto w-full max-w-md bg-white/70 dark:bg-[#0b0e14]/75 backdrop-blur-2xl border border-neutral-200/70 dark:border-white/10 shadow-[0_10px_35px_rgba(0,0,0,0.18)] dark:shadow-[0_12px_40px_rgba(0,0,0,0.6)] rounded-2xl sm:rounded-3xl transition-all duration-200 py-1.5 px-2 ring-1 ring-black/[0.04] dark:ring-white/[0.06]"
+          className="pointer-events-auto w-full max-w-md bg-white/70 dark:bg-[#1E1E1E]/75 backdrop-blur-2xl border border-neutral-200/70 dark:border-white/10 shadow-[0_10px_35px_rgba(0,0,0,0.18)] dark:shadow-[0_12px_40px_rgba(0,0,0,0.6)] rounded-2xl sm:rounded-3xl transition-all duration-200 py-1.5 px-2 ring-1 ring-black/[0.04] dark:ring-white/[0.06]"
           aria-label="Mobile Bottom Navigation"
         >
           <div className="grid grid-cols-5 items-center w-full">
@@ -182,7 +182,7 @@ export function PayerntMobileBottomNav({
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
               transition={{ type: "spring", damping: 25, stiffness: 280 }}
-              className="relative z-10 w-full rounded-t-3xl bg-white dark:bg-[#0f121a] border-t border-neutral-200/90 dark:border-white/[0.1] p-5 pb-[max(env(safe-area-inset-bottom),20px)] shadow-2xl space-y-4"
+              className="relative z-10 w-full rounded-t-3xl bg-white dark:bg-[#1E1E1E] border-t border-neutral-200/90 dark:border-white/[0.1] p-5 pb-[max(env(safe-area-inset-bottom),20px)] shadow-2xl space-y-4"
             >
               {/* Sheet Drag Handle + Close */}
               <div className="flex items-center justify-between pb-1">

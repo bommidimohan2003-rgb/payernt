@@ -147,7 +147,7 @@ export default function About() {
   return (
     <MainLayout>
       {/* 1. ABOUT HERO (Section 29) */}
-      <section className="relative overflow-hidden bg-neutral-50/70 dark:bg-[#05090D] pt-16 pb-20 sm:pt-24 sm:pb-28 transition-colors duration-300">
+      <section className="relative overflow-hidden bg-neutral-50/70 dark:bg-[#1E1E1E] pt-16 pb-20 sm:pt-24 sm:pb-28 transition-colors duration-300">
         {/* Ambient background glow */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[450px] bg-gradient-to-b from-neutral-200/40 via-neutral-100/10 to-transparent dark:from-[#0B1522] dark:via-[#071017] dark:to-transparent rounded-full blur-[160px] pointer-events-none" />
 
@@ -208,7 +208,7 @@ export default function About() {
 
             {/* Right: Editorial Creator & Gear Composition */}
             <div className="lg:col-span-5">
-              <div className="rounded-3xl border border-black/10 dark:border-white/10 bg-white/80 dark:bg-[#0D151D]/90 backdrop-blur-xl p-5 sm:p-6 shadow-2xl space-y-5">
+              <div className="rounded-3xl border border-black/10 dark:border-white/10 bg-white/80 dark:bg-[#1E1E1E]/90 backdrop-blur-xl p-5 sm:p-6 shadow-2xl space-y-5">
                 {/* Cinematic Visual Banner with Overlay */}
                 <div className="relative h-44 sm:h-48 rounded-2xl overflow-hidden border border-black/10 dark:border-white/10 group">
                   <img
@@ -365,7 +365,7 @@ export default function About() {
       </section>
 
       {/* 3. OUR MISSION (Section 31) */}
-      <section className="bg-neutral-100/60 dark:bg-[#071017] py-20 sm:py-28 transition-colors">
+      <section className="bg-neutral-100/60 dark:bg-[#1E1E1E] py-20 sm:py-28 transition-colors">
         <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 text-center">
           <div className="inline-flex items-center justify-center mb-4">
             <span className="h-0.5 w-8 bg-primary rounded-full" />
@@ -405,7 +405,7 @@ export default function About() {
             return (
               <div
                 key={aud.title}
-                className="p-6 rounded-2xl bg-white dark:bg-[#0D151D] border border-black/10 dark:border-white/10 hover:border-black/30 dark:hover:border-white/25 transition-all shadow-sm flex flex-col justify-between"
+                className="p-6 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 hover:border-black/30 dark:hover:border-white/25 transition-all shadow-sm flex flex-col justify-between"
               >
                 <div>
                   <div className="h-10 w-10 rounded-xl bg-black/5 dark:bg-white/5 flex items-center justify-center text-neutral-900 dark:text-white mb-4">
@@ -442,7 +442,7 @@ export default function About() {
           {howItWorksSteps.map((step) => (
             <div
               key={step.step}
-              className="relative p-6 rounded-2xl bg-white dark:bg-[#0D151D] border border-black/10 dark:border-white/10 flex flex-col justify-between"
+              className="relative p-6 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 flex flex-col justify-between"
             >
               <div>
                 <span className="font-mono text-xs font-black text-primary tracking-wider">
@@ -481,7 +481,7 @@ export default function About() {
             return (
               <div
                 key={pt.title}
-                className="p-6 rounded-2xl bg-white dark:bg-[#0D151D] border border-black/10 dark:border-white/10"
+                className="p-6 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10"
               >
                 <div className="h-10 w-10 rounded-xl bg-black/5 dark:bg-white/5 flex items-center justify-center text-primary mb-4">
                   <IconComp className="h-5 w-5" />
@@ -499,7 +499,7 @@ export default function About() {
       </section>
 
       {/* 7. REAL COMMUNITY STATS (Section 35) */}
-      <section className="bg-neutral-100/60 dark:bg-[#071017] py-16 sm:py-20 transition-colors">
+      <section className="bg-neutral-100/60 dark:bg-[#1E1E1E] py-16 sm:py-20 transition-colors">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-2xl mx-auto mb-12">
             <span className="text-xs font-bold uppercase tracking-widest text-primary">
@@ -566,7 +566,7 @@ export default function About() {
             ].map((st) => (
               <div
                 key={st.label}
-                className="p-6 rounded-2xl bg-white dark:bg-[#0D151D] border border-black/10 dark:border-white/10 text-center"
+                className="p-6 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 text-center"
               >
                 {st.val === null ? (
                   <div className="h-9 w-16 bg-secondary/80 animate-pulse rounded-lg mx-auto" />
@@ -589,7 +589,7 @@ export default function About() {
 
       {/* 8. LENDER CTA (Section 36) */}
       <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-20 sm:py-24">
-        <div className="rounded-3xl bg-[#161616] text-white dark:bg-[#0D151D] border border-white/10 p-8 sm:p-12 lg:p-16 flex flex-col lg:flex-row items-center justify-between gap-8">
+        <div className="rounded-3xl bg-[#161616] text-white dark:bg-[#1E1E1E] border border-white/10 p-8 sm:p-12 lg:p-16 flex flex-col lg:flex-row items-center justify-between gap-8">
           <div className="max-w-xl">
             <span className="text-xs font-bold uppercase tracking-widest text-primary">
               Creator Monetization

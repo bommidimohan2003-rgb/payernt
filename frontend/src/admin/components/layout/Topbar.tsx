@@ -58,7 +58,7 @@ export function Topbar() {
   }, []);
 
   return (
-    <header className="sticky top-0 z-30 flex items-center justify-between px-6 md:px-8 h-16 bg-white/95 dark:bg-[#0D1524]/95 border-b border-[#E6E4E9] dark:border-[#273244] backdrop-blur-md transition-colors duration-200">
+    <header className="sticky top-0 z-30 flex items-center justify-between px-6 md:px-8 h-16 bg-white/95 dark:bg-[#1E1E1E]/95 border-b border-[#E6E4E9] dark:border-[#273244] backdrop-blur-md transition-colors duration-200">
       {/* Left side: Current page title & contextual subtitle */}
       <div className="flex flex-col justify-center min-w-0 pr-4">
         <h1 className="text-base font-bold tracking-tight text-[#242424] dark:text-[#F8FAFC] truncate">
@@ -115,7 +115,7 @@ export function Topbar() {
         <NotificationDropdown />
 
         {/* Subtle Divider */}
-        <div className="h-5 w-[1px] bg-[#E6E4E9] dark:bg-[#273244] shrink-0" />
+        <div className="h-5 w-[1px] bg-[#E6E4E9] dark:bg-[#1E1E1E] shrink-0" />
 
         {/* Admin Profile */}
         <ProfileDropdown />

@@ -27,7 +27,7 @@ export function Testimonials() {
   };
 
   return (
-    <section className="bg-white dark:bg-[#05090D] py-14 sm:py-18 text-neutral-900 dark:text-white transition-colors duration-300">
+    <section className="bg-white dark:bg-[#1E1E1E] py-14 sm:py-18 text-neutral-900 dark:text-white transition-colors duration-300">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
@@ -57,7 +57,7 @@ export function Testimonials() {
                 <button
                   type="button"
                   onClick={() => scroll("left")}
-                  className="h-8 w-8 rounded-full border border-black/10 dark:border-white/15 bg-neutral-100 hover:bg-neutral-200 dark:bg-[#0D151D] dark:hover:bg-[#111B24] flex items-center justify-center text-neutral-800 dark:text-white transition-colors cursor-pointer"
+                  className="h-8 w-8 rounded-full border border-black/10 dark:border-white/15 bg-neutral-100 hover:bg-neutral-200 dark:bg-[#1E1E1E] dark:hover:bg-[#111B24] flex items-center justify-center text-neutral-800 dark:text-white transition-colors cursor-pointer"
                   aria-label="Previous reviews"
                 >
                   <ChevronLeft className="h-4 w-4" />
@@ -65,7 +65,7 @@ export function Testimonials() {
                 <button
                   type="button"
                   onClick={() => scroll("right")}
-                  className="h-8 w-8 rounded-full border border-black/10 dark:border-white/15 bg-neutral-100 hover:bg-neutral-200 dark:bg-[#0D151D] dark:hover:bg-[#111B24] flex items-center justify-center text-neutral-800 dark:text-white transition-colors cursor-pointer"
+                  className="h-8 w-8 rounded-full border border-black/10 dark:border-white/15 bg-neutral-100 hover:bg-neutral-200 dark:bg-[#1E1E1E] dark:hover:bg-[#111B24] flex items-center justify-center text-neutral-800 dark:text-white transition-colors cursor-pointer"
                   aria-label="Next reviews"
                 >
                   <ChevronRight className="h-4 w-4" />
@@ -81,7 +81,7 @@ export function Testimonials() {
             {[1, 2, 3].map((i) => (
               <div
                 key={i}
-                className="rounded-2xl bg-neutral-50 dark:bg-[#0D151D] border border-black/10 dark:border-white/10 p-5 sm:p-6 space-y-4 animate-pulse"
+                className="rounded-2xl bg-neutral-50 dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 p-5 sm:p-6 space-y-4 animate-pulse"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -106,7 +106,7 @@ export function Testimonials() {
 
         {/* Empty State */}
         {!isLoading && (reviews.length === 0 || isError) && (
-          <div className="rounded-2xl bg-neutral-50/50 dark:bg-[#0D151D]/60 border border-dashed border-black/15 dark:border-white/15 p-8 sm:p-12 text-center flex flex-col items-center justify-center">
+          <div className="rounded-2xl bg-neutral-50/50 dark:bg-[#1E1E1E]/60 border border-dashed border-black/15 dark:border-white/15 p-8 sm:p-12 text-center flex flex-col items-center justify-center">
             <div className="h-12 w-12 rounded-2xl bg-primary/10 text-primary dark:bg-white/10 dark:text-white flex items-center justify-center mb-4">
               <MessageSquareQuote className="h-6 w-6" />
             </div>
@@ -138,7 +138,7 @@ export function Testimonials() {
               return (
                 <div
                   key={r.id}
-                  className="rounded-2xl bg-neutral-50 dark:bg-[#0D151D] border border-black/10 dark:border-white/10 p-5 sm:p-6 flex flex-col justify-between space-y-4 shadow-md hover:border-black/20 dark:hover:border-white/20 transition-all text-left"
+                  className="rounded-2xl bg-neutral-50 dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 p-5 sm:p-6 flex flex-col justify-between space-y-4 shadow-md hover:border-black/20 dark:hover:border-white/20 transition-all text-left"
                 >
                   {/* User Header with Rating */}
                   <div className="flex items-start justify-between gap-3">

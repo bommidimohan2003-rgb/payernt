@@ -70,7 +70,7 @@ export const SecurityStickerModal: React.FC<SecurityStickerModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto">
       <div
-        className="w-full max-w-3xl bg-white dark:bg-[#0D151D] border border-neutral-200 dark:border-white/10 rounded-3xl p-5 sm:p-7 shadow-2xl space-y-6 my-auto"
+        className="w-full max-w-3xl bg-white dark:bg-[#1E1E1E] border border-neutral-200 dark:border-white/10 rounded-3xl p-5 sm:p-7 shadow-2xl space-y-6 my-auto"
         role="dialog"
         aria-modal="true"
         aria-labelledby="sticker-modal-title"
@@ -101,7 +101,7 @@ export const SecurityStickerModal: React.FC<SecurityStickerModalProps> = ({
         </div>
 
         {/* View Switcher Tabs */}
-        <div className="flex items-center p-1 rounded-2xl bg-neutral-100 dark:bg-[#131E2A] border border-neutral-200 dark:border-white/5 w-fit">
+        <div className="flex items-center p-1 rounded-2xl bg-neutral-100 dark:bg-[#1E1E1E] border border-neutral-200 dark:border-white/5 w-fit">
           <button
             type="button"
             onClick={() => setActiveView("sticker")}
@@ -258,7 +258,7 @@ export const SecurityStickerModal: React.FC<SecurityStickerModalProps> = ({
           <div className="space-y-5">
             <div className="flex flex-col md:flex-row items-center gap-6 p-6 rounded-3xl bg-neutral-50 dark:bg-black/40 border border-neutral-200 dark:border-white/10">
               {/* Interactive Laptop Bottom Panel Illustration */}
-              <div className="relative w-full max-w-sm aspect-[16/10] bg-neutral-200 dark:bg-[#131E2A] rounded-2xl border-2 border-neutral-300 dark:border-white/15 p-4 flex flex-col justify-between shadow-inner">
+              <div className="relative w-full max-w-sm aspect-[16/10] bg-neutral-200 dark:bg-[#1E1E1E] rounded-2xl border-2 border-neutral-300 dark:border-white/15 p-4 flex flex-col justify-between shadow-inner">
                 {/* Rubber feet indicators */}
                 <div className="flex justify-between">
                   <div className="w-8 h-2 rounded-full bg-neutral-400 dark:bg-neutral-600" />

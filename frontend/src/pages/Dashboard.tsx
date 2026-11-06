@@ -252,7 +252,7 @@ export default function Dashboard() {
         <BackButton fallback="/categories" className="mb-4" />
 
         {/* 1. WELCOME & COMMAND HEADER */}
-        <div className="rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#10151B] p-6 sm:p-8 shadow-sm">
+        <div className="rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#1E1E1E] p-6 sm:p-8 shadow-sm">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="flex items-center gap-4">
               <ProfilePhoto
@@ -317,7 +317,7 @@ export default function Dashboard() {
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="p-5 rounded-2xl bg-white dark:bg-[#10151B] border border-black/10 dark:border-[#A1A1AA]/20 shadow-sm"
+            className="p-5 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-black/10 dark:border-[#A1A1AA]/20 shadow-sm"
           >
             <div className="h-10 w-10 rounded-xl grid place-items-center bg-neutral-100 dark:bg-white/[0.05] text-neutral-700 dark:text-[#A1A1AA] border border-black/5 dark:border-white/5 mb-3">
               <Package className="h-5 w-5" />
@@ -334,7 +334,7 @@ export default function Dashboard() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.05 }}
-            className="p-5 rounded-2xl bg-white dark:bg-[#10151B] border border-black/10 dark:border-[#A1A1AA]/20 shadow-sm"
+            className="p-5 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-black/10 dark:border-[#A1A1AA]/20 shadow-sm"
           >
             <div className="h-10 w-10 rounded-xl grid place-items-center bg-neutral-100 dark:bg-white/[0.05] text-neutral-700 dark:text-[#A1A1AA] border border-black/5 dark:border-white/5 mb-3">
               <TrendingUp className="h-5 w-5" />
@@ -351,7 +351,7 @@ export default function Dashboard() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="p-5 rounded-2xl bg-white dark:bg-[#10151B] border border-black/10 dark:border-[#A1A1AA]/20 shadow-sm"
+            className="p-5 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-black/10 dark:border-[#A1A1AA]/20 shadow-sm"
           >
             <div className="h-10 w-10 rounded-xl grid place-items-center bg-neutral-100 dark:bg-white/[0.05] text-neutral-700 dark:text-[#A1A1AA] border border-black/5 dark:border-white/5 mb-3">
               <Heart className="h-5 w-5" />
@@ -368,7 +368,7 @@ export default function Dashboard() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 }}
-            className="p-5 rounded-2xl bg-white dark:bg-[#10151B] border border-black/10 dark:border-[#A1A1AA]/20 shadow-sm"
+            className="p-5 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-black/10 dark:border-[#A1A1AA]/20 shadow-sm"
           >
             <div className="h-10 w-10 rounded-xl grid place-items-center bg-neutral-100 dark:bg-white/[0.05] text-neutral-700 dark:text-[#A1A1AA] border border-black/5 dark:border-white/5 mb-3">
               <Bell className="h-5 w-5" />
@@ -386,7 +386,7 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* LEFT 8 COLS: ACTIVE RENTALS & RECENT ORDERS */}
           <div className="lg:col-span-8 space-y-6">
-            <div className="rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#10151B] p-6 shadow-sm">
+            <div className="rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#1E1E1E] p-6 shadow-sm">
               <div className="flex items-center justify-between pb-4 border-b border-black/5 dark:border-white/5">
                 <div>
                   <h2 className="text-base font-bold text-neutral-950 dark:text-[#F5F5F5]">
@@ -434,7 +434,7 @@ export default function Dashboard() {
                   {orders.slice(0, 5).map((o) => (
                     <div
                       key={o.id}
-                      className="flex flex-col gap-4 p-4 rounded-2xl border border-black/5 dark:border-[#A1A1AA]/15 bg-neutral-50/50 dark:bg-[#050709]/60 hover:bg-neutral-100/60 dark:hover:border-[#A1A1AA]/30 transition-all"
+                      className="flex flex-col gap-4 p-4 rounded-2xl border border-black/5 dark:border-[#A1A1AA]/15 bg-neutral-50/50 dark:bg-[#1E1E1E]/60 hover:bg-neutral-100/60 dark:hover:border-[#A1A1AA]/30 transition-all"
                     >
                       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                         <div className="flex items-center gap-3.5 min-w-0">
@@ -577,7 +577,7 @@ export default function Dashboard() {
           {/* RIGHT 4 COLS: PROFILE COMPLETION + MESSAGES + WISHLIST */}
           <div className="lg:col-span-4 space-y-6">
             {/* Profile Completeness Card */}
-            <div className="rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#10151B] p-6 shadow-sm space-y-4">
+            <div className="rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#1E1E1E] p-6 shadow-sm space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <User className="w-4 h-4 text-[#A1A1AA]" />
@@ -629,7 +629,7 @@ export default function Dashboard() {
             </div>
 
             {/* Messages & Owner Inquiries Widget */}
-            <div className="rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#10151B] p-6 shadow-sm space-y-4">
+            <div className="rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#1E1E1E] p-6 shadow-sm space-y-4">
               <div className="flex items-center justify-between pb-3 border-b border-black/5 dark:border-white/5">
                 <div className="flex items-center gap-2">
                   <MessageSquare className="w-4 h-4 text-[#A1A1AA]" />
@@ -659,7 +659,7 @@ export default function Dashboard() {
             </div>
 
             {/* Wishlist Preview */}
-            <div className="rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#10151B] p-6 shadow-sm space-y-4">
+            <div className="rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#1E1E1E] p-6 shadow-sm space-y-4">
               <div className="flex items-center justify-between pb-3 border-b border-black/5 dark:border-white/5">
                 <div className="flex items-center gap-2">
                   <Heart className="w-4 h-4 text-[#A1A1AA]" />

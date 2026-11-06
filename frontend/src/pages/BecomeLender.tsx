@@ -598,7 +598,7 @@ export default function BecomeLender() {
                                   className={`relative p-3 rounded-2xl border text-left cursor-pointer transition-all duration-200 flex flex-col justify-between gap-2 overflow-hidden ${
                                     isSelected
                                       ? "border-primary bg-primary/10 ring-2 ring-primary/40 shadow-md scale-[1.01]"
-                                      : "border-border/80 bg-card/60 dark:bg-zinc-900/60 hover:border-primary/40 hover:bg-card/90 shadow-sm"
+                                      : "border-border/80 bg-card/60 dark:bg-[#1E1E1E]/60 hover:border-primary/40 hover:bg-card/90 shadow-sm"
                                   }`}
                                 >
                                   <div className="flex items-center justify-between w-full">
@@ -654,7 +654,7 @@ export default function BecomeLender() {
                           </div>
 
                           {/* Rich Textarea Box */}
-                          <div className="relative rounded-2xl border border-border/80 bg-card/60 dark:bg-zinc-900/60 p-1 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/30 transition-all shadow-sm">
+                          <div className="relative rounded-2xl border border-border/80 bg-card/60 dark:bg-[#1E1E1E]/60 p-1 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/30 transition-all shadow-sm">
                             <textarea
                               value={description}
                               onChange={(e) => setDescription(e.target.value)}

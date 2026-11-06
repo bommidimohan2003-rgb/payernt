@@ -36,7 +36,7 @@ export function BackButton({
       type="button"
       onClick={handleClick}
       className={cn(
-        "group inline-flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-semibold text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-full bg-white dark:bg-[#0D151D] border border-black/10 dark:border-white/10 shadow-xs hover:border-black/20 dark:hover:border-white/20 transition-all cursor-pointer active:scale-95 shrink-0 select-none",
+        "group inline-flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-semibold text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-full bg-white dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 shadow-xs hover:border-black/20 dark:hover:border-white/20 transition-all cursor-pointer active:scale-95 shrink-0 select-none",
         className
       )}
       aria-label="Go back to previous page"

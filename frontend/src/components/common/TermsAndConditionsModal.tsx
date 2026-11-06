@@ -52,11 +52,11 @@ export function TermsAndConditionsModal({
             animate={{ scale: 1, y: 0, opacity: 1 }}
             exit={{ scale: 0.92, y: 12, opacity: 0 }}
             transition={{ type: "spring", damping: 25, stiffness: 350 }}
-            className="relative w-full max-w-xl bg-white dark:bg-[#0D151D] border border-black/10 dark:border-white/10 rounded-3xl shadow-2xl z-10 overflow-hidden my-auto flex flex-col max-h-[85vh]"
+            className="relative w-full max-w-xl bg-white dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 rounded-3xl shadow-2xl z-10 overflow-hidden my-auto flex flex-col max-h-[85vh]"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-center justify-between p-5 sm:p-6 border-b border-black/5 dark:border-white/10 bg-neutral-50/80 dark:bg-[#090F16]/80">
+            <div className="flex items-center justify-between p-5 sm:p-6 border-b border-black/5 dark:border-white/10 bg-neutral-50/80 dark:bg-[#1E1E1E]/80">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-500/20">
                   <ShieldCheck className="h-5 w-5" />
@@ -98,7 +98,7 @@ export function TermsAndConditionsModal({
               )}
 
               {/* Condition 1 */}
-              <div className="p-4 rounded-2xl bg-neutral-100/70 dark:bg-[#121C26] border border-black/5 dark:border-white/10 space-y-1.5">
+              <div className="p-4 rounded-2xl bg-neutral-100/70 dark:bg-[#1E1E1E] border border-black/5 dark:border-white/10 space-y-1.5">
                 <div className="flex items-center gap-2 font-bold text-neutral-900 dark:text-white text-xs sm:text-sm">
                   <span className="h-5 w-5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-xs font-bold shrink-0">
                     1
@@ -111,7 +111,7 @@ export function TermsAndConditionsModal({
               </div>
 
               {/* Condition 2 */}
-              <div className="p-4 rounded-2xl bg-neutral-100/70 dark:bg-[#121C26] border border-black/5 dark:border-white/10 space-y-1.5">
+              <div className="p-4 rounded-2xl bg-neutral-100/70 dark:bg-[#1E1E1E] border border-black/5 dark:border-white/10 space-y-1.5">
                 <div className="flex items-center gap-2 font-bold text-neutral-900 dark:text-white text-xs sm:text-sm">
                   <span className="h-5 w-5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-xs font-bold shrink-0">
                     2
@@ -124,7 +124,7 @@ export function TermsAndConditionsModal({
               </div>
 
               {/* Condition 3 */}
-              <div className="p-4 rounded-2xl bg-neutral-100/70 dark:bg-[#121C26] border border-black/5 dark:border-white/10 space-y-1.5">
+              <div className="p-4 rounded-2xl bg-neutral-100/70 dark:bg-[#1E1E1E] border border-black/5 dark:border-white/10 space-y-1.5">
                 <div className="flex items-center gap-2 font-bold text-neutral-900 dark:text-white text-xs sm:text-sm">
                   <span className="h-5 w-5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-xs font-bold shrink-0">
                     3

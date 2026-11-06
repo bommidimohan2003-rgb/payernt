@@ -167,7 +167,7 @@ export function Categories() {
   }, []);
 
   return (
-    <section className="relative overflow-hidden bg-neutral-50/50 dark:bg-[#05090D] py-8 sm:py-12 lg:py-14 text-neutral-900 dark:text-white transition-colors duration-300">
+    <section className="relative overflow-hidden bg-neutral-50/50 dark:bg-[#1E1E1E] py-8 sm:py-12 lg:py-14 text-neutral-900 dark:text-white transition-colors duration-300">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-6 sm:mb-8">

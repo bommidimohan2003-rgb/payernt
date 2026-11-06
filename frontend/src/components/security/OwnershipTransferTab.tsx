@@ -83,7 +83,7 @@ export const OwnershipTransferTab: React.FC<OwnershipTransferTabProps> = ({ onRe
             </h4>
 
             {transfers.incoming.length === 0 ? (
-              <div className="p-5 rounded-2xl bg-neutral-50 dark:bg-[#131E2A]/50 border border-neutral-200/60 dark:border-white/5 text-center text-xs text-neutral-400">
+              <div className="p-5 rounded-2xl bg-neutral-50 dark:bg-[#1E1E1E]/50 border border-neutral-200/60 dark:border-white/5 text-center text-xs text-neutral-400">
                 No incoming transfer requests at this time.
               </div>
             ) : (
@@ -91,7 +91,7 @@ export const OwnershipTransferTab: React.FC<OwnershipTransferTabProps> = ({ onRe
                 {transfers.incoming.map((t) => (
                   <div
                     key={t.id}
-                    className="p-4 rounded-2xl bg-white dark:bg-[#0D151D] border border-sky-500/30 shadow-sm space-y-3"
+                    className="p-4 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-sky-500/30 shadow-sm space-y-3"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-2.5">
@@ -137,7 +137,7 @@ export const OwnershipTransferTab: React.FC<OwnershipTransferTabProps> = ({ onRe
             </h4>
 
             {transfers.outgoing.length === 0 ? (
-              <div className="p-5 rounded-2xl bg-neutral-50 dark:bg-[#131E2A]/50 border border-neutral-200/60 dark:border-white/5 text-center text-xs text-neutral-400">
+              <div className="p-5 rounded-2xl bg-neutral-50 dark:bg-[#1E1E1E]/50 border border-neutral-200/60 dark:border-white/5 text-center text-xs text-neutral-400">
                 No active outgoing transfer requests.
               </div>
             ) : (
@@ -145,7 +145,7 @@ export const OwnershipTransferTab: React.FC<OwnershipTransferTabProps> = ({ onRe
                 {transfers.outgoing.map((t) => (
                   <div
                     key={t.id}
-                    className="p-4 rounded-2xl bg-white dark:bg-[#0D151D] border border-neutral-200 dark:border-white/10 shadow-sm space-y-3"
+                    className="p-4 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-neutral-200 dark:border-white/10 shadow-sm space-y-3"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-2.5">

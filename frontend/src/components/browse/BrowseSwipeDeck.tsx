@@ -485,7 +485,7 @@ export function BrowseSwipeDeck({
               opacity: thirdOpacity,
               zIndex: 1,
             }}
-            className="absolute inset-x-4 sm:inset-x-5 top-5 bottom-0 rounded-[24px] bg-white/40 dark:bg-[#090F15]/40 border border-black/5 dark:border-white/5 pointer-events-none shadow-sm overflow-hidden will-change-transform"
+            className="absolute inset-x-4 sm:inset-x-5 top-5 bottom-0 rounded-[24px] bg-white/40 dark:bg-[#1E1E1E]/40 border border-black/5 dark:border-white/5 pointer-events-none shadow-sm overflow-hidden will-change-transform"
           >
             <div className="absolute inset-0 w-full h-full overflow-hidden">
               <img
@@ -514,7 +514,7 @@ export function BrowseSwipeDeck({
               opacity: nextOpacity,
               zIndex: 2,
             }}
-            className="absolute inset-x-2 sm:inset-x-2.5 top-2.5 bottom-0 rounded-[24px] bg-white/80 dark:bg-[#0B121A]/80 border border-black/10 dark:border-white/10 pointer-events-none shadow-md overflow-hidden will-change-transform"
+            className="absolute inset-x-2 sm:inset-x-2.5 top-2.5 bottom-0 rounded-[24px] bg-white/80 dark:bg-[#1E1E1E]/80 border border-black/10 dark:border-white/10 pointer-events-none shadow-md overflow-hidden will-change-transform"
           >
             {getProductPrimaryImage(nextProduct) ? (
               <div className="absolute inset-0 w-full h-full overflow-hidden">

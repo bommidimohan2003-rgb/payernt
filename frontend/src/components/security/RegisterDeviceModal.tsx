@@ -78,7 +78,7 @@ export const RegisterDeviceModal: React.FC<RegisterDeviceModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto">
       <div
-        className="w-full max-w-lg bg-white dark:bg-[#0D151D] border border-neutral-200 dark:border-white/10 rounded-3xl p-6 sm:p-7 shadow-2xl space-y-5 my-auto"
+        className="w-full max-w-lg bg-white dark:bg-[#1E1E1E] border border-neutral-200 dark:border-white/10 rounded-3xl p-6 sm:p-7 shadow-2xl space-y-5 my-auto"
         role="dialog"
         aria-modal="true"
         aria-labelledby="register-device-title"
@@ -124,7 +124,7 @@ export const RegisterDeviceModal: React.FC<RegisterDeviceModalProps> = ({
               value={deviceName}
               onChange={(e) => setDeviceName(e.target.value)}
               placeholder='e.g. MacBook Pro 16" M3 Max'
-              className="w-full h-10 px-3.5 text-xs bg-neutral-50 dark:bg-[#131E2A] border border-neutral-300 dark:border-white/10 rounded-xl text-neutral-900 dark:text-white"
+              className="w-full h-10 px-3.5 text-xs bg-neutral-50 dark:bg-[#1E1E1E] border border-neutral-300 dark:border-white/10 rounded-xl text-neutral-900 dark:text-white"
             />
           </div>
 
@@ -136,7 +136,7 @@ export const RegisterDeviceModal: React.FC<RegisterDeviceModalProps> = ({
               <select
                 value={brand}
                 onChange={(e) => setBrand(e.target.value)}
-                className="w-full h-10 px-3 text-xs bg-neutral-50 dark:bg-[#131E2A] border border-neutral-300 dark:border-white/10 rounded-xl text-neutral-900 dark:text-white"
+                className="w-full h-10 px-3 text-xs bg-neutral-50 dark:bg-[#1E1E1E] border border-neutral-300 dark:border-white/10 rounded-xl text-neutral-900 dark:text-white"
               >
                 <option value="Apple">Apple</option>
                 <option value="Dell">Dell</option>
@@ -159,7 +159,7 @@ export const RegisterDeviceModal: React.FC<RegisterDeviceModalProps> = ({
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
                 placeholder="e.g. XPS 9530 / A2991"
-                className="w-full h-10 px-3 text-xs bg-neutral-50 dark:bg-[#131E2A] border border-neutral-300 dark:border-white/10 rounded-xl text-neutral-900 dark:text-white"
+                className="w-full h-10 px-3 text-xs bg-neutral-50 dark:bg-[#1E1E1E] border border-neutral-300 dark:border-white/10 rounded-xl text-neutral-900 dark:text-white"
               />
             </div>
           </div>
@@ -174,7 +174,7 @@ export const RegisterDeviceModal: React.FC<RegisterDeviceModalProps> = ({
                 value={serialNumber}
                 onChange={(e) => setSerialNumber(e.target.value)}
                 placeholder="e.g. C02G1234MD6R"
-                className="w-full h-10 px-3 text-xs bg-neutral-50 dark:bg-[#131E2A] border border-neutral-300 dark:border-white/10 rounded-xl text-neutral-900 dark:text-white font-mono"
+                className="w-full h-10 px-3 text-xs bg-neutral-50 dark:bg-[#1E1E1E] border border-neutral-300 dark:border-white/10 rounded-xl text-neutral-900 dark:text-white font-mono"
               />
             </div>
             <div>
@@ -184,7 +184,7 @@ export const RegisterDeviceModal: React.FC<RegisterDeviceModalProps> = ({
               <select
                 value={deviceType}
                 onChange={(e) => setDeviceType(e.target.value)}
-                className="w-full h-10 px-3 text-xs bg-neutral-50 dark:bg-[#131E2A] border border-neutral-300 dark:border-white/10 rounded-xl text-neutral-900 dark:text-white"
+                className="w-full h-10 px-3 text-xs bg-neutral-50 dark:bg-[#1E1E1E] border border-neutral-300 dark:border-white/10 rounded-xl text-neutral-900 dark:text-white"
               >
                 <option value="LAPTOP">Laptop</option>
                 <option value="MACBOOK">MacBook</option>
@@ -204,11 +204,11 @@ export const RegisterDeviceModal: React.FC<RegisterDeviceModalProps> = ({
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="e.g. Positioned over central bottom-panel chassis screw head."
-              className="w-full p-2.5 text-xs bg-neutral-50 dark:bg-[#131E2A] border border-neutral-300 dark:border-white/10 rounded-xl text-neutral-900 dark:text-white"
+              className="w-full p-2.5 text-xs bg-neutral-50 dark:bg-[#1E1E1E] border border-neutral-300 dark:border-white/10 rounded-xl text-neutral-900 dark:text-white"
             />
           </div>
 
-          <div className="flex items-center gap-2 p-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-900/50 text-[11px] text-neutral-500 dark:text-neutral-400 border border-neutral-200/60 dark:border-white/5">
+          <div className="flex items-center gap-2 p-2.5 rounded-xl bg-neutral-50 dark:bg-[#1E1E1E]/50 text-[11px] text-neutral-500 dark:text-neutral-400 border border-neutral-200/60 dark:border-white/5">
             <ShieldCheck className="h-4 w-4 text-emerald-500 shrink-0" />
             <span>Generates a unique cryptographic Security ID and tamper sticker.</span>
           </div>

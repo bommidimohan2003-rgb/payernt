@@ -1184,14 +1184,14 @@ const productSchema = product ? {
   if (productLoading && !product) {
     return (
       <MainLayout>
-        <div className="min-h-screen bg-[#FAFBF9] dark:bg-[#070C12] text-neutral-900 dark:text-neutral-100">
+        <div className="min-h-screen bg-[#FAFBF9] dark:bg-[#1E1E1E] text-neutral-900 dark:text-neutral-100">
           <div className="mx-auto max-w-7xl px-4 md:px-6 py-6 space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start w-full min-w-0">
               <div className="lg:col-span-6 space-y-3 min-w-0 w-full">
-                <div className="aspect-[4/3] w-full rounded-3xl bg-neutral-200/60 dark:bg-[#0D151D] animate-pulse border border-black/10 dark:border-white/10" />
+                <div className="aspect-[4/3] w-full rounded-3xl bg-neutral-200/60 dark:bg-[#1E1E1E] animate-pulse border border-black/10 dark:border-white/10" />
               </div>
               <div className="lg:col-span-6 space-y-4 min-w-0 w-full">
-                <div className="h-96 w-full rounded-3xl bg-neutral-200/60 dark:bg-[#0D151D] animate-pulse border border-black/10 dark:border-white/10 p-5 space-y-4" />
+                <div className="h-96 w-full rounded-3xl bg-neutral-200/60 dark:bg-[#1E1E1E] animate-pulse border border-black/10 dark:border-white/10 p-5 space-y-4" />
               </div>
             </div>
           </div>
@@ -1223,7 +1223,7 @@ const productSchema = product ? {
       <JsonLd schema={productSchema} />
       <JsonLd schema={breadcrumbSchema} />
 
-      <div className="min-h-screen bg-[#FAFBF9] dark:bg-[#070C12] text-neutral-900 dark:text-neutral-100 pb-24 transition-colors duration-300 selection:bg-emerald-500/20">
+      <div className="min-h-screen bg-[#FAFBF9] dark:bg-[#1E1E1E] text-neutral-900 dark:text-neutral-100 pb-24 transition-colors duration-300 selection:bg-emerald-500/20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 space-y-8">
 
           {/* Back Navigation Bar & Category Breadcrumb */}
@@ -1237,7 +1237,7 @@ const productSchema = product ? {
                   navigate({ to: "/categories" });
                 }
               }}
-              className="group inline-flex items-center gap-2 text-xs sm:text-sm font-semibold text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white px-3.5 py-1.5 sm:py-2 rounded-full bg-white dark:bg-[#0D151D] border border-black/10 dark:border-white/10 shadow-xs hover:border-black/20 dark:hover:border-white/20 transition-all cursor-pointer active:scale-95"
+              className="group inline-flex items-center gap-2 text-xs sm:text-sm font-semibold text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white px-3.5 py-1.5 sm:py-2 rounded-full bg-white dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 shadow-xs hover:border-black/20 dark:hover:border-white/20 transition-all cursor-pointer active:scale-95"
               aria-label="Go back to previous page"
             >
               <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1 text-neutral-600 dark:text-neutral-400 group-hover:text-neutral-950 dark:group-hover:text-white" />
@@ -1492,7 +1492,7 @@ const productSchema = product ? {
 
             {/* 2. Check Availability & Rental Booking Section (Mobile/Tablet: 1st after gallery (order-2), Desktop: Right Column Sticky) */}
             <div id="rental-booking-section" className="order-2 lg:order-3 lg:col-span-6 lg:col-start-7 lg:row-start-1 lg:row-span-2 space-y-4 text-left lg:sticky lg:top-24 min-w-0 w-full">
-              <div className="rounded-2xl sm:rounded-3xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#0D151D] p-4 sm:p-5 shadow-xs space-y-3.5">
+              <div className="rounded-2xl sm:rounded-3xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#1E1E1E] p-4 sm:p-5 shadow-xs space-y-3.5">
                 <div className="flex items-center justify-between pb-1 flex-wrap gap-2.5">
                   <div className="flex items-center gap-2">
                     <div className="h-8 w-8 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
@@ -1513,7 +1513,7 @@ const productSchema = product ? {
                   <button
                     type="button"
                     onClick={() => setShowFullCalendar((prev) => !prev)}
-                    className="w-full p-2.5 sm:p-3 rounded-xl border border-black/10 dark:border-white/10 bg-neutral-100/70 dark:bg-[#121C26] hover:bg-neutral-100 dark:hover:bg-[#162330] transition-all flex items-center justify-between cursor-pointer group"
+                    className="w-full p-2.5 sm:p-3 rounded-xl border border-black/10 dark:border-white/10 bg-neutral-100/70 dark:bg-[#1E1E1E] hover:bg-neutral-100 dark:hover:bg-[#162330] transition-all flex items-center justify-between cursor-pointer group"
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
                       <div className="h-8 w-8 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
@@ -1584,7 +1584,7 @@ const productSchema = product ? {
                       className={`p-1.5 xs:p-2 sm:p-2.5 rounded-xl border text-left transition-all cursor-pointer min-w-0 flex flex-col justify-between ${
                         selectedSlot === "morning" && durationMode === "half_day_morning"
                           ? "border-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 ring-2 ring-emerald-500/20 shadow-xs"
-                          : "border-black/10 dark:border-white/10 bg-neutral-100/60 dark:bg-[#121C26] hover:bg-neutral-100 dark:hover:bg-[#162330]"
+                          : "border-black/10 dark:border-white/10 bg-neutral-100/60 dark:bg-[#1E1E1E] hover:bg-neutral-100 dark:hover:bg-[#162330]"
                       }`}
                     >
                       <div className="min-w-0">
@@ -1608,7 +1608,7 @@ const productSchema = product ? {
                       className={`p-1.5 xs:p-2 sm:p-2.5 rounded-xl border text-left transition-all cursor-pointer min-w-0 flex flex-col justify-between ${
                         selectedSlot === "afternoon" && durationMode === "half_day_afternoon"
                           ? "border-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 ring-2 ring-emerald-500/20 shadow-xs"
-                          : "border-black/10 dark:border-white/10 bg-neutral-100/60 dark:bg-[#121C26] hover:bg-neutral-100 dark:hover:bg-[#162330]"
+                          : "border-black/10 dark:border-white/10 bg-neutral-100/60 dark:bg-[#1E1E1E] hover:bg-neutral-100 dark:hover:bg-[#162330]"
                       }`}
                     >
                       <div className="min-w-0">
@@ -1632,7 +1632,7 @@ const productSchema = product ? {
                       className={`p-1.5 xs:p-2 sm:p-2.5 rounded-xl border text-left transition-all cursor-pointer min-w-0 flex flex-col justify-between ${
                         selectedSlot === "full_day" && durationMode === "full_day"
                           ? "border-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 ring-2 ring-emerald-500/20 shadow-xs"
-                          : "border-black/10 dark:border-white/10 bg-neutral-100/60 dark:bg-[#121C26] hover:bg-neutral-100 dark:hover:bg-[#162330]"
+                          : "border-black/10 dark:border-white/10 bg-neutral-100/60 dark:bg-[#1E1E1E] hover:bg-neutral-100 dark:hover:bg-[#162330]"
                       }`}
                     >
                       <div className="min-w-0">
@@ -1652,7 +1652,7 @@ const productSchema = product ? {
                 </div>
 
                 {/* Booking Summary */}
-                <div className="p-2.5 sm:p-3 rounded-xl bg-neutral-100/70 dark:bg-[#121C26] border border-black/10 dark:border-white/10 flex items-center justify-between gap-3">
+                <div className="p-2.5 sm:p-3 rounded-xl bg-neutral-100/70 dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 flex items-center justify-between gap-3">
                   <div>
                     <span className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                       Booking Summary
@@ -1858,7 +1858,7 @@ const productSchema = product ? {
 
             {/* 3. Product Details & Book Section (Mobile/Tablet: 2nd after check availability (order-3), Desktop: Left Column under Gallery (order-2)) */}
             <div className="order-3 lg:order-2 lg:col-span-6 lg:col-start-1 lg:row-start-2 min-w-0 w-full">
-              <div className="rounded-3xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#0D151D] p-5 sm:p-6 shadow-xs space-y-5 text-left">
+              <div className="rounded-3xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#1E1E1E] p-5 sm:p-6 shadow-xs space-y-5 text-left">
                 {/* 1. Product Description moved to top of this section */}
                 <p className="text-sm text-muted-foreground leading-relaxed">
                   {product.description ||
@@ -2162,7 +2162,7 @@ const productSchema = product ? {
                   return (
                     <div
                       key={rev.id}
-                      className="p-6 rounded-3xl bg-white dark:bg-[#0D151D] border border-black/10 dark:border-white/10 shadow-xs space-y-3.5 flex flex-col justify-between transition-all hover:border-emerald-500/40"
+                      className="p-6 rounded-3xl bg-white dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 shadow-xs space-y-3.5 flex flex-col justify-between transition-all hover:border-emerald-500/40"
                     >
                       <div className="space-y-3.5">
                         <div className="flex items-center justify-between gap-3">
@@ -2214,13 +2214,13 @@ const productSchema = product ? {
                 })}
               </div>
             ) : (
-              <div className="w-full rounded-3xl border border-black/10 dark:border-white/10 bg-white/80 dark:bg-[#0D151D]/90 backdrop-blur-sm p-8 sm:p-12 text-center flex flex-col items-center justify-center space-y-5 shadow-xs relative overflow-hidden">
+              <div className="w-full rounded-3xl border border-black/10 dark:border-white/10 bg-white/80 dark:bg-[#1E1E1E]/90 backdrop-blur-sm p-8 sm:p-12 text-center flex flex-col items-center justify-center space-y-5 shadow-xs relative overflow-hidden">
                 {/* Subtle emerald ambient aura */}
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-80 h-28 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
 
                 {/* Product Preview Card */}
                 {product && (
-                  <div className="flex items-center gap-3.5 px-4 py-2.5 rounded-2xl bg-neutral-100/80 dark:bg-[#121C26] border border-black/10 dark:border-white/10 backdrop-blur-md max-w-sm w-full text-left">
+                  <div className="flex items-center gap-3.5 px-4 py-2.5 rounded-2xl bg-neutral-100/80 dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 backdrop-blur-md max-w-sm w-full text-left">
                     <div className="h-12 w-12 flex items-center justify-center shrink-0">
                       <img
                         src={product.image || "/brand/payent-logo-icon.png"}

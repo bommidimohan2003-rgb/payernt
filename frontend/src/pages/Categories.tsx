@@ -436,11 +436,11 @@ export default function Categories() {
 
   return (
     <MainLayout>
-      <div className="bg-[#FAFBF9] dark:bg-[#070C12] text-neutral-900 dark:text-neutral-100 min-h-screen">
+      <div className="bg-[#FAFBF9] dark:bg-[#1E1E1E] text-neutral-900 dark:text-neutral-100 min-h-screen">
         {/* ================================================================= */}
         {/* TOP SEARCH & UTILITY BAR + CATEGORY SYMBOLS BAR                   */}
         {/* ================================================================= */}
-        <section className="bg-white/90 dark:bg-[#090F16]/90 backdrop-blur-md sticky top-0 z-30 pt-3.5 pb-3 transition-all">
+        <section className="bg-white/90 dark:bg-[#1E1E1E]/90 backdrop-blur-md sticky top-0 z-30 pt-3.5 pb-3 transition-all">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-3">
             {/* Back Button + Search Input + Location Badge + User Links */}
             <div className="flex items-center justify-between gap-3 sm:gap-4">
@@ -579,7 +579,7 @@ export default function Categories() {
               <button
                 type="button"
                 onClick={() => setIsSortOpen(!isSortOpen)}
-                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-[#0D151D] text-xs font-bold text-neutral-900 dark:text-white hover:bg-neutral-50 dark:hover:bg-neutral-800/60 cursor-pointer shadow-xs transition-colors"
+                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-[#1E1E1E] text-xs font-bold text-neutral-900 dark:text-white hover:bg-neutral-50 dark:hover:bg-neutral-800/60 cursor-pointer shadow-xs transition-colors"
               >
                 <ArrowUpDown className="h-3.5 w-3.5 text-neutral-500" />
                 <span>
@@ -598,7 +598,7 @@ export default function Categories() {
               </button>
 
               {isSortOpen && (
-                <div className="absolute right-0 mt-2 w-48 rounded-2xl bg-white dark:bg-[#111A22] border border-neutral-200 dark:border-neutral-750 shadow-xl p-1.5 z-40">
+                <div className="absolute right-0 mt-2 w-48 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-neutral-200 dark:border-neutral-750 shadow-xl p-1.5 z-40">
                   {[
                     { id: "featured", label: "Recommended" },
                     { id: "newest", label: "Newest" },
@@ -635,7 +635,7 @@ export default function Categories() {
               {Array.from({ length: 8 }).map((_, i) => (
                 <div
                   key={i}
-                  className="rounded-3xl bg-white dark:bg-[#0D151D] border border-neutral-200 dark:border-neutral-800 p-4 space-y-3 animate-pulse"
+                  className="rounded-3xl bg-white dark:bg-[#1E1E1E] border border-neutral-200 dark:border-neutral-800 p-4 space-y-3 animate-pulse"
                 >
                   <div className="aspect-[4/3] rounded-2xl bg-neutral-200 dark:bg-neutral-800" />
                   <div className="h-4 bg-neutral-200 dark:bg-neutral-800 rounded w-3/4" />
@@ -645,7 +645,7 @@ export default function Categories() {
               ))}
             </div>
           ) : filteredProducts.length === 0 ? (
-            <div className="text-center py-16 px-4 rounded-3xl border border-dashed border-neutral-300 dark:border-neutral-800 bg-white dark:bg-[#0D151D]">
+            <div className="text-center py-16 px-4 rounded-3xl border border-dashed border-neutral-300 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E]">
               <div className="h-12 w-12 rounded-2xl bg-neutral-100 dark:bg-white/5 mx-auto grid place-items-center text-neutral-400 mb-3">
                 <Camera className="h-6 w-6" />
               </div>

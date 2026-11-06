@@ -205,7 +205,7 @@ export function PayerntHome({
           <button
             type="button"
             onClick={() => onNavigate("wallet")}
-            className="p-4 rounded-2xl bg-white dark:bg-[#10141d] border border-neutral-200/90 dark:border-white/[0.08] shadow-xs dark:shadow-md flex flex-col justify-between text-left transition-all active:scale-[0.98] cursor-pointer min-h-[102px] group"
+            className="p-4 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-neutral-200/90 dark:border-white/[0.08] shadow-xs dark:shadow-md flex flex-col justify-between text-left transition-all active:scale-[0.98] cursor-pointer min-h-[102px] group"
           >
             <div className="flex items-center justify-between w-full">
               <div className="flex items-center gap-2">
@@ -234,7 +234,7 @@ export function PayerntHome({
           <button
             type="button"
             onClick={() => onNavigate("analytics")}
-            className="p-4 rounded-2xl bg-white dark:bg-[#10141d] border border-neutral-200/90 dark:border-white/[0.08] shadow-xs dark:shadow-md flex flex-col justify-between text-left transition-all active:scale-[0.98] cursor-pointer min-h-[102px] group"
+            className="p-4 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-neutral-200/90 dark:border-white/[0.08] shadow-xs dark:shadow-md flex flex-col justify-between text-left transition-all active:scale-[0.98] cursor-pointer min-h-[102px] group"
           >
             <div className="flex items-center justify-between w-full">
               <div className="flex items-center gap-2">
@@ -263,7 +263,7 @@ export function PayerntHome({
           <button
             type="button"
             onClick={() => onNavigate("products")}
-            className="p-4 rounded-2xl bg-white dark:bg-[#10141d] border border-neutral-200/90 dark:border-white/[0.08] shadow-xs dark:shadow-md flex flex-col justify-between text-left transition-all active:scale-[0.98] cursor-pointer min-h-[102px] group"
+            className="p-4 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-neutral-200/90 dark:border-white/[0.08] shadow-xs dark:shadow-md flex flex-col justify-between text-left transition-all active:scale-[0.98] cursor-pointer min-h-[102px] group"
           >
             <div className="flex items-center justify-between w-full">
               <div className="flex items-center gap-2">
@@ -292,7 +292,7 @@ export function PayerntHome({
           <button
             type="button"
             onClick={() => onNavigate("requests")}
-            className="p-4 rounded-2xl bg-white dark:bg-[#10141d] border border-neutral-200/90 dark:border-white/[0.08] shadow-xs dark:shadow-md flex flex-col justify-between text-left transition-all active:scale-[0.98] cursor-pointer min-h-[102px] group"
+            className="p-4 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-neutral-200/90 dark:border-white/[0.08] shadow-xs dark:shadow-md flex flex-col justify-between text-left transition-all active:scale-[0.98] cursor-pointer min-h-[102px] group"
           >
             <div className="flex items-center justify-between w-full">
               <div className="flex items-center gap-2">
@@ -319,7 +319,7 @@ export function PayerntHome({
         </div>
 
         {/* Mobile Upcoming Bookings */}
-        <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#10141d] border border-neutral-200/90 dark:border-white/[0.08] shadow-xs dark:shadow-md">
+        <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-neutral-200/90 dark:border-white/[0.08] shadow-xs dark:shadow-md">
           <div className="flex items-center justify-between mb-3">
             <span className="text-sm font-bold text-neutral-900 dark:text-white font-display">
               Upcoming Bookings
@@ -375,7 +375,7 @@ export function PayerntHome({
 
 
         {/* Mobile Your Products */}
-        <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#10141d] border border-neutral-200/90 dark:border-white/[0.08] shadow-xs dark:shadow-md">
+        <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-neutral-200/90 dark:border-white/[0.08] shadow-xs dark:shadow-md">
           <div className="flex items-center justify-between mb-3">
             <span className="text-sm font-bold text-neutral-900 dark:text-white font-display">
               Your Products
@@ -450,7 +450,7 @@ export function PayerntHome({
         <button
           type="button"
           onClick={() => onNavigate("wallet")}
-          className="w-full p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#10141d] border border-neutral-200/90 dark:border-white/[0.08] shadow-xs dark:shadow-md flex items-center justify-between text-left transition-all active:scale-[0.99] cursor-pointer group"
+          className="w-full p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-neutral-200/90 dark:border-white/[0.08] shadow-xs dark:shadow-md flex items-center justify-between text-left transition-all active:scale-[0.99] cursor-pointer group"
         >
           <div>
             <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400">
@@ -478,7 +478,7 @@ export function PayerntHome({
             <button
               type="button"
               onClick={() => onNavigate("list")}
-              className="flex items-center gap-3 p-3 rounded-2xl bg-white dark:bg-[#10141d] border border-neutral-200/90 dark:border-white/[0.08] text-left hover:bg-neutral-50 dark:hover:bg-white/[0.04] shadow-xs active:scale-95 transition-all min-h-[50px] cursor-pointer"
+              className="flex items-center gap-3 p-3 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-neutral-200/90 dark:border-white/[0.08] text-left hover:bg-neutral-50 dark:hover:bg-white/[0.04] shadow-xs active:scale-95 transition-all min-h-[50px] cursor-pointer"
             >
               <div className="p-2 rounded-xl bg-neutral-900 text-white dark:bg-white dark:text-black shrink-0">
                 <Plus className="h-4 w-4 stroke-[2.5]" />
@@ -491,7 +491,7 @@ export function PayerntHome({
             <button
               type="button"
               onClick={() => onNavigate("requests")}
-              className="flex items-center gap-3 p-3 rounded-2xl bg-white dark:bg-[#10141d] border border-neutral-200/90 dark:border-white/[0.08] text-left hover:bg-neutral-50 dark:hover:bg-white/[0.04] shadow-xs active:scale-95 transition-all min-h-[50px] cursor-pointer"
+              className="flex items-center gap-3 p-3 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-neutral-200/90 dark:border-white/[0.08] text-left hover:bg-neutral-50 dark:hover:bg-white/[0.04] shadow-xs active:scale-95 transition-all min-h-[50px] cursor-pointer"
             >
               <div className="p-2 rounded-xl bg-neutral-100 text-neutral-800 dark:bg-white/[0.06] dark:text-neutral-200 shrink-0">
                 <Calendar className="h-4 w-4" />
@@ -504,7 +504,7 @@ export function PayerntHome({
             <button
               type="button"
               onClick={() => onNavigate("wallet")}
-              className="flex items-center gap-3 p-3 rounded-2xl bg-white dark:bg-[#10141d] border border-neutral-200/90 dark:border-white/[0.08] text-left hover:bg-neutral-50 dark:hover:bg-white/[0.04] shadow-xs active:scale-95 transition-all min-h-[50px] cursor-pointer"
+              className="flex items-center gap-3 p-3 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-neutral-200/90 dark:border-white/[0.08] text-left hover:bg-neutral-50 dark:hover:bg-white/[0.04] shadow-xs active:scale-95 transition-all min-h-[50px] cursor-pointer"
             >
               <div className="p-2 rounded-xl bg-neutral-100 text-neutral-800 dark:bg-white/[0.06] dark:text-neutral-200 shrink-0">
                 <Wallet className="h-4 w-4" />
@@ -517,7 +517,7 @@ export function PayerntHome({
             <button
               type="button"
               onClick={() => onNavigate("messages")}
-              className="flex items-center gap-3 p-3 rounded-2xl bg-white dark:bg-[#10141d] border border-neutral-200/90 dark:border-white/[0.08] text-left hover:bg-neutral-50 dark:hover:bg-white/[0.04] shadow-xs active:scale-95 transition-all min-h-[50px] cursor-pointer"
+              className="flex items-center gap-3 p-3 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-neutral-200/90 dark:border-white/[0.08] text-left hover:bg-neutral-50 dark:hover:bg-white/[0.04] shadow-xs active:scale-95 transition-all min-h-[50px] cursor-pointer"
             >
               <div className="p-2 rounded-xl bg-neutral-100 text-neutral-800 dark:bg-white/[0.06] dark:text-neutral-200 shrink-0">
                 <MessageSquare className="h-4 w-4" />
@@ -530,7 +530,7 @@ export function PayerntHome({
             <button
               type="button"
               onClick={() => onNavigate("analytics")}
-              className="col-span-2 flex items-center gap-3 p-3 rounded-2xl bg-white dark:bg-[#10141d] border border-neutral-200/90 dark:border-white/[0.08] text-left hover:bg-neutral-50 dark:hover:bg-white/[0.04] shadow-xs active:scale-95 transition-all min-h-[50px] cursor-pointer"
+              className="col-span-2 flex items-center gap-3 p-3 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-neutral-200/90 dark:border-white/[0.08] text-left hover:bg-neutral-50 dark:hover:bg-white/[0.04] shadow-xs active:scale-95 transition-all min-h-[50px] cursor-pointer"
             >
               <div className="p-2 rounded-xl bg-neutral-100 text-neutral-800 dark:bg-white/[0.06] dark:text-neutral-200 shrink-0">
                 <BarChart3 className="h-4 w-4" />
@@ -543,7 +543,7 @@ export function PayerntHome({
         </div>
 
         {/* Mobile Recent Activity */}
-        <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#10141d] border border-neutral-200/90 dark:border-white/[0.08] shadow-xs dark:shadow-md">
+        <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-neutral-200/90 dark:border-white/[0.08] shadow-xs dark:shadow-md">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-bold text-neutral-900 dark:text-white font-display">
               {tPayernt.recentActivity}
@@ -596,7 +596,7 @@ export function PayerntHome({
       {/* ========================================================= */}
       <div className="hidden lg:block w-full">
         {/* Main Outer Container Card */}
-        <div className="relative rounded-3xl bg-white dark:bg-[#0c0f16] border border-neutral-200/90 dark:border-white/[0.08] p-7 lg:p-9 shadow-xl dark:shadow-2xl overflow-hidden text-neutral-900 dark:text-white transition-colors duration-200">
+        <div className="relative rounded-3xl bg-white dark:bg-[#1E1E1E] border border-neutral-200/90 dark:border-white/[0.08] p-7 lg:p-9 shadow-xl dark:shadow-2xl overflow-hidden text-neutral-900 dark:text-white transition-colors duration-200">
           {/* Subtle Organic Gloss Wave Overlay */}
           <div className="absolute top-0 left-0 right-0 h-48 bg-gradient-to-b from-neutral-500/[0.03] dark:from-white/[0.04] to-transparent pointer-events-none" />
 
@@ -659,7 +659,7 @@ export function PayerntHome({
             <button
               type="button"
               onClick={() => onNavigate("wallet")}
-              className="group p-5 rounded-2xl bg-neutral-50/90 hover:bg-neutral-100/90 border-neutral-200/90 dark:bg-[#10141d]/90 dark:hover:bg-[#141924] dark:border-white/[0.07] border flex flex-col justify-between shadow-sm dark:shadow-lg text-left transition-all cursor-pointer"
+              className="group p-5 rounded-2xl bg-neutral-50/90 hover:bg-neutral-100/90 border-neutral-200/90 dark:bg-[#1E1E1E]/90 dark:hover:bg-[#141924] dark:border-white/[0.07] border flex flex-col justify-between shadow-sm dark:shadow-lg text-left transition-all cursor-pointer"
             >
               <div>
                 <div className="flex items-center justify-between w-full">
@@ -699,7 +699,7 @@ export function PayerntHome({
             <button
               type="button"
               onClick={() => onNavigate("analytics")}
-              className="group p-5 rounded-2xl bg-neutral-50/90 hover:bg-neutral-100/90 border-neutral-200/90 dark:bg-[#10141d]/90 dark:hover:bg-[#141924] dark:border-white/[0.07] border flex flex-col justify-between shadow-sm dark:shadow-lg text-left transition-all cursor-pointer"
+              className="group p-5 rounded-2xl bg-neutral-50/90 hover:bg-neutral-100/90 border-neutral-200/90 dark:bg-[#1E1E1E]/90 dark:hover:bg-[#141924] dark:border-white/[0.07] border flex flex-col justify-between shadow-sm dark:shadow-lg text-left transition-all cursor-pointer"
             >
               <div>
                 <div className="flex items-center justify-between w-full">
@@ -739,7 +739,7 @@ export function PayerntHome({
             <button
               type="button"
               onClick={() => onNavigate("products")}
-              className="group p-5 rounded-2xl bg-neutral-50/90 hover:bg-neutral-100/90 border-neutral-200/90 dark:bg-[#10141d]/90 dark:hover:bg-[#141924] dark:border-white/[0.07] border flex flex-col justify-between shadow-sm dark:shadow-lg text-left transition-all cursor-pointer"
+              className="group p-5 rounded-2xl bg-neutral-50/90 hover:bg-neutral-100/90 border-neutral-200/90 dark:bg-[#1E1E1E]/90 dark:hover:bg-[#141924] dark:border-white/[0.07] border flex flex-col justify-between shadow-sm dark:shadow-lg text-left transition-all cursor-pointer"
             >
               <div>
                 <div className="flex items-center justify-between w-full">
@@ -779,7 +779,7 @@ export function PayerntHome({
             <button
               type="button"
               onClick={() => onNavigate("requests")}
-              className="group p-5 rounded-2xl bg-neutral-50/90 hover:bg-neutral-100/90 border-neutral-200/90 dark:bg-[#10141d]/90 dark:hover:bg-[#141924] dark:border-white/[0.07] border flex flex-col justify-between shadow-sm dark:shadow-lg text-left transition-all cursor-pointer"
+              className="group p-5 rounded-2xl bg-neutral-50/90 hover:bg-neutral-100/90 border-neutral-200/90 dark:bg-[#1E1E1E]/90 dark:hover:bg-[#141924] dark:border-white/[0.07] border flex flex-col justify-between shadow-sm dark:shadow-lg text-left transition-all cursor-pointer"
             >
               <div>
                 <div className="flex items-center justify-between w-full">
@@ -819,7 +819,7 @@ export function PayerntHome({
           {/* 3. Middle Section: Upcoming Bookings (8 Cols on desktop) & Your Products (4 Cols on desktop) */}
           <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-5 mt-5">
             {/* Upcoming Bookings (Wide Card - 8 Cols on desktop, full width on mobile) */}
-            <div className="col-span-1 lg:col-span-8 p-4 sm:p-6 rounded-2xl bg-neutral-50/90 border-neutral-200/90 dark:bg-[#10141d]/90 dark:border-white/[0.07] border flex flex-col justify-between shadow-sm dark:shadow-lg min-h-[220px]">
+            <div className="col-span-1 lg:col-span-8 p-4 sm:p-6 rounded-2xl bg-neutral-50/90 border-neutral-200/90 dark:bg-[#1E1E1E]/90 dark:border-white/[0.07] border flex flex-col justify-between shadow-sm dark:shadow-lg min-h-[220px]">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="p-2 rounded-xl bg-white dark:bg-white/[0.05] border border-neutral-200 dark:border-white/10 text-neutral-700 dark:text-neutral-200">
@@ -882,7 +882,7 @@ export function PayerntHome({
             </div>
 
             {/* Your Products (Compact Card - 4 Cols on desktop, full width on mobile) */}
-            <div className="col-span-1 lg:col-span-4 p-4 sm:p-6 rounded-2xl bg-neutral-50/90 border-neutral-200/90 dark:bg-[#10141d]/90 dark:border-white/[0.07] border flex flex-col justify-between shadow-sm dark:shadow-lg min-h-[220px]">
+            <div className="col-span-1 lg:col-span-4 p-4 sm:p-6 rounded-2xl bg-neutral-50/90 border-neutral-200/90 dark:bg-[#1E1E1E]/90 dark:border-white/[0.07] border flex flex-col justify-between shadow-sm dark:shadow-lg min-h-[220px]">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="p-2 rounded-xl bg-white dark:bg-white/[0.05] border border-neutral-200 dark:border-white/10 text-neutral-700 dark:text-neutral-200">
@@ -980,7 +980,7 @@ export function PayerntHome({
               <button
                 type="button"
                 onClick={() => onNavigate("products")}
-                className="flex items-center justify-center h-20 rounded-2xl bg-neutral-50 hover:bg-neutral-100 border border-neutral-200/90 text-neutral-700 hover:text-black dark:bg-[#10141d]/90 dark:hover:bg-white/[0.08] dark:border-white/[0.07] dark:text-neutral-300 dark:hover:text-white shadow-xs dark:shadow-lg transition-all active:scale-95 cursor-pointer group"
+                className="flex items-center justify-center h-20 rounded-2xl bg-neutral-50 hover:bg-neutral-100 border border-neutral-200/90 text-neutral-700 hover:text-black dark:bg-[#1E1E1E]/90 dark:hover:bg-white/[0.08] dark:border-white/[0.07] dark:text-neutral-300 dark:hover:text-white shadow-xs dark:shadow-lg transition-all active:scale-95 cursor-pointer group"
                 title="Your Products"
               >
                 <Package className="h-5 w-5 stroke-[1.8] group-hover:scale-105 transition-transform" />
@@ -990,7 +990,7 @@ export function PayerntHome({
               <button
                 type="button"
                 onClick={() => onNavigate("requests")}
-                className="flex items-center justify-center h-20 rounded-2xl bg-neutral-50 hover:bg-neutral-100 border border-neutral-200/90 text-neutral-700 hover:text-black dark:bg-[#10141d]/90 dark:hover:bg-white/[0.08] dark:border-white/[0.07] dark:text-neutral-300 dark:hover:text-white shadow-xs dark:shadow-lg transition-all active:scale-95 cursor-pointer group"
+                className="flex items-center justify-center h-20 rounded-2xl bg-neutral-50 hover:bg-neutral-100 border border-neutral-200/90 text-neutral-700 hover:text-black dark:bg-[#1E1E1E]/90 dark:hover:bg-white/[0.08] dark:border-white/[0.07] dark:text-neutral-300 dark:hover:text-white shadow-xs dark:shadow-lg transition-all active:scale-95 cursor-pointer group"
                 title="Bookings"
               >
                 <Calendar className="h-5 w-5 stroke-[1.8] group-hover:scale-105 transition-transform" />
@@ -1000,7 +1000,7 @@ export function PayerntHome({
               <button
                 type="button"
                 onClick={() => onNavigate("wallet")}
-                className="flex items-center justify-center h-20 rounded-2xl bg-neutral-50 hover:bg-neutral-100 border border-neutral-200/90 text-neutral-700 hover:text-black dark:bg-[#10141d]/90 dark:hover:bg-white/[0.08] dark:border-white/[0.07] dark:text-neutral-300 dark:hover:text-white shadow-xs dark:shadow-lg transition-all active:scale-95 cursor-pointer group"
+                className="flex items-center justify-center h-20 rounded-2xl bg-neutral-50 hover:bg-neutral-100 border border-neutral-200/90 text-neutral-700 hover:text-black dark:bg-[#1E1E1E]/90 dark:hover:bg-white/[0.08] dark:border-white/[0.07] dark:text-neutral-300 dark:hover:text-white shadow-xs dark:shadow-lg transition-all active:scale-95 cursor-pointer group"
                 title="Wallet"
               >
                 <Wallet className="h-5 w-5 stroke-[1.8] group-hover:scale-105 transition-transform" />
@@ -1010,7 +1010,7 @@ export function PayerntHome({
               <button
                 type="button"
                 onClick={() => onNavigate("messages")}
-                className="flex items-center justify-center h-20 rounded-2xl bg-neutral-50 hover:bg-neutral-100 border border-neutral-200/90 text-neutral-700 hover:text-black dark:bg-[#10141d]/90 dark:hover:bg-white/[0.08] dark:border-white/[0.07] dark:text-neutral-300 dark:hover:text-white shadow-xs dark:shadow-lg transition-all active:scale-95 cursor-pointer group"
+                className="flex items-center justify-center h-20 rounded-2xl bg-neutral-50 hover:bg-neutral-100 border border-neutral-200/90 text-neutral-700 hover:text-black dark:bg-[#1E1E1E]/90 dark:hover:bg-white/[0.08] dark:border-white/[0.07] dark:text-neutral-300 dark:hover:text-white shadow-xs dark:shadow-lg transition-all active:scale-95 cursor-pointer group"
                 title="Messages"
               >
                 <MessageSquare className="h-5 w-5 stroke-[1.8] group-hover:scale-105 transition-transform" />
@@ -1020,7 +1020,7 @@ export function PayerntHome({
               <button
                 type="button"
                 onClick={() => onNavigate("analytics")}
-                className="flex items-center justify-center h-20 rounded-2xl bg-neutral-50 hover:bg-neutral-100 border border-neutral-200/90 text-neutral-700 hover:text-black dark:bg-[#10141d]/90 dark:hover:bg-white/[0.08] dark:border-white/[0.07] dark:text-neutral-300 dark:hover:text-white shadow-xs dark:shadow-lg transition-all active:scale-95 cursor-pointer group"
+                className="flex items-center justify-center h-20 rounded-2xl bg-neutral-50 hover:bg-neutral-100 border border-neutral-200/90 text-neutral-700 hover:text-black dark:bg-[#1E1E1E]/90 dark:hover:bg-white/[0.08] dark:border-white/[0.07] dark:text-neutral-300 dark:hover:text-white shadow-xs dark:shadow-lg transition-all active:scale-95 cursor-pointer group"
                 title="Analytics"
               >
                 <BarChart3 className="h-5 w-5 stroke-[1.8] group-hover:scale-105 transition-transform" />
@@ -1030,7 +1030,7 @@ export function PayerntHome({
             {/* Wallet Summary Card (4 Cols on desktop, full width on mobile) */}
             <div
               onClick={() => onNavigate("wallet")}
-              className="col-span-1 lg:col-span-4 p-4 sm:p-5 rounded-2xl bg-neutral-50/90 hover:bg-neutral-100/90 border-neutral-200/90 dark:bg-[#10141d]/90 dark:hover:bg-[#141924] dark:border-white/[0.07] border flex flex-col justify-between shadow-sm dark:shadow-lg transition-all cursor-pointer group"
+              className="col-span-1 lg:col-span-4 p-4 sm:p-5 rounded-2xl bg-neutral-50/90 hover:bg-neutral-100/90 border-neutral-200/90 dark:bg-[#1E1E1E]/90 dark:hover:bg-[#141924] dark:border-white/[0.07] border flex flex-col justify-between shadow-sm dark:shadow-lg transition-all cursor-pointer group"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -1059,7 +1059,7 @@ export function PayerntHome({
           </div>
 
           {/* 5. Bottom Card: Recent Activity (Full Width) */}
-          <div className="relative z-10 mt-5 p-6 rounded-2xl bg-neutral-50/90 border-neutral-200/90 dark:bg-[#10141d]/90 dark:border-white/[0.07] border shadow-sm dark:shadow-lg">
+          <div className="relative z-10 mt-5 p-6 rounded-2xl bg-neutral-50/90 border-neutral-200/90 dark:bg-[#1E1E1E]/90 dark:border-white/[0.07] border shadow-sm dark:shadow-lg">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-xl bg-white dark:bg-white/[0.05] border border-neutral-200 dark:border-white/10 text-neutral-700 dark:text-neutral-200">

@@ -11,7 +11,7 @@ export function BrandLogos() {
   ];
 
   return (
-    <section className="bg-white dark:bg-[#05090D] py-6 sm:py-8 text-neutral-900 dark:text-white transition-colors duration-300">
+    <section className="bg-white dark:bg-[#1E1E1E] py-6 sm:py-8 text-neutral-900 dark:text-white transition-colors duration-300">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
           {/* Left Title */}

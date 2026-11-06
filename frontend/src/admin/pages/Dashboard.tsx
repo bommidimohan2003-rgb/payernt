@@ -557,7 +557,7 @@ export function Dashboard() {
         {/* Global Controls: Telemetry, Date Range & Refresh */}
         <div className="flex flex-wrap items-center gap-2.5">
           {/* Live Telemetry Status Badge */}
-          <div className="flex items-center px-3 py-1.5 rounded-xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] text-xs font-semibold text-[#242424] dark:text-[#F8FAFC] shadow-xs">
+          <div className="flex items-center px-3 py-1.5 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] text-xs font-semibold text-[#242424] dark:text-[#F8FAFC] shadow-xs">
             <span
               className={cn(
                 "h-2 w-2 rounded-full mr-2",
@@ -574,7 +574,7 @@ export function Dashboard() {
           </div>
 
           {/* Date Range Selector Pills with Smooth Spring Motion */}
-          <div className="bg-[#F8F7F9] dark:bg-[#162238] p-1 rounded-xl border border-[#E6E4E9] dark:border-[#273244] flex items-center gap-1 shadow-xs">
+          <div className="bg-[#F8F7F9] dark:bg-[#1E1E1E] p-1 rounded-xl border border-[#E6E4E9] dark:border-[#273244] flex items-center gap-1 shadow-xs">
             {(["7D", "30D", "90D"] as DateRange[]).map((range) => (
               <button
                 key={range}
@@ -599,7 +599,7 @@ export function Dashboard() {
           </div>
 
           {/* Sync Timestamp & Manual Refresh */}
-          <div className="flex items-center gap-1 text-[11px] font-mono text-[#77757D] dark:text-[#9AAAC2] px-2.5 py-1.5 rounded-xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] shadow-xs">
+          <div className="flex items-center gap-1 text-[11px] font-mono text-[#77757D] dark:text-[#9AAAC2] px-2.5 py-1.5 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] shadow-xs">
             <Clock className="h-3.5 w-3.5 text-[#77757D] dark:text-[#9AAAC2]" />
             <span>Synced {lastSyncTime || "Realtime"}</span>
           </div>
@@ -608,7 +608,7 @@ export function Dashboard() {
             whileTap={{ scale: 0.94 }}
             onClick={() => fetchDashboardData(days, true)}
             disabled={isRefreshing}
-            className="p-2 rounded-xl bg-white dark:bg-[#111827] hover:bg-[#F8F7F9] dark:hover:bg-[#162238] text-[#77757D] dark:text-[#9AAAC2] hover:text-[#242424] dark:hover:text-[#F8FAFC] border border-[#E6E4E9] dark:border-[#273244] shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+            className="p-2 rounded-xl bg-white dark:bg-[#1E1E1E] hover:bg-[#F8F7F9] dark:hover:bg-[#162238] text-[#77757D] dark:text-[#9AAAC2] hover:text-[#242424] dark:hover:text-[#F8FAFC] border border-[#E6E4E9] dark:border-[#273244] shadow-xs transition-colors cursor-pointer disabled:opacity-50"
             title="Refresh dashboard telemetry"
           >
             <RefreshCw
@@ -666,7 +666,7 @@ export function Dashboard() {
         <motion.div
           whileHover={{ y: -3 }}
           transition={{ duration: 0.15 }}
-          className="rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] p-5 sm:p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between"
+          className="rounded-2xl bg-white dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] p-5 sm:p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between"
         >
           <div className="flex items-start justify-between">
             <div className="space-y-1">
@@ -700,7 +700,7 @@ export function Dashboard() {
         <motion.div
           whileHover={{ y: -3 }}
           transition={{ duration: 0.15 }}
-          className="rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] p-5 sm:p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between"
+          className="rounded-2xl bg-white dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] p-5 sm:p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between"
         >
           <div className="flex items-start justify-between">
             <div className="space-y-1">
@@ -734,7 +734,7 @@ export function Dashboard() {
         <motion.div
           whileHover={{ y: -3 }}
           transition={{ duration: 0.15 }}
-          className="rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] p-5 sm:p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between"
+          className="rounded-2xl bg-white dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] p-5 sm:p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between"
         >
           <div className="flex items-start justify-between">
             <div className="space-y-1">
@@ -770,12 +770,12 @@ export function Dashboard() {
       {/* ------------------------------------------------------------------ */}
       <motion.div
         variants={itemVariants}
-        className="rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] p-5 sm:p-6 shadow-xs space-y-6"
+        className="rounded-2xl bg-white dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] p-5 sm:p-6 shadow-xs space-y-6"
       >
         {/* Navigation Tabs Bar */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#E6E4E9] dark:border-[#273244] pb-4">
           {/* Rounded Tabs Container */}
-          <div className="bg-[#F8F7F9] dark:bg-[#162238] p-1.5 rounded-2xl border border-[#E6E4E9] dark:border-[#273244] inline-flex flex-wrap items-center gap-1">
+          <div className="bg-[#F8F7F9] dark:bg-[#1E1E1E] p-1.5 rounded-2xl border border-[#E6E4E9] dark:border-[#273244] inline-flex flex-wrap items-center gap-1">
             {(["Bookings", "Products", "Users", "Delivery", "Finance"] as AnalyticsTab[]).map(
               (tab) => {
                 const isActive = activeTab === tab;
@@ -907,7 +907,7 @@ export function Dashboard() {
                       </AreaChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center bg-[#F8F7F9] dark:bg-[#162238]/60 rounded-xl border border-dashed border-[#E6E4E9] dark:border-[#273244] text-xs text-[#77757D] dark:text-[#9AAAC2]">
+                    <div className="w-full h-full flex flex-col items-center justify-center bg-[#F8F7F9] dark:bg-[#1E1E1E]/60 rounded-xl border border-dashed border-[#E6E4E9] dark:border-[#273244] text-xs text-[#77757D] dark:text-[#9AAAC2]">
                       <BarChart3 className="h-6 w-6 mb-2 text-[#9E9DA4]" />
                       <span>No {activeTab.toLowerCase()} trend telemetry in selected period.</span>
                     </div>
@@ -918,7 +918,7 @@ export function Dashboard() {
           </div>
 
           {/* Secondary Distribution Panel: Donut Chart (1 Col) */}
-          <div className="bg-[#F8F7F9] dark:bg-[#162238] rounded-xl border border-[#E6E4E9] dark:border-[#273244] p-4 flex flex-col justify-between">
+          <div className="bg-[#F8F7F9] dark:bg-[#1E1E1E] rounded-xl border border-[#E6E4E9] dark:border-[#273244] p-4 flex flex-col justify-between">
             <div className="flex items-center justify-between pb-2 border-b border-[#E6E4E9] dark:border-[#273244]">
               <span className="text-xs font-bold text-[#242424] dark:text-[#F8FAFC]">
                 Booking Status Distribution
@@ -988,7 +988,7 @@ export function Dashboard() {
         className="grid grid-cols-1 md:grid-cols-3 gap-5"
       >
         {/* Top Rented Gear */}
-        <div className="rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] p-5 shadow-xs space-y-4">
+        <div className="rounded-2xl bg-white dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] p-5 shadow-xs space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-[#E6E4E9] dark:border-[#273244]">
             <div className="flex items-center gap-2">
               <Award className="h-4 w-4 text-[#FF7655]" />
@@ -1007,7 +1007,7 @@ export function Dashboard() {
                   className="flex items-center justify-between p-2 rounded-xl hover:bg-[#F8F7F9] dark:hover:bg-[#162238]/60 transition-colors duration-150"
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="h-8 w-8 rounded-lg bg-[#F8F7F9] dark:bg-[#162238] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-center shrink-0">
+                    <div className="h-8 w-8 rounded-lg bg-[#F8F7F9] dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-center shrink-0">
                       <Package className="h-4 w-4 text-[#77757D] dark:text-[#9AAAC2]" />
                     </div>
                     <div className="min-w-0">
@@ -1019,7 +1019,7 @@ export function Dashboard() {
                       </div>
                     </div>
                   </div>
-                  <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-lg bg-[#F8F7F9] dark:bg-[#162238] text-[#242424] dark:text-[#F8FAFC] border border-[#E6E4E9] dark:border-[#273244]">
+                  <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-lg bg-[#F8F7F9] dark:bg-[#1E1E1E] text-[#242424] dark:text-[#F8FAFC] border border-[#E6E4E9] dark:border-[#273244]">
                     {p.rentalCount || 0} rentals
                   </span>
                 </div>
@@ -1033,7 +1033,7 @@ export function Dashboard() {
         </div>
 
         {/* Category Velocity */}
-        <div className="rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] p-5 shadow-xs space-y-4">
+        <div className="rounded-2xl bg-white dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] p-5 shadow-xs space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-[#E6E4E9] dark:border-[#273244]">
             <div className="flex items-center gap-2">
               <Layers className="h-4 w-4 text-[#FF7655]" />
@@ -1058,7 +1058,7 @@ export function Dashboard() {
                       {cat.count} listings ({cat.percent}%)
                     </span>
                   </div>
-                  <div className="w-full h-1.5 rounded-full bg-[#F8F7F9] dark:bg-[#162238] overflow-hidden border border-[#E6E4E9] dark:border-[#273244]">
+                  <div className="w-full h-1.5 rounded-full bg-[#F8F7F9] dark:bg-[#1E1E1E] overflow-hidden border border-[#E6E4E9] dark:border-[#273244]">
                     <div
                       className="h-full rounded-full bg-gradient-to-r from-[#F9856A] to-[#FF7655]"
                       style={{ width: `${Math.min(cat.percent, 100)}%` }}
@@ -1075,7 +1075,7 @@ export function Dashboard() {
         </div>
 
         {/* Platform Compliance & Health */}
-        <div className="rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] p-5 shadow-xs space-y-4">
+        <div className="rounded-2xl bg-white dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] p-5 shadow-xs space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-[#E6E4E9] dark:border-[#273244]">
             <div className="flex items-center gap-2">
               <ShieldCheck className="h-4 w-4 text-[#10B981]" />
@@ -1089,15 +1089,15 @@ export function Dashboard() {
           </div>
 
           <div className="space-y-2 text-xs">
-            <div className="p-2.5 rounded-xl bg-[#F8F7F9] dark:bg-[#162238] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between">
+            <div className="p-2.5 rounded-xl bg-[#F8F7F9] dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between">
               <span className="text-[#242424] dark:text-[#F8FAFC] font-medium">PIN Handshake Verification</span>
               <span className="text-[#059669] dark:text-emerald-400 font-bold">Enforced</span>
             </div>
-            <div className="p-2.5 rounded-xl bg-[#F8F7F9] dark:bg-[#162238] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between">
+            <div className="p-2.5 rounded-xl bg-[#F8F7F9] dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between">
               <span className="text-[#242424] dark:text-[#F8FAFC] font-medium">Razorpay Escrow Vault</span>
               <span className="text-[#059669] dark:text-emerald-400 font-bold">Secured</span>
             </div>
-            <div className="p-2.5 rounded-xl bg-[#F8F7F9] dark:bg-[#162238] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between">
+            <div className="p-2.5 rounded-xl bg-[#F8F7F9] dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between">
               <span className="text-[#242424] dark:text-[#F8FAFC] font-medium">Platform Uptime SLA</span>
               <span className="text-[#242424] dark:text-[#F8FAFC] font-mono font-bold">99.98%</span>
             </div>
@@ -1125,7 +1125,7 @@ export function Dashboard() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           {/* PENDING APPROVALS LIST */}
-          <div className="rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] p-5 shadow-xs space-y-4">
+          <div className="rounded-2xl bg-white dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] p-5 shadow-xs space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-[#E6E4E9] dark:border-[#273244]">
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4 text-[#D97706] dark:text-amber-400" />
@@ -1145,7 +1145,7 @@ export function Dashboard() {
                   {pendingProductsList.slice(0, 3).map((prod) => (
                     <div
                       key={prod.id}
-                      className="p-3 rounded-xl bg-[#F8F7F9] dark:bg-[#162238] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between gap-3 hover:border-[#D6D4D9] dark:hover:border-[#3B82F6]/40 transition-all"
+                      className="p-3 rounded-xl bg-[#F8F7F9] dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between gap-3 hover:border-[#D6D4D9] dark:hover:border-[#3B82F6]/40 transition-all"
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
@@ -1185,7 +1185,7 @@ export function Dashboard() {
                   {pendingUsersList.slice(0, 2).map((u) => (
                     <div
                       key={u.id}
-                      className="p-3 rounded-xl bg-[#F8F7F9] dark:bg-[#162238] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between gap-3 hover:border-[#D6D4D9] dark:hover:border-[#3B82F6]/40 transition-all"
+                      className="p-3 rounded-xl bg-[#F8F7F9] dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between gap-3 hover:border-[#D6D4D9] dark:hover:border-[#3B82F6]/40 transition-all"
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
@@ -1214,7 +1214,7 @@ export function Dashboard() {
                   ))}
                 </>
               ) : (
-                <div className="py-10 text-center bg-[#F8F7F9] dark:bg-[#162238]/50 rounded-xl border border-dashed border-[#E6E4E9] dark:border-[#273244] text-xs text-[#77757D] dark:text-[#9AAAC2]">
+                <div className="py-10 text-center bg-[#F8F7F9] dark:bg-[#1E1E1E]/50 rounded-xl border border-dashed border-[#E6E4E9] dark:border-[#273244] text-xs text-[#77757D] dark:text-[#9AAAC2]">
                   <CheckCircle2 className="h-6 w-6 text-[#10B981] mx-auto mb-2" />
                   <span>All submissions verified. Zero queue backlog.</span>
                 </div>
@@ -1223,7 +1223,7 @@ export function Dashboard() {
           </div>
 
           {/* ISSUES & EXCEPTIONS LIST */}
-          <div className="rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] p-5 shadow-xs space-y-4">
+          <div className="rounded-2xl bg-white dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] p-5 shadow-xs space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-[#E6E4E9] dark:border-[#273244]">
               <div className="flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 text-[#DC2626]" />
@@ -1241,7 +1241,7 @@ export function Dashboard() {
                 issuesList.map((issue) => (
                   <div
                     key={issue.id}
-                    className="p-3 rounded-xl bg-[#F8F7F9] dark:bg-[#162238] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between gap-3 hover:border-[#D6D4D9] dark:hover:border-[#3B82F6]/40 transition-all"
+                    className="p-3 rounded-xl bg-[#F8F7F9] dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between gap-3 hover:border-[#D6D4D9] dark:hover:border-[#3B82F6]/40 transition-all"
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
@@ -1266,14 +1266,14 @@ export function Dashboard() {
 
                     <Link
                       to={issue.type === "report" ? "/admin/reports" : "/admin/support"}
-                      className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] text-[#242424] dark:text-[#F8FAFC] hover:bg-[#F8F7F9] dark:hover:bg-[#162238] transition-colors shrink-0 shadow-2xs"
+                      className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-white dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] text-[#242424] dark:text-[#F8FAFC] hover:bg-[#F8F7F9] dark:hover:bg-[#162238] transition-colors shrink-0 shadow-2xs"
                     >
                       Resolve
                     </Link>
                   </div>
                 ))
               ) : (
-                <div className="py-10 text-center bg-[#F8F7F9] dark:bg-[#162238]/50 rounded-xl border border-dashed border-[#E6E4E9] dark:border-[#273244] text-xs text-[#77757D] dark:text-[#9AAAC2]">
+                <div className="py-10 text-center bg-[#F8F7F9] dark:bg-[#1E1E1E]/50 rounded-xl border border-dashed border-[#E6E4E9] dark:border-[#273244] text-xs text-[#77757D] dark:text-[#9AAAC2]">
                   <CheckCircle2 className="h-6 w-6 text-[#10B981] mx-auto mb-2" />
                   <span>Zero open disputes or reported issues. Platform operational.</span>
                 </div>
@@ -1288,7 +1288,7 @@ export function Dashboard() {
       {/* ------------------------------------------------------------------ */}
       <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* UPCOMING BOOKINGS */}
-        <div className="rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] p-5 shadow-xs space-y-4">
+        <div className="rounded-2xl bg-white dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] p-5 shadow-xs space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-[#E6E4E9] dark:border-[#273244]">
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4 text-[#FF7655]" />
@@ -1306,7 +1306,7 @@ export function Dashboard() {
               upcomingBookingsList.map((bk) => (
                 <div
                   key={bk.id}
-                  className="p-3 rounded-xl bg-[#F8F7F9] dark:bg-[#162238] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between gap-3 hover:border-[#D6D4D9] dark:hover:border-[#3B82F6]/40 transition-all"
+                  className="p-3 rounded-xl bg-[#F8F7F9] dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between gap-3 hover:border-[#D6D4D9] dark:hover:border-[#3B82F6]/40 transition-all"
                 >
                   <div className="min-w-0">
                     <div className="text-xs font-bold text-[#242424] dark:text-[#F8FAFC] truncate">
@@ -1340,7 +1340,7 @@ export function Dashboard() {
         </div>
 
         {/* OVERDUE ACTIONS */}
-        <div className="rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] p-5 shadow-xs space-y-4">
+        <div className="rounded-2xl bg-white dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] p-5 shadow-xs space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-[#E6E4E9] dark:border-[#273244]">
             <div className="flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 text-[#D97706] dark:text-amber-400" />
@@ -1348,7 +1348,7 @@ export function Dashboard() {
                 Action Required Tasks
               </h3>
             </div>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#F8F7F9] dark:bg-[#162238] text-[#77757D] dark:text-[#9AAAC2] border border-[#E6E4E9] dark:border-[#273244]">
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#F8F7F9] dark:bg-[#1E1E1E] text-[#77757D] dark:text-[#9AAAC2] border border-[#E6E4E9] dark:border-[#273244]">
               {overdueActions.length} Tasks
             </span>
           </div>
@@ -1358,7 +1358,7 @@ export function Dashboard() {
               overdueActions.map((task) => (
                 <div
                   key={task.id}
-                  className="p-3 rounded-xl bg-[#F8F7F9] dark:bg-[#162238] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between gap-3 hover:border-[#D6D4D9] dark:hover:border-[#3B82F6]/40 transition-all"
+                  className="p-3 rounded-xl bg-[#F8F7F9] dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between gap-3 hover:border-[#D6D4D9] dark:hover:border-[#3B82F6]/40 transition-all"
                 >
                   <div className="min-w-0">
                     <div className="text-xs font-bold text-[#242424] dark:text-[#F8FAFC] truncate">
@@ -1395,7 +1395,7 @@ export function Dashboard() {
       {/* ------------------------------------------------------------------ */}
       <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* RECENT ACTIVITY TRAIL (2 COLS) */}
-        <div className="lg:col-span-2 rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] p-5 shadow-xs space-y-4">
+        <div className="lg:col-span-2 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] p-5 shadow-xs space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-[#E6E4E9] dark:border-[#273244]">
             <div className="flex items-center gap-2">
               <Activity className="h-4 w-4 text-[#FF7655]" />
@@ -1413,7 +1413,7 @@ export function Dashboard() {
               recentActivity.slice(0, 5).map((act) => (
                 <div
                   key={act.id}
-                  className="p-3 rounded-xl bg-[#F8F7F9] dark:bg-[#162238] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between gap-3 text-xs"
+                  className="p-3 rounded-xl bg-[#F8F7F9] dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between gap-3 text-xs"
                 >
                   <div className="min-w-0">
                     <span className="font-semibold text-[#242424] dark:text-[#F8FAFC]">{act.action}</span>
@@ -1435,7 +1435,7 @@ export function Dashboard() {
         </div>
 
         {/* PLATFORM HEALTH (1 COL) */}
-        <div className="rounded-2xl bg-white dark:bg-[#111827] border border-[#E6E4E9] dark:border-[#273244] p-5 shadow-xs space-y-4">
+        <div className="rounded-2xl bg-white dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] p-5 shadow-xs space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-[#E6E4E9] dark:border-[#273244]">
             <div className="flex items-center gap-2">
               <Database className="h-4 w-4 text-[#10B981]" />
@@ -1449,7 +1449,7 @@ export function Dashboard() {
           </div>
 
           <div className="space-y-3">
-            <div className="p-3 rounded-xl bg-[#F8F7F9] dark:bg-[#162238] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between">
+            <div className="p-3 rounded-xl bg-[#F8F7F9] dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between">
               <div>
                 <div className="text-xs font-bold text-[#242424] dark:text-[#F8FAFC]">FastAPI Backend</div>
                 <div className="text-[10px] font-mono text-[#77757D] dark:text-[#9AAAC2]">/api/health/ready</div>
@@ -1457,7 +1457,7 @@ export function Dashboard() {
               <span className="h-2 w-2 rounded-full bg-[#10B981] animate-pulse" />
             </div>
 
-            <div className="p-3 rounded-xl bg-[#F8F7F9] dark:bg-[#162238] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between">
+            <div className="p-3 rounded-xl bg-[#F8F7F9] dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between">
               <div>
                 <div className="text-xs font-bold text-[#242424] dark:text-[#F8FAFC]">Database Datastore</div>
                 <div className="text-[10px] font-mono text-[#77757D] dark:text-[#9AAAC2]">TiDB cloud MySQL SSL</div>
@@ -1465,7 +1465,7 @@ export function Dashboard() {
               <span className="h-2 w-2 rounded-full bg-[#10B981]" />
             </div>
 
-            <div className="p-3 rounded-xl bg-[#F8F7F9] dark:bg-[#162238] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between">
+            <div className="p-3 rounded-xl bg-[#F8F7F9] dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-between">
               <div>
                 <div className="text-xs font-bold text-[#242424] dark:text-[#F8FAFC]">Live WebSocket Stream</div>
                 <div className="text-[10px] font-mono text-[#77757D] dark:text-[#9AAAC2]">/api/admin/ws</div>

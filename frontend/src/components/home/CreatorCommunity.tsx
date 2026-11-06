@@ -3,7 +3,7 @@ import { ArrowRight, Users, ShieldCheck, Wallet } from "lucide-react";
 
 export function CreatorCommunity() {
   return (
-    <section className="relative overflow-hidden bg-white dark:bg-[#05090D] py-12 sm:py-16 text-neutral-900 dark:text-white transition-colors duration-300">
+    <section className="relative overflow-hidden bg-white dark:bg-[#1E1E1E] py-12 sm:py-16 text-neutral-900 dark:text-white transition-colors duration-300">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="relative rounded-3xl overflow-hidden border border-black/10 dark:border-white/10 bg-[#071017] shadow-2xl">
           {/* Background Cinematic Photo & Overlays */}

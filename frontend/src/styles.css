@@ -176,21 +176,21 @@ img, video, canvas, svg {
 
 .dark {
   /* ============================================================
-     DARK THEME PALETTE (Exact Approved Graphite + Electric Blue)
+     DARK THEME PALETTE (Exact #1E1E1E Background Across All Surfaces)
      ============================================================ */
   --background: #1E1E1E;
   --foreground: #FFFFFF;
   --surface-navigation: #1E1E1E;
-  --surface-card: #2A2A2A;
-  --surface-modal: #353535;
-  --card: #2A2A2A;
+  --surface-card: #1E1E1E;
+  --surface-modal: #1E1E1E;
+  --card: #1E1E1E;
   --card-foreground: #FFFFFF;
-  --popover: #353535;
+  --popover: #1E1E1E;
   --popover-foreground: #FFFFFF;
   --text-primary: #FFFFFF;
-  --text-secondary: #B3B3B3;
-  --border: #424242;
-  --input: #424242;
+  --text-secondary: #BDBDBD;
+  --border: #333333;
+  --input: #1E1E1E;
   --accent-primary: #4D8DFF;
   --accent-hover: #3478F6;
   --primary: #4D8DFF;
@@ -198,7 +198,7 @@ img, video, canvas, svg {
   --secondary: #1E1E1E;
   --secondary-foreground: #FFFFFF;
   --muted: #1E1E1E;
-  --muted-foreground: #B3B3B3;
+  --muted-foreground: #BDBDBD;
   --accent: #4D8DFF;
   --accent-foreground: #FFFFFF;
   --destructive: #F05252;
@@ -214,20 +214,20 @@ img, video, canvas, svg {
   --btn-primary-hover: #3478F6;
   --btn-primary-pressed: #2264DD;
 
-  --btn-secondary-bg: #2A2A2A;
+  --btn-secondary-bg: #1E1E1E;
   --btn-secondary-text: #FFFFFF;
-  --btn-secondary-border: #424242;
-  --btn-secondary-hover: #353535;
+  --btn-secondary-border: #333333;
+  --btn-secondary-hover: #262626;
   --btn-secondary-pressed: #1E1E1E;
 
   --btn-tertiary-bg: transparent;
-  --btn-tertiary-text: #B3B3B3;
+  --btn-tertiary-text: #BDBDBD;
   --btn-tertiary-hover: rgba(255, 255, 255, 0.08);
   --btn-tertiary-hover-text: #FFFFFF;
   --btn-tertiary-pressed: rgba(255, 255, 255, 0.12);
 
   --btn-outline-bg: transparent;
-  --btn-outline-border: #424242;
+  --btn-outline-border: #333333;
   --btn-outline-text: #FFFFFF;
   --btn-outline-hover: #4D8DFF;
   --btn-outline-hover-text: #FFFFFF;
@@ -241,37 +241,37 @@ img, video, canvas, svg {
   --dark-button-primary: #4D8DFF;
   --dark-button-primary-hover: #3478F6;
   --dark-button-primary-pressed: #2264DD;
-  --dark-button-secondary-border: #424242;
+  --dark-button-secondary-border: #333333;
   --dark-button-secondary-text: #FFFFFF;
-  --dark-button-secondary-hover: #353535;
+  --dark-button-secondary-hover: #262626;
   --dark-button-secondary-pressed: #1E1E1E;
-  --dark-button-tertiary-text: #B3B3B3;
+  --dark-button-tertiary-text: #BDBDBD;
   --dark-button-tertiary-hover: rgba(255, 255, 255, 0.08);
   --dark-button-tertiary-hover-text: #FFFFFF;
-  --dark-button-outline-border: #424242;
+  --dark-button-outline-border: #333333;
   --dark-button-outline-text: #FFFFFF;
   --dark-button-outline-hover: #4D8DFF;
   --dark-button-outline-hover-text: #FFFFFF;
 
   --payent-bg: #1E1E1E;
-  --payent-surface: #2A2A2A;
-  --payent-surface-elevated: #353535;
+  --payent-surface: #1E1E1E;
+  --payent-surface-elevated: #1E1E1E;
   --payent-accent: #4D8DFF;
   --payent-accent-hover: #3478F6;
-  --payent-border: #424242;
-  --payent-text-secondary: #B3B3B3;
+  --payent-border: #333333;
+  --payent-text-secondary: #BDBDBD;
   --payent-text-muted: #808080;
 
   /* Admin Design System Tokens - Dark Theme */
   --admin-bg: #1E1E1E;
   --admin-sidebar: #1E1E1E;
-  --admin-elevated: #2A2A2A;
-  --admin-card: #2A2A2A;
-  --admin-secondary-surface: #2A2A2A;
+  --admin-elevated: #1E1E1E;
+  --admin-card: #1E1E1E;
+  --admin-secondary-surface: #1E1E1E;
   --admin-text: #FFFFFF;
-  --admin-text-secondary: #B3B3B3;
+  --admin-text-secondary: #BDBDBD;
   --admin-text-muted: #808080;
-  --admin-border: #424242;
+  --admin-border: #333333;
   --admin-accent: #4D8DFF;
   --admin-accent-hover: #3478F6;
   --admin-orange-start: #F9856A;
@@ -291,23 +291,108 @@ img, video, canvas, svg {
     inset 0 -1px 0 0 rgba(0, 0, 0, 0.8);
 }
 
-/* Centralized Fallback & Legacy Utility Mappings */
+/* Centralized Fallback & Legacy Utility Mappings - Enforce #1E1E1E */
 .dark .bg-\[\#07090e\],
 .dark .bg-\[\#070C12\],
 .dark .bg-\[\#050709\],
-.dark .bg-\[\#05090D\] {
-  background-color: var(--background) !important;
-}
+.dark .bg-\[\#05090D\],
 .dark .bg-\[\#10151B\],
-.dark .bg-\[\#0B1015\] {
-  background-color: var(--card) !important;
+.dark .bg-\[\#0B1015\],
+.dark .bg-\[\#0D151D\],
+.dark .bg-\[\#171C23\],
+.dark .bg-\[\#12161F\],
+.dark .bg-\[\#10141D\],
+.dark .bg-\[\#10141d\],
+.dark .bg-\[\#162238\],
+.dark .bg-\[\#1A1F2C\],
+.dark .bg-\[\#131E2A\],
+.dark .bg-\[\#111827\],
+.dark .bg-\[\#121C26\],
+.dark .bg-\[\#1E2330\],
+.dark .bg-\[\#161B26\],
+.dark .bg-\[\#070D14\],
+.dark .bg-\[\#0A1017\],
+.dark .bg-\[\#1A222D\],
+.dark .bg-\[\#0D1524\],
+.dark .bg-\[\#273244\],
+.dark .bg-\[\#090F16\],
+.dark .bg-\[\#070A10\],
+.dark .bg-\[\#081018\],
+.dark .bg-\[\#0F121A\],
+.dark .bg-\[\#0f121a\],
+.dark .bg-\[\#071017\],
+.dark .bg-\[\#111A22\],
+.dark .bg-\[\#27272A\],
+.dark .bg-\[\#090F15\],
+.dark .bg-\[\#0B121A\],
+.dark .bg-\[\#070B10\],
+.dark .bg-\[\#0B0F14\],
+.dark .bg-\[\#141F2B\],
+.dark .bg-\[\#070D13\],
+.dark .bg-\[\#0B1522\],
+.dark .bg-\[\#080E16\],
+.dark .bg-\[\#0C1622\],
+.dark .bg-\[\#05090E\],
+.dark .bg-\[\#0A0E17\],
+.dark .bg-\[\#0E1318\],
+.dark .bg-\[\#22272E\],
+.dark .bg-\[\#161B22\],
+.dark .bg-\[\#0C0F16\],
+.dark .bg-\[\#0c0f16\],
+.dark .bg-\[\#0B0E14\],
+.dark .bg-\[\#0b0e14\] {
+  background-color: #1E1E1E !important;
 }
-.dark .bg-\[\#0D151D\] {
-  background-color: var(--surface-navigation) !important;
+
+.dark [class*="dark:bg-[#0D151D]"],
+.dark [class*="dark:bg-[#12161F]"],
+.dark [class*="dark:bg-[#10141D]"],
+.dark [class*="dark:bg-[#10141d]"],
+.dark [class*="dark:bg-[#10151B]"],
+.dark [class*="dark:bg-[#162238]"],
+.dark [class*="dark:bg-[#1A1F2C]"],
+.dark [class*="dark:bg-[#131E2A]"],
+.dark [class*="dark:bg-[#111827]"],
+.dark [class*="dark:bg-[#05090D]"],
+.dark [class*="dark:bg-[#050709]"],
+.dark [class*="dark:bg-[#121C26]"],
+.dark [class*="dark:bg-[#1E2330]"],
+.dark [class*="dark:bg-[#161B26]"],
+.dark [class*="dark:bg-[#070D14]"],
+.dark [class*="dark:bg-[#0A1017]"],
+.dark [class*="dark:bg-[#070C12]"],
+.dark [class*="dark:bg-[#1A222D]"],
+.dark [class*="dark:bg-[#0D1524]"],
+.dark [class*="dark:bg-[#273244]"],
+.dark [class*="dark:bg-[#090F16]"],
+.dark [class*="dark:bg-[#070A10]"],
+.dark [class*="dark:bg-[#081018]"],
+.dark [class*="dark:bg-[#0F121A]"],
+.dark [class*="dark:bg-[#0f121a]"],
+.dark [class*="dark:bg-[#071017]"],
+.dark [class*="dark:bg-[#111A22]"],
+.dark [class*="dark:bg-[#27272A]"],
+.dark [class*="dark:bg-[#090F15]"],
+.dark [class*="dark:bg-[#0B121A]"],
+.dark [class*="dark:bg-[#070B10]"],
+.dark [class*="dark:bg-[#0B0F14]"],
+.dark [class*="dark:bg-[#141F2B]"],
+.dark [class*="dark:bg-[#070D13]"],
+.dark [class*="dark:bg-[#0B1522]"],
+.dark [class*="dark:bg-[#080E16]"],
+.dark [class*="dark:bg-[#0C1622]"],
+.dark [class*="dark:bg-[#05090E]"],
+.dark [class*="dark:bg-[#0A0E17]"],
+.dark [class*="dark:bg-[#0E1318]"],
+.dark [class*="dark:bg-[#22272E]"],
+.dark [class*="dark:bg-[#161B22]"],
+.dark [class*="dark:bg-[#0C0F16]"],
+.dark [class*="dark:bg-[#0c0f16]"],
+.dark [class*="dark:bg-[#0B0E14]"],
+.dark [class*="dark:bg-[#0b0e14]"] {
+  background-color: #1E1E1E !important;
 }
-.dark .bg-\[\#171C23\] {
-  background-color: var(--surface-modal) !important;
-}
+
 .dark .border-white\/10,
 .dark .border-white\/\[0\.06\],
 .dark .border-\[rgba\(161\,161\,170\,0\.18\)\] {

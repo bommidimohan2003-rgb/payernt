@@ -126,7 +126,7 @@ export default function Settings() {
           </div>
 
           {/* Navigation Sub-Tabs */}
-          <div className="flex items-center gap-1.5 p-1.5 rounded-2xl bg-neutral-100 dark:bg-[#0D151D] border border-neutral-200 dark:border-white/10 overflow-x-auto scrollbar-none">
+          <div className="flex items-center gap-1.5 p-1.5 rounded-2xl bg-neutral-100 dark:bg-[#1E1E1E] border border-neutral-200 dark:border-white/10 overflow-x-auto scrollbar-none">
             <button
               type="button"
               onClick={() => setSecurityTab("qr")}
@@ -219,7 +219,7 @@ export default function Settings() {
 
           {/* Sub-Tab 3: Device Status Overview */}
           {securityTab === "status" && (
-            <div className="card-premium p-6 sm:p-7 bg-white dark:bg-[#0D151D] border border-neutral-200 dark:border-white/10 rounded-3xl shadow-sm space-y-6">
+            <div className="card-premium p-6 sm:p-7 bg-white dark:bg-[#1E1E1E] border border-neutral-200 dark:border-white/10 rounded-3xl shadow-sm space-y-6">
               <div>
                 <h3 className="text-lg font-bold text-neutral-900 dark:text-white font-display">
                   Hardware Registry & Security Status
@@ -279,7 +279,7 @@ export default function Settings() {
         {/* ========================================================================= */}
         {/* SECTION 2: APPEARANCE */}
         {/* ========================================================================= */}
-        <div className="card-premium p-5 sm:p-6 bg-white dark:bg-[#0D151D] border border-black/10 dark:border-white/10 rounded-3xl shadow-sm">
+        <div className="card-premium p-5 sm:p-6 bg-white dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 rounded-3xl shadow-sm">
           <h3 className="font-bold text-base text-neutral-900 dark:text-white flex items-center gap-2.5">
             {theme === "dark" ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
             {tCommon.appearance}
@@ -300,7 +300,7 @@ export default function Settings() {
         {/* ========================================================================= */}
         {/* SECTION 3: LANGUAGES */}
         {/* ========================================================================= */}
-        <div className="card-premium p-5 sm:p-6 bg-white dark:bg-[#0D151D] border border-black/10 dark:border-white/10 rounded-3xl shadow-sm space-y-4">
+        <div className="card-premium p-5 sm:p-6 bg-white dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 rounded-3xl shadow-sm space-y-4">
           <div>
             <h3 className="font-bold text-base text-neutral-900 dark:text-white flex items-center gap-2.5">
               <Globe className="h-5 w-5" />
@@ -316,7 +316,7 @@ export default function Settings() {
         {/* ========================================================================= */}
         {/* SECTION 4: NOTIFICATIONS */}
         {/* ========================================================================= */}
-        <div className="card-premium p-5 sm:p-6 bg-white dark:bg-[#0D151D] border border-black/10 dark:border-white/10 rounded-3xl shadow-sm">
+        <div className="card-premium p-5 sm:p-6 bg-white dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 rounded-3xl shadow-sm">
           <h3 className="font-bold text-base text-neutral-900 dark:text-white flex items-center gap-2.5">
             <Bell className="h-5 w-5" />
             {tCommon.notificationPreferences}
@@ -340,7 +340,7 @@ export default function Settings() {
         {/* ========================================================================= */}
         {/* SECTION 5: ACCOUNT & PROFILE */}
         {/* ========================================================================= */}
-        <div className="card-premium p-5 sm:p-6 bg-white dark:bg-[#0D151D] border border-black/10 dark:border-white/10 rounded-3xl shadow-sm">
+        <div className="card-premium p-5 sm:p-6 bg-white dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 rounded-3xl shadow-sm">
           <h3 className="font-bold text-base text-neutral-900 dark:text-white flex items-center gap-2.5">
             <Lock className="h-5 w-5" />
             Account & Profile
@@ -357,7 +357,7 @@ export default function Settings() {
         {/* ========================================================================= */}
         {/* SECTION 6: DANGER ZONE */}
         {/* ========================================================================= */}
-        <div className="card-premium p-5 sm:p-6 bg-neutral-50 dark:bg-neutral-900/40 border border-neutral-300/80 dark:border-white/10 rounded-3xl shadow-sm">
+        <div className="card-premium p-5 sm:p-6 bg-neutral-50 dark:bg-[#1E1E1E]/40 border border-neutral-300/80 dark:border-white/10 rounded-3xl shadow-sm">
           <h3 className="font-bold text-base text-neutral-900 dark:text-white flex items-center gap-2.5">
             <Trash2 className="h-5 w-5" />
             {tCommon.dangerZone}

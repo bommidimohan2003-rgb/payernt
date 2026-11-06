@@ -125,7 +125,7 @@ export function Hero() {
   };
 
   return (
-    <section className="relative overflow-hidden bg-neutral-50/60 dark:bg-[#05090D] text-neutral-900 dark:text-white pt-12 sm:pt-16 lg:pt-20 pb-12 lg:pb-16 transition-colors duration-300">
+    <section className="relative overflow-hidden bg-neutral-50/60 dark:bg-[#1E1E1E] text-neutral-900 dark:text-white pt-12 sm:pt-16 lg:pt-20 pb-12 lg:pb-16 transition-colors duration-300">
       {/* Ambient background glow matching dark cinematic reference */}
       <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[850px] h-[550px] bg-gradient-to-b from-neutral-200/40 via-neutral-100/10 to-transparent dark:from-[#0B1522] dark:via-[#071017] dark:to-transparent rounded-full blur-[160px] pointer-events-none opacity-60" />
       <div className="absolute top-28 left-1/2 -translate-x-1/2 w-[400px] h-[400px] bg-primary/5 dark:bg-white/5 rounded-full blur-[120px] pointer-events-none" />
@@ -181,7 +181,7 @@ export function Hero() {
         <div className="max-w-xl sm:max-w-2xl mx-auto mb-8 sm:mb-10">
           <form
             onSubmit={handleSearch}
-            className="p-1.5 sm:p-2 rounded-2xl sm:rounded-full bg-white dark:bg-[#0D151D] border border-black/15 dark:border-white/20 shadow-2xl flex items-center gap-1.5 sm:gap-2 transition-all focus-within:ring-2 focus-within:ring-primary/20 dark:focus-within:ring-white/20"
+            className="p-1.5 sm:p-2 rounded-2xl sm:rounded-full bg-white dark:bg-[#1E1E1E] border border-black/15 dark:border-white/20 shadow-2xl flex items-center gap-1.5 sm:gap-2 transition-all focus-within:ring-2 focus-within:ring-primary/20 dark:focus-within:ring-white/20"
           >
             {/* Keyword Search Input */}
             <div className="flex-1 min-w-0 flex items-center gap-2.5 pl-3 sm:pl-4 py-1 bg-transparent">

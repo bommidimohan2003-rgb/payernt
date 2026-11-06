@@ -61,7 +61,7 @@ export const DeviceVerificationPage: React.FC = () => {
           </div>
 
           {loading ? (
-            <div className="card-premium p-10 bg-white dark:bg-[#0D151D] border border-neutral-200 dark:border-white/10 rounded-3xl text-center space-y-4 shadow-xl">
+            <div className="card-premium p-10 bg-white dark:bg-[#1E1E1E] border border-neutral-200 dark:border-white/10 rounded-3xl text-center space-y-4 shadow-xl">
               <div className="h-14 w-14 rounded-2xl bg-sky-500/10 text-sky-500 flex items-center justify-center mx-auto animate-pulse">
                 <ShieldCheck className="h-7 w-7" />
               </div>
@@ -76,7 +76,7 @@ export const DeviceVerificationPage: React.FC = () => {
             </div>
           ) : data?.verified && data.deviceStatus === "ACTIVE" ? (
             /* 1. ACTIVE & VERIFIED DEVICE RESULT */
-            <div className="card-premium p-7 sm:p-9 bg-white dark:bg-[#0D151D] border border-emerald-500/30 dark:border-emerald-500/20 rounded-3xl shadow-2xl space-y-6 animate-in fade-in zoom-in-95 duration-200">
+            <div className="card-premium p-7 sm:p-9 bg-white dark:bg-[#1E1E1E] border border-emerald-500/30 dark:border-emerald-500/20 rounded-3xl shadow-2xl space-y-6 animate-in fade-in zoom-in-95 duration-200">
               {/* Status Header */}
               <div className="flex items-center gap-3.5 pb-4 border-b border-neutral-100 dark:border-white/5">
                 <div className="h-12 w-12 rounded-2xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0">
@@ -93,7 +93,7 @@ export const DeviceVerificationPage: React.FC = () => {
               </div>
 
               {/* Hardware Spec Card */}
-              <div className="p-5 rounded-2xl bg-neutral-50 dark:bg-[#131E2A] border border-neutral-200/80 dark:border-white/5 space-y-3.5">
+              <div className="p-5 rounded-2xl bg-neutral-50 dark:bg-[#1E1E1E] border border-neutral-200/80 dark:border-white/5 space-y-3.5">
                 <div className="flex items-center justify-between pb-3 border-b border-neutral-200/60 dark:border-white/5">
                   <div className="flex items-center gap-2">
                     <Laptop className="h-4 w-4 text-sky-500" />
@@ -158,7 +158,7 @@ export const DeviceVerificationPage: React.FC = () => {
             </div>
           ) : data?.deviceStatus === "REPORTED_LOST" ? (
             /* 2. REPORTED LOST RESULT */
-            <div className="card-premium p-7 sm:p-9 bg-white dark:bg-[#0D151D] border border-amber-500/40 dark:border-amber-500/30 rounded-3xl shadow-2xl space-y-6 animate-in fade-in duration-200">
+            <div className="card-premium p-7 sm:p-9 bg-white dark:bg-[#1E1E1E] border border-amber-500/40 dark:border-amber-500/30 rounded-3xl shadow-2xl space-y-6 animate-in fade-in duration-200">
               <div className="flex items-center gap-3.5 pb-4 border-b border-neutral-100 dark:border-white/5">
                 <div className="h-12 w-12 rounded-2xl bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 flex items-center justify-center shrink-0">
                   <AlertTriangle className="h-6 w-6" />
@@ -182,7 +182,7 @@ export const DeviceVerificationPage: React.FC = () => {
                 </p>
               </div>
 
-              <div className="p-4 rounded-2xl bg-neutral-50 dark:bg-[#131E2A] border border-neutral-200/80 dark:border-white/5 space-y-2 text-xs font-mono">
+              <div className="p-4 rounded-2xl bg-neutral-50 dark:bg-[#1E1E1E] border border-neutral-200/80 dark:border-white/5 space-y-2 text-xs font-mono">
                 <div className="flex justify-between">
                   <span className="text-neutral-400 font-sans">Device ID:</span>
                   <span className="font-bold text-neutral-800 dark:text-neutral-200">{data.deviceId}</span>
@@ -211,7 +211,7 @@ export const DeviceVerificationPage: React.FC = () => {
             </div>
           ) : data?.deviceStatus === "REPORTED_STOLEN" ? (
             /* 3. REPORTED STOLEN RESULT */
-            <div className="card-premium p-7 sm:p-9 bg-white dark:bg-[#0D151D] border border-rose-500/40 dark:border-rose-500/30 rounded-3xl shadow-2xl space-y-6 animate-in fade-in duration-200">
+            <div className="card-premium p-7 sm:p-9 bg-white dark:bg-[#1E1E1E] border border-rose-500/40 dark:border-rose-500/30 rounded-3xl shadow-2xl space-y-6 animate-in fade-in duration-200">
               <div className="flex items-center gap-3.5 pb-4 border-b border-neutral-100 dark:border-white/5">
                 <div className="h-12 w-12 rounded-2xl bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 flex items-center justify-center shrink-0">
                   <ShieldAlert className="h-6 w-6" />
@@ -235,7 +235,7 @@ export const DeviceVerificationPage: React.FC = () => {
                 </p>
               </div>
 
-              <div className="p-4 rounded-2xl bg-neutral-50 dark:bg-[#131E2A] border border-neutral-200/80 dark:border-white/5 space-y-2 text-xs font-mono">
+              <div className="p-4 rounded-2xl bg-neutral-50 dark:bg-[#1E1E1E] border border-neutral-200/80 dark:border-white/5 space-y-2 text-xs font-mono">
                 <div className="flex justify-between">
                   <span className="text-neutral-400 font-sans">Device ID:</span>
                   <span className="font-bold text-neutral-800 dark:text-neutral-200">{data.deviceId}</span>
@@ -264,7 +264,7 @@ export const DeviceVerificationPage: React.FC = () => {
             </div>
           ) : (
             /* 4. INVALID / FAKE QR RESULT */
-            <div className="card-premium p-7 sm:p-9 bg-white dark:bg-[#0D151D] border border-neutral-200 dark:border-white/10 rounded-3xl shadow-xl space-y-5 text-center">
+            <div className="card-premium p-7 sm:p-9 bg-white dark:bg-[#1E1E1E] border border-neutral-200 dark:border-white/10 rounded-3xl shadow-xl space-y-5 text-center">
               <div className="h-14 w-14 rounded-2xl bg-rose-500/10 text-rose-500 border border-rose-500/20 flex items-center justify-center mx-auto">
                 <ShieldX className="h-7 w-7" />
               </div>

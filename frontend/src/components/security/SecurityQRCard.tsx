@@ -119,7 +119,7 @@ export const SecurityQRCard: React.FC<SecurityQRCardProps> = ({
 
   if (!currentDevice) {
     return (
-      <div className="card-premium p-8 sm:p-10 bg-white dark:bg-[#0D151D] border border-neutral-200 dark:border-white/10 rounded-3xl shadow-sm text-center space-y-4">
+      <div className="card-premium p-8 sm:p-10 bg-white dark:bg-[#1E1E1E] border border-neutral-200 dark:border-white/10 rounded-3xl shadow-sm text-center space-y-4">
         <div className="h-16 w-16 mx-auto rounded-3xl bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-neutral-400">
           <Laptop className="h-8 w-8" />
         </div>
@@ -188,7 +188,7 @@ export const SecurityQRCard: React.FC<SecurityQRCardProps> = ({
   };
 
   return (
-    <div className="card-premium p-6 sm:p-8 bg-white dark:bg-[#0D151D] border border-neutral-200 dark:border-white/10 rounded-3xl shadow-sm space-y-6">
+    <div className="card-premium p-6 sm:p-8 bg-white dark:bg-[#1E1E1E] border border-neutral-200 dark:border-white/10 rounded-3xl shadow-sm space-y-6">
       {/* Header & Device Switcher */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-neutral-200 dark:border-white/10">
         <div>
@@ -215,7 +215,7 @@ export const SecurityQRCard: React.FC<SecurityQRCardProps> = ({
                   setSelectedDeviceId(e.target.value);
                   setRevealedData(null);
                 }}
-                className="w-full sm:w-64 appearance-none h-10 pl-3.5 pr-9 text-xs font-semibold bg-neutral-50 dark:bg-[#131E2A] border border-neutral-200 dark:border-white/10 rounded-xl text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-sky-500/40 cursor-pointer"
+                className="w-full sm:w-64 appearance-none h-10 pl-3.5 pr-9 text-xs font-semibold bg-neutral-50 dark:bg-[#1E1E1E] border border-neutral-200 dark:border-white/10 rounded-xl text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-sky-500/40 cursor-pointer"
               >
                 {devices.map((d) => (
                   <option key={d.deviceId} value={d.deviceId}>
@@ -230,7 +230,7 @@ export const SecurityQRCard: React.FC<SecurityQRCardProps> = ({
       </div>
 
       {/* Device Summary Badges Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 rounded-2xl bg-neutral-50 dark:bg-[#131E2A]/70 border border-neutral-200/80 dark:border-white/5">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 rounded-2xl bg-neutral-50 dark:bg-[#1E1E1E]/70 border border-neutral-200/80 dark:border-white/5">
         <div>
           <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 block">
             Device
@@ -267,7 +267,7 @@ export const SecurityQRCard: React.FC<SecurityQRCardProps> = ({
       {!isRevealed ? (
         <div className="p-8 sm:p-10 rounded-3xl bg-neutral-50 dark:bg-black/30 border border-neutral-200 dark:border-white/10 text-center space-y-6 flex flex-col items-center justify-center">
           <div className="relative">
-            <div className="h-24 w-24 rounded-3xl bg-neutral-100 dark:bg-[#131E2A] border border-neutral-300 dark:border-white/10 flex items-center justify-center text-neutral-400 shadow-inner">
+            <div className="h-24 w-24 rounded-3xl bg-neutral-100 dark:bg-[#1E1E1E] border border-neutral-300 dark:border-white/10 flex items-center justify-center text-neutral-400 shadow-inner">
               <QrCode className="h-12 w-12 opacity-40 blur-[1px]" />
             </div>
             <div className="absolute -bottom-2 -right-2 h-8 w-8 rounded-full bg-sky-500 text-white flex items-center justify-center shadow-lg border-2 border-white dark:border-[#0D151D]">
@@ -345,7 +345,7 @@ export const SecurityQRCard: React.FC<SecurityQRCardProps> = ({
                 </p>
               </div>
 
-              <div className="p-4 rounded-2xl bg-white dark:bg-[#131E2A] border border-neutral-200 dark:border-white/5 space-y-2 text-xs">
+              <div className="p-4 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-neutral-200 dark:border-white/5 space-y-2 text-xs">
                 <div className="flex items-center justify-between text-neutral-600 dark:text-neutral-300">
                   <span className="text-neutral-400">Brand:</span>
                   <span className="font-semibold">{currentDevice.brand}</span>

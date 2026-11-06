@@ -1061,8 +1061,8 @@ export default function Messages() {
                                   className={cn(
                                     "max-w-[85%] sm:max-w-[75%] rounded-2xl p-3.5 text-xs shadow-xs space-y-2",
                                     isMe
-                                      ? "bg-[#161616] text-[#FFFFFF] dark:bg-[#22272E] dark:text-[#FFFFFF] rounded-tr-xs"
-                                      : "bg-[#F5F5F3] text-[#161616] dark:bg-[#161B22] dark:text-[#E6EDF3] border border-black/5 dark:border-white/5 rounded-tl-xs",
+                                      ? "bg-[#161616] text-[#FFFFFF] dark:bg-[#1E1E1E] dark:text-[#FFFFFF] rounded-tr-xs"
+                                      : "bg-[#F5F5F3] text-[#161616] dark:bg-[#1E1E1E] dark:text-[#E6EDF3] border border-black/5 dark:border-white/5 rounded-tl-xs",
                                   )}
                                 >
                                   {/* Sender Label for Counterparty */}

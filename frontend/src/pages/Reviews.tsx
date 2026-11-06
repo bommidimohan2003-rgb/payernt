@@ -198,7 +198,7 @@ export default function Reviews() {
 
   return (
     <MainLayout>
-      <div className="min-h-screen bg-white dark:bg-[#05090D] text-neutral-900 dark:text-white transition-colors duration-300 pt-6 sm:pt-8 pb-24">
+      <div className="min-h-screen bg-white dark:bg-[#1E1E1E] text-neutral-900 dark:text-white transition-colors duration-300 pt-6 sm:pt-8 pb-24">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Header Breadcrumb & Title */}
         <BackButton fallback="/categories" className="mb-4" />
@@ -235,7 +235,7 @@ export default function Reviews() {
         </div>
 
         {/* Live Statistics Banner */}
-        <div className="rounded-2xl bg-neutral-50 dark:bg-[#0D151D] border border-black/10 dark:border-white/10 p-6 sm:p-8 mb-10 shadow-sm">
+        <div className="rounded-2xl bg-neutral-50 dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 p-6 sm:p-8 mb-10 shadow-sm">
           <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
             {/* Left: Big Score */}
             <div className="md:col-span-4 flex flex-col items-center justify-center text-center p-4 border-b md:border-b-0 md:border-r border-black/10 dark:border-white/10">
@@ -304,7 +304,7 @@ export default function Reviews() {
             </div>
 
             {/* Right: Guarantee Callout */}
-            <div className="md:col-span-3 flex flex-col justify-center bg-white dark:bg-[#05090D] p-5 rounded-xl border border-black/5 dark:border-white/5 space-y-2.5">
+            <div className="md:col-span-3 flex flex-col justify-center bg-white dark:bg-[#1E1E1E] p-5 rounded-xl border border-black/5 dark:border-white/5 space-y-2.5">
               <div className="flex items-center gap-2 text-emerald-500 font-bold text-xs uppercase tracking-wider">
                 <ShieldCheck className="h-4 w-4" />
                 <span>100% Verified Rentals</span>
@@ -328,7 +328,7 @@ export default function Reviews() {
               className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 ratingFilter === undefined
                   ? "bg-neutral-900 text-white dark:bg-[#F2F0EA] dark:text-[#0A0A0A]"
-                  : "bg-neutral-100 dark:bg-[#0D151D] text-neutral-600 dark:text-[#CFC9BD] hover:bg-neutral-200 dark:hover:bg-[rgba(242,240,234,0.07)]"
+                  : "bg-neutral-100 dark:bg-[#1E1E1E] text-neutral-600 dark:text-[#CFC9BD] hover:bg-neutral-200 dark:hover:bg-[rgba(242,240,234,0.07)]"
               }`}
             >
               All Stars
@@ -344,7 +344,7 @@ export default function Reviews() {
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
                   ratingFilter === s
                     ? "bg-neutral-900 text-white dark:bg-[#F2F0EA] dark:text-[#0A0A0A]"
-                    : "bg-neutral-100 dark:bg-[#0D151D] text-neutral-600 dark:text-[#CFC9BD] hover:bg-neutral-200 dark:hover:bg-[rgba(242,240,234,0.07)]"
+                    : "bg-neutral-100 dark:bg-[#1E1E1E] text-neutral-600 dark:text-[#CFC9BD] hover:bg-neutral-200 dark:hover:bg-[rgba(242,240,234,0.07)]"
                 }`}
               >
                 <span>{s}</span>
@@ -374,7 +374,7 @@ export default function Reviews() {
                 setSortOrder(e.target.value);
                 setPage(1);
               }}
-              className="bg-neutral-100 dark:bg-[#0D151D] border border-black/10 dark:border-white/10 rounded-lg px-3 py-1.5 text-xs font-bold text-neutral-800 dark:text-white cursor-pointer focus:outline-none focus:ring-1 focus:ring-[#FF1744]"
+              className="bg-neutral-100 dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 rounded-lg px-3 py-1.5 text-xs font-bold text-neutral-800 dark:text-white cursor-pointer focus:outline-none focus:ring-1 focus:ring-[#FF1744]"
             >
               <option value="newest">Newest First</option>
               <option value="highest">Highest Rated</option>
@@ -390,7 +390,7 @@ export default function Reviews() {
             {[1, 2, 3, 4, 5, 6].map((i) => (
               <div
                 key={i}
-                className="rounded-2xl bg-neutral-50 dark:bg-[#0D151D] border border-black/10 dark:border-white/10 p-6 space-y-4 animate-pulse"
+                className="rounded-2xl bg-neutral-50 dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 p-6 space-y-4 animate-pulse"
               >
                 <div className="flex items-center gap-3">
                   <div className="h-10 w-10 rounded-xl bg-neutral-200 dark:bg-neutral-800" />
@@ -410,7 +410,7 @@ export default function Reviews() {
 
         {/* Error State */}
         {!isReviewsLoading && isError && (
-          <div className="rounded-2xl bg-neutral-50 dark:bg-[#0D151D] border border-black/10 dark:border-white/10 p-12 text-center">
+          <div className="rounded-2xl bg-neutral-50 dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 p-12 text-center">
             <AlertCircle className="h-8 w-8 text-[#FF1744] mx-auto mb-3" />
             <h3 className="text-base font-bold text-neutral-900 dark:text-white mb-1">
               Unable to load reviews
@@ -429,7 +429,7 @@ export default function Reviews() {
 
         {/* Empty State */}
         {!isReviewsLoading && !isError && reviewsList.length === 0 && (
-          <div className="rounded-2xl bg-neutral-50/50 dark:bg-[#0D151D]/60 border border-dashed border-black/15 dark:border-white/15 p-12 sm:p-16 text-center flex flex-col items-center justify-center">
+          <div className="rounded-2xl bg-neutral-50/50 dark:bg-[#1E1E1E]/60 border border-dashed border-black/15 dark:border-white/15 p-12 sm:p-16 text-center flex flex-col items-center justify-center">
             <div className="h-14 w-14 rounded-2xl bg-[#FF1744]/10 text-[#FF1744] flex items-center justify-center mb-4">
               <MessageSquareQuote className="h-7 w-7" />
             </div>
@@ -462,7 +462,7 @@ export default function Reviews() {
               return (
                 <div
                   key={r.id}
-                  className="rounded-2xl bg-neutral-50 dark:bg-[#0D151D] border border-black/10 dark:border-white/10 p-6 flex flex-col justify-between space-y-4 shadow-sm hover:border-black/20 dark:hover:border-white/20 transition-all text-left group"
+                  className="rounded-2xl bg-neutral-50 dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 p-6 flex flex-col justify-between space-y-4 shadow-sm hover:border-black/20 dark:hover:border-white/20 transition-all text-left group"
                 >
                   {/* Top Creator Header */}
                   <div className="flex items-start justify-between gap-3">
@@ -577,7 +577,7 @@ export default function Reviews() {
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page === 1}
-              className="px-3.5 py-2 rounded-xl bg-neutral-100 dark:bg-[#0D151D] border border-black/10 dark:border-white/10 text-xs font-bold text-neutral-700 dark:text-white disabled:opacity-30 transition-opacity flex items-center gap-1 cursor-pointer disabled:cursor-not-allowed"
+              className="px-3.5 py-2 rounded-xl bg-neutral-100 dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 text-xs font-bold text-neutral-700 dark:text-white disabled:opacity-30 transition-opacity flex items-center gap-1 cursor-pointer disabled:cursor-not-allowed"
             >
               <ChevronLeft className="h-3.5 w-3.5" />
               <span>Previous</span>
@@ -591,7 +591,7 @@ export default function Reviews() {
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page === totalPages}
-              className="px-3.5 py-2 rounded-xl bg-neutral-100 dark:bg-[#0D151D] border border-black/10 dark:border-white/10 text-xs font-bold text-neutral-700 dark:text-white disabled:opacity-30 transition-opacity flex items-center gap-1 cursor-pointer disabled:cursor-not-allowed"
+              className="px-3.5 py-2 rounded-xl bg-neutral-100 dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 text-xs font-bold text-neutral-700 dark:text-white disabled:opacity-30 transition-opacity flex items-center gap-1 cursor-pointer disabled:cursor-not-allowed"
             >
               <span>Next</span>
               <ChevronRight className="h-3.5 w-3.5" />
@@ -605,7 +605,7 @@ export default function Reviews() {
       {/* ========================================================= */}
       {isWriteModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="relative w-full max-w-lg rounded-2xl bg-white dark:bg-[#0D151D] border border-black/10 dark:border-white/10 p-6 sm:p-7 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
+          <div className="relative w-full max-w-lg rounded-2xl bg-white dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 p-6 sm:p-7 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
             {/* Header */}
             <div className="flex items-center justify-between pb-3 border-b border-black/10 dark:border-white/10">
               <div className="flex items-center gap-2">
@@ -670,7 +670,7 @@ export default function Reviews() {
                       value={selectedBookingId}
                       onChange={(e) => setSelectedBookingId(e.target.value)}
                       required
-                      className="w-full bg-neutral-50 dark:bg-[#05090D] border border-black/10 dark:border-white/10 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#FF1744] cursor-pointer"
+                      className="w-full bg-neutral-50 dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#FF1744] cursor-pointer"
                     >
                       <option value="">-- Choose your completed rental --</option>
                       {eligibleBookings.map((b) => (
@@ -726,7 +726,7 @@ export default function Reviews() {
                     placeholder="How was the gear condition, packaging, and rental handover? Share details to help other creators..."
                     maxLength={2000}
                     required
-                    className="w-full bg-neutral-50 dark:bg-[#05090D] border border-black/10 dark:border-white/10 rounded-xl p-3 text-xs sm:text-sm text-neutral-900 dark:text-white placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-[#FF1744] resize-none"
+                    className="w-full bg-neutral-50 dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 rounded-xl p-3 text-xs sm:text-sm text-neutral-900 dark:text-white placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-[#FF1744] resize-none"
                   />
                 </div>
 
@@ -766,7 +766,7 @@ export default function Reviews() {
       {/* ========================================================= */}
       {editingReview && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="relative w-full max-w-lg rounded-2xl bg-white dark:bg-[#0D151D] border border-black/10 dark:border-white/10 p-6 sm:p-7 shadow-2xl space-y-5">
+          <div className="relative w-full max-w-lg rounded-2xl bg-white dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 p-6 sm:p-7 shadow-2xl space-y-5">
             <div className="flex items-center justify-between pb-3 border-b border-black/10 dark:border-white/10">
               <div className="flex items-center gap-2">
                 <Edit3 className="h-4 w-4 text-[#FF1744]" />
@@ -831,7 +831,7 @@ export default function Reviews() {
                   onChange={(e) => setEditComment(e.target.value)}
                   maxLength={2000}
                   required
-                  className="w-full bg-neutral-50 dark:bg-[#05090D] border border-black/10 dark:border-white/10 rounded-xl p-3 text-xs sm:text-sm text-neutral-900 dark:text-white placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-[#FF1744] resize-none"
+                  className="w-full bg-neutral-50 dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 rounded-xl p-3 text-xs sm:text-sm text-neutral-900 dark:text-white placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-[#FF1744] resize-none"
                 />
               </div>
 
@@ -869,7 +869,7 @@ export default function Reviews() {
       {/* ========================================================= */}
       {deletingReviewId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-[#0D151D] border border-black/10 dark:border-white/10 p-6 shadow-2xl space-y-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 p-6 shadow-2xl space-y-4">
             <div className="h-10 w-10 rounded-xl bg-[#FF1744]/10 text-[#FF1744] flex items-center justify-center">
               <Trash2 className="h-5 w-5" />
             </div>
