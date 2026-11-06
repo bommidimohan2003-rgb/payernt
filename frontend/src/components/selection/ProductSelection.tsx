@@ -711,10 +711,10 @@ export function ProductSelection() {
               animate={{ opacity: 1, scale: 1 }}
               exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.95 }}
               transition={{ duration: 0.3, ease: smoothEase }}
-              className="w-full flex items-center justify-center"
+              className="w-full flex items-center justify-center px-1"
             >
-              {/* BRANCHING CONTAINER */}
-              <div className="relative flex items-center justify-between w-full max-w-[350px] sm:max-w-[410px] h-[300px]">
+              {/* BRANCHING CONTAINER: Exact alignment between parent node, connector tree, and child cards */}
+              <div className="relative flex items-center justify-center w-full max-w-[340px] xs:max-w-[365px] sm:max-w-[400px] h-[206px]">
                 {/* 1. LEFT PARENT NODE (paYent) - TAP TO CLOSE */}
                 <motion.button
                   type="button"
@@ -728,24 +728,20 @@ export function ProductSelection() {
                   }
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.35, ease: smoothEase }}
-                  className="shrink-0 z-20 cursor-pointer outline-none select-none text-left p-2.5 sm:p-4 border border-border/80 hover:border-foreground/60 rounded-2xl bg-card/60 active:scale-95 transition-all backdrop-blur-md focus-visible:ring-1 focus-visible:ring-foreground/40 shadow-sm group"
+                  className="shrink-0 z-20 cursor-pointer outline-none select-none text-left p-2 sm:p-2.5 border border-border/80 hover:border-foreground/60 rounded-2xl bg-card/80 active:scale-95 transition-all backdrop-blur-md focus-visible:ring-1 focus-visible:ring-foreground/40 shadow-xs group"
                 >
-                  <BrandTitle className="text-xl sm:text-2xl font-extrabold tracking-tight text-foreground" />
-                  <div className="text-[7.5px] sm:text-[8px] font-mono tracking-widest text-muted-foreground/60 group-hover:text-foreground/80 transition-colors uppercase mt-1">
+                  <BrandTitle className="text-base xs:text-lg font-extrabold tracking-tight text-foreground" />
+                  <div className="text-[7px] font-mono tracking-widest text-muted-foreground/70 group-hover:text-foreground/90 transition-colors uppercase mt-0.5">
                     TAP TO CLOSE
                   </div>
                 </motion.button>
 
-                {/* 2. CENTER CURVED CONNECTOR LINES (SVG) */}
+                {/* 2. CENTER CURVED CONNECTOR LINES (SVG) - Perfectly connects parent right edge to both child cards */}
                 <div
-                  className="relative shrink-0 z-10 pointer-events-none"
-                  style={{
-                    width: "clamp(20px, 7vw, 44px)",
-                    height: "280px",
-                  }}
+                  className="relative shrink-0 z-10 pointer-events-none w-7 xs:w-8 sm:w-10 h-[206px]"
                 >
                   <svg
-                    viewBox="0 0 48 280"
+                    viewBox="0 0 36 206"
                     fill="none"
                     className="w-full h-full"
                     preserveAspectRatio="none"
@@ -758,46 +754,50 @@ export function ProductSelection() {
                         x2="100%"
                         y2="50%"
                       >
-                        <stop offset="0%" stopColor="var(--color-foreground, #ffffff)" stopOpacity="0.8" />
-                        <stop offset="100%" stopColor="var(--color-foreground, #ffffff)" stopOpacity="0.4" />
+                        <stop offset="0%" stopColor="var(--color-foreground, #17191C)" stopOpacity="0.85" />
+                        <stop offset="100%" stopColor="var(--color-foreground, #17191C)" stopOpacity="0.55" />
                       </linearGradient>
                     </defs>
 
-                    {/* Upper Curved Connector -> paye₹nt */}
-                    <motion.path
-                      d="M 0 140 C 22 140, 24 50, 48 50"
+                    {/* Stem from parent button right edge into the junction */}
+                    <path
+                      d="M 0 103 L 6 103"
                       stroke="url(#mobileBranchGrad)"
-                      strokeWidth="1.75"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                    />
+
+                    {/* Upper Curved Connector -> paye₹nt (LENDER card center at y=48) */}
+                    <motion.path
+                      d="M 6 103 C 18 103, 20 48, 36 48"
+                      stroke="url(#mobileBranchGrad)"
+                      strokeWidth="1.5"
                       strokeLinecap="round"
                       initial={shouldReduceMotion ? { pathLength: 1, opacity: 1 } : { pathLength: 0, opacity: 0 }}
                       animate={{ pathLength: 1, opacity: 1 }}
                       transition={{ duration: 0.45, delay: 0.08, ease: smoothEase }}
                     />
 
-                    {/* Lower Curved Connector -> pay₹ent */}
+                    {/* Lower Curved Connector -> pay₹ent (RENTER card center at y=158) */}
                     <motion.path
-                      d="M 0 140 C 22 140, 24 230, 48 230"
+                      d="M 6 103 C 18 103, 20 158, 36 158"
                       stroke="url(#mobileBranchGrad)"
-                      strokeWidth="1.75"
+                      strokeWidth="1.5"
                       strokeLinecap="round"
                       initial={shouldReduceMotion ? { pathLength: 1, opacity: 1 } : { pathLength: 0, opacity: 0 }}
                       animate={{ pathLength: 1, opacity: 1 }}
                       transition={{ duration: 0.45, delay: 0.12, ease: smoothEase }}
                     />
 
-                    {/* Origin junction ring and dot */}
-                    <circle cx="2" cy="140" r="3.5" stroke="var(--color-foreground, #ffffff)" strokeWidth="1" fill="none" opacity="0.8" />
-                    <circle cx="2" cy="140" r="1.5" fill="var(--color-foreground, #ffffff)" />
+                    {/* Origin junction ring and dot directly touching the stem */}
+                    <circle cx="6" cy="103" r="3" stroke="var(--color-foreground, #17191C)" strokeWidth="1" fill="none" opacity="0.8" />
+                    <circle cx="6" cy="103" r="1.5" fill="var(--color-foreground, #17191C)" />
                   </svg>
                 </div>
 
-                {/* 3. RIGHT CHILD NODES (STACKED VERTICALLY) */}
+                {/* 3. RIGHT CHILD NODES (STACKED VERTICALLY - REDUCED COMPACT SIZING) */}
                 <div
-                  className="flex flex-col justify-between shrink-0 z-20"
-                  style={{
-                    width: "clamp(136px, 45vw, 205px)",
-                    height: "280px",
-                  }}
+                  className="flex flex-col gap-3.5 shrink-0 z-20 w-[140px] xs:w-[155px] sm:w-[170px]"
                 >
                   {/* UPPER CHILD: LENDING -> paye₹nt (LENDER) */}
                   <motion.button
@@ -812,38 +812,37 @@ export function ProductSelection() {
                     }
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.35, delay: 0.18, ease: smoothEase }}
-                    className="group cursor-pointer outline-none select-none text-left p-2.5 sm:p-4 border border-border/80 hover:border-foreground/60 rounded-2xl bg-card/60 active:scale-95 transition-all focus-visible:ring-1 focus-visible:ring-foreground/40 flex flex-col justify-between backdrop-blur-md shadow-sm"
-                    style={{ minHeight: "130px" }}
+                    className="group cursor-pointer outline-none select-none text-left p-2 xs:p-2.5 border border-border/80 hover:border-foreground/60 rounded-2xl bg-card/80 active:scale-95 transition-all focus-visible:ring-1 focus-visible:ring-foreground/40 flex flex-col justify-between backdrop-blur-md shadow-xs h-[96px]"
                   >
                     <div>
                       <div className="flex items-center justify-between w-full">
-                        <span className="text-[9px] font-mono tracking-widest text-muted-foreground/90 uppercase flex items-center gap-1.5">
-                          <Coins className="w-3 h-3 text-foreground/80" />
+                        <span className="text-[8px] xs:text-[8.5px] font-mono tracking-wider text-muted-foreground/90 uppercase flex items-center gap-1">
+                          <Coins className="w-2.5 h-2.5 text-foreground/80" />
                           LENDING
                         </span>
-                        <ArrowUpRight className="w-3.5 h-3.5 text-muted-foreground/60 group-hover:text-foreground transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                        <ArrowUpRight className="w-3 h-3 text-muted-foreground/60 group-hover:text-foreground transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
                       </div>
-                      <div className="mt-1">
+                      <div className="mt-0.5">
                         <ChoiceTitle
                           name="paye₹nt"
-                          className="text-base sm:text-lg font-extrabold text-foreground"
+                          className="text-sm xs:text-[15px] font-extrabold text-foreground"
                         />
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between w-full mt-1.5">
-                      <p className="text-xs sm:text-sm font-bold text-foreground uppercase tracking-wider">
+                    <div className="flex items-center justify-between w-full mt-0.5">
+                      <p className="text-[11px] xs:text-xs font-bold text-foreground uppercase tracking-wider">
                         LENDER
                       </p>
                       <div
-                        className="relative w-7 h-7 rounded-full bg-foreground/5 border border-border flex items-center justify-center text-foreground/90 shrink-0"
+                        className="relative w-6 h-6 rounded-full bg-foreground/5 border border-border flex items-center justify-center text-foreground/90 shrink-0"
                         title="Upload Gear to Inventory"
                       >
-                        <PackagePlus className="w-3.5 h-3.5" />
+                        <PackagePlus className="w-3 h-3" />
                       </div>
                     </div>
 
-                    <div className="text-[8px] sm:text-[9px] font-mono uppercase tracking-widest text-muted-foreground/75 mt-1">
+                    <div className="text-[7px] xs:text-[7.5px] font-mono uppercase tracking-widest text-muted-foreground/75">
                       LENDMORE, EARNMORE
                     </div>
                   </motion.button>
@@ -861,42 +860,41 @@ export function ProductSelection() {
                     }
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.35, delay: 0.24, ease: smoothEase }}
-                    className="group cursor-pointer outline-none select-none text-left p-2.5 sm:p-4 border border-border/80 hover:border-foreground/60 rounded-2xl bg-card/60 active:scale-95 transition-all focus-visible:ring-1 focus-visible:ring-foreground/40 flex flex-col justify-between backdrop-blur-md shadow-sm"
-                    style={{ minHeight: "130px" }}
+                    className="group cursor-pointer outline-none select-none text-left p-2 xs:p-2.5 border border-border/80 hover:border-foreground/60 rounded-2xl bg-card/80 active:scale-95 transition-all focus-visible:ring-1 focus-visible:ring-foreground/40 flex flex-col justify-between backdrop-blur-md shadow-xs h-[96px]"
                   >
                     <div>
                       <div className="flex items-center justify-between w-full">
-                        <span className="text-[9px] font-mono tracking-widest text-muted-foreground/90 uppercase flex items-center gap-1.5">
-                          <ShoppingBag className="w-3 h-3 text-foreground/80" />
+                        <span className="text-[8px] xs:text-[8.5px] font-mono tracking-wider text-muted-foreground/90 uppercase flex items-center gap-1">
+                          <ShoppingBag className="w-2.5 h-2.5 text-foreground/80" />
                           RENTING
                         </span>
-                        <ArrowDownRight className="w-3.5 h-3.5 text-muted-foreground/60 group-hover:text-foreground transition-transform group-hover:translate-x-0.5 group-hover:translate-y-0.5" />
+                        <ArrowDownRight className="w-3 h-3 text-muted-foreground/60 group-hover:text-foreground transition-transform group-hover:translate-x-0.5 group-hover:translate-y-0.5" />
                       </div>
-                      <div className="mt-1">
+                      <div className="mt-0.5">
                         <ChoiceTitle
                           name="pay₹ent"
-                          className="text-base sm:text-lg font-extrabold text-foreground"
+                          className="text-sm xs:text-[15px] font-extrabold text-foreground"
                         />
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between w-full mt-1.5">
-                      <p className="text-xs sm:text-sm font-bold text-foreground uppercase tracking-wider">
+                    <div className="flex items-center justify-between w-full mt-0.5">
+                      <p className="text-[11px] xs:text-xs font-bold text-foreground uppercase tracking-wider">
                         RENTER
                       </p>
                       {/* Bag with product being added indicator */}
                       <div
-                        className="relative w-7 h-7 rounded-full bg-foreground/5 border border-border flex items-center justify-center text-foreground/90 shrink-0"
+                        className="relative w-6 h-6 rounded-full bg-foreground/5 border border-border flex items-center justify-center text-foreground/90 shrink-0"
                         title="Add Product to Rental Bag"
                       >
-                        <ShoppingBag className="w-3.5 h-3.5" />
-                        <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-foreground text-background rounded-full flex items-center justify-center text-[7px] font-black leading-none">
+                        <ShoppingBag className="w-3 h-3" />
+                        <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-foreground text-background rounded-full flex items-center justify-center text-[6px] font-black leading-none">
                           +
                         </span>
                       </div>
                     </div>
 
-                    <div className="text-[8px] sm:text-[9px] font-mono uppercase tracking-widest text-muted-foreground/75 mt-1">
+                    <div className="text-[7px] xs:text-[7.5px] font-mono uppercase tracking-widest text-muted-foreground/75">
                       RENTMORE, SAVEMORE
                     </div>
                   </motion.button>
