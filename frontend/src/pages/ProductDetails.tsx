@@ -1186,11 +1186,11 @@ const productSchema = product ? {
       <MainLayout>
         <div className="min-h-screen bg-[#FAFBF9] dark:bg-[#070C12] text-neutral-900 dark:text-neutral-100">
           <div className="mx-auto max-w-7xl px-4 md:px-6 py-6 space-y-6">
-            <div className="grid lg:grid-cols-12 gap-8 items-start">
-              <div className="lg:col-span-6 space-y-3">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start w-full min-w-0">
+              <div className="lg:col-span-6 space-y-3 min-w-0 w-full">
                 <div className="aspect-[4/3] w-full rounded-3xl bg-neutral-200/60 dark:bg-[#0D151D] animate-pulse border border-black/10 dark:border-white/10" />
               </div>
-              <div className="lg:col-span-6 space-y-4">
+              <div className="lg:col-span-6 space-y-4 min-w-0 w-full">
                 <div className="h-96 w-full rounded-3xl bg-neutral-200/60 dark:bg-[#0D151D] animate-pulse border border-black/10 dark:border-white/10 p-5 space-y-4" />
               </div>
             </div>
@@ -1262,10 +1262,10 @@ const productSchema = product ? {
           </div>
           
           {/* 1. TOP HERO: PRODUCT GALLERY & DETAILS (2-Column Grid matching Reference) */}
-          <section className="grid lg:grid-cols-12 gap-8 lg:gap-12 items-start">
+          <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start w-full min-w-0">
             
             {/* Left Column: Image Gallery & 10s Video Showcase (6 cols) */}
-            <div className="lg:col-span-6 space-y-4">
+            <div className="lg:col-span-6 space-y-4 min-w-0 w-full">
               {/* Main Product Showcase Card with edge-to-edge image & floating overlay badges */}
               <div className="relative rounded-3xl overflow-hidden bg-neutral-950 border border-neutral-200/80 dark:border-neutral-800 aspect-[4/3] sm:aspect-[16/11] min-h-[380px] sm:min-h-[460px] max-h-[520px] w-full flex items-center justify-center shadow-md group">
                 {/* Center Showcase: 10s Video Player or High-Resolution Photo */}
@@ -1443,7 +1443,7 @@ const productSchema = product ? {
               </div>
 
               {/* 5-Thumbnail Media Strip (Photos + 10s Video Option) */}
-              <div className="grid grid-cols-5 gap-1.5 sm:gap-3">
+              <div className="grid grid-cols-5 gap-1.5 sm:gap-3 w-full min-w-0">
                 {thumbnails.map((thumb, idx) => {
                   const isActive = !isVideoActive && idx === selectedImageIndex;
                   const isFourth = idx === 3;
@@ -1456,7 +1456,7 @@ const productSchema = product ? {
                         setIsVideoActive(false);
                         setSelectedImageIndex(idx);
                       }}
-                      className={`relative aspect-square rounded-2xl overflow-hidden border-2 transition-all cursor-pointer p-2 flex items-center justify-center bg-card ${
+                      className={`relative aspect-square rounded-2xl overflow-hidden border-2 transition-all cursor-pointer p-1 sm:p-2 flex items-center justify-center bg-card min-w-0 ${
                         isActive
                           ? "border-emerald-600 ring-2 ring-emerald-500/20 shadow-xs"
                           : "border-border/80 hover:border-emerald-500/50"
@@ -1477,14 +1477,14 @@ const productSchema = product ? {
                   type="button"
                   onClick={() => setIsVideoActive(true)}
                   title="Play 10s Inspection Video"
-                  className={`relative aspect-square rounded-2xl overflow-hidden border-2 transition-all cursor-pointer p-2 flex flex-col items-center justify-center bg-neutral-950 text-white ${
+                  className={`relative aspect-square rounded-2xl overflow-hidden border-2 transition-all cursor-pointer p-1 sm:p-2 flex flex-col items-center justify-center bg-neutral-950 text-white min-w-0 ${
                     isVideoActive
                       ? "border-emerald-500 ring-2 ring-emerald-500/30 shadow-xs"
                       : "border-border/80 hover:border-emerald-500/50"
                   }`}
                 >
-                  <Video className="h-5 w-5 text-emerald-400 mb-1" />
-                  <span className="text-[10px] font-bold tracking-tight text-neutral-200">10s Video</span>
+                  <Video className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-400 mb-0.5 sm:mb-1 shrink-0" />
+                  <span className="text-[8.5px] sm:text-[10px] font-bold tracking-tight text-neutral-200 truncate max-w-full">10s Video</span>
                 </button>
               </div>
 
@@ -1674,7 +1674,7 @@ const productSchema = product ? {
             </div>
 
             {/* Right Column: Interactive Booking Calendar & Action (In place of details) */}
-            <div id="rental-booking-section" className="lg:col-span-6 space-y-4 text-left lg:sticky lg:top-24">
+            <div id="rental-booking-section" className="lg:col-span-6 space-y-4 text-left lg:sticky lg:top-24 min-w-0 w-full">
               <div className="rounded-2xl sm:rounded-3xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#0D151D] p-4 sm:p-5 shadow-xs space-y-3.5">
                 <div className="flex items-center justify-between pb-1 flex-wrap gap-2.5">
                   <div className="flex items-center gap-2">

@@ -196,10 +196,11 @@ export function HelpChatbot() {
     <>
       {/* Floating Launcher Button */}
       <motion.button
+        id="payent-chatbot-launcher"
         whileHover={{ scale: 1.05, y: -2 }}
         whileTap={{ scale: 0.95 }}
         onClick={() => setIsOpen((prev) => !prev)}
-        className="fixed bottom-5 sm:bottom-6 right-4 sm:right-6 z-40 h-14 w-14 rounded-2xl bg-[#17191C] text-white shadow-[0_12px_32px_-4px_rgba(23,25,28,0.38)] flex items-center justify-center border border-white/10 hover:bg-[#252930] transition-colors focus:outline-none focus:ring-2 focus:ring-[#16A36A] focus:ring-offset-2 cursor-pointer"
+        className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] md:bottom-6 right-3 sm:right-6 z-40 h-12 w-12 sm:h-14 sm:w-14 rounded-2xl bg-[#17191C] text-white shadow-[0_12px_32px_-4px_rgba(23,25,28,0.38)] flex items-center justify-center border border-white/10 hover:bg-[#252930] transition-colors focus:outline-none focus:ring-2 focus:ring-[#16A36A] focus:ring-offset-2 cursor-pointer"
         aria-label="Payent Support Assistant"
       >
         <AnimatePresence mode="wait">

@@ -206,7 +206,7 @@ export function Hero() {
             {/* Search Submit Button */}
             <button
               type="submit"
-              className="h-9 sm:h-10 px-5 sm:px-6 rounded-xl sm:rounded-full bg-[#161616] hover:bg-[#262626] text-[#F2F0EA] dark:bg-[#F2F0EA] dark:text-[#161616] dark:hover:bg-white text-xs sm:text-sm font-bold transition-all shrink-0 shadow-sm cursor-pointer flex items-center gap-1.5"
+              className="h-9 sm:h-10 px-3.5 sm:px-6 rounded-xl sm:rounded-full bg-[#161616] hover:bg-[#262626] text-[#F2F0EA] dark:bg-[#F2F0EA] dark:text-[#161616] dark:hover:bg-white text-xs sm:text-sm font-bold transition-all shrink-0 shadow-sm cursor-pointer flex items-center gap-1.5"
             >
               <span>Search</span>
             </button>

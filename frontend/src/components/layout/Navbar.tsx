@@ -73,7 +73,7 @@ export function Navbar() {
               : "bg-background/80 backdrop-blur-xl"
         )}
       >
-        <div className="mx-auto flex h-16 sm:h-[68px] w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex h-16 sm:h-[68px] w-full max-w-7xl items-center justify-between px-3 sm:px-6 lg:px-8">
           {/* Left: Brand Identity Logo */}
           <div className="flex items-center gap-3">
             <Link

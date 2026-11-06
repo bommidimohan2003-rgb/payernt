@@ -290,7 +290,7 @@ export function Navigation4({
           isHovered.set(0);
           mouseX.set(Infinity);
         }}
-        className="pointer-events-auto py-1.5 sm:py-2 px-3 sm:px-5 md:px-7 rounded-2xl bg-surface-navigation/95 backdrop-blur-2xl border border-border shadow-elevation-2 flex items-center justify-center gap-1 sm:gap-2.5 md:gap-3.5 w-auto min-w-[290px] sm:min-w-[360px] md:min-w-[420px] max-w-[calc(100vw-1rem)] overflow-visible transition-colors duration-200"
+        className="pointer-events-auto py-1.5 sm:py-2 px-2.5 sm:px-5 md:px-7 rounded-2xl bg-surface-navigation/95 backdrop-blur-2xl border border-border shadow-elevation-2 flex items-center justify-center gap-1 sm:gap-2.5 md:gap-3.5 w-auto min-w-0 xs:min-w-[290px] sm:min-w-[360px] md:min-w-[420px] max-w-[calc(100vw-1rem)] overflow-visible transition-colors duration-200"
       >
         {/* The 5 Main Items in exact required order */}
         <div className="flex items-center justify-between sm:justify-around w-full gap-1.5 sm:gap-2.5 md:gap-4 shrink-0">
