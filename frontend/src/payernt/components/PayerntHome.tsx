@@ -319,18 +319,22 @@ export function PayerntHome({
         </div>
 
         {/* Mobile Upcoming Bookings */}
-        <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-neutral-200/90 dark:border-white/[0.08] shadow-xs dark:shadow-md">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-sm font-bold text-neutral-900 dark:text-white font-display">
+        <div className="relative rounded-2xl sm:rounded-3xl bg-white dark:bg-[#1E1E1E] border border-neutral-300/80 dark:border-neutral-700/80 pt-5 sm:pt-6 p-4 sm:p-5 shadow-xs text-left">
+          <div className="absolute -top-3 left-4 px-2 bg-white dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
+            <Calendar className="h-3.5 w-3.5 text-primary" />
+            <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
               Upcoming Bookings
             </span>
+          </div>
+          <div className="absolute -top-3 right-4 px-1.5 bg-white dark:bg-[#1E1E1E] z-10">
             <button
               type="button"
               onClick={() => onNavigate("requests")}
               className="flex items-center gap-0.5 text-xs font-semibold text-neutral-500 dark:text-neutral-400 hover:text-black dark:hover:text-white transition-colors cursor-pointer"
               aria-label="View all upcoming bookings"
             >
-              <ChevronRight className="h-4 w-4" />
+              <span>View all</span>
+              <ChevronRight className="h-3.5 w-3.5" />
             </button>
           </div>
 
@@ -375,18 +379,22 @@ export function PayerntHome({
 
 
         {/* Mobile Your Products */}
-        <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-neutral-200/90 dark:border-white/[0.08] shadow-xs dark:shadow-md">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-sm font-bold text-neutral-900 dark:text-white font-display">
+        <div className="relative rounded-2xl sm:rounded-3xl bg-white dark:bg-[#1E1E1E] border border-neutral-300/80 dark:border-neutral-700/80 pt-5 sm:pt-6 p-4 sm:p-5 shadow-xs text-left">
+          <div className="absolute -top-3 left-4 px-2 bg-white dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
+            <Package className="h-3.5 w-3.5 text-primary" />
+            <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
               Your Products
             </span>
+          </div>
+          <div className="absolute -top-3 right-4 px-1.5 bg-white dark:bg-[#1E1E1E] z-10">
             <button
               type="button"
               onClick={() => onNavigate("products")}
               className="flex items-center gap-0.5 text-xs font-semibold text-neutral-500 dark:text-neutral-400 hover:text-black dark:hover:text-white transition-colors cursor-pointer"
               aria-label="View all products"
             >
-              <ChevronRight className="h-4 w-4" />
+              <span>View all</span>
+              <ChevronRight className="h-3.5 w-3.5" />
             </button>
           </div>
 
@@ -819,22 +827,21 @@ export function PayerntHome({
           {/* 3. Middle Section: Upcoming Bookings (8 Cols on desktop) & Your Products (4 Cols on desktop) */}
           <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-5 mt-5">
             {/* Upcoming Bookings (Wide Card - 8 Cols on desktop, full width on mobile) */}
-            <div className="col-span-1 lg:col-span-8 p-4 sm:p-6 rounded-2xl bg-neutral-50/90 border-neutral-200/90 dark:bg-[#1E1E1E]/90 dark:border-white/[0.07] border flex flex-col justify-between shadow-sm dark:shadow-lg min-h-[220px]">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-xl bg-white dark:bg-white/[0.05] border border-neutral-200 dark:border-white/10 text-neutral-700 dark:text-neutral-200">
-                    <Calendar className="h-4 w-4" />
-                  </div>
-                  <h2 className="text-sm font-bold text-neutral-900 dark:text-neutral-200 font-display">
-                    Upcoming Bookings
-                  </h2>
-                </div>
+            <div className="relative col-span-1 lg:col-span-8 pt-5 sm:pt-6 p-4 sm:p-6 rounded-2xl bg-neutral-50/90 border-neutral-300/80 dark:bg-[#1E1E1E]/90 dark:border-neutral-700/80 border flex flex-col justify-between shadow-sm dark:shadow-lg min-h-[220px] text-left">
+              <div className="absolute -top-3 left-4 px-2 bg-neutral-50 dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
+                <Calendar className="h-3.5 w-3.5 text-primary" />
+                <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
+                  Upcoming Bookings
+                </span>
+              </div>
+              <div className="absolute -top-3 right-4 px-1.5 bg-neutral-50 dark:bg-[#1E1E1E] z-10">
                 <button
                   type="button"
                   onClick={() => onNavigate("requests")}
-                  className="h-7 w-7 rounded-full bg-white hover:bg-neutral-100 border border-neutral-200 dark:bg-white/[0.06] dark:hover:bg-white/15 dark:border-white/10 flex items-center justify-center text-neutral-700 dark:text-neutral-300 hover:text-black dark:hover:text-white transition-colors cursor-pointer"
+                  className="flex items-center gap-0.5 text-xs font-semibold text-neutral-500 dark:text-neutral-400 hover:text-black dark:hover:text-white transition-colors cursor-pointer"
                   title="View All Bookings"
                 >
+                  <span>View all</span>
                   <ChevronRight className="h-3.5 w-3.5" />
                 </button>
               </div>
@@ -882,22 +889,21 @@ export function PayerntHome({
             </div>
 
             {/* Your Products (Compact Card - 4 Cols on desktop, full width on mobile) */}
-            <div className="col-span-1 lg:col-span-4 p-4 sm:p-6 rounded-2xl bg-neutral-50/90 border-neutral-200/90 dark:bg-[#1E1E1E]/90 dark:border-white/[0.07] border flex flex-col justify-between shadow-sm dark:shadow-lg min-h-[220px]">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-xl bg-white dark:bg-white/[0.05] border border-neutral-200 dark:border-white/10 text-neutral-700 dark:text-neutral-200">
-                    <Package className="h-4 w-4" />
-                  </div>
-                  <h2 className="text-sm font-bold text-neutral-900 dark:text-neutral-200 font-display">
-                    Your Products
-                  </h2>
-                </div>
+            <div className="relative col-span-1 lg:col-span-4 pt-5 sm:pt-6 p-4 sm:p-6 rounded-2xl bg-neutral-50/90 border-neutral-300/80 dark:bg-[#1E1E1E]/90 dark:border-neutral-700/80 border flex flex-col justify-between shadow-sm dark:shadow-lg min-h-[220px] text-left">
+              <div className="absolute -top-3 left-4 px-2 bg-neutral-50 dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
+                <Package className="h-3.5 w-3.5 text-primary" />
+                <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
+                  Your Products
+                </span>
+              </div>
+              <div className="absolute -top-3 right-4 px-1.5 bg-neutral-50 dark:bg-[#1E1E1E] z-10">
                 <button
                   type="button"
                   onClick={() => onNavigate("products")}
-                  className="h-7 w-7 rounded-full bg-white hover:bg-neutral-100 border border-neutral-200 dark:bg-white/[0.06] dark:hover:bg-white/15 dark:border-white/10 flex items-center justify-center text-neutral-700 dark:text-neutral-300 hover:text-black dark:hover:text-white transition-colors cursor-pointer"
+                  className="flex items-center gap-0.5 text-xs font-semibold text-neutral-500 dark:text-neutral-400 hover:text-black dark:hover:text-white transition-colors cursor-pointer"
                   title="View All Products"
                 >
+                  <span>View all</span>
                   <ChevronRight className="h-3.5 w-3.5" />
                 </button>
               </div>

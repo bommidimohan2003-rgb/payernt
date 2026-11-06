@@ -112,7 +112,7 @@ export default function Cart() {
                 {cartItems.map((item) => (
                   <div
                     key={item.id}
-                    className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 rounded-2xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-[#1E1E1E] shadow-sm transition-all"
+                    className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 rounded-2xl border border-neutral-300/80 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E] shadow-sm transition-all"
                   >
                     <div className="flex items-center gap-4 min-w-0 flex-1">
                       {/* Thumbnail */}
@@ -176,10 +176,12 @@ export default function Cart() {
 
               {/* Right Column: Order Summary Card */}
               <div className="lg:col-span-4 sticky top-[100px] space-y-4">
-                <div className="rounded-3xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-[#1E1E1E] p-6 shadow-sm">
-                  <h2 className="text-base font-extrabold tracking-tight pb-4 border-b border-neutral-100 dark:border-white/10">
-                    Rental Summary
-                  </h2>
+                <div className="relative rounded-2xl sm:rounded-3xl border border-neutral-300/80 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E] pt-5 sm:pt-6 p-6 shadow-sm">
+                  <div className="absolute -top-3 left-4 px-2 bg-white dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
+                    <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
+                      Rental Summary
+                    </span>
+                  </div>
 
                   <div className="mt-4 space-y-2.5 text-xs">
                     <div className="flex justify-between text-neutral-600 dark:text-[#AAB3BC]">

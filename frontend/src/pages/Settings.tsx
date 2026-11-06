@@ -279,12 +279,14 @@ export default function Settings() {
         {/* ========================================================================= */}
         {/* SECTION 2: APPEARANCE */}
         {/* ========================================================================= */}
-        <div className="card-premium p-5 sm:p-6 bg-white dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 rounded-3xl shadow-sm">
-          <h3 className="font-bold text-base text-neutral-900 dark:text-white flex items-center gap-2.5">
-            {theme === "dark" ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
-            {tCommon.appearance}
-          </h3>
-          <div className="mt-4 flex items-center justify-between">
+        <div className="relative rounded-2xl sm:rounded-3xl bg-white dark:bg-[#1E1E1E] border border-neutral-300/80 dark:border-neutral-700/80 pt-5 sm:pt-6 p-5 sm:p-6 shadow-sm text-left">
+          <div className="absolute -top-3 left-4 px-2 bg-white dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
+            {theme === "dark" ? <Moon className="h-3.5 w-3.5 text-primary" /> : <Sun className="h-3.5 w-3.5 text-primary" />}
+            <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
+              {tCommon.appearance}
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
             <div>
               <div className="font-semibold text-xs sm:text-sm text-neutral-900 dark:text-white">
                 {tCommon.themeMode}
@@ -300,28 +302,30 @@ export default function Settings() {
         {/* ========================================================================= */}
         {/* SECTION 3: LANGUAGES */}
         {/* ========================================================================= */}
-        <div className="card-premium p-5 sm:p-6 bg-white dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 rounded-3xl shadow-sm space-y-4">
-          <div>
-            <h3 className="font-bold text-base text-neutral-900 dark:text-white flex items-center gap-2.5">
-              <Globe className="h-5 w-5" />
+        <div className="relative rounded-2xl sm:rounded-3xl bg-white dark:bg-[#1E1E1E] border border-neutral-300/80 dark:border-neutral-700/80 pt-5 sm:pt-6 p-5 sm:p-6 shadow-sm space-y-4 text-left">
+          <div className="absolute -top-3 left-4 px-2 bg-white dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
+            <Globe className="h-3.5 w-3.5 text-primary" />
+            <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
               {tCommon.languages}
-            </h3>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
-              {tCommon.selectLanguage} (English, తెలుగు, हिन्दी)
-            </p>
+            </span>
           </div>
+          <p className="text-xs text-neutral-500 dark:text-neutral-400">
+            {tCommon.selectLanguage} (English, తెలుగు, हिन्दी)
+          </p>
           <LanguageSelector />
         </div>
 
         {/* ========================================================================= */}
         {/* SECTION 4: NOTIFICATIONS */}
         {/* ========================================================================= */}
-        <div className="card-premium p-5 sm:p-6 bg-white dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 rounded-3xl shadow-sm">
-          <h3 className="font-bold text-base text-neutral-900 dark:text-white flex items-center gap-2.5">
-            <Bell className="h-5 w-5" />
-            {tCommon.notificationPreferences}
-          </h3>
-          <div className="mt-4 space-y-4">
+        <div className="relative rounded-2xl sm:rounded-3xl bg-white dark:bg-[#1E1E1E] border border-neutral-300/80 dark:border-neutral-700/80 pt-5 sm:pt-6 p-5 sm:p-6 shadow-sm text-left">
+          <div className="absolute -top-3 left-4 px-2 bg-white dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
+            <Bell className="h-3.5 w-3.5 text-primary" />
+            <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
+              {tCommon.notificationPreferences}
+            </span>
+          </div>
+          <div className="space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-xs sm:text-sm font-medium text-neutral-800 dark:text-neutral-200">
                 {tCommon.bookingAlerts}
@@ -340,14 +344,19 @@ export default function Settings() {
         {/* ========================================================================= */}
         {/* SECTION 5: ACCOUNT & PROFILE */}
         {/* ========================================================================= */}
-        <div className="card-premium p-5 sm:p-6 bg-white dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 rounded-3xl shadow-sm">
-          <h3 className="font-bold text-base text-neutral-900 dark:text-white flex items-center gap-2.5">
-            <Lock className="h-5 w-5" />
-            Account & Profile
-          </h3>
+        <div className="relative rounded-2xl sm:rounded-3xl bg-white dark:bg-[#1E1E1E] border border-neutral-300/80 dark:border-neutral-700/80 pt-5 sm:pt-6 p-5 sm:p-6 shadow-sm text-left">
+          <div className="absolute -top-3 left-4 px-2 bg-white dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
+            <Lock className="h-3.5 w-3.5 text-primary" />
+            <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
+              Account & Profile
+            </span>
+          </div>
+          <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-3">
+            Manage your public creator portfolio, verified ID documents, and payout accounts.
+          </p>
           <Button
             variant="outline"
-            className="mt-4 text-xs font-bold"
+            className="text-xs font-bold"
             onClick={() => navigate({ to: "/profile" })}
           >
             {tCommon.view} {tCommon.profile}
@@ -357,11 +366,13 @@ export default function Settings() {
         {/* ========================================================================= */}
         {/* SECTION 6: DANGER ZONE */}
         {/* ========================================================================= */}
-        <div className="card-premium p-5 sm:p-6 bg-neutral-50 dark:bg-[#1E1E1E]/40 border border-neutral-300/80 dark:border-white/10 rounded-3xl shadow-sm">
-          <h3 className="font-bold text-base text-neutral-900 dark:text-white flex items-center gap-2.5">
-            <Trash2 className="h-5 w-5" />
-            {tCommon.dangerZone}
-          </h3>
+        <div className="relative rounded-2xl sm:rounded-3xl bg-neutral-50 dark:bg-[#1E1E1E]/40 border border-destructive/40 pt-5 sm:pt-6 p-5 sm:p-6 shadow-sm text-left">
+          <div className="absolute -top-3 left-4 px-2 bg-neutral-50 dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
+            <Trash2 className="h-3.5 w-3.5 text-destructive" />
+            <span className="text-xs sm:text-[13px] font-bold tracking-tight text-destructive">
+              {tCommon.dangerZone}
+            </span>
+          </div>
           <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
             {tCommon.logoutConfirmation}
           </p>

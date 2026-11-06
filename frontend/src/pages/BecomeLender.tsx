@@ -416,13 +416,21 @@ export default function BecomeLender() {
               /* Guided Form & Live Preview Grid */
               <div className="grid lg:grid-cols-12 gap-8 items-start">
                 {/* Form Side (7 cols desktop) */}
-                <div className="lg:col-span-7 rounded-3xl border border-border/80 dark:border-white/10 bg-card/60 dark:bg-card/40 backdrop-blur-2xl p-6 sm:p-10 space-y-8 shadow-xl">
+                <div className="relative lg:col-span-7 rounded-2xl sm:rounded-3xl border border-neutral-300/80 dark:border-neutral-700/80 bg-card dark:bg-[#1E1E1E] pt-5 sm:pt-6 p-6 sm:p-8 space-y-8 shadow-sm text-left">
+                  <div className="absolute -top-3 left-4 px-2 bg-card dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
+                    <Sparkles className="h-3.5 w-3.5 text-primary" />
+                    <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
+                      Listing Creation Wizard
+                    </span>
+                  </div>
+                  <div className="absolute -top-3 right-4 px-1.5 bg-card dark:bg-[#1E1E1E] z-10">
+                    <span className="text-xs font-bold text-primary">
+                      Step {currentStep} of 3
+                    </span>
+                  </div>
                   {/* Stepper Navigation */}
                   <div className="space-y-4 pb-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-primary">
-                        Step {currentStep} of 3
-                      </span>
+                    <div className="flex items-center justify-end">
                       <span className="text-xs font-medium text-muted-foreground">
                         {currentStep === 1 && "Product Name & Description"}
                         {currentStep === 2 && "Product Photos"}

@@ -1143,15 +1143,14 @@ export default function Support() {
           {/* TAB 2: GUIDED TROUBLESHOOTER */}
           {activeTab === "troubleshoot" && (
             <div className="max-w-3xl mx-auto space-y-6">
-              <div className="p-6 sm:p-8 rounded-3xl bg-card border border-border space-y-6">
-                <div className="space-y-1">
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-foreground/5 dark:bg-white/5 text-[11px] font-bold text-muted-foreground">
-                    <Wrench className="w-3 h-3" />
-                    <span>Safe Troubleshooting Diagnostic</span>
-                  </div>
-                  <h2 className="text-xl sm:text-2xl font-black text-foreground">
+              <div className="relative rounded-2xl sm:rounded-3xl bg-card dark:bg-[#1E1E1E] border border-neutral-300/80 dark:border-neutral-700/80 pt-5 sm:pt-6 p-6 sm:p-8 space-y-6 text-left">
+                <div className="absolute -top-3 left-4 px-2 bg-card dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
+                  <Wrench className="h-3.5 w-3.5 text-primary" />
+                  <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
                     Diagnostic Flow for {currentCategory.name}
-                  </h2>
+                  </span>
+                </div>
+                <div className="space-y-1">
                   <p className="text-xs sm:text-sm text-muted-foreground">
                     Follow safe, standard operating procedures to verify hardware condition and rental handovers.
                   </p>
@@ -1387,12 +1386,15 @@ export default function Support() {
           {/* TAB 3: RAISE SUPPORT TICKET */}
           {activeTab === "ticket" && (
             <div className="max-w-2xl mx-auto space-y-6">
-              <div className="p-6 sm:p-8 rounded-3xl bg-card border border-border space-y-6">
-                <div>
-                  <h2 className="text-xl sm:text-2xl font-black text-foreground">
+              <div className="relative rounded-2xl sm:rounded-3xl bg-card dark:bg-[#1E1E1E] border border-neutral-300/80 dark:border-neutral-700/80 pt-5 sm:pt-6 p-6 sm:p-8 space-y-6 text-left">
+                <div className="absolute -top-3 left-4 px-2 bg-card dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
+                  <LifeBuoy className="h-3.5 w-3.5 text-primary" />
+                  <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
                     Raise a Ticket for {currentCategory.name}
-                  </h2>
-                  <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+                  </span>
+                </div>
+                <div>
+                  <p className="text-xs sm:text-sm text-muted-foreground">
                     Submit your request directly to our platform coordinators. Authenticated tickets receive prioritized review.
                   </p>
                 </div>

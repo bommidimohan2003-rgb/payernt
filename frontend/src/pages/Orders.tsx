@@ -766,7 +766,13 @@ export default function Orders() {
                       {/* Full Booking Details Grid */}
                       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         {/* Product & Schedule Card (Left 2 cols) */}
-                        <div className="lg:col-span-2 rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#1E1E1E] p-5 sm:p-6 space-y-6 shadow-sm">
+                        <div className="relative lg:col-span-2 rounded-2xl sm:rounded-3xl border border-neutral-300/80 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E] pt-5 sm:pt-6 p-5 sm:p-6 space-y-6 shadow-sm text-left">
+                          <div className="absolute -top-3 left-4 px-2 bg-white dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
+                            <Package className="h-3.5 w-3.5 text-primary" />
+                            <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
+                              Product & Rental Details
+                            </span>
+                          </div>
                           <div className="flex flex-col sm:flex-row items-start gap-4">
                             {o.productImage || (o as any).product_image ? (
                               <img
@@ -997,12 +1003,12 @@ export default function Orders() {
                         <div className="space-y-6">
                           {/* Equipment Handover PIN Card */}
                           {!isCancelled && (
-                            <div className="rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#1E1E1E] p-5 space-y-3 shadow-xs">
-                              <div className="flex items-center justify-between">
-                                <h3 className="font-bold text-sm text-neutral-950 dark:text-[#F5F5F5] flex items-center gap-1.5">
-                                  <Lock className="h-4 w-4 text-emerald-500" />
-                                  <span>Equipment Handover PIN</span>
-                                </h3>
+                            <div className="relative rounded-2xl sm:rounded-3xl border border-neutral-300/80 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E] pt-5 sm:pt-6 p-5 space-y-3 shadow-xs text-left">
+                              <div className="absolute -top-3 left-4 px-2 bg-white dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
+                                <Lock className="h-3.5 w-3.5 text-primary" />
+                                <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
+                                  Equipment Handover PIN
+                                </span>
                               </div>
 
                               <p className="text-xs text-neutral-500 dark:text-[#A1A1AA]">
@@ -1039,8 +1045,12 @@ export default function Orders() {
                           )}
 
                           {/* Quick Actions Card */}
-                          <div className="rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#1E1E1E] p-5 space-y-3 shadow-xs">
-                            <h3 className="font-bold text-sm text-neutral-950 dark:text-[#F5F5F5]">Quick Actions</h3>
+                          <div className="relative rounded-2xl sm:rounded-3xl border border-neutral-300/80 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E] pt-5 sm:pt-6 p-5 space-y-3 shadow-xs text-left">
+                            <div className="absolute -top-3 left-4 px-2 bg-white dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
+                              <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
+                                Quick Actions
+                              </span>
+                            </div>
 
                             <div className="flex flex-col gap-2">
                               <button

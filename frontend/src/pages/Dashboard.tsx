@@ -386,24 +386,28 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* LEFT 8 COLS: ACTIVE RENTALS & RECENT ORDERS */}
           <div className="lg:col-span-8 space-y-6">
-            <div className="rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#1E1E1E] p-6 shadow-sm">
-              <div className="flex items-center justify-between pb-4 border-b border-black/5 dark:border-white/5">
-                <div>
-                  <h2 className="text-base font-bold text-neutral-950 dark:text-[#F5F5F5]">
-                    Rental Bookings ({orders.length})
-                  </h2>
-                  <p className="text-xs text-neutral-500 dark:text-[#A1A1AA] mt-0.5">
-                    Your active shoots, equipment handoffs, and order history
-                  </p>
-                </div>
+            <div className="relative rounded-2xl sm:rounded-3xl border border-neutral-300/80 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E] pt-5 sm:pt-6 p-6 shadow-sm text-left">
+              <div className="absolute -top-3 left-4 px-2 bg-white dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
+                <Package className="h-3.5 w-3.5 text-primary" />
+                <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
+                  Rental Bookings ({orders.length})
+                </span>
+              </div>
+              <div className="absolute -top-3 right-4 px-1.5 bg-white dark:bg-[#1E1E1E] z-10">
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => navigate({ to: "/orders" })}
-                  className="text-xs font-bold text-neutral-700 dark:text-[#A1A1AA] hover:text-neutral-950 dark:hover:text-[#F5F5F5]"
+                  className="text-xs font-bold text-neutral-700 dark:text-[#A1A1AA] hover:text-neutral-950 dark:hover:text-[#F5F5F5] h-auto p-0"
                 >
                   View all ({orders.length})
                 </Button>
+              </div>
+
+              <div className="pb-4 border-b border-black/5 dark:border-white/5">
+                <p className="text-xs text-neutral-500 dark:text-[#A1A1AA]">
+                  Your active shoots, equipment handoffs, and order history
+                </p>
               </div>
 
               {loadingOrders ? (
@@ -577,14 +581,14 @@ export default function Dashboard() {
           {/* RIGHT 4 COLS: PROFILE COMPLETION + MESSAGES + WISHLIST */}
           <div className="lg:col-span-4 space-y-6">
             {/* Profile Completeness Card */}
-            <div className="rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#1E1E1E] p-6 shadow-sm space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <User className="w-4 h-4 text-[#A1A1AA]" />
-                  <h3 className="text-sm font-bold text-neutral-950 dark:text-[#F5F5F5]">
-                    Profile Completeness
-                  </h3>
-                </div>
+            <div className="relative rounded-2xl sm:rounded-3xl border border-neutral-300/80 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E] pt-5 sm:pt-6 p-6 shadow-sm space-y-4 text-left">
+              <div className="absolute -top-3 left-4 px-2 bg-white dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
+                <User className="h-3.5 w-3.5 text-primary" />
+                <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
+                  Profile Completeness
+                </span>
+              </div>
+              <div className="absolute -top-3 right-4 px-1.5 bg-white dark:bg-[#1E1E1E] z-10">
                 <span className="text-xs font-mono font-black text-neutral-900 dark:text-[#F5F5F5]">
                   {profileStatus.percentage}%
                 </span>
@@ -629,14 +633,14 @@ export default function Dashboard() {
             </div>
 
             {/* Messages & Owner Inquiries Widget */}
-            <div className="rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#1E1E1E] p-6 shadow-sm space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b border-black/5 dark:border-white/5">
-                <div className="flex items-center gap-2">
-                  <MessageSquare className="w-4 h-4 text-[#A1A1AA]" />
-                  <h3 className="text-sm font-bold text-neutral-950 dark:text-[#F5F5F5]">
-                    Direct Messages & Inquiries
-                  </h3>
-                </div>
+            <div className="relative rounded-2xl sm:rounded-3xl border border-neutral-300/80 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E] pt-5 sm:pt-6 p-6 shadow-sm space-y-4 text-left">
+              <div className="absolute -top-3 left-4 px-2 bg-white dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
+                <MessageSquare className="h-3.5 w-3.5 text-primary" />
+                <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
+                  Direct Messages & Inquiries
+                </span>
+              </div>
+              <div className="absolute -top-3 right-4 px-1.5 bg-white dark:bg-[#1E1E1E] z-10">
                 <Link
                   to="/messages"
                   className="text-xs font-bold text-neutral-700 dark:text-[#A1A1AA] hover:text-[#F5F5F5]"
@@ -651,7 +655,7 @@ export default function Dashboard() {
 
               <Link
                 to="/messages"
-                className="w-full h-9 rounded-xl border border-black/10 dark:border-[#A1A1AA]/25 text-neutral-900 dark:text-[#F5F5F5] hover:bg-neutral-100 dark:hover:bg-white/5 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
+                className="w-full h-9 rounded-xl border border-neutral-300/80 dark:border-neutral-700/80 text-neutral-900 dark:text-[#F5F5F5] hover:bg-neutral-100 dark:hover:bg-white/5 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
               >
                 <MessageSquare className="w-3.5 h-3.5" />
                 <span>Open Messenger Inbox</span>
@@ -659,14 +663,14 @@ export default function Dashboard() {
             </div>
 
             {/* Wishlist Preview */}
-            <div className="rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#1E1E1E] p-6 shadow-sm space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b border-black/5 dark:border-white/5">
-                <div className="flex items-center gap-2">
-                  <Heart className="w-4 h-4 text-[#A1A1AA]" />
-                  <h3 className="text-sm font-bold text-neutral-950 dark:text-[#F5F5F5]">
-                    Saved Gear ({ids.length})
-                  </h3>
-                </div>
+            <div className="relative rounded-2xl sm:rounded-3xl border border-neutral-300/80 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E] pt-5 sm:pt-6 p-6 shadow-sm space-y-4 text-left">
+              <div className="absolute -top-3 left-4 px-2 bg-white dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
+                <Heart className="h-3.5 w-3.5 text-primary" />
+                <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
+                  Saved Gear ({ids.length})
+                </span>
+              </div>
+              <div className="absolute -top-3 right-4 px-1.5 bg-white dark:bg-[#1E1E1E] z-10">
                 <Link
                   to="/wishlist"
                   className="text-xs font-bold text-neutral-600 dark:text-[#A1A1AA] hover:text-[#F5F5F5]"

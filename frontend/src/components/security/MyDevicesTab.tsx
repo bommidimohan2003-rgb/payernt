@@ -116,20 +116,20 @@ export const MyDevicesTab: React.FC<MyDevicesTabProps> = ({
             return (
               <div
                 key={dev.deviceId}
-                className="card-premium p-5 sm:p-6 bg-white dark:bg-[#1E1E1E] border border-neutral-200 dark:border-white/10 rounded-3xl shadow-sm space-y-4 flex flex-col justify-between hover:border-neutral-300 dark:hover:border-white/20 transition-all"
+                className="relative rounded-2xl sm:rounded-3xl bg-white dark:bg-[#1E1E1E] border border-neutral-300/80 dark:border-neutral-700/80 pt-5 sm:pt-6 p-5 sm:p-6 shadow-sm space-y-4 flex flex-col justify-between hover:border-primary/40 transition-all text-left"
               >
+                <div className="absolute -top-3 left-4 px-2 bg-white dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
+                  <Laptop className="h-3.5 w-3.5 text-primary" />
+                  <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
+                    {dev.deviceName}
+                  </span>
+                </div>
                 <div className="space-y-3">
                   {/* Top Bar */}
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2.5">
-                      <div className="h-10 w-10 rounded-2xl bg-sky-500/10 dark:bg-sky-400/15 border border-sky-500/20 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0">
-                        <Laptop className="h-5 w-5" />
-                      </div>
                       <div>
-                        <h4 className="font-bold text-sm text-neutral-900 dark:text-white">
-                          {dev.deviceName}
-                        </h4>
-                        <span className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                        <span className="text-[11px] text-neutral-500 dark:text-neutral-400 font-medium">
                           {dev.brand} &bull; {dev.model || "Laptop Chassis"}
                         </span>
                       </div>

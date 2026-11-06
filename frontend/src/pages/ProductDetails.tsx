@@ -1492,28 +1492,27 @@ const productSchema = product ? {
 
             {/* 2. Check Availability & Rental Booking Section (Mobile/Tablet: 1st after gallery (order-2), Desktop: Right Column Sticky) */}
             <div id="rental-booking-section" className="order-2 lg:order-3 lg:col-span-6 lg:col-start-7 lg:row-start-1 lg:row-span-2 space-y-4 text-left lg:sticky lg:top-24 min-w-0 w-full">
-              <div className="rounded-2xl sm:rounded-3xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#1E1E1E] p-4 sm:p-5 shadow-xs space-y-3.5">
+              <div className="relative rounded-2xl sm:rounded-3xl border border-neutral-300/80 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E] pt-5 sm:pt-6 p-4 sm:p-5 shadow-xs space-y-3.5">
+                <div className="absolute -top-3 left-4 px-2 bg-white dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
+                  <Calendar className="h-3.5 w-3.5 text-primary" />
+                  <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
+                    Rental Booking
+                  </span>
+                </div>
+
                 <div className="flex items-center justify-between pb-1 flex-wrap gap-2.5">
-                  <div className="flex items-center gap-2">
-                    <div className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-                      <Calendar className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <h2 className="text-sm sm:text-base font-bold text-foreground">Rental Booking</h2>
-                      <p className="text-[11px] text-muted-foreground">Select date, choose time slot, and verify availability.</p>
-                    </div>
-                  </div>
+                  <p className="text-[11px] text-muted-foreground">Select date, choose time slot, and verify availability.</p>
                 </div>
 
                 {/* Calendar Dropdown Selector */}
-                <div className="space-y-1.5">
-                  <label className="block text-[11px] font-bold text-foreground uppercase tracking-wider">
+                <div className="relative pt-1.5 space-y-1.5">
+                  <label className="absolute -top-2 left-3 px-1.5 bg-white dark:bg-[#1E1E1E] text-[10px] sm:text-[11px] font-bold text-foreground uppercase tracking-wider pointer-events-none select-none z-10">
                     Rental Date
                   </label>
                   <button
                     type="button"
                     onClick={() => setShowFullCalendar((prev) => !prev)}
-                    className="w-full p-2.5 sm:p-3 rounded-xl border border-black/10 dark:border-white/10 bg-neutral-100/70 dark:bg-[#1E1E1E] hover:bg-neutral-100 dark:hover:bg-white/10 transition-all flex items-center justify-between cursor-pointer group"
+                    className="w-full p-2.5 sm:p-3 rounded-xl border border-neutral-300/80 dark:border-neutral-700/80 bg-neutral-100/70 dark:bg-[#1E1E1E] hover:bg-neutral-100 dark:hover:bg-white/10 transition-all flex items-center justify-between cursor-pointer group"
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
                       <div className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
@@ -1572,11 +1571,11 @@ const productSchema = product ? {
                 </div>
 
                 {/* Choose Slot */}
-                <div className="space-y-1.5 pt-0.5">
-                  <label className="block text-[11px] font-bold text-foreground uppercase tracking-wider">
+                <div className="relative pt-2 space-y-1.5">
+                  <label className="absolute -top-1.5 left-3 px-1.5 bg-white dark:bg-[#1E1E1E] text-[10px] sm:text-[11px] font-bold text-foreground uppercase tracking-wider pointer-events-none select-none z-10">
                     Choose Time Slot
                   </label>
-                  <div className="grid grid-cols-3 gap-1.5 sm:gap-2 w-full min-w-0">
+                  <div className="grid grid-cols-3 gap-1.5 sm:gap-2 w-full min-w-0 pt-0.5">
                     {/* Morning */}
                     <button
                       type="button"
@@ -1584,7 +1583,7 @@ const productSchema = product ? {
                       className={`p-1.5 xs:p-2 sm:p-2.5 rounded-xl border text-left transition-all cursor-pointer min-w-0 flex flex-col justify-between ${
                         selectedSlot === "morning" && durationMode === "half_day_morning"
                           ? "border-primary bg-primary/10 dark:bg-primary/15 ring-2 ring-primary/20 shadow-xs"
-                          : "border-black/10 dark:border-white/10 bg-neutral-100/60 dark:bg-[#1E1E1E] hover:bg-neutral-100 dark:hover:bg-white/10"
+                          : "border-neutral-300/80 dark:border-neutral-700/80 bg-neutral-100/60 dark:bg-[#1E1E1E] hover:bg-neutral-100 dark:hover:bg-white/10"
                       }`}
                     >
                       <div className="min-w-0">
@@ -1608,7 +1607,7 @@ const productSchema = product ? {
                       className={`p-1.5 xs:p-2 sm:p-2.5 rounded-xl border text-left transition-all cursor-pointer min-w-0 flex flex-col justify-between ${
                         selectedSlot === "afternoon" && durationMode === "half_day_afternoon"
                           ? "border-primary bg-primary/10 dark:bg-primary/15 ring-2 ring-primary/20 shadow-xs"
-                          : "border-black/10 dark:border-white/10 bg-neutral-100/60 dark:bg-[#1E1E1E] hover:bg-neutral-100 dark:hover:bg-white/10"
+                          : "border-neutral-300/80 dark:border-neutral-700/80 bg-neutral-100/60 dark:bg-[#1E1E1E] hover:bg-neutral-100 dark:hover:bg-white/10"
                       }`}
                     >
                       <div className="min-w-0">
@@ -1632,7 +1631,7 @@ const productSchema = product ? {
                       className={`p-1.5 xs:p-2 sm:p-2.5 rounded-xl border text-left transition-all cursor-pointer min-w-0 flex flex-col justify-between ${
                         selectedSlot === "full_day" && durationMode === "full_day"
                           ? "border-primary bg-primary/10 dark:bg-primary/15 ring-2 ring-primary/20 shadow-xs"
-                          : "border-black/10 dark:border-white/10 bg-neutral-100/60 dark:bg-[#1E1E1E] hover:bg-neutral-100 dark:hover:bg-white/10"
+                          : "border-neutral-300/80 dark:border-neutral-700/80 bg-neutral-100/60 dark:bg-[#1E1E1E] hover:bg-neutral-100 dark:hover:bg-white/10"
                       }`}
                     >
                       <div className="min-w-0">
@@ -1652,11 +1651,11 @@ const productSchema = product ? {
                 </div>
 
                 {/* Booking Summary */}
-                <div className="p-2.5 sm:p-3 rounded-xl bg-neutral-100/70 dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 flex items-center justify-between gap-3">
+                <div className="relative rounded-2xl bg-neutral-100/70 dark:bg-[#1E1E1E] border border-neutral-300/80 dark:border-neutral-700/80 pt-4.5 pb-3 px-3.5 sm:px-4 flex items-center justify-between gap-3">
+                  <div className="absolute -top-2.5 left-3 px-1.5 bg-neutral-100 dark:bg-[#1E1E1E] text-[10px] sm:text-[11px] font-bold text-foreground pointer-events-none select-none z-10">
+                    Booking Summary
+                  </div>
                   <div>
-                    <span className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                      Booking Summary
-                    </span>
                     <div className="text-xs font-semibold text-foreground">
                       {durationMode === "half_day_morning"
                         ? "1 Day • Morning Slot"
@@ -1858,7 +1857,13 @@ const productSchema = product ? {
 
             {/* 3. Product Details & Book Section (Mobile/Tablet: 2nd after check availability (order-3), Desktop: Left Column under Gallery (order-2)) */}
             <div className="order-3 lg:order-2 lg:col-span-6 lg:col-start-1 lg:row-start-2 min-w-0 w-full">
-              <div className="rounded-3xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#1E1E1E] p-5 sm:p-6 shadow-xs space-y-5 text-left">
+              <div className="relative rounded-2xl sm:rounded-3xl border border-neutral-300/80 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E] pt-5 sm:pt-6 p-5 sm:p-6 shadow-xs space-y-5 text-left">
+                <div className="absolute -top-3 left-4 px-2 bg-white dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
+                  <Info className="h-3.5 w-3.5 text-primary" />
+                  <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
+                    Product Overview
+                  </span>
+                </div>
                 {/* 1. Product Description moved to top of this section */}
                 <p className="text-sm text-muted-foreground leading-relaxed">
                   {product.description ||

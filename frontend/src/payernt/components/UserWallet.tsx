@@ -317,25 +317,31 @@ export function UserWalletView({
       </div>
 
       {/* Saved Bank Accounts for Withdrawal */}
-      <div className="p-6 rounded-3xl border border-border bg-card space-y-4 shadow-2xs">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-sm font-bold text-foreground">Saved Bank Accounts</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Verified destinations for receiving wallet withdrawal settlements.
-            </p>
-          </div>
+      <div className="relative rounded-2xl sm:rounded-3xl border border-neutral-300/80 dark:border-neutral-700/80 bg-card dark:bg-[#1E1E1E] pt-5 sm:pt-6 p-6 space-y-4 shadow-2xs text-left">
+        <div className="absolute -top-3 left-4 px-2 bg-card dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
+          <Building className="h-3.5 w-3.5 text-primary" />
+          <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
+            Saved Bank Accounts
+          </span>
+        </div>
+        <div className="absolute -top-3 right-4 px-1.5 bg-card dark:bg-[#1E1E1E] z-10">
           <button
             type="button"
             onClick={() => {
               setBankFormError(null);
               setIsAddBankModalOpen(true);
             }}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border hover:bg-secondary text-xs font-semibold text-foreground cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg border border-border hover:bg-secondary text-xs font-semibold text-foreground cursor-pointer"
           >
             <Plus className="h-3.5 w-3.5" />
-            <span>Add Bank Account</span>
+            <span>Add Bank</span>
           </button>
+        </div>
+
+        <div>
+          <p className="text-xs text-muted-foreground">
+            Verified destinations for receiving wallet withdrawal settlements.
+          </p>
         </div>
 
         {wallet.bankAccounts.length === 0 ? (

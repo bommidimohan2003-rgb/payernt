@@ -179,17 +179,19 @@ export function LenderEarnings({
       </div>
 
       {/* Payout Transactions Log Table */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="font-bold text-base text-foreground font-display">
+      <div className="relative rounded-2xl sm:rounded-3xl border border-neutral-300/80 dark:border-neutral-700/80 bg-card dark:bg-[#1E1E1E] pt-5 sm:pt-6 p-4 sm:p-6 overflow-hidden shadow-xs space-y-4 text-left">
+        <div className="absolute -top-3 left-4 px-2 bg-card dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
+          <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground font-display">
             Completed Rental Settlement Log
-          </h3>
+          </span>
+        </div>
+        <div className="absolute -top-3 right-4 px-1.5 bg-card dark:bg-[#1E1E1E] z-10">
           <span className="text-xs text-muted-foreground font-medium">
             {transactions.length} Total Records
           </span>
         </div>
 
-        <div className="rounded-3xl border border-border/80 bg-card overflow-hidden shadow-xs">
+        <div className="rounded-2xl border border-border/80 bg-card overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>

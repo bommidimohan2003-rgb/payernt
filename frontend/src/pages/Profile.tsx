@@ -688,14 +688,14 @@ export default function Profile() {
           {/* Left 2 Columns: Active Tab Form Container */}
           <div className="lg:col-span-2 space-y-6">
             {activeTab === "details" && (
-              <div className="card-premium p-6 sm:p-8 border border-border/80 space-y-6 animate-in fade-in duration-300">
-                <div className="flex items-center justify-between pb-4 border-b border-border">
-                  <div className="flex items-center gap-2">
-                    <UserIcon className="h-5 w-5 text-primary" />
-                    <h3 className="font-extrabold text-lg text-foreground">
-                      General Creator Details
-                    </h3>
-                  </div>
+              <div className="relative rounded-2xl sm:rounded-3xl border border-neutral-300/80 dark:border-neutral-700/80 bg-card dark:bg-[#1E1E1E] pt-5 sm:pt-6 p-6 sm:p-8 space-y-6 animate-in fade-in duration-300 text-left">
+                <div className="absolute -top-3 left-4 px-2 bg-card dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
+                  <UserIcon className="h-3.5 w-3.5 text-primary" />
+                  <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
+                    General Creator Details
+                  </span>
+                </div>
+                <div className="absolute -top-3 right-4 px-1.5 bg-card dark:bg-[#1E1E1E] z-10">
                   <span className="text-xs text-muted-foreground font-semibold">
                     Public Marketplace Info
                   </span>
@@ -758,14 +758,14 @@ export default function Profile() {
             )}
 
             {activeTab === "location" && (
-              <div className="card-premium p-6 sm:p-8 border border-border/80 space-y-6 animate-in fade-in duration-300">
-                <div className="flex items-center justify-between pb-4 border-b border-border flex-wrap gap-2">
-                  <div className="flex items-center gap-2">
-                    <MapPin className="h-5 w-5 text-emerald-500" />
-                    <h3 className="font-extrabold text-lg text-foreground">
-                      Realtime Location & Address
-                    </h3>
-                  </div>
+              <div className="relative rounded-2xl sm:rounded-3xl border border-neutral-300/80 dark:border-neutral-700/80 bg-card dark:bg-[#1E1E1E] pt-5 sm:pt-6 p-6 sm:p-8 space-y-6 animate-in fade-in duration-300 text-left">
+                <div className="absolute -top-3 left-4 px-2 bg-card dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
+                  <MapPin className="h-3.5 w-3.5 text-primary" />
+                  <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
+                    Realtime Location & Address
+                  </span>
+                </div>
+                <div className="flex items-center justify-end pb-4 border-b border-border flex-wrap gap-2">
                   <Button
                     type="button"
                     variant="outline"
@@ -857,14 +857,14 @@ export default function Profile() {
             )}
 
             {activeTab === "payout" && (
-              <div className="card-premium p-6 sm:p-8 border border-border/80 space-y-6 animate-in fade-in duration-300">
-                <div className="flex items-center justify-between pb-4 border-b border-border">
-                  <div className="flex items-center gap-2">
-                    <CreditCard className="h-5 w-5 text-primary" />
-                    <h3 className="font-extrabold text-lg text-foreground">
-                      Contact & Payout Channels
-                    </h3>
-                  </div>
+              <div className="relative rounded-2xl sm:rounded-3xl border border-neutral-300/80 dark:border-neutral-700/80 bg-card dark:bg-[#1E1E1E] pt-5 sm:pt-6 p-6 sm:p-8 space-y-6 animate-in fade-in duration-300 text-left">
+                <div className="absolute -top-3 left-4 px-2 bg-card dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
+                  <CreditCard className="h-3.5 w-3.5 text-primary" />
+                  <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
+                    Contact & Payout Channels
+                  </span>
+                </div>
+                <div className="absolute -top-3 right-4 px-1.5 bg-card dark:bg-[#1E1E1E] z-10">
                   <span className="text-xs text-muted-foreground font-semibold">
                     Financial & Settlement
                   </span>
@@ -936,14 +936,14 @@ export default function Profile() {
             {activeTab === "security" && (
               <div className="space-y-6 animate-in fade-in duration-300">
                 {/* Security & Password Change */}
-                <div className="card-premium p-6 sm:p-8 border border-border/80 space-y-6">
-                  <div className="flex items-center justify-between pb-4 border-b border-border">
-                    <div className="flex items-center gap-2">
-                      <Lock className="h-5 w-5 text-primary" />
-                      <h3 className="font-extrabold text-lg text-foreground">
-                        Security & Password
-                      </h3>
-                    </div>
+                <div className="relative rounded-2xl sm:rounded-3xl border border-neutral-300/80 dark:border-neutral-700/80 bg-card dark:bg-[#1E1E1E] pt-5 sm:pt-6 p-6 sm:p-8 space-y-6 text-left">
+                  <div className="absolute -top-3 left-4 px-2 bg-card dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
+                    <Lock className="h-3.5 w-3.5 text-primary" />
+                    <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
+                      Security & Password
+                    </span>
+                  </div>
+                  <div className="absolute -top-3 right-4 px-1.5 bg-card dark:bg-[#1E1E1E] z-10">
                     <span className="text-xs text-muted-foreground font-semibold">
                       Account Protection
                     </span>

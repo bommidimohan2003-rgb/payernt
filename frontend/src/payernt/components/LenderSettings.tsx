@@ -350,30 +350,24 @@ export function LenderSettingsView({
       </div>
 
       {/* 3. Languages Selection Card */}
-      <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-neutral-200/90 dark:border-white/[0.08] shadow-xs space-y-4">
-        <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-xl bg-neutral-100 dark:bg-white/[0.06] text-neutral-800 dark:text-neutral-200">
-            <Globe className="h-4 w-4" />
-          </div>
-          <div>
-            <h2 className="text-sm font-bold text-neutral-900 dark:text-white">{tCommon.languages}</h2>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400">{tCommon.selectLanguage} (English, తెలుగు, हिन्दी)</p>
-          </div>
+      <div className="relative rounded-2xl sm:rounded-3xl bg-white dark:bg-[#1E1E1E] border border-neutral-300/80 dark:border-neutral-700/80 pt-5 sm:pt-6 p-4 sm:p-5 shadow-xs space-y-4 text-left">
+        <div className="absolute -top-3 left-4 px-2 bg-white dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
+          <Globe className="h-3.5 w-3.5 text-primary" />
+          <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
+            {tCommon.languages}
+          </span>
         </div>
-
+        <p className="text-xs text-neutral-500 dark:text-neutral-400">{tCommon.selectLanguage} (English, తెలుగు, हिन्दी)</p>
         <LanguageSelector />
       </div>
 
       {/* 4. Notification Preferences */}
-      <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-neutral-200/90 dark:border-white/[0.08] shadow-xs space-y-4">
-        <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-xl bg-neutral-100 dark:bg-white/[0.06] text-neutral-800 dark:text-neutral-200">
-            <Bell className="h-4 w-4" />
-          </div>
-          <div>
-            <h2 className="text-sm font-bold text-neutral-900 dark:text-white">{tCommon.notificationPreferences}</h2>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400">{tCommon.notifications}</p>
-          </div>
+      <div className="relative rounded-2xl sm:rounded-3xl bg-white dark:bg-[#1E1E1E] border border-neutral-300/80 dark:border-neutral-700/80 pt-5 sm:pt-6 p-4 sm:p-5 shadow-xs space-y-4 text-left">
+        <div className="absolute -top-3 left-4 px-2 bg-white dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
+          <Bell className="h-3.5 w-3.5 text-primary" />
+          <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
+            {tCommon.notificationPreferences}
+          </span>
         </div>
 
         <div className="divide-y divide-neutral-100 dark:divide-white/[0.06]">
@@ -422,15 +416,12 @@ export function LenderSettingsView({
       </div>
 
       {/* 5. Rental & Handover Preferences */}
-      <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-neutral-200/90 dark:border-white/[0.08] shadow-xs space-y-4">
-        <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-xl bg-neutral-100 dark:bg-white/[0.06] text-neutral-800 dark:text-neutral-200">
-            <Sliders className="h-4 w-4" />
-          </div>
-          <div>
-            <h2 className="text-sm font-bold text-neutral-900 dark:text-white">{tPayernt.lendingPreferences}</h2>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400">{tPayernt.tagline}</p>
-          </div>
+      <div className="relative rounded-2xl sm:rounded-3xl bg-white dark:bg-[#1E1E1E] border border-neutral-300/80 dark:border-neutral-700/80 pt-5 sm:pt-6 p-4 sm:p-5 shadow-xs space-y-4 text-left">
+        <div className="absolute -top-3 left-4 px-2 bg-white dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
+          <Sliders className="h-3.5 w-3.5 text-primary" />
+          <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
+            {tPayernt.lendingPreferences}
+          </span>
         </div>
 
         <div className="divide-y divide-neutral-100 dark:divide-white/[0.06]">

@@ -2,19 +2,66 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
-const Card = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={cn(
-      "rounded-xl border bg-card text-card-foreground shadow",
+export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
+  cutoutTitle?: React.ReactNode;
+  cutoutAction?: React.ReactNode;
+  cutoutIcon?: React.ReactNode;
+  cutoutBgClass?: string;
+}
+
+const Card = React.forwardRef<HTMLDivElement, CardProps>(
+  (
+    {
       className,
-    )}
-    {...props}
-  />
-));
+      cutoutTitle,
+      cutoutAction,
+      cutoutIcon,
+      cutoutBgClass = "bg-card dark:bg-[#1E1E1E]",
+      children,
+      ...props
+    },
+    ref,
+  ) => (
+    <div
+      ref={ref}
+      className={cn(
+        "rounded-2xl border border-border/80 dark:border-neutral-700/80 bg-card text-card-foreground shadow-xs transition-colors",
+        cutoutTitle && "relative pt-5 sm:pt-6",
+        className,
+      )}
+      {...props}
+    >
+      {cutoutTitle && (
+        <div
+          className={cn(
+            "absolute -top-2.5 sm:-top-3 left-4 px-2 flex items-center gap-1.5 z-10 pointer-events-none select-none",
+            cutoutBgClass,
+          )}
+        >
+          {cutoutIcon && (
+            <span className="shrink-0 text-muted-foreground flex items-center">
+              {cutoutIcon}
+            </span>
+          )}
+          <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
+            {cutoutTitle}
+          </span>
+        </div>
+      )}
+      {cutoutAction && (
+        <div
+          className={cn(
+            "absolute -top-2.5 sm:-top-3 right-4 px-1.5 z-10 pointer-events-auto",
+            cutoutBgClass,
+          )}
+        >
+          {cutoutAction}
+        </div>
+      )}
+      {children}
+    </div>
+  ),
+);
 Card.displayName = "Card";
 
 const CardHeader = React.forwardRef<

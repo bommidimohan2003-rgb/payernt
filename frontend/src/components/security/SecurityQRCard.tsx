@@ -188,15 +188,17 @@ export const SecurityQRCard: React.FC<SecurityQRCardProps> = ({
   };
 
   return (
-    <div className="card-premium p-6 sm:p-8 bg-white dark:bg-[#1E1E1E] border border-neutral-200 dark:border-white/10 rounded-3xl shadow-sm space-y-6">
+    <div className="relative rounded-2xl sm:rounded-3xl bg-white dark:bg-[#1E1E1E] border border-neutral-300/80 dark:border-neutral-700/80 pt-5 sm:pt-6 p-6 sm:p-8 shadow-sm space-y-6 text-left">
+      <div className="absolute -top-3 left-4 px-2 bg-white dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
+        <QrCode className="h-3.5 w-3.5 text-primary" />
+        <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
+          My Security QR
+        </span>
+      </div>
       {/* Header & Device Switcher */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-neutral-200 dark:border-white/10">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-neutral-200 dark:border-white/10">
         <div>
-          <h2 className="text-xl sm:text-2xl font-extrabold text-neutral-900 dark:text-white font-display tracking-tight flex items-center gap-2.5">
-            <QrCode className="h-6 w-6 text-sky-600 dark:text-sky-400" />
-            My Security QR
-          </h2>
-          <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 mt-1">
+          <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400">
             Your unique QR identity for your registered device.
           </p>
         </div>

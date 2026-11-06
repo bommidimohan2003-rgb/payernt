@@ -921,16 +921,18 @@ export default function Checkout() {
             {/* STEP A: ADD / SELECT DELIVERY ADDRESS */}
             {activeStep === "address" && (
               <div
-                className="spatial-card p-6 space-y-6"
+                className="relative rounded-2xl sm:rounded-3xl border border-neutral-300/80 dark:border-neutral-700/80 bg-card dark:bg-[#1E1E1E] pt-5 sm:pt-6 p-6 space-y-6 text-left"
                 id="delivery-address-section"
               >
+                <div className="absolute -top-3 left-4 px-2 bg-card dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
+                  <Truck className="h-3.5 w-3.5 text-primary" />
+                  <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
+                    Step A: Delivery Address
+                  </span>
+                </div>
                 <div className="flex items-center justify-between border-b border-border/60 pb-4">
                   <div>
-                    <h3 className="font-extrabold text-lg flex items-center gap-2">
-                      <Truck className="h-5 w-5 text-primary shrink-0" />
-                      <span>Step A: Delivery Address</span>
-                    </h3>
-                    <p className="text-xs text-muted-foreground mt-0.5">
+                    <p className="text-xs text-muted-foreground">
                       Enter the address where the equipment should be delivered.
                     </p>
                   </div>
@@ -1255,20 +1257,22 @@ export default function Checkout() {
             {activeStep === "review" && (
               <div className="space-y-6" id="order-review-section">
                 {/* 1. Saved Delivery Address Card */}
-                <div className="spatial-card p-6 space-y-4">
-                  <div className="flex items-center justify-between border-b border-border/60 pb-3">
-                    <h3 className="font-extrabold text-base flex items-center gap-2">
-                      <Truck className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                      <span>Saved Delivery Address</span>
-                    </h3>
+                <div className="relative rounded-2xl sm:rounded-3xl border border-neutral-300/80 dark:border-neutral-700/80 bg-card dark:bg-[#1E1E1E] pt-5 sm:pt-6 p-5 sm:p-6 shadow-sm space-y-4 text-left">
+                  <div className="absolute -top-3 left-4 px-2 bg-card dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
+                    <Truck className="h-3.5 w-3.5 text-primary" />
+                    <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
+                      Saved Delivery Address
+                    </span>
+                  </div>
+                  <div className="absolute -top-3 right-4 px-1.5 bg-card dark:bg-[#1E1E1E] z-10">
                     <button
                       type="button"
                       id="edit-address-btn"
                       onClick={() => handleEditAddress()}
-                      className="text-xs font-bold text-primary hover:underline flex items-center gap-1.5 cursor-pointer"
+                      className="text-xs font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
                     >
-                      <Edit3 className="h-3.5 w-3.5" />
-                      <span>Edit Address</span>
+                      <Edit3 className="h-3 w-3" />
+                      <span>Edit</span>
                     </button>
                   </div>
 
@@ -1334,14 +1338,16 @@ export default function Checkout() {
                 </div>
 
                 {/* 2. Product & Rental Schedule Card */}
-                <div className="spatial-card p-6 space-y-4">
-                  <div className="flex items-center justify-between border-b border-border/60 pb-3">
-                    <h3 className="font-extrabold text-base flex items-center gap-2">
-                      <Calendar className="h-5 w-5 text-primary shrink-0" />
-                      <span>Product & Rental Schedule</span>
-                    </h3>
-                    <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                      Authoritative Dates Confirmed
+                <div className="relative rounded-2xl sm:rounded-3xl border border-neutral-300/80 dark:border-neutral-700/80 bg-card dark:bg-[#1E1E1E] pt-5 sm:pt-6 p-5 sm:p-6 shadow-sm space-y-4 text-left">
+                  <div className="absolute -top-3 left-4 px-2 bg-card dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
+                    <Calendar className="h-3.5 w-3.5 text-primary" />
+                    <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
+                      Product & Rental Schedule
+                    </span>
+                  </div>
+                  <div className="absolute -top-3 right-4 px-1.5 bg-card dark:bg-[#1E1E1E] z-10">
+                    <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+                      Dates Confirmed
                     </span>
                   </div>
 
@@ -1390,10 +1396,13 @@ export default function Checkout() {
                 </div>
 
                 {/* 3. Payment Method Card */}
-                <div className="spatial-card p-6 space-y-4">
-                  <h3 className="font-bold text-base">
-                    Payment Method Selection
-                  </h3>
+                <div className="relative rounded-2xl sm:rounded-3xl border border-neutral-300/80 dark:border-neutral-700/80 bg-card dark:bg-[#1E1E1E] pt-5 sm:pt-6 p-5 sm:p-6 shadow-sm space-y-4 text-left">
+                  <div className="absolute -top-3 left-4 px-2 bg-card dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
+                    <CreditCard className="h-3.5 w-3.5 text-primary" />
+                    <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
+                      Payment Method
+                    </span>
+                  </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-secondary p-1 rounded-xl text-xs font-semibold">
                     <button
@@ -1531,10 +1540,14 @@ export default function Checkout() {
           </div>
 
           {/* ASIDE: BOOKING SUMMARY, PRICE & CONFIRM ORDER BUTTON */}
-          <aside className="spatial-float p-6 h-fit space-y-6 sticky top-24 shadow-xl">
+          <aside className="relative rounded-2xl sm:rounded-3xl border border-neutral-300/80 dark:border-neutral-700/80 bg-card dark:bg-[#1E1E1E] pt-5 sm:pt-6 p-6 h-fit space-y-6 sticky top-24 shadow-sm text-left">
+            <div className="absolute -top-3 left-4 px-2 bg-card dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
+              <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
+                Booking Summary
+              </span>
+            </div>
             <div>
-              <h3 className="font-extrabold text-base">Booking Summary</h3>
-              <div className="mt-4 flex gap-3 items-center">
+              <div className="mt-2 flex gap-3 items-center">
                 <img
                   src={product.image}
                   alt={product.title}

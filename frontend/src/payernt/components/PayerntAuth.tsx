@@ -365,12 +365,15 @@ export function PayerntAuth({
 
           {/* Right Section — Authentication Form Card */}
           <div className="lg:col-span-6 xl:col-span-6 flex justify-center lg:justify-end">
-            <div className="w-full max-w-lg card-premium p-5 sm:p-6.5 shadow-xl border border-border/80 bg-card/95 dark:bg-[#1E1E1E] dark:border-[#2D2D2D] backdrop-blur-2xl rounded-2xl space-y-3.5 sm:space-y-4 transition-all duration-300">
-              {/* Form Heading */}
-              <div className="space-y-1 text-left pb-1">
-                <h2 className="text-xl sm:text-2xl font-black text-foreground tracking-tight font-display">
+            <div className="relative w-full max-w-lg shadow-xl border border-neutral-300/80 bg-card/95 dark:bg-[#1E1E1E] dark:border-neutral-700/80 backdrop-blur-2xl rounded-2xl pt-5 sm:pt-6 p-5 sm:p-6.5 space-y-3.5 sm:space-y-4 transition-all duration-300 text-left">
+              <div className="absolute -top-3 left-4 px-2 bg-card dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
+                <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
                   {mode === "login" ? "Sign In to Payernt" : "Create Payernt Account"}
-                </h2>
+                </span>
+              </div>
+
+              {/* Form Heading Subtitle */}
+              <div className="space-y-1 text-left pb-1">
                 <p className="text-xs text-muted-foreground font-normal">
                   {mode === "login"
                     ? "Enter your credentials to manage your product listings."

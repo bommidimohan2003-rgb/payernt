@@ -694,10 +694,14 @@ export function BookingDetails() {
         {/* Product & Rental Overview */}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-
           {/* Product Details Card */}
-
-          <div className="md:col-span-2 rounded-3xl border border-border bg-card p-5 sm:p-6 space-y-6 shadow-sm">
+          <div className="relative md:col-span-2 rounded-2xl sm:rounded-3xl border border-neutral-300/80 dark:border-neutral-700/80 bg-card dark:bg-[#1E1E1E] pt-5 sm:pt-6 p-5 sm:p-6 space-y-6 shadow-sm text-left">
+            <div className="absolute -top-3 left-4 px-2 bg-card dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
+              <Package className="h-3.5 w-3.5 text-primary" />
+              <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
+                Product Details
+              </span>
+            </div>
 
             <div className="flex flex-col sm:flex-row gap-5 items-start">
 
@@ -930,22 +934,15 @@ export function BookingDetails() {
 
 
           {/* Right Column: Pricing & Authorized Vendor Card */}
-
           <div className="space-y-6">
-
             {/* Authorized Vendor Card */}
-
-            <div className="rounded-3xl border border-border bg-card p-5 space-y-4 shadow-sm">
-
-              <div className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-
+            <div className="relative rounded-2xl sm:rounded-3xl border border-neutral-300/80 dark:border-neutral-700/80 bg-card dark:bg-[#1E1E1E] pt-5 sm:pt-6 p-5 space-y-4 shadow-sm text-left">
+              <div className="absolute -top-3 left-4 px-2 bg-card dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
                 <User className="w-3.5 h-3.5 text-primary" />
-
-                <span>Product Owner (Vendor)</span>
-
+                <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
+                  Product Owner (Vendor)
+                </span>
               </div>
-
-
 
               <div className="flex items-center gap-3">
 
@@ -1020,15 +1017,12 @@ export function BookingDetails() {
 
 
             {/* Financial Summary Card */}
-
-            <div className="rounded-3xl border border-border bg-card p-5 space-y-4 shadow-sm">
-
-              <div className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-
+            <div className="relative rounded-2xl sm:rounded-3xl border border-neutral-300/80 dark:border-neutral-700/80 bg-card dark:bg-[#1E1E1E] pt-5 sm:pt-6 p-5 space-y-4 shadow-sm text-left">
+              <div className="absolute -top-3 left-4 px-2 bg-card dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
                 <CreditCard className="w-3.5 h-3.5 text-primary" />
-
-                <span>Payment Summary</span>
-
+                <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
+                  Payment Summary
+                </span>
               </div>
 
 
@@ -1102,13 +1096,11 @@ export function BookingDetails() {
 
 
             {/* Quick Links Card */}
-
-            <div className="rounded-3xl border border-border bg-card p-5 space-y-3 shadow-sm">
-
-              <div className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground">
-
-                Helpful Navigation
-
+            <div className="relative rounded-2xl sm:rounded-3xl border border-neutral-300/80 dark:border-neutral-700/80 bg-card dark:bg-[#1E1E1E] pt-5 sm:pt-6 p-5 space-y-3 shadow-sm text-left">
+              <div className="absolute -top-3 left-4 px-2 bg-card dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
+                <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
+                  Helpful Navigation
+                </span>
               </div>
 
               <div className="space-y-2">
@@ -1168,16 +1160,13 @@ export function BookingDetails() {
 
 
         {/* Next Steps for Renter */}
-
-        <div className="rounded-3xl border border-border bg-card p-5 sm:p-6 space-y-4 shadow-sm">
-
-          <h3 className="text-base font-black text-foreground flex items-center gap-2">
-
-            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-
-            <span>What happens next?</span>
-
-          </h3>
+        <div className="relative rounded-2xl sm:rounded-3xl border border-neutral-300/80 dark:border-neutral-700/80 bg-card dark:bg-[#1E1E1E] pt-5 sm:pt-6 p-5 sm:p-6 space-y-4 shadow-sm text-left">
+          <div className="absolute -top-3 left-4 px-2 bg-card dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
+            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+            <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
+              What Happens Next?
+            </span>
+          </div>
 
 
 
