@@ -81,6 +81,7 @@ function PayerntLayout() {
         <PayerntSidebar
           pendingRequestsCount={stats.pendingRequestsCount}
           unreadMessagesCount={unreadMessagesCount}
+          onLogout={logout}
         />
 
         {/* Dynamic Route View */}

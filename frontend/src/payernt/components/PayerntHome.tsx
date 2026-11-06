@@ -9,6 +9,7 @@ import {
   MessageSquare,
   Zap,
   Clock,
+  LogOut,
 } from "lucide-react";
 import { useLanguage } from "@/i18n";
 import type {
@@ -72,6 +73,7 @@ export function PayerntHome({
   onRefresh,
   onNavigate,
   onSelectProductForManage,
+  onLogout,
 }: PayerntHomeProps) {
   // Extract user's display name
   const { tCommon, tPayernt } = useLanguage();
@@ -174,13 +176,27 @@ export function PayerntHome({
         <KycStatusBanner role="vendor" className="mb-2" />
 
         {/* Mobile Greeting */}
-        <div className="pt-1 pb-1">
-          <p className="text-sm font-medium text-neutral-500 dark:text-neutral-400">
-            {greeting}
-          </p>
-          <h1 className="text-2xl sm:text-3xl font-black text-neutral-900 dark:text-white tracking-tight font-display mt-0.5">
-            {firstName}
-          </h1>
+        <div className="pt-1 pb-1 flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-neutral-500 dark:text-neutral-400">
+              {greeting}
+            </p>
+            <h1 className="text-2xl sm:text-3xl font-black text-neutral-900 dark:text-white tracking-tight font-display mt-0.5">
+              {firstName}
+            </h1>
+          </div>
+          {onLogout && (
+            <button
+              type="button"
+              onClick={onLogout}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-destructive/30 bg-destructive/10 hover:bg-destructive/20 text-destructive text-xs font-semibold cursor-pointer transition-colors shadow-2xs active:scale-95"
+              title={tCommon.logout}
+              aria-label={tCommon.logout}
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              <span>{tCommon.logout}</span>
+            </button>
+          )}
         </div>
 
         {/* Mobile 2x2 Metric Grid: Balance, Earnings, Listings, Rentals */}
@@ -622,6 +638,18 @@ export function PayerntHome({
               <span className="text-xs text-neutral-500 dark:text-neutral-400 font-medium tracking-wide">
                 {formattedDate}
               </span>
+              {onLogout && (
+                <button
+                  type="button"
+                  onClick={onLogout}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-destructive/30 bg-destructive/10 hover:bg-destructive/20 text-destructive text-xs font-semibold cursor-pointer transition-colors shadow-2xs active:scale-95"
+                  title={tCommon.logout}
+                  aria-label={tCommon.logout}
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                  <span>{tCommon.logout}</span>
+                </button>
+              )}
             </div>
           </div>
 

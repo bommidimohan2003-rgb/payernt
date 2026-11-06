@@ -179,6 +179,7 @@ export function LenderProfileView({
           </button>
           {onLogout && (
             <button
+              type="button"
               onClick={onLogout}
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl border border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive/20 text-xs font-bold cursor-pointer shrink-0 shadow-xs active:scale-98 transition-all"
             >

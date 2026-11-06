@@ -161,7 +161,7 @@ export function PayerntSidebar({
                   if (onCloseMobileDrawer) onCloseMobileDrawer();
                   onLogout();
                 }}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold text-text-secondary hover:text-text-primary hover:bg-secondary transition-all cursor-pointer"
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold text-destructive hover:bg-destructive/10 transition-all cursor-pointer"
               >
                 <LogOut className="h-4 w-4" />
                 <span>{tCommon.logout}</span>
@@ -242,6 +242,19 @@ export function PayerntSidebar({
               {language}
             </span>
           </button>
+
+          {/* Logout Button (Desktop Sidebar) */}
+          {onLogout && (
+            <button
+              type="button"
+              onClick={onLogout}
+              className="flex items-center justify-center h-11 w-11 rounded-2xl text-destructive hover:bg-destructive/10 border border-transparent transition-all duration-200 cursor-pointer relative group"
+              title={tCommon.logout}
+              aria-label={tCommon.logout}
+            >
+              <LogOut className="h-4.5 w-4.5 stroke-[1.8]" />
+            </button>
+          )}
         </div>
       </aside>
 

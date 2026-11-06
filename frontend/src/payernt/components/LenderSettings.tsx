@@ -499,7 +499,7 @@ export function LenderSettingsView({
             <button
               type="button"
               onClick={onLogout}
-              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-neutral-300 dark:border-white/10 bg-white dark:bg-white/[0.04] hover:bg-neutral-100 dark:hover:bg-white/[0.08] text-xs font-bold text-neutral-700 dark:text-neutral-300 transition-all cursor-pointer"
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-destructive/30 bg-destructive/10 hover:bg-destructive/20 text-xs font-bold text-destructive transition-all cursor-pointer shadow-xs active:scale-98"
             >
               <LogOut className="h-3.5 w-3.5" />
               <span>{tPayernt.logoutPayernt}</span>

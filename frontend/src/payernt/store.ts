@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { toast } from "sonner";
 import type {
   PayerntProduct,
   RentalRequest,
@@ -138,13 +139,15 @@ export function usePayerntStore() {
   const getStoredToken = () => {
     if (typeof window === "undefined") return null;
     try {
+      if (
+        localStorage.getItem("paye₹nt_signed_out") === "true" ||
+        localStorage.getItem("payent:signed_out") === "true"
+      ) {
+        return null;
+      }
       const raw =
         localStorage.getItem("paye₹nt_token") ||
-        localStorage.getItem("payernt_token") ||
-        localStorage.getItem("payent:token") ||
-        localStorage.getItem("payent_token") ||
-        localStorage.getItem("payent_auth_token") ||
-        localStorage.getItem("token");
+        localStorage.getItem("payernt_token");
       if (!raw) return null;
       let t = raw.trim();
       if (t.startsWith('"') && t.endsWith('"')) t = t.slice(1, -1).trim();
@@ -157,30 +160,17 @@ export function usePayerntStore() {
   const getRehydratedAccount = (): PayerntAccount | null => {
     if (typeof window === "undefined") return null;
     try {
+      if (
+        localStorage.getItem("paye₹nt_signed_out") === "true" ||
+        localStorage.getItem("payent:signed_out") === "true"
+      ) {
+        return null;
+      }
       const stored = localStorage.getItem(STORAGE_KEY_ACCOUNT);
       if (stored) {
         return JSON.parse(stored);
       }
-      const rawUser =
-        localStorage.getItem("payent:currentUser") ||
-        localStorage.getItem("payent_user") ||
-        localStorage.getItem("pay₹ent_account");
-      if (rawUser) {
-        const u = JSON.parse(rawUser);
-        if (u?.email) {
-          return {
-            id: u.id || `PAYERNT_USER_${u.email}`,
-            accountId: u.id || `PAYERNT_USER_${u.email}`,
-            accountType: "paye₹nt",
-            name: u.fullName || u.name || u.email.split("@")[0],
-            email: u.email,
-            phone: u.phone || "",
-            role: u.role || "vendor",
-            status: "active",
-            avatar: u.avatar || u.profilePhotoUrl || "",
-          } as unknown as PayerntAccount;
-        }
-      }
+      return null;
     } catch {}
     return null;
   };
@@ -378,6 +368,8 @@ export function usePayerntStore() {
   const login = useCallback((account: PayerntAccount) => {
     // 1. Enforce single active user-side session: Invalidate Payrent customer state
     try {
+      localStorage.removeItem("paye₹nt_signed_out");
+      localStorage.removeItem("payent:signed_out");
       localStorage.removeItem("payent:token");
       localStorage.removeItem("payent:currentUser");
       localStorage.removeItem("payent:refreshToken");
@@ -435,21 +427,53 @@ export function usePayerntStore() {
     setActiveAccount(null);
     try {
       payerntApi.logout().catch(() => {});
-      localStorage.removeItem("paye₹nt_token");
-      localStorage.removeItem("payernt_token");
-      localStorage.removeItem("paye₹nt_refresh_token");
-      localStorage.removeItem("payernt_refresh_token");
-      localStorage.removeItem(STORAGE_KEY_SESSION);
-      localStorage.removeItem(STORAGE_KEY_ACCOUNT);
-      localStorage.removeItem("payent:admin:token");
-      localStorage.removeItem("payent:admin:current_user");
+      const keysToRemove = [
+        "paye₹nt_token",
+        "payernt_token",
+        "paye₹nt_refresh_token",
+        "payernt_refresh_token",
+        "paye₹nt_auth_token",
+        "payernt_auth_token",
+        STORAGE_KEY_SESSION,
+        STORAGE_KEY_ACCOUNT,
+        STORAGE_KEY_ACTIVE_USER,
+        STORAGE_KEY_DRAFT,
+        "paye₹nt_account",
+        "payernt_account",
+        "paye₹nt_session",
+        "payernt_session",
+        "payent:admin:token",
+        "payent:admin:current_user",
+        "payent:token",
+        "payent:currentUser",
+        "payent:refreshToken",
+        "pay₹ent_session",
+        "pay₹ent_account",
+        "payent_token",
+        "token",
+      ];
+      for (const k of keysToRemove) {
+        localStorage.removeItem(k);
+      }
       localStorage.setItem("payent:signed_out", "true");
+      localStorage.setItem("paye₹nt_signed_out", "true");
     } catch {}
+
+    setDraftProduct(null);
+    setRentalRequests([]);
+    setUnreadMessagesCount(0);
+
     window.dispatchEvent(new Event("payent:admin:profile-updated"));
     window.dispatchEvent(
       new CustomEvent("paye₹nt_auth_change", { detail: null }),
     );
     window.dispatchEvent(new CustomEvent("payent:storage_change"));
+
+    toast.success("Successfully logged out from paye₹nt.");
+
+    if (typeof window !== "undefined") {
+      window.location.replace("/payernt");
+    }
   }, []);
 
   // Sync to localStorage and broadcast updates

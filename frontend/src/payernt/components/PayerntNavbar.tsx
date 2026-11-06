@@ -4,6 +4,7 @@ import {
   Bell,
   Sun,
   Moon,
+  LogOut,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { LenderNotification, DemoUser, PayerntAccount } from "../types";
@@ -216,6 +217,19 @@ export function PayerntNavbar({
                 shape="circle"
               />
             </button>
+
+            {/* Direct One-Click Logout Button on Header (Visible on ALL screen sizes) */}
+            {onLogout && (
+              <button
+                type="button"
+                onClick={onLogout}
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-neutral-300 dark:border-neutral-700/80 hover:border-destructive/50 dark:hover:border-destructive/50 bg-transparent hover:bg-destructive/10 text-neutral-600 dark:text-neutral-400 hover:text-destructive dark:hover:text-destructive transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive shrink-0"
+                aria-label={tCommon.logout}
+                title={tCommon.logout}
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+            )}
           </div>
         </div>
       </header>

@@ -182,12 +182,15 @@ export function PayerntAuth({
             );
             localStorage.removeItem("payent:admin:logged_out");
             localStorage.removeItem("payent:signed_out");
+            localStorage.removeItem("paye₹nt_signed_out");
             window.dispatchEvent(new Event("payent:admin:profile-updated"));
             toast.success(`Welcome back, ${res.account.name} (Administrator)!`);
             navigate({ to: "/admin/dashboard" });
             return;
           }
 
+          localStorage.removeItem("payent:signed_out");
+          localStorage.removeItem("paye₹nt_signed_out");
           toast.success(`Welcome back, ${res.account.name}!`);
           onAuthSuccess(res.account);
         } else if (res.status === "PENDING_REVIEW" || res.status === "REJECTED") {

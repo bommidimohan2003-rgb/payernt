@@ -435,15 +435,32 @@ export const payerntApi = {
         }).catch(() => {});
       }
 
-      localStorage.removeItem("paye₹nt_token");
-      localStorage.removeItem("payernt_token");
-      localStorage.removeItem("paye₹nt_refresh_token");
-      localStorage.removeItem("payernt_refresh_token");
-      localStorage.removeItem(STORAGE_KEY_SESSION);
-      localStorage.removeItem(STORAGE_KEY_ACCOUNT);
-      localStorage.removeItem("payent:admin:token");
-      localStorage.removeItem("payent:admin:current_user");
+      const keysToRemove = [
+        "paye₹nt_token",
+        "payernt_token",
+        "paye₹nt_refresh_token",
+        "payernt_refresh_token",
+        "paye₹nt_auth_token",
+        "payernt_auth_token",
+        STORAGE_KEY_SESSION,
+        STORAGE_KEY_ACCOUNT,
+        "payent:admin:token",
+        "payent:admin:current_user",
+        "payent:token",
+        "payent:currentUser",
+        "payent:refreshToken",
+        "pay₹ent_session",
+        "pay₹ent_account",
+        "payent_token",
+        "token",
+      ];
+      for (const k of keysToRemove) {
+        localStorage.removeItem(k);
+      }
+      localStorage.setItem("payent:signed_out", "true");
+      localStorage.setItem("paye₹nt_signed_out", "true");
       window.dispatchEvent(new Event("payent:admin:profile-updated"));
+      window.dispatchEvent(new CustomEvent("payent:storage_change"));
     } catch {}
     return { success: true };
   },
