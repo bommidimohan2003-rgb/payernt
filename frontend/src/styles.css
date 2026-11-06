@@ -816,4 +816,74 @@ html:not(.dark) .border-white\/10 {
   background-color: #1E1E1E;
 }
 
+/* ============================================================
+   Global Dual-Side Button Fill Animation System
+   ============================================================ */
+.dual-side-fill-btn {
+  position: relative !important;
+  overflow: hidden !important;
+  isolation: isolate !important;
+}
+
+.dual-side-fill-btn > * {
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+.dual-side-fill-btn::before,
+.dual-side-fill-btn::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0%;
+  pointer-events: none;
+  z-index: 0;
+  transition: width 0.45s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.25s ease, opacity 0.2s ease;
+  opacity: 0;
+}
+
+.dual-side-fill-btn::before {
+  left: 0;
+}
+
+.dual-side-fill-btn::after {
+  right: 0;
+}
+
+.dual-side-fill-btn[data-dual-state="processing"]::before,
+.dual-side-fill-btn[data-dual-state="processing"]::after {
+  width: 50% !important;
+  opacity: 1 !important;
+  background-color: #8FAF7E !important;
+}
+
+.dual-side-fill-btn[data-dual-state="success"]::before,
+.dual-side-fill-btn[data-dual-state="success"]::after {
+  width: 50% !important;
+  opacity: 1 !important;
+  background-color: #8FAF7E !important;
+}
+
+.dual-side-fill-btn[data-dual-state="error"]::before,
+.dual-side-fill-btn[data-dual-state="error"]::after {
+  width: 50% !important;
+  opacity: 1 !important;
+  background-color: #FF7F7F !important;
+}
+
+.dual-side-fill-btn[data-dual-state="processing"],
+.dual-side-fill-btn[data-dual-state="success"],
+.dual-side-fill-btn[data-dual-state="error"] {
+  color: #FFFFFF !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dual-side-fill-btn::before,
+  .dual-side-fill-btn::after {
+    transition: none !important;
+  }
+}
+
+
 

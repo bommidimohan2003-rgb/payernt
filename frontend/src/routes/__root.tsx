@@ -23,6 +23,7 @@ import { CartDrawer } from "@/components/cart/CartDrawer";
 import { AppPreloader } from "@/components/common/AppPreloader";
 import { Navigation4 } from "@/components/navigation/Navigation4";
 import { LanguageProvider } from "@/i18n";
+import { setupGlobalDualSideFillListener } from "@/utils/dualSideFill";
 
 import appCss from "../styles.css?url";
 
@@ -245,6 +246,12 @@ function RootContent() {
   useEffect(() => {
     const timer = setTimeout(() => setShowChatbot(true), 1000);
     return () => clearTimeout(timer);
+  }, []);
+
+  // Initialize Global Dual-Side Button Fill Animation System
+  useEffect(() => {
+    const cleanup = setupGlobalDualSideFillListener();
+    return cleanup;
   }, []);
 
   const isGateway = pathname === "/" || pathname === "/select";

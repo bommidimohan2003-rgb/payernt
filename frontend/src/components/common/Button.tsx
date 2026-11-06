@@ -1,18 +1,50 @@
-import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
+import {
+  forwardRef,
+  type ButtonHTMLAttributes,
+  type ReactNode,
+  useState,
+  useRef,
+  useEffect,
+} from "react";
+import { Check, AlertCircle, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type Variant = "primary" | "secondary" | "ghost" | "outline" | "destructive";
-type Size = "sm" | "md" | "lg" | "icon";
+export type ButtonVariant =
+  | "primary"
+  | "secondary"
+  | "ghost"
+  | "outline"
+  | "destructive";
 
-interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: Variant;
-  size?: Size;
+export type ButtonSize = "sm" | "md" | "lg" | "icon";
+
+export type DualFillStatus = "idle" | "processing" | "success" | "error";
+
+export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: ButtonVariant;
+  size?: ButtonSize;
   loading?: boolean;
   leftIcon?: ReactNode;
   rightIcon?: ReactNode;
+  /** Force a specific animation status */
+  animationStatus?: DualFillStatus;
+  /** Flag to indicate operation completed successfully */
+  isSuccess?: boolean;
+  /** Flag to indicate operation failed */
+  isError?: boolean;
+  /** Duration in ms to hold success/error state before resetting (default: 2000) */
+  successDuration?: number;
+  /** Disable the dual-side fill animation if needed */
+  disableDualFill?: boolean;
+  /** Custom text to display during success state */
+  successText?: ReactNode;
+  /** Custom text to display during error state */
+  errorText?: ReactNode;
+  /** Callback fired when the 2s completion animation finishes */
+  onAnimationComplete?: (status: "success" | "error") => void;
 }
 
-const variants: Record<Variant, string> = {
+const variants: Record<ButtonVariant, string> = {
   primary:
     "bg-[#161616] text-[#FFFFFF] hover:bg-[#292929] active:bg-[#0B0B0B] dark:bg-[#F2F0EA] dark:text-[#0A0A0A] dark:hover:bg-[#FFFDF7] dark:active:bg-[#DDD9D0] border border-transparent shadow-sm",
   secondary:
@@ -25,47 +57,258 @@ const variants: Record<Variant, string> = {
     "bg-[#FF1744] text-[#FFFFFF] hover:bg-[#D50000] active:bg-[#B71C1C] border border-transparent shadow-sm",
 };
 
-const sizes: Record<Size, string> = {
-  sm: "h-9 px-3 text-sm rounded-lg",
+const sizes: Record<ButtonSize, string> = {
+  sm: "h-9 px-3.5 text-xs sm:text-sm rounded-lg",
   md: "h-11 px-5 text-sm rounded-xl",
-  lg: "h-14 px-7 text-base rounded-2xl",
-  icon: "h-10 w-10 rounded-full grid place-items-center",
+  lg: "h-13 sm:h-14 px-7 text-sm sm:text-base rounded-2xl",
+  icon: "h-10 w-10 rounded-full grid place-items-center p-0",
 };
 
+/**
+ * Universal Button with Global Dual-Side Fill Animation
+ *
+ * Click behavior:
+ * - Left & Right panels simultaneously advance towards the center
+ * - Processing: #8FAF7E (Sage Green)
+ * - Success: Complete #8FAF7E fill + Checkmark icon for 2000ms
+ * - Failure: Complete #FF7F7F fill + Alert icon for 2000ms
+ * - Automatically awaits async `onClick` promises and reacts to `loading`/`isSuccess`/`isError`
+ */
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   function Button(
     {
       className,
       variant = "primary",
       size = "md",
-      loading,
+      loading = false,
       leftIcon,
       rightIcon,
       children,
       disabled,
+      onClick,
+      animationStatus: controlledStatus,
+      isSuccess,
+      isError,
+      successDuration = 2000,
+      disableDualFill = false,
+      successText,
+      errorText,
+      onAnimationComplete,
       ...rest
     },
     ref,
   ) {
+    const [internalStatus, setInternalStatus] = useState<DualFillStatus>("idle");
+    const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Active status is either controlled or internal
+    const status = controlledStatus || internalStatus;
+
+    // React to loading state transitions
+    const prevLoadingRef = useRef(loading);
+    useEffect(() => {
+      if (disableDualFill) return;
+
+      if (prevLoadingRef.current !== loading) {
+        if (loading) {
+          if (timeoutRef.current) clearTimeout(timeoutRef.current);
+          setInternalStatus("processing");
+        } else if (prevLoadingRef.current && !loading) {
+          // Finished loading: determine success vs failure
+          if (isError) {
+            setInternalStatus("error");
+            timeoutRef.current = setTimeout(() => {
+              setInternalStatus("idle");
+              onAnimationComplete?.("error");
+            }, successDuration);
+          } else {
+            setInternalStatus("success");
+            timeoutRef.current = setTimeout(() => {
+              setInternalStatus("idle");
+              onAnimationComplete?.("success");
+            }, successDuration);
+          }
+        }
+        prevLoadingRef.current = loading;
+      }
+    }, [loading, isError, successDuration, disableDualFill, onAnimationComplete]);
+
+    // React to explicit isSuccess / isError flags
+    useEffect(() => {
+      if (disableDualFill) return;
+
+      if (isSuccess && status !== "success") {
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        setInternalStatus("success");
+        timeoutRef.current = setTimeout(() => {
+          setInternalStatus("idle");
+          onAnimationComplete?.("success");
+        }, successDuration);
+      } else if (isError && status !== "error") {
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        setInternalStatus("error");
+        timeoutRef.current = setTimeout(() => {
+          setInternalStatus("idle");
+          onAnimationComplete?.("error");
+        }, successDuration);
+      }
+    }, [isSuccess, isError, status, successDuration, disableDualFill, onAnimationComplete]);
+
+    // Clean up timeout
+    useEffect(() => {
+      return () => {
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      };
+    }, []);
+
+    const handleClick = async (e: React.MouseEvent<HTMLButtonElement>) => {
+      // Prevent duplicate clicks while processing or loading
+      if (status === "processing" || loading) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+
+      if (disableDualFill) {
+        onClick?.(e);
+        return;
+      }
+
+      if (onClick) {
+        try {
+          const result = onClick(e);
+          // If onClick returns a Promise (async action)
+          if (result && typeof (result as any).then === "function") {
+            if (timeoutRef.current) clearTimeout(timeoutRef.current);
+            setInternalStatus("processing");
+            try {
+              await result;
+              setInternalStatus("success");
+              timeoutRef.current = setTimeout(() => {
+                setInternalStatus("idle");
+                onAnimationComplete?.("success");
+              }, successDuration);
+            } catch (asyncErr) {
+              setInternalStatus("error");
+              timeoutRef.current = setTimeout(() => {
+                setInternalStatus("idle");
+                onAnimationComplete?.("error");
+              }, successDuration);
+              throw asyncErr;
+            }
+          }
+        } catch (syncErr) {
+          setInternalStatus("error");
+          timeoutRef.current = setTimeout(() => {
+            setInternalStatus("idle");
+            onAnimationComplete?.("error");
+          }, successDuration);
+          throw syncErr;
+        }
+      }
+    };
+
+    const isProcessing = status === "processing" || loading;
+    const isSuccessState = status === "success";
+    const isErrorState = status === "error";
+    const isAnimated = isProcessing || isSuccessState || isErrorState;
+
     return (
       <button
         ref={ref}
-        disabled={disabled || loading}
+        disabled={disabled || isProcessing}
+        onClick={handleClick}
+        data-react-managed-button="true"
+        data-dual-state={status}
+        aria-busy={isProcessing}
         className={cn(
-          "inline-flex items-center justify-center gap-2 font-medium transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+          "relative overflow-hidden isolate inline-flex items-center justify-center gap-2 font-medium transition-all duration-200 select-none",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+          "disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer",
+          // Apply custom text color when animated
+          isSuccessState && "text-white font-bold",
+          isErrorState && "text-white font-bold",
           variants[variant],
           sizes[size],
           className,
         )}
         {...rest}
       >
-        {loading ? (
-          <span className="h-4 w-4 rounded-full border-2 border-current border-t-transparent animate-spin" />
-        ) : (
-          leftIcon
+        {/* ========================================================================= */}
+        {/* DUAL-SIDE FILL ANIMATION PANELS (LEFT & RIGHT MOVING TOWARDS CENTER)      */}
+        {/* ========================================================================= */}
+        {!disableDualFill && (
+          <>
+            {/* 1. LEFT PANEL - Starts from left edge (left: 0), fills towards center */}
+            <span
+              aria-hidden="true"
+              className={cn(
+                "pointer-events-none absolute inset-y-0 left-0 z-0 transition-all duration-450 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none",
+                !isAnimated && "w-0 opacity-0",
+                isProcessing && "w-1/2 opacity-100",
+                isSuccessState && "w-1/2 opacity-100",
+                isErrorState && "w-1/2 opacity-100",
+              )}
+              style={{
+                backgroundColor: isErrorState ? "#FF7F7F" : "#8FAF7E",
+              }}
+            />
+
+            {/* 2. RIGHT PANEL - Starts from right edge (right: 0), fills towards center */}
+            <span
+              aria-hidden="true"
+              className={cn(
+                "pointer-events-none absolute inset-y-0 right-0 z-0 transition-all duration-450 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none",
+                !isAnimated && "w-0 opacity-0",
+                isProcessing && "w-1/2 opacity-100",
+                isSuccessState && "w-1/2 opacity-100",
+                isErrorState && "w-1/2 opacity-100",
+              )}
+              style={{
+                backgroundColor: isErrorState ? "#FF7F7F" : "#8FAF7E",
+              }}
+            />
+
+            {/* Subtle soft pulse shimmer while processing */}
+            {isProcessing && (
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 z-0 bg-white/15 animate-pulse"
+              />
+            )}
+          </>
         )}
-        {children}
-        {!loading && rightIcon}
+
+        {/* ========================================================================= */}
+        {/* BUTTON CONTENT LAYER (TEXT & ICONS ALWAYS VISIBLE ABOVE ANIMATED FILL)   */}
+        {/* ========================================================================= */}
+        <span className="relative z-10 flex items-center justify-center gap-2 text-inherit transition-colors duration-200">
+          {isSuccessState ? (
+            <Check
+              className="h-4 w-4 shrink-0 animate-in zoom-in-75 duration-200 text-white"
+              strokeWidth={3}
+            />
+          ) : isErrorState ? (
+            <AlertCircle
+              className="h-4 w-4 shrink-0 animate-in zoom-in-75 duration-200 text-white"
+              strokeWidth={2.5}
+            />
+          ) : isProcessing ? (
+            <Loader2 className="h-4 w-4 shrink-0 animate-spin text-white" />
+          ) : (
+            leftIcon
+          )}
+
+          <span>
+            {isSuccessState && successText
+              ? successText
+              : isErrorState && errorText
+              ? errorText
+              : children}
+          </span>
+
+          {!isAnimated && rightIcon}
+        </span>
       </button>
     );
   },

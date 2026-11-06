@@ -324,8 +324,14 @@ export function RegisterForm() {
     }
   };
 
+  const [validationFailed, setValidationFailed] = useState(false);
+  const onInvalid = () => {
+    setValidationFailed(true);
+    setTimeout(() => setValidationFailed(false), 2000);
+  };
+
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-3 text-left">
+    <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="space-y-3 text-left">
       {/* 1. Full Name */}
       <Input
         label="Full Name"
@@ -507,6 +513,7 @@ export function RegisterForm() {
         type="submit"
         className="w-full font-extrabold h-10.5 sm:h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-lg active:scale-98 flex items-center justify-center gap-2 cursor-pointer mt-2"
         loading={isSubmitting}
+        isError={Boolean(error) || validationFailed}
         disabled={isSubmitting}
       >
         {isSubmitting ? (

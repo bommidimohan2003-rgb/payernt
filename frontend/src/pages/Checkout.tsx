@@ -1679,6 +1679,7 @@ export default function Checkout() {
                 className="w-full font-black text-sm sm:text-base py-6 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl shadow-lg transition-all active:scale-98 cursor-pointer flex items-center justify-center gap-2"
                 onClick={handleConfirmOrder}
                 loading={isProcessing || isVerifying}
+                isError={Boolean(paymentError)}
                 disabled={
                   isProcessing ||
                   isVerifying ||

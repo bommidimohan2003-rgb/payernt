@@ -671,11 +671,11 @@ export default function ProductDetails() {
   const handleCheckAvailability = async () => {
     if (!startDate) {
       toast.error("Please select a Rental Date.");
-      return;
+      throw new Error("Please select a Rental Date.");
     }
     if (durationMode === "custom" && !endDate) {
       toast.error("Please select both a Start Date and Return Date for multi-day rental.");
-      return;
+      throw new Error("Please select both a Start Date and Return Date for multi-day rental.");
     }
 
     const start = new Date(startDate);
@@ -687,7 +687,7 @@ export default function ProductDetails() {
       setAvailabilityMessage("Start date cannot be in the past.");
       setAvailabilityChecked(true);
       toast.error("Start date cannot be in the past.");
-      return;
+      throw new Error("Start date cannot be in the past.");
     }
 
     if (end < start) {
@@ -695,14 +695,14 @@ export default function ProductDetails() {
       setAvailabilityMessage("End date must be on or after the start date.");
       setAvailabilityChecked(true);
       toast.error("End date cannot be earlier than start date.");
-      return;
+      throw new Error("End date cannot be earlier than start date.");
     }
 
     if (product && !product.available) {
       setIsAvailableForDates(false);
       setAvailabilityMessage("This gear is currently marked as unavailable by the owner.");
       setAvailabilityChecked(true);
-      return;
+      throw new Error("This gear is currently marked as unavailable by the owner.");
     }
 
     // If single day slot selection (morning, afternoon, full_day), inspect live slot status
@@ -714,21 +714,21 @@ export default function ProductDetails() {
           setAvailabilityMessage(`The selected date or time slot is blocked by the owner for maintenance or personal use.`);
           setAvailabilityChecked(true);
           toast.error("Date or slot is blocked by owner.");
-          return;
+          throw new Error("Date or slot is blocked by owner.");
         }
         if (targetSlot.status === "booked") {
           setIsAvailableForDates(false);
           setAvailabilityMessage(`The ${targetSlot.name} slot is already booked for ${startDate}. Please choose another slot.`);
           setAvailabilityChecked(true);
           toast.error(`Slot ${targetSlot.name} is booked.`);
-          return;
+          throw new Error(`Slot ${targetSlot.name} is booked.`);
         }
         if (targetSlot.status === "not_available") {
           setIsAvailableForDates(false);
           setAvailabilityMessage(`The ${targetSlot.name} slot is not available: ${targetSlot.statusLabel}.`);
           setAvailabilityChecked(true);
           toast.error(`Slot ${targetSlot.name} is not available.`);
-          return;
+          throw new Error(`Slot ${targetSlot.name} is not available.`);
         }
       }
     }
@@ -883,11 +883,11 @@ export default function ProductDetails() {
   const handleBookNowAction = async () => {
     if (isOwner) {
       toast.error("You cannot rent your own product.");
-      return;
+      throw new Error("You cannot rent your own product.");
     }
     if (!termsAccepted) {
       toast.error("Please accept the terms and conditions to proceed.");
-      return;
+      throw new Error("Please accept the terms and conditions to proceed.");
     }
     if (isAvailableForDates) {
       handleProceedToCheckout();
@@ -1795,7 +1795,7 @@ const productSchema = product ? {
                         </button>
                       </div>
 
-                      <button
+                      <Button
                         type="button"
                         onClick={handleProceedToCheckout}
                         disabled={categoryRestriction?.restricted}
@@ -1803,7 +1803,7 @@ const productSchema = product ? {
                       >
                         <ShoppingBag className="h-4 w-4 shrink-0" />
                         <span>Confirm Booking & Rent (₹{estimatedTotal.toLocaleString("en-IN")})</span>
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 ) : availabilityChecked && isAvailableForDates === false ? (
@@ -1813,43 +1813,30 @@ const productSchema = product ? {
                       <span>{availabilityMessage}</span>
                     </div>
                     <div className="flex justify-end">
-                      <button
+                      <Button
                         type="button"
                         onClick={handleCheckAvailability}
                         disabled={isCheckingAvailability}
+                        loading={isCheckingAvailability}
                         className="py-2.5 sm:py-3 px-5 rounded-xl font-bold text-xs bg-secondary hover:bg-secondary/80 text-foreground transition-all cursor-pointer inline-flex items-center justify-center gap-2"
                       >
-                        {isCheckingAvailability ? (
-                          <>
-                            <span className="h-3.5 w-3.5 border-2 border-foreground border-t-transparent rounded-full animate-spin" />
-                            <span>Checking...</span>
-                          </>
-                        ) : (
-                          <span>Re-check Availability</span>
-                        )}
-                      </button>
+                        <CalendarCheck className="h-4 w-4 shrink-0" />
+                        <span>Re-check Availability</span>
+                      </Button>
                     </div>
                   </div>
                 ) : (
                   <div className="flex justify-end pt-1">
-                    <button
+                    <Button
                       type="button"
                       onClick={handleCheckAvailability}
                       disabled={isCheckingAvailability || categoryRestriction?.restricted}
+                      loading={isCheckingAvailability}
                       className="py-2.5 sm:py-3 px-6 rounded-full font-bold text-xs sm:text-sm shadow-sm transition-all duration-200 inline-flex items-center justify-center gap-2 cursor-pointer active:scale-95 bg-neutral-950 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-100 disabled:opacity-75 disabled:cursor-not-allowed"
                     >
-                      {isCheckingAvailability ? (
-                        <>
-                          <span className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          <span>Checking Availability...</span>
-                        </>
-                      ) : (
-                        <>
-                          <CalendarCheck className="h-4 w-4 shrink-0" />
-                          <span>CHECK AVAILABILITY</span>
-                        </>
-                      )}
-                    </button>
+                      <CalendarCheck className="h-4 w-4 shrink-0" />
+                      <span>CHECK AVAILABILITY</span>
+                    </Button>
                   </div>
                 )}
               </div>
@@ -2029,11 +2016,12 @@ const productSchema = product ? {
                     </button>
                   </div>
 
-                  <button
+                  <Button
                     type="button"
                     id="product-details-book-now-btn"
                     onClick={handleBookNowAction}
-                    disabled={categoryRestriction?.restricted}
+                    disabled={categoryRestriction?.restricted || isCheckingAvailability}
+                    loading={isCheckingAvailability}
                     className={`py-2.5 sm:py-3 px-6 rounded-full font-bold text-xs sm:text-sm shadow-sm transition-all duration-200 inline-flex items-center justify-center gap-2 cursor-pointer active:scale-95 ${
                       categoryRestriction?.restricted
                         ? "bg-amber-900/40 text-amber-300 border border-amber-500/30 cursor-not-allowed opacity-80"
@@ -2042,7 +2030,7 @@ const productSchema = product ? {
                   >
                     <ShoppingBag className="h-4 w-4 shrink-0" />
                     <span>BOOK NOW</span>
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>
