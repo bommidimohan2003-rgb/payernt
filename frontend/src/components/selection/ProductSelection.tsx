@@ -714,7 +714,7 @@ export function ProductSelection() {
               className="w-full flex items-center justify-center px-1"
             >
               {/* BRANCHING CONTAINER: Exact alignment between parent node, connector tree, and child cards */}
-              <div className="relative flex items-center justify-center w-full max-w-[340px] xs:max-w-[365px] sm:max-w-[400px] h-[206px]">
+              <div className="relative flex items-center justify-center w-full max-w-[340px] xs:max-w-[365px] sm:max-w-[400px] h-[212px]">
                 {/* 1. LEFT PARENT NODE (paYent) - TAP TO CLOSE */}
                 <motion.button
                   type="button"
@@ -728,7 +728,7 @@ export function ProductSelection() {
                   }
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.35, ease: smoothEase }}
-                  className="shrink-0 z-20 cursor-pointer outline-none select-none text-left p-2 sm:p-2.5 border border-border/80 hover:border-foreground/60 rounded-2xl bg-card/80 active:scale-95 transition-all backdrop-blur-md focus-visible:ring-1 focus-visible:ring-foreground/40 shadow-xs group"
+                  className="shrink-0 flex-none z-20 cursor-pointer outline-none select-none text-left p-2 sm:p-2.5 border border-border/80 hover:border-foreground/60 rounded-2xl bg-card/80 active:scale-95 transition-all backdrop-blur-md focus-visible:ring-1 focus-visible:ring-foreground/40 shadow-xs group"
                 >
                   <BrandTitle className="text-base xs:text-lg font-extrabold tracking-tight text-foreground" />
                   <div className="text-[7px] font-mono tracking-widest text-muted-foreground/70 group-hover:text-foreground/90 transition-colors uppercase mt-0.5">
@@ -736,68 +736,48 @@ export function ProductSelection() {
                   </div>
                 </motion.button>
 
-                {/* 2. CENTER CURVED CONNECTOR LINES (SVG) - Perfectly connects parent right edge to both child cards */}
+                {/* 2. CENTER CURLY BRACES CONNECTOR (SVG) - Perfectly connects vertical middle of paYent to middle of both child cards */}
                 <div
-                  className="relative shrink-0 z-10 pointer-events-none w-7 xs:w-8 sm:w-10 h-[206px]"
+                  className="relative shrink-0 flex-none z-10 pointer-events-none w-7 xs:w-8 sm:w-10 h-[212px] overflow-visible"
                 >
                   <svg
-                    viewBox="0 0 36 206"
+                    viewBox="0 0 32 212"
                     fill="none"
-                    className="w-full h-full"
+                    className="w-full h-full overflow-visible"
+                    style={{ width: "100%", height: "212px" }}
                     preserveAspectRatio="none"
                   >
-                    <defs>
-                      <linearGradient
-                        id="mobileBranchGrad"
-                        x1="0%"
-                        y1="50%"
-                        x2="100%"
-                        y2="50%"
-                      >
-                        <stop offset="0%" stopColor="var(--color-foreground, #17191C)" stopOpacity="0.85" />
-                        <stop offset="100%" stopColor="var(--color-foreground, #17191C)" stopOpacity="0.55" />
-                      </linearGradient>
-                    </defs>
-
-                    {/* Stem from parent button right edge into the junction */}
-                    <path
-                      d="M 0 103 L 6 103"
-                      stroke="url(#mobileBranchGrad)"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                    />
-
-                    {/* Upper Curved Connector -> paye₹nt (LENDER card center at y=48) */}
+                    {/* Upper Curly Branch -> connects middle of paYent (0, 106) to middle of paye₹nt LENDER card (33, 50) */}
                     <motion.path
-                      d="M 6 103 C 18 103, 20 48, 36 48"
-                      stroke="url(#mobileBranchGrad)"
-                      strokeWidth="1.5"
+                      d="M 0 106 C 8 106, 14 90, 14 74 C 14 58, 20 50, 33 50"
+                      stroke="currentColor"
+                      strokeWidth="1.75"
                       strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="text-foreground/80 dark:text-foreground/85"
                       initial={shouldReduceMotion ? { pathLength: 1, opacity: 1 } : { pathLength: 0, opacity: 0 }}
                       animate={{ pathLength: 1, opacity: 1 }}
-                      transition={{ duration: 0.45, delay: 0.08, ease: smoothEase }}
+                      transition={{ duration: 0.32, delay: 0.06, ease: smoothEase }}
                     />
 
-                    {/* Lower Curved Connector -> pay₹ent (RENTER card center at y=158) */}
+                    {/* Lower Curly Branch -> connects middle of paYent (0, 106) to middle of pay₹ent RENTER card (33, 162) */}
                     <motion.path
-                      d="M 6 103 C 18 103, 20 158, 36 158"
-                      stroke="url(#mobileBranchGrad)"
-                      strokeWidth="1.5"
+                      d="M 0 106 C 8 106, 14 122, 14 138 C 14 154, 20 162, 33 162"
+                      stroke="currentColor"
+                      strokeWidth="1.75"
                       strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="text-foreground/80 dark:text-foreground/85"
                       initial={shouldReduceMotion ? { pathLength: 1, opacity: 1 } : { pathLength: 0, opacity: 0 }}
                       animate={{ pathLength: 1, opacity: 1 }}
-                      transition={{ duration: 0.45, delay: 0.12, ease: smoothEase }}
+                      transition={{ duration: 0.32, delay: 0.08, ease: smoothEase }}
                     />
-
-                    {/* Origin junction ring and dot directly touching the stem */}
-                    <circle cx="6" cy="103" r="3" stroke="var(--color-foreground, #17191C)" strokeWidth="1" fill="none" opacity="0.8" />
-                    <circle cx="6" cy="103" r="1.5" fill="var(--color-foreground, #17191C)" />
                   </svg>
                 </div>
 
                 {/* 3. RIGHT CHILD NODES (STACKED VERTICALLY - REDUCED COMPACT SIZING) */}
                 <div
-                  className="flex flex-col gap-3.5 shrink-0 z-20 w-[140px] xs:w-[155px] sm:w-[170px]"
+                  className="flex flex-col justify-between shrink-0 flex-none z-20 w-[140px] xs:w-[155px] sm:w-[170px] h-[212px]"
                 >
                   {/* UPPER CHILD: LENDING -> paye₹nt (LENDER) */}
                   <motion.button
@@ -812,7 +792,7 @@ export function ProductSelection() {
                     }
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.35, delay: 0.18, ease: smoothEase }}
-                    className="group cursor-pointer outline-none select-none text-left p-2 xs:p-2.5 border border-border/80 hover:border-foreground/60 rounded-2xl bg-card/80 active:scale-95 transition-all focus-visible:ring-1 focus-visible:ring-foreground/40 flex flex-col justify-between backdrop-blur-md shadow-xs h-[96px]"
+                    className="group cursor-pointer outline-none select-none text-left p-2 xs:p-2.5 border border-border/80 hover:border-foreground/60 rounded-2xl bg-card/80 active:scale-95 transition-all focus-visible:ring-1 focus-visible:ring-foreground/40 flex flex-col justify-between backdrop-blur-md shadow-xs h-[100px] min-h-[100px] max-h-[100px] flex-none"
                   >
                     <div>
                       <div className="flex items-center justify-between w-full">
@@ -860,7 +840,7 @@ export function ProductSelection() {
                     }
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.35, delay: 0.24, ease: smoothEase }}
-                    className="group cursor-pointer outline-none select-none text-left p-2 xs:p-2.5 border border-border/80 hover:border-foreground/60 rounded-2xl bg-card/80 active:scale-95 transition-all focus-visible:ring-1 focus-visible:ring-foreground/40 flex flex-col justify-between backdrop-blur-md shadow-xs h-[96px]"
+                    className="group cursor-pointer outline-none select-none text-left p-2 xs:p-2.5 border border-border/80 hover:border-foreground/60 rounded-2xl bg-card/80 active:scale-95 transition-all focus-visible:ring-1 focus-visible:ring-foreground/40 flex flex-col justify-between backdrop-blur-md shadow-xs h-[100px] min-h-[100px] max-h-[100px] flex-none"
                   >
                     <div>
                       <div className="flex items-center justify-between w-full">
