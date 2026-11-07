@@ -4,6 +4,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { MainLayout } from "@/layouts/MainLayout";
 import { BackButton } from "@/components/common/BackButton";
 import { Button } from "@/components/common/Button";
+import { SwipeRow } from "@/components/reactbits/SwipeRow";
 import { STORAGE_KEYS, storage } from "@/utils/storage";
 import { api } from "@/utils/api";
 import { toast } from "sonner";
@@ -261,91 +262,115 @@ export default function Notifications() {
               const isUnread = !n.read;
               const hasAction = Boolean(n.link || n.bookingId);
 
+              const swipeActions = [
+                ...(isUnread
+                  ? [
+                      {
+                        label: "Read",
+                        icon: <Check className="h-4 w-4" />,
+                        variant: "success" as const,
+                        onClick: () => markSingleRead(n.id),
+                      },
+                    ]
+                  : []),
+                ...(hasAction
+                  ? [
+                      {
+                        label: "Open",
+                        icon: <ExternalLink className="h-4 w-4" />,
+                        variant: "default" as const,
+                        onClick: () => handleNotificationClick(n),
+                      },
+                    ]
+                  : []),
+              ];
+
               return (
-                <div
-                  key={n.id}
-                  onClick={() => handleNotificationClick(n)}
-                  className={`card-premium p-4 sm:p-5 rounded-2xl border transition-all select-none ${
-                    hasAction ? "cursor-pointer hover:border-primary/50 hover:shadow-md" : ""
-                  } ${
-                    isUnread
-                      ? "border-primary/40 bg-primary/[0.03] dark:bg-primary/[0.04] shadow-xs"
-                      : "border-border/70 bg-card/70 opacity-90"
-                  }`}
-                >
-                  <div className="flex items-start gap-3.5">
-                    {/* Status Icon */}
-                    <div
-                      className={`h-10 w-10 rounded-xl border grid place-items-center shrink-0 mt-0.5 ${
-                        n.type === "success"
-                          ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
-                          : n.type === "warning"
-                          ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
-                          : "bg-primary/10 text-primary border-primary/20"
-                      }`}
-                    >
-                      <Bell className="h-5 w-5" />
-                    </div>
-
-                    {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className={`text-sm sm:text-base ${isUnread ? "font-bold text-foreground" : "font-semibold text-foreground/90"}`}>
-                            {n.title}
-                          </h3>
-                          {isUnread && (
-                            <span className="w-2 h-2 rounded-full bg-primary shrink-0 animate-pulse" />
-                          )}
-                        </div>
-
-                        <span className="text-[11px] text-muted-foreground shrink-0 font-medium whitespace-nowrap">
-                          {formatTimestamp(n.createdAt)}
-                        </span>
+                <SwipeRow key={n.id} actions={swipeActions} className="rounded-2xl">
+                  <div
+                    onClick={() => handleNotificationClick(n)}
+                    className={`card-premium p-4 sm:p-5 rounded-2xl border transition-all select-none ${
+                      hasAction ? "cursor-pointer hover:border-primary/50 hover:shadow-md" : ""
+                    } ${
+                      isUnread
+                        ? "border-primary/40 bg-primary/[0.03] dark:bg-primary/[0.04] shadow-xs"
+                        : "border-border/70 bg-card/70 opacity-90"
+                    }`}
+                  >
+                    <div className="flex items-start gap-3.5">
+                      {/* Status Icon */}
+                      <div
+                        className={`h-10 w-10 rounded-xl border grid place-items-center shrink-0 mt-0.5 ${
+                          n.type === "success"
+                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                            : n.type === "warning"
+                            ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
+                            : "bg-primary/10 text-primary border-primary/20"
+                        }`}
+                      >
+                        <Bell className="h-5 w-5" />
                       </div>
 
-                      <p className="text-xs sm:text-sm text-muted-foreground mt-1 leading-relaxed">
-                        {n.message}
-                      </p>
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className={`text-sm sm:text-base ${isUnread ? "font-bold text-foreground" : "font-semibold text-foreground/90"}`}>
+                              {n.title}
+                            </h3>
+                            {isUnread && (
+                              <span className="w-2 h-2 rounded-full bg-primary shrink-0 animate-pulse" />
+                            )}
+                          </div>
 
-                      {/* Metadata Badges */}
-                      <div className="mt-3 flex items-center gap-2 flex-wrap text-xs">
-                        {n.productName && (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-secondary/80 border border-border text-foreground/90 font-medium text-[11px]">
-                            <Package className="h-3 w-3 text-muted-foreground" />
-                            <span className="truncate max-w-[200px]">{n.productName}</span>
+                          <span className="text-[11px] text-muted-foreground shrink-0 font-medium whitespace-nowrap">
+                            {formatTimestamp(n.createdAt)}
                           </span>
-                        )}
+                        </div>
 
-                        {n.bookingId && (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-secondary/80 border border-border text-foreground/90 font-mono text-[11px]">
-                            <Hash className="h-3 w-3 text-muted-foreground" />
-                            <span>{n.bookingId}</span>
-                          </span>
-                        )}
+                        <p className="text-xs sm:text-sm text-muted-foreground mt-1 leading-relaxed">
+                          {n.message}
+                        </p>
 
-                        {hasAction && (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-primary hover:underline ml-auto">
-                            <span>View booking</span>
-                            <ExternalLink className="h-3 w-3" />
-                          </span>
-                        )}
+                        {/* Metadata Badges */}
+                        <div className="mt-3 flex items-center gap-2 flex-wrap text-xs">
+                          {n.productName && (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-secondary/80 border border-border text-foreground/90 font-medium text-[11px]">
+                              <Package className="h-3 w-3 text-muted-foreground" />
+                              <span className="truncate max-w-[200px]">{n.productName}</span>
+                            </span>
+                          )}
 
-                        {isUnread && (
-                          <button
-                            type="button"
-                            onClick={(e) => markSingleRead(n.id, e)}
-                            className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground text-[11px] font-medium transition-colors cursor-pointer border border-transparent hover:border-border"
-                            title="Mark as read"
-                          >
-                            <Check className="h-3 w-3" />
-                            <span>Mark read</span>
-                          </button>
-                        )}
+                          {n.bookingId && (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-secondary/80 border border-border text-foreground/90 font-mono text-[11px]">
+                              <Hash className="h-3 w-3 text-muted-foreground" />
+                              <span>{n.bookingId}</span>
+                            </span>
+                          )}
+
+                          {hasAction && (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-primary hover:underline ml-auto">
+                              <span>View booking</span>
+                              <ExternalLink className="h-3 w-3" />
+                            </span>
+                          )}
+
+                          {isUnread && (
+                            <button
+                              type="button"
+                              onClick={(e) => markSingleRead(n.id, e)}
+                              className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground text-[11px] font-medium transition-colors cursor-pointer border border-transparent hover:border-border"
+                              title="Mark as read"
+                            >
+                              <Check className="h-3 w-3" />
+                              <span>Mark read</span>
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
+                </SwipeRow>
               );
             })
           )}

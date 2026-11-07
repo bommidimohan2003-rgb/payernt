@@ -1,0 +1,106 @@
+.wake-slider-container {
+  position: relative;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: pan-y;
+}
+
+.wake-slider-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #737373;
+}
+
+:is(.dark .wake-slider-header) {
+  color: #BDBDBD;
+}
+
+.wake-slider-value {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #171717;
+}
+
+:is(.dark .wake-slider-value) {
+  color: #FFFFFF;
+}
+
+.wake-slider-track {
+  position: relative;
+  width: 100%;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 3px;
+  padding: 0 4px;
+  border-radius: 0.75rem;
+  background-color: #F5F5F5;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  cursor: grab;
+  outline: none;
+  overflow: hidden;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.wake-slider-track:active {
+  cursor: grabbing;
+}
+
+.wake-slider-track:focus-visible {
+  border-color: #8FAF7E;
+  box-shadow: 0 0 0 2px rgba(143, 175, 126, 0.25);
+}
+
+:is(.dark .wake-slider-track) {
+  background-color: #1E1E1E;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+:is(.dark .wake-slider-track:focus-visible) {
+  border-color: #8FAF7E;
+  box-shadow: 0 0 0 2px rgba(143, 175, 126, 0.35);
+}
+
+.wake-slider-bar {
+  flex: 1 1 0%;
+  min-width: 2px;
+  max-width: 6px;
+  border-radius: 9999px;
+  background-color: #D4D4D8;
+  transform-origin: center bottom;
+  pointer-events: none;
+  will-change: height, background-color, transform;
+}
+
+:is(.dark .wake-slider-bar) {
+  background-color: #333333;
+}
+
+.wake-slider-bar.active {
+  background-color: #8FAF7E;
+}
+
+:is(.dark .wake-slider-bar.active) {
+  background-color: #8FAF7E;
+}
+
+.wake-slider-indicator {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background-color: #8FAF7E;
+  box-shadow: 0 0 8px rgba(143, 175, 126, 0.6);
+  pointer-events: none;
+  z-index: 10;
+  border-radius: 9999px;
+}

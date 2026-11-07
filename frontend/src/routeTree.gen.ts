@@ -21,6 +21,7 @@ import { Route as CheckoutRouteImport } from './routes/checkout'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as FaqRouteImport } from './routes/faq'
+import { Route as FiltersRouteImport } from './routes/filters'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as KycRouteImport } from './routes/kyc'
 import { Route as LenderPortalRouteImport } from './routes/lender-portal'
@@ -167,6 +168,11 @@ const DashboardRoute = DashboardRouteImport.update({
 const FaqRoute = FaqRouteImport.update({
   id: '/faq',
   path: '/faq',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FiltersRoute = FiltersRouteImport.update({
+  id: '/filters',
+  path: '/filters',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
@@ -618,6 +624,7 @@ export interface FileRoutesByFullPath {
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRoute
   '/faq': typeof FaqRoute
+  '/filters': typeof FiltersRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/kyc': typeof KycRoute
   '/lender-portal': typeof LenderPortalRoute
@@ -718,6 +725,7 @@ export interface FileRoutesByTo {
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRoute
   '/faq': typeof FaqRoute
+  '/filters': typeof FiltersRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/kyc': typeof KycRoute
   '/lender-portal': typeof LenderPortalRoute
@@ -818,6 +826,7 @@ export interface FileRoutesById {
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRoute
   '/faq': typeof FaqRoute
+  '/filters': typeof FiltersRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/kyc': typeof KycRoute
   '/lender-portal': typeof LenderPortalRoute
@@ -921,6 +930,7 @@ export interface FileRouteTypes {
     | '/contact'
     | '/dashboard'
     | '/faq'
+    | '/filters'
     | '/forgot-password'
     | '/kyc'
     | '/lender-portal'
@@ -1021,6 +1031,7 @@ export interface FileRouteTypes {
     | '/contact'
     | '/dashboard'
     | '/faq'
+    | '/filters'
     | '/forgot-password'
     | '/kyc'
     | '/lender-portal'
@@ -1120,6 +1131,7 @@ export interface FileRouteTypes {
     | '/contact'
     | '/dashboard'
     | '/faq'
+    | '/filters'
     | '/forgot-password'
     | '/kyc'
     | '/lender-portal'
@@ -1222,6 +1234,7 @@ export interface RootRouteChildren {
   ContactRoute: typeof ContactRoute
   DashboardRoute: typeof DashboardRoute
   FaqRoute: typeof FaqRoute
+  FiltersRoute: typeof FiltersRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   KycRoute: typeof KycRoute
   LenderPortalRoute: typeof LenderPortalRoute
@@ -1334,6 +1347,13 @@ declare module '@tanstack/react-router' {
       path: '/faq'
       fullPath: '/faq'
       preLoaderRoute: typeof FaqRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/filters': {
+      id: '/filters'
+      path: '/filters'
+      fullPath: '/filters'
+      preLoaderRoute: typeof FiltersRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/forgot-password': {
@@ -2177,6 +2197,7 @@ const rootRouteChildren: RootRouteChildren = {
   ContactRoute: ContactRoute,
   DashboardRoute: DashboardRoute,
   FaqRoute: FaqRoute,
+  FiltersRoute: FiltersRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
   KycRoute: KycRoute,
   LenderPortalRoute: LenderPortalRoute,

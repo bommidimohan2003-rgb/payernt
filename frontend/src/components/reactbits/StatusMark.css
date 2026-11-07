@@ -1,0 +1,59 @@
+.status-mark-container {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+.status-mark-svg {
+  display: block;
+  overflow: visible;
+}
+
+.status-mark-ring-pending {
+  stroke: #F59E0B;
+  stroke-dasharray: 4 3;
+  animation: status-mark-spin 6s linear infinite;
+  transform-origin: center;
+}
+
+:is(.dark .status-mark-ring-pending) {
+  stroke: #FBBF24;
+}
+
+.status-mark-arc-processing {
+  stroke: #3B82F6;
+  stroke-dasharray: 28 10;
+  animation: status-mark-spin 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  transform-origin: center;
+}
+
+:is(.dark .status-mark-arc-processing) {
+  stroke: #60A5FA;
+}
+
+@keyframes status-mark-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.status-mark-success {
+  color: #8FAF7E;
+}
+
+.status-mark-error {
+  color: #FF7F7F;
+}
+
+.status-mark-progress-text {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 8px;
+  font-weight: 800;
+  fill: currentColor;
+}

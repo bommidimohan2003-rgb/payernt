@@ -1,0 +1,22 @@
+{
+  "mcpServers": {
+    "reactbits": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "shadcn@latest",
+        "mcp"
+      ],
+      "cwd": "${workspaceFolder}/payernt-main/frontend"
+    },
+    "shadcn": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "shadcn@latest",
+        "mcp"
+      ],
+      "cwd": "${workspaceFolder}/payernt-main/frontend"
+    }
+  }
+}

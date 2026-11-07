@@ -25,6 +25,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { STORAGE_KEYS, storage } from "@/utils/storage";
 import { api } from "@/utils/api";
 import { Button } from "@/components/common/Button";
+import { HoldButton } from "@/components/reactbits/HoldButton";
 import type { Product, Order } from "@/types";
 import { LiveRentalQueue } from "@/components/rental/LiveRentalQueue";
 
@@ -533,12 +534,15 @@ export default function LenderPortal() {
                   >
                     Cancel
                   </Button>
-                  <Button
+                  <HoldButton
                     variant="destructive"
-                    onClick={() => handleDeleteListing(confirmDeleteId)}
+                    duration={1500}
+                    holdText="Keep holding to delete..."
+                    completeText="Deleted!"
+                    onHold={() => handleDeleteListing(confirmDeleteId)}
                   >
-                    Delete Listing
-                  </Button>
+                    Hold to Delete Listing
+                  </HoldButton>
                 </div>
               </motion.div>
             </div>

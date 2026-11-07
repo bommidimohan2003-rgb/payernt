@@ -257,6 +257,16 @@ export function Navigation4({
     },
   ];
 
+  const isDashboardRoute =
+    pathname.startsWith("/dashboard") ||
+    pathname.startsWith("/orders") ||
+    pathname.startsWith("/wishlist") ||
+    pathname.startsWith("/profile") ||
+    pathname.startsWith("/settings") ||
+    pathname.startsWith("/messages") ||
+    pathname.startsWith("/notifications") ||
+    pathname.startsWith("/kyc");
+
   if (
     pathname.startsWith("/admin") ||
     pathname.startsWith("/payernt") ||

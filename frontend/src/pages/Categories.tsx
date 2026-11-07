@@ -20,6 +20,8 @@ import {
   LayoutGrid,
   Heart,
   MessageSquare,
+  SlidersHorizontal,
+  Calendar,
 } from "lucide-react";
 import { MainLayout } from "@/layouts/MainLayout";
 import { ProductCard } from "@/components/common/ProductCard";
@@ -154,6 +156,12 @@ export default function Categories() {
     brand?: string;
     min_p?: string;
     max_p?: string;
+    city?: string;
+    pincode?: string;
+    cond?: string;
+    start?: string;
+    end?: string;
+    sort?: string;
   };
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -165,8 +173,24 @@ export default function Categories() {
 
   const [q, setLocalQ] = useState(search.q || "");
   const activeCategory = search.cat || "all";
-  const [sort, setSort] = useState<SortOption>("featured");
+  const [sort, setSort] = useState<SortOption>(() => (search.sort as SortOption) || "featured");
   const [isSortOpen, setIsSortOpen] = useState(false);
+
+  // Active filter count for badge
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (search.cat && search.cat !== "all") {
+      count += search.cat.split(",").filter(Boolean).length;
+    }
+    if (search.min_p && Number(search.min_p) > 0) count++;
+    if (search.max_p && Number(search.max_p) < 10000) count++;
+    if (search.city && search.city !== "All Cities") count++;
+    if (search.pincode) count++;
+    if (search.cond) count++;
+    if (search.start || search.end) count++;
+    if (search.sort && search.sort !== "featured") count++;
+    return count;
+  }, [search]);
 
   const [allProductsList, setAllProductsList] = useState<Product[]>(() => {
     const cached = storage.get<Product[]>("payent_server_products", []);
@@ -323,16 +347,27 @@ export default function Categories() {
 
   // Filtered & Sorted Product List
   const filteredProducts = useMemo(() => {
+    const selectedCats = (search.cat || "all")
+      .split(",")
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean);
+
     let list =
       mlResults !== null
         ? mlResults
-        : allProductsList.filter((p) =>
-            activeCategory === "all" ? true : matchCategory(p.category, activeCategory)
-          );
+        : allProductsList.filter((p) => {
+            if (!selectedCats || selectedCats.length === 0 || selectedCats.includes("all")) {
+              return true;
+            }
+            return selectedCats.some((c) => matchCategory(p.category, c));
+          });
 
     if (mlResults === null && q && q.trim()) {
       list = advancedSearch(list, q.trim());
     }
+
+    const minP = Number(search.min_p) || 0;
+    const effectiveMaxP = Number(search.max_p) || 10000;
 
     list = list.filter((p: any) => {
       if (isFakeOrDeletedProduct(p)) return false;
@@ -343,10 +378,44 @@ export default function Categories() {
         p.available === true;
 
       const isOwnProduct = isUserOwnProduct(p, user);
-      return isApproved && !isOwnProduct;
+      if (!isApproved || isOwnProduct) return false;
+
+      const cost = Number(p.price || (p as any).daily_rate || (p as any).dailyRate || 0);
+
+      // Price filter
+      if (minP > 0 && cost < minP) return false;
+      if (effectiveMaxP < 10000 && cost > effectiveMaxP) return false;
+
+      // Condition filter
+      if (search.cond) {
+        const condList = search.cond.split(",").map((s) => s.trim().toLowerCase());
+        const hasNew = condList.includes("new");
+        const hasUsed = condList.includes("used");
+        const pCond = String(p.condition || p.condition_grade || "Like New").toLowerCase();
+        if (hasNew && !hasUsed) {
+          if (!pCond.includes("new") && !pCond.includes("mint")) return false;
+        } else if (hasUsed && !hasNew) {
+          if (pCond.includes("brand new") || pCond.includes("brand-new")) return false;
+        }
+      }
+
+      // Location filter (City / Pincode)
+      if (search.city && search.city.trim() && search.city.toLowerCase() !== "all cities") {
+        const cTerm = search.city.trim().toLowerCase();
+        const pCity = String(p.city || p.owner_city || p.location || p.owner_address || "").toLowerCase();
+        if (!pCity.includes(cTerm)) return false;
+      }
+      if (search.pincode && search.pincode.trim()) {
+        const pinTerm = search.pincode.trim();
+        const pPin = String(p.pincode || p.owner_pincode || "");
+        if (!pPin.includes(pinTerm)) return false;
+      }
+
+      return true;
     });
 
-    switch (sort) {
+    const activeSort = search.sort || sort;
+    switch (activeSort) {
       case "price_asc":
         list = [...list].sort((a, b) => (a.price || 0) - (b.price || 0));
         break;
@@ -356,13 +425,22 @@ export default function Categories() {
       case "rating":
         list = [...list].sort((a, b) => (b.rating || 5) - (a.rating || 5));
         break;
+      case "newest":
+        list = [...list].sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")));
+        break;
       default:
         break;
     }
 
     return list;
   }, [
-    activeCategory,
+    search.cat,
+    search.min_p,
+    search.max_p,
+    search.city,
+    search.pincode,
+    search.cond,
+    search.sort,
     q,
     sort,
     mlResults,
@@ -472,6 +550,27 @@ export default function Categories() {
                   )}
                 </form>
 
+                {/* Dedicated Filter Button */}
+                <Link
+                  to="/filters"
+                  search={search as any}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-2 rounded-full border text-xs font-bold transition-all cursor-pointer shrink-0 shadow-xs",
+                    activeFilterCount > 0
+                      ? "bg-neutral-900 text-white border-neutral-900 dark:bg-white dark:text-black dark:border-white ring-2 ring-[#8FAF7E]/30"
+                      : "bg-neutral-100 dark:bg-white/5 text-neutral-800 dark:text-[#BDBDBD] border-neutral-200 dark:border-neutral-700/80 hover:bg-neutral-200 dark:hover:bg-white/10"
+                  )}
+                  title="Open full-page product filters"
+                >
+                  <SlidersHorizontal className="h-3.5 w-3.5 text-[#8FAF7E]" />
+                  <span className="hidden xs:inline">Filters</span>
+                  {activeFilterCount > 0 && (
+                    <span className="h-4.5 min-w-[18px] px-1 rounded-full text-[10px] font-bold bg-[#8FAF7E] text-black flex items-center justify-center">
+                      {activeFilterCount}
+                    </span>
+                  )}
+                </Link>
+
                 {/* Location Badge - now on the left beside search */}
                 <div className="hidden sm:flex items-center gap-1.5 px-3.5 py-1.5 bg-neutral-100 dark:bg-white/5 rounded-full border border-neutral-200 dark:border-white/10 text-xs text-neutral-700 dark:text-neutral-300 shrink-0">
                   <MapPin className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
@@ -516,6 +615,106 @@ export default function Categories() {
                 </Link>
               </div>
             </div>
+
+            {/* Active Filters Summary Chips */}
+            {activeFilterCount > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5 pt-1 text-xs">
+                <span className="text-[11px] font-bold text-neutral-500 dark:text-[#BDBDBD] uppercase tracking-wider mr-1 flex items-center gap-1">
+                  <SlidersHorizontal className="h-3 w-3 text-[#8FAF7E]" />
+                  Active Filters:
+                </span>
+
+                {/* Category Chips */}
+                {search.cat && search.cat !== "all" && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-neutral-200/80 dark:bg-white/10 text-neutral-900 dark:text-white border border-neutral-300 dark:border-neutral-700">
+                    <span>{search.cat.split(",").join(", ")}</span>
+                    <button
+                      type="button"
+                      onClick={() => navigate({ to: targetRoute, search: (prev: any) => ({ ...prev, cat: undefined }) })}
+                      className="hover:text-red-500 cursor-pointer"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                )}
+
+                {/* Price Chip */}
+                {(search.min_p || (search.max_p && Number(search.max_p) < 10000)) && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-neutral-200/80 dark:bg-white/10 text-neutral-900 dark:text-white border border-neutral-300 dark:border-neutral-700">
+                    <span>
+                      ₹{search.min_p || 0} – {Number(search.max_p) < 10000 ? `₹${search.max_p}` : "Any"}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => navigate({ to: targetRoute, search: (prev: any) => ({ ...prev, min_p: undefined, max_p: undefined }) })}
+                      className="hover:text-red-500 cursor-pointer"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                )}
+
+                {/* Dates Chip */}
+                {(search.start || search.end) && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-neutral-200/80 dark:bg-white/10 text-neutral-900 dark:text-white border border-neutral-300 dark:border-neutral-700">
+                    <Calendar className="h-3 w-3 text-[#8FAF7E]" />
+                    <span>{search.start || "Any"} to {search.end || "Any"}</span>
+                    <button
+                      type="button"
+                      onClick={() => navigate({ to: targetRoute, search: (prev: any) => ({ ...prev, start: undefined, end: undefined }) })}
+                      className="hover:text-red-500 cursor-pointer"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                )}
+
+                {/* Location Chip */}
+                {(search.city || search.pincode) && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-neutral-200/80 dark:bg-white/10 text-neutral-900 dark:text-white border border-neutral-300 dark:border-neutral-700">
+                    <MapPin className="h-3 w-3 text-[#8FAF7E]" />
+                    <span>{search.city || search.pincode}</span>
+                    <button
+                      type="button"
+                      onClick={() => navigate({ to: targetRoute, search: (prev: any) => ({ ...prev, city: undefined, pincode: undefined }) })}
+                      className="hover:text-red-500 cursor-pointer"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                )}
+
+                {/* Condition Chip */}
+                {search.cond && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-neutral-200/80 dark:bg-white/10 text-neutral-900 dark:text-white border border-neutral-300 dark:border-neutral-700">
+                    <span className="capitalize">{search.cond}</span>
+                    <button
+                      type="button"
+                      onClick={() => navigate({ to: targetRoute, search: (prev: any) => ({ ...prev, cond: undefined }) })}
+                      className="hover:text-red-500 cursor-pointer"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                )}
+
+                <Link
+                  to="/filters"
+                  search={search as any}
+                  className="text-xs font-bold text-[#8FAF7E] hover:underline cursor-pointer ml-1"
+                >
+                  Edit in Filters
+                </Link>
+
+                <button
+                  type="button"
+                  onClick={() => navigate({ to: targetRoute, search: { q: search.q } as any })}
+                  className="text-xs text-neutral-400 hover:text-red-500 underline cursor-pointer ml-1"
+                >
+                  Clear All
+                </button>
+              </div>
+            )}
 
             {/* CATEGORY SYMBOLS BAR — Spaced out circular category icons */}
             <div className="flex items-center gap-4 sm:gap-5 overflow-x-auto no-scrollbar py-2">
@@ -575,7 +774,8 @@ export default function Categories() {
             </div>
 
             {/* Sort Dropdown */}
-            <div className="relative" ref={sortRef}>
+            <div className="flex items-center gap-3 w-full sm:w-auto self-end sm:self-center">
+              <div className="relative self-end sm:self-center" ref={sortRef}>
               <button
                 type="button"
                 onClick={() => setIsSortOpen(!isSortOpen)}
@@ -628,6 +828,7 @@ export default function Categories() {
               )}
             </div>
           </div>
+        </div>
 
           {/* Equipment Grid */}
           {isLoadingProducts ? (

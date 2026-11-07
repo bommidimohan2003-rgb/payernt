@@ -51,6 +51,7 @@ import { ProductRotationViewer } from "@/components/common/ProductRotationViewer
 import { ProductAngleViewer } from "@/components/common/ProductAngleViewer";
 import { RecommendationSection } from "@/components/recommendations/RecommendationSection";
 import { RenterBookingCalendar } from "@/components/booking/RenterBookingCalendar";
+import { LatticeLoader } from "@/components/reactbits/LatticeLoader";
 import { tracker } from "@/utils/eventTracker";
 import { api, getApiBase } from "@/utils/api";
 import { storage, STORAGE_KEYS } from "@/utils/storage";
@@ -1808,9 +1809,17 @@ const productSchema = product ? {
                   </div>
                 ) : availabilityChecked && isAvailableForDates === false ? (
                   <div className="space-y-3">
-                    <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs font-bold flex items-center gap-2">
-                      <CalendarX className="h-4 w-4 shrink-0" />
-                      <span>{availabilityMessage}</span>
+                    <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs font-bold flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-2">
+                        <CalendarX className="h-4 w-4 shrink-0" />
+                        <span>{availabilityMessage}</span>
+                      </div>
+                      <LatticeLoader
+                        status="error"
+                        label="Slot unavailable"
+                        showTimer={false}
+                        gridSize={3}
+                      />
                     </div>
                     <div className="flex justify-end">
                       <Button
@@ -1826,7 +1835,16 @@ const productSchema = product ? {
                     </div>
                   </div>
                 ) : (
-                  <div className="flex justify-end pt-1">
+                  <div className="flex justify-end items-center gap-3 pt-1">
+                    {isCheckingAvailability && (
+                      <LatticeLoader
+                        status="working"
+                        label="Verifying real-time availability..."
+                        gridSize={3}
+                        pattern="ripple"
+                        showTimer
+                      />
+                    )}
                     <Button
                       type="button"
                       onClick={handleCheckAvailability}

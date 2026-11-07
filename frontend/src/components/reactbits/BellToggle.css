@@ -1,0 +1,74 @@
+.bell-toggle-container {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 9999px;
+  background-color: #F5F5F5;
+  border: 1.5px solid rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  outline: none;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #737373;
+  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.bell-toggle-container:hover:not(:disabled) {
+  border-color: rgba(0, 0, 0, 0.2);
+}
+
+.bell-toggle-container:focus-visible {
+  box-shadow: 0 0 0 3px rgba(143, 175, 126, 0.35);
+}
+
+:is(.dark .bell-toggle-container) {
+  background-color: #1E1E1E;
+  border: 1.5px solid rgba(255, 255, 255, 0.14);
+  color: #BDBDBD;
+}
+
+:is(.dark .bell-toggle-container:hover:not(:disabled)) {
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.bell-toggle-container.active {
+  background-color: rgba(143, 175, 126, 0.15);
+  border-color: #8FAF7E;
+  color: #171717;
+}
+
+:is(.dark .bell-toggle-container.active) {
+  background-color: rgba(143, 175, 126, 0.2);
+  border-color: #8FAF7E;
+  color: #FFFFFF;
+}
+
+.bell-toggle-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: top center;
+  color: inherit;
+}
+
+.bell-toggle-container.active .bell-toggle-icon {
+  color: #8FAF7E;
+}
+
+.bell-toggle-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.375rem;
+  height: 16px;
+  min-width: 16px;
+  border-radius: 9999px;
+  background-color: #8FAF7E;
+  color: #FFFFFF;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  line-height: 1;
+}

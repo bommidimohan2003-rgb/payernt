@@ -1,0 +1,68 @@
+.hold-button-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 0.875rem;
+  font-weight: 700;
+  font-size: 0.875rem;
+  padding: 0.75rem 1.5rem;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: pointer;
+  outline: none;
+  border: 1.5px solid transparent;
+  transition: transform 0.15s, border-color 0.2s, box-shadow 0.2s;
+}
+
+.hold-button-container:active {
+  transform: scale(0.98);
+}
+
+.hold-button-container.destructive {
+  background-color: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #EF4444;
+}
+
+:is(.dark .hold-button-container.destructive) {
+  background-color: rgba(255, 127, 127, 0.12);
+  border-color: rgba(255, 127, 127, 0.35);
+  color: #FF7F7F;
+}
+
+.hold-button-container.destructive:focus-visible {
+  box-shadow: 0 0 0 3px rgba(255, 127, 127, 0.35);
+}
+
+.hold-button-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  background-color: #EF4444;
+  pointer-events: none;
+  z-index: 1;
+}
+
+:is(.dark .hold-button-fill) {
+  background-color: #FF7F7F;
+}
+
+.hold-button-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: color 0.15s;
+}
+
+.hold-button-container.holding .hold-button-content {
+  color: #FFFFFF !important;
+}
+
+.hold-button-container.completed .hold-button-content {
+  color: #FFFFFF !important;
+}

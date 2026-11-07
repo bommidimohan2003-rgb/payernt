@@ -27,6 +27,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import type { PayerntProduct, VerificationStatus } from "../types";
 import { resolveProductImageUrl, resolveProductDailyRate } from "../productUtils";
+import { HoldButton } from "@/components/reactbits/HoldButton";
 
 export interface MyProductsProps {
   products: PayerntProduct[];
@@ -510,24 +511,18 @@ export function MyProducts({
               >
                 Cancel
               </button>
-              <button
-                type="button"
-                onClick={handleConfirmDelete}
+              <HoldButton
+                variant="destructive"
+                duration={1500}
+                holdText="Hold to permanently delete..."
+                completeText="Deleted"
                 disabled={isDeleting}
-                className="px-4 py-2 rounded-xl bg-destructive text-destructive-foreground text-xs font-bold active:scale-[0.98] transition-all cursor-pointer shadow-xs hover:opacity-90 flex items-center gap-1.5 disabled:opacity-50"
+                onHold={handleConfirmDelete}
+                className="text-xs py-2 px-4"
               >
-                {isDeleting ? (
-                  <>
-                    <div className="h-3 w-3 border-2 border-destructive-foreground border-t-transparent rounded-full animate-spin" />
-                    <span>Deleting...</span>
-                  </>
-                ) : (
-                  <>
-                    <Trash2 className="h-3.5 w-3.5" />
-                    <span>Delete Listing</span>
-                  </>
-                )}
-              </button>
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>Hold to Delete Listing</span>
+              </HoldButton>
             </div>
           </div>
         </div>

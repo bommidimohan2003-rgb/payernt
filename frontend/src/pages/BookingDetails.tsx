@@ -47,6 +47,7 @@ import { toast } from "sonner";
 import { api } from "@/utils/api";
 
 import { storage, STORAGE_KEYS } from "@/utils/storage";
+import { StatusMark, mapOrderStatusToStatusMark } from "@/components/reactbits/StatusMark";
 
 import type { Order } from "@/types";
 
@@ -552,15 +553,10 @@ export function BookingDetails() {
               </h1>
 
               <span
-
                 className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${statusInfo.badgeClass}`}
-
               >
-
-                {statusInfo.icon}
-
+                <StatusMark status={mapOrderStatusToStatusMark(booking?.status)} size={14} />
                 <span>{statusInfo.label}</span>
-
               </span>
 
             </div>

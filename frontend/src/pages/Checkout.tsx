@@ -30,6 +30,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { MainLayout } from "@/layouts/MainLayout";
 import { BackButton } from "@/components/common/BackButton";
 import { Button } from "@/components/common/Button";
+import { SlideCommit } from "@/components/reactbits/SlideCommit";
 import { Input } from "@/components/common/Input";
 import { Modal } from "@/components/common/Modal";
 import { storage, STORAGE_KEYS } from "@/utils/storage";
@@ -1671,12 +1672,27 @@ export default function Checkout() {
               </div>
             )}
 
-            {/* PRIMARY ACTION BUTTON: Explicitly labelled "Confirm Order" */}
-            <div className="space-y-2">
+            {/* PRIMARY ACTION: React Bits SlideCommit Slide-to-Confirm */}
+            <div className="space-y-3">
+              <SlideCommit
+                label={`Slide to Confirm Order (₹${total.toFixed(0)})`}
+                successLabel={`Order Confirmed • ₹${total.toFixed(0)}`}
+                onConfirm={handleConfirmOrder}
+                disabled={
+                  isProcessing ||
+                  isVerifying ||
+                  categoryRestriction?.restricted ||
+                  (kycStatus !== null && kycStatus !== "APPROVED") ||
+                  (fulfillmentMethod === "delivery" && !selectedAddress)
+                }
+              />
+
+              {/* Direct Tap Alternative with Global Dual-Side Fill Button */}
               <Button
-                size="lg"
+                size="sm"
+                variant="outline"
                 id="confirm-order-btn"
-                className="w-full font-black text-sm sm:text-base py-6 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl shadow-lg transition-all active:scale-98 cursor-pointer flex items-center justify-center gap-2"
+                className="w-full text-xs font-bold py-2 border-border/80 text-muted-foreground hover:text-foreground cursor-pointer"
                 onClick={handleConfirmOrder}
                 loading={isProcessing || isVerifying}
                 isError={Boolean(paymentError)}
@@ -1690,18 +1706,15 @@ export default function Checkout() {
               >
                 {isVerifying ? (
                   <span className="flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" /> Verifying
-                    Security...
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> Verifying Security...
                   </span>
                 ) : isProcessing ? (
                   <span className="flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" /> Confirming
-                    Order...
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> Confirming Order...
                   </span>
                 ) : (
-                  <span className="flex items-center gap-2">
-                    <CheckCircle2 className="h-5 w-5" /> Confirm Order (₹
-                    {total.toFixed(0)})
+                  <span className="flex items-center gap-1.5">
+                    <CheckCircle2 className="h-3.5 w-3.5" /> Tap to Confirm Directly (₹{total.toFixed(0)})
                   </span>
                 )}
               </Button>

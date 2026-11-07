@@ -5660,11 +5660,23 @@ def fetch_public_listings(
     response: Response,
     limit: Optional[int] = Query(None, ge=1, le=100),
     page: Optional[int] = Query(1, ge=1),
+    categories: Optional[str] = Query(None, description="Comma-separated category IDs or names"),
+    min_price: Optional[float] = Query(None, ge=0),
+    max_price: Optional[float] = Query(None, ge=0),
+    city: Optional[str] = Query(None),
+    pincode: Optional[str] = Query(None),
+    condition: Optional[str] = Query(None, description="Comma-separated conditions e.g. new,used"),
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    sort: Optional[str] = Query(None),
     authorization: Optional[str] = Header(None)
 ):
     response.headers["Cache-Control"] = "public, max-age=30, stale-while-revalidate=120"
     offset = (page - 1) * limit if limit is not None else 0
-    cache_key = f"public_custom_products:p{page}:l{limit}" if limit is not None else "public_custom_products"
+    cache_key = (
+        f"public_custom_products:p{page}:l{limit}:cat{categories}:min{min_price}:"
+        f"max{max_price}:c{city}:pin{pincode}:cond{condition}:s{start_date}:e{end_date}:sort{sort}"
+    )
 
     # Identify caller if authorization header is provided
     caller_email = None
@@ -5687,7 +5699,11 @@ def fetch_public_listings(
                     pass
 
     def _load():
-        listings = get_all_approved_custom_products(limit=limit, offset=offset) or []
+        has_filters = any([categories, min_price is not None, max_price is not None, city, pincode, condition, start_date, end_date, sort])
+        fetch_limit = None if has_filters else limit
+        fetch_offset = 0 if has_filters else offset
+
+        listings = get_all_approved_custom_products(limit=fetch_limit, offset=fetch_offset) or []
         try:
             from payernt_database import get_all_active_payernt_products
             payernt_items = get_all_active_payernt_products()
@@ -5766,9 +5782,98 @@ def fetch_public_listings(
         if not listings:
             return []
 
+        # 1. Filter by Categories (OR logic within selected categories)
+        if categories and categories.strip() and categories.strip().lower() != "all":
+            selected_cats = [c.strip().lower() for c in categories.split(",") if c.strip() and c.strip().lower() != "all"]
+            if selected_cats:
+                def _matches_category(p_cat: Optional[str]) -> bool:
+                    if not p_cat:
+                        return False
+                    low = str(p_cat).lower().strip()
+                    for sc in selected_cats:
+                        if sc == low:
+                            return True
+                        if sc in ["cameras", "camera"] and "camera" in low:
+                            return True
+                        if sc in ["laptops", "laptop"] and ("laptop" in low or "pc" in low or "mac" in low or "computer" in low):
+                            return True
+                        if sc in ["drones", "drone"] and "drone" in low:
+                            return True
+                        if sc in ["audio", "sound"] and ("audio" in low or "sound" in low or "headphone" in low or "speaker" in low or "mic" in low):
+                            return True
+                        if sc in ["tools", "tool", "drills"] and ("tool" in low or "drill" in low):
+                            return True
+                        if sc in ["powerbanks", "powerbank", "power"] and ("power" in low or "battery" in low or "station" in low):
+                            return True
+                        if sc in ["lighting", "light"] and ("light" in low or "studio" in low):
+                            return True
+                        if sc in ["bikes", "bike"] and ("bike" in low or "cycle" in low or "ride" in low):
+                            return True
+                        if sc in low or low in sc:
+                            return True
+                    return False
+                listings = [p for p in listings if _matches_category(p.get("category"))]
+
+        # 2. Filter by Price Range (Daily Rental Price)
+        if min_price is not None and min_price > 0:
+            listings = [p for p in listings if float(p.get("daily_rate") or p.get("price") or 0) >= min_price]
+        if max_price is not None and max_price < 10000:
+            listings = [p for p in listings if float(p.get("daily_rate") or p.get("price") or 0) <= max_price]
+
+        # 3. Filter by Location (City / Pincode)
+        if city and city.strip() and city.strip().lower() != "all cities":
+            c_term = city.strip().lower()
+            listings = [
+                p for p in listings
+                if c_term in str(p.get("owner_city") or p.get("city") or p.get("owner_address") or "").lower()
+            ]
+        if pincode and pincode.strip():
+            pin_term = pincode.strip()
+            listings = [
+                p for p in listings
+                if pin_term in str(p.get("owner_pincode") or p.get("pincode") or "")
+            ]
+
+        # 4. Filter by Condition (New / Used)
+        if condition and condition.strip():
+            cond_terms = [c.strip().lower() for c in condition.split(",") if c.strip()]
+            has_new = any(c in ["new", "like new", "mint"] for c in cond_terms)
+            has_used = any(c in ["used", "good", "fair", "excellent"] for c in cond_terms)
+            if has_new and not has_used:
+                listings = [
+                    p for p in listings
+                    if any(k in str(p.get("condition") or p.get("condition_grade") or "Like New").lower() for k in ["new", "mint"])
+                ]
+            elif has_used and not has_new:
+                listings = [
+                    p for p in listings
+                    if not any(k in str(p.get("condition") or p.get("condition_grade") or "").lower() for k in ["brand new", "brand-new"])
+                ]
+
+        # 5. Filter by Availability Dates (exclude products with conflicting bookings)
         pids = [str(p["id"]) for p in listings if p.get("id")]
-        today_str = dt.now(timezone.utc).strftime("%Y-%m-%d")
-        booked_set = set(check_products_booking_conflicts(pids, today_str, today_str)) if pids else set()
+        if start_date and end_date and pids:
+            conflicted_set = check_products_booking_conflicts(pids, start_date, end_date)
+            listings = [p for p in listings if str(p.get("id")) not in conflicted_set]
+            booked_set = set()
+        else:
+            today_str = dt.now(timezone.utc).strftime("%Y-%m-%d")
+            booked_set = set(check_products_booking_conflicts(pids, today_str, today_str)) if pids else set()
+
+        # 6. Sorting
+        if sort == "price_asc":
+            listings.sort(key=lambda p: float(p.get("daily_rate") or p.get("price") or 0))
+        elif sort == "price_desc":
+            listings.sort(key=lambda p: float(p.get("daily_rate") or p.get("price") or 0), reverse=True)
+        elif sort == "rating":
+            listings.sort(key=lambda p: float(p.get("rating") or 5.0), reverse=True)
+        elif sort == "newest":
+            listings.sort(key=lambda p: str(p.get("created_at") or ""), reverse=True)
+
+        # 7. Apply Pagination if filters were active
+        if has_filters and limit is not None and limit > 0:
+            listings = listings[offset : offset + limit]
+
         return [format_product_dict(p, is_summary=True, booked_pids_set=booked_set, is_public=True) for p in listings]
 
     all_listings = get_cached(cache_key, 30, _load)

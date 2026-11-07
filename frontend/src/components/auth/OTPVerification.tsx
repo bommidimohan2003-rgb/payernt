@@ -2,6 +2,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/common/Button";
 import { Input } from "@/components/common/Input";
+import { CodeSlots } from "@/components/reactbits/CodeSlots";
 import { STORAGE_KEYS, storage } from "@/utils/storage";
 import { api } from "@/utils/api";
 import { Info, Eye, EyeOff } from "lucide-react";
@@ -21,12 +22,11 @@ interface PendingUser {
 
 export function OTPVerification() {
   const navigate = useNavigate();
-  const [digits, setDigits] = useState<string[]>(Array(6).fill(""));
+  const [code, setCode] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [seconds, setSeconds] = useState(60);
   const [loading, setLoading] = useState(false);
 
-  const refs = useRef<Array<HTMLInputElement | null>>([]);
   const email = storage.get<string>(STORAGE_KEYS.otpEmail, "your email");
 
   const pendingUser = storage.get<PendingUser | null>(
@@ -42,20 +42,9 @@ export function OTPVerification() {
     return () => clearTimeout(t);
   }, [seconds]);
 
-  const change = (i: number, v: string) => {
-    const val = v.replace(/\D/g, "").slice(-1);
-    setDigits((prev) => {
-      const next = [...prev];
-      next[i] = val;
-      return next;
-    });
-    setError(null); // Clear error on change
-    if (val && i < 5) refs.current[i + 1]?.focus();
-  };
-
-  const verify = async () => {
-    const code = digits.join("");
-    if (code.length < 6) return setError("Enter all 6 digits");
+  const verify = async (overrideCode?: string) => {
+    const activeCode = overrideCode || code;
+    if (activeCode.length < 6) return setError("Enter all 6 digits");
 
     setError(null);
     setLoading(true);
@@ -65,7 +54,7 @@ export function OTPVerification() {
         const res = await api.registerVerify(
           pendingUser.email,
           pendingUser.phone,
-          code,
+          activeCode,
           pendingUser.password || "",
           pendingUser.fullName,
           pendingUser.adminCode,
@@ -136,35 +125,26 @@ export function OTPVerification() {
         </div>
       </div>
 
-      <div className="flex justify-between gap-2">
-        {digits.map((d, i) => (
-          <input
-            key={i}
-            ref={(el) => {
-              refs.current[i] = el;
-            }}
-            inputMode="numeric"
-            maxLength={1}
-            value={d}
-            onChange={(e) => change(i, e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Backspace" && !d && i > 0) {
-                setDigits((prev) => {
-                  const next = [...prev];
-                  next[i - 1] = "";
-                  return next;
-                });
-                refs.current[i - 1]?.focus();
-              }
-            }}
-            className="h-14 w-full max-w-[52px] text-center text-xl font-semibold rounded-xl border border-border bg-card focus:border-primary focus:ring-2 focus:ring-ring/40 outline-none"
-          />
-        ))}
+      {/* React Bits CodeSlots: 6-digit OTP Input */}
+      <div className="py-2">
+        <CodeSlots
+          length={6}
+          value={code}
+          onChange={(val) => {
+            setCode(val);
+            setError(null);
+          }}
+          onComplete={(completedCode) => {
+            setCode(completedCode);
+            verify(completedCode);
+          }}
+          error={error}
+          disabled={loading}
+          autoFocus
+        />
       </div>
 
-      {error && <p className="text-sm text-destructive font-medium">{error}</p>}
-
-      <Button className="w-full" onClick={verify} loading={loading}>
+      <Button className="w-full" onClick={() => verify()} loading={loading}>
         Verify Code
       </Button>
 

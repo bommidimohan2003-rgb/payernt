@@ -18,6 +18,7 @@ import {
   Lock,
 } from "lucide-react";
 import { Button } from "@/components/common/Button";
+import { WakeSlider } from "@/components/reactbits/WakeSlider";
 import { toast } from "sonner";
 
 export default function Payant() {
@@ -192,24 +193,19 @@ export default function Payant() {
               </div>
             </div>
 
-            {/* Slider */}
-            <div className="space-y-3 pt-2">
-              <div className="flex items-center justify-between text-xs font-medium">
-                <span className="text-neutral-400">Asset Valuation</span>
-                <span className="text-base font-bold text-white font-mono">
-                  ₹{assetValue.toLocaleString("en-IN")}
-                </span>
-              </div>
-              <input
-                type="range"
+            {/* React Bits WakeSlider: Asset Valuation */}
+            <div className="pt-2">
+              <WakeSlider
                 min={25000}
                 max={1500000}
                 step={25000}
                 value={assetValue}
-                onChange={(e) => setAssetValue(Number(e.target.value))}
-                className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-white"
+                onChange={(val) => setAssetValue(val)}
+                formatValue={(v) => `₹${v.toLocaleString("en-IN")}`}
+                label="Asset Valuation"
+                barCount={42}
               />
-              <div className="flex justify-between text-[11px] text-neutral-500 font-mono">
+              <div className="flex justify-between text-[11px] text-neutral-400 font-mono mt-1">
                 <span>₹25,000</span>
                 <span>₹7,50,000</span>
                 <span>₹15,00,000</span>

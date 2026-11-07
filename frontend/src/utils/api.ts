@@ -1738,6 +1738,51 @@ export const api = {
     return this.getPublicCustomProducts().catch(() => null);
   },
 
+  async getFilteredProducts(filters: {
+    categories?: string;
+    minPrice?: number;
+    maxPrice?: number;
+    city?: string;
+    pincode?: string;
+    condition?: string;
+    startDate?: string;
+    endDate?: string;
+    sort?: string;
+  } = {}): Promise<Product[]> {
+    const params = new URLSearchParams();
+    if (filters.categories) params.set("categories", filters.categories);
+    if (filters.minPrice !== undefined && filters.minPrice > 0) params.set("min_price", String(filters.minPrice));
+    if (filters.maxPrice !== undefined && filters.maxPrice < 10000) params.set("max_price", String(filters.maxPrice));
+    if (filters.city) params.set("city", filters.city);
+    if (filters.pincode) params.set("pincode", filters.pincode);
+    if (filters.condition) params.set("condition", filters.condition);
+    if (filters.startDate) params.set("start_date", filters.startDate);
+    if (filters.endDate) params.set("end_date", filters.endDate);
+    if (filters.sort) params.set("sort", filters.sort);
+
+    const qs = params.toString();
+    const url = `${API_BASE}/api/products${qs ? `?${qs}` : ""}`;
+    const token = typeof window !== "undefined" ? storage.get<string | null>(STORAGE_KEYS.token, null) : null;
+    const headers: Record<string, string> = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
+    try {
+      const res = await fetchWithTimeout(url, { method: "GET", headers }, 8000);
+      if (res.ok) {
+        const json = await res.json();
+        const raw = Array.isArray(json) ? json : json?.data || json?.products || [];
+        if (Array.isArray(raw)) {
+          return raw
+            .filter((p) => !isFakeOrDeletedProduct(p))
+            .map((p) => normalizeProductData(p));
+        }
+      }
+    } catch (err) {
+      console.warn("[API] getFilteredProducts notice:", err);
+    }
+    return [];
+  },
+
   async getPublicCategories() {
     if (!API_BASE) return null;
     return getCachedOrFetch(

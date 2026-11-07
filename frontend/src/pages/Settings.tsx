@@ -27,6 +27,8 @@ import { SecurityHistoryTab } from "@/components/security/SecurityHistoryTab";
 import { OwnershipTransferTab } from "@/components/security/OwnershipTransferTab";
 import { RegisterDeviceModal } from "@/components/security/RegisterDeviceModal";
 import { RegisteredDevice, deviceService } from "@/services/deviceService";
+import { BellToggle } from "@/components/reactbits/BellToggle";
+import { storage } from "@/utils/storage";
 
 function Toggle({ on, onChange }: { on: boolean; onChange: () => void }) {
   return (
@@ -330,13 +332,29 @@ export default function Settings() {
               <span className="text-xs sm:text-sm font-medium text-neutral-800 dark:text-neutral-200">
                 {tCommon.bookingAlerts}
               </span>
-              <Toggle on={emails} onChange={() => setEmails((v) => !v)} />
+              <BellToggle
+                checked={emails}
+                onChange={(next) => {
+                  setEmails(next);
+                  storage.set("payent_setting_booking_alerts", next);
+                }}
+                activeLabel="Alerts On"
+                inactiveLabel="Muted"
+              />
             </div>
             <div className="flex items-center justify-between">
               <span className="text-xs sm:text-sm font-medium text-neutral-800 dark:text-neutral-200">
                 {tCommon.messageAlerts}
               </span>
-              <Toggle on={push} onChange={() => setPush((v) => !v)} />
+              <BellToggle
+                checked={push}
+                onChange={(next) => {
+                  setPush(next);
+                  storage.set("payent_setting_message_alerts", next);
+                }}
+                activeLabel="Push On"
+                inactiveLabel="Muted"
+              />
             </div>
           </div>
         </div>

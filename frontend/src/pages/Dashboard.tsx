@@ -19,6 +19,8 @@ import {
   Store,
   Compass,
   KeyRound,
+  Calendar,
+  Lock,
 } from "lucide-react";
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { toast } from "sonner";
@@ -49,6 +51,7 @@ export default function Dashboard() {
   const [loadingOrders, setLoadingOrders] = useState(true);
   const [revealedPins, setRevealedPins] = useState<Record<string, { pin: string; instructions?: string }>>({});
   const [loadingPinOrderId, setLoadingPinOrderId] = useState<string | null>(null);
+  const [bookingFilter, setBookingFilter] = useState<"all" | "active" | "cancelled">("all");
 
 
 
@@ -198,6 +201,16 @@ export default function Dashboard() {
     [publicProducts, ids],
   );
 
+  const filteredBookings = useMemo(() => {
+    if (bookingFilter === "active") {
+      return orders.filter((o) => o.status === "active" || o.status === "pending");
+    }
+    if (bookingFilter === "cancelled") {
+      return orders.filter((o) => o.status === "cancelled");
+    }
+    return orders;
+  }, [orders, bookingFilter]);
+
   // Profile Completeness Engine
   const profileStatus = useMemo(() => {
     if (!user) return { percentage: 0, missing: [] };
@@ -218,7 +231,7 @@ export default function Dashboard() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-8 w-full max-w-7xl">
+      <div className="space-y-6 sm:space-y-8 w-full max-w-7xl">
         {/* ADMIN OPERATIONS CALLOUT */}
         {(user?.role === "admin" || (user as any)?.role === "superadmin" || (typeof window !== "undefined" && Boolean(localStorage.getItem("payent:admin:current_user")))) && (
           <div className="rounded-2xl border border-blue-500/30 bg-blue-950/20 dark:bg-blue-950/40 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -247,39 +260,47 @@ export default function Dashboard() {
         )}
 
         {/* Authoritative Dual-Side KYC Status Banner */}
-        <KycStatusBanner role="renter" className="mb-4" />
+        <KycStatusBanner role="renter" />
 
-        <BackButton fallback="/categories" className="mb-4" />
+        {/* Navigation Breadcrumb Bar */}
+        <div className="flex items-center justify-between gap-4">
+          <BackButton fallback="/categories" className="!mb-0 !py-1.5 !px-3.5 text-xs font-semibold" />
+          <div className="flex items-center gap-2 text-xs text-neutral-500 dark:text-neutral-400">
+            <Link to="/" className="hover:text-neutral-900 dark:hover:text-white transition-colors">Home</Link>
+            <span>/</span>
+            <span className="font-semibold text-neutral-900 dark:text-white">Creator Dashboard</span>
+          </div>
+        </div>
 
-        {/* 1. WELCOME & COMMAND HEADER */}
-        <div className="rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#1E1E1E] p-6 sm:p-8 shadow-sm">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div className="flex items-center gap-4">
+        {/* 1. WELCOME & COMMAND HERO */}
+        <div className="rounded-3xl border border-neutral-200/90 dark:border-white/10 bg-white dark:bg-[#1E1E1E] p-6 sm:p-7 shadow-sm">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+            <div className="flex items-center gap-4 sm:gap-5">
               <ProfilePhoto
                 src={user?.profilePhotoUrl || user?.profile_photo_url || user?.avatar}
                 alt={user?.fullName || "User"}
                 size="xl"
                 shape="rounded"
-                className="shadow-md border border-black/10 dark:border-[#A1A1AA]/25 shrink-0"
+                className="shadow-sm border border-neutral-200 dark:border-white/15 shrink-0"
               />
               <div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h1 className="text-2xl sm:text-3xl font-black text-neutral-950 dark:text-[#F5F5F5] tracking-tight">
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <h1 className="text-2xl sm:text-3xl font-black text-neutral-950 dark:text-white tracking-tight">
                     Welcome back, {user?.fullName?.split(" ")[0] || "Creator"}
                   </h1>
                   {user?.isVerified || (user as any)?.verified || user?.status === "approved" || user?.status === "active" ? (
-                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                      <ShieldCheck className="w-3 h-3" />
+                    <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                      <ShieldCheck className="w-3.5 h-3.5" />
                       Verified Renter
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
-                      <Clock className="w-3 h-3" />
+                    <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                      <Clock className="w-3.5 h-3.5" />
                       Review Pending
                     </span>
                   )}
                 </div>
-                <p className="mt-1 text-xs sm:text-sm text-neutral-500 dark:text-[#A1A1AA]">
+                <p className="mt-1 text-xs sm:text-sm text-neutral-500 dark:text-neutral-400">
                   Your creator command center for equipment bookings, saved gear, and project rentals.
                 </p>
               </div>
@@ -289,23 +310,23 @@ export default function Dashboard() {
             <div className="flex flex-wrap items-center gap-2.5">
               <Link
                 to="/browse"
-                className="inline-flex items-center gap-1.5 h-10 px-4 rounded-full bg-[#161616] text-[#FFFFFF] hover:bg-[#292929] dark:bg-[#F5F5F5] dark:text-[#050709] dark:hover:bg-[#FFFFFF] text-xs font-bold transition-all shadow-sm"
+                className="inline-flex items-center gap-2 h-10 px-5 rounded-xl bg-neutral-950 text-white hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-neutral-200 text-xs font-bold transition-all shadow-sm active:scale-95"
               >
-                <Compass className="w-3.5 h-3.5" />
+                <Compass className="w-4 h-4" />
                 <span>Explore Gear</span>
               </Link>
               <Link
                 to="/orders"
-                className="inline-flex items-center gap-1.5 h-10 px-4 rounded-full border border-black/10 dark:border-[#A1A1AA]/25 text-neutral-800 dark:text-[#F5F5F5] hover:bg-neutral-100 dark:hover:bg-white/5 text-xs font-bold transition-all"
+                className="inline-flex items-center gap-2 h-10 px-4 rounded-xl border border-neutral-200/90 dark:border-white/10 text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-white/5 text-xs font-bold transition-all active:scale-95"
               >
-                <Package className="w-3.5 h-3.5" />
+                <Package className="w-4 h-4 text-neutral-500 dark:text-neutral-400" />
                 <span>My Bookings</span>
               </Link>
               <Link
                 to="/wishlist"
-                className="inline-flex items-center gap-1.5 h-10 px-4 rounded-full border border-black/10 dark:border-[#A1A1AA]/25 text-neutral-800 dark:text-[#F5F5F5] hover:bg-neutral-100 dark:hover:bg-white/5 text-xs font-bold transition-all"
+                className="inline-flex items-center gap-2 h-10 px-4 rounded-xl border border-neutral-200/90 dark:border-white/10 text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-white/5 text-xs font-bold transition-all active:scale-95"
               >
-                <Heart className="w-3.5 h-3.5" />
+                <Heart className="w-4 h-4 text-neutral-500 dark:text-neutral-400" />
                 <span>Saved Wishlist ({ids.length})</span>
               </Link>
             </div>
@@ -313,132 +334,196 @@ export default function Dashboard() {
         </div>
 
         {/* 2. REAL METRICS KPI GRID */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="p-5 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-black/10 dark:border-[#A1A1AA]/20 shadow-sm"
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Link
+            to="/orders"
+            className="p-5 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-neutral-200/80 dark:border-white/10 hover:border-neutral-300 dark:hover:border-white/20 shadow-sm transition-all group flex flex-col justify-between"
           >
-            <div className="h-10 w-10 rounded-xl grid place-items-center bg-neutral-100 dark:bg-white/[0.05] text-neutral-700 dark:text-[#A1A1AA] border border-black/5 dark:border-white/5 mb-3">
-              <Package className="h-5 w-5" />
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+                Active Rentals
+              </span>
+              <div className="h-9 w-9 rounded-xl grid place-items-center bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                <Package className="h-4 w-4" />
+              </div>
             </div>
-            <div className="text-2xl font-black text-neutral-950 dark:text-[#F5F5F5] font-mono">
-              {activeRentalsCount}
+            <div className="mt-3 mb-1">
+              <span className="text-3xl font-black font-mono text-neutral-950 dark:text-white tracking-tight">
+                {activeRentalsCount}
+              </span>
             </div>
-            <div className="text-xs font-medium text-neutral-500 dark:text-[#A1A1AA] mt-0.5">
-              Active Rentals
+            <div className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+              <span>View rental schedule</span>
+              <ArrowRight className="w-3 h-3" />
             </div>
-          </motion.div>
+          </Link>
 
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.05 }}
-            className="p-5 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-black/10 dark:border-[#A1A1AA]/20 shadow-sm"
-          >
-            <div className="h-10 w-10 rounded-xl grid place-items-center bg-neutral-100 dark:bg-white/[0.05] text-neutral-700 dark:text-[#A1A1AA] border border-black/5 dark:border-white/5 mb-3">
-              <TrendingUp className="h-5 w-5" />
+          <div className="p-5 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-neutral-200/80 dark:border-white/10 shadow-sm flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+                Total Spent
+              </span>
+              <div className="h-9 w-9 rounded-xl grid place-items-center bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+                <TrendingUp className="h-4 w-4" />
+              </div>
             </div>
-            <div className="text-2xl font-black text-neutral-950 dark:text-[#F5F5F5] font-mono">
-              ₹{totalSpent.toLocaleString("en-IN")}
+            <div className="mt-3 mb-1">
+              <span className="text-3xl font-black font-mono text-neutral-950 dark:text-white tracking-tight">
+                ₹{totalSpent.toLocaleString("en-IN")}
+              </span>
             </div>
-            <div className="text-xs font-medium text-neutral-500 dark:text-[#A1A1AA] mt-0.5">
-              Total Spent
+            <div className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">
+              Across {completedRentalsCount + activeRentalsCount} total orders
             </div>
-          </motion.div>
+          </div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="p-5 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-black/10 dark:border-[#A1A1AA]/20 shadow-sm"
+          <Link
+            to="/wishlist"
+            className="p-5 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-neutral-200/80 dark:border-white/10 hover:border-neutral-300 dark:hover:border-white/20 shadow-sm transition-all group flex flex-col justify-between"
           >
-            <div className="h-10 w-10 rounded-xl grid place-items-center bg-neutral-100 dark:bg-white/[0.05] text-neutral-700 dark:text-[#A1A1AA] border border-black/5 dark:border-white/5 mb-3">
-              <Heart className="h-5 w-5" />
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+                Saved Gear
+              </span>
+              <div className="h-9 w-9 rounded-xl grid place-items-center bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+                <Heart className="h-4 w-4" />
+              </div>
             </div>
-            <div className="text-2xl font-black text-neutral-950 dark:text-[#F5F5F5] font-mono">
-              {ids.length}
+            <div className="mt-3 mb-1">
+              <span className="text-3xl font-black font-mono text-neutral-950 dark:text-white tracking-tight">
+                {ids.length}
+              </span>
             </div>
-            <div className="text-xs font-medium text-neutral-500 dark:text-[#A1A1AA] mt-0.5">
-              Saved Gear Items
+            <div className="text-[11px] font-medium text-rose-600 dark:text-rose-400 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+              <span>View saved items</span>
+              <ArrowRight className="w-3 h-3" />
             </div>
-          </motion.div>
+          </Link>
 
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15 }}
-            className="p-5 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-black/10 dark:border-[#A1A1AA]/20 shadow-sm"
+          <Link
+            to="/notifications"
+            className="p-5 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-neutral-200/80 dark:border-white/10 hover:border-neutral-300 dark:hover:border-white/20 shadow-sm transition-all group flex flex-col justify-between"
           >
-            <div className="h-10 w-10 rounded-xl grid place-items-center bg-neutral-100 dark:bg-white/[0.05] text-neutral-700 dark:text-[#A1A1AA] border border-black/5 dark:border-white/5 mb-3">
-              <Bell className="h-5 w-5" />
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+                Notifications
+              </span>
+              <div className="h-9 w-9 rounded-xl grid place-items-center bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                <Bell className="h-4 w-4" />
+              </div>
             </div>
-            <div className="text-2xl font-black text-neutral-950 dark:text-[#F5F5F5] font-mono">
-              {alertsList.length}
+            <div className="mt-3 mb-1">
+              <span className="text-3xl font-black font-mono text-neutral-950 dark:text-white tracking-tight">
+                {alertsList.length}
+              </span>
             </div>
-            <div className="text-xs font-medium text-neutral-500 dark:text-[#A1A1AA] mt-0.5">
-              System Notifications
+            <div className="text-[11px] font-medium text-amber-600 dark:text-amber-400 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+              <span>{unreadAlertsCount > 0 ? `${unreadAlertsCount} unread updates` : "All notifications read"}</span>
+              <ArrowRight className="w-3 h-3" />
             </div>
-          </motion.div>
+          </Link>
         </div>
 
-        {/* 3. MAIN DASHBOARD CONTENT GRID */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* LEFT 8 COLS: ACTIVE RENTALS & RECENT ORDERS */}
+        {/* 3. MAIN DASHBOARD CONTENT GRID (2 COLUMNS: LEFT 8 COLS, RIGHT 4 COLS) */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-start">
+          {/* LEFT 8 COLS: RENTAL BOOKINGS */}
           <div className="lg:col-span-8 space-y-6">
-            <div className="relative rounded-2xl sm:rounded-3xl border border-neutral-300/80 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E] pt-5 sm:pt-6 p-6 shadow-sm text-left">
-              <div className="absolute -top-3 left-4 px-2 bg-white dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
-                <Package className="h-3.5 w-3.5 text-primary" />
-                <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
-                  Rental Bookings ({orders.length})
-                </span>
-              </div>
-              <div className="absolute -top-3 right-4 px-1.5 bg-white dark:bg-[#1E1E1E] z-10">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => navigate({ to: "/orders" })}
-                  className="text-xs font-bold text-neutral-700 dark:text-[#A1A1AA] hover:text-neutral-950 dark:hover:text-[#F5F5F5] h-auto p-0"
+            <div className="rounded-3xl border border-neutral-200/90 dark:border-white/10 bg-white dark:bg-[#1E1E1E] p-6 sm:p-7 shadow-sm text-left">
+              {/* Clean Integrated Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-neutral-100 dark:border-white/5">
+                <div>
+                  <div className="flex items-center gap-2.5">
+                    <div className="h-8 w-8 rounded-lg bg-neutral-100 dark:bg-white/5 border border-black/5 dark:border-white/5 grid place-items-center text-neutral-800 dark:text-neutral-200">
+                      <Package className="h-4 w-4" />
+                    </div>
+                    <h2 className="text-base sm:text-lg font-bold text-neutral-950 dark:text-white tracking-tight">
+                      Rental Bookings
+                    </h2>
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-neutral-100 dark:bg-white/10 text-neutral-700 dark:text-neutral-300">
+                      {orders.length}
+                    </span>
+                  </div>
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 pl-10.5">
+                    Your active shoots, equipment handoffs, and order history
+                  </p>
+                </div>
+                <Link
+                  to="/orders"
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-neutral-700 hover:text-black dark:text-neutral-300 dark:hover:text-white transition-colors self-start sm:self-center"
                 >
-                  View all ({orders.length})
-                </Button>
+                  <span>View all ({orders.length})</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
               </div>
 
-              <div className="pb-4 border-b border-black/5 dark:border-white/5">
-                <p className="text-xs text-neutral-500 dark:text-[#A1A1AA]">
-                  Your active shoots, equipment handoffs, and order history
-                </p>
+              {/* Status Filter Tabs */}
+              <div className="flex items-center gap-2 pt-3 pb-1 overflow-x-auto scrollbar-none">
+                <button
+                  type="button"
+                  onClick={() => setBookingFilter("all")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    bookingFilter === "all"
+                      ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 shadow-sm"
+                      : "bg-neutral-100 text-neutral-600 dark:bg-white/5 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+                  }`}
+                >
+                  All ({orders.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBookingFilter("active")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    bookingFilter === "active"
+                      ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 shadow-sm"
+                      : "bg-neutral-100 text-neutral-600 dark:bg-white/5 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+                  }`}
+                >
+                  Active ({activeRentalsCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBookingFilter("cancelled")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    bookingFilter === "cancelled"
+                      ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 shadow-sm"
+                      : "bg-neutral-100 text-neutral-600 dark:bg-white/5 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+                  }`}
+                >
+                  Cancelled ({orders.filter((o) => o.status === "cancelled").length})
+                </button>
               </div>
 
               {loadingOrders ? (
                 <div className="py-12 text-center text-xs text-neutral-400">
                   Loading your rental bookings...
                 </div>
-              ) : orders.length === 0 ? (
+              ) : filteredBookings.length === 0 ? (
                 <div className="py-12 text-center space-y-3">
                   <div className="h-12 w-12 rounded-2xl bg-neutral-100 dark:bg-white/5 mx-auto grid place-items-center text-neutral-400">
                     <Camera className="w-6 h-6" />
                   </div>
-                  <div className="font-bold text-neutral-900 dark:text-[#F5F5F5] text-sm">
-                    No equipment rentals yet
+                  <div className="font-bold text-neutral-900 dark:text-white text-sm">
+                    {bookingFilter === "active" ? "No active rentals right now" : "No bookings found"}
                   </div>
-                  <p className="text-xs text-neutral-500 dark:text-[#A1A1AA] max-w-sm mx-auto">
-                    Explore cinema cameras, drones, and studio workstations for your upcoming production shoot.
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400 max-w-sm mx-auto">
+                    {bookingFilter === "active"
+                      ? "Explore cinema gear, drones, and microphones for your next production."
+                      : "No equipment bookings matched this filter category."}
                   </p>
                   <Link
                     to="/browse"
-                    className="inline-flex items-center gap-1.5 px-5 py-2 rounded-full bg-[#161616] text-white dark:bg-[#F5F5F5] dark:text-[#050709] text-xs font-bold shadow-sm mt-2"
+                    className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-neutral-950 text-white dark:bg-white dark:text-black text-xs font-bold shadow-sm mt-2 hover:opacity-95 transition-opacity"
                   >
                     <span>Browse Equipment</span>
                     <ArrowRight className="w-3.5 h-3.5" />
                   </Link>
                 </div>
               ) : (
-                <div className="mt-4 space-y-3">
-                  {orders.slice(0, 5).map((o) => (
+                <div className="mt-4 space-y-4">
+                  {filteredBookings.slice(0, 5).map((o) => (
                     <div
                       key={o.id}
-                      className="flex flex-col gap-4 p-4 rounded-2xl border border-black/5 dark:border-[#A1A1AA]/15 bg-neutral-50/50 dark:bg-[#1E1E1E]/60 hover:bg-neutral-100/60 dark:hover:border-[#A1A1AA]/30 transition-all"
+                      className="rounded-2xl border border-neutral-200/80 dark:border-white/10 bg-neutral-50/50 dark:bg-white/[0.02] hover:bg-neutral-50 dark:hover:bg-white/[0.04] p-4 sm:p-5 transition-all space-y-4"
                     >
                       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                         <div className="flex items-center gap-3.5 min-w-0">
@@ -451,28 +536,29 @@ export default function Dashboard() {
                               alt=""
                               loading="lazy"
                               decoding="async"
-                              className="h-14 w-14 rounded-xl object-cover border border-black/10 dark:border-white/10 shrink-0"
+                              className="h-16 w-16 rounded-xl object-cover border border-neutral-200 dark:border-white/10 shrink-0 bg-neutral-100 dark:bg-neutral-800"
                             />
                           ) : (
-                            <div className="h-14 w-14 rounded-xl border border-black/10 dark:border-white/10 bg-secondary/30 flex items-center justify-center text-muted-foreground/50 shrink-0">
+                            <div className="h-16 w-16 rounded-xl border border-neutral-200 dark:border-white/10 bg-neutral-100 dark:bg-white/5 flex items-center justify-center text-neutral-400 shrink-0">
                               <Package className="h-6 w-6 opacity-60" />
                             </div>
                           )}
                           <div className="min-w-0">
-                            <div className="font-bold text-sm text-neutral-950 dark:text-[#F5F5F5] truncate">
+                            <div className="font-bold text-sm sm:text-base text-neutral-950 dark:text-white truncate">
                               {o.productTitle || o.product_title || "Cinema Gear Rental"}
                             </div>
-                            <div className="text-xs text-neutral-500 dark:text-[#A1A1AA] mt-0.5">
-                              {o.startDate || o.start_date || "Today"} → {o.endDate || o.end_date || "Upcoming"}
+                            <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 flex items-center gap-1.5">
+                              <Calendar className="w-3.5 h-3.5 shrink-0 text-neutral-400" />
+                              <span>{o.startDate || o.start_date || "Today"} → {o.endDate || o.end_date || "Upcoming"}</span>
                             </div>
-                            <div className="text-[11px] font-mono text-neutral-400 dark:text-[#A1A1AA]/70 mt-0.5">
+                            <div className="text-[11px] font-mono text-neutral-400 dark:text-neutral-500 mt-1">
                               ID: #{o.id}
                             </div>
                           </div>
                         </div>
 
                         <div className="flex sm:flex-col items-center sm:items-end justify-between gap-2 shrink-0">
-                          <div className="font-black text-sm text-neutral-900 dark:text-[#F5F5F5] font-mono">
+                          <div className="font-black text-base sm:text-lg text-neutral-950 dark:text-white font-mono">
                             ₹{Number(o.total || 0).toLocaleString("en-IN")}
                           </div>
 
@@ -488,7 +574,7 @@ export default function Dashboard() {
                               </button>
                             )}
                             <span
-                              className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
+                              className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full border ${
                                 o.status === "active"
                                   ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
                                   : o.status === "pending"
@@ -498,6 +584,9 @@ export default function Dashboard() {
                                       : "bg-neutral-100 dark:bg-white/10 text-neutral-700 dark:text-neutral-300 border-neutral-200 dark:border-white/10"
                               }`}
                             >
+                              {o.status === "active" && (
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                              )}
                               {o.status.toUpperCase()}
                             </span>
                           </div>
@@ -505,8 +594,13 @@ export default function Dashboard() {
                       </div>
 
                       {/* 4-Digit Renter Secret PIN Section */}
-                      <div className="pt-2 border-t border-black/5 dark:border-white/5">
-                        {revealedPins[o.id] ? (
+                      {o.status === "cancelled" ? (
+                        <div className="pt-3 border-t border-neutral-200/60 dark:border-white/5 flex items-center gap-2 text-xs text-neutral-400 dark:text-neutral-500">
+                          <XCircle className="w-3.5 h-3.5 text-neutral-400" />
+                          <span>Booking Cancelled • No handover required</span>
+                        </div>
+                      ) : revealedPins[o.id] ? (
+                        <div className="pt-2 border-t border-neutral-200/60 dark:border-white/5">
                           <SecretPinDisplay
                             pin={revealedPins[o.id].pin}
                             type="renter"
@@ -515,23 +609,33 @@ export default function Dashboard() {
                             onHide={() => handleRevealSecretPin(o.id)}
                             compact={false}
                           />
-                        ) : (
-                          <div className="flex items-center justify-between gap-3 flex-wrap">
-                            <span className="text-[11px] text-neutral-500 dark:text-[#A1A1AA]">
-                              Equipment Handover PIN
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => handleRevealSecretPin(o.id)}
-                              disabled={loadingPinOrderId === o.id || o.status === "cancelled"}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-black/10 dark:border-[#A1A1AA]/30 hover:bg-neutral-100 dark:hover:bg-white/5 text-neutral-800 dark:text-[#F5F5F5] text-xs font-semibold transition-colors disabled:opacity-50 cursor-pointer"
-                            >
-                              <KeyRound className="h-3.5 w-3.5 text-[#A1A1AA]" />
-                              <span>{loadingPinOrderId === o.id ? "Retrieving PIN..." : "Reveal Secret PIN"}</span>
-                            </button>
+                        </div>
+                      ) : (
+                        <div className="pt-3 border-t border-neutral-200/60 dark:border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-neutral-100/60 dark:bg-white/[0.03] p-3.5 rounded-xl border border-neutral-200/60 dark:border-white/5">
+                          <div className="flex items-center gap-2.5">
+                            <div className="h-8 w-8 rounded-lg bg-white dark:bg-white/10 grid place-items-center text-neutral-700 dark:text-neutral-300 border border-neutral-200 dark:border-white/10 shrink-0">
+                              <KeyRound className="h-4 w-4" />
+                            </div>
+                            <div>
+                              <div className="text-xs font-bold text-neutral-900 dark:text-white">
+                                Equipment Handover PIN
+                              </div>
+                              <div className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                                Share this 4-digit verification code with the equipment owner at pickup
+                              </div>
+                            </div>
                           </div>
-                        )}
-                      </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRevealSecretPin(o.id)}
+                            disabled={loadingPinOrderId === o.id}
+                            className="inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white dark:bg-white/10 border border-neutral-300 dark:border-white/15 hover:bg-neutral-50 dark:hover:bg-white/15 text-neutral-900 dark:text-white text-xs font-semibold shadow-sm transition-all cursor-pointer shrink-0"
+                          >
+                            <KeyRound className="h-3.5 w-3.5 text-neutral-500 dark:text-neutral-400" />
+                            <span>{loadingPinOrderId === o.id ? "Retrieving PIN..." : "Reveal Secret PIN"}</span>
+                          </button>
+                        </div>
+                      )}
 
                       {/* Live Rental Queue with 8 milestones and live timer */}
                       {o.status !== "cancelled" && (
@@ -581,37 +685,39 @@ export default function Dashboard() {
           {/* RIGHT 4 COLS: PROFILE COMPLETION + MESSAGES + WISHLIST */}
           <div className="lg:col-span-4 space-y-6">
             {/* Profile Completeness Card */}
-            <div className="relative rounded-2xl sm:rounded-3xl border border-neutral-300/80 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E] pt-5 sm:pt-6 p-6 shadow-sm space-y-4 text-left">
-              <div className="absolute -top-3 left-4 px-2 bg-white dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
-                <User className="h-3.5 w-3.5 text-primary" />
-                <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
-                  Profile Completeness
-                </span>
-              </div>
-              <div className="absolute -top-3 right-4 px-1.5 bg-white dark:bg-[#1E1E1E] z-10">
-                <span className="text-xs font-mono font-black text-neutral-900 dark:text-[#F5F5F5]">
+            <div className="rounded-3xl border border-neutral-200/90 dark:border-white/10 bg-white dark:bg-[#1E1E1E] p-6 shadow-sm space-y-4 text-left">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="h-8 w-8 rounded-lg bg-neutral-100 dark:bg-white/5 border border-black/5 dark:border-white/5 grid place-items-center text-neutral-800 dark:text-neutral-200">
+                    <User className="h-4 w-4" />
+                  </div>
+                  <h3 className="text-sm font-bold text-neutral-950 dark:text-white">
+                    Profile Completeness
+                  </h3>
+                </div>
+                <span className="text-xs font-mono font-black text-neutral-900 dark:text-white px-2 py-0.5 rounded-md bg-neutral-100 dark:bg-white/10">
                   {profileStatus.percentage}%
                 </span>
               </div>
 
-              {/* Monochrome Progress Bar */}
+              {/* Progress Bar */}
               <div className="w-full h-2 rounded-full bg-neutral-100 dark:bg-white/10 overflow-hidden">
                 <div
-                  className="h-full bg-neutral-900 dark:bg-[#F5F5F5] rounded-full transition-all duration-500"
+                  className="h-full bg-neutral-900 dark:bg-white rounded-full transition-all duration-500"
                   style={{ width: `${profileStatus.percentage}%` }}
                 />
               </div>
 
               {profileStatus.missing.length > 0 ? (
-                <div className="space-y-2">
-                  <p className="text-[11px] text-neutral-500 dark:text-[#A1A1AA]">
+                <div className="space-y-3 pt-1">
+                  <p className="text-[11px] text-neutral-500 dark:text-neutral-400 leading-normal">
                     Complete remaining items for faster booking verification:
                   </p>
                   <div className="flex flex-wrap gap-1.5">
                     {profileStatus.missing.map((item) => (
                       <span
                         key={item}
-                        className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-neutral-100 dark:bg-white/5 text-neutral-700 dark:text-[#A1A1AA] border border-neutral-200 dark:border-white/10"
+                        className="text-[10px] font-semibold px-2.5 py-1 rounded-lg bg-neutral-100 dark:bg-white/5 text-neutral-700 dark:text-neutral-300 border border-neutral-200/80 dark:border-white/10"
                       >
                         + {item}
                       </span>
@@ -619,9 +725,10 @@ export default function Dashboard() {
                   </div>
                   <Link
                     to="/profile"
-                    className="block text-center mt-3 text-xs font-bold text-neutral-900 dark:text-[#F5F5F5] hover:underline pt-2 border-t border-black/5 dark:border-white/5"
+                    className="inline-flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl border border-neutral-300/80 dark:border-white/10 hover:bg-neutral-100 dark:hover:bg-white/5 text-xs font-bold text-neutral-900 dark:text-white transition-all text-center"
                   >
-                    Complete Profile Now →
+                    <span>Complete Profile Now</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
                   </Link>
                 </div>
               ) : (
@@ -633,29 +740,32 @@ export default function Dashboard() {
             </div>
 
             {/* Messages & Owner Inquiries Widget */}
-            <div className="relative rounded-2xl sm:rounded-3xl border border-neutral-300/80 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E] pt-5 sm:pt-6 p-6 shadow-sm space-y-4 text-left">
-              <div className="absolute -top-3 left-4 px-2 bg-white dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
-                <MessageSquare className="h-3.5 w-3.5 text-primary" />
-                <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
-                  Direct Messages & Inquiries
-                </span>
-              </div>
-              <div className="absolute -top-3 right-4 px-1.5 bg-white dark:bg-[#1E1E1E] z-10">
+            <div className="rounded-3xl border border-neutral-200/90 dark:border-white/10 bg-white dark:bg-[#1E1E1E] p-6 shadow-sm space-y-4 text-left">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="h-8 w-8 rounded-lg bg-neutral-100 dark:bg-white/5 border border-black/5 dark:border-white/5 grid place-items-center text-neutral-800 dark:text-neutral-200">
+                    <MessageSquare className="h-4 w-4" />
+                  </div>
+                  <h3 className="text-sm font-bold text-neutral-950 dark:text-white">
+                    Direct Messages
+                  </h3>
+                </div>
                 <Link
                   to="/messages"
-                  className="text-xs font-bold text-neutral-700 dark:text-[#A1A1AA] hover:text-[#F5F5F5]"
+                  className="text-xs font-bold text-neutral-600 hover:text-black dark:text-neutral-400 dark:hover:text-white flex items-center gap-1 transition-colors"
                 >
-                  Inbox →
+                  <span>Inbox</span>
+                  <ArrowRight className="w-3 h-3" />
                 </Link>
               </div>
 
-              <p className="text-xs text-neutral-500 dark:text-[#A1A1AA] leading-relaxed">
+              <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed">
                 Chat directly with verified equipment owners to coordinate pickup timing, gear accessories, and return inspections.
               </p>
 
               <Link
                 to="/messages"
-                className="w-full h-9 rounded-xl border border-neutral-300/80 dark:border-neutral-700/80 text-neutral-900 dark:text-[#F5F5F5] hover:bg-neutral-100 dark:hover:bg-white/5 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
+                className="w-full h-10 rounded-xl bg-neutral-100 hover:bg-neutral-200/80 dark:bg-white/5 dark:hover:bg-white/10 text-neutral-900 dark:text-white text-xs font-bold flex items-center justify-center gap-2 transition-all"
               >
                 <MessageSquare className="w-3.5 h-3.5" />
                 <span>Open Messenger Inbox</span>
@@ -663,47 +773,59 @@ export default function Dashboard() {
             </div>
 
             {/* Wishlist Preview */}
-            <div className="relative rounded-2xl sm:rounded-3xl border border-neutral-300/80 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E] pt-5 sm:pt-6 p-6 shadow-sm space-y-4 text-left">
-              <div className="absolute -top-3 left-4 px-2 bg-white dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
-                <Heart className="h-3.5 w-3.5 text-primary" />
-                <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
-                  Saved Gear ({ids.length})
-                </span>
-              </div>
-              <div className="absolute -top-3 right-4 px-1.5 bg-white dark:bg-[#1E1E1E] z-10">
+            <div className="rounded-3xl border border-neutral-200/90 dark:border-white/10 bg-white dark:bg-[#1E1E1E] p-6 shadow-sm space-y-4 text-left">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="h-8 w-8 rounded-lg bg-neutral-100 dark:bg-white/5 border border-black/5 dark:border-white/5 grid place-items-center text-neutral-800 dark:text-neutral-200">
+                    <Heart className="h-4 w-4" />
+                  </div>
+                  <h3 className="text-sm font-bold text-neutral-950 dark:text-white">
+                    Saved Gear ({ids.length})
+                  </h3>
+                </div>
                 <Link
                   to="/wishlist"
-                  className="text-xs font-bold text-neutral-600 dark:text-[#A1A1AA] hover:text-[#F5F5F5]"
+                  className="text-xs font-bold text-neutral-600 hover:text-black dark:text-neutral-400 dark:hover:text-white flex items-center gap-1 transition-colors"
                 >
-                  View all →
+                  <span>View all</span>
+                  <ArrowRight className="w-3 h-3" />
                 </Link>
               </div>
 
               {wishlistItems.length === 0 ? (
-                <p className="text-xs text-neutral-500 dark:text-[#A1A1AA] py-2">
-                  No saved gear yet. Tap the heart on any product to save it for upcoming projects.
-                </p>
+                <div className="py-4 text-center space-y-2">
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed">
+                    No saved gear yet. Tap the heart on any product to save it for upcoming projects.
+                  </p>
+                  <Link
+                    to="/browse"
+                    className="inline-flex items-center gap-1 text-xs font-bold text-neutral-900 dark:text-white hover:underline pt-1"
+                  >
+                    <span>Browse equipment</span>
+                    <ArrowRight className="w-3 h-3" />
+                  </Link>
+                </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-2.5">
                   {wishlistItems.map((item) => (
                     <Link
                       key={item.id}
                       to="/product/$id"
                       params={{ id: item.id }}
-                      className="flex items-center gap-3 p-2 rounded-xl hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors group"
+                      className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-neutral-100 dark:hover:bg-white/5 border border-transparent hover:border-neutral-200/80 dark:hover:border-white/10 transition-all group"
                     >
                       <img
                         src={getOptimizedImageUrl(item.image, 'thumb')}
                         alt={item.title}
                         loading="lazy"
                         decoding="async"
-                        className="h-10 w-10 rounded-lg object-cover border border-black/5 dark:border-white/5"
+                        className="h-11 w-11 rounded-lg object-cover border border-neutral-200 dark:border-white/10 shrink-0"
                       />
                       <div className="min-w-0 flex-1">
-                        <div className="text-xs font-bold text-neutral-900 dark:text-[#F5F5F5] truncate group-hover:text-white transition-colors">
+                        <div className="text-xs font-bold text-neutral-900 dark:text-white truncate group-hover:text-primary transition-colors">
                           {item.title}
                         </div>
-                        <div className="text-[10px] text-neutral-500 dark:text-[#A1A1AA]">
+                        <div className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5">
                           ₹{item.price}/day • {item.category}
                         </div>
                       </div>
