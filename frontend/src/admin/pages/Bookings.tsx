@@ -14,6 +14,7 @@ import {
   Clock,
   ShieldAlert,
   AlertTriangle,
+  BarChart3,
 } from "lucide-react";
 import { Table, Column } from "../components/layout/Table";
 import { Pagination } from "../components/layout/Pagination";
@@ -24,6 +25,35 @@ import { cn } from "@/lib/utils";
 import { adminWS } from "../services/websocket";
 import { AdminProductImage } from "../components/common/AdminProductImage";
 
+const RENTER_CANCELLATION_REASONS = [
+  "I no longer need this product.",
+  "I found a better alternative.",
+  "The rental price is too high.",
+  "My plans have changed.",
+  "The product is not suitable for my needs.",
+  "I booked by mistake.",
+  "Other reason.",
+];
+
+const REASON_CODE_LABELS: Record<string, string> = {
+  NOT_NEEDED: "I no longer need this product.",
+  FOUND_ALTERNATIVE: "I found a better alternative.",
+  PRICE_HIGH: "The rental price is too high.",
+  CHANGED_PLANS: "My plans have changed.",
+  NOT_SUITABLE: "The product is not suitable for my needs.",
+  MISTAKE: "I booked by mistake.",
+  OTHER: "Other reason.",
+  LENDER_UNAVAILABLE: "Lender unavailable",
+  ITEM_DAMAGED: "Item damaged / unavailable",
+  SCHEDULE_CONFLICT: "Schedule conflict",
+};
+
+export function formatCancellationReason(reason?: string): string {
+  if (!reason) return "Not specified";
+  if (REASON_CODE_LABELS[reason]) return REASON_CODE_LABELS[reason];
+  return reason.replace(/_/g, " ");
+}
+
 export default function Bookings() {
   const [bookings, setBookings] = useState<AdminBooking[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,6 +62,7 @@ export default function Bookings() {
   // Filters
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [cancellationReasonFilter, setCancellationReasonFilter] = useState("all");
 
   // Sorting
   const [sortKey, setSortKey] = useState("createdAt");
@@ -178,6 +209,17 @@ export default function Bookings() {
       result = result.filter((b) => b.status === statusFilter);
     }
 
+    if (cancellationReasonFilter !== "all") {
+      result = result.filter((b) => {
+        if (b.status !== "cancelled") return false;
+        const formatted = formatCancellationReason(b.cancellationReason);
+        return (
+          formatted.toLowerCase() === cancellationReasonFilter.toLowerCase() ||
+          (b.cancellationReason && b.cancellationReason.toLowerCase() === cancellationReasonFilter.toLowerCase())
+        );
+      });
+    }
+
     result.sort((a, b) => {
       const fieldA = (a as unknown as Record<string, string | number>)[sortKey];
       const fieldB = (b as unknown as Record<string, string | number>)[sortKey];
@@ -192,7 +234,28 @@ export default function Bookings() {
     });
 
     return result;
-  }, [bookings, search, statusFilter, sortKey, sortOrder]);
+  }, [bookings, search, statusFilter, cancellationReasonFilter, sortKey, sortOrder]);
+
+  const cancellationStats = useMemo(() => {
+    const cancelled = bookings.filter((b) => b.status === "cancelled");
+    const total = cancelled.length;
+    const reasonCounts: Record<string, number> = {};
+
+    cancelled.forEach((b) => {
+      const rawReason = b.cancellationReason || "Not specified";
+      const formatted = formatCancellationReason(rawReason);
+      reasonCounts[formatted] = (reasonCounts[formatted] || 0) + 1;
+    });
+
+    const breakdown = Object.entries(reasonCounts).sort((a, b) => b[1] - a[1]);
+    const topReason = breakdown.length > 0 ? breakdown[0] : null;
+
+    return {
+      total,
+      breakdown,
+      topReason,
+    };
+  }, [bookings]);
 
   const paginatedBookings = useMemo(() => {
     const start = (currentPage - 1) * itemsPerPage;
@@ -311,7 +374,26 @@ export default function Bookings() {
               <span className="h-1.5 w-1.5 rounded-full bg-current" />
               {row.status}
             </span>
-            {row.deliveryStatus && (
+            {isCancelled && (
+              <div className="pt-0.5 space-y-0.5">
+                <div
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-500/10 text-[#FF1744] border border-red-500/20 max-w-[200px] truncate"
+                  title={`Reason: ${formatCancellationReason(row.cancellationReason)}${row.cancellationExplanation || row.cancellationFeedback ? `\nExplanation: ${row.cancellationExplanation || row.cancellationFeedback}` : ""}`}
+                >
+                  <AlertTriangle className="h-2.5 w-2.5 shrink-0 text-[#FF1744]" />
+                  <span className="truncate">{formatCancellationReason(row.cancellationReason)}</span>
+                </div>
+                {(row.cancellationExplanation || row.cancellationFeedback) && (
+                  <div
+                    className="text-[10px] text-muted-foreground italic truncate max-w-[200px]"
+                    title={row.cancellationExplanation || row.cancellationFeedback}
+                  >
+                    "{row.cancellationExplanation || row.cancellationFeedback}"
+                  </div>
+                )}
+              </div>
+            )}
+            {!isCancelled && row.deliveryStatus && (
               <span className="block text-[9px] font-mono text-muted-foreground uppercase">
                 {row.deliveryStatus.replace(/_/g, " ")}
               </span>
@@ -419,6 +501,9 @@ export default function Bookings() {
             onClick={() => {
               setStatusFilter(tab.id);
               setCurrentPage(1);
+              if (tab.id !== "cancelled") {
+                setCancellationReasonFilter("all");
+              }
             }}
             className={cn(
               "px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer flex items-center gap-2",
@@ -442,6 +527,102 @@ export default function Bookings() {
         ))}
       </div>
 
+      {/* CANCELLATION REASON ANALYTICS & INSIGHTS (Shown when viewing Cancelled bookings) */}
+      {statusFilter === "cancelled" && (
+        <div className="bg-[var(--admin-card)] rounded-xl border border-red-500/20 p-4 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-[var(--admin-border)] pb-2.5">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-red-500/10 text-[#FF1744] flex items-center justify-center">
+                <BarChart3 className="h-4 w-4" />
+              </div>
+              <div>
+                <h3 className="text-xs font-bold text-[var(--admin-text)] flex items-center gap-2">
+                  <span>Cancellation Reason Analytics</span>
+                  {cancellationReasonFilter !== "all" && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-500/10 text-[#FF1744] border border-red-500/20">
+                      Filtering: {cancellationReasonFilter}
+                    </span>
+                  )}
+                </h3>
+                <p className="text-[11px] text-[var(--admin-text-secondary)] mt-0.5">
+                  {cancellationStats.total} total cancelled booking{cancellationStats.total === 1 ? "" : "s"}
+                  {cancellationStats.topReason && (
+                    <> • Top Reason: <span className="font-semibold text-foreground">"{cancellationStats.topReason[0]}" ({cancellationStats.topReason[1]})</span></>
+                  )}
+                </p>
+              </div>
+            </div>
+
+            {cancellationReasonFilter !== "all" && (
+              <button
+                type="button"
+                onClick={() => {
+                  setCancellationReasonFilter("all");
+                  setCurrentPage(1);
+                }}
+                className="self-start sm:self-auto text-[11px] font-semibold text-[#FF1744] hover:underline cursor-pointer flex items-center gap-1"
+              >
+                <span>Clear reason filter</span>
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+
+          {/* Interactive Reason Breakdown Pills */}
+          <div className="flex flex-wrap gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => {
+                setCancellationReasonFilter("all");
+                setCurrentPage(1);
+              }}
+              className={cn(
+                "px-2.5 py-1 rounded-lg text-xs font-medium border transition-all cursor-pointer flex items-center gap-1.5",
+                cancellationReasonFilter === "all"
+                  ? "bg-red-500/20 text-[#FF1744] border-red-500/40 font-bold"
+                  : "bg-[var(--admin-elevated)] text-[var(--admin-text-secondary)] border-[var(--admin-border)] hover:text-[var(--admin-text)]"
+              )}
+            >
+              <span>All Reasons</span>
+              <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-black/10 dark:bg-white/10 font-bold">
+                {cancellationStats.total}
+              </span>
+            </button>
+
+            {cancellationStats.breakdown.map(([reason, count]) => {
+              const isSelected = cancellationReasonFilter.toLowerCase() === reason.toLowerCase();
+              const pct = cancellationStats.total > 0 ? Math.round((count / cancellationStats.total) * 100) : 0;
+              return (
+                <button
+                  key={reason}
+                  type="button"
+                  onClick={() => {
+                    setCancellationReasonFilter(isSelected ? "all" : reason);
+                    setCurrentPage(1);
+                  }}
+                  className={cn(
+                    "px-2.5 py-1 rounded-lg text-xs font-medium border transition-all cursor-pointer flex items-center gap-1.5",
+                    isSelected
+                      ? "bg-red-500 text-white border-red-600 font-bold shadow-xs"
+                      : "bg-[var(--admin-elevated)] text-[var(--admin-text-secondary)] border-[var(--admin-border)] hover:border-red-500/40 hover:text-[var(--admin-text)]"
+                  )}
+                >
+                  <span className="truncate max-w-[240px]">{reason}</span>
+                  <span
+                    className={cn(
+                      "text-[10px] font-mono px-1.5 py-0.2 rounded-full font-bold",
+                      isSelected ? "bg-white/20 text-white" : "bg-black/10 dark:bg-white/10 text-[var(--admin-text)]"
+                    )}
+                  >
+                    {count} ({pct}%)
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* FILTERS & SEARCH */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-[var(--admin-card)] p-3 rounded-xl border border-[var(--admin-border)]">
         <div className="relative flex-1 max-w-sm">
@@ -458,12 +639,44 @@ export default function Bookings() {
           />
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {statusFilter === "cancelled" && (
+            <select
+              value={cancellationReasonFilter}
+              onChange={(e) => {
+                setCancellationReasonFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="bg-[var(--admin-elevated)] text-[var(--admin-text)] text-xs rounded-lg px-2.5 py-2 border border-red-500/30 focus:outline-none font-medium cursor-pointer max-w-[220px]"
+              title="Filter by cancellation reason"
+            >
+              <option value="all">All Reasons ({cancellationStats.total})</option>
+              {RENTER_CANCELLATION_REASONS.map((r) => {
+                const count = cancellationStats.breakdown.find(([k]) => k.toLowerCase() === r.toLowerCase())?.[1] || 0;
+                return (
+                  <option key={r} value={r}>
+                    {r} {count > 0 ? `(${count})` : ""}
+                  </option>
+                );
+              })}
+              {cancellationStats.breakdown
+                .filter(([r]) => !RENTER_CANCELLATION_REASONS.some((k) => k.toLowerCase() === r.toLowerCase()))
+                .map(([r, count]) => (
+                  <option key={r} value={r}>
+                    {r} ({count})
+                  </option>
+                ))}
+            </select>
+          )}
+
           <select
             value={statusFilter}
             onChange={(e) => {
               setStatusFilter(e.target.value);
               setCurrentPage(1);
+              if (e.target.value !== "cancelled") {
+                setCancellationReasonFilter("all");
+              }
             }}
             className="bg-[var(--admin-elevated)] text-[var(--admin-text)] text-xs rounded-lg px-2.5 py-2 border border-[var(--admin-border)] focus:outline-none font-medium cursor-pointer"
           >
@@ -575,15 +788,15 @@ export default function Bookings() {
                     <div className="flex justify-between items-center">
                       <span className="text-muted-foreground text-[11px]">Reason:</span>
                       <span className="font-bold text-foreground text-[11px]">
-                        {selectedBooking.cancellationReason?.replace(/_/g, " ") || "Personal / Schedule Conflict"}
+                        {formatCancellationReason(selectedBooking.cancellationReason)}
                       </span>
                     </div>
 
-                    {selectedBooking.cancellationFeedback && (
+                    {(selectedBooking.cancellationExplanation || selectedBooking.cancellationFeedback) && (
                       <div className="space-y-1 pt-1">
-                        <span className="text-muted-foreground text-[10px] block font-semibold">Written Feedback:</span>
+                        <span className="text-muted-foreground text-[10px] block font-semibold">Written Explanation / Feedback:</span>
                         <p className="p-2.5 rounded-lg bg-background/60 border border-border/40 text-[11px] text-foreground italic">
-                          "{selectedBooking.cancellationFeedback}"
+                          "{selectedBooking.cancellationExplanation || selectedBooking.cancellationFeedback}"
                         </p>
                       </div>
                     )}
@@ -744,16 +957,18 @@ export default function Bookings() {
                 <button
                   onClick={() => handleRefund(selectedBooking.id)}
                   disabled={actionLoading}
-                  className="px-3.5 py-2 rounded-xl bg-destructive/10 hover:bg-destructive/20 text-destructive font-bold text-xs transition-all cursor-pointer"
+                  className="px-3 py-1.5 rounded-lg bg-destructive/10 hover:bg-destructive/20 text-destructive font-semibold text-xs transition-all cursor-pointer inline-flex items-center gap-1.5"
                 >
-                  Refund & Cancel
+                  <XCircle className="h-3.5 w-3.5 shrink-0" />
+                  <span>Refund & Cancel</span>
                 </button>
                 <button
                   onClick={() => handleComplete(selectedBooking.id)}
                   disabled={actionLoading}
-                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-all cursor-pointer"
+                  className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition-all cursor-pointer inline-flex items-center gap-1.5 shadow-xs"
                 >
-                  Mark Completed
+                  <CheckCircle className="h-3.5 w-3.5 shrink-0" />
+                  <span>Mark Completed</span>
                 </button>
               </div>
             )}

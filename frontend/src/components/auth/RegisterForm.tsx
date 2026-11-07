@@ -523,8 +523,8 @@ export function RegisterForm() {
           </div>
         ) : (
           <>
+            <ArrowRight className="h-4 w-4 shrink-0" />
             <span>Create Payrent Account</span>
-            <ArrowRight className="h-4 w-4" />
           </>
         )}
       </Button>

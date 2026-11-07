@@ -287,10 +287,10 @@ export function ForgotPassword() {
         <Button
           type="button"
           onClick={() => navigate({ to: "/login" })}
-          className="w-full bg-primary text-primary-foreground font-bold py-3 rounded-xl shadow-md cursor-pointer"
+          className="w-full bg-primary text-primary-foreground font-bold py-2.5 rounded-xl shadow-xs cursor-pointer inline-flex items-center justify-center gap-1.5"
         >
-          Sign In
-          <ArrowRight className="h-4 w-4 ml-2" />
+          <ArrowRight className="h-4 w-4 shrink-0" />
+          <span>Sign In</span>
         </Button>
       </div>
     );
@@ -431,11 +431,11 @@ export function ForgotPassword() {
 
       <Button
         type="submit"
-        className="w-full bg-primary text-primary-foreground font-bold py-3 rounded-xl shadow-md cursor-pointer"
+        className="w-full bg-primary text-primary-foreground font-bold py-2.5 rounded-xl shadow-xs cursor-pointer inline-flex items-center justify-center gap-1.5"
         loading={submitting}
       >
-        Continue
-        <ArrowRight className="h-4 w-4 ml-2" />
+        <ArrowRight className="h-4 w-4 shrink-0" />
+        <span>Continue</span>
       </Button>
     </form>
   );

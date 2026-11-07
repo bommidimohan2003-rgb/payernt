@@ -170,8 +170,8 @@ export function Sidebar() {
             to="/support"
             className="inline-flex items-center justify-center gap-1.5 w-full py-1.5 rounded-xl bg-white text-black hover:bg-neutral-100 dark:bg-white dark:text-black text-xs font-bold transition-all shadow-sm active:scale-95"
           >
+            <ArrowRight className="w-3 h-3 shrink-0" />
             <span>Chat With Concierge</span>
-            <ArrowRight className="w-3 h-3" />
           </Link>
         </div>
       </aside>

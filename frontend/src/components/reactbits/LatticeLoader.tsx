@@ -12,6 +12,7 @@ export interface LatticeLoaderProps {
   shape?: "round" | "square";
   pattern?: "ripple" | "snake" | "orbit" | "pulse";
   className?: string;
+  embedded?: boolean;
 }
 
 export function LatticeLoader({
@@ -22,6 +23,7 @@ export function LatticeLoader({
   shape = "round",
   pattern = "ripple",
   className = "",
+  embedded = false,
 }: LatticeLoaderProps) {
   const [elapsed, setElapsed] = useState<number>(0);
   const [activeStep, setActiveStep] = useState<number>(0);
@@ -77,7 +79,7 @@ export function LatticeLoader({
 
   return (
     <div
-      className={`lattice-loader-container ${className}`}
+      className={`lattice-loader-container ${embedded ? "lattice-loader-embedded" : ""} ${className}`}
       role="status"
       aria-live="polite"
       aria-label={`${label} - ${status}`}

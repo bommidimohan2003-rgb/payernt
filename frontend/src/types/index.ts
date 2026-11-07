@@ -214,6 +214,10 @@ export interface Order {
   dailyRate?: number;
   daily_rate?: number;
   bookingStatus?: string;
+  withInsurance?: boolean;
+  with_insurance?: boolean;
+  insuranceFee?: number;
+  insurance_fee?: number;
 }
 
 export interface UserAddress {

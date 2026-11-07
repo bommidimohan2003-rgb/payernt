@@ -207,13 +207,27 @@ from database import (
     CATEGORY_BOOKING_RESTRICTION_MESSAGE,
     get_or_create_booking_conversation,
     get_or_create_product_conversation,
+    get_or_create_admin_conversation,
     get_conversation,
     get_user_conversations,
+    get_admin_conversations,
+    get_admin_conversation_counts,
     get_conversation_detail,
     get_conversation_messages,
     add_message,
     mark_conversation_read,
     get_total_unread_messages_count,
+    ADMIN_EMAIL,
+    ADMIN_NAME,
+    is_admin_email,
+    get_user_communication_role,
+    create_announcement,
+    get_announcements_for_user,
+    mark_announcement_read,
+    acknowledge_announcement,
+    get_admin_announcements,
+    update_announcement,
+    archive_announcement,
     estimate_delivery_eta_minutes,
     check_db_health,
     mask_email_safely,
@@ -288,6 +302,8 @@ if HAS_RAZORPAY and razorpay and RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET:
 from contextlib import asynccontextmanager
 
 def _async_startup_tasks():
+    if os.environ.get("TESTING") or os.environ.get("PYTEST_CURRENT_TEST"):
+        return
     try:
         init_db()
         prewarm_db_pool(5)
@@ -3354,6 +3370,8 @@ class OrderSchema(BaseModel):
     location_directions: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
+    with_insurance: Optional[bool] = True
+    withInsurance: Optional[bool] = None
     timeSlot: Optional[str] = None
     time_slot: Optional[str] = None
     durationType: Optional[str] = None
@@ -3885,6 +3903,7 @@ def get_authorized_renter_pin(
     }
 
 @app.post("/api/orders/{id}/cancel")
+@app.post("/api/bookings/{id}/cancel")
 def cancel_user_order(
     id: str,
     data: Optional[Dict[str, Any]] = None,
@@ -3894,7 +3913,10 @@ def cancel_user_order(
     from payernt_database import invalidate_vendor_dashboard_cache, MOCK_RENTAL_SECURITIES
 
     with _BOOKING_CONCURRENCY_LOCK:
-        clean_email = email.strip().lower()
+        if isinstance(email, dict):
+            clean_email = (email.get("email") or email.get("sub") or "").strip().lower()
+        else:
+            clean_email = str(email or "").strip().lower()
         order = fetch_one("SELECT * FROM orders WHERE id = %s OR product_id = %s", (id, id))
         if not order and id in MOCK_ORDERS:
             order = MOCK_ORDERS[id]
@@ -3948,8 +3970,9 @@ def cancel_user_order(
                 detail="Cannot cancel booking after courier pickup has occurred."
             )
 
-        reason_code = (data or {}).get("reason") or "RENTER_REQUESTED"
-        feedback = (data or {}).get("notes") or (data or {}).get("feedback")
+        reason_code = str((data or {}).get("reason") or "RENTER_REQUESTED").strip()
+        raw_feedback = (data or {}).get("explanation") or (data or {}).get("notes") or (data or {}).get("feedback")
+        feedback = str(raw_feedback).strip()[:500] if raw_feedback else None
 
         has_pu = bool(order.get("picked_up_at") or order.get("pickedUpAt"))
 
@@ -5051,7 +5074,14 @@ def check_single_product_availability(
     if not prod:
         raise HTTPException(status_code=404, detail=f"Product '{id}' not found.")
 
-    req_slot = (session or time_slot or "full_day").strip().lower()
+    start_date = start_date if isinstance(start_date, str) else None
+    end_date = end_date if isinstance(end_date, str) else None
+    session_val = session if isinstance(session, str) else None
+    time_slot_val = time_slot if isinstance(time_slot, str) else None
+    duration_type = duration_type if isinstance(duration_type, str) else None
+    exclude_order_id = exclude_order_id if isinstance(exclude_order_id, str) else None
+
+    req_slot = (session_val or time_slot_val or "full_day").strip().lower()
     if req_slot not in ("morning", "afternoon", "full_day", "custom", "multi_day"):
         req_slot = "full_day"
 
@@ -5121,6 +5151,28 @@ def check_single_product_availability(
     if (view_end - view_start).days > 180:
         view_end = view_start + datetime.timedelta(days=180)
 
+    # Authoritative calculation of active booked days and automatic next-day preparation blocked days
+    actual_booked_dates = set()
+    preparation_blocked_dates = set()
+    for ord_row in active_orders:
+        if exclude_order_id and (ord_row.get("id") == exclude_order_id or str(ord_row.get("id")) == str(exclude_order_id)):
+            continue
+        ord_status = str(ord_row.get("status") or "").lower()
+        if ord_status in ('cancelled', 'canceled', 'refunded', 'rejected', 'failed', 'expired'):
+            continue
+        s_d = parse_date_safely(ord_row.get("start_date") or ord_row.get("startDate"))
+        e_d = parse_date_safely(ord_row.get("end_date") or ord_row.get("endDate")) or s_d
+        if s_d and e_d:
+            if s_d > e_d:
+                s_d, e_d = e_d, s_d
+            cur = s_d
+            while cur <= e_d:
+                actual_booked_dates.add(cur.strftime("%Y-%m-%d"))
+                cur += datetime.timedelta(days=1)
+            # Automatic next-day block: entire following calendar day
+            prep_d = e_d + datetime.timedelta(days=1)
+            preparation_blocked_dates.add(prep_d.strftime("%Y-%m-%d"))
+
     # Evaluate per-date slot availability and conflicts in-memory
     morning_booked_dates = set()
     afternoon_booked_dates = set()
@@ -5153,10 +5205,10 @@ def check_single_product_availability(
             product=prod, pre_fetched_orders=active_orders
         )
 
-        # Separate vendor blocks from real reservation bookings
-        m_is_blocked = d_str in full_day_blocked_dates or d_str in morning_blocked_dates
-        a_is_blocked = d_str in full_day_blocked_dates or d_str in afternoon_blocked_dates
-        f_is_blocked = d_str in full_day_blocked_dates or d_str in morning_blocked_dates or d_str in afternoon_blocked_dates
+        # Separate vendor blocks & preparation blocks from real reservation bookings
+        m_is_blocked = d_str in full_day_blocked_dates or d_str in morning_blocked_dates or d_str in preparation_blocked_dates
+        a_is_blocked = d_str in full_day_blocked_dates or d_str in afternoon_blocked_dates or d_str in preparation_blocked_dates
+        f_is_blocked = d_str in full_day_blocked_dates or d_str in morning_blocked_dates or d_str in afternoon_blocked_dates or d_str in preparation_blocked_dates
 
         if m_conf and not m_is_blocked:
             morning_booked_dates.add(d_str)
@@ -5178,15 +5230,18 @@ def check_single_product_availability(
 
     # 3. Resolve session-specific booked and blocked dates for caller
     if req_slot == "morning":
-        booked_result = morning_booked_dates
-        blocked_result = full_day_blocked_dates | morning_blocked_dates
+        booked_result = (morning_booked_dates - preparation_blocked_dates) | (actual_booked_dates & {d for d in session_availability_map if not session_availability_map[d]["morning"]})
+        blocked_result = full_day_blocked_dates | morning_blocked_dates | preparation_blocked_dates
     elif req_slot == "afternoon":
-        booked_result = afternoon_booked_dates
-        blocked_result = full_day_blocked_dates | afternoon_blocked_dates
+        booked_result = (afternoon_booked_dates - preparation_blocked_dates) | (actual_booked_dates & {d for d in session_availability_map if not session_availability_map[d]["afternoon"]})
+        blocked_result = full_day_blocked_dates | afternoon_blocked_dates | preparation_blocked_dates
     else:
         # Full day / multi-day custom rental: any date that conflicts with full day
-        booked_result = dates_conflicting_full_day
-        blocked_result = full_day_blocked_dates | morning_blocked_dates | afternoon_blocked_dates
+        booked_result = (dates_conflicting_full_day - preparation_blocked_dates) | actual_booked_dates
+        blocked_result = full_day_blocked_dates | morning_blocked_dates | afternoon_blocked_dates | preparation_blocked_dates
+
+    # Ensure actual booked dates are not in blocked_result, but preparation days are
+    booked_result = booked_result - preparation_blocked_dates
 
     # 4. Evaluate requested date range if start_date and end_date are provided
     is_avail = bool(prod.get("available", True))
@@ -5214,7 +5269,8 @@ def check_single_product_availability(
 
         if has_conf:
             is_avail = False
-            is_block_reason = bool(
+            is_prep_reason = bool(conf_reason and ("following an existing booking" in conf_reason.lower() or "preparation" in conf_reason.lower()))
+            is_block_reason = is_prep_reason or bool(
                 conf_reason and ("personal use" in conf_reason.lower() or "blocked" in conf_reason.lower() or "unavailable period" in conf_reason.lower())
             )
             status_str = "blocked" if is_block_reason else "booked"
@@ -5222,7 +5278,7 @@ def check_single_product_availability(
             conflicts_list.append({
                 "date": start_date,
                 "session": req_slot,
-                "reason": status_str,
+                "reason": "preparation_blocked" if is_prep_reason else status_str,
                 "detail": conf_reason
             })
         else:
@@ -5266,9 +5322,11 @@ def check_single_product_availability(
         "conflicts": conflicts_list,
         "blocked_dates": sorted(list(blocked_result)),
         "blockedDates": sorted(list(blocked_result)),
+        "preparation_blocked_dates": sorted(list(preparation_blocked_dates)),
+        "preparationBlockedDates": sorted(list(preparation_blocked_dates)),
         "booked_dates": sorted(list(booked_result)),
         "bookedDates": sorted(list(booked_result)),
-        "all_blocked_dates": sorted(list(all_blocked_date_strings)),
+        "all_blocked_dates": sorted(list(all_blocked_date_strings | preparation_blocked_dates)),
         "full_day_booked_dates": sorted(list(full_day_booked_dates)),
         "fullDayBookedDates": sorted(list(full_day_booked_dates)),
         "session_availability": session_availability_map,
@@ -6616,6 +6674,8 @@ class CreateRazorpayOrderSchema(BaseModel):
     location_directions: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
+    with_insurance: Optional[bool] = True
+    withInsurance: Optional[bool] = None
 
 class VerifyRazorpayPaymentSchema(BaseModel):
     razorpay_order_id: str
@@ -6668,9 +6728,9 @@ def create_razorpay_order(data: CreateRazorpayOrderSchema, current_user: dict = 
     try:
         d1 = datetime.datetime.fromisoformat(data.start_date.replace("Z", ""))
         d2 = datetime.datetime.fromisoformat(data.end_date.replace("Z", ""))
-        days = max(1, math.ceil((d2 - d1).total_seconds() / 86400))
+        days = max(1, (d2.date() - d1.date()).days + 1)
     except Exception:
-        days = 3
+        days = 1
 
     subtotal = price_per_day * days
     discount = 0
@@ -6679,8 +6739,12 @@ def create_razorpay_order(data: CreateRazorpayOrderSchema, current_user: dict = 
         if code_clean in ("SAVE10", "WELCOME10", "PAYENT10"):
             discount = int(subtotal * 0.10)
 
-    tax = int((subtotal - discount) * 0.08)
-    total_rupees = max(1, subtotal - discount + tax)
+    with_ins = data.with_insurance if data.with_insurance is not None else (data.withInsurance if data.withInsurance is not None else True)
+    tax_rate = 0.05
+    ins_rate = 0.03 if with_ins else 0.0
+    tax = int((subtotal - discount) * tax_rate)
+    insurance = int((subtotal - discount) * ins_rate)
+    total_rupees = max(1, subtotal - discount + tax + insurance)
     amount_paise = total_rupees * 100
 
     order_id = f"ord_{uuid.uuid4().hex[:12]}"
@@ -7431,24 +7495,24 @@ async def conversation_websocket(websocket: WebSocket, conversation_id: str, tok
         return
 
     user_email = payload["sub"].strip().lower()
-    conv = None
-    try:
-        conv = fetch_one("SELECT * FROM conversations WHERE id = %s", (conversation_id,))
-    except Exception:
-        pass
-    if not conv:
-        conv = MOCK_CONVERSATIONS.get(conversation_id)
-
+    conv = get_conversation(conversation_id)
     if not conv:
         await websocket.close(code=4004, reason="Conversation not found.")
         return
 
     user_rec = get_user(user_email) or {}
-    is_admin = user_rec.get("role") == "admin"
-    is_member = (conv.get("customer_email", "").strip().lower() == user_email or
-                 conv.get("lender_email", "").strip().lower() == user_email or
-                 is_admin)
+    curr_is_admin = is_admin_email(user_email) or user_rec.get("role") in ("admin", "superadmin")
+    cust_email = (conv.get("customer_email") or "").strip().lower()
+    lend_email = (conv.get("lender_email") or "").strip().lower()
+    has_admin_participant = is_admin_email(cust_email) or is_admin_email(lend_email) or (conv.get("conversation_type") or "").startswith("admin_")
 
+    # Strict Rule: Conversations must involve Admin
+    if not has_admin_participant and not curr_is_admin:
+        await websocket.close(code=4003, reason="Forbidden: Direct user-to-user conversation is not allowed.")
+        return
+
+    # Strict Rule: Non-admin can only connect to their own conversation
+    is_member = (cust_email == user_email or lend_email == user_email or curr_is_admin)
     if not is_member:
         await websocket.close(code=4003, reason="Not authorized to join this conversation.")
         return
@@ -7934,20 +7998,43 @@ class MessageAttachmentUploadSchema(BaseModel):
     file_type: str
     file_size: Optional[int] = 0
 
+class CreateAnnouncementSchema(BaseModel):
+    title: str
+    content: str
+    target_audience: str = "ALL"
+    category: Optional[str] = "General"
+    status: Optional[str] = "published"
+    pinned: Optional[bool] = False
+
+class UpdateAnnouncementSchema(BaseModel):
+    title: Optional[str] = None
+    content: Optional[str] = None
+    target_audience: Optional[str] = None
+    category: Optional[str] = None
+    status: Optional[str] = None
+    pinned: Optional[bool] = None
+
 @app.post("/api/conversations")
 def create_or_get_conversation_endpoint(data: CreateOrGetConversationSchema, current_user_email: str = Depends(get_current_user_email)):
     clean_user = current_user_email.strip().lower()
     clean_pid = (data.product_id or "").strip()
     clean_bid = (data.booking_id or "").strip()
 
-    if not clean_pid and not clean_bid:
-        raise HTTPException(status_code=400, detail="Either product_id or booking_id must be provided.")
+    # Strict check: If an arbitrary recipient is passed and is not Admin, reject!
+    recipient_email = getattr(data, 'recipient_email', None) or getattr(data, 'recipientEmail', None) or getattr(data, 'receiver_id', None)
+    if recipient_email and not is_admin_email(recipient_email):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Direct user-to-user communication is strictly prohibited. Communication is only permitted with paYent Admin."
+        )
 
     try:
         if clean_bid:
             conv = get_or_create_booking_conversation(clean_bid, clean_user)
-        else:
+        elif clean_pid:
             conv = get_or_create_product_conversation(clean_pid, clean_user, data.initial_message)
+        else:
+            conv = get_or_create_admin_conversation(clean_user, initial_message=data.initial_message)
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
 
@@ -7962,37 +8049,10 @@ def get_booking_conversation_endpoint(booking_id: str, current_user_email: str =
     clean_user = current_user_email.strip().lower()
     clean_bid = booking_id.strip()
 
-    order = None
-    try:
-        order = fetch_one("SELECT * FROM orders WHERE id = %s", (clean_bid,))
-    except Exception:
-        pass
-    if not order:
-        order = MOCK_ORDERS.get(clean_bid)
-
-    if not order:
-        raise HTTPException(status_code=404, detail="Booking not found.")
-
-    customer_email = (order.get("user_email") or "").strip().lower()
-    product_id = order.get("product_id") or order.get("productId") or ""
-    product = None
-    if product_id:
-        try:
-            product = fetch_one("SELECT * FROM custom_products WHERE id = %s", (product_id,))
-        except Exception:
-            pass
-        if not product:
-            product = MOCK_CUSTOM_PRODUCTS.get(product_id, {})
-    lender_email = (product.get("user_email") or "").strip().lower()
-
-    user_rec = get_user(clean_user) or {}
-    is_admin = user_rec.get("role") == "admin"
-
-    if clean_user != customer_email and clean_user != lender_email and not is_admin:
-        raise HTTPException(status_code=403, detail="Forbidden. Not authorized to view this booking's conversation.")
-
     conv = get_or_create_booking_conversation(clean_bid, clean_user)
     detail = get_conversation_detail(conv["id"], clean_user)
+    if not detail:
+        raise HTTPException(status_code=404, detail="Booking conversation not found.")
 
     return {
         "success": True,
@@ -8050,29 +8110,43 @@ def send_conversation_message_endpoint(conversation_id: str, data: SendChatMessa
     if len(clean_content) > 5000:
         raise HTTPException(status_code=422, detail="Message content exceeds maximum allowed length of 5000 characters.")
 
-    conv = None
-    try:
-        conv = fetch_one("SELECT * FROM conversations WHERE id = %s", (clean_cid,))
-    except Exception:
-        pass
-    if not conv:
-        conv = MOCK_CONVERSATIONS.get(clean_cid)
-
+    conv = get_conversation(clean_cid)
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation not found.")
 
+    cust_email = (conv.get("customer_email") or "").strip().lower()
+    lend_email = (conv.get("lender_email") or "").strip().lower()
+    curr_is_admin = is_admin_email(clean_user)
+    has_admin_participant = is_admin_email(cust_email) or is_admin_email(lend_email) or (conv.get("conversation_type") or "").startswith("admin_")
+
+    # 1. Negative Security Check: Direct user-to-user communication blocked
+    if not has_admin_participant and not curr_is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Direct user-to-user communication is strictly prohibited. Communication is only permitted with paYent Admin."
+        )
+
+    # 2. Non-admin can only post to their own conversation
+    if not curr_is_admin and clean_user != cust_email and clean_user != lend_email:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden. Not authorized to message in this conversation."
+        )
+
+    # 3. Non-admin impersonating Admin blocked
+    if not curr_is_admin and (clean_user == ADMIN_EMAIL or "admin" in clean_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden. Impersonating administrator is strictly prohibited."
+        )
+
     user_rec = get_user(clean_user) or {}
-    is_admin = user_rec.get("role") == "admin"
-    is_customer = conv.get("customer_email", "").strip().lower() == clean_user
-    is_lender = conv.get("lender_email", "").strip().lower() == clean_user
+    sender_name = ADMIN_NAME if curr_is_admin else (user_rec.get("full_name") or clean_user.split("@")[0])
+    sender_email = ADMIN_EMAIL if curr_is_admin else clean_user
 
-    if not is_customer and not is_lender and not is_admin:
-        raise HTTPException(status_code=403, detail="Forbidden. Not authorized to message in this conversation.")
-
-    sender_name = user_rec.get("full_name") or clean_user.split("@")[0]
     msg = add_message(
         conversation_id=clean_cid,
-        sender_email=clean_user,
+        sender_email=sender_email,
         sender_name=sender_name,
         content=clean_content or ("Attached file" if data.attachment_url else ""),
         message_type=data.message_type or ("IMAGE" if data.attachment_url and (data.file_type or "").startswith("image/") else "TEXT"),
@@ -8082,8 +8156,9 @@ def send_conversation_message_endpoint(conversation_id: str, data: SendChatMessa
         file_size=data.file_size
     )
 
-    counterparty_email = conv.get("lender_email") if is_customer else conv.get("customer_email")
-    if counterparty_email:
+    # Counterparty notification
+    counterparty_email = cust_email if curr_is_admin else (lend_email if clean_user == cust_email else cust_email)
+    if counterparty_email and counterparty_email != clean_user:
         preview_text = clean_content[:100] + ("..." if len(clean_content) > 100 else "") if clean_content else "Sent an attachment"
         create_notification(
             email=counterparty_email,
@@ -8093,6 +8168,19 @@ def send_conversation_message_endpoint(conversation_id: str, data: SendChatMessa
         )
 
     broadcast_chat_message(clean_cid, msg)
+
+    # If user sent message, broadcast to admin WS
+    if not curr_is_admin:
+        try:
+            import asyncio
+            asyncio.create_task(admin_ws_manager.broadcast({
+                "type": "admin.new_message",
+                "conversationId": clean_cid,
+                "senderEmail": clean_user,
+                "message": msg
+            }))
+        except Exception:
+            pass
 
     return {
         "success": True,
@@ -8115,34 +8203,34 @@ def upload_conversation_attachment_endpoint(conversation_id: str, data: MessageA
 
     cust_email = (conv.get("customer_email") or "").strip().lower()
     lend_email = (conv.get("lender_email") or "").strip().lower()
-    user_rec = get_user(clean_user) or {}
-    is_admin = user_rec.get("role") in ("admin", "superadmin")
+    curr_is_admin = is_admin_email(clean_user)
+    has_admin_participant = is_admin_email(cust_email) or is_admin_email(lend_email) or (conv.get("conversation_type") or "").startswith("admin_")
 
-    if clean_user != cust_email and clean_user != lend_email and not is_admin:
+    if not has_admin_participant and not curr_is_admin:
+        raise HTTPException(status_code=403, detail="Direct user-to-user communication is strictly prohibited.")
+
+    if not curr_is_admin and clean_user != cust_email and clean_user != lend_email:
         raise HTTPException(status_code=403, detail="Forbidden. Not authorized to upload attachments to this conversation.")
 
-    # Validate attachment size (max 5MB in base64 is ~7MB string)
     if len(data.file_data) > 7 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="Attachment size exceeds 5MB limit.")
 
-    # Validate MIME type
     clean_mime = (data.file_type or "").strip().lower()
     if clean_mime not in ALLOWED_ATTACHMENT_MIMES and not clean_mime.startswith("image/"):
-        raise HTTPException(status_code=415, detail=f"Unsupported file type '{data.file_type}'. Allowed types: images, PDF, text, ZIP.")
+        raise HTTPException(status_code=415, detail=f"Unsupported file type '{data.file_type}'.")
 
-    # Sanitize file name to prevent path traversal
     raw_filename = os.path.basename(data.file_name or "attachment")
-    sanitized_filename = re.sub(r'[^a-zA-Z0-9._-]', '_', raw_filename)
-    if not sanitized_filename:
-        sanitized_filename = "attachment"
+    sanitized_filename = re.sub(r'[^a-zA-Z0-9._-]', '_', raw_filename) or "attachment"
 
-    sender_name = user_rec.get("full_name") or clean_user.split("@")[0]
+    user_rec = get_user(clean_user) or {}
+    sender_name = ADMIN_NAME if curr_is_admin else (user_rec.get("full_name") or clean_user.split("@")[0])
+    sender_email = ADMIN_EMAIL if curr_is_admin else clean_user
     msg_type = "IMAGE" if clean_mime.startswith("image/") else "FILE"
     content_text = f"Shared {sanitized_filename}"
 
     msg = add_message(
         conversation_id=clean_cid,
-        sender_email=clean_user,
+        sender_email=sender_email,
         sender_name=sender_name,
         content=content_text,
         message_type=msg_type,
@@ -8152,8 +8240,8 @@ def upload_conversation_attachment_endpoint(conversation_id: str, data: MessageA
         file_size=data.file_size
     )
 
-    counterparty_email = lend_email if clean_user == cust_email else cust_email
-    if counterparty_email:
+    counterparty_email = cust_email if curr_is_admin else (lend_email if clean_user == cust_email else cust_email)
+    if counterparty_email and counterparty_email != clean_user:
         create_notification(
             email=counterparty_email,
             title=f"New Attachment from {sender_name}",
@@ -8174,12 +8262,6 @@ def mark_conversation_read_patch_endpoint(conversation_id: str, current_user_ema
     clean_cid = conversation_id.strip()
 
     conv = get_conversation(clean_cid)
-    if not conv:
-        for c in MOCK_CONVERSATIONS.values():
-            if c.get("id") == clean_cid or c.get("booking_id") == clean_cid:
-                conv = c
-                break
-
     target_id = conv["id"] if conv else clean_cid
     mark_conversation_read(target_id, clean_user)
     return {"success": True}
@@ -8187,6 +8269,213 @@ def mark_conversation_read_patch_endpoint(conversation_id: str, current_user_ema
 @app.post("/api/conversations/{conversation_id}/read")
 def mark_conversation_read_post_endpoint(conversation_id: str, current_user_email: str = Depends(get_current_user_email)):
     return mark_conversation_read_patch_endpoint(conversation_id, current_user_email)
+
+# --- ADMIN MESSAGING ENDPOINTS ---
+
+@app.get("/api/admin/conversations")
+def get_admin_conversations_endpoint(
+    tab: Optional[str] = Query("all"),
+    search: Optional[str] = Query(None),
+    unread_only: bool = Query(False),
+    current_user: dict = Depends(require_admin)
+):
+    """
+    Dedicated Admin inboxes: Renter Messages and Vendor Messages with search and unread filter.
+    """
+    convs = get_admin_conversations(user_type=tab, search=search, unread_only=unread_only)
+    return {
+        "success": True,
+        "conversations": convs
+    }
+
+@app.get("/api/admin/conversations/counts")
+def get_admin_conversations_counts_endpoint(
+    current_user: dict = Depends(require_admin)
+):
+    """
+    Returns counts for Renter Messages, Vendor Messages, and unread badges.
+    """
+    counts = get_admin_conversation_counts()
+    return {
+        "success": True,
+        "counts": counts
+    }
+
+@app.post("/api/admin/conversations/{conversation_id}/messages")
+def admin_reply_conversation_message_endpoint(
+    conversation_id: str,
+    data: SendChatMessageSchema,
+    current_user: dict = Depends(require_admin)
+):
+    """
+    Admin sends reply to a Renter or Vendor in their private conversation.
+    """
+    clean_cid = conversation_id.strip()
+    clean_content = data.content.strip()
+
+    if not clean_content and not data.attachment_url:
+        raise HTTPException(status_code=422, detail="Message content or attachment is required.")
+
+    conv = get_conversation(clean_cid)
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found.")
+
+    target_email = conv.get("customer_email") if not is_admin_email(conv.get("customer_email")) else conv.get("lender_email")
+    admin_name = current_user.get("full_name") or ADMIN_NAME
+
+    msg = add_message(
+        conversation_id=clean_cid,
+        sender_email=ADMIN_EMAIL,
+        sender_name=admin_name,
+        content=clean_content or ("Attached file" if data.attachment_url else ""),
+        message_type=data.message_type or ("IMAGE" if data.attachment_url and (data.file_type or "").startswith("image/") else "TEXT"),
+        attachment_url=data.attachment_url,
+        file_name=data.file_name,
+        file_type=data.file_type,
+        file_size=data.file_size
+    )
+
+    if target_email:
+        preview_text = clean_content[:100] + ("..." if len(clean_content) > 100 else "") if clean_content else "Sent an attachment"
+        create_notification(
+            email=target_email,
+            title=f"New Message from {admin_name}",
+            message=preview_text,
+            notif_type="admin_message"
+        )
+
+    broadcast_chat_message(clean_cid, msg)
+
+    return {
+        "success": True,
+        "message": msg
+    }
+
+# --- ANNOUNCEMENT API ENDPOINTS ---
+
+@app.get("/api/announcements")
+def get_user_announcements_endpoint(
+    unread_only: bool = Query(False),
+    current_user_email: str = Depends(get_current_user_email)
+):
+    """
+    Fetches broadcast announcements strictly targeted for the user's account type (ALL, RENTERS, or VENDORS).
+    """
+    clean_user = current_user_email.strip().lower()
+    role = get_user_communication_role(clean_user)
+    announcements, unread_count = get_announcements_for_user(clean_user, user_type=role, unread_only=unread_only)
+    return {
+        "success": True,
+        "announcements": announcements,
+        "unreadCount": unread_count
+    }
+
+@app.post("/api/announcements/{announcement_id}/read")
+def mark_announcement_read_endpoint(
+    announcement_id: str,
+    current_user_email: str = Depends(get_current_user_email)
+):
+    """Marks an announcement as read for the authenticated user."""
+    clean_user = current_user_email.strip().lower()
+    mark_announcement_read(announcement_id, clean_user)
+    return {
+        "success": True,
+        "announcementId": announcement_id
+    }
+
+@app.post("/api/announcements/{announcement_id}/acknowledge")
+def acknowledge_announcement_endpoint(
+    announcement_id: str,
+    current_user_email: str = Depends(get_current_user_email)
+):
+    """Records explicit user acknowledgement of an announcement."""
+    clean_user = current_user_email.strip().lower()
+    acknowledge_announcement(announcement_id, clean_user)
+    return {
+        "success": True,
+        "announcementId": announcement_id,
+        "acknowledged": True
+    }
+
+@app.get("/api/admin/announcements")
+def get_admin_announcements_endpoint(
+    search: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    current_user: dict = Depends(require_admin)
+):
+    """Admin: Lists all announcements with real read & acknowledgement statistics."""
+    announcements = get_admin_announcements(search=search, status=status)
+    return {
+        "success": True,
+        "announcements": announcements
+    }
+
+@app.post("/api/admin/announcements")
+def create_admin_announcement_endpoint(
+    data: CreateAnnouncementSchema,
+    current_user: dict = Depends(require_admin)
+):
+    """Admin: Creates and optionally publishes a broadcast announcement."""
+    admin_id = current_user.get("id") or current_user.get("email") or "admin"
+    admin_name = current_user.get("full_name") or ADMIN_NAME
+
+    try:
+        ann = create_announcement(
+            title=data.title,
+            content=data.content,
+            target_audience=data.target_audience,
+            author_id=admin_id,
+            author_name=admin_name,
+            status=data.status or "published",
+            category=data.category or "General",
+            pinned=data.pinned or False
+        )
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+
+    return {
+        "success": True,
+        "announcement": ann
+    }
+
+@app.put("/api/admin/announcements/{announcement_id}")
+def update_admin_announcement_endpoint(
+    announcement_id: str,
+    data: UpdateAnnouncementSchema,
+    current_user: dict = Depends(require_admin)
+):
+    """Admin: Updates an announcement."""
+    ann = update_announcement(
+        announcement_id=announcement_id,
+        title=data.title,
+        content=data.content,
+        target_audience=data.target_audience,
+        category=data.category,
+        status=data.status,
+        pinned=data.pinned
+    )
+    if not ann:
+        raise HTTPException(status_code=404, detail="Announcement not found or no changes provided.")
+
+    return {
+        "success": True,
+        "announcement": ann
+    }
+
+@app.delete("/api/admin/announcements/{announcement_id}")
+def archive_admin_announcement_endpoint(
+    announcement_id: str,
+    current_user: dict = Depends(require_admin)
+):
+    """Admin: Archives an announcement."""
+    ok = archive_announcement(announcement_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Announcement not found.")
+
+    return {
+        "success": True,
+        "message": "Announcement archived."
+    }
 
 @app.websocket("/api/admin/ws")
 async def admin_websocket(websocket: WebSocket, token: Optional[str] = None):
@@ -12110,7 +12399,8 @@ def admin_bookings_list(current_admin: dict = Depends(check_admin_user)):
                     "start_datetime": o.get("start_datetime"),
                     "end_datetime": o.get("end_datetime"),
                     "cancellation_reason_code": canc.get("reason_code") or o.get("cancellation_reason"),
-                    "cancellation_feedback": canc.get("feedback") or o.get("cancellation_feedback"),
+                    "cancellation_feedback": canc.get("feedback") or o.get("cancellation_feedback") or o.get("cancellation_explanation"),
+                    "cancellation_explanation": o.get("cancellation_explanation") or canc.get("feedback") or o.get("cancellation_feedback"),
                     "cancellation_timestamp": canc.get("created_at") or o.get("cancelled_at"),
                     "cancellation_previous_status": canc.get("previous_status"),
                     "cancellation_initiated_by": canc.get("initiated_by") or o.get("cancelled_by"),
@@ -12142,7 +12432,8 @@ def admin_bookings_list(current_admin: dict = Depends(check_admin_user)):
             "startDatetime": r.get("start_datetime") or r.get("startDatetime"),
             "endDatetime": r.get("end_datetime") or r.get("endDatetime"),
             "cancellationReason": r.get("cancellation_reason_code") or r.get("cancellation_reason"),
-            "cancellationFeedback": r.get("cancellation_feedback"),
+            "cancellationFeedback": r.get("cancellation_feedback") or r.get("cancellation_explanation"),
+            "cancellationExplanation": r.get("cancellation_explanation") or r.get("cancellation_feedback"),
             "cancellationTimestamp": r.get("cancellation_timestamp") or r.get("cancelled_at"),
             "cancellationPreviousStatus": r.get("cancellation_previous_status"),
             "cancellationInitiatedBy": r.get("cancellation_initiated_by") or r.get("cancelled_by"),

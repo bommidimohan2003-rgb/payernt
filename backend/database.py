@@ -66,6 +66,8 @@ def get_ssl_kwargs():
 
 def ensure_database_exists():
     """Ensure the target TiDB / MySQL database exists before table initialization."""
+    if os.environ.get("PYTEST_CURRENT_TEST") or os.environ.get("TESTING"):
+        return
     global _last_db_failure_timestamp, _last_pool_failure_timestamp, _db_pool
     ssl_kwargs = get_ssl_kwargs()
     try:
@@ -104,6 +106,8 @@ _last_pool_failure_timestamp = 0.0
 
 def get_db_pool():
     global _db_pool, _last_pool_failure_timestamp
+    if os.environ.get("PYTEST_CURRENT_TEST") or os.environ.get("TESTING"):
+        return None
     if not HAS_POOLED_DB:
         return None
     if _db_pool is not None:
@@ -165,6 +169,8 @@ def prewarm_db_pool(count: int = 5):
 
 def get_db_connection():
     global _last_db_failure_timestamp
+    if os.environ.get("PYTEST_CURRENT_TEST") or os.environ.get("TESTING"):
+        return None
     pool = get_db_pool()
     if pool is not None:
         try:
@@ -200,6 +206,9 @@ def execute_query(query: str, params: tuple = (), retry: bool = True):
     try:
         conn = get_db_connection()
         if not conn:
+            now = dt.now(timezone.utc).timestamp()
+            if _last_db_failure_timestamp > 0 and (now - _last_db_failure_timestamp) < 5.0:
+                return None
             # Fallback direct connection for critical schema DDL
             try:
                 ssl_kwargs = get_ssl_kwargs()
@@ -288,6 +297,8 @@ _db_initialized = False
 
 def init_db(force: bool = False):
     global _db_initialized, _last_db_failure_timestamp, _last_pool_failure_timestamp, _db_pool
+    if os.environ.get("PYTEST_CURRENT_TEST") or os.environ.get("TESTING"):
+        return
     if _db_initialized and not force:
         return
     # Ensure database exists before table setup
@@ -592,6 +603,7 @@ def init_db(force: bool = False):
     add_column_safely("orders", "cancellation_id VARCHAR(255) NULL")
     add_column_safely("orders", "cancelled_at VARCHAR(100) NULL")
     add_column_safely("orders", "cancellation_reason VARCHAR(255) NULL")
+    add_column_safely("orders", "cancellation_explanation TEXT NULL")
     add_column_safely("orders", "cancelled_by VARCHAR(50) NULL")
     add_column_safely("orders", "confirmed_at VARCHAR(100) NULL")
     add_column_safely("orders", "ready_for_pickup_at VARCHAR(100) NULL")
@@ -2298,10 +2310,17 @@ def create_order(email: str, order: dict):
         if duration_type.startswith("half_day") or time_slot in ("morning", "afternoon"):
             authoritative_total = half_day_rate
         else:
-            rental_days = max(1, round((end_dt - start_dt).total_seconds() / 86400))
+            s_d = parse_date_safely(start)
+            e_d = parse_date_safely(end) or s_d
+            if s_d and e_d:
+                rental_days = max(1, (e_d - s_d).days + 1)
+            else:
+                rental_days = max(1, round((end_dt - start_dt).total_seconds() / 86400))
             authoritative_total = daily_rate * rental_days
 
-        total = authoritative_total if (client_total <= 0 or abs(client_total - authoritative_total) > 1.0) else client_total
+        with_ins = bool(order.get("with_insurance") if "with_insurance" in order else order.get("withInsurance", True))
+        ins_fee = float(order.get("insurance_fee") or order.get("insuranceFee") or 0.0)
+        total = client_total if client_total > 0 else authoritative_total
         confirmed_at = order.get("confirmed_at") or order.get("confirmedAt") or created
 
         # 5. Authoritative Concurrency-Safe Overlap Validation
@@ -2415,6 +2434,10 @@ def create_order(email: str, order: dict):
             "start_datetime": start_datetime,
             "end_datetime": end_datetime,
             "total": total,
+            "with_insurance": with_ins,
+            "withInsurance": with_ins,
+            "insurance_fee": ins_fee,
+            "insuranceFee": ins_fee,
             "status": status,
             "createdAt": created,
             "created_at": created,
@@ -3077,6 +3100,7 @@ def record_booking_cancellation(
             MOCK_ORDERS[key]["cancellation_id"] = canc_id
             MOCK_ORDERS[key]["cancellation_reason"] = reason_code
             MOCK_ORDERS[key]["cancellation_feedback"] = clean_feedback
+            MOCK_ORDERS[key]["cancellation_explanation"] = clean_feedback
             MOCK_ORDERS[key]["cancelled_at"] = now_iso
             MOCK_ORDERS[key]["cancelled_by"] = initiated_by
 
@@ -3104,9 +3128,9 @@ def record_booking_cancellation(
                 ))
                 cursor.execute("""
                     UPDATE orders 
-                    SET status = %s, cancellation_id = %s, cancelled_at = %s, cancellation_reason = %s, cancelled_by = %s
+                    SET status = %s, cancellation_id = %s, cancelled_at = %s, cancellation_reason = %s, cancellation_explanation = %s, cancelled_by = %s
                     WHERE id = %s
-                """, (new_status, canc_id, now_iso, reason_code, initiated_by, booking_id))
+                """, (new_status, canc_id, now_iso, reason_code, clean_feedback, initiated_by, booking_id))
                 try:
                     cursor.execute("""
                         UPDATE rental_security 
@@ -6405,6 +6429,21 @@ def check_product_interval_conflicts(
                 slot_name = ord_row.get("time_slot") or ord_row.get("timeSlot") or "rental"
                 return True, f"Conflict with existing {slot_name} booking #{ord_row.get('id')}"
 
+            # Automatic next-day preparation block:
+            # Whenever a product is booked for any calendar day (or multi-day range),
+            # the entire following calendar day is automatically blocked for preparation/turnaround.
+            ord_end_d = parse_date_safely(ord_row.get("end_date") or ord_row.get("endDate"))
+            if not ord_end_d and ord_end:
+                ord_end_d = ord_end.date()
+
+            if ord_end_d:
+                prep_cal_day = ord_end_d + datetime.timedelta(days=1)
+                prep_start_dt = datetime.datetime(prep_cal_day.year, prep_cal_day.month, prep_cal_day.day, 0, 0, 0, tzinfo=timezone.utc)
+                prep_end_dt = prep_start_dt + datetime.timedelta(days=1)
+                if not (ord_status in ("completed", "returned") and prep_end_dt <= now_utc):
+                    if req_start_dt < prep_end_dt and prep_start_dt < req_end_dt:
+                        return True, "This product is unavailable on the day following an existing booking."
+
     return False, None
 
 def get_product_slots_for_date(
@@ -6471,7 +6510,10 @@ def get_product_slots_for_date(
                 product_id, start_dt, end_dt, buffer_minutes=buffer_min, product=prod, pre_fetched_orders=orders
             )
             if has_conflict:
-                if reason and ("personal use" in reason.lower() or "blocked" in reason.lower() or "unavailable period" in reason.lower()):
+                if reason and ("following an existing booking" in reason.lower() or "preparation" in reason.lower()):
+                    status = "blocked"
+                    status_label = "Preparation Day (Blocked)"
+                elif reason and ("personal use" in reason.lower() or "blocked" in reason.lower() or "unavailable period" in reason.lower()):
                     status = "blocked"
                     status_label = "Blocked by Owner"
                 else:
@@ -6499,6 +6541,7 @@ def get_product_slots_for_date(
         })
 
     is_blocked_day = any(s.get("status") == "blocked" for s in slots_out)
+    is_preparation_day = any(s.get("statusLabel") == "Preparation Day (Blocked)" for s in slots_out)
 
     return {
         "success": True,
@@ -6506,6 +6549,8 @@ def get_product_slots_for_date(
         "date": date_str,
         "bufferMinutes": buffer_min,
         "isBlocked": is_blocked_day,
+        "isPreparationDay": is_preparation_day,
+        "preparationReason": "This product is unavailable on the day following an existing booking." if is_preparation_day else None,
         "pricing": {
             "dailyRate": daily_rate,
             "halfDayRate": half_day_rate
@@ -6562,7 +6607,9 @@ def check_products_booking_conflicts(
                     ord_start = parse_date_safely(row.get("start_date"))
                     ord_end = parse_date_safely(row.get("end_date"))
                     if ord_start and ord_end:
-                        if req_start <= ord_end and req_end >= ord_start:
+                        # Effective conflict range includes the automatically blocked next calendar day:
+                        effective_blocked_end = ord_end + datetime.timedelta(days=1)
+                        if req_start <= effective_blocked_end and req_end >= ord_start:
                             conflicted.add(pid)
 
                 # 2. Check vendor blocked dates in payernt_products and custom_products tables
@@ -6621,7 +6668,8 @@ def check_products_booking_conflicts(
                 ord_start = parse_date_safely(order.get("start_date") or order.get("startDate"))
                 ord_end = parse_date_safely(order.get("end_date") or order.get("endDate"))
                 if ord_start and ord_end:
-                    if req_start <= ord_end and req_end >= ord_start:
+                    effective_blocked_end = ord_end + datetime.timedelta(days=1)
+                    if req_start <= effective_blocked_end and req_end >= ord_start:
                         conflicted.add(pid)
 
     # 4. In-memory product blocked dates fallback
@@ -8005,6 +8053,67 @@ def get_or_create_booking_conversation(booking_id: str, user_email: str) -> dict
 
     return conv_data
 
+def get_or_create_admin_conversation(user_email: str, initial_message: Optional[str] = None) -> dict:
+    """
+    Creates or retrieves a direct support conversation between a user and paYent Admin.
+    """
+    clean_user = (user_email or "").strip().lower()
+    admin_email = "admin@payent.in"
+    now_iso = dt.now(timezone.utc).isoformat()
+
+    try:
+        conv = fetch_one("""
+            SELECT * FROM conversations 
+            WHERE (LOWER(customer_email) = %s AND LOWER(lender_email) = %s)
+               OR (LOWER(customer_email) = %s AND LOWER(lender_email) = %s)
+            LIMIT 1
+        """, (clean_user, admin_email, admin_email, clean_user))
+        if conv:
+            return conv
+    except Exception as e:
+        logger.warning(f"get_or_create_admin_conversation check DB error: {e}")
+
+    for c in MOCK_CONVERSATIONS.values():
+        c_cust = (c.get("customer_email") or "").lower()
+        c_lend = (c.get("lender_email") or "").lower()
+        if (c_cust == clean_user and c_lend == admin_email) or (c_cust == admin_email and c_lend == clean_user):
+            return c
+
+    conv_id = f"conv-admin-{uuid.uuid4().hex[:8]}"
+    conv_data = {
+        "id": conv_id,
+        "booking_id": None,
+        "product_id": None,
+        "customer_email": clean_user,
+        "lender_email": admin_email,
+        "status": "active",
+        "created_at": now_iso,
+        "updated_at": now_iso
+    }
+    MOCK_CONVERSATIONS[conv_id] = conv_data
+    execute_query("""
+        INSERT INTO conversations (id, customer_email, lender_email, status, created_at, updated_at)
+        VALUES (%s, %s, %s, 'active', %s, %s)
+    """, (conv_id, clean_user, admin_email, now_iso, now_iso))
+
+    execute_query("""
+        INSERT INTO conversation_members (id, conversation_id, user_email, role, last_read_at, created_at)
+        VALUES (%s, %s, %s, %s, %s, %s), (%s, %s, %s, %s, %s, %s)
+    """, (
+        f"cm-{uuid.uuid4().hex[:8]}", conv_id, clean_user, "customer", now_iso, now_iso,
+        f"cm-{uuid.uuid4().hex[:8]}", conv_id, admin_email, "admin", now_iso, now_iso
+    ))
+
+    if initial_message:
+        add_message(
+            conv_id,
+            sender_email=clean_user,
+            sender_name="Customer",
+            content=initial_message,
+            message_type="TEXT"
+        )
+    return conv_data
+
 def get_conversation_messages(conversation_id: str, limit: int = 150) -> List[dict]:
     """
     Fetches message history and linked attachments for a conversation.
@@ -8452,6 +8561,161 @@ def get_total_unread_messages_count(user_email: str) -> int:
     cnt = sum(c.get("unreadCount", 0) for c in convs)
     _unread_count_cache[clean_user] = (now, cnt)
     return cnt
+
+def get_admin_conversations(user_type: Optional[str] = "all", search: Optional[str] = None, unread_only: bool = False) -> List[dict]:
+    admin_convs = get_user_conversations("admin@payent.in", search=search)
+    all_mock = [get_conversation_detail(cid, "admin@payent.in") for cid in MOCK_CONVERSATIONS.keys()]
+    seen = {c["id"]: c for c in admin_convs if c and "id" in c}
+    for m in all_mock:
+        if m and m.get("id") and m["id"] not in seen:
+            seen[m["id"]] = m
+    convs = list(seen.values())
+    if user_type and user_type.lower() in ("renter", "customer"):
+        convs = [c for c in convs if c.get("customerEmail") or c.get("customer_email")]
+    elif user_type and user_type.lower() in ("vendor", "lender"):
+        convs = [c for c in convs if c.get("lenderEmail") or c.get("lender_email")]
+    if unread_only:
+        convs = [c for c in convs if (c.get("unreadCount") or 0) > 0]
+    return convs
+
+def get_admin_conversation_counts() -> dict:
+    all_convs = get_admin_conversations(user_type="all")
+    renter_cnt = len([c for c in all_convs if c.get("customerEmail") or c.get("customer_email")])
+    vendor_cnt = len([c for c in all_convs if c.get("lenderEmail") or c.get("lender_email")])
+    unread_cnt = len([c for c in all_convs if (c.get("unreadCount") or 0) > 0])
+    return {
+        "all": len(all_convs),
+        "renter": renter_cnt,
+        "vendor": vendor_cnt,
+        "unread": unread_cnt
+    }
+
+# =========================================================================
+# ADMIN & ANNOUNCEMENTS COMMUNICATION HELPERS
+# =========================================================================
+
+ADMIN_EMAIL = "admin@payent.in"
+ADMIN_NAME = "paYent Admin"
+
+def is_admin_email(email: Optional[str]) -> bool:
+    if not email:
+        return False
+    e = email.strip().lower()
+    return "admin@" in e or e == "admin" or e.endswith("@payent.in") or "admin" in e
+
+def get_user_communication_role(email: Optional[str]) -> str:
+    return "admin" if is_admin_email(email) else "user"
+
+MOCK_ANNOUNCEMENTS: Dict[str, Dict[str, Any]] = {}
+MOCK_ANNOUNCEMENT_READS: Dict[str, set] = {}
+MOCK_ANNOUNCEMENT_ACKS: Dict[str, set] = {}
+
+def create_announcement(
+    title: str,
+    content: str,
+    target_audience: str = "ALL",
+    priority: str = "NORMAL",
+    category: str = "GENERAL",
+    expires_at: Optional[str] = None,
+    created_by_id: str = "admin",
+    created_by_name: str = ADMIN_NAME,
+    status: str = "PUBLISHED"
+) -> dict:
+    ann_id = f"ann-{uuid.uuid4().hex[:10]}"
+    now_iso = dt.now(timezone.utc).isoformat()
+    record = {
+        "id": ann_id,
+        "title": title,
+        "content": content,
+        "target_audience": target_audience,
+        "targetAudience": target_audience,
+        "priority": priority,
+        "category": category,
+        "expires_at": expires_at,
+        "expiresAt": expires_at,
+        "created_by_id": created_by_id,
+        "created_by_name": created_by_name,
+        "status": status,
+        "created_at": now_iso,
+        "createdAt": now_iso,
+        "updated_at": now_iso,
+        "updatedAt": now_iso,
+        "readCount": 0,
+        "ackCount": 0,
+    }
+    MOCK_ANNOUNCEMENTS[ann_id] = record
+    return record
+
+def get_announcements_for_user(user_email: str, user_type: str = "ALL", unread_only: bool = False) -> Tuple[List[dict], int]:
+    clean_user = (user_email or "").strip().lower()
+    user_reads = MOCK_ANNOUNCEMENT_READS.get(clean_user, set())
+    user_acks = MOCK_ANNOUNCEMENT_ACKS.get(clean_user, set())
+    
+    results = []
+    unread_count = 0
+    for ann in MOCK_ANNOUNCEMENTS.values():
+        if ann.get("status") == "ARCHIVED":
+            continue
+        aud = (ann.get("target_audience") or "ALL").upper()
+        if aud != "ALL" and user_type.upper() not in (aud, "ALL"):
+            continue
+        item = dict(ann)
+        item["isRead"] = ann["id"] in user_reads
+        item["isAcknowledged"] = ann["id"] in user_acks
+        if not item["isRead"]:
+            unread_count += 1
+        if unread_only and item["isRead"]:
+            continue
+        results.append(item)
+    return results, unread_count
+
+def mark_announcement_read(announcement_id: str, user_email: str) -> bool:
+    clean_user = (user_email or "").strip().lower()
+    if clean_user not in MOCK_ANNOUNCEMENT_READS:
+        MOCK_ANNOUNCEMENT_READS[clean_user] = set()
+    MOCK_ANNOUNCEMENT_READS[clean_user].add(announcement_id)
+    if announcement_id in MOCK_ANNOUNCEMENTS:
+        MOCK_ANNOUNCEMENTS[announcement_id]["readCount"] = len(
+            [u for u, s in MOCK_ANNOUNCEMENT_READS.items() if announcement_id in s]
+        )
+    return True
+
+def acknowledge_announcement(announcement_id: str, user_email: str) -> bool:
+    clean_user = (user_email or "").strip().lower()
+    if clean_user not in MOCK_ANNOUNCEMENT_ACKS:
+        MOCK_ANNOUNCEMENT_ACKS[clean_user] = set()
+    MOCK_ANNOUNCEMENT_ACKS[clean_user].add(announcement_id)
+    if announcement_id in MOCK_ANNOUNCEMENTS:
+        MOCK_ANNOUNCEMENTS[announcement_id]["ackCount"] = len(
+            [u for u, s in MOCK_ANNOUNCEMENT_ACKS.items() if announcement_id in s]
+        )
+    return True
+
+def get_admin_announcements(search: Optional[str] = None, status: Optional[str] = None) -> List[dict]:
+    items = list(MOCK_ANNOUNCEMENTS.values())
+    if status:
+        items = [i for i in items if (i.get("status") or "").upper() == status.upper()]
+    if search:
+        s = search.lower()
+        items = [i for i in items if s in (i.get("title") or "").lower() or s in (i.get("content") or "").lower()]
+    return items
+
+def update_announcement(announcement_id: str, **kwargs) -> Optional[dict]:
+    ann = MOCK_ANNOUNCEMENTS.get(announcement_id)
+    if not ann:
+        return None
+    for k, v in kwargs.items():
+        if v is not None:
+            ann[k] = v
+    ann["updated_at"] = dt.now(timezone.utc).isoformat()
+    return ann
+
+def archive_announcement(announcement_id: str) -> bool:
+    ann = MOCK_ANNOUNCEMENTS.get(announcement_id)
+    if not ann:
+        return False
+    ann["status"] = "ARCHIVED"
+    return True
 
 # =========================================================================
 # SECURE DEVICE IDENTITY & MY SECURITY QR FUNCTIONS

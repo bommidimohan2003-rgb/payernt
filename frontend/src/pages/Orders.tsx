@@ -15,6 +15,7 @@ import {
   Edit3,
   X,
   ArrowLeft,
+  ChevronLeft,
   ChevronRight,
   ChevronDown,
   Ban,
@@ -42,6 +43,32 @@ import { LiveRentalQueue } from "@/components/rental/LiveRentalQueue";
 import { formatBookingDateTime } from "@/utils/formatters";
 
 export type BookingFilter = "all" | "pending" | "ongoing" | "cancelled" | "completed";
+
+export const CANCELLATION_REASONS = [
+  "I no longer need this product.",
+  "I found a better alternative.",
+  "The rental price is too high.",
+  "My plans have changed.",
+  "The product is not suitable for my needs.",
+  "I booked by mistake.",
+  "Other reason.",
+] as const;
+
+export const isEligibleForCancellation = (order: Order | null | undefined): boolean => {
+  if (!order) return false;
+  const st = String(order.status || "").toLowerCase();
+  if (st === "cancelled" || st === "canceled" || st === "completed" || st === "returned") {
+    return false;
+  }
+  if (st === "active" || st === "in_progress" || st === "ongoing") {
+    return false;
+  }
+  const delSt = String((order as any).delivery_status || (order as any).deliveryStatus || "").toUpperCase();
+  if (["PICKED_UP_FROM_VENDOR", "OUT_FOR_DELIVERY", "DELIVERED", "COMPLETED"].includes(delSt)) {
+    return false;
+  }
+  return true;
+};
 
 export const DEFAULT_SAMPLE_ORDERS: Order[] = [
   {
@@ -418,8 +445,36 @@ export default function Orders() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setErrorState] = useState<string | null>(null);
+  // Cancellation Modal & Flow State
   const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null);
+  const [selectedReason, setSelectedReason] = useState<string>("");
+  const [cancellationExplanation, setCancellationExplanation] = useState<string>("");
   const [isCancelling, setIsCancelling] = useState(false);
+
+  const cancellingOrder = useMemo(() => {
+    if (!cancellingOrderId) return null;
+    return (
+      orders.find(
+        (o) =>
+          o.id === cancellingOrderId ||
+          o.productId === cancellingOrderId ||
+          (o as any).product_id === cancellingOrderId
+      ) || null
+    );
+  }, [orders, cancellingOrderId]);
+
+  const openCancellationModal = useCallback((orderId: string) => {
+    setCancellingOrderId(orderId);
+    setSelectedReason("");
+    setCancellationExplanation("");
+  }, []);
+
+  const closeCancellationModal = useCallback(() => {
+    if (isCancelling) return;
+    setCancellingOrderId(null);
+    setSelectedReason("");
+    setCancellationExplanation("");
+  }, [isCancelling]);
   const [revealedPins, setRevealedPins] = useState<Record<string, { pin: string; instructions?: string }>>({});
   const [loadingPinOrderId, setLoadingPinOrderId] = useState<string | null>(null);
 
@@ -625,13 +680,26 @@ export default function Orders() {
   };
 
   const handleCancelOrder = (orderId: string) => {
-    if (isCancelling) return;
+    if (isCancelling || !selectedReason) {
+      if (!selectedReason) {
+        toast.error("Please select a cancellation reason.");
+      }
+      return;
+    }
     const currentToken = storage.get<string | null>(STORAGE_KEYS.token, null);
-    if (!currentToken) return;
+    if (!currentToken) {
+      toast.error("Please sign in to cancel this booking.");
+      return;
+    }
+    const cleanExplanation = cancellationExplanation.trim().slice(0, 500);
     const nowIso = new Date().toISOString();
     setIsCancelling(true);
     api
-      .cancelOrder(currentToken, orderId)
+      .cancelOrder(currentToken, orderId, {
+        reason: selectedReason,
+        notes: cleanExplanation,
+        explanation: cleanExplanation,
+      })
       .then(() => {
         setOrders((prev) =>
           prev.map((o) =>
@@ -641,17 +709,29 @@ export default function Orders() {
                   status: "cancelled" as const,
                   cancelledAt: nowIso,
                   cancelled_at: nowIso,
+                  cancellationReason: selectedReason,
+                  cancellation_reason: selectedReason,
+                  cancellationExplanation: cleanExplanation,
+                  cancellation_explanation: cleanExplanation,
                 }
               : o
           )
         );
-        toast.success("Order cancelled successfully.");
+        toast.success(`Booking #${orderId} has been cancelled successfully.`);
         window.dispatchEvent(
           new CustomEvent("payent_queue_updated", {
-            detail: { bookingId: orderId, status: "cancelled", cancelled_at: nowIso },
+            detail: {
+              bookingId: orderId,
+              status: "cancelled",
+              cancelled_at: nowIso,
+              reason: selectedReason,
+              explanation: cleanExplanation,
+            },
           })
         );
-        setCancellingOrderId(null);
+        window.dispatchEvent(new CustomEvent("payent_orders_updated", { detail: { bookingId: orderId, status: "cancelled" } }));
+        window.dispatchEvent(new CustomEvent("payent_booking_updated", { detail: { bookingId: orderId, status: "cancelled" } }));
+        closeCancellationModal();
       })
       .catch((err) => {
         toast.error(err.message || "Failed to cancel order.");
@@ -1216,6 +1296,11 @@ export default function Orders() {
                                 Reason: {String((o as any).cancellationReason || (o as any).cancellation_reason).replace(/_/g, " ")}
                               </p>
                             )}
+                            {((o as any).cancellationExplanation || (o as any).cancellation_explanation) && (
+                              <p className="text-[11px] text-neutral-600 dark:text-neutral-300 italic">
+                                Note: &ldquo;{(o as any).cancellationExplanation || (o as any).cancellation_explanation}&rdquo;
+                              </p>
+                            )}
                             {((o as any).refund_status || (o as any).refundStatus) && (
                               <p className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold">
                                 Refund Status: {String((o as any).refund_status || (o as any).refundStatus).replace(/_/g, " ").toUpperCase()}
@@ -1545,12 +1630,12 @@ export default function Orders() {
                                 <span>Chat with Lender</span>
                               </button>
 
-                              {!isCancelled && o.status !== "completed" && (
+                              {isEligibleForCancellation(o) && (
                                 <button
                                   type="button"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    setCancellingOrderId(o.id);
+                                    openCancellationModal(o.id);
                                   }}
                                   className="inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-500/10 text-xs font-semibold transition-colors cursor-pointer"
                                 >
@@ -1642,51 +1727,245 @@ export default function Orders() {
 
       {/* Cancellation Confirmation Modal */}
       <AnimatePresence>
-        {cancellingOrderId && (
-          <div className="fixed inset-0 z-50 grid place-items-center p-4">
+        {cancellingOrderId && cancellingOrder && (
+          <div className="fixed inset-0 z-50 grid place-items-center p-3 sm:p-4 overflow-y-auto">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setCancellingOrderId(null)}
+              onClick={closeCancellationModal}
               className="fixed inset-0 bg-black/60 dark:bg-[#050709]/85 backdrop-blur-sm"
             />
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              initial={{ opacity: 0, scale: 0.96, y: 12 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              exit={{ opacity: 0, scale: 0.96, y: 12 }}
               transition={{ type: "spring", damping: 25, stiffness: 350 }}
-              className="relative w-full max-w-md overflow-hidden rounded-2xl border border-neutral-200 dark:border-white/20 bg-white dark:bg-[#1E1E1E] p-5 sm:p-6 shadow-2xl z-10 text-left"
+              className="relative w-full max-w-3xl max-h-[85vh] flex flex-col overflow-hidden rounded-2xl border border-neutral-200 dark:border-white/15 bg-white dark:bg-[#1E1E1E] shadow-2xl z-10 text-left my-auto"
             >
-              <div className="flex flex-col gap-1.5">
-                <h3 className="text-lg font-bold text-neutral-900 dark:text-white">
-                  Cancel Gear Rental
-                </h3>
-                <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed">
-                  Are you sure you want to cancel this gear rental? Once cancelled, the reservation holds will be released back to the lender. This action cannot be undone.
-                </p>
+              {/* Modal Header */}
+              <div className="flex items-center justify-between px-5 py-3.5 border-b border-neutral-200/80 dark:border-white/10 shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-red-500/10 text-red-600 dark:text-red-400 grid place-items-center">
+                    <Ban className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm sm:text-base font-bold text-neutral-900 dark:text-white leading-tight">
+                      Cancel Rental Booking
+                    </h3>
+                    <p className="text-[11px] text-neutral-500 dark:text-neutral-400 font-mono mt-0.5">
+                      Order #{cancellingOrder.id} • {cancellingOrder.productTitle || (cancellingOrder as any).product_title || "Rental Gear"}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeCancellationModal}
+                  disabled={isCancelling}
+                  className="h-8 w-8 rounded-lg grid place-items-center text-neutral-400 hover:text-neutral-700 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                  aria-label="Close"
+                >
+                  <X className="h-4 w-4" />
+                </button>
               </div>
-              <div className="mt-5 flex justify-end gap-2.5">
-                <Button
-                  variant="ghost"
-                  disabled={isCancelling}
-                  onClick={() => setCancellingOrderId(null)}
-                  className="text-neutral-600 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white text-xs"
-                >
-                  Keep Rental
-                </Button>
-                <Button
-                  variant="destructive"
-                  disabled={isCancelling}
-                  onClick={() => {
-                    if (cancellingOrderId) {
-                      handleCancelOrder(cancellingOrderId);
-                    }
-                  }}
-                  className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs disabled:opacity-50"
-                >
-                  {isCancelling ? "Cancelling..." : "Confirm Cancellation"}
-                </Button>
+
+              {/* Combined Body: Reason Selection & Review */}
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-4 p-4 sm:p-5 overflow-y-auto">
+                {/* Left Column: Reasons Selection (7 cols) */}
+                <div className="md:col-span-7 space-y-2.5">
+                  <div className="space-y-0.5">
+                    <label className="text-xs font-bold text-neutral-900 dark:text-white block">
+                      Why do you want to cancel this booking?
+                    </label>
+                    <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                      Select one primary reason below to proceed.
+                    </p>
+                  </div>
+
+                  {/* Compact Radio Selection List */}
+                  <div className="space-y-1.5" role="radiogroup" aria-label="Cancellation reason">
+                    {CANCELLATION_REASONS.map((reason, idx) => {
+                      const isSelected = selectedReason === reason;
+                      return (
+                        <div
+                          key={`reason-${idx}`}
+                          role="radio"
+                          aria-checked={isSelected}
+                          tabIndex={0}
+                          onClick={() => setSelectedReason(reason)}
+                          onKeyDown={(e) => {
+                            if (e.key === " " || e.key === "Enter") {
+                              e.preventDefault();
+                              setSelectedReason(reason);
+                            }
+                          }}
+                          className={`flex items-center gap-2.5 px-3 py-2 rounded-xl border text-xs cursor-pointer transition-all select-none ${
+                            isSelected
+                              ? "border-emerald-600 dark:border-emerald-500 bg-emerald-500/10 dark:bg-emerald-500/15 text-neutral-950 dark:text-white shadow-xs font-semibold"
+                              : "border-neutral-200/80 dark:border-white/10 bg-neutral-50/50 dark:bg-white/[0.02] text-neutral-700 dark:text-neutral-300 hover:border-neutral-300 dark:hover:border-white/20 hover:bg-neutral-100/50 dark:hover:bg-white/[0.04]"
+                          }`}
+                        >
+                          <div
+                            className={`h-3.5 w-3.5 rounded-full border flex items-center justify-center shrink-0 transition-all ${
+                              isSelected
+                                ? "border-emerald-600 dark:border-emerald-500 bg-emerald-600 dark:bg-emerald-500"
+                                : "border-neutral-300 dark:border-white/30 bg-transparent"
+                            }`}
+                          >
+                            {isSelected && <div className="h-1.5 w-1.5 rounded-full bg-white" />}
+                          </div>
+                          <span className="flex-1 leading-snug">{reason}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Optional Text Area for 'Other reason.' */}
+                  {selectedReason === "Other reason." && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="space-y-1 pt-0.5"
+                    >
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="font-semibold text-neutral-700 dark:text-neutral-300">
+                          Additional explanation (optional):
+                        </span>
+                        <span
+                          className={`font-mono text-[10px] ${
+                            cancellationExplanation.length >= 480
+                              ? "text-red-500 font-bold"
+                              : "text-neutral-400"
+                          }`}
+                        >
+                          {cancellationExplanation.length}/500
+                        </span>
+                      </div>
+                      <textarea
+                        rows={2}
+                        maxLength={500}
+                        value={cancellationExplanation}
+                        onChange={(e) => setCancellationExplanation(e.target.value)}
+                        placeholder="Help us understand your reason for cancellation..."
+                        className="w-full rounded-xl border border-neutral-300 dark:border-white/15 bg-white dark:bg-neutral-900/60 p-2.5 text-xs text-neutral-900 dark:text-white placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 resize-none transition-all"
+                      />
+                    </motion.div>
+                  )}
+                </div>
+
+                {/* Right Column: Review & Refund Terms (5 cols) */}
+                <div className="md:col-span-5 flex flex-col justify-between space-y-3">
+                  {/* Booking Summary Box */}
+                  <div className="rounded-xl border border-neutral-200/90 dark:border-white/10 bg-neutral-50/60 dark:bg-white/[0.02] p-3 space-y-2.5">
+                    <div className="flex items-center gap-2.5">
+                      <img
+                        src={
+                          cancellingOrder.productImage ||
+                          (cancellingOrder as any).product_image ||
+                          "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=600"
+                        }
+                        alt=""
+                        className="w-11 h-11 rounded-lg object-cover bg-neutral-100 dark:bg-white/5 shrink-0 border border-neutral-200/80 dark:border-white/10"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs font-bold text-neutral-900 dark:text-white truncate">
+                          {cancellingOrder.productTitle || (cancellingOrder as any).product_title || "Rental Gear"}
+                        </div>
+                        <div className="text-[11px] text-neutral-500 dark:text-neutral-400 font-medium truncate">
+                          {cancellingOrder.startDate || (cancellingOrder as any).start_date || "—"} – {cancellingOrder.endDate || (cancellingOrder as any).end_date || "—"}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-neutral-200/70 dark:border-white/10 space-y-1.5 text-xs">
+                      <div className="flex items-center justify-between text-neutral-600 dark:text-neutral-300">
+                        <span>Cancellation Fee:</span>
+                        <span className="font-bold text-emerald-600 dark:text-emerald-400">₹0 (Free)</span>
+                      </div>
+                      <div className="flex items-center justify-between font-medium">
+                        <span className="text-neutral-700 dark:text-neutral-200">Expected Refund:</span>
+                        <span className="font-bold font-mono text-neutral-900 dark:text-white">
+                          ₹{Number(cancellingOrder.total || 0).toLocaleString("en-IN")} (100%)
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Refund Policy and Escrow Guarantee Note */}
+                  <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/[0.04] p-3 space-y-1.5 text-[11px] text-neutral-600 dark:text-neutral-400 leading-relaxed">
+                    <div className="flex items-center gap-1.5 font-bold text-emerald-700 dark:text-emerald-400">
+                      <ShieldCheck className="h-3.5 w-3.5" />
+                      <span>100% Escrow Protected</span>
+                    </div>
+                    <p className="text-[11px]">
+                      The full rental total will be refunded to your original payment method in 3–5 business days. Holds on this gear will be released back to the lender.
+                    </p>
+                  </div>
+
+                  {/* Selected Reason Status Box */}
+                  <div className="rounded-xl border border-neutral-200/70 dark:border-white/10 p-2.5 bg-neutral-50/50 dark:bg-white/[0.02]">
+                    <span className="text-[10px] text-neutral-400 uppercase tracking-wider font-bold block mb-1">
+                      Selected Reason
+                    </span>
+                    {selectedReason ? (
+                      <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 text-xs font-semibold">
+                        <CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                        <span className="truncate">{selectedReason}</span>
+                      </div>
+                    ) : (
+                      <span className="text-[11px] text-neutral-400 italic">
+                        Please choose a reason on the left to proceed
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer Action Bar */}
+              <div className="px-5 py-3 border-t border-neutral-200/80 dark:border-white/10 flex items-center justify-between gap-3 bg-neutral-50/60 dark:bg-white/[0.02] shrink-0">
+                <div className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                  {!selectedReason ? (
+                    <span className="text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1">
+                      <AlertTriangle className="h-3 w-3 shrink-0" />
+                      <span>Select a reason to confirm</span>
+                    </span>
+                  ) : (
+                    <span className="text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
+                      <CheckCircle2 className="h-3 w-3 shrink-0" />
+                      <span>Ready to confirm cancellation</span>
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={isCancelling}
+                    onClick={closeCancellationModal}
+                    className="text-xs px-3 py-1.5 h-auto text-neutral-700 dark:text-neutral-300 border-neutral-300 dark:border-white/15 hover:bg-neutral-100 dark:hover:bg-white/10 inline-flex items-center gap-1.5"
+                  >
+                    <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                    <span>Keep My Booking</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    disabled={!selectedReason || isCancelling}
+                    onClick={() => {
+                      if (cancellingOrderId) {
+                        handleCancelOrder(cancellingOrderId);
+                      }
+                    }}
+                    className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs px-3.5 py-1.5 h-auto shadow-xs disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
+                  >
+                    <Ban className="h-3.5 w-3.5 shrink-0" />
+                    <span>{isCancelling ? "Processing..." : "Confirm Cancellation"}</span>
+                  </Button>
+                </div>
               </div>
             </motion.div>
           </div>
@@ -1820,19 +2099,23 @@ export default function Orders() {
               <div className="flex items-center justify-end gap-2.5 pt-2.5 border-t border-neutral-200/70 dark:border-white/10">
                 <Button
                   variant="ghost"
+                  size="sm"
                   onClick={() => setLocationModalOrder(null)}
                   disabled={isSavingLocation}
-                  className="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white text-xs"
+                  className="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white text-xs px-3 py-1.5 inline-flex items-center gap-1.5"
                 >
-                  Cancel
+                  <X className="h-3.5 w-3.5 shrink-0" />
+                  <span>Cancel</span>
                 </Button>
                 <Button
                   variant="primary"
+                  size="sm"
                   onClick={handleSaveLocation}
                   disabled={isSavingLocation}
-                  className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold"
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3.5 py-1.5 inline-flex items-center gap-1.5"
                 >
-                  {isSavingLocation ? "Saving..." : "Update Location"}
+                  <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                  <span>{isSavingLocation ? "Saving..." : "Update Location"}</span>
                 </Button>
               </div>
             </motion.div>

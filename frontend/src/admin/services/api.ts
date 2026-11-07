@@ -229,6 +229,7 @@ export interface AdminBooking {
   endDatetime?: string;
   cancellationReason?: string;
   cancellationFeedback?: string;
+  cancellationExplanation?: string;
   cancellationTimestamp?: string;
   cancellationPreviousStatus?: string;
   cancellationInitiatedBy?: string;

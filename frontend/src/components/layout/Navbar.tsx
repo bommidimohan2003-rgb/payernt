@@ -158,10 +158,10 @@ export function Navbar() {
                 <Link
                   to="/register"
                   id="nav-signup-btn"
-                  className="inline-flex items-center gap-1.5 px-4 sm:px-5 py-2 text-xs sm:text-sm font-bold sm:font-semibold rounded-full bg-neutral-950 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-100 shadow-sm transition-all duration-200 cursor-pointer active:scale-95 select-none"
+                  className="inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-1.5 text-xs sm:text-sm font-bold sm:font-semibold rounded-full bg-neutral-950 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-100 shadow-xs transition-all duration-200 cursor-pointer active:scale-95 select-none"
                 >
+                  <ArrowRight className="h-3.5 w-3.5 stroke-[2.2] shrink-0" />
                   <span>{tCommon.signup}</span>
-                  <ArrowRight className="h-3.5 w-3.5 stroke-[2.2]" />
                 </Link>
               </div>
             )}

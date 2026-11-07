@@ -25,6 +25,8 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   size?: ButtonSize;
   loading?: boolean;
   leftIcon?: ReactNode;
+  /** Primary symbol/icon displayed first before button name */
+  icon?: ReactNode;
   rightIcon?: ReactNode;
   /** Force a specific animation status */
   animationStatus?: DualFillStatus;
@@ -58,10 +60,10 @@ const variants: Record<ButtonVariant, string> = {
 };
 
 const sizes: Record<ButtonSize, string> = {
-  sm: "h-9 px-3.5 text-xs sm:text-sm rounded-lg",
-  md: "h-11 px-5 text-sm rounded-xl",
-  lg: "h-13 sm:h-14 px-7 text-sm sm:text-base rounded-2xl",
-  icon: "h-10 w-10 rounded-full grid place-items-center p-0",
+  sm: "h-8 px-3 text-xs rounded-lg",
+  md: "h-9 sm:h-9.5 px-3.5 text-xs sm:text-sm rounded-xl",
+  lg: "h-10 sm:h-11 px-5 text-xs sm:text-sm rounded-xl",
+  icon: "h-8 w-8 rounded-full grid place-items-center p-0",
 };
 
 /**
@@ -82,6 +84,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       size = "md",
       loading = false,
       leftIcon,
+      icon,
       rightIcon,
       children,
       disabled,
@@ -235,7 +238,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         data-dual-state={status}
         aria-busy={isProcessing}
         className={cn(
-          "relative overflow-hidden isolate inline-flex items-center justify-center gap-2 font-medium transition-all duration-200 select-none",
+          "relative overflow-hidden isolate inline-flex items-center justify-center gap-1.5 font-medium transition-all duration-200 select-none [&_svg]:order-first",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
           "disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer",
           // Apply custom text color when animated
@@ -295,34 +298,32 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         )}
 
         {/* ========================================================================= */}
-        {/* BUTTON CONTENT LAYER (TEXT & ICONS ALWAYS VISIBLE ABOVE ANIMATED FILL)   */}
+        {/* BUTTON CONTENT LAYER (SYMBOL ALWAYS ON THE LEFT, BUTTON NAME ON THE RIGHT) */}
         {/* ========================================================================= */}
-        <span className="relative z-10 flex items-center justify-center gap-2 text-inherit transition-colors duration-200">
+        <span className="relative z-10 flex items-center justify-center gap-1.5 text-inherit transition-colors duration-200 [&_svg]:order-first">
           {isSuccessState ? (
             <Check
-              className="h-4 w-4 shrink-0 animate-in zoom-in-75 duration-200 text-white"
+              className="h-3.5 w-3.5 shrink-0 animate-in zoom-in-75 duration-200 text-white"
               strokeWidth={3}
             />
           ) : isErrorState ? (
             <AlertCircle
-              className="h-4 w-4 shrink-0 animate-in zoom-in-75 duration-200 text-white"
+              className="h-3.5 w-3.5 shrink-0 animate-in zoom-in-75 duration-200 text-white"
               strokeWidth={2.5}
             />
           ) : isProcessing ? (
-            <Loader2 className="h-4 w-4 shrink-0 animate-spin text-white" />
+            <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-white" />
           ) : (
-            leftIcon
+            icon || leftIcon || rightIcon
           )}
 
-          <span>
+          <span className="inline-flex items-center gap-1.5 [&_svg]:order-first">
             {isSuccessState && successText
               ? successText
               : isErrorState && errorText
               ? errorText
               : children}
           </span>
-
-          {!isAnimated && rightIcon}
         </span>
       </button>
     );

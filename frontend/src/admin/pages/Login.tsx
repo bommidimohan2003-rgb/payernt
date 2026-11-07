@@ -283,8 +283,8 @@ export default function Login() {
                   </>
                 ) : (
                   <>
+                    <ArrowRight className="h-4 w-4 shrink-0" />
                     <span>Sign In to Admin</span>
-                    <ArrowRight className="h-4 w-4" />
                   </>
                 )}
               </button>
@@ -446,8 +446,8 @@ export default function Login() {
                   </>
                 ) : (
                   <>
+                    <ArrowRight className="h-4 w-4 shrink-0" />
                     <span>Create Admin Account</span>
-                    <ArrowRight className="h-4 w-4" />
                   </>
                 )}
               </button>

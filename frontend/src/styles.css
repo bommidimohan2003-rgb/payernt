@@ -890,5 +890,22 @@ html:not(.dark) .border-white\/10 {
   }
 }
 
+/* ========================================================================= */
+/* UNIVERSAL BUTTON DESIGN: SYMBOL ON THE LEFT, BUTTON NAME ON THE RIGHT     */
+/* ========================================================================= */
+button:where(:not([data-no-auto-order])),
+[role="button"]:where(:not([data-no-auto-order])),
+.btn:where(:not([data-no-auto-order])) {
+  /* Enforce standard compact sizing and alignment */
+}
+
+button:where(:not([data-no-auto-order])) > svg,
+button:where(:not([data-no-auto-order])) > span > svg,
+[role="button"]:where(:not([data-no-auto-order])) > svg,
+.btn:where(:not([data-no-auto-order])) > svg {
+  order: -1 !important;
+}
+
+
 
 

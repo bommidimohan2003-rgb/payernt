@@ -93,3 +93,69 @@
 :is(.dark .lattice-timer) {
   color: #BDBDBD;
 }
+
+/* Embedded variant for inside buttons & action controls */
+.lattice-loader-container.lattice-loader-embedded {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+  gap: 0.625rem;
+}
+
+:is(.dark .lattice-loader-container.lattice-loader-embedded) {
+  background: transparent !important;
+  border: none !important;
+}
+
+.lattice-loader-embedded .lattice-label {
+  color: inherit !important;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: normal;
+}
+
+:is(.dark .lattice-loader-embedded .lattice-label) {
+  color: inherit !important;
+}
+
+.lattice-loader-embedded .lattice-timer {
+  color: inherit !important;
+  opacity: 0.85;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding-left: 0.35rem;
+}
+
+:is(.dark .lattice-loader-embedded .lattice-timer) {
+  color: inherit !important;
+}
+
+.lattice-loader-embedded .lattice-cell {
+  background-color: currentColor;
+  opacity: 0.3;
+}
+
+:is(.dark .lattice-loader-embedded .lattice-cell) {
+  background-color: currentColor;
+  opacity: 0.3;
+}
+
+.lattice-loader-embedded .lattice-cell.active-working {
+  background-color: #8FAF7E !important;
+  opacity: 1 !important;
+  box-shadow: 0 0 6px rgba(143, 175, 126, 0.8) !important;
+  transform: scale(1.15);
+}
+
+.lattice-loader-embedded .lattice-cell.active-done {
+  background-color: #8FAF7E !important;
+  opacity: 1 !important;
+  box-shadow: 0 0 4px rgba(143, 175, 126, 0.6) !important;
+}
+
+.lattice-loader-embedded .lattice-cell.active-error {
+  background-color: #FF7F7F !important;
+  opacity: 1 !important;
+  box-shadow: 0 0 4px rgba(255, 127, 127, 0.6) !important;
+}

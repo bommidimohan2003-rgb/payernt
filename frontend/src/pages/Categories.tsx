@@ -22,6 +22,7 @@ import {
   MessageSquare,
   SlidersHorizontal,
   Calendar,
+  Bell,
 } from "lucide-react";
 import { MainLayout } from "@/layouts/MainLayout";
 import { ProductCard } from "@/components/common/ProductCard";
@@ -32,7 +33,7 @@ import type { Product, Category } from "@/types";
 import { cn } from "@/lib/utils";
 import { useSearch, useNavigate, Link, useRouterState } from "@tanstack/react-router";
 import { tracker } from "@/utils/eventTracker";
-import { storage } from "@/utils/storage";
+import { storage, STORAGE_KEYS } from "@/utils/storage";
 import { api } from "@/utils/api";
 import { isFakeOrDeletedProduct, isUserOwnProduct } from "@/utils/productFilters";
 import { useAuth } from "@/hooks/useAuth";
@@ -209,6 +210,34 @@ export default function Categories() {
   const sortRef = useRef<HTMLDivElement>(null);
   const { wishlistCount } = useWishlist();
   const { unreadCount } = useUnreadMessages();
+  const [unreadNotifsCount, setUnreadNotifsCount] = useState(0);
+
+  // Sync notification unread count for top bar
+  useEffect(() => {
+    const checkNotifs = async () => {
+      const token = storage.get<string | null>(STORAGE_KEYS.token, null);
+      if (!token) {
+        setUnreadNotifsCount(0);
+        return;
+      }
+      try {
+        const notifs = await api.getNotifications(token);
+        if (Array.isArray(notifs)) {
+          const unread = notifs.filter((n: any) => !n.read).length;
+          setUnreadNotifsCount(unread);
+        }
+      } catch {
+        // ignore
+      }
+    };
+    void checkNotifs();
+    const interval = setInterval(checkNotifs, 15000);
+    window.addEventListener("payent_notifications_updated", checkNotifs);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("payent_notifications_updated", checkNotifs);
+    };
+  }, [user]);
 
   // User location detection
   const {
@@ -587,28 +616,46 @@ export default function Categories() {
                 </div>
               </div>
 
-              {/* Right Quick Links */}
-              <div className="flex items-center gap-2 shrink-0">
+              {/* Right Quick Links: Notifications, Wishlist, Messages */}
+              <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+                <Link
+                  to="/notifications"
+                  id="explore-notifications-btn"
+                  className="p-1.5 sm:p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-200 transition-colors relative cursor-pointer active:scale-95"
+                  aria-label="Notifications"
+                  title="Notifications"
+                >
+                  <Bell className="h-5 w-5" />
+                  {unreadNotifsCount > 0 && (
+                    <span className="absolute -top-1 -right-1 h-4 min-w-4 px-1 rounded-full bg-red-600 text-white text-[10px] font-bold flex items-center justify-center shadow-xs">
+                      {unreadNotifsCount > 9 ? "9+" : unreadNotifsCount}
+                    </span>
+                  )}
+                </Link>
+
                 <Link
                   to="/wishlist"
-                  className="p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-200 transition-colors relative"
+                  className="p-1.5 sm:p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-200 transition-colors relative cursor-pointer active:scale-95"
                   aria-label="Wishlist"
+                  title="Wishlist"
                 >
                   <Heart className="h-5 w-5" />
                   {wishlistCount > 0 && (
-                    <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-emerald-600 text-white text-[10px] font-bold flex items-center justify-center">
+                    <span className="absolute -top-1 -right-1 h-4 min-w-4 px-1 rounded-full bg-emerald-600 text-white text-[10px] font-bold flex items-center justify-center shadow-xs">
                       {wishlistCount}
                     </span>
                   )}
                 </Link>
+
                 <Link
                   to="/messages"
-                  className="p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-200 transition-colors relative"
+                  className="p-1.5 sm:p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-200 transition-colors relative cursor-pointer active:scale-95"
                   aria-label="Messages"
+                  title="Messages"
                 >
                   <MessageSquare className="h-5 w-5" />
                   {unreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-emerald-600 text-white text-[10px] font-bold flex items-center justify-center">
+                    <span className="absolute -top-1 -right-1 h-4 min-w-4 px-1 rounded-full bg-emerald-600 text-white text-[10px] font-bold flex items-center justify-center shadow-xs">
                       {unreadCount}
                     </span>
                   )}
@@ -716,8 +763,8 @@ export default function Categories() {
               </div>
             )}
 
-            {/* CATEGORY SYMBOLS BAR — Spaced out circular category icons */}
-            <div className="flex items-center gap-4 sm:gap-5 overflow-x-auto no-scrollbar py-2">
+            {/* CATEGORY SYMBOLS BAR — Circular icon category bar matching mobile explorer spec */}
+            <div className="flex items-center gap-3 sm:gap-4.5 overflow-x-auto no-scrollbar py-2.5">
               {categoryChips.map((c) => {
                 const Icon = c.icon;
                 const isActive = activeCategory === c.id;
@@ -729,20 +776,20 @@ export default function Categories() {
                     title={`${c.name} (${c.count})`}
                     aria-label={`${c.name} (${c.count})`}
                     className={cn(
-                      "group inline-flex items-center justify-center w-9 h-9 rounded-full transition-all duration-200 cursor-pointer shrink-0 border",
+                      "group inline-flex items-center justify-center w-12 h-12 sm:w-[52px] sm:h-[52px] rounded-full transition-all duration-200 cursor-pointer shrink-0 border active:scale-95 shadow-xs",
                       isActive
-                        ? "bg-neutral-900 text-white border-neutral-900 dark:bg-white dark:text-neutral-900 dark:border-white shadow-xs ring-2 ring-emerald-500/20"
-                        : "bg-neutral-100/90 dark:bg-white/5 text-neutral-700 dark:text-neutral-300 border-neutral-200/80 dark:border-white/10 hover:bg-neutral-200/80 dark:hover:bg-white/10 hover:text-neutral-900 dark:hover:text-white hover:border-neutral-300 dark:hover:border-white/20"
+                        ? "bg-[#1E1E1E] text-[#00D492] border-2 border-[#00D492] ring-2 ring-[#00D492]/40 shadow-sm"
+                        : "bg-[#F5F4F5] dark:bg-[#272727] text-[#525252] dark:text-neutral-300 border-[#E5E7EB] dark:border-white/10 hover:bg-[#EDEDED] dark:hover:bg-[#333333] hover:text-neutral-900 dark:hover:text-white hover:border-neutral-300 dark:hover:border-white/20"
                     )}
                   >
                     <Icon
                       className={cn(
-                        "w-[18px] h-[18px] shrink-0 transition-colors",
+                        "w-6 h-6 shrink-0 transition-colors",
                         isActive
-                          ? "text-emerald-400 dark:text-emerald-600"
-                          : "text-neutral-600 dark:text-neutral-400 group-hover:text-emerald-500"
+                          ? "text-[#00D492]"
+                          : "text-[#525252] dark:text-neutral-400 group-hover:text-emerald-500 dark:group-hover:text-emerald-400"
                       )}
-                      strokeWidth={2.1}
+                      strokeWidth={1.85}
                     />
                   </button>
                 );

@@ -1423,7 +1423,7 @@ export const api = {
     return await res.json();
   },
 
-  async cancelOrder(token: string, orderId: string, options?: { reason?: string; notes?: string }) {
+  async cancelOrder(token: string, orderId: string, options?: { reason?: string; notes?: string; explanation?: string }) {
     let res: Response;
     try {
       res = await this.fetchWithAuth(
@@ -1450,7 +1450,16 @@ export const api = {
       o.id === orderId ||
       o.productId === orderId ||
       (o as { product_id?: string }).product_id === orderId
-        ? { ...o, status: "cancelled" as const }
+        ? {
+            ...o,
+            status: "cancelled" as const,
+            cancellationReason: options?.reason,
+            cancellation_reason: options?.reason,
+            cancellationExplanation: options?.explanation || options?.notes,
+            cancellation_explanation: options?.explanation || options?.notes,
+            cancelledAt: new Date().toISOString(),
+            cancelled_at: new Date().toISOString(),
+          }
         : o,
     );
     storage.set(STORAGE_KEYS.orders, updatedOrders);
@@ -1461,7 +1470,13 @@ export const api = {
     this.invalidateCache("bookings");
 
     if (typeof window !== "undefined") {
-      const detail = { bookingId: orderId, status: "cancelled" };
+      const detail = {
+        bookingId: orderId,
+        status: "cancelled",
+        reason: options?.reason,
+        explanation: options?.explanation || options?.notes,
+        cancelledAt: new Date().toISOString(),
+      };
       window.dispatchEvent(new CustomEvent("payent_orders_updated", { detail }));
       window.dispatchEvent(new CustomEvent("payent_booking_updated", { detail }));
       window.dispatchEvent(new CustomEvent("payent_queue_updated", { detail }));
@@ -2115,6 +2130,8 @@ export const api = {
       locationDirections?: string;
       latitude?: number | null;
       longitude?: number | null;
+      with_insurance?: boolean;
+      withInsurance?: boolean;
     },
   ) {
     const res = await this.fetchWithAuth(
@@ -2136,6 +2153,7 @@ export const api = {
           location_directions: locationData?.locationDirections || "",
           latitude: locationData?.latitude ?? null,
           longitude: locationData?.longitude ?? null,
+          with_insurance: locationData?.with_insurance ?? locationData?.withInsurance ?? true,
         }),
       },
     );

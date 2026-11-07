@@ -468,9 +468,8 @@ export function ProductCard({
                     <span>Unavailable</span>
                   ) : (
                     <>
-                      <Calendar className="h-3.5 w-3.5 text-emerald-400" />
+                      <Calendar className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
                       <span>Rent Gear</span>
-                      <ArrowRight className="h-3 w-3 text-white/80" />
                     </>
                   )}
                 </button>

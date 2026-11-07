@@ -6,7 +6,7 @@ import { Check, AlertCircle, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "relative overflow-hidden isolate inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 select-none",
+  "relative overflow-hidden isolate inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md text-sm font-medium cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed [&_svg]:pointer-events-none [&_svg]:size-3.5 [&_svg]:shrink-0 [&_svg]:order-first select-none",
   {
     variants: {
       variant: {
@@ -22,10 +22,10 @@ const buttonVariants = cva(
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {
-        default: "h-9 px-4 py-2",
-        sm: "h-8 rounded-md px-3 text-xs",
-        lg: "h-10 rounded-md px-8",
-        icon: "h-9 w-9",
+        default: "h-8 sm:h-8.5 px-3.5 py-1.5 text-xs sm:text-sm",
+        sm: "h-7.5 px-2.5 text-xs rounded-md",
+        lg: "h-9.5 sm:h-10 px-5 text-xs sm:text-sm rounded-md",
+        icon: "h-8 w-8",
       },
     },
     defaultVariants: {
@@ -43,6 +43,9 @@ export interface ButtonProps
     VariantProps<typeof buttonVariants> {
   asChild?: boolean;
   loading?: boolean;
+  /** Primary symbol/icon displayed first before button name */
+  icon?: React.ReactNode;
+  leftIcon?: React.ReactNode;
   animationStatus?: DualFillStatus;
   isSuccess?: boolean;
   isError?: boolean;
@@ -61,6 +64,8 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       size,
       asChild = false,
       loading = false,
+      icon,
+      leftIcon,
       animationStatus: controlledStatus,
       isSuccess,
       isError,
@@ -270,22 +275,24 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
           </>
         )}
 
-        <span className="relative z-10 flex items-center justify-center gap-2 text-inherit transition-colors duration-200">
+        <span className="relative z-10 flex items-center justify-center gap-1.5 text-inherit transition-colors duration-200 [&_svg]:order-first">
           {isSuccessState ? (
             <Check
-              className="h-4 w-4 shrink-0 animate-in zoom-in-75 duration-200 text-white"
+              className="h-3.5 w-3.5 shrink-0 animate-in zoom-in-75 duration-200 text-white"
               strokeWidth={3}
             />
           ) : isErrorState ? (
             <AlertCircle
-              className="h-4 w-4 shrink-0 animate-in zoom-in-75 duration-200 text-white"
+              className="h-3.5 w-3.5 shrink-0 animate-in zoom-in-75 duration-200 text-white"
               strokeWidth={2.5}
             />
           ) : isProcessing ? (
-            <Loader2 className="h-4 w-4 shrink-0 animate-spin text-white" />
-          ) : null}
+            <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-white" />
+          ) : (
+            icon || leftIcon || null
+          )}
 
-          <span>
+          <span className="inline-flex items-center gap-1.5 [&_svg]:order-first">
             {isSuccessState && successText
               ? successText
               : isErrorState && errorText

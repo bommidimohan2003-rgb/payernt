@@ -159,10 +159,10 @@ export function KycStatusBanner({ role, className = "" }: KycStatusBannerProps) 
         <button
           type="button"
           onClick={handleAction}
-          className="self-start sm:self-auto inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs shadow-xs transition-all cursor-pointer shrink-0"
+          className="self-start sm:self-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs shadow-xs transition-all cursor-pointer shrink-0"
         >
+          <ArrowRight className="h-3.5 w-3.5 shrink-0" />
           <span>View Status</span>
-          <ArrowRight className="h-3.5 w-3.5" />
         </button>
       </div>
     );
@@ -199,10 +199,10 @@ export function KycStatusBanner({ role, className = "" }: KycStatusBannerProps) 
         <button
           type="button"
           onClick={handleAction}
-          className="self-start sm:self-auto inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-xs transition-all cursor-pointer shrink-0"
+          className="self-start sm:self-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-xs transition-all cursor-pointer shrink-0"
         >
+          <ArrowRight className="h-3.5 w-3.5 shrink-0" />
           <span>Review & Resubmit</span>
-          <ArrowRight className="h-3.5 w-3.5" />
         </button>
       </div>
     );
@@ -233,10 +233,10 @@ export function KycStatusBanner({ role, className = "" }: KycStatusBannerProps) 
         <button
           type="button"
           onClick={handleAction}
-          className="self-start sm:self-auto inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-xs transition-all cursor-pointer shrink-0"
+          className="self-start sm:self-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-xs transition-all cursor-pointer shrink-0"
         >
+          <ArrowRight className="h-3.5 w-3.5 shrink-0" />
           <span>Update Information</span>
-          <ArrowRight className="h-3.5 w-3.5" />
         </button>
       </div>
     );
@@ -268,10 +268,10 @@ export function KycStatusBanner({ role, className = "" }: KycStatusBannerProps) 
       <button
         type="button"
         onClick={handleAction}
-        className="self-start sm:self-auto inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-xs transition-all cursor-pointer shrink-0"
+        className="self-start sm:self-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-xs transition-all cursor-pointer shrink-0"
       >
+        <ArrowRight className="h-3.5 w-3.5 shrink-0" />
         <span>Complete KYC</span>
-        <ArrowRight className="h-3.5 w-3.5" />
       </button>
     </div>
   );

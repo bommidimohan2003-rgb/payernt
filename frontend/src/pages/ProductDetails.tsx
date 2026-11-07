@@ -552,6 +552,13 @@ export default function ProductDetails() {
       if (startDate) setEndDate(startDate);
     } else if (mode === "custom") {
       setSelectedSlot("full_day");
+      if (startDate && (!endDate || endDate === startDate)) {
+        const parts = startDate.split("-").map(Number);
+        const startObj = new Date(parts[0], parts[1] - 1, parts[2]);
+        const endObj = new Date(startObj);
+        endObj.setDate(startObj.getDate() + 1);
+        setEndDate(toDateInputValue(endObj));
+      }
     }
   };
 
@@ -561,9 +568,9 @@ export default function ProductDetails() {
     if (!startDate) return;
     const parts = startDate.split("-").map(Number);
     const startObj = new Date(parts[0], parts[1] - 1, parts[2]);
-    // Exactly N elapsed 24-hour days:
+    // Exactly N elapsed calendar days:
     const endObj = new Date(startObj);
-    endObj.setDate(startObj.getDate() + Math.max(1, days - 1));
+    endObj.setDate(startObj.getDate() + Math.max(0, days - 1));
     const endStr = toDateInputValue(endObj);
     setEndDate(endStr);
     setAvailabilityChecked(false);
@@ -736,6 +743,13 @@ export default function ProductDetails() {
 
     // Backend authoritative availability verification for requested date span and session
     setIsCheckingAvailability(true);
+    const checkStartTime = performance.now();
+    const ensureVisibleDelay = async () => {
+      const elapsed = performance.now() - checkStartTime;
+      if (elapsed < 800) {
+        await new Promise((r) => setTimeout(r, 800 - elapsed));
+      }
+    };
     try {
       const checkEnd = durationMode === "custom" ? endDate : startDate;
       const effectiveSession = durationMode === "custom" ? "full_day" : selectedSlot;
@@ -761,13 +775,20 @@ export default function ProductDetails() {
             const pId = String(o.productId || (o as any).product_id || "");
             if (pId !== String(id) || o.status === "cancelled") return false;
             if (!o.startDate || !o.endDate) return false;
-            return !(checkEnd < o.startDate || startDate > o.endDate);
+            // Includes the automatically blocked next calendar day after o.endDate
+            const [eY, eM, eD] = String(o.endDate).split("-").map(Number);
+            const nextDay = new Date(eY, eM - 1, eD + 1);
+            const y = nextDay.getFullYear();
+            const m = String(nextDay.getMonth() + 1).padStart(2, "0");
+            const d = String(nextDay.getDate()).padStart(2, "0");
+            const nextDateStr = `${y}-${m}-${d}`;
+            return !(checkEnd < o.startDate || startDate > nextDateStr);
           });
           if (activeOverlap) {
             setIsAvailableForDates(false);
-            setAvailabilityMessage("Selected dates conflict with an existing reservation.");
+            setAvailabilityMessage("This product is unavailable on the day following an existing booking.");
             setAvailabilityChecked(true);
-            toast.error("Selected dates are already reserved.");
+            toast.error("This product is unavailable on the day following an existing booking.");
             return;
           }
           setIsAvailableForDates(true);
@@ -785,7 +806,7 @@ export default function ProductDetails() {
       const availData = await res.json();
       if (availData.is_available === false || availData.isAvailable === false || availData.status === "blocked" || availData.status === "booked") {
         setIsAvailableForDates(false);
-        const reason = availData.reason || (availData.status === "blocked" ? "Selected dates/slot are blocked by owner." : "Selected dates/slot are already reserved.");
+        const reason = availData.reason || (availData.status === "blocked" ? "This product is unavailable on the day following an existing booking." : "Selected dates/slot are already reserved.");
         setAvailabilityMessage(reason);
         setAvailabilityChecked(true);
         toast.error(reason);
@@ -793,19 +814,17 @@ export default function ProductDetails() {
       }
       if (availData.conflicts && availData.conflicts.length > 0) {
         const firstConflict = availData.conflicts[0];
-        const isBlocked = firstConflict.reason === "blocked";
+        const isPrepBlocked = firstConflict.reason === "preparation_blocked" || (firstConflict.detail && firstConflict.detail.includes("following an existing booking"));
+        const isBlocked = firstConflict.reason === "blocked" || isPrepBlocked;
         setIsAvailableForDates(false);
-        setAvailabilityMessage(
-          isBlocked
-            ? `Unavailable: Date ${firstConflict.date} is blocked by the equipment owner.`
-            : `Unavailable: Date ${firstConflict.date} is already reserved by another renter.`
-        );
+        const conflictText = isPrepBlocked
+          ? "This product is unavailable on the day following an existing booking."
+          : isBlocked
+          ? `Unavailable: Date ${firstConflict.date} is blocked by the equipment owner.`
+          : `Unavailable: Date ${firstConflict.date} is already reserved by another renter.`;
+        setAvailabilityMessage(conflictText);
         setAvailabilityChecked(true);
-        toast.error(
-          isBlocked
-            ? `Date ${firstConflict.date} is blocked by owner.`
-            : `Date ${firstConflict.date} is already reserved.`
-        );
+        toast.error(conflictText);
         return;
       }
 
@@ -825,6 +844,7 @@ export default function ProductDetails() {
       setAvailabilityChecked(true);
       return;
     } finally {
+      await ensureVisibleDelay();
       setIsCheckingAvailability(false);
     }
   };
@@ -1209,10 +1229,12 @@ const productSchema = product ? {
           <h1 className="text-3xl font-extrabold text-foreground">Product not found</h1>
           <p className="text-sm text-muted-foreground">The equipment you requested may have been unlisted or moved.</p>
           <Button
-            className="mt-4"
+            size="sm"
+            className="mt-4 inline-flex items-center gap-1.5"
             onClick={() => navigate({ to: "/browse" })}
           >
-            Browse Explore Items
+            <LayoutGrid className="h-3.5 w-3.5 shrink-0" />
+            <span>Browse Explore Items</span>
           </Button>
         </div>
       </MainLayout>
@@ -1523,7 +1545,7 @@ const productSchema = product ? {
                         <span className="text-xs sm:text-sm font-bold text-foreground font-mono block truncate">
                           {startDate ? (
                             durationMode === "custom" && endDate && endDate !== startDate
-                              ? `${startDate} → ${endDate}`
+                              ? `${startDate} → ${endDate} (${rentalDays} Days)`
                               : startDate
                           ) : (
                             "Select date on calendar"
@@ -1571,12 +1593,12 @@ const productSchema = product ? {
                   )}
                 </div>
 
-                {/* Choose Slot */}
+                {/* Choose Duration & Slot */}
                 <div className="relative pt-2 space-y-1.5">
                   <label className="absolute -top-1.5 left-3 px-1.5 bg-white dark:bg-[#1E1E1E] text-[10px] sm:text-[11px] font-bold text-foreground uppercase tracking-wider pointer-events-none select-none z-10">
-                    Choose Time Slot
+                    Rental Duration & Slot
                   </label>
-                  <div className="grid grid-cols-3 gap-1.5 sm:gap-2 w-full min-w-0 pt-0.5">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2 w-full min-w-0 pt-0.5">
                     {/* Morning */}
                     <button
                       type="button"
@@ -1638,7 +1660,7 @@ const productSchema = product ? {
                       <div className="min-w-0">
                         <div className="flex items-center gap-1 mb-0.5 min-w-0">
                           <Calendar className="h-3 w-3 text-primary shrink-0" />
-                          <span className="text-[10px] xs:text-[11px] sm:text-xs font-bold text-foreground truncate">Full Day</span>
+                          <span className="text-[10px] xs:text-[11px] sm:text-xs font-bold text-foreground truncate">1 Full Day</span>
                         </div>
                         <div className="text-[8px] xs:text-[8.5px] sm:text-[10px] text-muted-foreground truncate leading-tight">
                           24 Hours
@@ -1648,7 +1670,65 @@ const productSchema = product ? {
                         ₹{fullDayPrice}
                       </div>
                     </button>
+
+                    {/* Multi-Day */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleDurationModeChange("custom");
+                        setShowFullCalendar(true);
+                      }}
+                      className={`p-1.5 xs:p-2 sm:p-2.5 rounded-xl border text-left transition-all cursor-pointer min-w-0 flex flex-col justify-between ${
+                        durationMode === "custom"
+                          ? "border-primary bg-primary/10 dark:bg-primary/15 ring-2 ring-primary/20 shadow-xs"
+                          : "border-neutral-300/80 dark:border-neutral-700/80 bg-neutral-100/60 dark:bg-[#1E1E1E] hover:bg-neutral-100 dark:hover:bg-white/10"
+                      }`}
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1 mb-0.5 min-w-0">
+                          <Clock className="h-3 w-3 text-emerald-500 shrink-0" />
+                          <span className="text-[10px] xs:text-[11px] sm:text-xs font-bold text-foreground truncate">Multi-Day</span>
+                        </div>
+                        <div className="text-[8px] xs:text-[8.5px] sm:text-[10px] text-muted-foreground truncate leading-tight">
+                          Custom Range
+                        </div>
+                      </div>
+                      <div className="mt-1 text-[10px] xs:text-[11px] sm:text-xs font-extrabold text-primary font-mono">
+                        ₹{fullDayPrice}/day
+                      </div>
+                    </button>
                   </div>
+
+                  {/* Multi-Day Preset Duration Pills */}
+                  {durationMode === "custom" && (
+                    <div className="pt-2 animate-in fade-in slide-in-from-top-1 duration-150">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                          Duration Presets:
+                        </span>
+                        <span className="text-[10px] text-primary font-semibold">
+                          {rentalDays} {rentalDays === 1 ? "day" : "days"} selected
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {[2, 3, 5, 7, 14].map((d) => (
+                          <button
+                            key={d}
+                            type="button"
+                            onClick={() => handleSelectPresetDuration(d)}
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer flex items-center gap-1 ${
+                              rentalDays === d
+                                ? "border-primary bg-primary text-primary-foreground shadow-xs"
+                                : "border-neutral-300/80 dark:border-neutral-700/80 bg-neutral-100/60 dark:bg-[#1E1E1E] text-foreground hover:bg-neutral-200/70 dark:hover:bg-white/10"
+                            }`}
+                          >
+                            <Calendar className="h-3 w-3 shrink-0" />
+                            <span>{d} Days {d === 7 ? "(1 Wk)" : d === 14 ? "(2 Wks)" : ""}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Booking Summary */}
@@ -1663,8 +1743,8 @@ const productSchema = product ? {
                         : durationMode === "half_day_afternoon"
                         ? "1 Day • Afternoon Slot"
                         : durationMode === "full_day"
-                        ? "1 Day • Full Day"
-                        : `${rentalDays} Days Rental`}
+                        ? `1 Day • Full Day (${startDate})`
+                        : `${rentalDays} Days Rental (${startDate} → ${endDate})`}
                     </div>
                   </div>
                   <div className="text-right">
@@ -1788,7 +1868,7 @@ const productSchema = product ? {
                               termsAccepted ? "font-semibold" : "font-medium"
                             )}
                           >
-                            terms&condtion will apply
+                            T&C will apply
                           </span>
                           <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-red-500/10 text-red-600 dark:text-red-400 group-hover:bg-red-500/20 transition-colors">
                             view
@@ -1800,9 +1880,9 @@ const productSchema = product ? {
                         type="button"
                         onClick={handleProceedToCheckout}
                         disabled={categoryRestriction?.restricted}
-                        className="py-2 sm:py-2.5 px-5 rounded-full font-bold text-xs sm:text-sm shadow-sm transition-all duration-200 inline-flex items-center justify-center gap-2 cursor-pointer active:scale-95 bg-neutral-950 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-100"
+                        className="py-1.5 sm:py-2 px-4 rounded-full font-semibold text-xs sm:text-sm shadow-xs transition-all duration-200 inline-flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 bg-neutral-950 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-100 min-h-[36px]"
                       >
-                        <ShoppingBag className="h-4 w-4 shrink-0" />
+                        <ShoppingBag className="h-3.5 w-3.5 shrink-0" />
                         <span>Confirm Booking & Rent (₹{estimatedTotal.toLocaleString("en-IN")})</span>
                       </Button>
                     </div>
@@ -1826,34 +1906,52 @@ const productSchema = product ? {
                         type="button"
                         onClick={handleCheckAvailability}
                         disabled={isCheckingAvailability}
-                        loading={isCheckingAvailability}
-                        className="py-2.5 sm:py-3 px-5 rounded-xl font-bold text-xs bg-secondary hover:bg-secondary/80 text-foreground transition-all cursor-pointer inline-flex items-center justify-center gap-2"
+                        disableDualFill={isCheckingAvailability}
+                        className="py-2 px-4 rounded-xl font-semibold text-xs bg-secondary hover:bg-secondary/80 text-foreground transition-all cursor-pointer inline-flex items-center justify-center gap-1.5 min-h-[36px]"
                       >
-                        <CalendarCheck className="h-4 w-4 shrink-0" />
-                        <span>Re-check Availability</span>
+                        {isCheckingAvailability ? (
+                          <LatticeLoader
+                            status="working"
+                            label="Verifying real-time availability..."
+                            gridSize={3}
+                            pattern="ripple"
+                            showTimer
+                            embedded
+                          />
+                        ) : (
+                          <>
+                            <CalendarCheck className="h-3.5 w-3.5 shrink-0" />
+                            <span>Re-check Availability</span>
+                          </>
+                        )}
                       </Button>
                     </div>
                   </div>
                 ) : (
-                  <div className="flex justify-end items-center gap-3 pt-1">
-                    {isCheckingAvailability && (
-                      <LatticeLoader
-                        status="working"
-                        label="Verifying real-time availability..."
-                        gridSize={3}
-                        pattern="ripple"
-                        showTimer
-                      />
-                    )}
+                  <div className="flex justify-end items-center pt-1">
                     <Button
                       type="button"
+                      id="check-availability-action-btn"
                       onClick={handleCheckAvailability}
                       disabled={isCheckingAvailability || categoryRestriction?.restricted}
-                      loading={isCheckingAvailability}
-                      className="py-2.5 sm:py-3 px-6 rounded-full font-bold text-xs sm:text-sm shadow-sm transition-all duration-200 inline-flex items-center justify-center gap-2 cursor-pointer active:scale-95 bg-neutral-950 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-100 disabled:opacity-75 disabled:cursor-not-allowed"
+                      disableDualFill={isCheckingAvailability}
+                      className="py-2 px-4.5 rounded-full font-semibold text-xs sm:text-sm shadow-xs transition-all duration-200 inline-flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 bg-neutral-950 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-100 disabled:opacity-90 disabled:cursor-not-allowed min-h-[38px]"
                     >
-                      <CalendarCheck className="h-4 w-4 shrink-0" />
-                      <span>CHECK AVAILABILITY</span>
+                      {isCheckingAvailability ? (
+                        <LatticeLoader
+                          status="working"
+                          label="Verifying real-time availability..."
+                          gridSize={3}
+                          pattern="ripple"
+                          showTimer
+                          embedded
+                        />
+                      ) : (
+                        <>
+                          <CalendarCheck className="h-3.5 w-3.5 shrink-0" />
+                          <span>CHECK AVAILABILITY</span>
+                        </>
+                      )}
                     </Button>
                   </div>
                 )}
@@ -2026,7 +2124,7 @@ const productSchema = product ? {
                           termsAccepted ? "font-semibold" : "font-medium"
                         )}
                       >
-                        terms&condtion will apply
+                        T&C will apply
                       </span>
                       <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-red-500/10 text-red-600 dark:text-red-400 group-hover:bg-red-500/20 transition-colors">
                         view
@@ -2039,15 +2137,28 @@ const productSchema = product ? {
                     id="product-details-book-now-btn"
                     onClick={handleBookNowAction}
                     disabled={categoryRestriction?.restricted || isCheckingAvailability}
-                    loading={isCheckingAvailability}
-                    className={`py-2.5 sm:py-3 px-6 rounded-full font-bold text-xs sm:text-sm shadow-sm transition-all duration-200 inline-flex items-center justify-center gap-2 cursor-pointer active:scale-95 ${
+                    disableDualFill={isCheckingAvailability}
+                    className={`py-2 px-4 rounded-full font-semibold text-xs sm:text-sm shadow-xs transition-all duration-200 inline-flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 min-h-[38px] ${
                       categoryRestriction?.restricted
                         ? "bg-amber-900/40 text-amber-300 border border-amber-500/30 cursor-not-allowed opacity-80"
                         : "bg-neutral-950 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-100"
                     }`}
                   >
-                    <ShoppingBag className="h-4 w-4 shrink-0" />
-                    <span>BOOK NOW</span>
+                    {isCheckingAvailability ? (
+                      <LatticeLoader
+                        embedded
+                        status="working"
+                        label="Verifying..."
+                        gridSize={3}
+                        pattern="ripple"
+                        showTimer
+                      />
+                    ) : (
+                      <>
+                        <ShoppingBag className="h-3.5 w-3.5 shrink-0" />
+                        <span>BOOK NOW</span>
+                      </>
+                    )}
                   </Button>
                 </div>
               </div>

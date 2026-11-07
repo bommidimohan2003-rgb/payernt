@@ -296,8 +296,8 @@ export function LoginForm() {
           </div>
         ) : (
           <>
+            <ArrowRight className="h-4 w-4 shrink-0" />
             <span>Sign in to Payrent</span>
-            <ArrowRight className="h-4 w-4" />
           </>
         )}
       </Button>

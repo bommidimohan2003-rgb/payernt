@@ -126,10 +126,10 @@ export function CartDrawer() {
                       closeCart();
                       navigate({ to: "/browse" });
                     }}
-                    className="mt-5 inline-flex items-center gap-1.5 rounded-full bg-[#161616] text-[#F2F0EA] dark:bg-[#F2F0EA] dark:text-[#161616] px-5 py-2 text-xs font-semibold shadow-sm hover:opacity-90 transition-opacity cursor-pointer"
+                    className="mt-5 inline-flex items-center gap-1.5 rounded-full bg-[#161616] text-[#F2F0EA] dark:bg-[#F2F0EA] dark:text-[#161616] px-4 py-1.5 text-xs font-semibold shadow-xs hover:opacity-90 transition-opacity cursor-pointer"
                   >
+                    <ArrowRight className="h-3.5 w-3.5 shrink-0" />
                     <span>Explore Gear</span>
-                    <ArrowRight className="h-3.5 w-3.5" />
                   </button>
                 </div>
               ) : (
@@ -218,10 +218,10 @@ export function CartDrawer() {
                   type="button"
                   onClick={handleCheckout}
                   id="cart-drawer-checkout-btn"
-                  className="w-full flex items-center justify-center gap-2 rounded-full py-2.5 px-4 text-xs font-bold shadow-md transition-all bg-[#161616] text-[#F2F0EA] hover:bg-[#262626] dark:bg-[#F2F0EA] dark:text-[#161616] dark:hover:bg-white cursor-pointer"
+                  className="w-full flex items-center justify-center gap-1.5 rounded-full py-2 px-4 text-xs font-bold shadow-xs transition-all bg-[#161616] text-[#F2F0EA] hover:bg-[#262626] dark:bg-[#F2F0EA] dark:text-[#161616] dark:hover:bg-white cursor-pointer"
                 >
+                  <ArrowRight className="h-3.5 w-3.5 shrink-0" />
                   <span>Select Dates & Checkout</span>
-                  <ArrowRight className="h-3.5 w-3.5" />
                 </button>
 
                 {/* Secondary Actions */}

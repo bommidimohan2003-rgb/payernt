@@ -9,6 +9,7 @@ import {
   CalendarOff,
   RefreshCw,
   Info,
+  Clock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getApiBase } from "@/utils/api";
@@ -68,12 +69,13 @@ function getTodayKey(): string {
 interface CachedAvailability {
   blockedDates: Set<string>;
   bookedDates: Set<string>;
+  preparationBlockedDates: Set<string>;
   timestamp: number;
 }
 
 const AVAILABILITY_CACHE_TTL_MS = 30_000; // 30 seconds fresh cache
 const availabilityCache = new Map<string, CachedAvailability>();
-const inFlightRequests = new Map<string, Promise<{ blocked: Set<string>; booked: Set<string> }>>();
+const inFlightRequests = new Map<string, Promise<{ blocked: Set<string>; booked: Set<string>; prepBlocked: Set<string> }>>();
 
 export function invalidateCalendarAvailabilityCache(productId?: string | number) {
   if (!productId) {
@@ -101,6 +103,7 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
   className,
   session = "full_day",
   selectedSlot,
+  onSelectDurationMode,
   ...rest
 }) => {
   const handleDatesUpdate = useCallback((start: string, end: string) => {
@@ -128,6 +131,7 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
   // Availability data fetched from backend
   const [blockedDates, setBlockedDates] = useState<Set<string>>(new Set());
   const [bookedDates, setBookedDates] = useState<Set<string>>(new Set());
+  const [preparationBlockedDates, setPreparationBlockedDates] = useState<Set<string>>(new Set());
   const [isLoadingAvailability, setIsLoadingAvailability] = useState(false);
   const [isProvisional, setIsProvisional] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -172,6 +176,7 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
         const isFresh = Date.now() - cached.timestamp < AVAILABILITY_CACHE_TTL_MS;
         setBlockedDates(cached.blockedDates);
         setBookedDates(cached.bookedDates);
+        setPreparationBlockedDates(cached.preparationBlockedDates || new Set());
         setFetchError(null);
         if (isFresh) {
           setIsLoadingAvailability(false);
@@ -220,6 +225,8 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
                   o.status !== "cancelled"
               );
               const booked = new Set<string>();
+              const prepBlocked = new Set<string>();
+              const blocked = new Set<string>();
               for (const o of relevant) {
                 if (o.startDate && o.endDate) {
                   const [sY, sM, sD] = String(o.startDate).split("-").map(Number);
@@ -230,38 +237,51 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
                     booked.add(formatDateKey(cur.getFullYear(), cur.getMonth(), cur.getDate()));
                     cur.setDate(cur.getDate() + 1);
                   }
+                  // Automatically block next calendar day following existing booking
+                  const nextDay = new Date(eY, eM - 1, eD + 1);
+                  const nextKey = formatDateKey(nextDay.getFullYear(), nextDay.getMonth(), nextDay.getDate());
+                  prepBlocked.add(nextKey);
+                  blocked.add(nextKey);
                 }
               }
-              return { blocked: new Set<string>(), booked };
+              return { blocked, booked, prepBlocked };
             }
             throw new Error(`Availability check failed with status ${res.status}`);
           }
 
           const data = await res.json();
+          const prepList = Array.isArray(data.preparationBlockedDates)
+            ? data.preparationBlockedDates
+            : Array.isArray(data.preparation_blocked_dates)
+            ? data.preparation_blocked_dates
+            : [];
+          const prepBlocked = new Set<string>(prepList);
           const blocked = new Set<string>(
-            Array.isArray(data.blockedDates) ? data.blockedDates : []
+            Array.isArray(data.blockedDates) ? data.blockedDates : (Array.isArray(data.blocked_dates) ? data.blocked_dates : [])
           );
           const booked = new Set<string>(
-            Array.isArray(data.bookedDates) ? data.bookedDates : []
+            Array.isArray(data.bookedDates) ? data.bookedDates : (Array.isArray(data.booked_dates) ? data.booked_dates : [])
           );
 
-          return { blocked, booked };
+          return { blocked, booked, prepBlocked };
         })();
 
         inFlightRequests.set(cacheKey, reqPromise);
       }
 
-      const { blocked, booked } = await reqPromise;
+      const { blocked, booked, prepBlocked } = await reqPromise;
 
       // Update short-lived cache
       availabilityCache.set(cacheKey, {
         blockedDates: blocked,
         bookedDates: booked,
+        preparationBlockedDates: prepBlocked,
         timestamp: Date.now(),
       });
 
       setBlockedDates(blocked);
       setBookedDates(booked);
+      setPreparationBlockedDates(prepBlocked);
       setIsProvisional(false);
       setFetchError(null);
     } catch (err: any) {
@@ -377,7 +397,8 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
     for (let day = 1; day <= daysInMonth; day++) {
       const dateKey = formatDateKey(viewYear, viewMonth, day);
       const isPast = dateKey < effectiveMinDate;
-      const isBlocked = blockedDates.has(dateKey);
+      const isPrepBlocked = preparationBlockedDates.has(dateKey);
+      const isBlocked = blockedDates.has(dateKey) || isPrepBlocked;
       const isBooked = bookedDates.has(dateKey);
 
       days.push({
@@ -387,15 +408,16 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
         isPast,
         isBlocked,
         isBooked,
+        isPrepBlocked,
       });
     }
 
     return days;
-  }, [viewYear, viewMonth, effectiveMinDate, blockedDates, bookedDates]);
+  }, [viewYear, viewMonth, effectiveMinDate, blockedDates, bookedDates, preparationBlockedDates]);
 
   // Check if a range [start, end] contains any unavailable dates
   const checkRangeUnavailable = useCallback(
-    (startKey: string, endKey: string): { hasConflict: boolean; reason?: "blocked" | "booked"; date?: string } => {
+    (startKey: string, endKey: string): { hasConflict: boolean; reason?: "preparation_blocked" | "blocked" | "booked"; date?: string } => {
       if (startKey > endKey) {
         [startKey, endKey] = [endKey, startKey];
       }
@@ -408,6 +430,9 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
 
       while (cur <= end) {
         const key = formatDateKey(cur.getFullYear(), cur.getMonth(), cur.getDate());
+        if (preparationBlockedDates.has(key)) {
+          return { hasConflict: true, reason: "preparation_blocked", date: key };
+        }
         if (blockedDates.has(key)) {
           return { hasConflict: true, reason: "blocked", date: key };
         }
@@ -419,16 +444,22 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
 
       return { hasConflict: false };
     },
-    [blockedDates, bookedDates]
+    [blockedDates, bookedDates, preparationBlockedDates]
   );
 
   // Cell Click Handler
-  const handleDateClick = (dateKey: string, isBlocked: boolean, isBooked: boolean, isPast: boolean) => {
+  const handleDateClick = (dateKey: string, isBlocked: boolean, isBooked: boolean, isPast: boolean, isPrepBlocked?: boolean) => {
     if (disabled || isPast) return;
 
     // Prevent selecting unverified dates if availability check failed completely
     if (fetchError && blockedDates.size === 0 && bookedDates.size === 0) {
       setConflictMessage("Availability could not be verified from the server. Please click Retry to verify dates before selecting.");
+      return;
+    }
+
+    // Direct click on preparation blocked date (day following existing booking)
+    if (isPrepBlocked || preparationBlockedDates.has(dateKey)) {
+      setConflictMessage("This product is unavailable on the day following an existing booking.");
       return;
     }
 
@@ -480,7 +511,11 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
     // Verify all dates in between are continuously available
     const conflict = checkRangeUnavailable(selectedStartDate, dateKey);
     if (conflict.hasConflict) {
-      if (conflict.reason === "blocked") {
+      if (conflict.reason === "preparation_blocked") {
+        setConflictMessage(
+          `Cannot select this range: Date ${conflict.date} is unavailable on the day following an existing booking.`
+        );
+      } else if (conflict.reason === "blocked") {
         setConflictMessage(
           `Cannot select this range: Date ${conflict.date} is blocked by the owner. Please choose continuous available dates.`
         );
@@ -499,10 +534,11 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
   };
 
   // Helper to determine styling for a cell
-  const getCellState = (dateKey: string, isBlocked: boolean, isBooked: boolean, isPast: boolean) => {
+  const getCellState = (dateKey: string, isBlocked: boolean, isBooked: boolean, isPast: boolean, isPrepBlocked?: boolean) => {
     if (isPast) return "past";
-    if (isBlocked) return "blocked";
+    if (isPrepBlocked || preparationBlockedDates.has(dateKey)) return "preparation-blocked";
     if (isBooked) return "booked";
+    if (isBlocked) return "blocked";
 
     const isStart = dateKey === selectedStartDate;
     const isEnd = dateKey === selectedEndDate;
@@ -587,6 +623,47 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
         </div>
       </div>
 
+      {/* Segmented Mode Switcher (Single Day vs Multi-Day Range) */}
+      {onSelectDurationMode && (
+        <div className="flex items-center gap-1 p-0.5 rounded-xl bg-neutral-100/90 dark:bg-neutral-800/80 border border-neutral-200/90 dark:border-neutral-700/80 text-[10px] font-bold">
+          <button
+            type="button"
+            onClick={() => {
+              onSelectDurationMode("full_day");
+              setIsPickingEnd(false);
+              if (selectedStartDate) {
+                handleDatesUpdate(selectedStartDate, selectedStartDate);
+              }
+            }}
+            className={cn(
+              "flex-1 py-1 px-2.5 rounded-lg text-center transition-all cursor-pointer flex items-center justify-center gap-1",
+              durationMode !== "custom"
+                ? "bg-white dark:bg-[#1E1E1E] text-primary shadow-xs font-extrabold"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <CalendarIcon className="w-3 h-3 shrink-0" />
+            <span>Single Day</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              onSelectDurationMode("custom");
+              setIsPickingEnd(Boolean(selectedStartDate && (!selectedEndDate || selectedEndDate === selectedStartDate)));
+            }}
+            className={cn(
+              "flex-1 py-1 px-2.5 rounded-lg text-center transition-all cursor-pointer flex items-center justify-center gap-1",
+              durationMode === "custom"
+                ? "bg-white dark:bg-[#1E1E1E] text-primary shadow-xs font-extrabold"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Clock className="w-3 h-3 shrink-0 text-emerald-500" />
+            <span>Multi-Day Range</span>
+          </button>
+        </div>
+      )}
+
       {/* Real-time sync / fetch status indicator */}
       {isLoadingAvailability && (
         <div className="flex items-center justify-between text-[11px] text-primary bg-primary/5 px-2.5 py-1.5 rounded-lg border border-primary/20">
@@ -669,7 +746,8 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
             cell.dateKey,
             cell.isBlocked,
             cell.isBooked,
-            cell.isPast
+            cell.isPast,
+            cell.isPrepBlocked
           );
 
           // State-based Styling
@@ -678,6 +756,7 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
           const isEnd = cellState === "selected-end";
           const isInRange = cellState === "selected-in-range";
           const isHoverRange = cellState === "hover-in-range";
+          const isPrepBlocked = cellState === "preparation-blocked";
           const isBlocked = cellState === "blocked";
           const isBooked = cellState === "booked";
           const isPast = cellState === "past";
@@ -692,19 +771,22 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
                   cell.dateKey,
                   cell.isBlocked,
                   cell.isBooked,
-                  cell.isPast
+                  cell.isPast,
+                  cell.isPrepBlocked
                 )
               }
               onMouseEnter={() => {
-                if (isPickingEnd && !cell.isPast && !cell.isBlocked && !cell.isBooked) {
+                if (isPickingEnd && !cell.isPast && !cell.isBlocked && !cell.isBooked && !cell.isPrepBlocked) {
                   setHoveredDate(cell.dateKey);
                 }
               }}
               title={
-                isBlocked
-                  ? `Blocked by Owner (${cell.dateKey})`
+                isPrepBlocked
+                  ? `BLOCKED / PREPARATION DAY — This product is unavailable on the day following an existing booking. (${cell.dateKey})`
                   : isBooked
-                  ? `Already Reserved (${cell.dateKey})`
+                  ? `BOOKED — Already reserved by a renter (${cell.dateKey})`
+                  : isBlocked
+                  ? `Blocked by Owner (${cell.dateKey})`
                   : isPast
                   ? `Past Date (${cell.dateKey})`
                   : `Available: ${cell.dateKey}`
@@ -717,9 +799,15 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
                 // Past Disabled
                 isPast &&
                   "opacity-30 text-muted-foreground bg-muted/20 border border-transparent cursor-not-allowed",
-                // Unavailable (Blocked or Booked) - RED + High Contrast Strikethrough
-                (isBlocked || isBooked) &&
+                // Actual Booked Day - RED + High Contrast Strikethrough
+                isBooked &&
                   "bg-red-500/15 dark:bg-red-950/40 border border-red-500/50 text-red-600 dark:text-red-400 font-bold cursor-not-allowed shadow-inner",
+                // Automatic Next-Day Blocked / Preparation Day - AMBER + Strikethrough
+                isPrepBlocked &&
+                  "bg-amber-500/15 dark:bg-amber-950/40 border border-amber-500/50 text-amber-700 dark:text-amber-400 font-bold cursor-not-allowed shadow-inner",
+                // Owner Blocked Day
+                isBlocked &&
+                  "bg-neutral-500/15 dark:bg-neutral-800/40 border border-neutral-400/50 text-neutral-500 dark:text-neutral-400 font-bold cursor-not-allowed",
                 // Selected Single
                 isSingle &&
                   "bg-primary text-primary-foreground font-black shadow-md border border-primary ring-2 ring-primary/30 z-10 scale-[1.03]",
@@ -740,18 +828,34 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
               <span
                 className={cn(
                   "relative z-10 leading-none",
-                  (isBooked || isBlocked) &&
-                    "line-through decoration-red-600 dark:decoration-red-400 decoration-2 font-medium text-red-600 dark:text-red-400"
+                  isBooked &&
+                    "line-through decoration-red-600 dark:decoration-red-400 decoration-2 font-medium text-red-600 dark:text-red-400",
+                  isPrepBlocked &&
+                    "line-through decoration-amber-600 dark:decoration-amber-400 decoration-2 font-medium text-amber-700 dark:text-amber-400",
+                  isBlocked && !isPrepBlocked &&
+                    "line-through decoration-neutral-500 decoration-1 text-neutral-500 dark:text-neutral-400"
                 )}
               >
                 {cell.dayNumber}
               </span>
 
               {/* Status indicator pin/dot */}
-              {(isBlocked || isBooked) && (
+              {isBooked && (
                 <span
                   className="w-1 h-1 rounded-full bg-red-600 dark:bg-red-400 absolute bottom-1"
-                  aria-label={isBlocked ? "Blocked by owner" : "Already booked"}
+                  aria-label="Already booked"
+                />
+              )}
+              {isPrepBlocked && (
+                <span
+                  className="w-1 h-1 rounded-full bg-amber-600 dark:bg-amber-400 absolute bottom-1"
+                  aria-label="Preparation day blocked"
+                />
+              )}
+              {isBlocked && !isPrepBlocked && (
+                <span
+                  className="w-1 h-1 rounded-full bg-neutral-400 absolute bottom-1"
+                  aria-label="Blocked by owner"
                 />
               )}
               {(isSingle || isStart || isEnd) && (
@@ -804,7 +908,7 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
       </div>
 
       {/* Compact Legend Explaining Date States */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-border/60 text-[10px] text-muted-foreground font-medium">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-2 border-t border-border/60 text-[10px] text-muted-foreground font-medium">
         <div className="flex items-center gap-1.5">
           <div className="w-3 h-3 rounded-md bg-card border border-border" />
           <span>Available</span>
@@ -814,14 +918,22 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
             <span className="text-[8px] font-bold line-through text-red-600 dark:text-red-400">12</span>
           </div>
           <span className="text-red-600 dark:text-red-400 font-semibold">
-            Unavailable / Booked
+            Booked
           </span>
         </div>
         <div className="flex items-center gap-1.5">
-          <div className="w-3 h-3 rounded-md bg-red-500/15 border border-red-500/40 flex items-center justify-center">
-            <div className="w-1.5 h-1.5 rounded-full bg-red-600 dark:bg-red-400" />
+          <div className="w-3 h-3 rounded-md bg-amber-500/20 border border-amber-500/50 flex items-center justify-center">
+            <span className="text-[8px] font-bold line-through text-amber-700 dark:text-amber-400">13</span>
           </div>
-          <span className="text-red-600 dark:text-red-400 font-semibold">Blocked (Owner)</span>
+          <span className="text-amber-700 dark:text-amber-400 font-semibold">
+            Blocked / Prep Day
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded-md bg-neutral-500/15 border border-neutral-400/50 flex items-center justify-center">
+            <div className="w-1.5 h-1.5 rounded-full bg-neutral-500" />
+          </div>
+          <span className="text-muted-foreground">Owner Blocked</span>
         </div>
         <div className="flex items-center gap-1.5">
           <div className="w-3 h-3 rounded-md bg-primary text-primary-foreground font-bold flex items-center justify-center text-[8px]">

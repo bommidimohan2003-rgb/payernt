@@ -1,9 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import {
-  X,
-  ShieldCheck,
-  BadgeCheck,
-} from "lucide-react";
+import { X, Check } from "lucide-react";
 import { useEffect } from "react";
 
 interface TermsAndConditionsModalProps {
@@ -17,7 +13,7 @@ interface TermsAndConditionsModalProps {
 export function TermsAndConditionsModal({
   open,
   onClose,
-  productTitle,
+  onAccept,
 }: TermsAndConditionsModalProps) {
   useEffect(() => {
     if (!open) return;
@@ -31,6 +27,11 @@ export function TermsAndConditionsModal({
     };
   }, [open, onClose]);
 
+  const handleUnderstand = () => {
+    onAccept?.();
+    onClose();
+  };
+
   return (
     <AnimatePresence>
       {open && (
@@ -42,102 +43,61 @@ export function TermsAndConditionsModal({
         >
           {/* Backdrop */}
           <div
-            className="fixed inset-0 bg-black/75 backdrop-blur-md"
+            className="fixed inset-0 bg-black/60 dark:bg-black/75 backdrop-blur-xs"
             onClick={onClose}
           />
 
-          {/* Modal Container */}
+          {/* Modal Container: increased width and compact height matching Image 3 */}
           <motion.div
-            initial={{ scale: 0.92, y: 18, opacity: 0 }}
+            initial={{ scale: 0.94, y: 14, opacity: 0 }}
             animate={{ scale: 1, y: 0, opacity: 1 }}
-            exit={{ scale: 0.92, y: 12, opacity: 0 }}
+            exit={{ scale: 0.94, y: 10, opacity: 0 }}
             transition={{ type: "spring", damping: 25, stiffness: 350 }}
-            className="relative w-full max-w-xl bg-white dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 rounded-3xl shadow-2xl z-10 overflow-hidden my-auto flex flex-col max-h-[85vh]"
+            className="relative w-full max-w-xl sm:max-w-2xl bg-card border border-border/80 dark:border-white/10 rounded-3xl shadow-2xl z-10 p-5 sm:p-6 space-y-4 text-left my-auto flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-center justify-between p-5 sm:p-6 border-b border-black/5 dark:border-white/10 bg-neutral-50/80 dark:bg-[#1E1E1E]/80">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-500/20">
-                  <ShieldCheck className="h-5 w-5" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-base sm:text-lg font-extrabold text-neutral-900 dark:text-white tracking-tight">
-                      Rental Terms & Conditions
-                    </h3>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
-                      Payernt Policy
-                    </span>
-                  </div>
-                  <p className="text-xs text-neutral-500 dark:text-[#A8B1BA]">
-                    Standard peer-to-peer equipment rental & protection agreement
-                  </p>
-                </div>
-              </div>
-
+            <div className="flex items-center justify-between border-b border-border/60 pb-3">
+              <h3 className="text-base sm:text-lg font-bold text-foreground">
+                paYent Rental Agreement
+              </h3>
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-full p-2 hover:bg-neutral-200/60 dark:hover:bg-white/10 text-neutral-500 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer"
+                className="p-1 rounded-xl hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                 aria-label="Close modal"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            {/* Scrollable Content: ONLY 3 CONDITIONS */}
-            <div className="p-5 sm:p-6 overflow-y-auto space-y-4 text-left leading-relaxed">
-              {productTitle && (
-                <div className="p-3.5 rounded-2xl bg-emerald-500/5 border border-emerald-500/20 flex items-center gap-3">
-                  <BadgeCheck className="h-5 w-5 text-emerald-600 shrink-0" />
-                  <div className="text-xs text-neutral-800 dark:text-neutral-200">
-                    Applying to: <strong className="font-semibold text-emerald-600 dark:text-emerald-400">{productTitle}</strong>
-                  </div>
-                </div>
-              )}
-
-              {/* Condition 1 */}
-              <div className="p-4 rounded-2xl bg-neutral-100/70 dark:bg-[#1E1E1E] border border-black/5 dark:border-white/10 space-y-1.5">
-                <div className="flex items-center gap-2 font-bold text-neutral-900 dark:text-white text-xs sm:text-sm">
-                  <span className="h-5 w-5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-xs font-bold shrink-0">
-                    1
-                  </span>
-                  <span>Equipment Inspection & Safe Handling</span>
-                </div>
-                <p className="pl-7 text-xs text-neutral-600 dark:text-[#A8B1BA] leading-relaxed">
-                  The renter agrees to inspect the gear upon delivery or pickup. Any pre-existing cosmetic wear, missing accessories, or operational anomalies must be recorded and shared within 2 hours of handover. Equipment must be operated responsibly for legal purposes only.
-                </p>
-              </div>
-
-              {/* Condition 2 */}
-              <div className="p-4 rounded-2xl bg-neutral-100/70 dark:bg-[#1E1E1E] border border-black/5 dark:border-white/10 space-y-1.5">
-                <div className="flex items-center gap-2 font-bold text-neutral-900 dark:text-white text-xs sm:text-sm">
-                  <span className="h-5 w-5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-xs font-bold shrink-0">
-                    2
-                  </span>
-                  <span>Identity Verification & Security Deposit</span>
-                </div>
-                <p className="pl-7 text-xs text-neutral-600 dark:text-[#A8B1BA] leading-relaxed">
-                  Valid government ID verification is mandatory for all bookings. Any security deposit hold is securely safeguarded in Payernt Escrow and fully released upon timely, undamaged return of the gear.
-                </p>
-              </div>
-
-              {/* Condition 3 */}
-              <div className="p-4 rounded-2xl bg-neutral-100/70 dark:bg-[#1E1E1E] border border-black/5 dark:border-white/10 space-y-1.5">
-                <div className="flex items-center gap-2 font-bold text-neutral-900 dark:text-white text-xs sm:text-sm">
-                  <span className="h-5 w-5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-xs font-bold shrink-0">
-                    3
-                  </span>
-                  <span>Timely Returns & Protection Policy</span>
-                </div>
-                <p className="pl-7 text-xs text-neutral-600 dark:text-[#A8B1BA] leading-relaxed">
-                  Gear must be returned at or before the designated slot. Extensions must be requested through Payernt at least 2 hours in advance. In case of accidental damage or loss, standard repair assessment and Payernt protection coverage apply.
-                </p>
-              </div>
+            {/* Content: Numbered items exactly matching the uploaded screenshot */}
+            <div className="space-y-3.5 text-xs text-muted-foreground leading-relaxed pr-1">
+              <p>
+                <strong className="text-foreground">1. Equipment Inspection &amp; Safe Handling:</strong>{" "}
+                The renter agrees to inspect the gear upon delivery or pickup. Any pre-existing cosmetic wear, missing accessories, or operational anomalies must be recorded and shared within 2 hours of handover. Equipment must be operated responsibly for legal purposes only.
+              </p>
+              <p>
+                <strong className="text-foreground">2. Identity Verification &amp; Security Deposit:</strong>{" "}
+                Valid government ID verification is mandatory for all bookings. Any security deposit hold is securely safeguarded in Payernt Escrow and fully released upon timely, undamaged return of the gear.
+              </p>
+              <p>
+                <strong className="text-foreground">3. Timely Returns &amp; Protection Policy:</strong>{" "}
+                Gear must be returned at or before the designated slot. Extensions must be requested through Payernt at least 2 hours in advance. In case of accidental damage or loss, standard repair assessment and Payernt protection coverage apply.
+              </p>
             </div>
 
-            {/* Note: NO BUTTONS IN POPUP as explicitly requested */}
+            {/* Divider & Action */}
+            <div className="pt-3 border-t border-border/60 flex justify-end">
+              <button
+                type="button"
+                onClick={handleUnderstand}
+                className="px-4 py-1.5 sm:px-5 sm:py-2 rounded-full bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold text-xs sm:text-sm shadow-xs transition-all cursor-pointer inline-flex items-center justify-center gap-1.5 active:scale-95"
+              >
+                <Check className="h-3.5 w-3.5 shrink-0" />
+                <span>I Understand</span>
+              </button>
+            </div>
           </motion.div>
         </motion.div>
       )}

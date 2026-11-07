@@ -2,6 +2,7 @@ import { useNavigate, useSearch } from "@tanstack/react-router";
 import {
   Check,
   ShieldCheck,
+  ShieldAlert,
   Lock,
   Loader2,
   AlertTriangle,
@@ -40,6 +41,7 @@ import { RecommendationSection } from "@/components/recommendations/Recommendati
 import type { Order, Product, UserAddress } from "@/types";
 import { toast } from "sonner";
 import { CelebrationFlourish } from "@/components/common/CelebrationFlourish";
+import { BookingFinishedModal } from "@/components/booking/BookingFinishedModal";
 
 const loadRazorpayScript = (): Promise<boolean> => {
   return new Promise((resolve) => {
@@ -119,11 +121,12 @@ export default function Checkout() {
   );
   const initialEnd = useMemo(() => {
     if (search.end && search.end >= initialStart) return search.end;
-    return new Date(Date.now() + 86400000 * 3).toISOString().slice(0, 10);
+    return initialStart;
   }, [search.end, initialStart]);
 
   const [start, setStart] = useState(initialStart);
   const [end, setEnd] = useState(initialEnd);
+  const [withInsurance, setWithInsurance] = useState<boolean>(true);
 
   // Address State & Form
   const [savedAddresses, setSavedAddresses] = useState<UserAddress[]>([]);
@@ -200,6 +203,7 @@ export default function Checkout() {
 
   // Modal & Processing Statuses
   const [open, setOpen] = useState(false);
+  const [bookingId, setBookingId] = useState<string>("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
@@ -316,14 +320,27 @@ export default function Checkout() {
   // Rental Calculations
   const days = Math.max(
     1,
-    Math.ceil((+new Date(end) - +new Date(start)) / 86400000),
+    Math.round((+new Date(end + "T00:00:00") - +new Date(start + "T00:00:00")) / 86400000) + 1,
   );
   const subtotal = (product?.price ?? 0) * days;
   const discount = applied ? subtotal * 0.1 : 0;
-  const tax = (subtotal - discount) * 0.08;
+  const taxableBase = Math.max(0, subtotal - discount);
+  const tax = taxableBase * 0.05;
+  const insuranceFee = taxableBase * 0.03;
+  const insurance = withInsurance ? insuranceFee : 0;
   const total = useMemo(
-    () => subtotal - discount + tax,
-    [subtotal, discount, tax],
+    () => taxableBase + tax + insurance,
+    [taxableBase, tax, insurance],
+  );
+
+  const totalWithInsurance = useMemo(
+    () => taxableBase + tax + insuranceFee,
+    [taxableBase, tax, insuranceFee],
+  );
+
+  const totalWithoutInsurance = useMemo(
+    () => taxableBase + tax,
+    [taxableBase, tax],
   );
 
   // Formatted delivery address string for snapshots
@@ -454,7 +471,7 @@ export default function Checkout() {
   };
 
   // Step C: Confirm Order (Explicit submission action)
-  const handleConfirmOrder = async () => {
+  const handleConfirmOrder = async (overrideWithInsurance?: boolean) => {
     if (!product) return;
     setPaymentError(null);
     const token = storage.get<string | null>(STORAGE_KEYS.token, null);
@@ -496,6 +513,13 @@ export default function Checkout() {
     if (isProcessing || isVerifying) return;
     setIsProcessing(true);
 
+    const effectiveInsurance = typeof overrideWithInsurance === "boolean" ? overrideWithInsurance : withInsurance;
+    if (typeof overrideWithInsurance === "boolean") {
+      setWithInsurance(overrideWithInsurance);
+    }
+    const effectiveInsFee = effectiveInsurance ? insuranceFee : 0;
+    const finalTotal = Math.round(taxableBase + tax + effectiveInsFee);
+
     const bookingId = `ord_${Date.now()}`;
     const orderPayload: Order = {
       id: bookingId,
@@ -504,7 +528,11 @@ export default function Checkout() {
       productImage: product.image,
       startDate: start,
       endDate: end,
-      total: Math.round(total),
+      total: finalTotal,
+      withInsurance: effectiveInsurance,
+      with_insurance: effectiveInsurance,
+      insuranceFee: Math.round(effectiveInsFee),
+      insurance_fee: Math.round(effectiveInsFee),
       status: "pending",
       category: product.category || "",
       createdAt: new Date().toISOString(),
@@ -529,14 +557,11 @@ export default function Checkout() {
       window.dispatchEvent(new CustomEvent("payent_orders_updated"));
 
       const actualBookingId = res?.id || res?.bookingId || orderPayload.id;
-      setConfirmedOrder(orderPayload);
+      setBookingId(actualBookingId);
+      setConfirmedOrder({ ...orderPayload, id: actualBookingId });
       tracker.bookingCompleted(product.id, product.category);
       setIsProcessing(false);
-      toast.success("Booking confirmed! Navigating to your booking details...");
-      navigate({
-        to: "/payent/bookings/$id",
-        params: { id: actualBookingId },
-      });
+      setOpen(true);
     } catch (err: unknown) {
       setIsProcessing(false);
       const msg =
@@ -594,6 +619,8 @@ export default function Checkout() {
           customLocation:
             fulfillmentMethod === "custom" ? customLocation.trim() : "",
           locationDirections: locationDirections.trim(),
+          with_insurance: withInsurance,
+          withInsurance: withInsurance,
         },
       );
 
@@ -673,12 +700,12 @@ export default function Checkout() {
             window.dispatchEvent(new CustomEvent("payent_orders_updated"));
 
             const actualBookingId = verifyRes.order_id || orderRes.order_id;
+            setBookingId(actualBookingId);
             setConfirmedOrder(confirmed);
             tracker.bookingCompleted(product.id, product.category);
-            navigate({
-              to: "/payent/bookings/$id",
-              params: { id: actualBookingId },
-            });
+            setIsVerifying(false);
+            setIsProcessing(false);
+            setOpen(true);
           } catch (verifyErr) {
             setIsVerifying(false);
             toast.dismiss("rzp-verify");
@@ -1611,10 +1638,52 @@ export default function Checkout() {
               )}
 
               <div className="flex justify-between text-muted-foreground">
-                <span>Tax & Insurance (8%)</span>
+                <span>Platform Tax & Service (5%)</span>
                 <span className="font-semibold text-foreground">
                   ₹{tax.toFixed(2)}
                 </span>
+              </div>
+
+              {/* Single Button for With / Without Insurance */}
+              <div className="flex items-center justify-between p-2.5 rounded-xl border border-neutral-300/80 dark:border-neutral-700/80 bg-neutral-100/60 dark:bg-white/5 gap-2">
+                <div className="min-w-0 text-left">
+                  <div className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                    {withInsurance ? (
+                      <ShieldCheck className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                    ) : (
+                      <ShieldAlert className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                    )}
+                    <span>Equipment Damage Insurance</span>
+                  </div>
+                  <div className="text-[10px] text-muted-foreground mt-0.5 truncate">
+                    {withInsurance
+                      ? `Protection included (+₹${insuranceFee.toFixed(2)})`
+                      : "Standard rental • No damage protection (₹0.00)"}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setWithInsurance((prev) => !prev)}
+                  className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs shrink-0 select-none ${
+                    withInsurance
+                      ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                      : "bg-neutral-200 dark:bg-neutral-800 text-foreground hover:bg-neutral-300 dark:hover:bg-neutral-700 border border-border"
+                  }`}
+                  title={withInsurance ? "Click to switch to without insurance" : "Click to switch to with insurance"}
+                >
+                  {withInsurance ? (
+                    <>
+                      <ShieldCheck className="h-3.5 w-3.5" />
+                      <span>With Insurance</span>
+                    </>
+                  ) : (
+                    <>
+                      <ShieldAlert className="h-3.5 w-3.5" />
+                      <span>Without Insurance</span>
+                    </>
+                  )}
+                </button>
               </div>
 
               <div className="flex justify-between pt-3 border-t border-border font-black text-base text-foreground">
@@ -1663,11 +1732,14 @@ export default function Checkout() {
                 <button
                   type="button"
                   onClick={() => navigate({ to: "/kyc" })}
-                  className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold text-xs shrink-0 cursor-pointer transition-all active:scale-95"
+                  className="px-2.5 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold text-xs shrink-0 cursor-pointer transition-all active:scale-95 inline-flex items-center gap-1.5 shadow-xs"
                 >
-                  {kycStatus === "NOT_STARTED"
-                    ? "Complete KYC"
-                    : "View KYC Status"}
+                  <Lock className="h-3 w-3 shrink-0" />
+                  <span>
+                    {kycStatus === "NOT_STARTED"
+                      ? "Complete KYC"
+                      : "View KYC Status"}
+                  </span>
                 </button>
               </div>
             )}
@@ -1675,9 +1747,9 @@ export default function Checkout() {
             {/* PRIMARY ACTION: React Bits SlideCommit Slide-to-Confirm */}
             <div className="space-y-3">
               <SlideCommit
-                label={`Slide to Confirm Order (₹${total.toFixed(0)})`}
-                successLabel={`Order Confirmed • ₹${total.toFixed(0)}`}
-                onConfirm={handleConfirmOrder}
+                label={`Slide to Confirm (₹${total.toFixed(0)}) • ${withInsurance ? "With Insurance" : "Without Insurance"}`}
+                successLabel={`Order Confirmed • ₹${total.toFixed(0)} (${withInsurance ? "Insured" : "No Insurance"})`}
+                onConfirm={() => handleConfirmOrder()}
                 disabled={
                   isProcessing ||
                   isVerifying ||
@@ -1686,38 +1758,6 @@ export default function Checkout() {
                   (fulfillmentMethod === "delivery" && !selectedAddress)
                 }
               />
-
-              {/* Direct Tap Alternative with Global Dual-Side Fill Button */}
-              <Button
-                size="sm"
-                variant="outline"
-                id="confirm-order-btn"
-                className="w-full text-xs font-bold py-2 border-border/80 text-muted-foreground hover:text-foreground cursor-pointer"
-                onClick={handleConfirmOrder}
-                loading={isProcessing || isVerifying}
-                isError={Boolean(paymentError)}
-                disabled={
-                  isProcessing ||
-                  isVerifying ||
-                  categoryRestriction?.restricted ||
-                  (kycStatus !== null && kycStatus !== "APPROVED") ||
-                  (fulfillmentMethod === "delivery" && !selectedAddress)
-                }
-              >
-                {isVerifying ? (
-                  <span className="flex items-center gap-2">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> Verifying Security...
-                  </span>
-                ) : isProcessing ? (
-                  <span className="flex items-center gap-2">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> Confirming Order...
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1.5">
-                    <CheckCircle2 className="h-3.5 w-3.5" /> Tap to Confirm Directly (₹{total.toFixed(0)})
-                  </span>
-                )}
-              </Button>
 
               {paymentMethod === "card" && (
                 <button
@@ -1758,65 +1798,44 @@ export default function Checkout() {
           />
         )}
 
-        {/* Celebration & Booking Confirmed Modal */}
-        <Modal
+        {/* Finished Little Box Popup with Revealing Green Tick Mark */}
+        <BookingFinishedModal
           open={open}
           onClose={() => {
             setOpen(false);
-            navigate({ to: "/dashboard" });
+            if (bookingId) {
+              navigate({
+                to: "/payent/bookings/$id",
+                params: { id: bookingId },
+              });
+            } else {
+              navigate({ to: "/dashboard" });
+            }
           }}
-          title="Booking Confirmed"
-        >
-          <div className="text-center py-4 relative overflow-hidden">
-            {open && (
-              <CelebrationFlourish
-                productImage={product.image}
-                productTitle={product.title}
-              />
-            )}
-            <div className="h-16 w-16 mx-auto rounded-full bg-emerald-500/10 grid place-items-center relative z-10 border border-emerald-500/30">
-              <Check className="h-8 w-8 text-emerald-600 dark:text-emerald-400" />
-            </div>
-            <h3 className="mt-4 font-black text-2xl text-foreground font-display">
-              Your Rental Order is Confirmed!
-            </h3>
-            <p className="mt-2 text-xs sm:text-sm text-muted-foreground px-4 leading-relaxed">
-              We've created your rental booking. A confirmation receipt has been
-              dispatched. Delivery is now being scheduled to your saved address:
-            </p>
-
-            <div className="my-4 mx-4 p-3.5 rounded-xl bg-secondary/40 border border-border/80 text-xs text-left">
-              <div className="font-bold text-foreground">
-                Destination: {selectedAddress?.full_name || user?.fullName}
-              </div>
-              <div className="text-muted-foreground pt-0.5">
-                {formattedDeliveryAddress}
-              </div>
-            </div>
-
-            <div className="mt-6 flex flex-col gap-2.5">
-              <Button
-                id="view-dashboard-btn"
-                className="w-full font-bold bg-emerald-600 hover:bg-emerald-700 text-white"
-                onClick={() => {
-                  setOpen(false);
-                  navigate({ to: "/dashboard" });
-                }}
-              >
-                View Booking & Delivery Tracking
-              </Button>
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  setOpen(false);
-                  navigate({ to: "/" });
-                }}
-              >
-                Return to Marketplace
-              </Button>
-            </div>
-          </div>
-        </Modal>
+          bookingId={bookingId || confirmedOrder?.id || ""}
+          product={product}
+          startDate={start}
+          endDate={end}
+          totalAmount={total}
+          withInsurance={withInsurance}
+          deliveryAddress={formattedDeliveryAddress}
+          recipientName={selectedAddress?.full_name || user?.fullName}
+          onViewBooking={() => {
+            setOpen(false);
+            if (bookingId) {
+              navigate({
+                to: "/payent/bookings/$id",
+                params: { id: bookingId },
+              });
+            } else {
+              navigate({ to: "/dashboard" });
+            }
+          }}
+          onContinueShopping={() => {
+            setOpen(false);
+            navigate({ to: "/payent/explore" });
+          }}
+        />
       </section>
     </MainLayout>
   );
