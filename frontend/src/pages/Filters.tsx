@@ -114,9 +114,6 @@ export default function FiltersPage() {
   });
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  // 8. Mobile Sidebar Drawer Toggle
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState<boolean>(false);
-
   // Fetch real products on mount
   useEffect(() => {
     setIsLoading(true);
@@ -497,7 +494,7 @@ export default function FiltersPage() {
     syncUrlParams,
   ]);
 
-  // Sidebar Filter Section Component (reusable for desktop & mobile drawer)
+  // Sidebar Filter Section Component (reusable for desktop & mobile)
   const renderSidebarFilters = (isMobileView = false) => {
     // Exact background matching so top-border notch interruptions are 100% invisible and seamless
     const notchBgClass = isMobileView
@@ -505,12 +502,13 @@ export default function FiltersPage() {
       : "bg-neutral-50 dark:bg-[#1E1E1E]";
 
     return (
-      <div className="space-y-6">
+      <div className="space-y-2 xs:space-y-2.5 sm:space-y-6">
         {/* 1. CATEGORY SECTION BOX */}
         <SectionBox
           title="Category"
+          titleClassName="text-[9.5px] xs:text-[10.5px] sm:text-[13px] font-bold px-0.5 sm:px-1"
           cutoutBgClass={notchBgClass}
-          className="p-4 pt-5.5 rounded-2xl border-neutral-300/80 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] shadow-xs"
+          className="p-1 xs:p-1.5 sm:p-4 pt-3 sm:pt-5.5 rounded-lg sm:rounded-2xl border-neutral-300/80 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] shadow-xs"
           action={
             selectedCats.length > 0 ? (
               <button
@@ -519,14 +517,14 @@ export default function FiltersPage() {
                   setSelectedCats([]);
                   syncUrlParams({ cat: [] });
                 }}
-                className="text-[11px] font-medium text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white cursor-pointer px-1 transition-colors"
+                className="text-[9px] xs:text-[10px] sm:text-[11px] font-medium text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white cursor-pointer px-0.5 sm:px-1 transition-colors"
               >
                 Reset
               </button>
             ) : null
           }
         >
-          <div className="space-y-2 mt-1">
+          <div className="space-y-0.5 xs:space-y-1 sm:space-y-2 mt-0.5 sm:mt-1">
             {PRIMARY_CATEGORIES.map((cat) => {
               const isChecked = selectedCats.includes(cat.id);
               const count = categoryCounts[cat.id] ?? 0;
@@ -535,24 +533,24 @@ export default function FiltersPage() {
                 <label
                   key={cat.id}
                   onClick={() => handleToggleCat(cat.id)}
-                  className="group flex items-center justify-between py-1.5 px-2 -mx-1 rounded-lg cursor-pointer select-none transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800/60"
+                  className="group flex items-center justify-between py-0.5 sm:py-1.5 px-0.5 sm:px-2 -mx-0.5 sm:-mx-1 rounded cursor-pointer select-none transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800/60"
                 >
-                  <div className="flex items-center gap-3">
-                    {/* Reference Screenshot Checkbox */}
+                  <div className="flex items-center gap-1 xs:gap-1.5 sm:gap-3 min-w-0">
+                    {/* Checkbox */}
                     <div
                       className={cn(
-                        "w-4.5 h-4.5 rounded-[5px] flex items-center justify-center transition-all duration-150 shrink-0",
+                        "w-3 h-3 xs:w-3.5 xs:h-3.5 sm:w-4.5 sm:h-4.5 rounded-[3px] sm:rounded-[5px] flex items-center justify-center transition-all duration-150 shrink-0",
                         isChecked
                           ? "bg-neutral-900 text-white dark:bg-white dark:text-black shadow-xs"
                           : "bg-transparent border border-neutral-400 dark:border-neutral-700 group-hover:border-neutral-600 dark:group-hover:border-neutral-500"
                       )}
                     >
-                      {isChecked && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                      {isChecked && <Check className="w-2 h-2 sm:w-3.5 sm:h-3.5 stroke-[3]" />}
                     </div>
 
                     <span
                       className={cn(
-                        "text-sm tracking-tight transition-colors",
+                        "text-[9px] xs:text-[10px] sm:text-sm tracking-tight transition-colors truncate",
                         isChecked
                           ? "text-neutral-900 dark:text-white font-medium"
                           : "text-neutral-700 dark:text-neutral-300 group-hover:text-neutral-900 dark:group-hover:text-white"
@@ -562,7 +560,7 @@ export default function FiltersPage() {
                     </span>
                   </div>
 
-                  <span className="text-xs text-neutral-400 dark:text-neutral-500 font-mono">
+                  <span className="text-[7.5px] xs:text-[8.5px] sm:text-xs text-neutral-400 dark:text-neutral-500 font-mono ml-0.5 shrink-0">
                     {count}
                   </span>
                 </label>
@@ -573,16 +571,17 @@ export default function FiltersPage() {
 
         {/* 2. PRICE RANGE SECTION BOX (WAKESLIDER + NOTCH NUMERIC INPUTS) */}
         <SectionBox
-          title="Price Range"
+          title="Price"
+          titleClassName="text-[9.5px] xs:text-[10.5px] sm:text-[13px] font-bold px-0.5 sm:px-1"
           cutoutBgClass={notchBgClass}
-          className="p-4 pt-5.5 rounded-2xl border-neutral-300/80 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] shadow-xs space-y-4"
+          className="p-1 xs:p-1.5 sm:p-4 pt-3 sm:pt-5.5 rounded-lg sm:rounded-2xl border-neutral-300/80 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] shadow-xs space-y-1.5 xs:space-y-2 sm:space-y-4"
           badge={
-            <span className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 font-mono">
+            <span className="text-[7.5px] xs:text-[8.5px] sm:text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 font-mono truncate max-w-[42px] xs:max-w-[55px] sm:max-w-none">
               {minPrice > 0
-                ? `₹${minPrice.toLocaleString("en-IN")} – ${maxPrice >= 10000 ? "₹10,000+" : `₹${maxPrice.toLocaleString("en-IN")}`}`
+                ? `₹${minPrice}–${maxPrice >= 10000 ? "10k+" : maxPrice}`
                 : maxPrice >= 10000
-                ? "Any price"
-                : `≤ ₹${maxPrice.toLocaleString("en-IN")}/day`}
+                ? "Any"
+                : `≤₹${maxPrice}`}
             </span>
           }
           action={
@@ -594,7 +593,7 @@ export default function FiltersPage() {
                   setMaxPrice(10000);
                   syncUrlParams({ minP: 0, maxP: 10000 });
                 }}
-                className="text-[11px] font-medium text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white cursor-pointer px-1 transition-colors"
+                className="text-[9px] xs:text-[10px] sm:text-[11px] font-medium text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white cursor-pointer px-0.5 sm:px-1 transition-colors"
               >
                 Reset
               </button>
@@ -602,7 +601,7 @@ export default function FiltersPage() {
           }
         >
           {/* React Bits WakeSlider: Price Wave Slider */}
-          <div className="pt-1">
+          <div className="pt-0.5 sm:pt-1">
             <WakeSlider
               min={200}
               max={10000}
@@ -614,16 +613,16 @@ export default function FiltersPage() {
               onChangeEnd={(val) => {
                 syncUrlParams({ maxP: val });
               }}
-              formatValue={(v) => (v >= 10000 ? "Any price" : `≤ ₹${v.toLocaleString("en-IN")}/day`)}
-              label="Max Daily Rate"
-              barCount={30}
+              formatValue={(v) => (v >= 10000 ? "Any" : `≤ ₹${v.toLocaleString("en-IN")}`)}
+              label="Max Rate"
+              barCount={14}
             />
           </div>
 
-          {/* Direct Min / Max Input Fields with Notch Styling (Image 1 style) */}
-          <div className="grid grid-cols-2 gap-3 pt-1">
+          {/* Direct Min / Max Input Fields with Notch Styling */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 xs:gap-1.5 sm:gap-3 pt-0.5 sm:pt-1">
             <Input
-              label="Min (₹)"
+              label="Min"
               type="number"
               min={0}
               max={maxPrice - 100}
@@ -636,17 +635,17 @@ export default function FiltersPage() {
                 syncUrlParams({ minP: val });
               }}
               cutoutBgClass={notchBgClass}
-              className="text-xs font-mono"
-              inputWrapperClassName="h-11 sm:h-11 rounded-[16px] border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E]"
+              className="text-[9px] xs:text-[10px] sm:text-xs font-mono"
+              inputWrapperClassName="h-6 xs:h-7 sm:h-11 px-1.5 xs:px-2 sm:px-4 rounded-md sm:rounded-[16px] border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E]"
             />
             <Input
-              label="Max (₹)"
+              label="Max"
               type="number"
               min={minPrice + 100}
               max={10000}
               step={100}
               value={maxPrice >= 10000 ? "" : maxPrice}
-              placeholder="10,000+"
+              placeholder="10k+"
               onChange={(e) => {
                 const val = Number(e.target.value) || 10000;
                 const clamped = Math.min(10000, Math.max(minPrice + 100, val));
@@ -654,24 +653,25 @@ export default function FiltersPage() {
                 syncUrlParams({ maxP: clamped });
               }}
               cutoutBgClass={notchBgClass}
-              className="text-xs font-mono"
-              inputWrapperClassName="h-11 sm:h-11 rounded-[16px] border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E]"
+              className="text-[9px] xs:text-[10px] sm:text-xs font-mono"
+              inputWrapperClassName="h-6 xs:h-7 sm:h-11 px-1.5 xs:px-2 sm:px-4 rounded-md sm:rounded-[16px] border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E]"
             />
           </div>
 
           {/* Quick Min / Max bound hints */}
-          <div className="flex items-center justify-between text-[11px] text-neutral-500 font-mono">
-            <span>₹0/day</span>
-            <span>₹10,000/day</span>
+          <div className="flex items-center justify-between text-[7.5px] xs:text-[8.5px] sm:text-[11px] text-neutral-500 font-mono">
+            <span>₹0</span>
+            <span>₹10k</span>
           </div>
         </SectionBox>
 
-        {/* 3. AVAILABILITY DATES SECTION BOX (INPUTS WITH NOTCH STYLING) */}
+        {/* 3. AVAILABILITY DATES SECTION BOX */}
         <SectionBox
-          title="Availability Dates"
-          icon={<Calendar className="h-3.5 w-3.5 text-neutral-500 dark:text-neutral-400" />}
+          title="Dates"
+          titleClassName="text-[9.5px] xs:text-[10.5px] sm:text-[13px] font-bold px-0.5 sm:px-1"
+          icon={<Calendar className="h-2.5 w-2.5 sm:h-3.5 sm:w-3.5 text-neutral-500 dark:text-neutral-400" />}
           cutoutBgClass={notchBgClass}
-          className="p-4 pt-5.5 rounded-2xl border-neutral-300/80 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] shadow-xs space-y-3.5"
+          className="p-1 xs:p-1.5 sm:p-4 pt-3 sm:pt-5.5 rounded-lg sm:rounded-2xl border-neutral-300/80 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] shadow-xs space-y-1.5 sm:space-y-3.5"
           action={
             startDate || endDate ? (
               <button
@@ -681,17 +681,16 @@ export default function FiltersPage() {
                   setEndDate("");
                   syncUrlParams({ startD: "", endD: "" });
                 }}
-                className="text-[11px] font-medium text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white cursor-pointer px-1 transition-colors"
+                className="text-[9px] xs:text-[10px] sm:text-[11px] font-medium text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white cursor-pointer px-0.5 sm:px-1 transition-colors"
               >
                 Clear
               </button>
             ) : null
           }
         >
-          <div className="space-y-3">
-            {/* Start Date Input using Notch Design */}
+          <div className="space-y-1.5 sm:space-y-3">
             <Input
-              label="Start Date"
+              label="Start"
               type="date"
               min={todayStr}
               value={startDate}
@@ -699,15 +698,14 @@ export default function FiltersPage() {
                 setStartDate(e.target.value);
                 syncUrlParams({ startD: e.target.value });
               }}
-              icon={<Calendar className="h-4 w-4 stroke-[1.6]" />}
+              icon={<Calendar className="h-2.5 w-2.5 sm:h-3.5 sm:w-3.5 stroke-[1.6]" />}
               cutoutBgClass={notchBgClass}
-              className="text-xs [&::-webkit-calendar-picker-indicator]:dark:filter [&::-webkit-calendar-picker-indicator]:dark:invert cursor-pointer"
-              inputWrapperClassName="h-11 sm:h-11 rounded-[16px] border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E]"
+              className="text-[8.5px] xs:text-[9.5px] sm:text-xs [&::-webkit-calendar-picker-indicator]:dark:filter [&::-webkit-calendar-picker-indicator]:dark:invert cursor-pointer"
+              inputWrapperClassName="h-6 xs:h-7 sm:h-11 px-1 xs:px-1.5 sm:px-4 rounded-md sm:rounded-[16px] border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E]"
             />
 
-            {/* End Date Input using Notch Design */}
             <Input
-              label="End Date"
+              label="End"
               type="date"
               min={startDate || todayStr}
               value={endDate}
@@ -715,24 +713,21 @@ export default function FiltersPage() {
                 setEndDate(e.target.value);
                 syncUrlParams({ endD: e.target.value });
               }}
-              icon={<Calendar className="h-4 w-4 stroke-[1.6]" />}
+              icon={<Calendar className="h-2.5 w-2.5 sm:h-3.5 sm:w-3.5 stroke-[1.6]" />}
               cutoutBgClass={notchBgClass}
-              className="text-xs [&::-webkit-calendar-picker-indicator]:dark:filter [&::-webkit-calendar-picker-indicator]:dark:invert cursor-pointer"
-              inputWrapperClassName="h-11 sm:h-11 rounded-[16px] border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E]"
+              className="text-[8.5px] xs:text-[9.5px] sm:text-xs [&::-webkit-calendar-picker-indicator]:dark:filter [&::-webkit-calendar-picker-indicator]:dark:invert cursor-pointer"
+              inputWrapperClassName="h-6 xs:h-7 sm:h-11 px-1 xs:px-1.5 sm:px-4 rounded-md sm:rounded-[16px] border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E]"
             />
           </div>
-
-          <p className="text-[11px] text-neutral-500 leading-tight">
-            Backend excludes confirmed rental conflicts for chosen dates.
-          </p>
         </SectionBox>
 
-        {/* 4. LOCATION & DISTANCE SECTION BOX */}
+        {/* 4. LOCATION SECTION BOX */}
         <SectionBox
-          title="Location & Distance"
-          icon={<MapPin className="h-3.5 w-3.5 text-[#8FAF7E]" />}
+          title="Location"
+          titleClassName="text-[9.5px] xs:text-[10.5px] sm:text-[13px] font-bold px-0.5 sm:px-1"
+          icon={<MapPin className="h-2.5 w-2.5 sm:h-3.5 sm:w-3.5 text-[#8FAF7E]" />}
           cutoutBgClass={notchBgClass}
-          className="p-4 pt-5.5 rounded-2xl border-neutral-300/80 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] shadow-xs space-y-3.5"
+          className="p-1 xs:p-1.5 sm:p-4 pt-3 sm:pt-5.5 rounded-lg sm:rounded-2xl border-neutral-300/80 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] shadow-xs space-y-1.5 sm:space-y-3.5"
           action={
             cityInput || pincodeInput ? (
               <button
@@ -742,7 +737,7 @@ export default function FiltersPage() {
                   setPincodeInput("");
                   syncUrlParams({ cityVal: "", pinVal: "" });
                 }}
-                className="text-[11px] font-medium text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white cursor-pointer px-1 transition-colors"
+                className="text-[9px] xs:text-[10px] sm:text-[11px] font-medium text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white cursor-pointer px-0.5 sm:px-1 transition-colors"
               >
                 Clear
               </button>
@@ -759,33 +754,33 @@ export default function FiltersPage() {
                 syncUrlParams({ cityVal: detectedCity });
               }
             }}
-            className="w-full flex items-center justify-between p-2.5 rounded-[16px] bg-white hover:bg-neutral-50 dark:bg-[#1E1E1E] dark:hover:bg-neutral-800/60 border border-neutral-300 dark:border-neutral-700/80 hover:border-neutral-400 dark:hover:border-neutral-500 text-xs text-left cursor-pointer transition-colors"
+            className="w-full flex items-center justify-between p-1 sm:p-2.5 rounded-md sm:rounded-[16px] bg-white hover:bg-neutral-50 dark:bg-[#1E1E1E] dark:hover:bg-neutral-800/60 border border-neutral-300 dark:border-neutral-700/80 text-[8.5px] xs:text-[9.5px] sm:text-xs text-left cursor-pointer transition-colors"
           >
-            <div className="flex items-center gap-2">
-              <MapPin className="h-4 w-4 text-[#8FAF7E] shrink-0" />
-              <span className="text-neutral-800 dark:text-neutral-200 font-medium truncate">
-                {isDetecting ? "Detecting GPS..." : detectedCity || "Use Current GPS Location"}
+            <div className="flex items-center gap-1 sm:gap-2 min-w-0">
+              <MapPin className="h-2.5 w-2.5 sm:h-3.5 sm:w-3.5 text-[#8FAF7E] shrink-0" />
+              <span className="text-neutral-800 dark:text-neutral-200 font-medium truncate text-[8.5px] xs:text-[9.5px] sm:text-xs">
+                {isDetecting ? "GPS..." : detectedCity || "GPS"}
               </span>
             </div>
-            <span className="text-[10px] font-mono font-bold text-[#8FAF7E] uppercase bg-[#8FAF7E]/10 px-1.5 py-0.5 rounded">
-              GPS
+            <span className="text-[7px] xs:text-[8px] font-mono font-bold text-[#8FAF7E] uppercase bg-[#8FAF7E]/10 px-0.5 sm:px-1 py-0.2 rounded shrink-0">
+              Auto
             </span>
           </button>
 
-          {/* City Input with Notch Design */}
+          {/* City Input */}
           <Input
-            label="City / Region"
+            label="City"
             type="text"
             value={cityInput}
             onChange={(e) => {
               setCityInput(e.target.value);
               syncUrlParams({ cityVal: e.target.value });
             }}
-            placeholder="e.g. Hyderabad, Bengaluru..."
-            icon={<MapPin className="h-4 w-4 stroke-[1.6]" />}
+            placeholder="City"
+            icon={<MapPin className="h-2.5 w-2.5 sm:h-3.5 sm:w-3.5 stroke-[1.6]" />}
             cutoutBgClass={notchBgClass}
-            className="text-xs"
-            inputWrapperClassName="h-11 sm:h-11 rounded-[16px] border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E]"
+            className="text-[8.5px] xs:text-[9.5px] sm:text-xs"
+            inputWrapperClassName="h-6 xs:h-7 sm:h-11 px-1 xs:px-1.5 sm:px-4 rounded-md sm:rounded-[16px] border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E]"
             rightAdornment={
               cityInput ? (
                 <button
@@ -794,28 +789,28 @@ export default function FiltersPage() {
                     setCityInput("");
                     syncUrlParams({ cityVal: "" });
                   }}
-                  className="p-1 text-neutral-400 hover:text-neutral-800 dark:hover:text-white cursor-pointer"
+                  className="p-0.5 text-neutral-400 hover:text-neutral-800 dark:hover:text-white cursor-pointer"
                 >
-                  <X className="h-3.5 w-3.5" />
+                  <X className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                 </button>
               ) : null
             }
           />
 
-          {/* PIN Code Input with Notch Design */}
+          {/* PIN Code Input */}
           <Input
-            label="PIN Code"
+            label="PIN"
             type="text"
             value={pincodeInput}
             onChange={(e) => {
               setPincodeInput(e.target.value);
               syncUrlParams({ pinVal: e.target.value });
             }}
-            placeholder="e.g. 500081"
-            icon={<Navigation className="h-4 w-4 stroke-[1.6]" />}
+            placeholder="PIN"
+            icon={<Navigation className="h-2.5 w-2.5 sm:h-3.5 sm:w-3.5 stroke-[1.6]" />}
             cutoutBgClass={notchBgClass}
-            className="text-xs font-mono"
-            inputWrapperClassName="h-11 sm:h-11 rounded-[16px] border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E]"
+            className="text-[8.5px] xs:text-[9.5px] sm:text-xs font-mono"
+            inputWrapperClassName="h-6 xs:h-7 sm:h-11 px-1 xs:px-1.5 sm:px-4 rounded-md sm:rounded-[16px] border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E]"
             rightAdornment={
               pincodeInput ? (
                 <button
@@ -824,9 +819,9 @@ export default function FiltersPage() {
                     setPincodeInput("");
                     syncUrlParams({ pinVal: "" });
                   }}
-                  className="p-1 text-neutral-400 hover:text-neutral-800 dark:hover:text-white cursor-pointer"
+                  className="p-0.5 text-neutral-400 hover:text-neutral-800 dark:hover:text-white cursor-pointer"
                 >
-                  <X className="h-3.5 w-3.5" />
+                  <X className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                 </button>
               ) : null
             }
@@ -836,14 +831,15 @@ export default function FiltersPage() {
         {/* 5. PRODUCT CONDITION SECTION BOX */}
         <SectionBox
           title="Condition"
-          icon={<ShieldCheck className="h-3.5 w-3.5 text-neutral-500 dark:text-neutral-400" />}
+          titleClassName="text-[9.5px] xs:text-[10.5px] sm:text-[13px] font-bold px-0.5 sm:px-1"
+          icon={<ShieldCheck className="h-2.5 w-2.5 sm:h-3.5 sm:w-3.5 text-neutral-500 dark:text-neutral-400" />}
           cutoutBgClass={notchBgClass}
-          className="p-4 pt-5.5 rounded-2xl border-neutral-300/80 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] shadow-xs"
+          className="p-1 xs:p-1.5 sm:p-4 pt-3 sm:pt-5.5 rounded-lg sm:rounded-2xl border-neutral-300/80 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] shadow-xs"
         >
-          <div className="space-y-2 mt-1">
+          <div className="space-y-0.5 xs:space-y-1 sm:space-y-2 mt-0.5 sm:mt-1">
             {[
-              { id: "new" as const, label: "Brand New / Mint", count: conditionCounts.new },
-              { id: "used" as const, label: "Verified Used", count: conditionCounts.used },
+              { id: "new" as const, label: "New", fullLabel: "Brand New", count: conditionCounts.new },
+              { id: "used" as const, label: "Used", fullLabel: "Verified Used", count: conditionCounts.used },
             ].map((cond) => {
               const isChecked = selectedConditions.includes(cond.id);
 
@@ -851,33 +847,34 @@ export default function FiltersPage() {
                 <label
                   key={cond.id}
                   onClick={() => handleToggleCondition(cond.id)}
-                  className="group flex items-center justify-between py-1.5 px-2 -mx-1 rounded-lg cursor-pointer select-none transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800/60"
+                  className="group flex items-center justify-between py-0.5 sm:py-1.5 px-0.5 sm:px-2 -mx-0.5 sm:-mx-1 rounded cursor-pointer select-none transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800/60"
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1 xs:gap-1.5 sm:gap-3 min-w-0">
                     <div
                       className={cn(
-                        "w-4.5 h-4.5 rounded-[5px] flex items-center justify-center transition-all duration-150 shrink-0",
+                        "w-3 h-3 xs:w-3.5 xs:h-3.5 sm:w-4.5 sm:h-4.5 rounded-[3px] sm:rounded-[5px] flex items-center justify-center transition-all duration-150 shrink-0",
                         isChecked
                           ? "bg-neutral-900 text-white dark:bg-white dark:text-black shadow-xs"
                           : "bg-transparent border border-neutral-400 dark:border-neutral-700 group-hover:border-neutral-600 dark:group-hover:border-neutral-500"
                       )}
                     >
-                      {isChecked && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                      {isChecked && <Check className="w-2 h-2 sm:w-3.5 sm:h-3.5 stroke-[3]" />}
                     </div>
 
                     <span
                       className={cn(
-                        "text-sm tracking-tight transition-colors",
+                        "text-[9px] xs:text-[10px] sm:text-sm tracking-tight transition-colors truncate",
                         isChecked
                           ? "text-neutral-900 dark:text-white font-medium"
                           : "text-neutral-700 dark:text-neutral-300 group-hover:text-neutral-900 dark:group-hover:text-white"
                       )}
                     >
-                      {cond.label}
+                      <span className="sm:hidden">{cond.label}</span>
+                      <span className="hidden sm:inline">{cond.fullLabel}</span>
                     </span>
                   </div>
 
-                  <span className="text-xs text-neutral-400 dark:text-neutral-500 font-mono">
+                  <span className="text-[7.5px] xs:text-[8.5px] sm:text-xs text-neutral-400 dark:text-neutral-500 font-mono ml-0.5 shrink-0">
                     {cond.count}
                   </span>
                 </label>
@@ -885,6 +882,16 @@ export default function FiltersPage() {
             })}
           </div>
         </SectionBox>
+
+        {/* Clear All Bottom Button for sidebar */}
+        <button
+          type="button"
+          onClick={handleClearAll}
+          className="w-full py-1 sm:py-2 px-1 sm:px-3 rounded-md sm:rounded-xl border border-neutral-300 dark:border-neutral-700 text-[9px] xs:text-[10px] sm:text-xs font-semibold text-neutral-700 dark:text-neutral-200 hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors text-center cursor-pointer inline-flex items-center justify-center gap-1 shadow-xs"
+        >
+          <RotateCcw className="h-2.5 w-2.5 sm:h-3.5 sm:w-3.5 shrink-0" />
+          <span>Clear all</span>
+        </button>
       </div>
     );
   };
@@ -894,43 +901,33 @@ export default function FiltersPage() {
       {/* =================================================================== */}
       {/* TOP HEADER: BACK TO EXPLORE + BRAND + TITLE + DONE BUTTON           */}
       {/* =================================================================== */}
-      <header className="sticky top-0 z-30 h-16 shrink-0 bg-white/95 dark:bg-[#1E1E1E]/95 backdrop-blur-md border-b border-neutral-200 dark:border-neutral-800 px-4 sm:px-8 flex items-center justify-between gap-4">
+      <header className="sticky top-0 z-30 h-14 sm:h-16 shrink-0 bg-white/95 dark:bg-[#1E1E1E]/95 backdrop-blur-md border-b border-neutral-200 dark:border-neutral-800 px-3 sm:px-8 flex items-center justify-between gap-2 sm:gap-4">
         {/* Left: Back Link & Title */}
-        <div className="flex items-center gap-3 sm:gap-4">
+        <div className="flex items-center gap-2 sm:gap-4 min-w-0">
           <Link
             to="/categories"
             search={search as any}
-            className="inline-flex items-center gap-2 text-xs sm:text-sm font-semibold text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white transition-colors p-1.5 -ml-1.5 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800/50"
+            className="inline-flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-semibold text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white transition-colors p-1 -ml-1 sm:p-1.5 sm:-ml-1.5 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800/50 shrink-0"
             title="Return to standard Explore view"
           >
             <ArrowLeft className="h-4 w-4 stroke-[2]" />
             <span className="hidden sm:inline">Back to Explore</span>
           </Link>
           <div className="h-4 w-[1px] bg-neutral-300 dark:bg-neutral-800 hidden sm:block" />
-          <h1 className="text-sm sm:text-base font-bold text-neutral-900 dark:text-white tracking-tight flex items-center gap-2">
+          <h1 className="text-xs sm:text-base font-bold text-neutral-900 dark:text-white tracking-tight flex items-center gap-1.5 truncate">
             <span>Filter Marketplace</span>
-            <span className="text-xs font-normal text-neutral-500 dark:text-neutral-400 hidden md:inline">
-              ({filteredProducts.length} items)
+            <span className="text-[11px] sm:text-xs font-normal text-neutral-500 dark:text-neutral-400">
+              ({filteredProducts.length})
             </span>
           </h1>
         </div>
 
-        {/* Right: Mobile Filter Drawer Toggle + Done Button */}
-        <div className="flex items-center gap-2.5">
-          {/* Mobile Filter Toggle */}
-          <button
-            type="button"
-            onClick={() => setMobileSidebarOpen(true)}
-            className="lg:hidden inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-[#1E1E1E] text-xs font-semibold text-neutral-900 dark:text-white cursor-pointer transition-colors shadow-xs"
-          >
-            <SlidersHorizontal className="h-3.5 w-3.5 text-[#8FAF7E]" />
-            <span>Filters ({activeChips.length})</span>
-          </button>
-
+        {/* Right: Done Button */}
+        <div className="flex items-center gap-2 shrink-0">
           <Link
             to="/categories"
             search={search as any}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-neutral-900 text-white dark:bg-white dark:text-black hover:bg-neutral-800 dark:hover:bg-neutral-200 text-xs font-bold transition-colors cursor-pointer shadow-xs"
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-neutral-900 text-white dark:bg-white dark:text-black hover:bg-neutral-800 dark:hover:bg-neutral-200 text-xs font-bold transition-colors cursor-pointer shadow-xs"
           >
             Done
           </Link>
@@ -938,98 +935,39 @@ export default function FiltersPage() {
       </header>
 
       {/* =================================================================== */}
-      {/* MAIN TWO-COLUMN BODY LAYOUT (SCREENSHOT PROPORTIONS: 28% / 72%)     */}
-      {/* Desktop: Exactly calculated viewport height for independent scroll  */}
+      {/* MAIN TWO-COLUMN BODY LAYOUT                                         */}
+      {/* Same 2-column design on laptop AND mobile screen:                   */}
+      {/* Left side: Filter settings | Right side: Products                   */}
+      {/* Both columns move naturally together while scrolling                */}
       {/* =================================================================== */}
-      <div className="flex-1 max-w-[1600px] w-full mx-auto flex relative overflow-hidden lg:h-[calc(100vh-4rem)]">
+      <div className="flex-1 max-w-[1600px] w-full mx-auto flex relative min-h-[calc(100vh-4rem)]">
         {/* ----------------------------------------------------------------- */}
-        {/* LEFT COLUMN: DESKTOP FILTER SIDEBAR (~28% DESKTOP)                */}
-        {/* Independently scrollable, stable, and visually balanced           */}
+        {/* LEFT COLUMN: FILTER SIDEBAR (LAPTOP & MOBILE)                     */}
+        {/* Moves naturally as user scrolls the page                          */}
         {/* ----------------------------------------------------------------- */}
-        <aside className="hidden lg:flex flex-col w-[320px] xl:w-[28%] shrink-0 h-full bg-neutral-50 dark:bg-[#1E1E1E] border-r border-neutral-200 dark:border-neutral-800">
-          <div className="flex-1 overflow-y-auto px-5 xl:px-6 py-6 custom-scrollbar">
+        <aside className="w-[98px] xs:w-[112px] sm:w-[200px] md:w-[240px] lg:w-[280px] xl:w-[26%] shrink-0 bg-neutral-50 dark:bg-[#1E1E1E] border-r border-neutral-200 dark:border-neutral-800">
+          <div className="px-1 xs:px-1.5 sm:px-3.5 lg:px-5 xl:px-6 py-2 sm:py-6">
             {renderSidebarFilters(false)}
           </div>
         </aside>
 
         {/* ----------------------------------------------------------------- */}
-        {/* MOBILE FILTER DRAWER OVERLAY & SLIDE-OVER                         */}
-        {/* Clean full-page experience on mobile without competing containers */}
+        {/* RIGHT COLUMN: PRODUCT RESULTS GRID (LAPTOP & MOBILE)              */}
+        {/* 3 cards per row on mobile (grid-cols-3)                           */}
         {/* ----------------------------------------------------------------- */}
-        {mobileSidebarOpen && (
-          <div className="lg:hidden fixed inset-0 z-50 flex">
-            {/* Backdrop */}
-            <div
-              className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
-              onClick={() => setMobileSidebarOpen(false)}
-            />
-
-            {/* Slide-over panel */}
-            <div className="relative w-full max-w-sm sm:max-w-md bg-white dark:bg-[#1E1E1E] ml-auto h-full flex flex-col shadow-2xl z-10">
-              {/* Drawer Header */}
-              <div className="flex items-center justify-between p-4 border-b border-neutral-200 dark:border-neutral-800">
-                <div className="flex items-center gap-2">
-                  <SlidersHorizontal className="h-4 w-4 text-[#8FAF7E]" />
-                  <span className="font-bold text-sm text-neutral-900 dark:text-white">
-                    Filter Criteria ({activeChips.length})
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setMobileSidebarOpen(false)}
-                  className="p-1.5 text-neutral-500 hover:text-black dark:text-neutral-400 dark:hover:text-white rounded-lg transition-colors"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-
-              {/* Drawer Content */}
-              <div className="flex-1 overflow-y-auto p-4 sm:p-5 custom-scrollbar">
-                {renderSidebarFilters(true)}
-              </div>
-
-              {/* Drawer Footer: Clear & Apply Actions */}
-              <div className="p-3.5 border-t border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-[#1E1E1E] flex items-center gap-2.5">
-                <button
-                  type="button"
-                  onClick={handleClearAll}
-                  className="flex-1 py-2 px-3 rounded-xl border border-neutral-300 dark:border-neutral-700 text-xs font-semibold text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors text-center cursor-pointer inline-flex items-center justify-center gap-1.5"
-                >
-                  <RotateCcw className="h-3.5 w-3.5 shrink-0" />
-                  <span>Clear all</span>
-                </button>
-                <Button
-                  type="button"
-                  variant="primary"
-                  size="sm"
-                  onClick={() => setMobileSidebarOpen(false)}
-                  className="flex-1 py-2 px-3 rounded-xl font-bold text-xs cursor-pointer inline-flex items-center justify-center gap-1.5"
-                >
-                  <Check className="h-3.5 w-3.5 shrink-0" />
-                  <span>Apply Filters ({filteredProducts.length})</span>
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ----------------------------------------------------------------- */}
-        {/* RIGHT COLUMN: PRODUCT RESULTS GRID (~72% DESKTOP)                 */}
-        {/* Sticky top controls + strictly aligned 3-column cards grid        */}
-        {/* ----------------------------------------------------------------- */}
-        <main className="flex-1 h-full overflow-y-auto px-4 sm:px-6 lg:px-8 py-6 custom-scrollbar flex flex-col space-y-6">
-          {/* SEARCH INPUT BAR WITH NOTCH DESIGN (Image 1 Style) */}
+        <main className="flex-1 min-w-0 px-1.5 xs:px-2 sm:px-5 lg:px-8 py-2 sm:py-6 flex flex-col space-y-2 sm:space-y-6">
+          {/* SEARCH INPUT BAR WITH NOTCH DESIGN */}
           <div className="w-full shrink-0">
             <Input
               label="Search Equipment"
               type="text"
               value={searchQuery}
               onChange={(e) => handleSearchChange(e.target.value)}
-              placeholder="Search cameras, lenses, laptops, audio, lighting, drones..."
-              icon={<Search className="h-5 w-5 stroke-[1.6]" />}
+              placeholder="Search cameras, laptops, drones..."
+              icon={<Search className="h-3.5 w-3.5 sm:h-5 sm:w-5 stroke-[1.6]" />}
               cutoutBgClass="bg-neutral-50 dark:bg-[#1E1E1E]"
-              className="text-sm sm:text-base"
-              inputWrapperClassName="h-12 sm:h-13 rounded-[20px] border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E] shadow-xs"
+              className="text-[10px] xs:text-xs sm:text-base"
+              inputWrapperClassName="h-8 xs:h-9 sm:h-12 lg:h-13 px-2 xs:px-3 sm:px-5 rounded-lg sm:rounded-[20px] border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E] shadow-xs"
               rightAdornment={
                 searchQuery ? (
                   <button
@@ -1040,7 +978,7 @@ export default function FiltersPage() {
                     }}
                     className="p-1 text-neutral-400 hover:text-black dark:hover:text-white cursor-pointer"
                   >
-                    <X className="h-4 w-4" />
+                    <X className="h-3 w-3 sm:h-4 sm:w-4" />
                   </button>
                 ) : null
               }
@@ -1048,21 +986,21 @@ export default function FiltersPage() {
           </div>
 
           {/* STICKY TOP ROW: REMOVABLE FILTER CHIPS + CLEAR ALL (EXACT REFERENCE) */}
-          <div className="sticky top-0 z-20 bg-neutral-50/95 dark:bg-[#1E1E1E]/95 backdrop-blur-md pt-1 pb-3 border-b border-neutral-200 dark:border-neutral-800/80 flex items-center justify-between gap-3 flex-wrap min-h-[38px]">
-            <div className="flex items-center gap-2 flex-wrap">
+          <div className="sticky top-14 sm:top-16 z-20 bg-neutral-50/95 dark:bg-[#1E1E1E]/95 backdrop-blur-md pt-1 pb-2 sm:pb-3 border-b border-neutral-200 dark:border-neutral-800/80 flex items-center justify-between gap-1.5 sm:gap-3 flex-wrap min-h-[30px] sm:min-h-[38px]">
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
               {activeChips.map((chip) => (
                 <div
                   key={chip.id}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white dark:bg-[#1E1E1E] border border-neutral-300/80 dark:border-neutral-700 text-xs sm:text-sm text-neutral-800 dark:text-neutral-200 transition-colors shadow-xs"
+                  className="inline-flex items-center gap-1 px-1.5 xs:px-2 sm:px-3 py-0.5 sm:py-1.5 rounded-md sm:rounded-lg bg-white dark:bg-[#1E1E1E] border border-neutral-300/80 dark:border-neutral-700 text-[9.5px] xs:text-[10.5px] sm:text-sm text-neutral-800 dark:text-neutral-200 transition-colors shadow-xs"
                 >
-                  <span>{chip.label}</span>
+                  <span className="truncate max-w-[80px] xs:max-w-[120px] sm:max-w-none">{chip.label}</span>
                   <button
                     type="button"
                     onClick={chip.onRemove}
                     className="text-neutral-400 hover:text-black dark:hover:text-white p-0.5 rounded cursor-pointer transition-colors"
                     aria-label={`Remove filter ${chip.label}`}
                   >
-                    <X className="h-3.5 w-3.5" />
+                    <X className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                   </button>
                 </div>
               ))}
@@ -1071,28 +1009,28 @@ export default function FiltersPage() {
                 <button
                   type="button"
                   onClick={handleClearAll}
-                  className="text-xs sm:text-sm font-medium text-neutral-500 hover:text-black dark:text-neutral-400 dark:hover:text-white transition-colors cursor-pointer px-2 py-1 flex items-center gap-1"
+                  className="text-[9.5px] xs:text-[10.5px] sm:text-sm font-medium text-neutral-500 hover:text-black dark:text-neutral-400 dark:hover:text-white transition-colors cursor-pointer px-1 sm:px-2 py-0.5 flex items-center gap-1"
                 >
-                  <RotateCcw className="h-3 w-3" />
+                  <RotateCcw className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                   <span>Clear all</span>
                 </button>
               )}
 
               {activeChips.length === 0 && (
-                <span className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400">
+                <span className="text-[10px] xs:text-xs sm:text-sm text-neutral-500 dark:text-neutral-400">
                   Showing all equipment. Use filters on the left to narrow down.
                 </span>
               )}
             </div>
 
-            <div className="text-xs text-neutral-500 dark:text-neutral-400 font-mono shrink-0">
-              {filteredProducts.length} {filteredProducts.length === 1 ? "gear" : "gears"} available
+            <div className="text-[9px] xs:text-[10px] sm:text-xs text-neutral-500 dark:text-neutral-400 font-mono shrink-0">
+              {filteredProducts.length} {filteredProducts.length === 1 ? "gear" : "gears"}
             </div>
           </div>
 
-          {/* PRODUCT CARDS GRID (3 COLUMNS ON DESKTOP - EQUAL DIMENSIONS & ALIGNED) */}
+          {/* PRODUCT CARDS GRID (3 CARDS PER ROW ON MOBILE, 2 ON SM, 3 ON LG) */}
           {filteredProducts.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 pb-24">
+            <div className="grid grid-cols-3 sm:grid-cols-2 lg:grid-cols-3 gap-1.5 xs:gap-2 sm:gap-4 lg:gap-5 pb-24">
               {filteredProducts.map((p: any) => {
                 const rate = p.price || p.daily_rate || p.dailyRate || 0;
                 const img =
@@ -1109,10 +1047,10 @@ export default function FiltersPage() {
                     to="/product/$id"
                     params={{ id: String(p.id) }}
                     search={{ from: "filters" } as any}
-                    className="group bg-white dark:bg-[#1E1E1E] border border-neutral-200 dark:border-neutral-800 hover:border-neutral-400 dark:hover:border-neutral-600 rounded-2xl p-3.5 flex flex-col h-full justify-between transition-all duration-200 cursor-pointer shadow-xs hover:shadow-md hover:-translate-y-0.5"
+                    className="group bg-white dark:bg-[#1E1E1E] border border-neutral-200 dark:border-neutral-800 hover:border-neutral-400 dark:hover:border-neutral-600 rounded-lg sm:rounded-2xl p-1 xs:p-1.5 sm:p-3.5 flex flex-col h-full justify-between transition-all duration-200 cursor-pointer shadow-xs hover:shadow-md hover:-translate-y-0.5"
                   >
                     {/* Top Image Container with Fixed Consistent Aspect Ratio */}
-                    <div className="relative w-full aspect-square sm:aspect-[4/3] rounded-xl overflow-hidden bg-neutral-100 dark:bg-neutral-900 mb-3 shrink-0">
+                    <div className="relative w-full aspect-square sm:aspect-[4/3] rounded-md sm:rounded-xl overflow-hidden bg-neutral-100 dark:bg-neutral-900 mb-1 sm:mb-2.5 shrink-0">
                       <img
                         src={img}
                         alt={p.title || p.name || "Equipment"}
@@ -1124,32 +1062,30 @@ export default function FiltersPage() {
                         }}
                       />
                       {p.condition && (
-                        <span className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide uppercase bg-black/70 text-white backdrop-blur-xs border border-white/10">
+                        <span className="absolute top-1 left-1 sm:top-2 sm:left-2 px-1 py-0.2 sm:px-1.5 sm:py-0.5 rounded sm:rounded-full text-[7px] xs:text-[8px] sm:text-[10px] font-semibold tracking-wide uppercase bg-black/75 text-white backdrop-blur-xs border border-white/10 leading-none">
                           {p.condition}
                         </span>
                       )}
                     </div>
 
-                    {/* Card Body & Footer: Strictly Aligned (Image 2 style) */}
-                    <div className="flex-1 flex flex-col justify-between">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <h4 className="text-sm font-semibold text-neutral-900 dark:text-white tracking-tight line-clamp-1 group-hover:text-neutral-700 dark:group-hover:text-neutral-200 transition-colors">
-                            {p.title || p.name}
-                          </h4>
-                          <p className="text-xs text-neutral-500 dark:text-neutral-400 truncate mt-0.5">
-                            {vendorName}
-                          </p>
-                        </div>
+                    {/* Card Body & Pricing */}
+                    <div className="flex-1 flex flex-col justify-between min-w-0">
+                      <div className="min-w-0">
+                        <h4 className="text-[9.5px] xs:text-[11px] sm:text-sm font-semibold text-neutral-900 dark:text-white tracking-tight truncate line-clamp-1 group-hover:text-neutral-700 dark:group-hover:text-neutral-200 transition-colors leading-tight">
+                          {p.title || p.name}
+                        </h4>
+                        <p className="hidden xs:block text-[8px] xs:text-[9.5px] sm:text-xs text-neutral-500 dark:text-neutral-400 truncate mt-0.5 leading-none">
+                          {vendorName}
+                        </p>
+                      </div>
 
-                        <div className="text-right shrink-0">
-                          <span className="text-sm sm:text-base font-bold text-neutral-900 dark:text-white font-mono">
-                            ₹{Number(rate).toLocaleString("en-IN")}
-                          </span>
-                          <span className="block text-[10px] text-neutral-500 dark:text-neutral-400 -mt-0.5">
-                            / day
-                          </span>
-                        </div>
+                      <div className="mt-1 sm:mt-2 pt-0.5 border-t border-neutral-100 dark:border-neutral-800/60 flex items-baseline justify-between sm:justify-end sm:gap-1 flex-wrap">
+                        <span className="text-[9.5px] xs:text-[11.5px] sm:text-base font-bold text-neutral-900 dark:text-white font-mono leading-none">
+                          ₹{Number(rate).toLocaleString("en-IN")}
+                        </span>
+                        <span className="text-[7px] xs:text-[8px] sm:text-[10px] text-neutral-500 dark:text-neutral-400 leading-none">
+                          /day
+                        </span>
                       </div>
                     </div>
                   </Link>
