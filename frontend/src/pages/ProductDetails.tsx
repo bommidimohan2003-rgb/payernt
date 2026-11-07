@@ -41,6 +41,7 @@ import { Rating } from "@/components/common/Rating";
 import { useWishlist } from "@/hooks/useWishlist";
 import { useAuth } from "@/hooks/useAuth";
 import { useCart } from "@/hooks/useCart";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { JsonLd } from "@/components/common/JsonLd";
@@ -1163,6 +1164,9 @@ const productSchema = product ? {
   const isWishlisted = product ? has(product.id) : false;
 
   // Related Products
+  const isMobile = useIsMobile();
+  const relatedPageSize = isMobile ? 3 : 4;
+
   const relatedProductsList = useMemo(() => {
     if (!product) return [];
     const currentId = product.id;
@@ -1192,14 +1196,14 @@ const productSchema = product ? {
   }, [similarProducts, frequentlyTogether, product?.id, user]);
 
   const displayedRelated = useMemo(() => {
-    if (relatedProductsList.length <= 4) return relatedProductsList;
-    const start = (relatedCarouselPage * 4) % relatedProductsList.length;
-    const slice = relatedProductsList.slice(start, start + 4);
-    if (slice.length < 4) {
-      return [...slice, ...relatedProductsList.slice(0, 4 - slice.length)];
+    if (relatedProductsList.length <= relatedPageSize) return relatedProductsList;
+    const start = (relatedCarouselPage * relatedPageSize) % relatedProductsList.length;
+    const slice = relatedProductsList.slice(start, start + relatedPageSize);
+    if (slice.length < relatedPageSize) {
+      return [...slice, ...relatedProductsList.slice(0, relatedPageSize - slice.length)];
     }
     return slice;
-  }, [relatedProductsList, relatedCarouselPage]);
+  }, [relatedProductsList, relatedCarouselPage, relatedPageSize]);
 
 
   if (productLoading && !product) {
@@ -2166,71 +2170,79 @@ const productSchema = product ? {
           </section>
 
           {/* 2. RELATED PRODUCTS (Left-aligned title with overlapping details on image) */}
-          <section className="space-y-6 pt-2">
+          <section className="space-y-4 sm:space-y-6 pt-2">
             <div className="flex items-center justify-start gap-2.5">
               <span className="h-2 w-2 rounded-full bg-primary" />
-              <h2 className="text-xl sm:text-2xl font-extrabold text-foreground tracking-tight font-display">
+              <h2 className="text-lg sm:text-2xl font-extrabold text-foreground tracking-tight font-display">
                 Related Products
               </h2>
             </div>
 
             <div className="relative">
               {/* Left Arrow Button */}
-              {relatedProductsList.length > 4 && (
+              {relatedProductsList.length > relatedPageSize && (
                 <button
                   type="button"
                   onClick={() => setRelatedCarouselPage((p) => Math.max(0, p - 1))}
                   disabled={relatedCarouselPage === 0}
-                  className="absolute -left-3 sm:-left-5 top-1/2 -translate-y-1/2 z-10 p-2 sm:p-2.5 rounded-full bg-card border border-border shadow-md hover:bg-secondary disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-all"
+                  className="absolute -left-2.5 sm:-left-5 top-1/2 -translate-y-1/2 z-10 p-1.5 sm:p-2.5 rounded-full bg-card/90 dark:bg-[#1E1E1E]/90 backdrop-blur-md border border-border shadow-md hover:bg-secondary disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer transition-all"
                   aria-label="Previous related products"
                 >
-                  <ChevronLeft className="h-4 w-4 text-foreground" />
+                  <ChevronLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-foreground" />
                 </button>
               )}
 
-              {/* 4 Related Product Cards - Clean Edge-to-Edge Cards without Background Divs */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                {displayedRelated.map((rel) => (
+              {/* 3 Related Product Cards on Mobile (1 row of 3) / 4 on Desktop */}
+              <div className="grid grid-cols-3 sm:grid-cols-2 lg:grid-cols-4 gap-1.5 xs:gap-2 sm:gap-4 lg:gap-5">
+                {displayedRelated.map((rel, idx) => (
                   <Link
                     key={rel.id}
                     to="/payent/products/$id"
                     params={{ id: rel.id }}
-                    className="group relative aspect-[4/3] rounded-3xl overflow-hidden bg-neutral-950 border border-neutral-800/80 hover:border-primary/50 shadow-md hover:shadow-xl transition-all block text-left"
+                    className={cn(
+                      "group relative aspect-[4/5] xs:aspect-square sm:aspect-[4/3] rounded-xl sm:rounded-3xl overflow-hidden bg-neutral-950 border border-neutral-800/80 hover:border-primary/50 shadow-sm hover:shadow-xl transition-all block text-left",
+                      idx === 3 && "hidden sm:block"
+                    )}
                   >
                     {/* Edge-to-Edge Product Image */}
                     <img
                       src={rel.image || "/brand/payent-logo-icon.png"}
                       alt={rel.title}
+                      loading="lazy"
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src =
+                          "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=600&auto=format&fit=crop&q=80";
+                      }}
                     />
 
                     {/* Smooth dark gradient overlay for text readability */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent pointer-events-none" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/50 to-transparent pointer-events-none" />
 
                     {/* Overlap: Top Rating Badge */}
-                    <div className="absolute top-3 right-3 flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/15 text-[11px] font-bold text-amber-400 shadow-sm pointer-events-none">
-                      <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                    <div className="absolute top-1.5 right-1.5 sm:top-3 sm:right-3 flex items-center gap-0.5 sm:gap-1 px-1.5 py-0.5 sm:px-2.5 sm:py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/15 text-[8.5px] xs:text-[9.5px] sm:text-[11px] font-bold text-amber-400 shadow-sm pointer-events-none">
+                      <Star className="h-2 w-2 sm:h-3 sm:w-3 fill-amber-400 text-amber-400 shrink-0" />
                       <span>{(rel.rating != null ? Number(rel.rating) : 4.7).toFixed(1)}</span>
-                      <span className="text-white/60 font-normal text-[10px]">({rel.reviews || 84})</span>
+                      <span className="hidden sm:inline text-white/60 font-normal text-[10px]">({rel.reviews || 84})</span>
                     </div>
 
                     {/* Overlap: Bottom Details */}
-                    <div className="absolute inset-x-0 bottom-0 p-3.5 sm:p-4 space-y-1">
+                    <div className="absolute inset-x-0 bottom-0 p-1.5 xs:p-2 sm:p-4 space-y-0.5 sm:space-y-1">
                       <div>
-                        <h3 className="font-bold text-sm sm:text-base text-white group-hover:text-primary transition-colors truncate drop-shadow-sm">
+                        <h3 className="font-bold text-[10px] xs:text-[11.5px] sm:text-base text-white group-hover:text-primary transition-colors truncate drop-shadow-sm leading-tight">
                           {rel.title}
                         </h3>
-                        <p className="text-xs text-neutral-300 capitalize truncate">
+                        <p className="text-[8px] xs:text-[9px] sm:text-xs text-neutral-300 capitalize truncate leading-none">
                           {rel.category || "Gear"}
                         </p>
                       </div>
 
-                      <div className="flex items-center justify-between pt-1.5 border-t border-white/15">
-                        <span className="font-extrabold text-sm text-white font-mono drop-shadow-sm">
+                      <div className="flex items-center justify-between pt-0.5 sm:pt-1.5 border-t border-white/15">
+                        <span className="font-extrabold text-[9.5px] xs:text-[11px] sm:text-sm text-white font-mono drop-shadow-sm leading-tight">
                           ₹{(Number(rel.price) || 0).toLocaleString("en-IN")}{" "}
-                          <span className="text-[11px] text-neutral-300 font-normal font-sans">/ day</span>
+                          <span className="text-[7.5px] xs:text-[8.5px] sm:text-[11px] text-neutral-300 font-normal font-sans">/ day</span>
                         </span>
-                        <span className="text-[11px] font-semibold text-primary flex items-center gap-1 drop-shadow-sm">
+                        <span className="hidden sm:inline-flex text-[11px] font-semibold text-primary items-center gap-1 drop-shadow-sm">
                           <span className="h-1.5 w-1.5 rounded-full bg-primary" />
                           Available
                         </span>
@@ -2241,15 +2253,15 @@ const productSchema = product ? {
               </div>
 
               {/* Right Arrow Button */}
-              {relatedProductsList.length > 4 && (
+              {relatedProductsList.length > relatedPageSize && (
                 <button
                   type="button"
                   onClick={() => setRelatedCarouselPage((p) => p + 1)}
-                  disabled={(relatedCarouselPage + 1) * 4 >= relatedProductsList.length}
-                  className="absolute -right-3 sm:-right-5 top-1/2 -translate-y-1/2 z-10 p-2 sm:p-2.5 rounded-full bg-card border border-border shadow-md hover:bg-secondary disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-all"
+                  disabled={(relatedCarouselPage + 1) * relatedPageSize >= relatedProductsList.length}
+                  className="absolute -right-2.5 sm:-right-5 top-1/2 -translate-y-1/2 z-10 p-1.5 sm:p-2.5 rounded-full bg-card/90 dark:bg-[#1E1E1E]/90 backdrop-blur-md border border-border shadow-md hover:bg-secondary disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer transition-all"
                   aria-label="Next related products"
                 >
-                  <ChevronRight className="h-4 w-4 text-foreground" />
+                  <ChevronRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-foreground" />
                 </button>
               )}
             </div>

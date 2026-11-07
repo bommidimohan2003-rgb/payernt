@@ -2,8 +2,6 @@ import React, { useState, useEffect, useRef } from "react";
 import {
   motion,
   useReducedMotion,
-  useMotionValue,
-  useSpring,
   AnimatePresence,
 } from "framer-motion";
 import { useNavigate, Link } from "@tanstack/react-router";
@@ -157,26 +155,6 @@ export function ProductSelection() {
   // Mobile interactive branch state
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
-  // Smooth mouse follow light (Desktop only)
-  const mouseX = useMotionValue(typeof window !== "undefined" ? window.innerWidth / 2 : 500);
-  const mouseY = useMotionValue(typeof window !== "undefined" ? window.innerHeight / 2 : 400);
-
-  const springConfig = { damping: 28, stiffness: 180, mass: 0.6 };
-  const smoothMouseX = useSpring(mouseX, springConfig);
-  const smoothMouseY = useSpring(mouseY, springConfig);
-
-  useEffect(() => {
-    if (typeof window === "undefined" || shouldReduceMotion) return;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      mouseX.set(e.clientX);
-      mouseY.set(e.clientY);
-    };
-
-    window.addEventListener("mousemove", handleMouseMove, { passive: true });
-    return () => window.removeEventListener("mousemove", handleMouseMove);
-  }, [mouseX, mouseY, shouldReduceMotion]);
-
   // Smooth architectural easing curve
   const smoothEase: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
@@ -200,19 +178,6 @@ export function ProductSelection() {
       <div className="fixed top-5 left-5 sm:top-6 sm:left-8 z-40 md:hidden select-none">
         <BrandTitle className="text-sm sm:text-base font-extrabold tracking-tight text-foreground" />
       </div>
-
-      {/* DESKTOP CURSOR-FOLLOW LIGHT (SUBTLE RADIAL AMBIENT FIELD) */}
-      {!shouldReduceMotion && (
-        <motion.div
-          className="hidden md:block fixed w-[560px] h-[560px] rounded-full pointer-events-none z-0 -translate-x-1/2 -translate-y-1/2 opacity-[0.035] dark:opacity-[0.065] blur-3xl"
-          style={{
-            x: smoothMouseX,
-            y: smoothMouseY,
-            background:
-              "radial-gradient(circle, var(--color-foreground, #ffffff) 0%, transparent 70%)",
-          }}
-        />
-      )}
 
       {/* ================================================================== */}
       {/* DESKTOP / LARGE-SCREEN FULL-VIEWPORT GATEWAY (>= 768px)            */}
@@ -432,19 +397,6 @@ export function ProductSelection() {
             transition={{ duration: 0.5, delay: 0.65, ease: smoothEase }}
             className="group relative flex-1 flex flex-col items-center justify-center p-8 lg:p-16 text-center cursor-pointer outline-none transition-all focus-visible:ring-1 focus-visible:ring-foreground/40"
           >
-            {/* Soft neutral ambient spotlight illumination behind active path */}
-            <motion.div
-              animate={{
-                opacity: hoveredSide === "payernt" ? 0.09 : 0,
-              }}
-              transition={{ duration: 0.3 }}
-              className="absolute inset-0 pointer-events-none"
-              style={{
-                background:
-                  "radial-gradient(ellipse 65% 55% at 50% 50%, var(--color-foreground, #ffffff) 0%, transparent 70%)",
-              }}
-            />
-
             <motion.div
               animate={{
                 scale:
@@ -548,19 +500,6 @@ export function ProductSelection() {
             transition={{ duration: 0.5, delay: 0.65, ease: smoothEase }}
             className="group relative flex-1 flex flex-col items-center justify-center p-8 lg:p-16 text-center cursor-pointer outline-none transition-all focus-visible:ring-1 focus-visible:ring-foreground/40"
           >
-            {/* Soft neutral ambient spotlight illumination behind active path */}
-            <motion.div
-              animate={{
-                opacity: hoveredSide === "payrent" ? 0.09 : 0,
-              }}
-              transition={{ duration: 0.3 }}
-              className="absolute inset-0 pointer-events-none"
-              style={{
-                background:
-                  "radial-gradient(ellipse 65% 55% at 50% 50%, var(--color-foreground, #ffffff) 0%, transparent 70%)",
-              }}
-            />
-
             <motion.div
               animate={{
                 scale:
