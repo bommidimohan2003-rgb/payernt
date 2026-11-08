@@ -64,8 +64,8 @@ export default function FiltersPage() {
     sort?: string;
   };
 
-  // Mobile Filter Sidebar Toggle State (collapsible on mobile with "<" symbol)
-  const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(true);
+  // Mobile Filter Sidebar Toggle State (drawer on mobile with "<" symbol)
+  const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
 
   // 1. Search Query State
   const [searchQuery, setSearchQuery] = useState<string>(search.q || "");
@@ -505,13 +505,13 @@ export default function FiltersPage() {
       : "bg-neutral-50 dark:bg-[#1E1E1E]";
 
     return (
-      <div className="space-y-2 xs:space-y-2.5 sm:space-y-6">
+      <div className="space-y-3.5 sm:space-y-6">
         {/* 1. CATEGORY SECTION BOX */}
         <SectionBox
           title="Category"
-          titleClassName="text-[9.5px] xs:text-[10.5px] sm:text-[13px] font-bold px-0.5 sm:px-1"
+          titleClassName="text-xs sm:text-[13px] font-bold px-1"
           cutoutBgClass={notchBgClass}
-          className="p-1 xs:p-1.5 sm:p-4 pt-3 sm:pt-5.5 rounded-lg sm:rounded-2xl border-neutral-300/80 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] shadow-xs"
+          className="p-3 sm:p-4 pt-3.5 sm:pt-5.5 rounded-xl sm:rounded-2xl border-neutral-300/80 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] shadow-xs"
           action={
             selectedCats.length > 0 ? (
               <button
@@ -520,14 +520,15 @@ export default function FiltersPage() {
                   setSelectedCats([]);
                   syncUrlParams({ cat: [] });
                 }}
-                className="text-[9px] xs:text-[10px] sm:text-[11px] font-medium text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white cursor-pointer px-0.5 sm:px-1 transition-colors"
+                className="text-[10px] sm:text-[11px] font-medium text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white cursor-pointer px-1 transition-colors"
               >
                 Reset
               </button>
             ) : null
           }
         >
-          <div className="space-y-0.5 xs:space-y-1 sm:space-y-2 mt-0.5 sm:mt-1">
+          {/* On mobile: compact 2-column grid; on desktop: vertical list */}
+          <div className="grid grid-cols-2 gap-x-2 gap-y-1 sm:block sm:space-y-2 mt-1">
             {PRIMARY_CATEGORIES.map((cat) => {
               const isChecked = selectedCats.includes(cat.id);
               const count = categoryCounts[cat.id] ?? 0;
@@ -536,24 +537,24 @@ export default function FiltersPage() {
                 <label
                   key={cat.id}
                   onClick={() => handleToggleCat(cat.id)}
-                  className="group flex items-center justify-between py-0.5 sm:py-1.5 px-0.5 sm:px-2 -mx-0.5 sm:-mx-1 rounded cursor-pointer select-none transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800/60"
+                  className="group flex items-center justify-between py-1 sm:py-1.5 px-1.5 sm:px-2 rounded-lg cursor-pointer select-none transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800/60"
                 >
-                  <div className="flex items-center gap-1 xs:gap-1.5 sm:gap-3 min-w-0">
+                  <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
                     {/* Checkbox */}
                     <div
                       className={cn(
-                        "w-3 h-3 xs:w-3.5 xs:h-3.5 sm:w-4.5 sm:h-4.5 rounded-[3px] sm:rounded-[5px] flex items-center justify-center transition-all duration-150 shrink-0",
+                        "w-3.5 h-3.5 sm:w-4.5 sm:h-4.5 rounded-[4px] sm:rounded-[5px] flex items-center justify-center transition-all duration-150 shrink-0",
                         isChecked
                           ? "bg-neutral-900 text-white dark:bg-white dark:text-black shadow-xs"
                           : "bg-transparent border border-neutral-400 dark:border-neutral-700 group-hover:border-neutral-600 dark:group-hover:border-neutral-500"
                       )}
                     >
-                      {isChecked && <Check className="w-2 h-2 sm:w-3.5 sm:h-3.5 stroke-[3]" />}
+                      {isChecked && <Check className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 stroke-[3]" />}
                     </div>
 
                     <span
                       className={cn(
-                        "text-[9px] xs:text-[10px] sm:text-sm tracking-tight transition-colors truncate",
+                        "text-[10.5px] sm:text-sm tracking-tight transition-colors truncate",
                         isChecked
                           ? "text-neutral-900 dark:text-white font-medium"
                           : "text-neutral-700 dark:text-neutral-300 group-hover:text-neutral-900 dark:group-hover:text-white"
@@ -563,7 +564,7 @@ export default function FiltersPage() {
                     </span>
                   </div>
 
-                  <span className="text-[7.5px] xs:text-[8.5px] sm:text-xs text-neutral-400 dark:text-neutral-500 font-mono ml-0.5 shrink-0">
+                  <span className="text-[8.5px] sm:text-xs text-neutral-400 dark:text-neutral-500 font-mono ml-1 shrink-0">
                     {count}
                   </span>
                 </label>
@@ -575,11 +576,11 @@ export default function FiltersPage() {
         {/* 2. PRICE RANGE SECTION BOX (WAKESLIDER + NOTCH NUMERIC INPUTS) */}
         <SectionBox
           title="Price"
-          titleClassName="text-[9.5px] xs:text-[10.5px] sm:text-[13px] font-bold px-0.5 sm:px-1"
+          titleClassName="text-xs sm:text-[13px] font-bold px-1"
           cutoutBgClass={notchBgClass}
-          className="p-1 xs:p-1.5 sm:p-4 pt-3 sm:pt-5.5 rounded-lg sm:rounded-2xl border-neutral-300/80 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] shadow-xs space-y-1.5 xs:space-y-2 sm:space-y-4"
+          className="p-3 sm:p-4 pt-3.5 sm:pt-5.5 rounded-xl sm:rounded-2xl border-neutral-300/80 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] shadow-xs space-y-2 sm:space-y-4"
           badge={
-            <span className="text-[7.5px] xs:text-[8.5px] sm:text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 font-mono truncate max-w-[42px] xs:max-w-[55px] sm:max-w-none">
+            <span className="text-[10px] sm:text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 font-mono">
               {minPrice > 0
                 ? `₹${minPrice}–${maxPrice >= 10000 ? "10k+" : maxPrice}`
                 : maxPrice >= 10000
@@ -596,7 +597,7 @@ export default function FiltersPage() {
                   setMaxPrice(10000);
                   syncUrlParams({ minP: 0, maxP: 10000 });
                 }}
-                className="text-[9px] xs:text-[10px] sm:text-[11px] font-medium text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white cursor-pointer px-0.5 sm:px-1 transition-colors"
+                className="text-[10px] sm:text-[11px] font-medium text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white cursor-pointer px-1 transition-colors"
               >
                 Reset
               </button>
@@ -618,12 +619,12 @@ export default function FiltersPage() {
               }}
               formatValue={(v) => (v >= 10000 ? "Any" : `≤ ₹${v.toLocaleString("en-IN")}`)}
               label="Max Rate"
-              barCount={14}
+              barCount={16}
             />
           </div>
 
-          {/* Direct Min / Max Input Fields with Notch Styling */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 xs:gap-1.5 sm:gap-3 pt-0.5 sm:pt-1">
+          {/* Direct Min / Max Input Fields with Notch Styling in 2 columns */}
+          <div className="grid grid-cols-2 gap-2 sm:gap-3 pt-0.5 sm:pt-1">
             <Input
               label="Min"
               type="number"
@@ -638,8 +639,8 @@ export default function FiltersPage() {
                 syncUrlParams({ minP: val });
               }}
               cutoutBgClass={notchBgClass}
-              className="text-[9px] xs:text-[10px] sm:text-xs font-mono"
-              inputWrapperClassName="h-6 xs:h-7 sm:h-11 px-1.5 xs:px-2 sm:px-4 rounded-md sm:rounded-[16px] border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E]"
+              className="text-[11px] sm:text-xs font-mono"
+              inputWrapperClassName="h-8 sm:h-11 px-2.5 sm:px-4 rounded-xl sm:rounded-[16px] border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E]"
             />
             <Input
               label="Max"
@@ -656,13 +657,13 @@ export default function FiltersPage() {
                 syncUrlParams({ maxP: clamped });
               }}
               cutoutBgClass={notchBgClass}
-              className="text-[9px] xs:text-[10px] sm:text-xs font-mono"
-              inputWrapperClassName="h-6 xs:h-7 sm:h-11 px-1.5 xs:px-2 sm:px-4 rounded-md sm:rounded-[16px] border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E]"
+              className="text-[11px] sm:text-xs font-mono"
+              inputWrapperClassName="h-8 sm:h-11 px-2.5 sm:px-4 rounded-xl sm:rounded-[16px] border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E]"
             />
           </div>
 
           {/* Quick Min / Max bound hints */}
-          <div className="flex items-center justify-between text-[7.5px] xs:text-[8.5px] sm:text-[11px] text-neutral-500 font-mono">
+          <div className="flex items-center justify-between text-[9px] sm:text-[11px] text-neutral-500 font-mono">
             <span>₹0</span>
             <span>₹10k</span>
           </div>
@@ -671,10 +672,10 @@ export default function FiltersPage() {
         {/* 3. AVAILABILITY DATES SECTION BOX */}
         <SectionBox
           title="Dates"
-          titleClassName="text-[9.5px] xs:text-[10.5px] sm:text-[13px] font-bold px-0.5 sm:px-1"
-          icon={<Calendar className="h-2.5 w-2.5 sm:h-3.5 sm:w-3.5 text-neutral-500 dark:text-neutral-400" />}
+          titleClassName="text-xs sm:text-[13px] font-bold px-1"
+          icon={<Calendar className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-neutral-500 dark:text-neutral-400" />}
           cutoutBgClass={notchBgClass}
-          className="p-1 xs:p-1.5 sm:p-4 pt-3 sm:pt-5.5 rounded-lg sm:rounded-2xl border-neutral-300/80 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] shadow-xs space-y-1.5 sm:space-y-3.5"
+          className="p-3 sm:p-4 pt-3.5 sm:pt-5.5 rounded-xl sm:rounded-2xl border-neutral-300/80 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] shadow-xs space-y-2 sm:space-y-3.5"
           action={
             startDate || endDate ? (
               <button
@@ -684,14 +685,15 @@ export default function FiltersPage() {
                   setEndDate("");
                   syncUrlParams({ startD: "", endD: "" });
                 }}
-                className="text-[9px] xs:text-[10px] sm:text-[11px] font-medium text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white cursor-pointer px-0.5 sm:px-1 transition-colors"
+                className="text-[10px] sm:text-[11px] font-medium text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white cursor-pointer px-1 transition-colors"
               >
                 Clear
               </button>
             ) : null
           }
         >
-          <div className="space-y-1.5 sm:space-y-3">
+          {/* Start and End dates in 2 columns side-by-side on mobile, stacked on desktop */}
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-1 sm:space-y-3">
             <Input
               label="Start"
               type="date"
@@ -701,10 +703,10 @@ export default function FiltersPage() {
                 setStartDate(e.target.value);
                 syncUrlParams({ startD: e.target.value });
               }}
-              icon={<Calendar className="h-2.5 w-2.5 sm:h-3.5 sm:w-3.5 stroke-[1.6]" />}
+              icon={<Calendar className="h-3 w-3 sm:h-3.5 sm:w-3.5 stroke-[1.6]" />}
               cutoutBgClass={notchBgClass}
-              className="text-[8.5px] xs:text-[9.5px] sm:text-xs [&::-webkit-calendar-picker-indicator]:dark:filter [&::-webkit-calendar-picker-indicator]:dark:invert cursor-pointer"
-              inputWrapperClassName="h-6 xs:h-7 sm:h-11 px-1 xs:px-1.5 sm:px-4 rounded-md sm:rounded-[16px] border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E]"
+              className="text-[10px] sm:text-xs [&::-webkit-calendar-picker-indicator]:dark:filter [&::-webkit-calendar-picker-indicator]:dark:invert cursor-pointer"
+              inputWrapperClassName="h-8 sm:h-11 px-2 sm:px-4 rounded-xl sm:rounded-[16px] border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E]"
             />
 
             <Input
@@ -716,10 +718,10 @@ export default function FiltersPage() {
                 setEndDate(e.target.value);
                 syncUrlParams({ endD: e.target.value });
               }}
-              icon={<Calendar className="h-2.5 w-2.5 sm:h-3.5 sm:w-3.5 stroke-[1.6]" />}
+              icon={<Calendar className="h-3 w-3 sm:h-3.5 sm:w-3.5 stroke-[1.6]" />}
               cutoutBgClass={notchBgClass}
-              className="text-[8.5px] xs:text-[9.5px] sm:text-xs [&::-webkit-calendar-picker-indicator]:dark:filter [&::-webkit-calendar-picker-indicator]:dark:invert cursor-pointer"
-              inputWrapperClassName="h-6 xs:h-7 sm:h-11 px-1 xs:px-1.5 sm:px-4 rounded-md sm:rounded-[16px] border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E]"
+              className="text-[10px] sm:text-xs [&::-webkit-calendar-picker-indicator]:dark:filter [&::-webkit-calendar-picker-indicator]:dark:invert cursor-pointer"
+              inputWrapperClassName="h-8 sm:h-11 px-2 sm:px-4 rounded-xl sm:rounded-[16px] border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E]"
             />
           </div>
         </SectionBox>
@@ -727,10 +729,10 @@ export default function FiltersPage() {
         {/* 4. LOCATION SECTION BOX */}
         <SectionBox
           title="Location"
-          titleClassName="text-[9.5px] xs:text-[10.5px] sm:text-[13px] font-bold px-0.5 sm:px-1"
-          icon={<MapPin className="h-2.5 w-2.5 sm:h-3.5 sm:w-3.5 text-[#8FAF7E]" />}
+          titleClassName="text-xs sm:text-[13px] font-bold px-1"
+          icon={<MapPin className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-[#8FAF7E]" />}
           cutoutBgClass={notchBgClass}
-          className="p-1 xs:p-1.5 sm:p-4 pt-3 sm:pt-5.5 rounded-lg sm:rounded-2xl border-neutral-300/80 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] shadow-xs space-y-1.5 sm:space-y-3.5"
+          className="p-3 sm:p-4 pt-3.5 sm:pt-5.5 rounded-xl sm:rounded-2xl border-neutral-300/80 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] shadow-xs space-y-2 sm:space-y-3.5"
           action={
             cityInput || pincodeInput ? (
               <button
@@ -740,7 +742,7 @@ export default function FiltersPage() {
                   setPincodeInput("");
                   syncUrlParams({ cityVal: "", pinVal: "" });
                 }}
-                className="text-[9px] xs:text-[10px] sm:text-[11px] font-medium text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white cursor-pointer px-0.5 sm:px-1 transition-colors"
+                className="text-[10px] sm:text-[11px] font-medium text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white cursor-pointer px-1 transition-colors"
               >
                 Clear
               </button>
@@ -757,92 +759,93 @@ export default function FiltersPage() {
                 syncUrlParams({ cityVal: detectedCity });
               }
             }}
-            className="w-full flex items-center justify-between p-1 sm:p-2.5 rounded-md sm:rounded-[16px] bg-white hover:bg-neutral-50 dark:bg-[#1E1E1E] dark:hover:bg-neutral-800/60 border border-neutral-300 dark:border-neutral-700/80 text-[8.5px] xs:text-[9.5px] sm:text-xs text-left cursor-pointer transition-colors"
+            className="w-full flex items-center justify-between p-2 sm:p-2.5 rounded-xl sm:rounded-[16px] bg-white hover:bg-neutral-50 dark:bg-[#1E1E1E] dark:hover:bg-neutral-800/60 border border-neutral-300 dark:border-neutral-700/80 text-[11px] sm:text-xs text-left cursor-pointer transition-colors"
           >
-            <div className="flex items-center gap-1 sm:gap-2 min-w-0">
-              <MapPin className="h-2.5 w-2.5 sm:h-3.5 sm:w-3.5 text-[#8FAF7E] shrink-0" />
-              <span className="text-neutral-800 dark:text-neutral-200 font-medium truncate text-[8.5px] xs:text-[9.5px] sm:text-xs">
-                {isDetecting ? "GPS..." : detectedCity || "GPS"}
+            <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+              <MapPin className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-[#8FAF7E] shrink-0" />
+              <span className="text-neutral-800 dark:text-neutral-200 font-medium truncate text-xs">
+                {isDetecting ? "GPS..." : detectedCity || "Auto GPS"}
               </span>
             </div>
-            <span className="text-[7px] xs:text-[8px] font-mono font-bold text-[#8FAF7E] uppercase bg-[#8FAF7E]/10 px-0.5 sm:px-1 py-0.2 rounded shrink-0">
+            <span className="text-[8px] sm:text-[9px] font-mono font-bold text-[#8FAF7E] uppercase bg-[#8FAF7E]/10 px-1.5 py-0.5 rounded-md shrink-0">
               Auto
             </span>
           </button>
 
-          {/* City Input */}
-          <Input
-            label="City"
-            type="text"
-            value={cityInput}
-            onChange={(e) => {
-              setCityInput(e.target.value);
-              syncUrlParams({ cityVal: e.target.value });
-            }}
-            placeholder="City"
-            icon={<MapPin className="h-2.5 w-2.5 sm:h-3.5 sm:w-3.5 stroke-[1.6]" />}
-            cutoutBgClass={notchBgClass}
-            className="text-[8.5px] xs:text-[9.5px] sm:text-xs"
-            inputWrapperClassName="h-6 xs:h-7 sm:h-11 px-1 xs:px-1.5 sm:px-4 rounded-md sm:rounded-[16px] border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E]"
-            rightAdornment={
-              cityInput ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCityInput("");
-                    syncUrlParams({ cityVal: "" });
-                  }}
-                  className="p-0.5 text-neutral-400 hover:text-neutral-800 dark:hover:text-white cursor-pointer"
-                >
-                  <X className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-                </button>
-              ) : null
-            }
-          />
+          {/* City & PIN Code inputs in 2 columns side-by-side */}
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-1 sm:space-y-3">
+            <Input
+              label="City"
+              type="text"
+              value={cityInput}
+              onChange={(e) => {
+                setCityInput(e.target.value);
+                syncUrlParams({ cityVal: e.target.value });
+              }}
+              placeholder="City"
+              icon={<MapPin className="h-3 w-3 sm:h-3.5 sm:w-3.5 stroke-[1.6]" />}
+              cutoutBgClass={notchBgClass}
+              className="text-[11px] sm:text-xs"
+              inputWrapperClassName="h-8 sm:h-11 px-2 sm:px-4 rounded-xl sm:rounded-[16px] border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E]"
+              rightAdornment={
+                cityInput ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCityInput("");
+                      syncUrlParams({ cityVal: "" });
+                    }}
+                    className="p-0.5 text-neutral-400 hover:text-neutral-800 dark:hover:text-white cursor-pointer"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                ) : null
+              }
+            />
 
-          {/* PIN Code Input */}
-          <Input
-            label="PIN"
-            type="text"
-            value={pincodeInput}
-            onChange={(e) => {
-              setPincodeInput(e.target.value);
-              syncUrlParams({ pinVal: e.target.value });
-            }}
-            placeholder="PIN"
-            icon={<Navigation className="h-2.5 w-2.5 sm:h-3.5 sm:w-3.5 stroke-[1.6]" />}
-            cutoutBgClass={notchBgClass}
-            className="text-[8.5px] xs:text-[9.5px] sm:text-xs font-mono"
-            inputWrapperClassName="h-6 xs:h-7 sm:h-11 px-1 xs:px-1.5 sm:px-4 rounded-md sm:rounded-[16px] border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E]"
-            rightAdornment={
-              pincodeInput ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPincodeInput("");
-                    syncUrlParams({ pinVal: "" });
-                  }}
-                  className="p-0.5 text-neutral-400 hover:text-neutral-800 dark:hover:text-white cursor-pointer"
-                >
-                  <X className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-                </button>
-              ) : null
-            }
-          />
+            <Input
+              label="PIN"
+              type="text"
+              value={pincodeInput}
+              onChange={(e) => {
+                setPincodeInput(e.target.value);
+                syncUrlParams({ pinVal: e.target.value });
+              }}
+              placeholder="PIN"
+              icon={<Navigation className="h-3 w-3 sm:h-3.5 sm:w-3.5 stroke-[1.6]" />}
+              cutoutBgClass={notchBgClass}
+              className="text-[11px] sm:text-xs font-mono"
+              inputWrapperClassName="h-8 sm:h-11 px-2 sm:px-4 rounded-xl sm:rounded-[16px] border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E]"
+              rightAdornment={
+                pincodeInput ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPincodeInput("");
+                      syncUrlParams({ pinVal: "" });
+                    }}
+                    className="p-0.5 text-neutral-400 hover:text-neutral-800 dark:hover:text-white cursor-pointer"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                ) : null
+              }
+            />
+          </div>
         </SectionBox>
 
         {/* 5. PRODUCT CONDITION SECTION BOX */}
         <SectionBox
           title="Condition"
-          titleClassName="text-[9.5px] xs:text-[10.5px] sm:text-[13px] font-bold px-0.5 sm:px-1"
-          icon={<ShieldCheck className="h-2.5 w-2.5 sm:h-3.5 sm:w-3.5 text-neutral-500 dark:text-neutral-400" />}
+          titleClassName="text-xs sm:text-[13px] font-bold px-1"
+          icon={<ShieldCheck className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-neutral-500 dark:text-neutral-400" />}
           cutoutBgClass={notchBgClass}
-          className="p-1 xs:p-1.5 sm:p-4 pt-3 sm:pt-5.5 rounded-lg sm:rounded-2xl border-neutral-300/80 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] shadow-xs"
+          className="p-3 sm:p-4 pt-3.5 sm:pt-5.5 rounded-xl sm:rounded-2xl border-neutral-300/80 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] shadow-xs"
         >
-          <div className="space-y-0.5 xs:space-y-1 sm:space-y-2 mt-0.5 sm:mt-1">
+          <div className="grid grid-cols-2 gap-2 sm:block sm:space-y-2 mt-1">
             {[
-              { id: "new" as const, label: "New", fullLabel: "Brand New", count: conditionCounts.new },
-              { id: "used" as const, label: "Used", fullLabel: "Verified Used", count: conditionCounts.used },
+              { id: "new" as const, label: "Brand New", count: conditionCounts.new },
+              { id: "used" as const, label: "Verified Used", count: conditionCounts.used },
             ].map((cond) => {
               const isChecked = selectedConditions.includes(cond.id);
 
@@ -850,34 +853,33 @@ export default function FiltersPage() {
                 <label
                   key={cond.id}
                   onClick={() => handleToggleCondition(cond.id)}
-                  className="group flex items-center justify-between py-0.5 sm:py-1.5 px-0.5 sm:px-2 -mx-0.5 sm:-mx-1 rounded cursor-pointer select-none transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800/60"
+                  className="group flex items-center justify-between py-1 sm:py-1.5 px-2 rounded-lg cursor-pointer select-none transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800/60"
                 >
-                  <div className="flex items-center gap-1 xs:gap-1.5 sm:gap-3 min-w-0">
+                  <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
                     <div
                       className={cn(
-                        "w-3 h-3 xs:w-3.5 xs:h-3.5 sm:w-4.5 sm:h-4.5 rounded-[3px] sm:rounded-[5px] flex items-center justify-center transition-all duration-150 shrink-0",
+                        "w-3.5 h-3.5 sm:w-4.5 sm:h-4.5 rounded-[4px] sm:rounded-[5px] flex items-center justify-center transition-all duration-150 shrink-0",
                         isChecked
                           ? "bg-neutral-900 text-white dark:bg-white dark:text-black shadow-xs"
                           : "bg-transparent border border-neutral-400 dark:border-neutral-700 group-hover:border-neutral-600 dark:group-hover:border-neutral-500"
                       )}
                     >
-                      {isChecked && <Check className="w-2 h-2 sm:w-3.5 sm:h-3.5 stroke-[3]" />}
+                      {isChecked && <Check className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 stroke-[3]" />}
                     </div>
 
                     <span
                       className={cn(
-                        "text-[9px] xs:text-[10px] sm:text-sm tracking-tight transition-colors truncate",
+                        "text-[11px] sm:text-sm tracking-tight transition-colors truncate",
                         isChecked
                           ? "text-neutral-900 dark:text-white font-medium"
                           : "text-neutral-700 dark:text-neutral-300 group-hover:text-neutral-900 dark:group-hover:text-white"
                       )}
                     >
-                      <span className="sm:hidden">{cond.label}</span>
-                      <span className="hidden sm:inline">{cond.fullLabel}</span>
+                      {cond.label}
                     </span>
                   </div>
 
-                  <span className="text-[7.5px] xs:text-[8.5px] sm:text-xs text-neutral-400 dark:text-neutral-500 font-mono ml-0.5 shrink-0">
+                  <span className="text-[9px] sm:text-xs text-neutral-400 dark:text-neutral-500 font-mono ml-1 shrink-0">
                     {cond.count}
                   </span>
                 </label>
@@ -890,9 +892,9 @@ export default function FiltersPage() {
         <button
           type="button"
           onClick={handleClearAll}
-          className="w-full py-1 sm:py-2 px-1 sm:px-3 rounded-md sm:rounded-xl border border-neutral-300 dark:border-neutral-700 text-[9px] xs:text-[10px] sm:text-xs font-semibold text-neutral-700 dark:text-neutral-200 hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors text-center cursor-pointer inline-flex items-center justify-center gap-1 shadow-xs"
+          className="w-full py-2 px-3 rounded-xl border border-neutral-300 dark:border-neutral-700 text-xs font-semibold text-neutral-700 dark:text-neutral-200 hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors text-center cursor-pointer inline-flex items-center justify-center gap-1.5 shadow-xs"
         >
-          <RotateCcw className="h-2.5 w-2.5 sm:h-3.5 sm:w-3.5 shrink-0" />
+          <RotateCcw className="h-3.5 w-3.5 shrink-0" />
           <span>Clear all</span>
         </button>
       </div>
@@ -944,62 +946,81 @@ export default function FiltersPage() {
       {/* Both columns move naturally together while scrolling                */}
       {/* =================================================================== */}
       <div className="flex-1 max-w-[1600px] w-full mx-auto flex relative min-h-[calc(100vh-4rem)]">
-        {/* ----------------------------------------------------------------- */}
-        {/* LEFT COLUMN: FILTER SIDEBAR (LAPTOP & MOBILE)                     */}
-        {/* Moves naturally as user scrolls the page                          */}
-        {/* ----------------------------------------------------------------- */}
-        <aside
-          className={cn(
-            "shrink-0 bg-neutral-50 dark:bg-[#1E1E1E] border-r border-neutral-200 dark:border-neutral-800 transition-all duration-300 relative",
-            isMobileFilterOpen
-              ? "w-[140px] xs:w-[160px] sm:w-[200px] md:w-[240px] lg:w-[280px] xl:w-[26%]"
-              : "w-0 sm:w-[200px] md:w-[240px] lg:w-[280px] xl:w-[26%] overflow-hidden sm:overflow-visible border-r-0 sm:border-r"
-          )}
-        >
-          {/* Mobile Collapse Toggle Handle on Boundary Edge */}
-          <button
-            type="button"
-            onClick={() => setIsMobileFilterOpen((prev) => !prev)}
-            className="sm:hidden absolute -right-3 top-2.5 z-30 w-6 h-6 rounded-full bg-neutral-900 text-white dark:bg-white dark:text-black border border-neutral-300 dark:border-neutral-700 shadow-md flex items-center justify-center cursor-pointer hover:scale-110 active:scale-95 transition-transform"
-            title={isMobileFilterOpen ? "Close filters (<)" : "Open filters (<)"}
-            aria-label={isMobileFilterOpen ? "Close filters (<)" : "Open filters (<)"}
-          >
-            <span className="font-mono font-black text-xs leading-none select-none">
-              {isMobileFilterOpen ? "<" : ">"}
-            </span>
-          </button>
-
+        {/* Backdrop for mobile drawer */}
+        {isMobileFilterOpen && (
           <div
-            className={cn(
-              "px-1.5 xs:px-2.5 sm:px-3.5 lg:px-5 xl:px-6 py-2 sm:py-6",
-              !isMobileFilterOpen && "hidden sm:block"
-            )}
-          >
-            {renderSidebarFilters(false)}
-          </div>
-        </aside>
-
-        {/* Mobile Edge Open Button when filters are closed */}
-        {!isMobileFilterOpen && (
-          <button
-            type="button"
-            onClick={() => setIsMobileFilterOpen(true)}
-            className="sm:hidden fixed left-0 top-24 z-40 py-2.5 px-1.5 rounded-r-xl bg-neutral-900 text-white dark:bg-white dark:text-black shadow-lg flex flex-col items-center gap-1 cursor-pointer hover:opacity-90 active:scale-95 transition-all text-[11px] font-bold border border-l-0 border-neutral-700 dark:border-neutral-300 animate-in fade-in slide-in-from-left-2 duration-150"
-            title="Open filters (<)"
-            aria-label="Open filters (<)"
-          >
-            <span className="font-mono font-black text-xs leading-none">&lt;</span>
-            <span className="[writing-mode:vertical-lr] text-[9px] uppercase tracking-wider font-extrabold py-0.5">
-              Filters
-            </span>
-          </button>
+            onClick={() => setIsMobileFilterOpen(false)}
+            className="sm:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-xs transition-opacity duration-300"
+            aria-hidden="true"
+          />
         )}
 
         {/* ----------------------------------------------------------------- */}
-        {/* RIGHT COLUMN: PRODUCT RESULTS GRID (LAPTOP & MOBILE)              */}
-        {/* 3 cards per row on mobile (grid-cols-3)                           */}
+        {/* LEFT COLUMN: FILTER SIDEBAR                                       */}
+        {/* Desktop: Static in-flow sidebar                                   */}
+        {/* Mobile: Full-width slide-out drawer with "<" to close            */}
         {/* ----------------------------------------------------------------- */}
-        <main className="flex-1 min-w-0 px-1.5 xs:px-2 sm:px-5 lg:px-8 py-2 sm:py-6 flex flex-col space-y-2 sm:space-y-6">
+        <aside
+          className={cn(
+            // Desktop layout (unaltered in-flow sidebar)
+            "sm:shrink-0 sm:static sm:z-auto sm:bg-neutral-50 sm:dark:bg-[#1E1E1E] sm:border-r sm:border-neutral-200 sm:dark:border-neutral-800 sm:w-[200px] md:w-[240px] lg:w-[280px] xl:w-[26%] sm:translate-x-0 sm:shadow-none sm:flex sm:flex-col",
+            // Mobile layout (smooth slide-over drawer)
+            "fixed inset-y-0 left-0 z-50 w-[86vw] max-w-[340px] bg-white dark:bg-[#1E1E1E] shadow-2xl transition-transform duration-300 ease-in-out border-r border-neutral-200 dark:border-neutral-800 flex flex-col",
+            isMobileFilterOpen ? "translate-x-0" : "-translate-x-full sm:translate-x-0"
+          )}
+        >
+          {/* Mobile Drawer Header with "<" Close Button */}
+          <div className="sm:hidden flex items-center justify-between px-4 py-3 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50/90 dark:bg-neutral-900/90 shrink-0">
+            <button
+              type="button"
+              onClick={() => setIsMobileFilterOpen(false)}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-neutral-200/80 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs font-bold hover:bg-neutral-300 dark:hover:bg-neutral-700 transition-colors cursor-pointer"
+              aria-label="Close filters"
+            >
+              <span className="font-mono font-black text-sm leading-none">&lt;</span>
+              <span>Close</span>
+            </button>
+
+            <span className="font-extrabold text-sm text-neutral-900 dark:text-white">
+              Filters
+              {activeChips.length > 0 && (
+                <span className="ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold">
+                  {activeChips.length}
+                </span>
+              )}
+            </span>
+
+            <button
+              type="button"
+              onClick={handleClearAll}
+              className="text-xs font-semibold text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white transition-colors cursor-pointer"
+            >
+              Reset
+            </button>
+          </div>
+
+          {/* Scrollable Filter List */}
+          <div className="flex-1 overflow-y-auto px-3.5 sm:px-3.5 lg:px-5 xl:px-6 py-3.5 sm:py-6">
+            {renderSidebarFilters(true)}
+          </div>
+
+          {/* Mobile Drawer Bottom Action */}
+          <div className="sm:hidden p-3 border-t border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] shrink-0">
+            <button
+              type="button"
+              onClick={() => setIsMobileFilterOpen(false)}
+              className="w-full py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white dark:bg-white dark:text-black dark:hover:bg-neutral-100 font-bold text-xs shadow-md transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <span>Show {filteredProducts.length} Results</span>
+            </button>
+          </div>
+        </aside>
+
+        {/* ----------------------------------------------------------------- */}
+        {/* RIGHT COLUMN: PRODUCT RESULTS GRID (LAPTOP & MOBILE)              */}
+        {/* 3 cards per row on mobile (grid-cols-3) with full width           */}
+        {/* ----------------------------------------------------------------- */}
+        <main className="flex-1 min-w-0 px-2 sm:px-5 lg:px-8 py-2.5 sm:py-6 flex flex-col space-y-2.5 sm:space-y-6">
           {/* SEARCH INPUT BAR WITH NOTCH DESIGN */}
           <div className="w-full shrink-0">
             <Input
@@ -1008,10 +1029,10 @@ export default function FiltersPage() {
               value={searchQuery}
               onChange={(e) => handleSearchChange(e.target.value)}
               placeholder="Search cameras, laptops, drones..."
-              icon={<Search className="h-3.5 w-3.5 sm:h-5 sm:w-5 stroke-[1.6]" />}
+              icon={<Search className="h-4 w-4 sm:h-5 sm:w-5 stroke-[1.6]" />}
               cutoutBgClass="bg-neutral-50 dark:bg-[#1E1E1E]"
-              className="text-[10px] xs:text-xs sm:text-base"
-              inputWrapperClassName="h-8 xs:h-9 sm:h-12 lg:h-13 px-2 xs:px-3 sm:px-5 rounded-lg sm:rounded-[20px] border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E] shadow-xs"
+              className="text-xs sm:text-base"
+              inputWrapperClassName="h-9 sm:h-12 lg:h-13 px-3 sm:px-5 rounded-xl sm:rounded-[20px] border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E] shadow-xs"
               rightAdornment={
                 searchQuery ? (
                   <button
@@ -1022,7 +1043,7 @@ export default function FiltersPage() {
                     }}
                     className="p-1 text-neutral-400 hover:text-black dark:hover:text-white cursor-pointer"
                   >
-                    <X className="h-3 w-3 sm:h-4 sm:w-4" />
+                    <X className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   </button>
                 ) : null
               }
@@ -1035,12 +1056,18 @@ export default function FiltersPage() {
               {/* Mobile Filter Toggle Button with "<" */}
               <button
                 type="button"
-                onClick={() => setIsMobileFilterOpen((prev) => !prev)}
-                className="sm:hidden inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white dark:bg-[#1E1E1E] border border-neutral-300/80 dark:border-neutral-700 text-[9.5px] xs:text-[10.5px] font-bold text-neutral-800 dark:text-neutral-200 shadow-xs cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shrink-0"
-                title={isMobileFilterOpen ? "Close filters (<)" : "Open filters (<)"}
+                onClick={() => setIsMobileFilterOpen(true)}
+                className="sm:hidden inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-neutral-900 text-white dark:bg-white dark:text-black text-xs font-bold shadow-xs cursor-pointer hover:opacity-90 active:scale-95 transition-all shrink-0"
+                title="Open filters (<)"
+                aria-label="Open filters (<)"
               >
                 <span className="font-mono font-black text-xs leading-none">&lt;</span>
-                <span>{isMobileFilterOpen ? "Filters" : "Filters"}</span>
+                <span>Filters</span>
+                {activeChips.length > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-white/20 dark:bg-black/20 font-black">
+                    {activeChips.length}
+                  </span>
+                )}
               </button>
               {activeChips.map((chip) => (
                 <div
