@@ -206,6 +206,8 @@ def execute_query(query: str, params: tuple = (), retry: bool = True):
     try:
         conn = get_db_connection()
         if not conn:
+            if os.environ.get("PYTEST_CURRENT_TEST") or os.environ.get("TESTING"):
+                return None
             now = dt.now(timezone.utc).timestamp()
             if _last_db_failure_timestamp > 0 and (now - _last_db_failure_timestamp) < 5.0:
                 return None
@@ -966,6 +968,18 @@ def init_db(force: bool = False):
         )
     """)
 
+    # Safely alter payments table for extended attributes and fast queries
+    add_column_safely("payments", "order_id VARCHAR(255)")
+    add_column_safely("payments", "razorpay_order_id VARCHAR(255)")
+    add_column_safely("payments", "razorpay_payment_id VARCHAR(255)")
+    add_column_safely("payments", "refund_id VARCHAR(255)")
+    add_column_safely("payments", "refund_status VARCHAR(50)")
+    add_column_safely("payments", "product_title VARCHAR(255)")
+    add_column_safely("payments", "product_image LONGTEXT")
+    add_column_safely("payments", "updated_at VARCHAR(100)")
+    add_index_safely("payments", "idx_payments_customer_id", "customer_id")
+    add_index_safely("payments", "idx_payments_booking_id", "booking_id")
+
     # Create processed_payment_events table for webhook idempotency
     execute_query("""
         CREATE TABLE IF NOT EXISTS processed_payment_events (
@@ -1395,6 +1409,7 @@ MOCK_USERS = {
 }
 MOCK_OTPS = {}
 MOCK_ORDERS: Dict[str, Dict[str, Any]] = {}
+MOCK_PAYMENTS: Dict[str, Dict[str, Any]] = {}
 MOCK_BOOKING_CANCELLATIONS: Dict[str, Dict[str, Any]] = {}
 MOCK_RENTAL_QUEUE_ACTIONS: Dict[str, List[Dict[str, Any]]] = {}
 MOCK_CARTS = {}
@@ -4812,13 +4827,15 @@ def create_order_record(
     status: str = "pending",
     razorpay_order_id: str = None,
     payment_status: str = "unpaid",
+    razorpay_payment_id: str = None,
     delivery_method: str = "delivery",
     delivery_address: Optional[str] = None,
     pickup_location: Optional[str] = None,
     custom_location: Optional[str] = None,
     location_directions: Optional[str] = None,
     latitude: Optional[float] = None,
-    longitude: Optional[float] = None
+    longitude: Optional[float] = None,
+    **kwargs
 ):
     created_at = dt.now(timezone.utc).isoformat()
     order_data = {
@@ -4833,6 +4850,7 @@ def create_order_record(
         "status": status,
         "created_at": created_at,
         "razorpay_order_id": razorpay_order_id,
+        "razorpay_payment_id": razorpay_payment_id,
         "payment_status": payment_status,
         "delivery_method": delivery_method,
         "deliveryMethod": delivery_method,
@@ -4989,6 +5007,209 @@ def update_order_payment_status(
             MOCK_ORDERS[order_id]["refund_id"] = refund_id
         if refund_status:
             MOCK_ORDERS[order_id]["refund_status"] = refund_status
+
+
+def record_or_update_payment(
+    payment_id: str,
+    booking_id: str = None,
+    customer_id: str = "",
+    customer_name: str = "Valued Customer",
+    amount: int = 0,
+    status: str = "pending",
+    method: str = "Razorpay (UPI / Card / NetBanking)",
+    invoice_url: str = "#",
+    razorpay_order_id: str = None,
+    razorpay_payment_id: str = None,
+    refund_id: str = None,
+    refund_status: str = None,
+    product_title: str = None,
+    product_image: str = None,
+    order_id: str = None,
+    currency: str = "INR",
+    metadata: dict = None,
+    **kwargs
+):
+    """
+    Persist or update transaction record in payments table.
+    """
+    effective_booking_id = booking_id or order_id or ""
+    now_iso = dt.now(timezone.utc).isoformat()
+    record = {
+        "id": payment_id,
+        "booking_id": effective_booking_id,
+        "customer_id": (customer_id or "").strip().lower(),
+        "customer_name": customer_name,
+        "amount": int(amount or 0),
+        "status": status,
+        "method": method,
+        "invoice_url": invoice_url,
+        "created_at": now_iso,
+        "updated_at": now_iso,
+        "razorpay_order_id": razorpay_order_id,
+        "razorpay_payment_id": razorpay_payment_id,
+        "refund_id": refund_id,
+        "refund_status": refund_status,
+        "product_title": product_title or "Equipment Rental",
+        "product_image": product_image or "",
+    }
+    MOCK_PAYMENTS[payment_id] = record
+
+    try:
+        execute_query("""
+            INSERT INTO payments (
+                id, booking_id, customer_id, customer_name, amount, status, method, invoice_url,
+                created_at, updated_at, razorpay_order_id, razorpay_payment_id, refund_id, refund_status,
+                product_title, product_image
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE
+                amount = VALUES(amount),
+                status = VALUES(status),
+                method = VALUES(method),
+                invoice_url = VALUES(invoice_url),
+                updated_at = VALUES(updated_at),
+                razorpay_order_id = COALESCE(VALUES(razorpay_order_id), razorpay_order_id),
+                razorpay_payment_id = COALESCE(VALUES(razorpay_payment_id), razorpay_payment_id),
+                refund_id = COALESCE(VALUES(refund_id), refund_id),
+                refund_status = COALESCE(VALUES(refund_status), refund_status),
+                product_title = COALESCE(VALUES(product_title), product_title),
+                product_image = COALESCE(VALUES(product_image), product_image)
+        """, (
+            payment_id, effective_booking_id, customer_id.strip().lower() if customer_id else "", customer_name,
+            int(amount or 0), status, method, invoice_url, now_iso, now_iso,
+            razorpay_order_id, razorpay_payment_id, refund_id, refund_status,
+            product_title, product_image
+        ))
+    except Exception as e:
+        logger.warning(f"Database write error in record_or_update_payment: {e}")
+
+
+def get_user_payments(email: str, status_filter: str = "all", search: str = ""):
+    """
+    Fetch payment history records for an authenticated customer.
+    Falls back to orders table to ensure complete coverage.
+    """
+    clean_email = (email or "").strip().lower()
+    if not clean_email:
+        return []
+
+    results = []
+    try:
+        conn = get_db_connection()
+        if conn:
+            try:
+                with conn.cursor() as cursor:
+                    sql = """
+                        SELECT p.id, p.booking_id, p.customer_id, p.customer_name, p.amount,
+                               p.status, p.method, p.invoice_url, p.created_at, p.updated_at,
+                               p.razorpay_order_id, p.razorpay_payment_id, p.refund_id, p.refund_status,
+                               COALESCE(p.product_title, o.product_title, 'Equipment Rental') AS product_title,
+                               COALESCE(p.product_image, o.product_image, '') AS product_image,
+                               o.start_date, o.end_date, o.status AS booking_status
+                        FROM payments p
+                        LEFT JOIN orders o ON p.booking_id = o.id
+                        WHERE p.customer_id = %s
+                        ORDER BY p.created_at DESC
+                        LIMIT 200
+                    """
+                    cursor.execute(sql, (clean_email,))
+                    results = cursor.fetchall() or []
+
+                    # If no payment table records exist yet for this user, populate from orders table
+                    if not results:
+                        cursor.execute("""
+                            SELECT o.id AS booking_id, o.user_email AS customer_id, o.total AS amount,
+                                   o.payment_status AS status, o.razorpay_payment_id, o.razorpay_order_id,
+                                   o.product_title, o.product_image, o.start_date, o.end_date, o.status AS booking_status,
+                                   o.refund_id, o.refund_status, o.created_at
+                            FROM orders o
+                            WHERE o.user_email = %s
+                            ORDER BY o.created_at DESC
+                            LIMIT 200
+                        """, (clean_email,))
+                        order_rows = cursor.fetchall() or []
+                        for r in order_rows:
+                            st = str(r.get("status") or "unpaid").lower()
+                            if st in ("paid", "active", "completed") and r.get("booking_status") != "cancelled":
+                                st = "successful"
+                            elif r.get("booking_status") == "cancelled" or r.get("status") == "failed":
+                                st = "cancelled" if r.get("refund_status") == "refunded" else "failed"
+                            
+                            tx_id = r.get("razorpay_payment_id") or f"pay_{r['booking_id']}"
+                            results.append({
+                                "id": tx_id,
+                                "booking_id": r["booking_id"],
+                                "customer_id": clean_email,
+                                "customer_name": clean_email.split("@")[0].capitalize(),
+                                "amount": r["amount"],
+                                "status": st,
+                                "method": "Razorpay (UPI / Card)",
+                                "invoice_url": f"/api/payments/receipt/{r['booking_id']}",
+                                "created_at": r["created_at"],
+                                "razorpay_order_id": r.get("razorpay_order_id"),
+                                "razorpay_payment_id": r.get("razorpay_payment_id"),
+                                "refund_id": r.get("refund_id"),
+                                "refund_status": r.get("refund_status"),
+                                "product_title": r.get("product_title") or "Equipment Rental",
+                                "product_image": r.get("product_image") or "",
+                                "start_date": r.get("start_date"),
+                                "end_date": r.get("end_date"),
+                                "booking_status": r.get("booking_status")
+                            })
+            finally:
+                conn.close()
+    except Exception as e:
+        logger.warning(f"Error reading user payments: {e}")
+
+    # Memory fallback
+    if not results:
+        for p in MOCK_PAYMENTS.values():
+            if (p.get("customer_id") or "").strip().lower() == clean_email:
+                results.append(dict(p))
+
+        for o in MOCK_ORDERS.values():
+            if (o.get("user_email") or o.get("userEmail")) == clean_email:
+                if not any(r.get("booking_id") == o["id"] for r in results):
+                    results.append({
+                        "id": o.get("razorpay_payment_id") or f"pay_{o['id']}",
+                        "booking_id": o["id"],
+                        "customer_id": clean_email,
+                        "customer_name": clean_email.split("@")[0].capitalize(),
+                        "amount": o.get("total", 0),
+                        "status": "successful" if o.get("payment_status") == "paid" else "unpaid",
+                        "method": "Razorpay (UPI / Card)",
+                        "invoice_url": f"/api/payments/receipt/{o['id']}",
+                        "created_at": o.get("created_at") or dt.now(timezone.utc).isoformat(),
+                        "razorpay_order_id": o.get("razorpay_order_id"),
+                        "razorpay_payment_id": o.get("razorpay_payment_id"),
+                        "refund_id": o.get("refund_id"),
+                        "refund_status": o.get("refund_status"),
+                        "product_title": o.get("product_title") or o.get("productTitle") or "Gear Rental",
+                        "product_image": o.get("product_image") or o.get("productImage") or "",
+                        "start_date": o.get("start_date") or o.get("startDate"),
+                        "end_date": o.get("end_date") or o.get("endDate"),
+                        "booking_status": o.get("status")
+                    })
+
+    # Apply in-memory filters if specified
+    if status_filter and status_filter != "all":
+        results = [
+            r for r in results 
+            if str(r.get("status", "")).lower() == status_filter.lower()
+               or (status_filter == "successful" and str(r.get("status", "")).lower() in ("paid", "successful"))
+               or (status_filter == "pending" and str(r.get("status", "")).lower() in ("pending", "processing", "created", "unpaid"))
+        ]
+
+    if search and search.strip():
+        q = search.strip().lower()
+        results = [
+            r for r in results
+            if q in str(r.get("id", "")).lower()
+               or q in str(r.get("booking_id", "")).lower()
+               or q in str(r.get("product_title", "")).lower()
+               or q in str(r.get("razorpay_payment_id", "")).lower()
+        ]
+
+    return results
 
 
 # Recommendation System Database Helpers

@@ -211,6 +211,14 @@ export interface Order {
   vendor_id?: string;
   paymentStatus?: string;
   payment_status?: string;
+  razorpayOrderId?: string;
+  razorpay_order_id?: string;
+  razorpayPaymentId?: string;
+  razorpay_payment_id?: string;
+  refundId?: string;
+  refund_id?: string;
+  refundStatus?: string;
+  refund_status?: string;
   dailyRate?: number;
   daily_rate?: number;
   bookingStatus?: string;
@@ -218,6 +226,28 @@ export interface Order {
   with_insurance?: boolean;
   insuranceFee?: number;
   insurance_fee?: number;
+}
+
+export interface UserPaymentTransaction {
+  id: string;
+  booking_id: string;
+  customer_id: string;
+  customer_name?: string;
+  amount: number;
+  status: "successful" | "paid" | "pending" | "processing" | "unpaid" | "failed" | "refunded" | "cancelled" | string;
+  method: string;
+  invoice_url?: string;
+  created_at: string;
+  updated_at?: string;
+  razorpay_order_id?: string;
+  razorpay_payment_id?: string;
+  refund_id?: string;
+  refund_status?: string;
+  product_title?: string;
+  product_image?: string;
+  start_date?: string;
+  end_date?: string;
+  booking_status?: string;
 }
 
 export interface UserAddress {

@@ -34,6 +34,7 @@ import { Route as PayantRouteImport } from './routes/payant'
 import { Route as PayentRouteImport } from './routes/payent'
 import { Route as PayerntRouteImport } from './routes/payernt'
 import { Route as PaymentRouteImport } from './routes/payment'
+import { Route as PaymentsRouteImport } from './routes/payments'
 import { Route as PayrentRouteImport } from './routes/payrent'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as ProfileRouteImport } from './routes/profile'
@@ -233,6 +234,11 @@ const PayerntRoute = PayerntRouteImport.update({
 const PaymentRoute = PaymentRouteImport.update({
   id: '/payment',
   path: '/payment',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PaymentsRoute = PaymentsRouteImport.update({
+  id: '/payments',
+  path: '/payments',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PayrentRoute = PayrentRouteImport.update({
@@ -637,6 +643,7 @@ export interface FileRoutesByFullPath {
   '/payent': typeof PayentRouteWithChildren
   '/payernt': typeof PayerntRouteWithChildren
   '/payment': typeof PaymentRoute
+  '/payments': typeof PaymentsRoute
   '/payrent': typeof PayrentRouteWithChildren
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
@@ -736,6 +743,7 @@ export interface FileRoutesByTo {
   '/otp': typeof OtpRoute
   '/payant': typeof PayantRoute
   '/payment': typeof PaymentRoute
+  '/payments': typeof PaymentsRoute
   '/payrent': typeof PayrentRouteWithChildren
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
@@ -839,6 +847,7 @@ export interface FileRoutesById {
   '/payent': typeof PayentRouteWithChildren
   '/payernt': typeof PayerntRouteWithChildren
   '/payment': typeof PaymentRoute
+  '/payments': typeof PaymentsRoute
   '/payrent': typeof PayrentRouteWithChildren
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
@@ -943,6 +952,7 @@ export interface FileRouteTypes {
     | '/payent'
     | '/payernt'
     | '/payment'
+    | '/payments'
     | '/payrent'
     | '/privacy'
     | '/profile'
@@ -1042,6 +1052,7 @@ export interface FileRouteTypes {
     | '/otp'
     | '/payant'
     | '/payment'
+    | '/payments'
     | '/payrent'
     | '/privacy'
     | '/profile'
@@ -1144,6 +1155,7 @@ export interface FileRouteTypes {
     | '/payent'
     | '/payernt'
     | '/payment'
+    | '/payments'
     | '/payrent'
     | '/privacy'
     | '/profile'
@@ -1247,6 +1259,7 @@ export interface RootRouteChildren {
   PayentRoute: typeof PayentRouteWithChildren
   PayerntRoute: typeof PayerntRouteWithChildren
   PaymentRoute: typeof PaymentRoute
+  PaymentsRoute: typeof PaymentsRoute
   PayrentRoute: typeof PayrentRouteWithChildren
   PrivacyRoute: typeof PrivacyRoute
   ProfileRoute: typeof ProfileRoute
@@ -1438,6 +1451,13 @@ declare module '@tanstack/react-router' {
       path: '/payment'
       fullPath: '/payment'
       preLoaderRoute: typeof PaymentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/payments': {
+      id: '/payments'
+      path: '/payments'
+      fullPath: '/payments'
+      preLoaderRoute: typeof PaymentsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/payrent': {
@@ -2210,6 +2230,7 @@ const rootRouteChildren: RootRouteChildren = {
   PayentRoute: PayentRouteWithChildren,
   PayerntRoute: PayerntRouteWithChildren,
   PaymentRoute: PaymentRoute,
+  PaymentsRoute: PaymentsRoute,
   PayrentRoute: PayrentRouteWithChildren,
   PrivacyRoute: PrivacyRoute,
   ProfileRoute: ProfileRoute,

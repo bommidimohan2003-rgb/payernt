@@ -1112,6 +1112,12 @@ export const api = {
               longitude: (o.longitude ?? o.location_longitude ?? null) as number | null,
               mapUrl: (o.mapUrl || o.map_url || "") as string,
               locationChangeRequest: (o.locationChangeRequest || o.location_change_request || null) as any,
+              paymentStatus: String(o.paymentStatus || o.payment_status || "unpaid"),
+              payment_status: String(o.payment_status || o.paymentStatus || "unpaid"),
+              razorpayOrderId: (o.razorpayOrderId || o.razorpay_order_id || undefined) as string | undefined,
+              razorpayPaymentId: (o.razorpayPaymentId || o.razorpay_payment_id || undefined) as string | undefined,
+              refundId: (o.refundId || o.refund_id || undefined) as string | undefined,
+              refundStatus: (o.refundStatus || o.refund_status || undefined) as string | undefined,
             };
           }) as Order[];
           storage.set(STORAGE_KEYS.orders, normalized);
@@ -2169,6 +2175,7 @@ export const api = {
     razorpayOrderId: string,
     razorpayPaymentId: string,
     razorpaySignature: string,
+    orderId?: string,
   ) {
     const res = await this.fetchWithAuth(`${API_BASE}/api/payments/verify`, {
       method: "POST",
@@ -2179,11 +2186,78 @@ export const api = {
         razorpay_order_id: razorpayOrderId,
         razorpay_payment_id: razorpayPaymentId,
         razorpay_signature: razorpaySignature,
+        order_id: orderId || null,
       }),
     });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
       throw new Error(data.detail || "Razorpay signature verification failed.");
+    }
+    this.invalidateCache("user_orders");
+    return res.json();
+  },
+
+  async createOrderPayment(token: string, orderId: string) {
+    const res = await this.fetchWithAuth(
+      `${API_BASE}/api/payments/create-order`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          order_id: orderId,
+        }),
+      },
+    );
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.detail || "Failed to initialize payment for this order.");
+    }
+    return res.json();
+  },
+
+  async getPaymentStatus(token: string, orderId: string) {
+    const res = await this.fetchWithAuth(
+      `${API_BASE}/api/payments/status/${encodeURIComponent(orderId)}`,
+      {
+        method: "GET",
+      },
+    );
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.detail || "Failed to fetch payment status.");
+    }
+    return res.json();
+  },
+
+  async getUserPaymentHistory(token: string, params?: { q?: string; status?: string }) {
+    const searchParams = new URLSearchParams();
+    if (params?.q) searchParams.set("q", params.q);
+    if (params?.status) searchParams.set("status", params.status);
+    const qs = searchParams.toString();
+    const url = `${API_BASE}/api/payments/history${qs ? `?${qs}` : ""}`;
+
+    const res = await this.fetchWithAuth(url, {
+      method: "GET",
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.detail || "Failed to fetch payment transactions.");
+    }
+    return res.json();
+  },
+
+  async getPaymentReceipt(token: string, orderId: string) {
+    const res = await this.fetchWithAuth(
+      `${API_BASE}/api/payments/receipt/${encodeURIComponent(orderId)}`,
+      {
+        method: "GET",
+      },
+    );
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.detail || "Failed to fetch payment receipt.");
     }
     return res.json();
   },

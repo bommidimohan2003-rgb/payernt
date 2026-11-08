@@ -28,6 +28,12 @@ import {
   ArrowUpDown,
   Store,
   XCircle,
+  CreditCard,
+  Receipt,
+  RotateCcw,
+  Download,
+  RefreshCw,
+  FileText,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/common/Button";
@@ -501,6 +507,62 @@ export default function Orders() {
   const [editDirections, setEditDirections] = useState("");
   const [editReason, setEditReason] = useState("");
   const [isSavingLocation, setIsSavingLocation] = useState(false);
+
+  // Payment Receipt Modal & Status Checker State
+  const [receiptOrder, setReceiptOrder] = useState<Order | null>(null);
+  const [receiptData, setReceiptData] = useState<any | null>(null);
+  const [receiptLoading, setReceiptLoading] = useState(false);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+
+  const handleOpenReceipt = async (order: Order) => {
+    setReceiptOrder(order);
+    setShowReceiptModal(true);
+    const token = storage.get<string | null>(STORAGE_KEYS.token, null);
+    if (!token) return;
+
+    setReceiptLoading(true);
+    try {
+      const data = await api.getPaymentReceipt(token, order.id);
+      setReceiptData(data);
+    } catch {
+      setReceiptData({
+        receipt_number: `REC-${order.id.replace("ord_", "")}`,
+        order_id: order.id,
+        product_title: order.productTitle || (order as any).product_title || "Equipment Rental",
+        transaction_id: order.razorpayPaymentId || (order as any).razorpay_payment_id || `pay_${order.id}`,
+        total_amount: order.total,
+        payment_status: order.paymentStatus || (order as any).payment_status || "paid",
+        issued_at: order.confirmedAt || order.createdAt || new Date().toISOString(),
+        escrow_guarantee: "100% Escrow Secured by Payent Protection",
+      });
+    } finally {
+      setReceiptLoading(false);
+    }
+  };
+
+  const handleCheckOrderPaymentStatus = async (orderId: string) => {
+    const token = storage.get<string | null>(STORAGE_KEYS.token, null);
+    if (!token) return;
+
+    toast.loading("Checking real-time payment status...", { id: "check-pay" });
+    try {
+      const res = await api.getPaymentStatus(token, orderId);
+      toast.dismiss("check-pay");
+      const st = String(res.payment_status || "").toLowerCase();
+      if (st === "paid" || st === "successful") {
+        toast.success("Payment verified! Booking is confirmed.");
+        void loadOrders();
+      } else if (st === "failed") {
+        toast.error("Payment failed. Please retry payment.");
+        void loadOrders();
+      } else {
+        toast.info("Payment is still pending gateway confirmation.");
+      }
+    } catch (err: any) {
+      toast.dismiss("check-pay");
+      toast.error(err?.message || "Failed to check payment status.");
+    }
+  };
 
   const navigate = useNavigate();
 
@@ -1056,6 +1118,17 @@ export default function Orders() {
               </select>
               <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-neutral-400 pointer-events-none" />
             </div>
+
+            {/* Payment History Navigation Button */}
+            <button
+              type="button"
+              onClick={() => navigate({ to: "/payments" })}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-white dark:bg-[#1E1E1E] border border-neutral-200/90 dark:border-white/10 text-neutral-800 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-white/5 cursor-pointer shadow-xs transition-colors shrink-0"
+              title="View all payments & receipts"
+            >
+              <CreditCard className="h-3 w-3 text-neutral-400" />
+              <span>Payment History</span>
+            </button>
           </div>
         </div>
 
@@ -1199,31 +1272,86 @@ export default function Orders() {
 
                     {/* Right Section: Status badge, Rental total, View Details */}
                     <div className="flex flex-row md:flex-col items-center md:items-end justify-between md:justify-center gap-2 sm:gap-2.5 shrink-0 pt-2.5 md:pt-0 border-t md:border-t-0 border-neutral-100 dark:border-white/5">
-                      {/* Status Badge */}
-                      {isCancelled ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20">
-                          <XCircle className="h-3 w-3" />
-                          <span>Cancelled</span>
-                        </span>
-                      ) : isCompleted ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-neutral-100 dark:bg-white/10 text-neutral-800 dark:text-white/90 border border-neutral-200 dark:border-white/20">
-                          <CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
-                          <span>Completed</span>
-                        </span>
-                      ) : isPending ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
-                          <Clock className="h-3 w-3" />
-                          <span>{badge.label}</span>
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
-                          <span className="relative flex h-1.5 w-1.5">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                      {/* Status Badges: Booking & Payment Status */}
+                      <div className="flex flex-wrap items-center md:justify-end gap-1.5">
+                        {isCancelled ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20">
+                            <XCircle className="h-3 w-3" />
+                            <span>Cancelled</span>
                           </span>
-                          <span>{badge.label}</span>
-                        </span>
-                      )}
+                        ) : isCompleted ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-neutral-100 dark:bg-white/10 text-neutral-800 dark:text-white/90 border border-neutral-200 dark:border-white/20">
+                            <CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                            <span>Completed</span>
+                          </span>
+                        ) : isPending ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+                            <Clock className="h-3 w-3" />
+                            <span>{badge.label}</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                            <span className="relative flex h-1.5 w-1.5">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                            </span>
+                            <span>{badge.label}</span>
+                          </span>
+                        )}
+
+                        {/* Authoritative Payment Status Badge */}
+                        {(() => {
+                          const paySt = String(o.paymentStatus || (o as any).payment_status || "unpaid").toLowerCase();
+                          const refSt = String((o as any).refundStatus || (o as any).refund_status || "").toLowerCase();
+
+                          if (refSt === "refunded" || paySt === "refunded") {
+                            return (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-500/20">
+                                <RotateCcw className="h-2.5 w-2.5" />
+                                <span>Refunded</span>
+                              </span>
+                            );
+                          }
+                          if (refSt === "pending_review" || refSt === "refund_pending" || refSt === "processing") {
+                            return (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border border-indigo-500/20">
+                                <Clock className="h-2.5 w-2.5" />
+                                <span>Refund Processing</span>
+                              </span>
+                            );
+                          }
+                          if (paySt === "paid" || paySt === "successful") {
+                            return (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                                <ShieldCheck className="h-2.5 w-2.5" />
+                                <span>Paid • Escrow Secured</span>
+                              </span>
+                            );
+                          }
+                          if (paySt === "processing" || paySt === "pending") {
+                            return (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+                                <Clock className="h-2.5 w-2.5" />
+                                <span>Payment Processing</span>
+                              </span>
+                            );
+                          }
+                          if (paySt === "failed") {
+                            return (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20">
+                                <XCircle className="h-2.5 w-2.5" />
+                                <span>Payment Failed</span>
+                              </span>
+                            );
+                          }
+                          return (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30">
+                              <Lock className="h-2.5 w-2.5" />
+                              <span>Payment Required</span>
+                            </span>
+                          );
+                        })()}
+                      </div>
 
                       {/* Rental Total */}
                       <div className="text-right">
@@ -1606,6 +1734,74 @@ export default function Orders() {
                             </div>
 
                             <div className="flex flex-col gap-2">
+                              {/* Payment-specific Primary Actions */}
+                              {(() => {
+                                const paySt = String(o.paymentStatus || (o as any).payment_status || "unpaid").toLowerCase();
+                                if (!isCancelled) {
+                                  if (paySt === "unpaid") {
+                                    return (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          navigate({ to: "/payment", search: { orderId: o.id } as any });
+                                        }}
+                                        className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                                      >
+                                        <Lock className="h-3.5 w-3.5" />
+                                        <span>Pay Now • ₹{Number(o.total || 0).toLocaleString("en-IN")}</span>
+                                      </button>
+                                    );
+                                  }
+                                  if (paySt === "failed") {
+                                    return (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          navigate({ to: "/payment", search: { orderId: o.id } as any });
+                                        }}
+                                        className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                                      >
+                                        <RotateCcw className="h-3.5 w-3.5" />
+                                        <span>Retry Payment</span>
+                                      </button>
+                                    );
+                                  }
+                                  if (paySt === "processing" || paySt === "pending") {
+                                    return (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleCheckOrderPaymentStatus(o.id);
+                                        }}
+                                        className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 font-bold text-xs transition-colors cursor-pointer"
+                                      >
+                                        <RefreshCw className="h-3.5 w-3.5" />
+                                        <span>Check Payment Status</span>
+                                      </button>
+                                    );
+                                  }
+                                  if (paySt === "paid" || paySt === "successful") {
+                                    return (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleOpenReceipt(o);
+                                        }}
+                                        className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-neutral-200/90 dark:border-white/15 bg-white dark:bg-white/5 hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-800 dark:text-white font-semibold text-xs transition-all cursor-pointer shadow-xs"
+                                      >
+                                        <Receipt className="h-3.5 w-3.5 text-neutral-400" />
+                                        <span>View Receipt</span>
+                                      </button>
+                                    );
+                                  }
+                                }
+                                return null;
+                              })()}
+
                               <button
                                 type="button"
                                 onClick={(e) => {
@@ -2119,6 +2315,100 @@ export default function Orders() {
                 </Button>
               </div>
             </motion.div>
+          </div>
+        )}
+
+        {/* Receipt Modal */}
+        {showReceiptModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+            <div className="w-full max-w-md p-6 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] shadow-2xl space-y-5 text-left">
+              <div className="flex items-center justify-between pb-3 border-b border-neutral-200 dark:border-neutral-800">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-neutral-700 dark:text-neutral-300" />
+                  <h3 className="text-base font-extrabold text-neutral-900 dark:text-white">
+                    Official Rental Receipt
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowReceiptModal(false)}
+                  className="p-1 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-400 hover:text-neutral-900 dark:hover:text-white cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {receiptLoading ? (
+                <div className="p-8 text-center space-y-2">
+                  <Loader2 className="h-6 w-6 animate-spin mx-auto text-neutral-700 dark:text-neutral-300" />
+                  <p className="text-xs text-neutral-500">Retrieving official receipt...</p>
+                </div>
+              ) : (
+                <div className="space-y-3 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-neutral-400">Receipt No:</span>
+                    <span className="font-mono font-bold text-neutral-800 dark:text-neutral-200">
+                      {receiptData?.receipt_number || `REC-${receiptOrder?.id.replace("ord_", "")}`}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span className="text-neutral-400">Order Reference:</span>
+                    <span className="font-mono text-neutral-800 dark:text-neutral-200">
+                      #{receiptData?.order_id || receiptOrder?.id}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span className="text-neutral-400">Transaction ID:</span>
+                    <span className="font-mono text-neutral-800 dark:text-neutral-200 truncate max-w-[200px]">
+                      {receiptData?.transaction_id || receiptOrder?.razorpayPaymentId || `pay_${receiptOrder?.id}`}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span className="text-neutral-400">Item:</span>
+                    <span className="font-semibold text-neutral-800 dark:text-neutral-200 truncate max-w-[200px]">
+                      {receiptData?.product_title || receiptOrder?.productTitle || (receiptOrder as any)?.product_title}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span className="text-neutral-400">Payment Status:</span>
+                    <span className="font-bold text-emerald-600 dark:text-emerald-400 uppercase">
+                      {receiptData?.payment_status || receiptOrder?.paymentStatus || "PAID"}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center pt-2 border-t border-neutral-200 dark:border-neutral-800">
+                    <span className="font-bold text-neutral-900 dark:text-white">Amount:</span>
+                    <span className="font-mono font-extrabold text-base text-neutral-900 dark:text-white">
+                      ₹{Number(receiptData?.total_amount || receiptOrder?.total || 0).toLocaleString("en-IN")}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (typeof window !== "undefined") window.print();
+                  }}
+                  className="flex-1 py-2 px-3 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white dark:bg-white dark:text-black dark:hover:bg-neutral-100 font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  <span>Print / Save Receipt</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowReceiptModal(false)}
+                  className="py-2 px-4 rounded-xl border border-neutral-300 dark:border-neutral-700 text-xs font-semibold text-neutral-700 dark:text-neutral-300 cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </AnimatePresence>

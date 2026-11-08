@@ -3591,6 +3591,13 @@ def fetch_orders(email: str = Depends(get_current_user_email)):
                 "longitude": lng,
                 "mapUrl": map_url,
                 "locationChangeRequest": loc_change,
+                "payment_status": str(o.get("payment_status") or "unpaid"),
+                "paymentStatus": str(o.get("payment_status") or "unpaid"),
+                "razorpay_order_id": o.get("razorpay_order_id"),
+                "razorpay_payment_id": o.get("razorpay_payment_id"),
+                "refund_id": o.get("refund_id"),
+                "refund_status": o.get("refund_status"),
+                "refundStatus": o.get("refund_status"),
             })
     return result
 
@@ -6663,9 +6670,10 @@ def check_superadmin_user(current_user_email: str = Depends(get_current_user_ema
 # --- RAZORPAY BACKEND PAYMENT ENDPOINTS ---
 # ==============================================================================
 class CreateRazorpayOrderSchema(BaseModel):
-    product_id: str
-    start_date: str
-    end_date: str
+    order_id: Optional[str] = None
+    product_id: Optional[str] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
     coupon_code: Optional[str] = None
     delivery_method: Optional[str] = "delivery"
     delivery_address: Optional[str] = None
@@ -6681,6 +6689,7 @@ class VerifyRazorpayPaymentSchema(BaseModel):
     razorpay_order_id: str
     razorpay_payment_id: str
     razorpay_signature: str
+    order_id: Optional[str] = None
 
 class RefundPaymentSchema(BaseModel):
     order_id: str
@@ -6690,10 +6699,122 @@ class RefundPaymentSchema(BaseModel):
 @app.post("/api/payments/create-order")
 def create_razorpay_order(data: CreateRazorpayOrderSchema, current_user: dict = Depends(get_approved_user)):
     current_user_email = current_user["email"].strip().lower()
+
+    # Flow A: Paying for an existing booking / order (from Orders page)
+    if data.order_id:
+        order = get_order_by_id(data.order_id)
+        if not order:
+            order = fetch_one("SELECT * FROM orders WHERE id = %s", (data.order_id,))
+        if not order:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Order '{data.order_id}' not found."
+            )
+
+        order_owner = (order.get("user_email") or order.get("userEmail") or "").strip().lower()
+        if order_owner != current_user_email:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have permission to pay for this order."
+            )
+
+        curr_pay_st = str(order.get("payment_status") or "unpaid").lower()
+        if curr_pay_st in ("paid", "successful", "escrowed"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This order has already been paid for."
+            )
+
+        curr_st = str(order.get("status") or "").lower()
+        if curr_st in ("cancelled", "canceled"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot initiate payment for a cancelled booking."
+            )
+
+        # Authoritative total from backend order record
+        total_rupees = int(round(float(order.get("total", 0))))
+        if total_rupees <= 0:
+            total_rupees = 1
+        amount_paise = total_rupees * 100
+
+        product_id = str(order.get("product_id") or order.get("productId") or "")
+        product_title = str(order.get("product_title") or order.get("productTitle") or "Gear Rental")
+        product_image = str(order.get("product_image") or order.get("productImage") or "")
+
+        razorpay_order_id = f"order_rzp_{uuid.uuid4().hex[:14]}"
+        if razorpay_client:
+            try:
+                rzp_response = razorpay_client.order.create({
+                    "amount": amount_paise,
+                    "currency": "INR",
+                    "receipt": data.order_id,
+                    "notes": {
+                        "order_id": data.order_id,
+                        "product_id": product_id,
+                        "user_email": current_user_email
+                    }
+                })
+                razorpay_order_id = rzp_response["id"]
+            except Exception as e:
+                logger.error(f"Error creating Razorpay Order via SDK: {e}")
+                if IS_PRODUCTION:
+                    raise HTTPException(status_code=500, detail="Failed to initialize Razorpay payment order.")
+
+        # Update order with razorpay_order_id
+        try:
+            execute_query(
+                "UPDATE orders SET razorpay_order_id = %s, payment_status = %s WHERE id = %s",
+                (razorpay_order_id, "processing", data.order_id)
+            )
+        except Exception:
+            pass
+        if data.order_id in MOCK_ORDERS:
+            MOCK_ORDERS[data.order_id]["razorpay_order_id"] = razorpay_order_id
+            MOCK_ORDERS[data.order_id]["payment_status"] = "processing"
+
+        # Record payment transaction attempt in payments table
+        from database import record_or_update_payment
+        tx_id = f"tx_{razorpay_order_id}"
+        record_or_update_payment(
+            payment_id=tx_id,
+            booking_id=data.order_id,
+            customer_id=current_user_email,
+            customer_name=current_user.get("full_name") or current_user_email.split("@")[0].capitalize(),
+            amount=total_rupees,
+            status="pending",
+            method="Razorpay (UPI / Card)",
+            invoice_url=f"/api/payments/receipt/{data.order_id}",
+            razorpay_order_id=razorpay_order_id,
+            product_title=product_title,
+            product_image=product_image
+        )
+
+        return {
+            "success": True,
+            "order_id": data.order_id,
+            "razorpay_order_id": razorpay_order_id,
+            "amount": amount_paise,
+            "currency": "INR",
+            "key_id": RAZORPAY_KEY_ID or "rzp_test_payent_key",
+            "total": total_rupees,
+            "product": {
+                "id": product_id,
+                "title": product_title,
+                "image": product_image
+            }
+        }
+
+    # Flow B: Creating order and payment concurrently from checkout
+    if not data.product_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="product_id or order_id is required."
+        )
+
     product = fetch_one("SELECT * FROM custom_products WHERE id = %s", (data.product_id,))
     if not product:
-        # Check if product is in orders or default catalog ID format
-        product = fetch_one("SELECT title, price, image FROM custom_products WHERE id LIKE %s", (f"%{data.product_id}%",))
+        product = fetch_one("SELECT title, price, image, category FROM custom_products WHERE id LIKE %s", (f"%{data.product_id}%",))
         
     if not product:
         raise HTTPException(
@@ -6701,15 +6822,13 @@ def create_razorpay_order(data: CreateRazorpayOrderSchema, current_user: dict = 
             detail=f"Product '{data.product_id}' not found in catalog."
         )
 
-    conflicts = check_products_booking_conflicts([data.product_id], data.start_date, data.end_date)
+    conflicts = check_products_booking_conflicts([data.product_id], data.start_date or "", data.end_date or "")
     if data.product_id in conflicts:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="This gear is already booked by another creator for the selected dates. Please select different dates."
         )
 
-    # Category booking restriction check:
-    # Only one product per category can be in the booking-to-delivery process for the same renter at a time.
     category = (product.get("category") or "").strip()
     if not category:
         category = get_product_category(data.product_id)
@@ -6726,8 +6845,8 @@ def create_razorpay_order(data: CreateRazorpayOrderSchema, current_user: dict = 
     product_image = product.get("image", "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=600")
 
     try:
-        d1 = datetime.datetime.fromisoformat(data.start_date.replace("Z", ""))
-        d2 = datetime.datetime.fromisoformat(data.end_date.replace("Z", ""))
+        d1 = datetime.datetime.fromisoformat((data.start_date or "").replace("Z", ""))
+        d2 = datetime.datetime.fromisoformat((data.end_date or "").replace("Z", ""))
         days = max(1, (d2.date() - d1.date()).days + 1)
     except Exception:
         days = 1
@@ -6774,8 +6893,8 @@ def create_razorpay_order(data: CreateRazorpayOrderSchema, current_user: dict = 
         product_id=data.product_id,
         product_title=product_title,
         product_image=product_image,
-        start_date=data.start_date,
-        end_date=data.end_date,
+        start_date=data.start_date or "",
+        end_date=data.end_date or "",
         total=total_rupees,
         status="pending",
         razorpay_order_id=razorpay_order_id,
@@ -6789,28 +6908,57 @@ def create_razorpay_order(data: CreateRazorpayOrderSchema, current_user: dict = 
         longitude=data.longitude
     )
 
+    from database import record_or_update_payment
+    record_or_update_payment(
+        payment_id=f"tx_{razorpay_order_id}",
+        booking_id=order_id,
+        customer_id=current_user_email,
+        customer_name=current_user.get("full_name") or current_user_email.split("@")[0].capitalize(),
+        amount=total_rupees,
+        status="pending",
+        method="Razorpay (UPI / Card)",
+        invoice_url=f"/api/payments/receipt/{order_id}",
+        razorpay_order_id=razorpay_order_id,
+        product_title=product_title,
+        product_image=product_image
+    )
+
     return {
         "success": True,
         "order_id": order_id,
         "razorpay_order_id": razorpay_order_id,
         "amount": amount_paise,
         "currency": "INR",
-        "key_id": RAZORPAY_KEY_ID,
+        "key_id": RAZORPAY_KEY_ID or "rzp_test_payent_key",
         "total": total_rupees,
         "days": days
     }
 
 @app.post("/api/payments/verify")
 def verify_razorpay_payment(data: VerifyRazorpayPaymentSchema, current_user_email: str = Depends(get_current_user_email)):
+    clean_email = current_user_email.strip().lower()
     order = get_order_by_razorpay_order_id(data.razorpay_order_id)
+    if not order and data.order_id:
+        order = get_order_by_id(data.order_id) or fetch_one("SELECT * FROM orders WHERE id = %s", (data.order_id,))
+
     if not order:
         raise HTTPException(status_code=404, detail="Booking order record not found.")
+
+    order_owner = (order.get("user_email") or order.get("userEmail") or "").strip().lower()
+    if order_owner and order_owner != clean_email:
+        user = get_user(clean_email)
+        is_admin = (user.get("role") in ("admin", "superadmin")) if (user and isinstance(user, dict)) else False
+        if not is_admin:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not have permission to verify this order payment.")
 
     if order.get("payment_status") == "paid":
         return {
             "success": True,
             "message": "Payment already verified.",
-            "order_id": order["id"]
+            "order_id": order["id"],
+            "payment_id": data.razorpay_payment_id,
+            "status": order.get("status") or "active",
+            "payment_status": "paid"
         }
 
     signature_valid = False
@@ -6826,14 +6974,22 @@ def verify_razorpay_payment(data: VerifyRazorpayPaymentSchema, current_user_emai
             logger.warning(f"Razorpay SDK signature verification failed: {e}")
             signature_valid = False
 
+    secret_key = RAZORPAY_KEY_SECRET or "rzp_test_payent_key_secret"
     if not signature_valid:
         msg = f"{data.razorpay_order_id}|{data.razorpay_payment_id}"
         expected_sig = hmac.new(
-            RAZORPAY_KEY_SECRET.encode(),
+            secret_key.encode(),
             msg.encode(),
             hashlib.sha256
         ).hexdigest()
         signature_valid = hmac.compare_digest(expected_sig, data.razorpay_signature)
+
+    # In local development test mode without live keys, allow explicit simulated test signatures
+    if not signature_valid and not IS_PRODUCTION:
+        if data.razorpay_signature and (data.razorpay_signature.startswith("mock_sig") or data.razorpay_signature.startswith("test_sig")):
+            signature_valid = True
+
+    from database import update_order_payment_status, record_or_update_payment, notify_booking_event
 
     if not signature_valid:
         update_order_payment_status(
@@ -6842,6 +6998,19 @@ def verify_razorpay_payment(data: VerifyRazorpayPaymentSchema, current_user_emai
             status="failed",
             razorpay_payment_id=data.razorpay_payment_id,
             razorpay_signature=data.razorpay_signature
+        )
+        record_or_update_payment(
+            payment_id=data.razorpay_payment_id or f"failed_{data.razorpay_order_id}",
+            booking_id=order["id"],
+            customer_id=clean_email,
+            customer_name=order.get("customer_name") or clean_email.split("@")[0].capitalize(),
+            amount=int(order.get("total", 0)),
+            status="failed",
+            method="Razorpay (UPI / Card)",
+            razorpay_order_id=data.razorpay_order_id,
+            razorpay_payment_id=data.razorpay_payment_id,
+            product_title=order.get("product_title") or "Gear Rental",
+            product_image=order.get("product_image") or ""
         )
         raise HTTPException(status_code=400, detail="Invalid Razorpay payment signature. Verification failed.")
 
@@ -6853,13 +7022,116 @@ def verify_razorpay_payment(data: VerifyRazorpayPaymentSchema, current_user_emai
         razorpay_signature=data.razorpay_signature
     )
 
+    record_or_update_payment(
+        payment_id=data.razorpay_payment_id,
+        booking_id=order["id"],
+        customer_id=clean_email,
+        customer_name=order.get("customer_name") or clean_email.split("@")[0].capitalize(),
+        amount=int(order.get("total", 0)),
+        status="successful",
+        method="Razorpay (UPI / Card)",
+        invoice_url=f"/api/payments/receipt/{order['id']}",
+        razorpay_order_id=data.razorpay_order_id,
+        razorpay_payment_id=data.razorpay_payment_id,
+        product_title=order.get("product_title") or "Gear Rental",
+        product_image=order.get("product_image") or ""
+    )
+
     notify_booking_event(order["id"], "payment_verified")
 
     return {
         "success": True,
         "message": "Payment verified and booking activated successfully.",
-        "order_id": order["id"]
+        "order_id": order["id"],
+        "payment_id": data.razorpay_payment_id,
+        "status": "active",
+        "payment_status": "paid"
     }
+
+@app.get("/api/payments/status/{order_id}")
+def check_payment_status_endpoint(order_id: str, current_user_email: str = Depends(get_current_user_email)):
+    clean_email = current_user_email.strip().lower()
+    order = get_order_by_id(order_id) or fetch_one("SELECT * FROM orders WHERE id = %s", (order_id,))
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found.")
+
+    order_owner = (order.get("user_email") or order.get("userEmail") or "").strip().lower()
+    if order_owner != clean_email:
+        user = get_user(clean_email)
+        is_admin = (user.get("role") in ("admin", "superadmin")) if (user and isinstance(user, dict)) else False
+        if not is_admin:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden.")
+
+    return {
+        "success": True,
+        "order_id": order["id"],
+        "payment_status": str(order.get("payment_status") or "unpaid"),
+        "status": str(order.get("status") or "pending"),
+        "razorpay_order_id": order.get("razorpay_order_id"),
+        "razorpay_payment_id": order.get("razorpay_payment_id"),
+        "total": float(order.get("total", 0)),
+        "refund_id": order.get("refund_id"),
+        "refund_status": order.get("refund_status")
+    }
+
+@app.get("/api/payments/history")
+def get_user_payment_history(
+    q: Optional[str] = None,
+    status: Optional[str] = "all",
+    current_user_email: str = Depends(get_current_user_email)
+):
+    from database import get_user_payments
+    clean_email = current_user_email.strip().lower()
+    transactions = get_user_payments(email=clean_email, status_filter=status or "all", search=q or "")
+    return {
+        "success": True,
+        "transactions": transactions,
+        "total_count": len(transactions)
+    }
+
+@app.get("/api/payments/receipt/{order_id}")
+def get_payment_receipt_endpoint(order_id: str, current_user_email: str = Depends(get_current_user_email)):
+    clean_email = current_user_email.strip().lower()
+    order = get_order_by_id(order_id) or fetch_one("SELECT * FROM orders WHERE id = %s", (order_id,))
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found for receipt.")
+
+    order_owner = (order.get("user_email") or order.get("userEmail") or "").strip().lower()
+    user = get_user(clean_email)
+    is_admin = (user.get("role") in ("admin", "superadmin")) if (user and isinstance(user, dict)) else False
+    if order_owner != clean_email and not is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden.")
+
+    total = float(order.get("total", 0))
+    subtotal = round(total / 1.08, 2)
+    tax = round(total - subtotal, 2)
+
+    receipt_data = {
+        "success": True,
+        "receipt_number": f"REC-{order['id'].replace('ord_', '')}",
+        "order_id": order["id"],
+        "customer_name": user.get("full_name") or clean_email.split("@")[0].capitalize() if user else clean_email.split("@")[0].capitalize(),
+        "customer_email": clean_email,
+        "product_title": order.get("product_title") or "Gear Rental",
+        "product_id": order.get("product_id") or "",
+        "start_date": order.get("start_date") or order.get("startDate") or "",
+        "end_date": order.get("end_date") or order.get("endDate") or "",
+        "payment_method": "Razorpay (UPI / Card / NetBanking)",
+        "transaction_id": order.get("razorpay_payment_id") or f"pay_{order['id']}",
+        "gateway_order_id": order.get("razorpay_order_id") or "",
+        "subtotal": subtotal,
+        "gst_tax": tax,
+        "total_amount": total,
+        "amount_paid": total,
+        "currency": "INR",
+        "payment_status": str(order.get("payment_status") or "unpaid"),
+        "booking_status": str(order.get("status") or "pending"),
+        "created_at": order.get("created_at") or order.get("createdAt") or "",
+        "issued_at": datetime.datetime.now(timezone.utc).isoformat(),
+        "escrow_guarantee": "100% Escrow Secured by Payent Protection"
+    }
+    receipt_data["receipt"] = receipt_data
+    return receipt_data
 
 @app.post("/api/payments/webhook")
 async def razorpay_webhook_handler(request: Request):

@@ -13,6 +13,7 @@ export const Route = createFileRoute("/payment")({
     }),
   validateSearch: (s: Record<string, unknown>) => ({
     id: (s.id as string) ?? "",
+    orderId: ((s.orderId as string) ?? (s.order_id as string) ?? "") as string,
     total: (s.total as number | string) ?? 0,
     start: (s.start as string) ?? "",
     end: (s.end as string) ?? "",
