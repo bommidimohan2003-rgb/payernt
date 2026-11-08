@@ -1,12 +1,12 @@
 import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
-import { Check, AlertCircle, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "relative overflow-hidden isolate inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md text-sm font-medium cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed [&_svg]:pointer-events-none [&_svg]:size-3.5 [&_svg]:shrink-0 [&_svg]:order-first select-none",
+  "relative inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md text-sm font-medium cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed [&_svg]:pointer-events-none [&_svg]:size-3.5 [&_svg]:shrink-0 [&_svg]:order-first select-none",
   {
     variants: {
       variant: {
@@ -66,14 +66,14 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       loading = false,
       icon,
       leftIcon,
-      animationStatus: controlledStatus,
+      animationStatus: _animationStatus,
       isSuccess,
       isError,
-      successDuration = 2000,
-      disableDualFill = false,
+      successDuration: _successDuration,
+      disableDualFill: _disableDualFill,
       successText,
       errorText,
-      onAnimationComplete,
+      onAnimationComplete: _onAnimationComplete,
       children,
       disabled,
       onClick,
@@ -81,123 +81,12 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     },
     ref,
   ) => {
-    const [internalStatus, setInternalStatus] = React.useState<DualFillStatus>("idle");
-    const timeoutRef = React.useRef<NodeJS.Timeout | null>(null);
-    const loadingStartTimeRef = React.useRef<number>(0);
-
-    const status = controlledStatus || internalStatus;
-
-    // React to loading transitions
-    const prevLoadingRef = React.useRef(loading);
-    React.useEffect(() => {
-      if (disableDualFill || asChild) return;
-
-      if (prevLoadingRef.current !== loading) {
-        if (loading) {
-          if (timeoutRef.current) clearTimeout(timeoutRef.current);
-          loadingStartTimeRef.current = Date.now();
-          setInternalStatus("processing");
-        } else if (prevLoadingRef.current && !loading) {
-          if (isError) {
-            if (timeoutRef.current) clearTimeout(timeoutRef.current);
-            setInternalStatus("error");
-            timeoutRef.current = setTimeout(() => {
-              setInternalStatus("idle");
-              onAnimationComplete?.("error");
-            }, 2000 + successDuration);
-          } else {
-            const elapsed = Date.now() - loadingStartTimeRef.current;
-            const remainingTo2s = Math.max(0, 2000 - elapsed);
-
-            if (timeoutRef.current) clearTimeout(timeoutRef.current);
-            timeoutRef.current = setTimeout(() => {
-              setInternalStatus("success");
-              timeoutRef.current = setTimeout(() => {
-                setInternalStatus("idle");
-                onAnimationComplete?.("success");
-              }, successDuration);
-            }, remainingTo2s);
-          }
-        }
-        prevLoadingRef.current = loading;
-      }
-    }, [loading, isError, successDuration, disableDualFill, asChild, onAnimationComplete]);
-
-    // React to explicit isSuccess / isError flags
-    React.useEffect(() => {
-      if (disableDualFill || asChild) return;
-
-      if (isSuccess && status !== "success") {
-        if (timeoutRef.current) clearTimeout(timeoutRef.current);
-        setInternalStatus("success");
-        timeoutRef.current = setTimeout(() => {
-          setInternalStatus("idle");
-          onAnimationComplete?.("success");
-        }, 2000 + successDuration);
-      } else if (isError && status !== "error") {
-        if (timeoutRef.current) clearTimeout(timeoutRef.current);
-        setInternalStatus("error");
-        timeoutRef.current = setTimeout(() => {
-          setInternalStatus("idle");
-          onAnimationComplete?.("error");
-        }, 2000 + successDuration);
-      }
-    }, [isSuccess, isError, status, successDuration, disableDualFill, asChild, onAnimationComplete]);
-
-    React.useEffect(() => {
-      return () => {
-        if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      };
-    }, []);
-
-    const handleClick = async (e: React.MouseEvent<HTMLButtonElement>) => {
-      if (status === "processing" || loading) {
+    const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+      if (disabled || loading) {
         e.preventDefault();
-        e.stopPropagation();
         return;
       }
-
-      if (disableDualFill || asChild) {
-        onClick?.(e);
-        return;
-      }
-
-      if (onClick) {
-        try {
-          const result = onClick(e);
-          if (result && typeof (result as any).then === "function") {
-            if (timeoutRef.current) clearTimeout(timeoutRef.current);
-            setInternalStatus("processing");
-            const startTime = Date.now();
-            try {
-              const res = await result;
-              const elapsed = Date.now() - startTime;
-              const remainingTo2s = Math.max(0, 2000 - elapsed);
-              if (remainingTo2s > 0) {
-                await new Promise((resolve) => setTimeout(resolve, remainingTo2s));
-              }
-              setInternalStatus("success");
-              timeoutRef.current = setTimeout(() => {
-                setInternalStatus("idle");
-                onAnimationComplete?.("success");
-              }, successDuration);
-              return res;
-            } catch (asyncErr) {
-              setInternalStatus("error");
-              timeoutRef.current = setTimeout(() => {
-                setInternalStatus("idle");
-                onAnimationComplete?.("error");
-              }, 2000 + successDuration);
-            }
-          }
-        } catch (syncErr) {
-          setInternalStatus("error");
-          timeoutRef.current = setTimeout(() => {
-            setInternalStatus("idle");
-            onAnimationComplete?.("error");
-          }, 2000 + successDuration);
-        }
-      }
+      onClick?.(e);
     };
 
     if (asChild) {
@@ -212,98 +101,37 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       );
     }
 
-    const isProcessing = status === "processing" || loading;
-    const isSuccessState = status === "success";
-    const isErrorState = status === "error";
-    const isAnimated = isProcessing || isSuccessState || isErrorState;
+    const displayText =
+      isSuccess && successText
+        ? successText
+        : isError && errorText
+        ? errorText
+        : children;
 
     return (
       <button
-        className={cn(
-          buttonVariants({ variant, size, className }),
-          isSuccessState && "text-white font-bold",
-          isErrorState && "text-white font-bold",
-        )}
+        className={cn(buttonVariants({ variant, size, className }))}
         ref={ref}
-        disabled={disabled || isProcessing}
+        disabled={disabled || loading}
         onClick={handleClick}
-        data-react-managed-button="true"
-        data-dual-state={status}
-        aria-busy={isProcessing}
+        aria-busy={loading}
         {...props}
       >
-        {!disableDualFill && (
-          <>
-            {/* 1. LEFT PANEL */}
-            <span
-              aria-hidden="true"
-              className={cn(
-                "pointer-events-none absolute inset-y-0 left-0 z-0 will-change-[width,opacity] motion-reduce:transition-none",
-                !isAnimated && "w-0 opacity-0",
-                isProcessing && "w-1/2 opacity-100",
-                isSuccessState && "w-1/2 opacity-100",
-                isErrorState && "w-1/2 opacity-100",
-              )}
-              style={{
-                backgroundColor: isErrorState ? "#FF7F7F" : "#8FAF7E",
-                transition: "width 2000ms cubic-bezier(0.22, 1, 0.36, 1), background-color 300ms ease, opacity 200ms ease",
-              }}
-            />
-
-            {/* 2. RIGHT PANEL */}
-            <span
-              aria-hidden="true"
-              className={cn(
-                "pointer-events-none absolute inset-y-0 right-0 z-0 will-change-[width,opacity] motion-reduce:transition-none",
-                !isAnimated && "w-0 opacity-0",
-                isProcessing && "w-1/2 opacity-100",
-                isSuccessState && "w-1/2 opacity-100",
-                isErrorState && "w-1/2 opacity-100",
-              )}
-              style={{
-                backgroundColor: isErrorState ? "#FF7F7F" : "#8FAF7E",
-                transition: "width 2000ms cubic-bezier(0.22, 1, 0.36, 1), background-color 300ms ease, opacity 200ms ease",
-              }}
-            />
-
-            {isProcessing && (
-              <span
-                aria-hidden="true"
-                className="pointer-events-none absolute inset-0 z-0 bg-white/15 animate-pulse"
-              />
-            )}
-          </>
-        )}
-
-        <span className="relative z-10 flex items-center justify-center gap-1.5 text-inherit transition-colors duration-200 [&_svg]:order-first">
-          {isSuccessState ? (
-            <Check
-              className="h-3.5 w-3.5 shrink-0 animate-in zoom-in-75 duration-200 text-white"
-              strokeWidth={3}
-            />
-          ) : isErrorState ? (
-            <AlertCircle
-              className="h-3.5 w-3.5 shrink-0 animate-in zoom-in-75 duration-200 text-white"
-              strokeWidth={2.5}
-            />
-          ) : isProcessing ? (
-            <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-white" />
+        <span className="relative flex items-center justify-center gap-1.5 text-inherit transition-colors duration-150 [&_svg]:order-first">
+          {loading ? (
+            <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
           ) : (
             icon || leftIcon || null
           )}
-
           <span className="inline-flex items-center gap-1.5 [&_svg]:order-first">
-            {isSuccessState && successText
-              ? successText
-              : isErrorState && errorText
-              ? errorText
-              : children}
+            {displayText}
           </span>
         </span>
       </button>
     );
   },
 );
+
 Button.displayName = "Button";
 
 export { Button, buttonVariants };

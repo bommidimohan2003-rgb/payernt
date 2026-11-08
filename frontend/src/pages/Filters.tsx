@@ -64,6 +64,9 @@ export default function FiltersPage() {
     sort?: string;
   };
 
+  // Mobile Filter Sidebar Toggle State (collapsible on mobile with "<" symbol)
+  const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(true);
+
   // 1. Search Query State
   const [searchQuery, setSearchQuery] = useState<string>(search.q || "");
 
@@ -945,11 +948,52 @@ export default function FiltersPage() {
         {/* LEFT COLUMN: FILTER SIDEBAR (LAPTOP & MOBILE)                     */}
         {/* Moves naturally as user scrolls the page                          */}
         {/* ----------------------------------------------------------------- */}
-        <aside className="w-[98px] xs:w-[112px] sm:w-[200px] md:w-[240px] lg:w-[280px] xl:w-[26%] shrink-0 bg-neutral-50 dark:bg-[#1E1E1E] border-r border-neutral-200 dark:border-neutral-800">
-          <div className="px-1 xs:px-1.5 sm:px-3.5 lg:px-5 xl:px-6 py-2 sm:py-6">
+        <aside
+          className={cn(
+            "shrink-0 bg-neutral-50 dark:bg-[#1E1E1E] border-r border-neutral-200 dark:border-neutral-800 transition-all duration-300 relative",
+            isMobileFilterOpen
+              ? "w-[140px] xs:w-[160px] sm:w-[200px] md:w-[240px] lg:w-[280px] xl:w-[26%]"
+              : "w-0 sm:w-[200px] md:w-[240px] lg:w-[280px] xl:w-[26%] overflow-hidden sm:overflow-visible border-r-0 sm:border-r"
+          )}
+        >
+          {/* Mobile Collapse Toggle Handle on Boundary Edge */}
+          <button
+            type="button"
+            onClick={() => setIsMobileFilterOpen((prev) => !prev)}
+            className="sm:hidden absolute -right-3 top-2.5 z-30 w-6 h-6 rounded-full bg-neutral-900 text-white dark:bg-white dark:text-black border border-neutral-300 dark:border-neutral-700 shadow-md flex items-center justify-center cursor-pointer hover:scale-110 active:scale-95 transition-transform"
+            title={isMobileFilterOpen ? "Close filters (<)" : "Open filters (<)"}
+            aria-label={isMobileFilterOpen ? "Close filters (<)" : "Open filters (<)"}
+          >
+            <span className="font-mono font-black text-xs leading-none select-none">
+              {isMobileFilterOpen ? "<" : ">"}
+            </span>
+          </button>
+
+          <div
+            className={cn(
+              "px-1.5 xs:px-2.5 sm:px-3.5 lg:px-5 xl:px-6 py-2 sm:py-6",
+              !isMobileFilterOpen && "hidden sm:block"
+            )}
+          >
             {renderSidebarFilters(false)}
           </div>
         </aside>
+
+        {/* Mobile Edge Open Button when filters are closed */}
+        {!isMobileFilterOpen && (
+          <button
+            type="button"
+            onClick={() => setIsMobileFilterOpen(true)}
+            className="sm:hidden fixed left-0 top-24 z-40 py-2.5 px-1.5 rounded-r-xl bg-neutral-900 text-white dark:bg-white dark:text-black shadow-lg flex flex-col items-center gap-1 cursor-pointer hover:opacity-90 active:scale-95 transition-all text-[11px] font-bold border border-l-0 border-neutral-700 dark:border-neutral-300 animate-in fade-in slide-in-from-left-2 duration-150"
+            title="Open filters (<)"
+            aria-label="Open filters (<)"
+          >
+            <span className="font-mono font-black text-xs leading-none">&lt;</span>
+            <span className="[writing-mode:vertical-lr] text-[9px] uppercase tracking-wider font-extrabold py-0.5">
+              Filters
+            </span>
+          </button>
+        )}
 
         {/* ----------------------------------------------------------------- */}
         {/* RIGHT COLUMN: PRODUCT RESULTS GRID (LAPTOP & MOBILE)              */}
@@ -988,6 +1032,16 @@ export default function FiltersPage() {
           {/* STICKY TOP ROW: REMOVABLE FILTER CHIPS + CLEAR ALL (EXACT REFERENCE) */}
           <div className="sticky top-14 sm:top-16 z-20 bg-neutral-50/95 dark:bg-[#1E1E1E]/95 backdrop-blur-md pt-1 pb-2 sm:pb-3 border-b border-neutral-200 dark:border-neutral-800/80 flex items-center justify-between gap-1.5 sm:gap-3 flex-wrap min-h-[30px] sm:min-h-[38px]">
             <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+              {/* Mobile Filter Toggle Button with "<" */}
+              <button
+                type="button"
+                onClick={() => setIsMobileFilterOpen((prev) => !prev)}
+                className="sm:hidden inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white dark:bg-[#1E1E1E] border border-neutral-300/80 dark:border-neutral-700 text-[9.5px] xs:text-[10.5px] font-bold text-neutral-800 dark:text-neutral-200 shadow-xs cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shrink-0"
+                title={isMobileFilterOpen ? "Close filters (<)" : "Open filters (<)"}
+              >
+                <span className="font-mono font-black text-xs leading-none">&lt;</span>
+                <span>{isMobileFilterOpen ? "Filters" : "Filters"}</span>
+              </button>
               {activeChips.map((chip) => (
                 <div
                   key={chip.id}

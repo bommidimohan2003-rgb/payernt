@@ -121,8 +121,11 @@ function formatDisplayDate(dateStr: string): string {
 // Calculate inclusive days between two YYYY-MM-DD dates
 function calculateInclusiveDays(startStr: string, endStr: string): number {
   if (!startStr || !endStr) return 0;
-  const start = new Date(startStr);
-  const end = new Date(endStr);
+  const [sY, sM, sD] = startStr.split("-").map(Number);
+  const [eY, eM, eD] = endStr.split("-").map(Number);
+  if (!sY || !sM || !sD || !eY || !eM || !eD) return 0;
+  const start = new Date(sY, sM - 1, sD);
+  const end = new Date(eY, eM - 1, eD);
   const diffTime = end.getTime() - start.getTime();
   if (diffTime < 0) return 0;
   return Math.round(diffTime / (1000 * 60 * 60 * 24)) + 1;
@@ -270,6 +273,25 @@ export default function ProductDetails() {
   const [loadingSlots, setLoadingSlots] = useState<boolean>(false);
   const [slotsError, setSlotsError] = useState<string | null>(null);
   const slotsAbortControllerRef = useRef<AbortController | null>(null);
+
+  // Time Slot Dropdown State
+  const [isSlotDropdownOpen, setIsSlotDropdownOpen] = useState(false);
+  const slotDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close slot dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (slotDropdownRef.current && !slotDropdownRef.current.contains(event.target as Node)) {
+        setIsSlotDropdownOpen(false);
+      }
+    }
+    if (isSlotDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isSlotDropdownOpen]);
 
   // Stale-While-Revalidate: load latest product details in background
   useEffect(() => {
@@ -563,22 +585,6 @@ export default function ProductDetails() {
     }
   };
 
-  const handleSelectPresetDuration = (days: number) => {
-    setDurationMode("custom");
-    setSelectedSlot("full_day");
-    if (!startDate) return;
-    const parts = startDate.split("-").map(Number);
-    const startObj = new Date(parts[0], parts[1] - 1, parts[2]);
-    // Exactly N elapsed calendar days:
-    const endObj = new Date(startObj);
-    endObj.setDate(startObj.getDate() + Math.max(0, days - 1));
-    const endStr = toDateInputValue(endObj);
-    setEndDate(endStr);
-    setAvailabilityChecked(false);
-    setIsAvailableForDates(null);
-    setAvailabilityMessage("");
-  };
-
   const handleSlotSelect = (slotId: "morning" | "afternoon" | "full_day") => {
     setSelectedSlot(slotId);
     if (slotId === "morning") {
@@ -656,6 +662,111 @@ export default function ProductDetails() {
     return Number(product?.price) || 0;
   }, [daySlots, product?.price]);
 
+  // Active Slot Info for Dropdown Display
+  const currentSlotInfo = useMemo(() => {
+    if (durationMode === "half_day_morning") {
+      return {
+        id: "morning" as const,
+        title: "Morning Slot",
+        time: "8:00 AM – 12:00 PM (4 Hours)",
+        shortTime: "8 AM - 12 PM",
+        price: morningPrice,
+        priceSuffix: "",
+        icon: Sun,
+        iconColor: "text-amber-500",
+        iconBg: "bg-amber-500/10",
+        tag: "Morning",
+      };
+    }
+    if (durationMode === "half_day_afternoon") {
+      return {
+        id: "afternoon" as const,
+        title: "Afternoon Slot",
+        time: "1:00 PM – 5:00 PM (4 Hours)",
+        shortTime: "1 PM - 5 PM",
+        price: afternoonPrice,
+        priceSuffix: "",
+        icon: Sun,
+        iconColor: "text-orange-500",
+        iconBg: "bg-orange-500/10",
+        tag: "Afternoon",
+      };
+    }
+    if (durationMode === "custom") {
+      return {
+        id: "custom" as const,
+        title: "Multi-Day Rental",
+        time: `${rentalDays} Days (${startDate} → ${endDate})`,
+        shortTime: `${rentalDays} Days Range`,
+        price: fullDayPrice,
+        priceSuffix: "/day",
+        icon: Clock,
+        iconColor: "text-emerald-500",
+        iconBg: "bg-emerald-500/10",
+        tag: "Multi-Day",
+      };
+    }
+    return {
+      id: "full_day" as const,
+      title: "1 Full Day",
+      time: "Full 24-Hour Rental Period",
+      shortTime: "24 Hours",
+      price: fullDayPrice,
+      priceSuffix: "",
+      icon: Calendar,
+      iconColor: "text-primary",
+      iconBg: "bg-primary/10",
+      tag: "Full Day",
+    };
+  }, [durationMode, morningPrice, afternoonPrice, fullDayPrice, rentalDays, startDate, endDate]);
+
+  const slotOptions = useMemo(() => [
+    {
+      id: "morning" as const,
+      title: "Morning Slot",
+      time: "8:00 AM – 12:00 PM (4 Hours)",
+      price: morningPrice,
+      priceSuffix: "",
+      icon: Sun,
+      iconColor: "text-amber-500",
+      iconBg: "bg-amber-500/10",
+      tag: "Half-day",
+    },
+    {
+      id: "afternoon" as const,
+      title: "Afternoon Slot",
+      time: "1:00 PM – 5:00 PM (4 Hours)",
+      price: afternoonPrice,
+      priceSuffix: "",
+      icon: Sun,
+      iconColor: "text-orange-500",
+      iconBg: "bg-orange-500/10",
+      tag: "Half-day",
+    },
+    {
+      id: "full_day" as const,
+      title: "1 Full Day",
+      time: "Full 24-Hour Rental Period",
+      price: fullDayPrice,
+      priceSuffix: "",
+      icon: Calendar,
+      iconColor: "text-primary",
+      iconBg: "bg-primary/10",
+      tag: "Popular",
+    },
+    {
+      id: "custom" as const,
+      title: "Multi-Day Rental",
+      time: "Select custom date range on calendar",
+      price: fullDayPrice,
+      priceSuffix: "/day",
+      icon: Clock,
+      iconColor: "text-emerald-500",
+      iconBg: "bg-emerald-500/10",
+      tag: "Flexible",
+    },
+  ], [morningPrice, afternoonPrice, fullDayPrice]);
+
   // Handle Date Changes (resets check state)
   const handleStartDateChange = (val: string) => {
     setStartDate(val);
@@ -664,13 +775,38 @@ export default function ProductDetails() {
     setAvailabilityMessage("");
     if (durationMode !== "custom") {
       setEndDate(val);
-    } else if (endDate && val && new Date(endDate) < new Date(val)) {
-      setEndDate(val);
+    } else if (endDate && val && endDate <= val) {
+      const [y, m, d] = val.split("-").map(Number);
+      const nextDay = new Date(y, m - 1, d + 1);
+      setEndDate(toDateInputValue(nextDay));
     }
   };
 
   const handleEndDateChange = (val: string) => {
     setEndDate(val);
+    setAvailabilityChecked(false);
+    setIsAvailableForDates(null);
+    setAvailabilityMessage("");
+  };
+
+  const handleDateRangeChange = (start: string, end: string) => {
+    setStartDate(start);
+    setEndDate(end);
+    setAvailabilityChecked(false);
+    setIsAvailableForDates(null);
+    setAvailabilityMessage("");
+  };
+
+  // Change duration by adjusting days directly
+  const handleDaysChange = (newDays: number) => {
+    const validDays = Math.max(2, Math.min(90, newDays));
+    if (!startDate) return;
+    const [sY, sM, sD] = startDate.split("-").map(Number);
+    const startObj = new Date(sY, sM - 1, sD);
+    const endObj = new Date(startObj);
+    endObj.setDate(startObj.getDate() + validDays - 1);
+    const endStr = toDateInputValue(endObj);
+    setEndDate(endStr);
     setAvailabilityChecked(false);
     setIsAvailableForDates(null);
     setAvailabilityMessage("");
@@ -1573,10 +1709,7 @@ const productSchema = product ? {
                         productId={product.id}
                         selectedStartDate={startDate}
                         selectedEndDate={endDate}
-                        onDateChange={(start, end) => {
-                          handleStartDateChange(start);
-                          handleEndDateChange(end);
-                        }}
+                        onDateChange={handleDateRangeChange}
                         productTitle={product.title}
                         pricePerDay={Number(product.price) || 0}
                         productAvailable={product.available}
@@ -1597,143 +1730,163 @@ const productSchema = product ? {
                   )}
                 </div>
 
-                {/* Choose Duration & Slot */}
-                <div className="relative pt-2 space-y-1.5">
+                {/* Time Slot Dropdown Menu */}
+                <div ref={slotDropdownRef} className="relative pt-2 space-y-1.5">
                   <label className="absolute -top-1.5 left-3 px-1.5 bg-white dark:bg-[#1E1E1E] text-[10px] sm:text-[11px] font-bold text-foreground uppercase tracking-wider pointer-events-none select-none z-10">
-                    Rental Duration & Slot
+                    Time Slot
                   </label>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2 w-full min-w-0 pt-0.5">
-                    {/* Morning */}
-                    <button
-                      type="button"
-                      onClick={() => handleSlotSelect("morning")}
-                      className={`p-1.5 xs:p-2 sm:p-2.5 rounded-xl border text-left transition-all cursor-pointer min-w-0 flex flex-col justify-between ${
-                        selectedSlot === "morning" && durationMode === "half_day_morning"
-                          ? "border-primary bg-primary/10 dark:bg-primary/15 ring-2 ring-primary/20 shadow-xs"
-                          : "border-neutral-300/80 dark:border-neutral-700/80 bg-neutral-100/60 dark:bg-[#1E1E1E] hover:bg-neutral-100 dark:hover:bg-white/10"
-                      }`}
-                    >
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1 mb-0.5 min-w-0">
-                          <Sun className="h-3 w-3 text-amber-500 shrink-0" />
-                          <span className="text-[10px] xs:text-[11px] sm:text-xs font-bold text-foreground truncate">Morning</span>
-                        </div>
-                        <div className="text-[8px] xs:text-[8.5px] sm:text-[10px] text-muted-foreground truncate leading-tight">
-                          8 AM - 12 PM
-                        </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsSlotDropdownOpen((prev) => !prev)}
+                    className={cn(
+                      "w-full p-2.5 sm:p-3 rounded-xl border transition-all flex items-center justify-between cursor-pointer group text-left",
+                      isSlotDropdownOpen
+                        ? "border-primary bg-primary/5 dark:bg-primary/10 ring-2 ring-primary/20"
+                        : "border-neutral-300/80 dark:border-neutral-700/80 bg-neutral-100/60 dark:bg-[#1E1E1E] hover:bg-neutral-100 dark:hover:bg-white/10"
+                    )}
+                    aria-haspopup="listbox"
+                    aria-expanded={isSlotDropdownOpen}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className={cn("h-8 w-8 rounded-lg flex items-center justify-center shrink-0", currentSlotInfo.iconBg, currentSlotInfo.iconColor)}>
+                        <currentSlotInfo.icon className="h-4 w-4" />
                       </div>
-                      <div className="mt-1 text-[10px] xs:text-[11px] sm:text-xs font-extrabold text-primary font-mono">
-                        ₹{morningPrice}
-                      </div>
-                    </button>
-
-                    {/* Afternoon */}
-                    <button
-                      type="button"
-                      onClick={() => handleSlotSelect("afternoon")}
-                      className={`p-1.5 xs:p-2 sm:p-2.5 rounded-xl border text-left transition-all cursor-pointer min-w-0 flex flex-col justify-between ${
-                        selectedSlot === "afternoon" && durationMode === "half_day_afternoon"
-                          ? "border-primary bg-primary/10 dark:bg-primary/15 ring-2 ring-primary/20 shadow-xs"
-                          : "border-neutral-300/80 dark:border-neutral-700/80 bg-neutral-100/60 dark:bg-[#1E1E1E] hover:bg-neutral-100 dark:hover:bg-white/10"
-                      }`}
-                    >
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1 mb-0.5 min-w-0">
-                          <Sun className="h-3 w-3 text-orange-500 shrink-0" />
-                          <span className="text-[10px] xs:text-[11px] sm:text-xs font-bold text-foreground truncate">Afternoon</span>
+                      <div className="text-left truncate min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs sm:text-sm font-bold text-foreground block truncate">
+                            {currentSlotInfo.title}
+                          </span>
+                          <span className="text-[10px] font-bold text-primary font-mono bg-primary/10 px-1.5 py-0.5 rounded-md shrink-0">
+                            ₹{currentSlotInfo.price}{currentSlotInfo.priceSuffix}
+                          </span>
                         </div>
-                        <div className="text-[8px] xs:text-[8.5px] sm:text-[10px] text-muted-foreground truncate leading-tight">
-                          1 PM - 5 PM
-                        </div>
-                      </div>
-                      <div className="mt-1 text-[10px] xs:text-[11px] sm:text-xs font-extrabold text-primary font-mono">
-                        ₹{afternoonPrice}
-                      </div>
-                    </button>
-
-                    {/* Full Day */}
-                    <button
-                      type="button"
-                      onClick={() => handleSlotSelect("full_day")}
-                      className={`p-1.5 xs:p-2 sm:p-2.5 rounded-xl border text-left transition-all cursor-pointer min-w-0 flex flex-col justify-between ${
-                        selectedSlot === "full_day" && durationMode === "full_day"
-                          ? "border-primary bg-primary/10 dark:bg-primary/15 ring-2 ring-primary/20 shadow-xs"
-                          : "border-neutral-300/80 dark:border-neutral-700/80 bg-neutral-100/60 dark:bg-[#1E1E1E] hover:bg-neutral-100 dark:hover:bg-white/10"
-                      }`}
-                    >
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1 mb-0.5 min-w-0">
-                          <Calendar className="h-3 w-3 text-primary shrink-0" />
-                          <span className="text-[10px] xs:text-[11px] sm:text-xs font-bold text-foreground truncate">1 Full Day</span>
-                        </div>
-                        <div className="text-[8px] xs:text-[8.5px] sm:text-[10px] text-muted-foreground truncate leading-tight">
-                          24 Hours
-                        </div>
-                      </div>
-                      <div className="mt-1 text-[10px] xs:text-[11px] sm:text-xs font-extrabold text-primary font-mono">
-                        ₹{fullDayPrice}
-                      </div>
-                    </button>
-
-                    {/* Multi-Day */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        handleDurationModeChange("custom");
-                        setShowFullCalendar(true);
-                      }}
-                      className={`p-1.5 xs:p-2 sm:p-2.5 rounded-xl border text-left transition-all cursor-pointer min-w-0 flex flex-col justify-between ${
-                        durationMode === "custom"
-                          ? "border-primary bg-primary/10 dark:bg-primary/15 ring-2 ring-primary/20 shadow-xs"
-                          : "border-neutral-300/80 dark:border-neutral-700/80 bg-neutral-100/60 dark:bg-[#1E1E1E] hover:bg-neutral-100 dark:hover:bg-white/10"
-                      }`}
-                    >
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1 mb-0.5 min-w-0">
-                          <Clock className="h-3 w-3 text-emerald-500 shrink-0" />
-                          <span className="text-[10px] xs:text-[11px] sm:text-xs font-bold text-foreground truncate">Multi-Day</span>
-                        </div>
-                        <div className="text-[8px] xs:text-[8.5px] sm:text-[10px] text-muted-foreground truncate leading-tight">
-                          Custom Range
-                        </div>
-                      </div>
-                      <div className="mt-1 text-[10px] xs:text-[11px] sm:text-xs font-extrabold text-primary font-mono">
-                        ₹{fullDayPrice}/day
-                      </div>
-                    </button>
-                  </div>
-
-                  {/* Multi-Day Preset Duration Pills */}
-                  {durationMode === "custom" && (
-                    <div className="pt-2 animate-in fade-in slide-in-from-top-1 duration-150">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                          Duration Presets:
-                        </span>
-                        <span className="text-[10px] text-primary font-semibold">
-                          {rentalDays} {rentalDays === 1 ? "day" : "days"} selected
+                        <span className="text-[10px] text-muted-foreground font-medium block truncate">
+                          {currentSlotInfo.time}
                         </span>
                       </div>
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        {[2, 3, 5, 7, 14].map((d) => (
+                    </div>
+
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-primary shrink-0 ml-2">
+                      <span className="hidden xs:inline">{isSlotDropdownOpen ? "Close" : "Select Slot"}</span>
+                      <ChevronDown className={cn("h-3.5 w-3.5 transition-transform duration-200", isSlotDropdownOpen ? "rotate-180" : "")} />
+                    </div>
+                  </button>
+
+                  {/* Dropdown Menu Options */}
+                  {isSlotDropdownOpen && (
+                    <div className="absolute left-0 right-0 top-full mt-1.5 z-30 p-1.5 rounded-xl border border-neutral-300/90 dark:border-neutral-700 bg-white dark:bg-[#1E1E1E] shadow-xl space-y-1 animate-in fade-in slide-in-from-top-2 duration-150">
+                      {slotOptions.map((opt) => {
+                        const isSelected =
+                          (opt.id === "custom" && durationMode === "custom") ||
+                          (opt.id !== "custom" && selectedSlot === opt.id && durationMode !== "custom");
+                        const OptIcon = opt.icon;
+
+                        return (
                           <button
-                            key={d}
+                            key={opt.id}
                             type="button"
-                            onClick={() => handleSelectPresetDuration(d)}
-                            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer flex items-center gap-1 ${
-                              rentalDays === d
-                                ? "border-primary bg-primary text-primary-foreground shadow-xs"
-                                : "border-neutral-300/80 dark:border-neutral-700/80 bg-neutral-100/60 dark:bg-[#1E1E1E] text-foreground hover:bg-neutral-200/70 dark:hover:bg-white/10"
-                            }`}
+                            onClick={() => {
+                              if (opt.id === "custom") {
+                                handleDurationModeChange("custom");
+                                setShowFullCalendar(true);
+                              } else {
+                                handleSlotSelect(opt.id);
+                              }
+                              setIsSlotDropdownOpen(false);
+                            }}
+                            className={cn(
+                              "w-full p-2 sm:p-2.5 rounded-lg flex items-center justify-between gap-2.5 text-left transition-all cursor-pointer",
+                              isSelected
+                                ? "bg-primary/10 dark:bg-primary/20 border border-primary/30"
+                                : "hover:bg-neutral-100 dark:hover:bg-white/5 border border-transparent"
+                            )}
                           >
-                            <Calendar className="h-3 w-3 shrink-0" />
-                            <span>{d} Days {d === 7 ? "(1 Wk)" : d === 14 ? "(2 Wks)" : ""}</span>
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className={cn("h-7 w-7 rounded-md flex items-center justify-center shrink-0", opt.iconBg, opt.iconColor)}>
+                                <OptIcon className="h-3.5 w-3.5" />
+                              </div>
+                              <div className="truncate min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <span className={cn("text-xs font-bold truncate", isSelected ? "text-primary" : "text-foreground")}>
+                                    {opt.title}
+                                  </span>
+                                  <span className="text-[9px] font-mono font-semibold px-1.5 py-0.2 rounded bg-neutral-200/60 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400">
+                                    {opt.tag}
+                                  </span>
+                                </div>
+                                <span className="text-[10px] text-muted-foreground block truncate">
+                                  {opt.time}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="text-xs font-mono font-bold text-foreground">
+                                ₹{opt.price}{opt.priceSuffix}
+                              </span>
+                              <div className={cn("w-4 h-4 rounded-full flex items-center justify-center", isSelected ? "text-primary" : "opacity-0")}>
+                                <Check className="h-3.5 w-3.5 stroke-[2.5]" />
+                              </div>
+                            </div>
                           </button>
-                        ))}
-                      </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
+
+                {/* Multi-Day Days Marker / Stepper */}
+                {durationMode === "custom" && (
+                    <div className="pt-2 animate-in fade-in slide-in-from-top-1 duration-150">
+                      <div className="flex items-center justify-between p-2.5 sm:p-3 rounded-xl bg-neutral-100/70 dark:bg-[#1E1E1E] border border-neutral-300/80 dark:border-neutral-700/80">
+                        <div>
+                          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+                            Rental Duration
+                          </span>
+                          <span className="text-xs sm:text-sm font-bold text-foreground">
+                            {rentalDays} {rentalDays === 1 ? "Day" : "Days"} ({startDate} → {endDate})
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 sm:gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleDaysChange(rentalDays - 1)}
+                            disabled={rentalDays <= 2}
+                            className="w-8 h-8 rounded-lg border border-neutral-300/80 dark:border-neutral-700/80 flex items-center justify-center font-bold text-base hover:bg-neutral-200/70 dark:hover:bg-white/10 disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer text-foreground"
+                            title="Decrease days"
+                          >
+                            -
+                          </button>
+
+                          <div className="flex items-center justify-center px-2 py-1 bg-white dark:bg-neutral-900 border border-neutral-300/80 dark:border-neutral-700/80 rounded-lg">
+                            <input
+                              type="number"
+                              min={2}
+                              max={90}
+                              value={rentalDays}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value, 10);
+                                if (!isNaN(val)) handleDaysChange(val);
+                              }}
+                              className="w-8 text-center font-mono font-bold text-xs sm:text-sm bg-transparent outline-none text-foreground"
+                            />
+                            <span className="text-[10px] font-medium text-muted-foreground ml-0.5">d</span>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => handleDaysChange(rentalDays + 1)}
+                            disabled={rentalDays >= 90}
+                            className="w-8 h-8 rounded-lg border border-neutral-300/80 dark:border-neutral-700/80 flex items-center justify-center font-bold text-base hover:bg-neutral-200/70 dark:hover:bg-white/10 disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer text-foreground"
+                            title="Increase days"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                 {/* Booking Summary */}
                 <div className="relative rounded-2xl bg-neutral-100/70 dark:bg-[#1E1E1E] border border-neutral-300/80 dark:border-neutral-700/80 pt-4.5 pb-3 px-3.5 sm:px-4 flex items-center justify-between gap-3">
@@ -1910,7 +2063,6 @@ const productSchema = product ? {
                         type="button"
                         onClick={handleCheckAvailability}
                         disabled={isCheckingAvailability}
-                        disableDualFill={isCheckingAvailability}
                         className="py-2 px-4 rounded-xl font-semibold text-xs bg-secondary hover:bg-secondary/80 text-foreground transition-all cursor-pointer inline-flex items-center justify-center gap-1.5 min-h-[36px]"
                       >
                         {isCheckingAvailability ? (
@@ -1938,7 +2090,6 @@ const productSchema = product ? {
                       id="check-availability-action-btn"
                       onClick={handleCheckAvailability}
                       disabled={isCheckingAvailability || categoryRestriction?.restricted}
-                      disableDualFill={isCheckingAvailability}
                       className="py-2 px-4.5 rounded-full font-semibold text-xs sm:text-sm shadow-xs transition-all duration-200 inline-flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 bg-neutral-950 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-100 disabled:opacity-90 disabled:cursor-not-allowed min-h-[38px]"
                     >
                       {isCheckingAvailability ? (
@@ -2141,7 +2292,6 @@ const productSchema = product ? {
                     id="product-details-book-now-btn"
                     onClick={handleBookNowAction}
                     disabled={categoryRestriction?.restricted || isCheckingAvailability}
-                    disableDualFill={isCheckingAvailability}
                     className={`py-2 px-4 rounded-full font-semibold text-xs sm:text-sm shadow-xs transition-all duration-200 inline-flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 min-h-[38px] ${
                       categoryRestriction?.restricted
                         ? "bg-amber-900/40 text-amber-300 border border-amber-500/30 cursor-not-allowed opacity-80"

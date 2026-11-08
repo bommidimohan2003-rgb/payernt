@@ -139,7 +139,8 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
   // Range selection UX state
   const [hoveredDate, setHoveredDate] = useState<string | null>(null);
   const [conflictMessage, setConflictMessage] = useState<string | null>(null);
-  const [isPickingEnd, setIsPickingEnd] = useState(false);
+  const [activeTarget, setActiveTarget] = useState<"start" | "end">("end");
+  const isPickingEnd = activeTarget === "end";
 
   // Controller and debounce references
   const abortControllerRef = React.useRef<AbortController | null>(null);
@@ -481,30 +482,42 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
     // Single-day mode
     if (durationMode !== "custom") {
       handleDatesUpdate(dateKey, dateKey);
-      setIsPickingEnd(false);
+      setActiveTarget("start");
       return;
     }
 
-    // Multi-day custom mode
-    if (!isPickingEnd || !selectedStartDate) {
-      // Pick start date
-      handleDatesUpdate(dateKey, dateKey);
-      setIsPickingEnd(true);
+    // Multi-day custom mode: Picking / Changing Start Date
+    if (activeTarget === "start" || !selectedStartDate) {
+      let newEnd = selectedEndDate;
+      if (!newEnd || dateKey >= newEnd) {
+        // Automatically default return date to start date + 1 day
+        const [y, m, d] = dateKey.split("-").map(Number);
+        const nextDay = new Date(y, m - 1, d + 1);
+        newEnd = formatDateKey(nextDay.getFullYear(), nextDay.getMonth(), nextDay.getDate());
+      }
+      handleDatesUpdate(dateKey, newEnd);
+      setActiveTarget("end");
       return;
     }
 
-    // We are picking the return / end date
+    // Multi-day custom mode: Picking / Changing Return Date (activeTarget === "end")
     if (dateKey < selectedStartDate) {
-      // User clicked an earlier date, seamlessly restart range from here
-      handleDatesUpdate(dateKey, dateKey);
-      setIsPickingEnd(true);
+      // User clicked an earlier date, seamlessly restart range with start as this date
+      const [y, m, d] = dateKey.split("-").map(Number);
+      const nextDay = new Date(y, m - 1, d + 1);
+      const defaultEnd = formatDateKey(nextDay.getFullYear(), nextDay.getMonth(), nextDay.getDate());
+      handleDatesUpdate(dateKey, defaultEnd);
+      setActiveTarget("end");
       return;
     }
 
     if (dateKey === selectedStartDate) {
-      // Clicking same date finishes single-day span
-      handleDatesUpdate(selectedStartDate, selectedStartDate);
-      setIsPickingEnd(false);
+      // Clicking same date: enforce at least 2 days for multi-day rental
+      const [y, m, d] = dateKey.split("-").map(Number);
+      const nextDay = new Date(y, m - 1, d + 1);
+      const defaultEnd = formatDateKey(nextDay.getFullYear(), nextDay.getMonth(), nextDay.getDate());
+      handleDatesUpdate(selectedStartDate, defaultEnd);
+      setActiveTarget("end");
       return;
     }
 
@@ -529,7 +542,6 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
 
     // Valid range selected!
     handleDatesUpdate(selectedStartDate, dateKey);
-    setIsPickingEnd(false);
     setHoveredDate(null);
   };
 
@@ -630,7 +642,7 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
             type="button"
             onClick={() => {
               onSelectDurationMode("full_day");
-              setIsPickingEnd(false);
+              setActiveTarget("start");
               if (selectedStartDate) {
                 handleDatesUpdate(selectedStartDate, selectedStartDate);
               }
@@ -649,7 +661,7 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
             type="button"
             onClick={() => {
               onSelectDurationMode("custom");
-              setIsPickingEnd(Boolean(selectedStartDate && (!selectedEndDate || selectedEndDate === selectedStartDate)));
+              setActiveTarget(selectedStartDate ? "end" : "start");
             }}
             className={cn(
               "flex-1 py-1 px-2.5 rounded-lg text-center transition-all cursor-pointer flex items-center justify-center gap-1",
@@ -660,6 +672,53 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
           >
             <Clock className="w-3 h-3 shrink-0 text-emerald-500" />
             <span>Multi-Day Range</span>
+          </button>
+        </div>
+      )}
+
+      {/* Date Range Selection Tabs in Multi-Day Mode */}
+      {durationMode === "custom" && (
+        <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-neutral-100/90 dark:bg-neutral-800/80 border border-neutral-200/90 dark:border-neutral-700/80 text-xs">
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTarget("start");
+              setConflictMessage(null);
+            }}
+            className={cn(
+              "p-2 rounded-lg text-left transition-all cursor-pointer flex flex-col min-w-0",
+              activeTarget === "start"
+                ? "bg-white dark:bg-[#1E1E1E] text-primary shadow-xs font-bold ring-2 ring-primary/30"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <span className="text-[9px] uppercase tracking-wider font-semibold opacity-70 truncate">
+              1. Start Date {activeTarget === "start" && "• Picking"}
+            </span>
+            <span className="font-mono font-bold text-xs truncate">
+              {selectedStartDate || "Pick start"}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTarget("end");
+              setConflictMessage(null);
+            }}
+            className={cn(
+              "p-2 rounded-lg text-left transition-all cursor-pointer flex flex-col min-w-0",
+              activeTarget === "end"
+                ? "bg-white dark:bg-[#1E1E1E] text-primary shadow-xs font-bold ring-2 ring-primary/30"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <span className="text-[9px] uppercase tracking-wider font-semibold opacity-70 truncate">
+              2. Return Date {activeTarget === "end" && "• Picking"}
+            </span>
+            <span className="font-mono font-bold text-xs truncate">
+              {selectedEndDate || "Pick return"}
+            </span>
           </button>
         </div>
       )}
@@ -897,7 +956,7 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
             type="button"
             onClick={() => {
               handleDatesUpdate("", "");
-              setIsPickingEnd(false);
+              setActiveTarget("start");
               setConflictMessage(null);
             }}
             className="text-[11px] text-muted-foreground hover:text-foreground font-semibold underline cursor-pointer"
