@@ -121,7 +121,7 @@ def get_db_pool():
     try:
         _db_pool = PooledDB(
             creator=pymysql,
-            mincached=5,
+            mincached=1,
             maxcached=35,
             maxshared=0,
             maxconnections=50,
@@ -1450,16 +1450,7 @@ def get_user(email: str):
         if now - t < 30.0:
             return cached
 
-    # 1. Search admin_accounts
-    try:
-        admin = fetch_one("SELECT * FROM admin_accounts WHERE LOWER(email) = %s", (clean_email,))
-        if admin:
-            _user_cache[clean_email] = (now, admin)
-            return admin
-    except Exception as e:
-        logger.warning("DB read error in get_user (admin_accounts): %s", e)
-
-    # 2. Search payrent_accounts
+    # 1. Search payrent_accounts (primary renter & customer accounts)
     try:
         payrent = fetch_one("SELECT * FROM payrent_accounts WHERE LOWER(email) = %s", (clean_email,))
         if payrent:
@@ -1467,6 +1458,15 @@ def get_user(email: str):
             return payrent
     except Exception as e:
         logger.warning("DB read error in get_user (payrent_accounts): %s", e)
+
+    # 2. Search admin_accounts
+    try:
+        admin = fetch_one("SELECT * FROM admin_accounts WHERE LOWER(email) = %s", (clean_email,))
+        if admin:
+            _user_cache[clean_email] = (now, admin)
+            return admin
+    except Exception as e:
+        logger.warning("DB read error in get_user (admin_accounts): %s", e)
 
     # 3. Fallback to users table
     try:
@@ -4723,15 +4723,17 @@ def check_auth_lockout(key: str, max_attempts: int = 5, lock_duration_secs: int 
         locked_until = mem_rec.get("locked_until", 0)
         if locked_until > now:
             return True, locked_until - now
-        return False, 0
+        if mem_rec.get("checked_at", 0) > now - 60:
+            return False, 0
 
     try:
         row = fetch_one("SELECT locked_until FROM auth_rate_limits WHERE key_id = %s", (key,))
         if row:
             locked_until = int(row.get("locked_until") or 0)
             if locked_until > now:
-                RATE_LIMIT_STORE[key] = {"attempts": 5, "last_attempt": now, "locked_until": locked_until}
+                RATE_LIMIT_STORE[key] = {"attempts": 5, "last_attempt": now, "locked_until": locked_until, "checked_at": now}
                 return True, locked_until - now
+        RATE_LIMIT_STORE[key] = {"attempts": 0, "last_attempt": now, "locked_until": 0, "checked_at": now}
     except Exception:
         pass
     return False, 0

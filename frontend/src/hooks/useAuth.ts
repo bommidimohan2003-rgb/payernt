@@ -278,10 +278,25 @@ export function useAuth() {
       const err = e as { name?: string; message?: string };
       if (
         err?.name === "AbortError" ||
+        err?.name === "TimeoutError" ||
         err?.message?.includes("aborted") ||
-        err?.message?.includes("signal is aborted")
+        err?.message?.includes("signal is aborted") ||
+        err?.message?.includes("timed out")
       ) {
-        return { ok: false, error: "Connection timed out. Please try logging in again." };
+        return {
+          ok: false,
+          error: err?.message || "Connection timed out. Please verify the backend server is running and try again."
+        };
+      }
+      if (
+        err?.message?.includes("Failed to fetch") ||
+        err?.message?.includes("Unable to connect") ||
+        err?.message?.includes("NetworkError")
+      ) {
+        return {
+          ok: false,
+          error: err?.message || "Unable to connect to the authentication server at http://127.0.0.1:8001. Please ensure the backend is running."
+        };
       }
       return { ok: false, error: err.message || "Invalid email or password." };
     }

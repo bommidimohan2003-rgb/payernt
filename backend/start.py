@@ -3,13 +3,13 @@ import sys
 import uvicorn
 
 def get_port() -> int:
-    port_env = os.getenv("PORT", "8000")
+    port_env = os.getenv("PORT", "8001")
     try:
         return int(port_env)
     except (ValueError, TypeError):
         # In case a literal '$PORT' or invalid string was passed as environment variable
-        print(f"[STARTUP WARNING]: Invalid PORT environment variable value '{port_env}'. Defaulting to 8000.")
-        return 8000
+        print(f"[STARTUP WARNING]: Invalid PORT environment variable value '{port_env}'. Defaulting to 8001.")
+        return 8001
 
 if __name__ == "__main__":
     port = get_port()

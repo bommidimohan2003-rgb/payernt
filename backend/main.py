@@ -33,7 +33,7 @@ try:
 except ImportError:
     pass
 
-from fastapi import FastAPI, HTTPException, Header, Depends, Query, status, Request, Response, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Header, Depends, Query, status, Request, Response, WebSocket, WebSocketDisconnect, BackgroundTasks
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -1534,7 +1534,7 @@ def cross_side_register_endpoint(data: CrossSideRegisterSchema):
 
 @app.post("/api/login")
 @app.post("/api/auth/login")
-def login(data: LoginRequestSchema, request: Request, response: Response):
+def login(data: LoginRequestSchema, request: Request, response: Response, background_tasks: BackgroundTasks):
     clean_email = data.email.lower().strip()
     client_ip = request.client.host if request.client else "unknown"
     ip_key = f"login_ip:{client_ip}"
@@ -1613,8 +1613,8 @@ def login(data: LoginRequestSchema, request: Request, response: Response):
     clear_failed_auth_attempts(ip_key)
     clear_failed_auth_attempts(user_key)
 
-    # 1. Enforce single active user-side session: Revoke any active Payernt sessions
-    revoke_cross_side_user_sessions(user["email"], user.get("person_id"), logging_in_account_type="payrent")
+    # 1. Enforce single active user-side session: Revoke any active Payernt sessions asynchronously
+    background_tasks.add_task(revoke_cross_side_user_sessions, user["email"], user.get("person_id"), logging_in_account_type="payrent")
 
     # 2. Invalidate previous bearer token if present in headers (session switching)
     auth_header = request.headers.get("authorization")
@@ -1645,8 +1645,8 @@ def login(data: LoginRequestSchema, request: Request, response: Response):
     device_name = "Desktop" if ("Windows" in user_agent or "Macintosh" in user_agent or "Linux" in user_agent) and "Mobile" not in user_agent else ("Mobile" if "Mobile" in user_agent or "Android" in user_agent or "iPhone" in user_agent else "Web Browser")
     expires_at_str = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=7)).isoformat()
 
-    # Store hashed session entry in TiDB Cloud database
-    create_db_session(session_id, user["email"], refresh_token, device_name, client_ip, user_agent, expires_at_str, account_type="payrent")
+    # Store hashed session entry in TiDB Cloud database asynchronously
+    background_tasks.add_task(create_db_session, session_id, user["email"], refresh_token, device_name, client_ip, user_agent, expires_at_str, account_type="payrent")
 
     # Set refresh token in HttpOnly, Secure cookie
     response.set_cookie(

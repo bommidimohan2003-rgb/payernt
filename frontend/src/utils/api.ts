@@ -457,7 +457,7 @@ export const api = {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ email: cleanEmail, password }),
           },
-          12000
+          30000
         );
         if (res.ok) {
           const data = await res.json();
@@ -496,7 +496,17 @@ export const api = {
         const data = await res.json().catch(() => ({}));
         throw new Error(parseApiError(data, "Login failed. Please check your credentials and try again."));
       }
-    } catch (err: unknown) {
+    } catch (err: any) {
+      if (err?.name === "AbortError" || err?.message?.includes("timed out")) {
+        throw new Error("The login request timed out. Please verify the backend server is running and try again.");
+      }
+      if (
+        err?.message?.includes("Failed to fetch") ||
+        err?.message?.includes("NetworkError") ||
+        err?.message?.includes("connection refused")
+      ) {
+        throw new Error("Unable to connect to login server at http://127.0.0.1:8001. Please make sure the backend is running.");
+      }
       throw err;
     }
 
