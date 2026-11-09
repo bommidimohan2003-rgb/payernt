@@ -39,8 +39,11 @@ export interface User {
 export interface Product {
   id: string;
   title: string;
+  name?: string;
   description: string;
   price: number;
+  daily_rate?: number;
+  dailyRate?: number;
   image: string;
   images?: string[];
   videoUrl?: string;
@@ -48,6 +51,9 @@ export interface Product {
   angleImages?: { label: string; image: string }[];
   rotationFrames?: string[];
   category: string;
+  condition?: string;
+  condition_grade?: string;
+  brand?: string;
   rating: number;
   reviews: number;
   available: boolean;
@@ -55,9 +61,12 @@ export interface Product {
   availability_reason?: string | null;
   isReference?: boolean;
   status?: "approved" | "pending" | "rejected";
+  created_at?: string;
+  createdAt?: string;
   location?: string | any;
   city?: string;
   area?: string;
+  pincode?: string;
   owner: {
     id?: string;
     name: string;
@@ -80,6 +89,11 @@ export interface Product {
   user_email?: string;
   userEmail?: string;
   owner_name?: string;
+  ownerName?: string;
+  owner_city?: string;
+  owner_state?: string;
+  owner_address?: string;
+  owner_pincode?: string;
   is_vendor_product?: boolean;
   ownerAccountType?: "paye₹nt";
   vendorSecretPin?: string;
@@ -524,6 +538,8 @@ export interface RealtimeConversation {
     name: string;
     email: string;
     avatar?: string;
+    profilePhotoUrl?: string;
+    profile_photo_url?: string;
     phone?: string;
     verified?: boolean;
     role: "customer" | "lender";

@@ -82,6 +82,14 @@ export function PayerntKycPage() {
     fetchKycStatus();
   }, [activeAccount?.email]);
 
+  useEffect(() => {
+    const inputEl = fileInputRef.current;
+    if (!inputEl) return;
+    const handleDialogCancel = () => setFileDialogOpen(false);
+    inputEl.addEventListener("cancel", handleDialogCancel);
+    return () => inputEl.removeEventListener("cancel", handleDialogCancel);
+  }, [setFileDialogOpen]);
+
   // Format 12-digit number with spaces for display (e.g. 1234 5678 9012)
   const formatAadhaarInput = (value: string) => {
     const digits = value.replace(/\D/g, "").slice(0, 12);
@@ -527,7 +535,6 @@ export function PayerntKycPage() {
                     setFileDialogOpen(false);
                     handleFileChange(e);
                   }}
-                  onCancel={() => setFileDialogOpen(false)}
                   className="hidden"
                 />
 

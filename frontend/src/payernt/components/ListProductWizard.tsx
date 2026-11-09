@@ -2309,7 +2309,7 @@ export function ListProductWizard({
                           Front Photo
                         </p>
                         <span
-                          className={`text-[8.5px] sm:text-[10px] font-semibold px-1.5 py-0.2 rounded-full truncate ${
+                          className={`text-[8.5px] sm:text-[10px] font-semibold px-1.5 py-0.5 rounded-full truncate ${
                             frontPhotoUrl
                               ? "bg-secondary text-foreground border border-border"
                               : "bg-secondary/60 text-muted-foreground"
@@ -2382,7 +2382,7 @@ export function ListProductWizard({
                           Back Photo
                         </p>
                         <span
-                          className={`text-[8.5px] sm:text-[10px] font-semibold px-1.5 py-0.2 rounded-full truncate ${
+                          className={`text-[8.5px] sm:text-[10px] font-semibold px-1.5 py-0.5 rounded-full truncate ${
                             backPhotoUrl
                               ? "bg-secondary text-foreground border border-border"
                               : "bg-secondary/60 text-muted-foreground"
@@ -2455,7 +2455,7 @@ export function ListProductWizard({
                           10s Video
                         </p>
                         <span
-                          className={`text-[8.5px] sm:text-[10px] font-semibold px-1.5 py-0.2 rounded-full truncate ${
+                          className={`text-[8.5px] sm:text-[10px] font-semibold px-1.5 py-0.5 rounded-full truncate ${
                             capturedVideoUrl
                               ? "bg-secondary text-foreground border border-border"
                               : "bg-secondary/60 text-muted-foreground"
@@ -3220,7 +3220,7 @@ export function ListProductWizard({
                       <div className="relative z-10 p-3.5 space-y-2">
                         <div className="space-y-0.5">
                           <div className="text-[10px] font-extrabold text-primary-foreground/90 uppercase tracking-wider flex items-center gap-1.5">
-                            <span className="bg-primary text-primary-foreground px-1.5 py-0.2 rounded text-[9px] font-black">
+                            <span className="bg-primary text-primary-foreground px-1.5 py-0.5 rounded text-[9px] font-black">
                               {brand || "BRAND"}
                             </span>
                             <span className="text-white/80">{model}</span>

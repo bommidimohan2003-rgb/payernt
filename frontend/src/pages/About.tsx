@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { Link } from "@tanstack/react-router";
-import { motion } from "framer-motion";
 import {
   Film,
   Camera,
@@ -13,13 +12,10 @@ import {
   CreditCard,
   MessageSquare,
   Clock,
-  CheckCircle2,
-  Sparkles,
 } from "lucide-react";
 import { MainLayout } from "@/layouts/MainLayout";
 import { BackButton } from "@/components/common/BackButton";
 import { api } from "@/utils/api";
-import { PayentLogoMark } from "@/components/common/LogoIcon";
 import heroFilmmakerImg from "@/assets/images/hero_filmmaker_rig.webp";
 
 interface PublicStats {
@@ -128,6 +124,11 @@ export default function About() {
 
   useEffect(() => {
     let isMounted = true;
+    if (typeof window !== "undefined" && window.location.hash) {
+      const id = window.location.hash.replace("#", "");
+      const el = document.getElementById(id);
+      if (el) el.scrollIntoView({ behavior: "smooth" });
+    }
     api
       .getPublicStats()
       .then((data) => {
@@ -158,14 +159,14 @@ export default function About() {
               <BackButton fallback="/" className="mb-4" />
               {/* Eyebrow */}
               <div className="flex items-center gap-2 mb-4">
-                <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" />
-                <span className="text-xs font-bold uppercase tracking-widest text-neutral-500 dark:text-[#AAB3BC]">
+                <span className="inline-block w-2 h-2 rounded-full bg-neutral-900 dark:bg-white" />
+                <span className="text-xs font-semibold text-neutral-600 dark:text-[#AAB3BC]">
                   Built For People Who Create
                 </span>
               </div>
 
               {/* Headline */}
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-neutral-950 dark:text-white leading-[1.1]">
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-semibold tracking-tight text-neutral-950 dark:text-white leading-[1.1]">
                 Gear should never <br />
                 <span className="underline decoration-neutral-400 dark:decoration-neutral-600 underline-offset-8">
                   limit your story.
@@ -174,33 +175,33 @@ export default function About() {
 
               {/* Supporting Text */}
               <p className="mt-5 text-sm sm:text-base text-neutral-600 dark:text-[#AAB3BC] leading-relaxed max-w-xl">
-                PAYENT connects creators with the technology they need to create
-                more without owning everything. Rent professional cinema cameras, drones, workstations, and audio gear directly from verified lenders.
+                paYent connects creators with the technology they need to create
+                more without owning everything. Rent verified cinema cameras, drones, workstations, and audio gear directly from trusted owners.
               </p>
 
               {/* Quick CTAs */}
               <div className="mt-7 flex flex-wrap items-center gap-3">
                 <Link
                   to="/browse"
-                  className="inline-flex items-center gap-2 h-11 px-6 rounded-full bg-[#161616] text-[#FFFFFF] hover:bg-[#292929] active:bg-[#0B0B0B] dark:bg-[#F2F0EA] dark:text-[#0A0A0A] dark:hover:bg-[#FFFFFF] text-xs font-bold transition-all shadow-md cursor-pointer"
+                  className="inline-flex items-center gap-2 h-11 px-6 rounded-full bg-[#161616] text-[#FFFFFF] hover:bg-[#292929] active:bg-[#0B0B0B] dark:bg-[#F2F0EA] dark:text-[#0A0A0A] dark:hover:bg-[#FFFFFF] text-xs font-semibold transition-colors shadow-md cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
                 >
                   <span>Explore Gear</span>
-                  <ArrowRight className="h-3.5 w-3.5" />
+                  <ArrowRight className="h-4 w-4 stroke-[1.75]" aria-hidden="true" />
                 </Link>
               </div>
 
               {/* Micro-trust indicators */}
-              <div className="mt-8 pt-6 border-t border-black/5 dark:border-white/5 flex flex-wrap items-center gap-4 text-xs text-neutral-500 dark:text-neutral-400">
+              <div className="mt-8 pt-6 border-t border-black/5 dark:border-white/5 flex flex-wrap items-center gap-4 text-xs text-neutral-600 dark:text-neutral-400">
                 <div className="flex items-center gap-1.5">
-                  <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                  <ShieldCheck className="w-4 h-4 stroke-[1.75] text-neutral-900 dark:text-white" aria-hidden="true" />
                   <span>Verified Creators</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <CreditCard className="w-4 h-4 text-emerald-500" />
+                  <CreditCard className="w-4 h-4 stroke-[1.75] text-neutral-900 dark:text-white" aria-hidden="true" />
                   <span>Razorpay Protected</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <Clock className="w-4 h-4 text-emerald-500" />
+                  <Clock className="w-4 h-4 stroke-[1.75] text-neutral-900 dark:text-white" aria-hidden="true" />
                   <span>Direct Handoffs</span>
                 </div>
               </div>
@@ -210,7 +211,7 @@ export default function About() {
             <div className="lg:col-span-5">
               <div className="rounded-3xl border border-black/10 dark:border-white/10 bg-white/80 dark:bg-[#1E1E1E]/90 backdrop-blur-xl p-5 sm:p-6 shadow-2xl space-y-5">
                 {/* Cinematic Visual Banner with Overlay */}
-                <div className="relative h-44 sm:h-48 rounded-2xl overflow-hidden border border-black/10 dark:border-white/10 group">
+                <div className="relative h-44 sm:h-48 rounded-2xl overflow-hidden border border-black/10 dark:border-white/10">
                   <img
                     src={heroFilmmakerImg}
                     alt="Creators filming on set"
@@ -218,29 +219,29 @@ export default function About() {
                     decoding="async"
                     width={600}
                     height={240}
-                    className="w-full h-full object-cover object-center filter contrast-110 brightness-95 group-hover:scale-105 transition-transform duration-700"
+                    className="w-full h-full object-cover object-center filter contrast-110 brightness-95"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
                   
                   {/* Floating Brand Badge */}
                   <div className="absolute top-3 left-3 flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/20 text-white shadow-lg">
-                    <span className="text-[10px] font-mono font-bold tracking-widest uppercase text-emerald-400">
-                      CREATOR HUB
+                    <span className="text-xs font-medium text-white">
+                      Creator Hub
                     </span>
                   </div>
 
                   {/* Editorial Tagline Overlay */}
                   <div className="absolute bottom-3 inset-x-3 flex items-center justify-between text-white">
                     <div>
-                      <div className="text-xs font-black tracking-wide uppercase text-white drop-shadow-md">
+                      <div className="text-xs font-semibold text-white drop-shadow-md">
                         Real Gear • Real Creators
                       </div>
-                      <div className="text-[10px] text-neutral-300 font-medium">
+                      <div className="text-xs text-neutral-300 font-medium">
                         Verified peer-to-peer equipment exchange
                       </div>
                     </div>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold backdrop-blur-md">
-                      ACTIVE
+                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-white/15 text-white border border-white/25 font-medium backdrop-blur-md">
+                      Active
                     </span>
                   </div>
                 </div>
@@ -248,47 +249,47 @@ export default function About() {
                 {/* Creator Categories Visual Strip */}
                 <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
                   <div className="flex flex-col items-center p-1.5 sm:p-2 rounded-xl bg-neutral-50 dark:bg-white/[0.03] border border-black/5 dark:border-white/5 text-center min-w-0">
-                    <Camera className="w-4 h-4 text-emerald-500 mb-1 shrink-0" />
-                    <span className="text-[10px] sm:text-[11px] font-semibold text-neutral-800 dark:text-neutral-200 truncate max-w-full">Cameras</span>
-                    <span className="text-[8.5px] sm:text-[9px] text-neutral-400 truncate max-w-full">Cinema & FX</span>
+                    <Camera className="w-4 h-4 stroke-[1.75] text-neutral-900 dark:text-white mb-1 shrink-0" aria-hidden="true" />
+                    <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200 truncate max-w-full">Cameras</span>
+                    <span className="text-xs text-neutral-600 dark:text-neutral-400 truncate max-w-full">Cinema &amp; FX</span>
                   </div>
                   <div className="flex flex-col items-center p-1.5 sm:p-2 rounded-xl bg-neutral-50 dark:bg-white/[0.03] border border-black/5 dark:border-white/5 text-center min-w-0">
-                    <Plane className="w-4 h-4 text-emerald-500 mb-1 shrink-0" />
-                    <span className="text-[10px] sm:text-[11px] font-semibold text-neutral-800 dark:text-neutral-200 truncate max-w-full">Drones</span>
-                    <span className="text-[8.5px] sm:text-[9px] text-neutral-400 truncate max-w-full">DJI & Aerial</span>
+                    <Plane className="w-4 h-4 stroke-[1.75] text-neutral-900 dark:text-white mb-1 shrink-0" aria-hidden="true" />
+                    <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200 truncate max-w-full">Drones</span>
+                    <span className="text-xs text-neutral-600 dark:text-neutral-400 truncate max-w-full">DJI &amp; Aerial</span>
                   </div>
                   <div className="flex flex-col items-center p-1.5 sm:p-2 rounded-xl bg-neutral-50 dark:bg-white/[0.03] border border-black/5 dark:border-white/5 text-center min-w-0">
-                    <Monitor className="w-4 h-4 text-emerald-500 mb-1 shrink-0" />
-                    <span className="text-[10px] sm:text-[11px] font-semibold text-neutral-800 dark:text-neutral-200 truncate max-w-full">Laptops</span>
-                    <span className="text-[8.5px] sm:text-[9px] text-neutral-400 truncate max-w-full">M3 Studio</span>
+                    <Monitor className="w-4 h-4 stroke-[1.75] text-neutral-900 dark:text-white mb-1 shrink-0" aria-hidden="true" />
+                    <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200 truncate max-w-full">Laptops</span>
+                    <span className="text-xs text-neutral-600 dark:text-neutral-400 truncate max-w-full">M3 Studio</span>
                   </div>
                 </div>
 
                 {/* Real Live Marketplace Metrics Grid */}
                 <div className="grid grid-cols-2 gap-3 pt-2 border-t border-black/5 dark:border-white/5">
                   <div className="p-3 rounded-2xl bg-neutral-100/70 dark:bg-white/[0.04]">
-                    <div className="text-[10px] uppercase font-bold text-neutral-400 dark:text-neutral-400">
+                    <div className="text-xs font-medium text-neutral-600 dark:text-neutral-400">
                       Live Catalog
                     </div>
-                    <div className="text-lg font-black text-neutral-900 dark:text-white font-mono mt-0.5">
+                    <div className="text-lg font-semibold text-neutral-900 dark:text-white tabular-nums mt-0.5">
                       {loadingStats ? "..." : `${stats?.activeListings || 2}+ Items`}
                     </div>
                   </div>
                   <div className="p-3 rounded-2xl bg-neutral-100/70 dark:bg-white/[0.04]">
-                    <div className="text-[10px] uppercase font-bold text-neutral-400 dark:text-neutral-400">
+                    <div className="text-xs font-medium text-neutral-600 dark:text-neutral-400">
                       Verified Safety
                     </div>
-                    <div className="text-lg font-black text-neutral-900 dark:text-white font-mono mt-0.5">
+                    <div className="text-lg font-semibold text-neutral-900 dark:text-white tabular-nums mt-0.5">
                       100% Escrow
                     </div>
                   </div>
                 </div>
 
                 {/* Footer preview */}
-                <div className="flex items-center justify-between text-[11px] text-neutral-500 dark:text-neutral-400 pt-1">
-                  <span>Direct local & courier handoffs</span>
+                <div className="flex items-center justify-between text-xs text-neutral-600 dark:text-neutral-400 pt-1">
+                  <span>Direct local &amp; courier handoffs</span>
                   <Link to="/browse" className="font-semibold text-neutral-900 dark:text-white hover:underline flex items-center gap-1">
-                    Explore Roster <ArrowRight className="w-3 h-3" />
+                    Explore Roster <ArrowRight className="w-3.5 h-3.5 stroke-[1.75]" aria-hidden="true" />
                   </Link>
                 </div>
               </div>
@@ -301,17 +302,17 @@ export default function About() {
       <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-20 sm:py-28">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start">
           <div className="lg:col-span-4">
-            <span className="text-xs font-bold uppercase tracking-widest text-primary">
+            <span className="text-xs font-semibold text-neutral-600 dark:text-neutral-400">
               Our Story
             </span>
-            <h2 className="mt-3 text-3xl sm:text-4xl font-black tracking-tight text-neutral-950 dark:text-white leading-tight">
+            <h2 className="mt-3 text-3xl sm:text-4xl font-semibold tracking-tight text-neutral-950 dark:text-white leading-tight">
               A marketplace forged by filmmakers and tech enthusiasts.
             </h2>
           </div>
 
           <div className="lg:col-span-8 space-y-8 text-neutral-700 dark:text-[#AAB3BC] text-sm sm:text-base leading-relaxed">
             <div>
-              <h3 className="text-lg font-bold text-neutral-950 dark:text-white mb-2">
+              <h3 className="text-lg font-semibold text-neutral-950 dark:text-white mb-2">
                 The Problem
               </h3>
               <p>
@@ -325,12 +326,12 @@ export default function About() {
             </div>
 
             <div>
-              <h3 className="text-lg font-bold text-neutral-950 dark:text-white mb-2">
+              <h3 className="text-lg font-semibold text-neutral-950 dark:text-white mb-2">
                 The Idea
               </h3>
               <p>
                 We asked a straightforward question: why should access to
-                world-class storytelling technology require personal ownership?
+                professional storytelling technology require personal ownership?
                 By bridging creators who need equipment for a few shoot days
                 with owners whose gear is between calls, we build a
                 collaborative, circular production economy.
@@ -338,11 +339,11 @@ export default function About() {
             </div>
 
             <div>
-              <h3 className="text-lg font-bold text-neutral-950 dark:text-white mb-2">
+              <h3 className="text-lg font-semibold text-neutral-950 dark:text-white mb-2">
                 The Marketplace
               </h3>
               <p>
-                PAYENT was designed from day one with the rigorous standards
+                paYent was designed from day one with the rigorous standards
                 creative professionals expect. Clear specifications, verified
                 account holders, secure payment handling, and real feedback
                 ensure that both renters and gear owners operate with mutual
@@ -351,7 +352,7 @@ export default function About() {
             </div>
 
             <div>
-              <h3 className="text-lg font-bold text-neutral-950 dark:text-white mb-2">
+              <h3 className="text-lg font-semibold text-neutral-950 dark:text-white mb-2">
                 The Vision
               </h3>
               <p>
@@ -368,17 +369,17 @@ export default function About() {
       <section className="bg-neutral-100/60 dark:bg-[#1E1E1E] py-20 sm:py-28 transition-colors">
         <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 text-center">
           <div className="inline-flex items-center justify-center mb-4">
-            <span className="h-0.5 w-8 bg-primary rounded-full" />
+            <span className="h-0.5 w-8 bg-neutral-900 dark:bg-white rounded-full" />
           </div>
-          <span className="block text-xs font-bold uppercase tracking-widest text-neutral-500 dark:text-[#AAB3BC] mb-4">
+          <span className="block text-xs font-semibold text-neutral-600 dark:text-[#AAB3BC] mb-4">
             Our Mission
           </span>
-          <blockquote className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-neutral-950 dark:text-white leading-snug">
+          <blockquote className="text-2xl sm:text-3xl md:text-4xl font-semibold tracking-tight text-neutral-950 dark:text-white leading-snug">
             “Democratize access to professional-grade technology. Minimize
             electronic waste through shared utility. Empower every storyteller
             to produce without limits.”
           </blockquote>
-          <p className="mt-6 text-sm text-neutral-500 dark:text-[#8D98A3] font-medium">
+          <p className="mt-6 text-sm text-neutral-600 dark:text-[#8D98A3] font-medium">
             Designed for the next generation of creative independence.
           </p>
         </div>
@@ -387,14 +388,14 @@ export default function About() {
       {/* 4. CREATOR AUDIENCE (Section 32) */}
       <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-20 sm:py-28">
         <div className="max-w-2xl">
-          <span className="text-xs font-bold uppercase tracking-widest text-primary">
+          <span className="text-xs font-semibold text-neutral-600 dark:text-neutral-400">
             Who It Is For
           </span>
-          <h2 className="mt-3 text-3xl sm:text-4xl font-black tracking-tight text-neutral-950 dark:text-white">
+          <h2 className="mt-3 text-3xl sm:text-4xl font-semibold tracking-tight text-neutral-950 dark:text-white">
             Built across creative disciplines.
           </h2>
           <p className="mt-3 text-sm sm:text-base text-neutral-600 dark:text-[#AAB3BC]">
-            Whatever your focus in modern digital production, PAYENT provides
+            Whatever your focus in modern digital production, paYent provides
             verified gear suited to your exact workflow.
           </p>
         </div>
@@ -405,13 +406,13 @@ export default function About() {
             return (
               <div
                 key={aud.title}
-                className="p-6 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 hover:border-black/30 dark:hover:border-white/25 transition-all shadow-sm flex flex-col justify-between"
+                className="p-6 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 transition-colors shadow-sm flex flex-col justify-between"
               >
                 <div>
                   <div className="h-10 w-10 rounded-xl bg-black/5 dark:bg-white/5 flex items-center justify-center text-neutral-900 dark:text-white mb-4">
-                    <IconComp className="h-5 w-5" />
+                    <IconComp className="h-5 w-5 stroke-[1.75]" aria-hidden="true" />
                   </div>
-                  <h3 className="text-base font-bold text-neutral-950 dark:text-white mb-2">
+                  <h3 className="text-base font-semibold text-neutral-950 dark:text-white mb-2">
                     {aud.title}
                   </h3>
                   <p className="text-xs sm:text-sm text-neutral-600 dark:text-[#AAB3BC] leading-relaxed">
@@ -427,14 +428,14 @@ export default function About() {
       {/* 5. HOW PAYENT WORKS (Section 33) */}
       <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-20 sm:py-28">
         <div className="text-center max-w-2xl mx-auto">
-          <span className="text-xs font-bold uppercase tracking-widest text-primary">
+          <span className="text-xs font-semibold text-neutral-600 dark:text-neutral-400">
             The Rental Journey
           </span>
-          <h2 className="mt-3 text-3xl sm:text-4xl font-black tracking-tight text-neutral-950 dark:text-white">
-            How PAYENT Works
+          <h2 className="mt-3 text-3xl sm:text-4xl font-semibold tracking-tight text-neutral-950 dark:text-white">
+            How paYent Works
           </h2>
           <p className="mt-3 text-sm sm:text-base text-neutral-600 dark:text-[#AAB3BC]">
-            A seamless four-step flow built around clarity, speed, and trust.
+            A four-step rental flow built around clarity, speed, and trust.
           </p>
         </div>
 
@@ -445,10 +446,10 @@ export default function About() {
               className="relative p-6 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 flex flex-col justify-between"
             >
               <div>
-                <span className="font-mono text-xs font-black text-primary tracking-wider">
-                  {step.step}
+                <span className="text-xs font-semibold text-neutral-600 dark:text-neutral-400 tabular-nums">
+                  Step {step.step}
                 </span>
-                <h3 className="mt-2 text-lg font-bold text-neutral-950 dark:text-white">
+                <h3 className="mt-2 text-lg font-semibold text-neutral-950 dark:text-white">
                   {step.title}
                 </h3>
                 <p className="mt-2 text-xs sm:text-sm text-neutral-600 dark:text-[#AAB3BC] leading-relaxed">
@@ -460,18 +461,21 @@ export default function About() {
         </div>
       </section>
 
-      {/* 6. TRUST & SAFETY (Section 34) */}
-      <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-20 sm:py-28">
+      {/* 6. TRUST & SAFETY / RENTAL AGREEMENT & ESCROW (Section 34) */}
+      <section
+        id="rental-agreement-escrow"
+        className="scroll-mt-24 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-20 sm:py-28"
+      >
         <div className="max-w-2xl">
-          <span className="text-xs font-bold uppercase tracking-widest text-primary">
-            Platform Security
+          <span className="text-xs font-semibold text-neutral-600 dark:text-neutral-400">
+            Platform Security &amp; Rental Agreement
           </span>
-          <h2 className="mt-3 text-3xl sm:text-4xl font-black tracking-tight text-neutral-950 dark:text-white">
-            Built on accountability.
+          <h2 className="mt-3 text-3xl sm:text-4xl font-semibold tracking-tight text-neutral-950 dark:text-white">
+            Built on accountability and escrow protection.
           </h2>
           <p className="mt-3 text-sm sm:text-base text-neutral-600 dark:text-[#AAB3BC]">
-            We operate genuine platform safeguards so every gear exchange
-            proceeds with peace of mind.
+            Every rental booking operates under paYent Escrow protection and verified
+            8-digit PIN handover checks so equipment and deposits remain safeguarded.
           </p>
         </div>
 
@@ -483,10 +487,10 @@ export default function About() {
                 key={pt.title}
                 className="p-6 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10"
               >
-                <div className="h-10 w-10 rounded-xl bg-black/5 dark:bg-white/5 flex items-center justify-center text-primary mb-4">
-                  <IconComp className="h-5 w-5" />
+                <div className="h-10 w-10 rounded-xl bg-black/5 dark:bg-white/5 flex items-center justify-center text-neutral-900 dark:text-white mb-4">
+                  <IconComp className="h-5 w-5 stroke-[1.75]" aria-hidden="true" />
                 </div>
-                <h3 className="text-base font-bold text-neutral-950 dark:text-white mb-2">
+                <h3 className="text-base font-semibold text-neutral-950 dark:text-white mb-2">
                   {pt.title}
                 </h3>
                 <p className="text-xs sm:text-sm text-neutral-600 dark:text-[#AAB3BC] leading-relaxed">
@@ -502,10 +506,10 @@ export default function About() {
       <section className="bg-neutral-100/60 dark:bg-[#1E1E1E] py-16 sm:py-20 transition-colors">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-2xl mx-auto mb-12">
-            <span className="text-xs font-bold uppercase tracking-widest text-primary">
+            <span className="text-xs font-semibold text-neutral-600 dark:text-neutral-400">
               The Platform In Motion
             </span>
-            <h2 className="mt-2 text-2xl sm:text-3xl font-black tracking-tight text-neutral-950 dark:text-white">
+            <h2 className="mt-2 text-2xl sm:text-3xl font-semibold tracking-tight text-neutral-950 dark:text-white">
               More than a rental platform.
             </h2>
             <p className="mt-2 text-xs sm:text-sm text-neutral-600 dark:text-[#AAB3BC]">
@@ -569,16 +573,16 @@ export default function About() {
                 className="p-6 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 text-center"
               >
                 {st.val === null ? (
-                  <div className="h-9 w-16 bg-secondary/80 animate-pulse rounded-lg mx-auto" />
+                  <div className="h-9 w-16 bg-secondary/80 rounded-lg mx-auto" />
                 ) : (
-                  <div className="text-3xl sm:text-4xl font-black font-mono tracking-tight text-neutral-950 dark:text-white">
+                  <div className="text-3xl sm:text-4xl font-semibold tracking-tight text-neutral-950 dark:text-white tabular-nums">
                     {st.val}
                   </div>
                 )}
-                <div className="mt-1.5 text-xs font-bold uppercase tracking-wider text-neutral-800 dark:text-[#E0E5EA]">
+                <div className="mt-1.5 text-xs font-semibold text-neutral-800 dark:text-[#E0E5EA]">
                   {st.label}
                 </div>
-                <div className="mt-1 text-[11px] text-neutral-500 dark:text-[#697680]">
+                <div className="mt-1 text-xs text-neutral-600 dark:text-[#8D98A3]">
                   {st.note}
                 </div>
               </div>
@@ -591,10 +595,10 @@ export default function About() {
       <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-20 sm:py-24">
         <div className="rounded-3xl bg-[#161616] text-white dark:bg-[#1E1E1E] border border-white/10 p-8 sm:p-12 lg:p-16 flex flex-col lg:flex-row items-center justify-between gap-8">
           <div className="max-w-xl">
-            <span className="text-xs font-bold uppercase tracking-widest text-primary">
+            <span className="text-xs font-semibold text-neutral-300">
               Creator Monetization
             </span>
-            <h2 className="mt-3 text-3xl sm:text-4xl font-black tracking-tight leading-tight">
+            <h2 className="mt-3 text-3xl sm:text-4xl font-semibold tracking-tight leading-tight">
               Own gear? <br />
               Put it to work.
             </h2>
@@ -608,10 +612,10 @@ export default function About() {
           <div className="shrink-0">
             <Link
               to="/browse"
-              className="inline-flex items-center gap-2.5 h-12 px-8 rounded-full bg-white text-black hover:bg-[#EAEAEA] text-sm font-bold transition-all shadow-lg cursor-pointer"
+              className="inline-flex items-center gap-2.5 h-12 px-8 rounded-full bg-white text-black hover:bg-[#EAEAEA] text-sm font-semibold transition-colors shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-white cursor-pointer"
             >
               <span>Explore Gear</span>
-              <ArrowRight className="h-4 w-4" />
+              <ArrowRight className="h-4 w-4 stroke-[1.75]" aria-hidden="true" />
             </Link>
           </div>
         </div>
@@ -619,7 +623,7 @@ export default function About() {
 
       {/* 9. FINAL CTA (Section 37) */}
       <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-20 sm:py-28 text-center">
-        <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-neutral-950 dark:text-white">
+        <h2 className="text-3xl sm:text-4xl lg:text-5xl font-semibold tracking-tight text-neutral-950 dark:text-white">
           Create More. Rent Smarter.
         </h2>
         <p className="mt-4 text-sm sm:text-base text-neutral-600 dark:text-[#AAB3BC] max-w-xl mx-auto">
@@ -630,10 +634,10 @@ export default function About() {
         <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
           <Link
             to="/browse"
-            className="inline-flex items-center gap-2 h-12 px-8 rounded-full bg-[#161616] text-[#FFFFFF] hover:bg-[#292929] active:bg-[#0B0B0B] dark:bg-[#F2F0EA] dark:text-[#0A0A0A] dark:hover:bg-[#FFFFFF] text-sm font-bold transition-all shadow-md cursor-pointer"
+            className="inline-flex items-center gap-2 h-12 px-8 rounded-full bg-[#161616] text-[#FFFFFF] hover:bg-[#292929] active:bg-[#0B0B0B] dark:bg-[#F2F0EA] dark:text-[#0A0A0A] dark:hover:bg-[#FFFFFF] text-sm font-semibold transition-colors shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white cursor-pointer"
           >
             <span>Explore Gear</span>
-            <ArrowRight className="h-4 w-4" />
+            <ArrowRight className="h-4 w-4 stroke-[1.75]" aria-hidden="true" />
           </Link>
         </div>
       </section>

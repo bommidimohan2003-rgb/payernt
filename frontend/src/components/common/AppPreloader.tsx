@@ -7,14 +7,14 @@ interface AppPreloaderProps {
 }
 
 type PreloaderPhase =
-  | "top-left-p-hold"   // (1) 0.00s - 1.80s: "P" sitting in top-left corner on black background
-  | "top-left-p-up"     // (2) 1.80s - 2.50s: Top-left "P" moves smoothly upward and exits
-  | "center-typing"     // (3) 2.50s - 4.10s: "PAYENT" types letter-by-letter in center with glowing cursor
-  | "center-hold"       // (4) 4.10s - 4.70s: Complete "PAYENT" glows in center and holds
-  | "move-left-landing" // (5) 4.70s - 5.80s: "PAYENT" moves horizontally LEFT to navbar & home page lands
+  | "top-left-p-hold"   // (1) 0.00s - 1.80s: "p" sitting in top-left corner on black background
+  | "top-left-p-up"     // (2) 1.80s - 2.50s: Top-left "p" moves smoothly upward and exits
+  | "center-typing"     // (3) 2.50s - 4.10s: "paYent" types letter-by-letter in center with cursor
+  | "center-hold"       // (4) 4.10s - 4.70s: Complete "paYent" glows in center and holds
+  | "move-left-landing" // (5) 4.70s - 5.80s: "paYent" moves horizontally LEFT to navbar & home page lands
   | "complete";         // (6) 6.00s+: Preloader unmounts, permanent logo remains on the left
 
-const LETTERS = ["P", "A", "Y", "E", "N", "T"];
+const LETTERS = ["p", "a", "Y", "e", "n", "t"];
 
 export function AppPreloader({
   onComplete,
@@ -55,13 +55,25 @@ export function AppPreloader({
         return;
       }
 
-      // Check query param ?preload=true for instant replay testing
+      // Check query param ?preload=true for explicit replay testing
       const urlParams = new URLSearchParams(window.location.search);
       const replay = urlParams.get("preload") === "true";
       if (urlParams.get("nopreloader") === "true") {
         if (onComplete) onComplete();
         return;
       }
+
+      // Only show the gateway intro splash on "/" unless explicitly replayed/forced;
+      // deep links (/payent, /browse, /filters, /orders, etc.) must paint immediately without a 6s black curtain.
+      const isGatewayEntry = pathname === "/";
+      if (!isGatewayEntry && !replay && !forceShow) {
+        try {
+          sessionStorage.setItem("payent:preloaded", "true");
+        } catch {}
+        if (onComplete) onComplete();
+        return;
+      }
+
       hasSeen =
         !replay &&
         !forceShow &&
@@ -154,42 +166,20 @@ export function AppPreloader({
 
     const timers: NodeJS.Timeout[] = [];
 
-    // Frame 2: Top-left "P" moves upward after 1.8s
-    timers.push(
-      setTimeout(() => {
-        setPhase("top-left-p-up");
-      }, 1800)
-    );
-
-    // Frame 3: Typing animation starts in center at 2.5s
+    timers.push(setTimeout(() => setPhase("top-left-p-up"), 180));
     timers.push(
       setTimeout(() => {
         setPhase("center-typing");
-        setTypedCount(1); // 'P'
-      }, 2500)
+        setTypedCount(1);
+      }, 300)
     );
-
-    timers.push(setTimeout(() => setTypedCount(2), 2750)); // 'PA'
-    timers.push(setTimeout(() => setTypedCount(3), 3000)); // 'PAY'
-    timers.push(setTimeout(() => setTypedCount(4), 3250)); // 'PAYE'
-    timers.push(setTimeout(() => setTypedCount(5), 3500)); // 'PAYEN'
-    timers.push(setTimeout(() => setTypedCount(6), 3750)); // 'PAYENT'
-
-    // Frame 4: Typing complete & center hold
-    timers.push(
-      setTimeout(() => {
-        setPhase("center-hold");
-      }, 4100)
-    );
-
-    // Frame 5 & 6: "PAYENT" moves horizontally left & Home page starts landing underneath
-    timers.push(
-      setTimeout(() => {
-        setPhase("move-left-landing");
-      }, 4700)
-    );
-
-    // Final Completion
+    timers.push(setTimeout(() => setTypedCount(2), 360));
+    timers.push(setTimeout(() => setTypedCount(3), 420));
+    timers.push(setTimeout(() => setTypedCount(4), 480));
+    timers.push(setTimeout(() => setTypedCount(5), 540));
+    timers.push(setTimeout(() => setTypedCount(6), 600));
+    timers.push(setTimeout(() => setPhase("center-hold"), 680));
+    timers.push(setTimeout(() => setPhase("move-left-landing"), 820));
     timers.push(
       setTimeout(() => {
         setPhase("complete");
@@ -198,7 +188,7 @@ export function AppPreloader({
           sessionStorage.setItem("payent:preloaded", "true");
         } catch {}
         if (onComplete) onComplete();
-      }, 5900)
+      }, 1150)
     );
 
     return () => {
@@ -220,8 +210,8 @@ export function AppPreloader({
             transition={{ duration: 0.35, ease: "easeInOut" }}
             className="fixed inset-0 z-[99999] flex items-center justify-center bg-[#000000] text-white select-none pointer-events-none"
           >
-            <span className="text-3xl font-sans font-black tracking-tight text-white">
-              PAYENT
+            <span className="text-3xl font-sans font-semibold text-white">
+              paYent
             </span>
           </motion.div>
         )}
@@ -298,8 +288,8 @@ export function AppPreloader({
                 }}
                 className="z-40 pointer-events-none flex items-center select-none"
               >
-                <span className="font-sans font-black tracking-tight text-3xl sm:text-4xl text-white leading-none drop-shadow-[0_0_16px_rgba(255,255,255,0.4)]">
-                  P
+                <span className="font-sans font-semibold text-3xl sm:text-4xl text-white leading-none drop-shadow-[0_0_16px_rgba(255,255,255,0.4)]">
+                  p
                 </span>
               </motion.div>
             )}
@@ -363,7 +353,7 @@ export function AppPreloader({
               className="z-50 pointer-events-none flex items-center justify-center select-none origin-center"
               style={{ willChange: "transform, opacity" }}
             >
-              <div className="relative inline-flex items-center justify-center font-sans font-black tracking-tight text-5xl sm:text-6xl md:text-7xl lg:text-8xl text-white leading-none drop-shadow-[0_0_30px_rgba(255,255,255,0.4)]">
+              <div className="relative inline-flex items-center justify-center font-sans font-semibold tracking-tight text-5xl sm:text-6xl md:text-7xl lg:text-8xl text-white leading-none drop-shadow-[0_0_30px_rgba(255,255,255,0.4)]">
                 {/* Horizontal speed trail glow during left motion */}
                 {isMovingToLeft && (
                   <motion.div

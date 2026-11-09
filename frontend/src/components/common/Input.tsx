@@ -34,7 +34,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
     <div className={cn("w-full relative", label && "pt-2", containerClassName)}>
       <div
         className={cn(
-          "group relative flex items-center gap-3 rounded-[20px] border px-4.5 sm:px-5 h-12 sm:h-13 transition-all",
+          "group relative flex items-center gap-3 rounded-xl border px-4.5 sm:px-5 h-12 sm:h-13 transition-colors",
           bgCutout,
           "border-neutral-300 dark:border-neutral-700/90 focus-within:border-foreground/80 dark:focus-within:border-neutral-400 focus-within:ring-1 focus-within:ring-foreground/20 dark:focus-within:ring-white/20",
           error && "border-destructive focus-within:border-destructive focus-within:ring-destructive/30",
@@ -45,7 +45,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
           <label
             htmlFor={inputId}
             className={cn(
-              "absolute -top-2.5 left-5 sm:left-6 px-2 text-xs font-medium tracking-tight transition-colors pointer-events-none select-none z-10",
+              "absolute -top-2.5 left-5 sm:left-6 px-2 text-xs font-medium transition-colors pointer-events-none select-none z-10",
               bgCutout,
               error
                 ? "text-destructive font-semibold"

@@ -423,7 +423,9 @@ adminApi.interceptors.response.use(
   (response) => response,
   async (error) => {
     const status = error.response?.status;
-    if ((status === 401 || status === 403) && typeof window !== "undefined") {
+    const url = error.config?.url || "";
+    const isLoginEndpoint = url.includes("/login") || url.includes("/auth/login");
+    if (!isLoginEndpoint && (status === 401 || status === 403) && typeof window !== "undefined") {
       localStorage.removeItem("payent:admin:token");
       localStorage.removeItem("payent:admin:current_user");
 

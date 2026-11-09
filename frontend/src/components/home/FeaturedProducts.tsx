@@ -221,7 +221,7 @@ export function FeaturedProducts() {
             {[1, 2, 3, 4].map((i) => (
               <div
                 key={i}
-                className="rounded-2xl bg-neutral-100 dark:bg-[#1E1E1E] border border-black/5 dark:border-white/10 h-72 animate-pulse"
+                className="rounded-2xl bg-neutral-100 dark:bg-[#1E1E1E] border border-black/5 dark:border-white/10 h-72"
               />
             ))}
           </div>

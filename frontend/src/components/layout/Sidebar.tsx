@@ -48,17 +48,17 @@ export function Sidebar() {
   return (
     <>
       <aside className="hidden lg:block w-64 xl:w-72 shrink-0 sticky top-20 h-fit space-y-3 pb-8">
-        <nav className="card-premium p-3 space-y-1 bg-white/90 dark:bg-[#1E1E1E] backdrop-blur-md border border-neutral-200/90 dark:border-white/10 rounded-3xl shadow-sm">
+        <nav className="p-3 space-y-1 bg-white dark:bg-[#141414] border border-neutral-200 dark:border-neutral-800 rounded-2xl shadow-xs">
           {/* Workspace Identity Header */}
-          <div className="px-3.5 py-3 mb-2 border-b border-black/5 dark:border-white/5 flex items-center justify-between">
+          <div className="px-3.5 py-3 mb-2 border-b border-neutral-200/80 dark:border-neutral-800 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse" />
-              <span className="text-xs font-bold text-neutral-800 dark:text-neutral-200 uppercase tracking-wider">
+              <span className="w-2 h-2 rounded-full bg-neutral-950 dark:bg-white inline-block" aria-hidden="true" />
+              <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">
                 Creator Workspace
               </span>
             </div>
-            <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-neutral-100 dark:bg-white/10 text-neutral-600 dark:text-neutral-400">
-              {user?.role === "lender" ? "LENDER" : "RENTER"}
+            <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300">
+              {user?.role === "lender" ? "Lender" : "Renter"}
             </span>
           </div>
 
@@ -71,27 +71,28 @@ export function Sidebar() {
                 key={it.to}
                 to={it.to}
                 className={cn(
-                  "flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs sm:text-sm font-medium transition-all",
+                  "flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-colors",
                   active
-                    ? "bg-[#161616] text-[#FFFFFF] dark:bg-[#F5F5F5] dark:text-[#050709] shadow-sm font-bold"
-                    : "text-neutral-600 dark:text-[#A1A1AA] hover:text-neutral-950 dark:hover:text-[#F5F5F5] hover:bg-neutral-100/80 dark:hover:bg-white/5"
+                    ? "bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 font-semibold"
+                    : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800/70"
                 )}
               >
                 <div className="flex items-center gap-3">
                   <it.icon
                     className={cn(
                       "h-4 w-4",
-                      active ? "text-neutral-200 dark:text-[#050709]" : "text-neutral-500 dark:text-[#A1A1AA]"
+                      active ? "text-white dark:text-neutral-950" : "text-neutral-600 dark:text-neutral-400"
                     )}
+                    aria-hidden="true"
                   />
                   <span>{it.label}</span>
                 </div>
                 {isMessages && unreadCount > 0 && (
                   <span className={cn(
-                    "px-2 py-0.5 min-w-[20px] h-[20px] rounded-full text-[10px] font-bold flex items-center justify-center leading-none shadow-sm",
+                    "px-2 py-0.5 min-w-[20px] h-[20px] rounded-full text-[11px] font-semibold flex items-center justify-center leading-none tabular-nums",
                     active
-                      ? "bg-black text-white dark:bg-[#1E1E1E] dark:text-[#F5F5F5]"
-                      : "bg-neutral-900 text-white dark:bg-white/15 dark:text-[#F5F5F5]"
+                      ? "bg-white text-neutral-950 dark:bg-neutral-900 dark:text-white"
+                      : "bg-neutral-900 text-white dark:bg-neutral-800 dark:text-white"
                   )}>
                     {unreadCount > 99 ? "99+" : unreadCount}
                   </span>
@@ -104,74 +105,74 @@ export function Sidebar() {
           <button
             type="button"
             onClick={() => setIsLangModalOpen(true)}
-            className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs sm:text-sm font-medium text-neutral-600 dark:text-[#A1A1AA] hover:text-neutral-950 dark:hover:text-[#F5F5F5] hover:bg-neutral-100/80 dark:hover:bg-white/5 transition-all cursor-pointer"
+            className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800/70 transition-colors cursor-pointer"
           >
             <div className="flex items-center gap-3">
-              <Globe className="h-4 w-4 text-neutral-500 dark:text-[#A1A1AA]" />
+              <Globe className="h-4 w-4 text-neutral-600 dark:text-neutral-400" aria-hidden="true" />
               <span>{tCommon.languages}</span>
             </div>
-            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-lg bg-neutral-200/80 dark:bg-white/10 text-neutral-800 dark:text-[#F5F5F5]">
+            <span className="text-[11px] font-medium px-2 py-0.5 rounded-lg bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200">
               {getLanguageLabel()}
             </span>
           </button>
 
           {/* Logout Option directly below Languages */}
           {user && (
-            <div className="pt-2 border-t border-black/5 dark:border-white/5 mt-2">
+            <div className="pt-2 border-t border-neutral-200/80 dark:border-neutral-800 mt-2">
               <button
                 type="button"
                 onClick={() => {
                   logout();
                   navigate({ to: "/" });
                 }}
-                className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs sm:text-sm font-medium text-neutral-600 dark:text-[#A1A1AA] hover:text-neutral-950 dark:hover:text-[#F5F5F5] hover:bg-neutral-100/80 dark:hover:bg-white/5 transition-all cursor-pointer"
+                className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800/70 transition-colors cursor-pointer"
               >
-                <LogOut className="h-4 w-4 text-neutral-500 dark:text-[#A1A1AA]" />
+                <LogOut className="h-4 w-4 text-neutral-600 dark:text-neutral-400" aria-hidden="true" />
                 <span>{tCommon.logout}</span>
               </button>
             </div>
           )}
 
-          {/* Escrow Protected Callout Card (Integrated & fully visible) */}
-          <div className="pt-2.5 border-t border-black/5 dark:border-white/5 mt-2">
-            <div className="p-3 rounded-2xl bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/20 text-left space-y-1.5">
-              <div className="flex items-center justify-between">
+          {/* Escrow Protected Callout Card (Monochrome) */}
+          <div className="pt-2.5 border-t border-neutral-200/80 dark:border-neutral-800 mt-2">
+            <div className="p-3 rounded-xl bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-left space-y-1.5">
+              <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5">
-                  <ShieldCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                  <span className="text-xs font-bold text-neutral-900 dark:text-white">
+                  <ShieldCheck className="h-4 w-4 text-neutral-900 dark:text-white" aria-hidden="true" />
+                  <span className="text-xs font-semibold text-neutral-900 dark:text-white">
                     Escrow Protected
                   </span>
                 </div>
-                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                  100% SAFE
+                <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-neutral-200/80 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200">
+                  Verified
                 </span>
               </div>
-              <p className="text-[11px] text-neutral-600 dark:text-neutral-400 leading-snug">
-                All bookings secured with encrypted 4-digit handover PIN verification and zero-risk damage escrow.
+              <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-snug">
+                Bookings use 4-digit handover PIN verification and deposit escrow.
               </p>
             </div>
           </div>
         </nav>
 
-        {/* 24/7 Shoot Concierge Card */}
-        <div className="p-3.5 rounded-3xl bg-neutral-950 dark:bg-white/[0.04] text-white border border-neutral-800 dark:border-white/10 shadow-sm space-y-2 text-left">
+        {/* Shoot Concierge Card (Monochrome) */}
+        <div className="p-3.5 rounded-2xl bg-white dark:bg-[#141414] text-neutral-900 dark:text-white border border-neutral-200 dark:border-neutral-800 shadow-xs space-y-2 text-left">
           <div className="flex items-center gap-2">
-            <div className="h-6 w-6 rounded-lg bg-white/10 text-emerald-400 grid place-items-center">
-              <Headphones className="h-3.5 w-3.5" />
+            <div className="h-7 w-7 rounded-lg bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-white grid place-items-center">
+              <Headphones className="h-3.5 w-3.5" aria-hidden="true" />
             </div>
-            <span className="text-xs font-bold text-white tracking-tight">
+            <span className="text-xs font-semibold text-neutral-900 dark:text-white">
               Production Concierge
             </span>
           </div>
-          <p className="text-[11px] text-neutral-300 dark:text-neutral-400 leading-snug">
+          <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-snug">
             Need urgent gear swaps or courier coordination?
           </p>
           <Link
             to="/support"
-            className="inline-flex items-center justify-center gap-1.5 w-full py-1.5 rounded-xl bg-white text-black hover:bg-neutral-100 dark:bg-white dark:text-black text-xs font-bold transition-all shadow-sm active:scale-95"
+            className="inline-flex items-center justify-center gap-1.5 w-full min-h-[40px] py-1.5 px-3 rounded-xl bg-neutral-950 text-white hover:bg-neutral-800 dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-200 text-xs font-semibold transition-colors"
           >
-            <ArrowRight className="w-3 h-3 shrink-0" />
             <span>Chat With Concierge</span>
+            <ArrowRight className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
           </Link>
         </div>
       </aside>

@@ -568,7 +568,7 @@ export default function Users() {
             <span>{tab.label}</span>
             <span
               className={cn(
-                "px-1.5 py-0.2 rounded-full text-[10px] font-mono",
+                "px-1.5 py-0.5 rounded-full text-[10px] font-mono",
                 tab.isApproval && pendingCount > 0
                   ? "bg-amber-500/20 text-amber-500 font-bold border border-amber-500/30"
                   : statusFilter === tab.id

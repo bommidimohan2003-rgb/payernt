@@ -204,7 +204,7 @@ export default function KycVerification() {
           <div className="flex items-center gap-3">
             <ProfilePhoto
               src={row.applicant_avatar || undefined}
-              name={row.applicant_name || row.email}
+              alt={row.applicant_name || row.email}
               size="sm"
             />
             <div className="min-w-0">
@@ -496,7 +496,7 @@ export default function KycVerification() {
                   <span>{tab.label}</span>
                   <span
                     className={cn(
-                      "px-1.5 py-0.2 rounded-full text-[10px] font-mono",
+                      "px-1.5 py-0.5 rounded-full text-[10px] font-mono",
                       active
                         ? "bg-primary-foreground/20 text-primary-foreground"
                         : tab.highlight && tab.count > 0

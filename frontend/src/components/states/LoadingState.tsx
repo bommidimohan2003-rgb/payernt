@@ -44,7 +44,7 @@ export function LoadingState({
         {Array.from({ length: count }).map((_, i) => (
           <div
             key={i}
-            className="p-5 rounded-2xl border border-border/40 bg-card/40 space-y-3 animate-pulse"
+            className="p-5 rounded-2xl border border-border/40 bg-card/40 space-y-3"
           >
             <div className="flex items-center justify-between">
               <div className="h-3 w-24 bg-muted/60 rounded" />
@@ -64,7 +64,7 @@ export function LoadingState({
         {Array.from({ length: count }).map((_, i) => (
           <div
             key={i}
-            className="p-4 rounded-xl border border-border/40 bg-card/40 flex items-center gap-4 animate-pulse"
+            className="p-4 rounded-xl border border-border/40 bg-card/40 flex items-center gap-4"
           >
             <div className="h-12 w-12 rounded-xl bg-muted/70 shrink-0" />
             <div className="flex-1 space-y-2">
@@ -82,7 +82,7 @@ export function LoadingState({
     return (
       <div
         className={cn(
-          "rounded-2xl border border-border/40 bg-card/40 overflow-hidden animate-pulse",
+          "rounded-2xl border border-border/40 bg-card/40 overflow-hidden",
           className,
         )}
       >
@@ -111,7 +111,7 @@ export function LoadingState({
     return (
       <div
         className={cn(
-          "grid grid-cols-1 lg:grid-cols-12 gap-8 animate-pulse",
+          "grid grid-cols-1 lg:grid-cols-12 gap-8",
           className,
         )}
       >
@@ -144,7 +144,7 @@ export function LoadingState({
       {Array.from({ length: count }).map((_, i) => (
         <div
           key={i}
-          className="rounded-2xl border border-border/40 bg-card/40 overflow-hidden space-y-3 p-3 animate-pulse"
+          className="rounded-2xl border border-border/40 bg-card/40 overflow-hidden space-y-3 p-3"
         >
           <div className="h-44 rounded-xl bg-muted/70 w-full" />
           <div className="space-y-2 p-1">

@@ -16,7 +16,6 @@ import {
   Clock,
   Heart,
   AlertCircle,
-  Sparkles,
   CheckCircle2,
   CalendarCheck,
   CalendarX,
@@ -34,19 +33,17 @@ import {
   LayoutGrid,
 } from "lucide-react";
 import { useState, useEffect, useMemo, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { MainLayout } from "@/layouts/MainLayout";
 import { Button } from "@/components/common/Button";
 import { Rating } from "@/components/common/Rating";
+import { RentalProductCard } from "@/components/common/RentalProductCard";
 import { useWishlist } from "@/hooks/useWishlist";
 import { useAuth } from "@/hooks/useAuth";
 import { useCart } from "@/hooks/useCart";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { JsonLd } from "@/components/common/JsonLd";
-import { INITIAL_FALLBACK_PRODUCTS, findFallbackProduct } from "@/utils/fallbackProducts";
-import cameraImg from "@/assets/images/camera.webp";
+import { INITIAL_FALLBACK_PRODUCTS } from "@/utils/fallbackProducts";
 import { PhotoDetailViewer } from "@/components/common/PhotoDetailViewer";
 import { ProductRotationViewer } from "@/components/common/ProductRotationViewer";
 import { ProductAngleViewer } from "@/components/common/ProductAngleViewer";
@@ -54,7 +51,7 @@ import { RecommendationSection } from "@/components/recommendations/Recommendati
 import { RenterBookingCalendar } from "@/components/booking/RenterBookingCalendar";
 import { LatticeLoader } from "@/components/reactbits/LatticeLoader";
 import { tracker } from "@/utils/eventTracker";
-import { api, getApiBase } from "@/utils/api";
+import { api, getApiBase, normalizeProductData } from "@/utils/api";
 import { storage, STORAGE_KEYS } from "@/utils/storage";
 import { isFakeOrDeletedProduct, isUserOwnProduct } from "@/utils/productFilters";
 import { formatOwnerAddress, formatRelativeTime } from "@/utils/formatters";
@@ -167,21 +164,20 @@ export default function ProductDetails() {
     restricted: boolean;
     message: string;
   } | null>(null);
-  // Instant cache lookup for zero-latency initial render
+  // SSR-deterministic fallback lookup (client storage cache hydrated in useEffect post-mount for Obs B)
   const initialCachedProduct = useMemo(() => {
     if (!id) return null;
-    const fromApi = api.getCachedProduct(id);
-    if (fromApi) return fromApi;
-    const targetKey = String(id).toLowerCase();
+    const targetKey = String(id).toLowerCase().trim();
     const fromFallback = INITIAL_FALLBACK_PRODUCTS.find(
       (p) => String(p.id).toLowerCase() === targetKey || String(p.id) === String(id)
     );
-    if (fromFallback) return fromFallback;
-    if (targetKey === "1" || targetKey.includes("sony")) return INITIAL_FALLBACK_PRODUCTS[0];
-    return null;
+    return fromFallback || null;
   }, [id]);
   const [product, setProduct] = useState<Product | null>(initialCachedProduct);
   const [productLoading, setProductLoading] = useState<boolean>(!initialCachedProduct);
+  const [productError, setProductError] = useState<string | null>(null);
+  const [reloadCount, setReloadCount] = useState<number>(0);
+  const [cachedCatalog, setCachedCatalog] = useState<Product[]>([]);
 
   // Redesign Visual UI States
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
@@ -238,16 +234,23 @@ export default function ProductDetails() {
     };
   }, [product?.id]);
 
-  // Date Selection & Availability States
-  const todayStr = useMemo(() => toDateInputValue(new Date()), []);
-  const tomorrowStr = useMemo(() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 1);
-    return toDateInputValue(d);
-  }, []);
+  // Date Selection & Availability States (initialized post-mount to guarantee SSR/CSR parity)
+  const [todayStr, setTodayStr] = useState<string>("");
+  const [tomorrowStr, setTomorrowStr] = useState<string>("");
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
 
-  const [startDate, setStartDate] = useState<string>(todayStr);
-  const [endDate, setEndDate] = useState<string>(todayStr);
+  useEffect(() => {
+    const now = new Date();
+    const todayVal = toDateInputValue(now);
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowVal = toDateInputValue(tomorrow);
+    setTodayStr(todayVal);
+    setTomorrowStr(tomorrowVal);
+    setStartDate((prev) => prev || todayVal);
+    setEndDate((prev) => prev || todayVal);
+  }, []);
   const [availabilityChecked, setAvailabilityChecked] = useState<boolean>(false);
   const [isAvailableForDates, setIsAvailableForDates] = useState<boolean | null>(null);
   const [availabilityMessage, setAvailabilityMessage] = useState<string>("");
@@ -293,7 +296,7 @@ export default function ProductDetails() {
     };
   }, [isSlotDropdownOpen]);
 
-  // Stale-While-Revalidate: load latest product details in background
+  // Stale-While-Revalidate: hydrate local cache & fetch latest product details post-mount
   useEffect(() => {
     let isMounted = true;
     setSelectedImageIndex(0);
@@ -301,12 +304,17 @@ export default function ProductDetails() {
     setAvailabilityChecked(false);
     setIsAvailableForDates(null);
     setAvailabilityMessage("");
+    setProductError(null);
+
+    const storedCatalog = storage.get<Product[]>("payent_server_products", []);
+    if (Array.isArray(storedCatalog) && storedCatalog.length > 0 && isMounted) {
+      setCachedCatalog(storedCatalog);
+    }
 
     const cached = initialCachedProduct || api.getCachedProduct(id);
-    const initial = cached;
-    if (initial) {
+    if (cached) {
       if (isMounted) {
-        setProduct(initial);
+        setProduct(cached);
         setProductLoading(false);
       }
     } else {
@@ -318,18 +326,35 @@ export default function ProductDetails() {
 
     async function loadTargetProduct() {
       let found: Product | null = cached || null;
-      try {
-        const live = await api.getProductById(id);
-        if (live) found = live;
-      } catch {
-        /* ignore */
+      let directStatus: number | null = null;
+      let hadFetchError = false;
+      const apiBase = getApiBase();
+
+      if (apiBase && id) {
+        try {
+          const res = await fetch(`${apiBase}/api/products/${encodeURIComponent(id)}`);
+          directStatus = res.status;
+          if (res.ok) {
+            const raw = await res.json();
+            if (raw && raw.id) {
+              const normalized = normalizeProductData(raw);
+              if (!isFakeOrDeletedProduct(normalized)) {
+                found = normalized;
+              }
+            }
+          } else if (res.status >= 500) {
+            hadFetchError = true;
+          }
+        } catch {
+          hadFetchError = true;
+        }
       }
 
       if (!found) {
         try {
           const items = await api.getPublicProducts();
           if (Array.isArray(items)) {
-            const targetKey = String(id).toLowerCase();
+            const targetKey = String(id).toLowerCase().trim();
             found =
               items.find(
                 (p: Product) =>
@@ -338,7 +363,7 @@ export default function ProductDetails() {
               ) || null;
           }
         } catch {
-          /* ignore */
+          hadFetchError = true;
         }
       }
 
@@ -346,7 +371,7 @@ export default function ProductDetails() {
         try {
           const localItems = storage.get<Product[]>("payent_server_products", []);
           if (Array.isArray(localItems)) {
-            const targetKey = String(id).toLowerCase();
+            const targetKey = String(id).toLowerCase().trim();
             found =
               localItems.find(
                 (p: Product) =>
@@ -360,34 +385,29 @@ export default function ProductDetails() {
       }
 
       if (!found) {
-        found = {
-          id: id || "sony-alpha-a7-iii",
-          title: "Sony Alpha a7 III",
-          category: "Camera",
-          price: 499,
-          rating: 4.8,
-          reviews: 124,
-          image: cameraImg,
-          images: [cameraImg],
-          description: "Capture stunning photos and videos with the Sony Alpha a7 III. Perfect for events, travel and professional shoots.",
-          condition: "Excellent",
-          location: "Vizag, AP",
-          available: true,
-          owner: {
-            id: "owner-sai-teja",
-            name: "Sai Teja",
-            city: "Vizag, AP",
-            isVerified: true,
-          },
-        } as unknown as Product;
+        const targetKey = String(id).toLowerCase().trim();
+        found =
+          INITIAL_FALLBACK_PRODUCTS.find(
+            (p) =>
+              String(p.id).toLowerCase() === targetKey ||
+              String(p.id) === String(id)
+          ) || null;
       }
 
       if (isMounted) {
         if (found) {
           setProduct(found);
+          setProductError(null);
           api.cacheProduct(found);
         } else if (!cached) {
           setProduct(null);
+          if (hadFetchError && directStatus !== 404) {
+            setProductError(
+              "Unable to load product details right now. Please check your connection and try again."
+            );
+          } else {
+            setProductError(null);
+          }
         }
         setProductLoading(false);
       }
@@ -397,21 +417,36 @@ export default function ProductDetails() {
     return () => {
       isMounted = false;
     };
-  }, [id]);
+  }, [id, initialCachedProduct, reloadCount]);
 
   const [similarProducts, setSimilarProducts] = useState<Product[]>([]);
   const [frequentlyTogether, setFrequentlyTogether] = useState<Product[]>([]);
+  const [localOrders, setLocalOrders] = useState<Order[]>([]);
 
-  // Existing Bookings lookup for Date Overlap Detection
+  useEffect(() => {
+    const syncLocalOrders = () => {
+      setLocalOrders(storage.get<Order[]>(STORAGE_KEYS.orders, []));
+    };
+    syncLocalOrders();
+    if (typeof window !== "undefined") {
+      window.addEventListener("payent_orders_updated", syncLocalOrders);
+      window.addEventListener("storage", syncLocalOrders);
+      return () => {
+        window.removeEventListener("payent_orders_updated", syncLocalOrders);
+        window.removeEventListener("storage", syncLocalOrders);
+      };
+    }
+  }, []);
+
+  // Existing Bookings lookup for Date Overlap Detection (SSR-safe via post-mount localOrders state)
   const existingProductBookings = useMemo(() => {
-    if (!product) return [];
-    const allOrders = storage.get<Order[]>(STORAGE_KEYS.orders, []);
-    return allOrders.filter(
+    if (!product || localOrders.length === 0) return [];
+    return localOrders.filter(
       (o) =>
         (o.productId === product.id || (o as any).product_id === product.id) &&
         o.status !== "cancelled"
     );
-  }, [product]);
+  }, [product, localOrders]);
 
   const currentUserId = user?.id || user?.email || "";
   const ownerId =
@@ -558,7 +593,14 @@ export default function ProductDetails() {
     };
   }, [id, startDate]);
 
-  const handleDurationModeChange = (mode: DurationMode) => {
+  const handleDurationModeChange = (rawMode: string) => {
+    const mode: DurationMode =
+      rawMode === "half_day_morning" ||
+      rawMode === "half_day_afternoon" ||
+      rawMode === "full_day" ||
+      rawMode === "custom"
+        ? rawMode
+        : "full_day";
     setDurationMode(mode);
     setAvailabilityChecked(false);
     setIsAvailableForDates(null);
@@ -585,7 +627,11 @@ export default function ProductDetails() {
     }
   };
 
-  const handleSlotSelect = (slotId: "morning" | "afternoon" | "full_day") => {
+  const handleSlotSelect = (rawSlotId: string) => {
+    const slotId: "morning" | "afternoon" | "full_day" =
+      rawSlotId === "morning" || rawSlotId === "afternoon" || rawSlotId === "full_day"
+        ? rawSlotId
+        : "full_day";
     setSelectedSlot(slotId);
     if (slotId === "morning") {
       setDurationMode("half_day_morning");
@@ -662,7 +708,7 @@ export default function ProductDetails() {
     return Number(product?.price) || 0;
   }, [daySlots, product?.price]);
 
-  // Active Slot Info for Dropdown Display
+  // Active Slot Info for Dropdown Display (monochrome aligned)
   const currentSlotInfo = useMemo(() => {
     if (durationMode === "half_day_morning") {
       return {
@@ -673,8 +719,8 @@ export default function ProductDetails() {
         price: morningPrice,
         priceSuffix: "",
         icon: Sun,
-        iconColor: "text-amber-500",
-        iconBg: "bg-amber-500/10",
+        iconColor: "text-neutral-900 dark:text-neutral-100",
+        iconBg: "bg-neutral-200/80 dark:bg-neutral-800",
         tag: "Morning",
       };
     }
@@ -687,8 +733,8 @@ export default function ProductDetails() {
         price: afternoonPrice,
         priceSuffix: "",
         icon: Sun,
-        iconColor: "text-orange-500",
-        iconBg: "bg-orange-500/10",
+        iconColor: "text-neutral-900 dark:text-neutral-100",
+        iconBg: "bg-neutral-200/80 dark:bg-neutral-800",
         tag: "Afternoon",
       };
     }
@@ -701,8 +747,8 @@ export default function ProductDetails() {
         price: fullDayPrice,
         priceSuffix: "/day",
         icon: Clock,
-        iconColor: "text-emerald-500",
-        iconBg: "bg-emerald-500/10",
+        iconColor: "text-neutral-900 dark:text-neutral-100",
+        iconBg: "bg-neutral-200/80 dark:bg-neutral-800",
         tag: "Multi-Day",
       };
     }
@@ -714,8 +760,8 @@ export default function ProductDetails() {
       price: fullDayPrice,
       priceSuffix: "",
       icon: Calendar,
-      iconColor: "text-primary",
-      iconBg: "bg-primary/10",
+      iconColor: "text-neutral-900 dark:text-neutral-100",
+      iconBg: "bg-neutral-200/80 dark:bg-neutral-800",
       tag: "Full Day",
     };
   }, [durationMode, morningPrice, afternoonPrice, fullDayPrice, rentalDays, startDate, endDate]);
@@ -728,8 +774,8 @@ export default function ProductDetails() {
       price: morningPrice,
       priceSuffix: "",
       icon: Sun,
-      iconColor: "text-amber-500",
-      iconBg: "bg-amber-500/10",
+      iconColor: "text-neutral-900 dark:text-neutral-100",
+      iconBg: "bg-neutral-200/80 dark:bg-neutral-800",
       tag: "Half-day",
     },
     {
@@ -739,8 +785,8 @@ export default function ProductDetails() {
       price: afternoonPrice,
       priceSuffix: "",
       icon: Sun,
-      iconColor: "text-orange-500",
-      iconBg: "bg-orange-500/10",
+      iconColor: "text-neutral-900 dark:text-neutral-100",
+      iconBg: "bg-neutral-200/80 dark:bg-neutral-800",
       tag: "Half-day",
     },
     {
@@ -750,8 +796,8 @@ export default function ProductDetails() {
       price: fullDayPrice,
       priceSuffix: "",
       icon: Calendar,
-      iconColor: "text-primary",
-      iconBg: "bg-primary/10",
+      iconColor: "text-neutral-900 dark:text-neutral-100",
+      iconBg: "bg-neutral-200/80 dark:bg-neutral-800",
       tag: "Popular",
     },
     {
@@ -761,8 +807,8 @@ export default function ProductDetails() {
       price: fullDayPrice,
       priceSuffix: "/day",
       icon: Clock,
-      iconColor: "text-emerald-500",
-      iconBg: "bg-emerald-500/10",
+      iconColor: "text-neutral-900 dark:text-neutral-100",
+      iconBg: "bg-neutral-200/80 dark:bg-neutral-800",
       tag: "Flexible",
     },
   ], [morningPrice, afternoonPrice, fullDayPrice]);
@@ -929,9 +975,9 @@ export default function ProductDetails() {
             return;
           }
           setIsAvailableForDates(true);
-          setAvailabilityMessage("✓ Product and time slot available for selected dates!");
+          setAvailabilityMessage("✓ Product and time slot available for selected dates");
           setAvailabilityChecked(true);
-          toast.success("Gear is available! Review booking summary below.");
+          toast.success("Gear is available. Review booking summary below.");
           return;
         }
         setIsAvailableForDates(false);
@@ -966,9 +1012,9 @@ export default function ProductDetails() {
       }
 
       setIsAvailableForDates(true);
-      setAvailabilityMessage("✓ Product and time slot available for selected dates!");
+      setAvailabilityMessage("✓ Product and time slot available for selected dates");
       setAvailabilityChecked(true);
-      toast.success("Gear is available! Review booking summary below.");
+      toast.success("Gear is available. Review booking summary below.");
     } catch (e: any) {
       console.debug("Backend availability check error:", e);
       setIsAvailableForDates(false);
@@ -1179,7 +1225,7 @@ const productSchema = product ? {
     category: product.category,
     brand: {
       "@type": "Brand",
-      name: "Payent",
+      name: "paYent",
     },
     offers: {
       "@type": "Offer",
@@ -1191,11 +1237,15 @@ const productSchema = product ? {
         : "https://schema.org/OutOfStock",
       url: `https://payent.com/product/${product.id}`,
     },
-    aggregateRating: {
-      "@type": "AggregateRating",
-      ratingValue: product.rating != null ? Number(product.rating) : 4.8,
-      reviewCount: product.reviews || 124,
-    },
+    ...(Number(product.reviews || genuineReviews.length || 0) > 0 && product.rating != null
+      ? {
+          aggregateRating: {
+            "@type": "AggregateRating",
+            ratingValue: Number(product.rating),
+            reviewCount: genuineReviews.length || Number(product.reviews),
+          },
+        }
+      : {}),
   } : null;
 
   const breadcrumbSchema = product ? {
@@ -1299,9 +1349,8 @@ const productSchema = product ? {
   const brand = product ? getProductBrand(product) : null;
   const isWishlisted = product ? has(product.id) : false;
 
-  // Related Products
-  const isMobile = useIsMobile();
-  const relatedPageSize = isMobile ? 3 : 4;
+  // Related Products (2×2 on mobile, 4×1 on lg+)
+  const relatedPageSize = 4;
 
   const relatedProductsList = useMemo(() => {
     if (!product) return [];
@@ -1315,8 +1364,9 @@ const productSchema = product ? {
         arr.findIndex((x) => x.id === p.id) === i
     );
     if (list.length >= 4) return list;
-    const catalog = storage.get<Product[]>("payent_server_products", []);
-    for (const p of catalog) {
+    const sourceCatalog =
+      cachedCatalog.length > 0 ? cachedCatalog : INITIAL_FALLBACK_PRODUCTS;
+    for (const p of sourceCatalog) {
       if (
         p &&
         p.id !== currentId &&
@@ -1329,7 +1379,7 @@ const productSchema = product ? {
       if (list.length >= 8) break;
     }
     return list;
-  }, [similarProducts, frequentlyTogether, product?.id, user]);
+  }, [similarProducts, frequentlyTogether, cachedCatalog, product?.id, user]);
 
   const displayedRelated = useMemo(() => {
     if (relatedProductsList.length <= relatedPageSize) return relatedProductsList;
@@ -1349,10 +1399,10 @@ const productSchema = product ? {
           <div className="mx-auto max-w-7xl px-4 md:px-6 py-6 space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start w-full min-w-0">
               <div className="lg:col-span-6 space-y-3 min-w-0 w-full">
-                <div className="aspect-[4/3] w-full rounded-3xl bg-neutral-200/60 dark:bg-[#1E1E1E] animate-pulse border border-black/10 dark:border-white/10" />
+                <div className="aspect-[4/3] w-full rounded-3xl bg-neutral-200/70 dark:bg-[#1E1E1E] border border-neutral-200 dark:border-neutral-800" />
               </div>
               <div className="lg:col-span-6 space-y-4 min-w-0 w-full">
-                <div className="h-96 w-full rounded-3xl bg-neutral-200/60 dark:bg-[#1E1E1E] animate-pulse border border-black/10 dark:border-white/10 p-5 space-y-4" />
+                <div className="h-96 w-full rounded-3xl bg-neutral-200/70 dark:bg-[#1E1E1E] border border-neutral-200 dark:border-neutral-800 p-5 space-y-4" />
               </div>
             </div>
           </div>
@@ -1362,11 +1412,44 @@ const productSchema = product ? {
     );
   }
 
+  if (productError && !product) {
+    return (
+      <MainLayout>
+        <div className="mx-auto max-w-3xl px-4 md:px-6 py-24 text-center space-y-4">
+          <AlertCircle className="h-10 w-10 text-destructive mx-auto stroke-[1.75]" />
+          <h1 className="text-2xl sm:text-3xl font-semibold text-foreground">Unable to load product</h1>
+          <p className="text-sm text-muted-foreground">{productError}</p>
+          <div className="pt-2 flex items-center justify-center gap-3">
+            <Button
+              size="sm"
+              onClick={() => {
+                setProductError(null);
+                setProductLoading(true);
+                setReloadCount((c) => c + 1);
+              }}
+            >
+              <RotateCcw className="h-3.5 w-3.5 shrink-0" />
+              <span>Retry</span>
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => navigate({ to: "/browse" })}
+            >
+              <LayoutGrid className="h-3.5 w-3.5 shrink-0" />
+              <span>Browse Explore Items</span>
+            </Button>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
+
   if (!product) {
     return (
       <MainLayout>
         <div className="mx-auto max-w-3xl px-4 md:px-6 py-24 text-center space-y-4">
-          <h1 className="text-3xl font-extrabold text-foreground">Product not found</h1>
+          <h1 className="text-3xl font-semibold text-foreground">Product not found</h1>
           <p className="text-sm text-muted-foreground">The equipment you requested may have been unlisted or moved.</p>
           <Button
             size="sm"
@@ -1383,14 +1466,14 @@ const productSchema = product ? {
 
   return (
     <MainLayout>
-      <JsonLd schema={productSchema} />
-      <JsonLd schema={breadcrumbSchema} />
+      {productSchema && <JsonLd schema={productSchema} />}
+      {breadcrumbSchema && <JsonLd schema={breadcrumbSchema} />}
 
-      <div className="min-h-screen bg-background text-neutral-900 dark:text-neutral-100 pb-24 transition-colors duration-300 selection:bg-foreground/15">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 space-y-8">
+      <div className="min-h-screen bg-neutral-50 dark:bg-[#1E1E1E] text-neutral-900 dark:text-neutral-100 pb-24 transition-colors duration-200 selection:bg-neutral-900 selection:text-white dark:selection:bg-white dark:selection:text-neutral-900">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 space-y-6">
 
           {/* Back Navigation Bar & Category Breadcrumb */}
-          <div className="flex items-center justify-between pb-1">
+          <div className="flex items-center justify-between">
             <button
               type="button"
               onClick={() => {
@@ -1400,40 +1483,88 @@ const productSchema = product ? {
                   navigate({ to: "/categories" });
                 }
               }}
-              className="group inline-flex items-center gap-2 text-xs sm:text-sm font-semibold text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white px-3.5 py-1.5 sm:py-2 rounded-full bg-white dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 shadow-xs hover:border-black/20 dark:hover:border-white/20 transition-all cursor-pointer active:scale-95"
+              className="group inline-flex items-center gap-2 min-h-[40px] text-xs sm:text-sm font-semibold text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white px-3.5 py-1.5 rounded-full bg-white dark:bg-[#1E1E1E] border border-neutral-200 dark:border-neutral-800 shadow-xs hover:border-neutral-400 dark:hover:border-neutral-600 transition-colors cursor-pointer"
               aria-label="Go back to previous page"
             >
-              <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1 text-neutral-600 dark:text-neutral-400 group-hover:text-neutral-950 dark:group-hover:text-white" />
+              <ArrowLeft className="h-4 w-4 text-neutral-600 dark:text-neutral-400 group-hover:text-neutral-950 dark:group-hover:text-white transition-colors" aria-hidden="true" />
               <span>Back</span>
             </button>
 
             {product?.category && (
-              <div className="hidden sm:flex items-center gap-2 text-xs text-neutral-500 dark:text-[#A8B1BA]">
-                <Link to="/categories" className="hover:text-neutral-900 dark:hover:text-white transition-colors">
-                  Categories
+              <div className="hidden sm:flex items-center gap-2 text-xs text-neutral-600 dark:text-neutral-400">
+                <Link to="/categories" className="hover:text-neutral-950 dark:hover:text-white transition-colors">
+                  Explore
                 </Link>
-                <span>/</span>
+                <span aria-hidden="true">/</span>
                 <Link
                   to="/categories"
                   search={{ cat: product.category }}
-                  className="capitalize hover:text-neutral-900 dark:hover:text-white transition-colors font-medium text-neutral-800 dark:text-neutral-200"
+                  className="capitalize hover:text-neutral-950 dark:hover:text-white transition-colors font-medium text-neutral-900 dark:text-neutral-200"
                 >
                   {product.category}
                 </Link>
               </div>
             )}
           </div>
+
+          {/* Product Heading Bar (On Clean Page Canvas — Always Readable Regardless of Photo/Video State) */}
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 pb-3 border-b border-neutral-200 dark:border-neutral-800 text-left">
+            <div className="space-y-1 min-w-0">
+              <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-neutral-600 dark:text-neutral-400 capitalize">
+                <span>{product.category || "Gear"}</span>
+                {brand && (
+                  <>
+                    <span aria-hidden="true">·</span>
+                    <span className="font-semibold text-neutral-900 dark:text-neutral-100">{brand}</span>
+                  </>
+                )}
+              </div>
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-semibold text-neutral-950 dark:text-white tracking-tight font-display">
+                {product.title}
+              </h1>
+            </div>
+
+            {(() => {
+              const totalCount =
+                genuineReviews.length > 0
+                  ? genuineReviews.length
+                  : product.reviews
+                  ? Number(product.reviews)
+                  : 0;
+              const avgRating =
+                totalCount > 0 && product.rating != null ? Number(product.rating) : null;
+
+              return (
+                <button
+                  type="button"
+                  onClick={() => {
+                    document.getElementById("customer-reviews-section")?.scrollIntoView({ behavior: "smooth" });
+                  }}
+                  title="View Customer Reviews"
+                  className="shrink-0 inline-flex items-center gap-1.5 min-h-[40px] px-3.5 py-1.5 rounded-full bg-white dark:bg-[#1E1E1E] hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-900 dark:text-white border border-neutral-200 dark:border-neutral-800 shadow-xs transition-colors cursor-pointer text-xs select-none w-fit"
+                >
+                  <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" aria-hidden="true" />
+                  <span className="font-bold tabular-nums">
+                    {avgRating != null ? avgRating.toFixed(1) : "New"}
+                  </span>
+                  <span className="text-neutral-600 dark:text-neutral-400 font-medium tabular-nums">
+                    ({totalCount} {totalCount === 1 ? "review" : "reviews"})
+                  </span>
+                </button>
+              );
+            })()}
+          </div>
           
-          {/* 1. TOP HERO: PRODUCT GALLERY & DETAILS (2-Column Grid matching Reference) */}
-          <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-x-12 lg:gap-y-6 items-start w-full min-w-0">
+          {/* 1. TOP HERO: PRODUCT GALLERY & DETAILS (2-Column Grid) */}
+          <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-x-10 lg:gap-y-6 items-start w-full min-w-0">
             
             {/* 1. Left Top / Mobile 1st: Image Gallery & 10s Video Showcase */}
             <div className="order-1 lg:order-1 lg:col-span-6 lg:col-start-1 lg:row-start-1 space-y-4 min-w-0 w-full">
-              {/* Main Product Showcase Card with edge-to-edge image & floating overlay badges */}
-              <div className="relative rounded-3xl overflow-hidden bg-neutral-950 border border-neutral-200/80 dark:border-neutral-800 aspect-[4/3] sm:aspect-[16/11] min-h-[380px] sm:min-h-[460px] max-h-[520px] w-full flex items-center justify-center shadow-md group">
+              {/* Main Product Showcase Card */}
+              <div className="relative rounded-3xl overflow-hidden bg-neutral-950 border border-neutral-200 dark:border-neutral-800 aspect-[4/3] sm:aspect-[16/11] min-h-[340px] sm:min-h-[440px] max-h-[500px] w-full flex items-center justify-center shadow-sm group">
                 {/* Center Showcase: 10s Video Player or High-Resolution Photo */}
                 {isVideoActive ? (
-                  <div className="w-full h-full min-h-[380px] sm:min-h-[460px] rounded-3xl overflow-hidden bg-black flex flex-col items-center justify-center relative shadow-inner">
+                  <div className="w-full h-full min-h-[340px] sm:min-h-[440px] rounded-3xl overflow-hidden bg-black flex flex-col items-center justify-center relative">
                     <video
                       key={activeVideoUrl}
                       poster={activeDisplayImage || product?.image}
@@ -1455,105 +1586,41 @@ const productSchema = product ? {
                       <source src={activeVideoUrl} type="video/mp4" />
                       <source src={activeVideoUrl.replace(/\.mp4$/, ".webm")} type="video/webm" />
                     </video>
-                    <div className="absolute bottom-3 left-3 px-3 py-1 rounded-full bg-black/70 backdrop-blur-md text-[11px] text-primary font-bold border border-primary/30 flex items-center gap-1.5 select-none pointer-events-none">
-                      <ShieldCheck className="h-3.5 w-3.5" />
+                    <div className="absolute bottom-3 left-3 px-3 py-1 rounded-full bg-neutral-950/85 backdrop-blur-md text-xs text-white font-semibold border border-white/20 flex items-center gap-1.5 select-none pointer-events-none">
+                      <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
                       <span>Verified 10s Inspection Video</span>
                     </div>
-                    {/* Full Screen Video Overlay Button */}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setIsFullscreenVideoActive(true);
-                        setIsPhotoViewerOpen(true);
-                      }}
-                      title="Watch video in full screen"
-                      className="absolute top-3 right-3 px-3 py-1.5 rounded-full bg-black/70 hover:bg-black/90 text-white backdrop-blur-md border border-white/20 transition-all cursor-pointer z-10 hover:scale-105 active:scale-95 shadow-md flex items-center gap-1.5 text-xs font-semibold"
-                    >
-                      <Maximize2 className="h-3.5 w-3.5 text-primary" />
-                      <span>Full Screen</span>
-                    </button>
                   </div>
                 ) : (
-                  <div className="relative w-full h-full min-h-[380px] sm:min-h-[460px] overflow-hidden flex items-center justify-center">
+                  <div className="relative w-full h-full min-h-[340px] sm:min-h-[440px] overflow-hidden flex items-center justify-center bg-neutral-100 dark:bg-neutral-900">
                     <img
                       src={activeDisplayImage}
-                      alt={product.title}
+                      alt={`${product.title} photo ${selectedImageIndex + 1}`}
                       onClick={() => {
                         setIsFullscreenVideoActive(false);
                         setIsPhotoViewerOpen(true);
                       }}
-                      className="w-full h-full min-h-[380px] sm:min-h-[460px] max-h-[520px] object-cover object-center transition-transform duration-500 ease-out group-hover:scale-105 cursor-pointer"
+                      className="w-full h-full min-h-[340px] sm:min-h-[440px] max-h-[500px] object-cover object-center cursor-pointer"
                     />
-                    {/* Top gradient overlay to ensure wording & badge legibility directly on the image */}
-                    <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/60 via-black/20 to-transparent pointer-events-none" />
-                    {/* Bottom gradient overlay for title & category legibility on the image */}
-                    <div className="absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-black/85 via-black/40 to-transparent pointer-events-none" />
+                    <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/45 to-transparent pointer-events-none" />
                   </div>
                 )}
 
-                {/* Bottom Overlays: Title & Category on Left, Reviews / Rating on Right Bottom Overlap */}
-                {!isVideoActive && (
-                  <div className="absolute bottom-3 sm:bottom-5 left-3 sm:left-5 right-3 sm:right-5 z-10 flex flex-col xs:flex-row xs:items-end justify-between gap-2 sm:gap-3">
-                    {/* Bottom-Left: Title & Category / Brand */}
-                    <div className="text-left pointer-events-none space-y-0.5 sm:space-y-1 min-w-0 max-w-full xs:max-w-[65%]">
-                      <h1 className="text-lg sm:text-2xl lg:text-3xl font-extrabold text-white tracking-tight drop-shadow-md font-display line-clamp-2">
-                        {product.title}
-                      </h1>
-                      <p className="text-xs sm:text-sm font-semibold text-neutral-200 drop-shadow-sm flex items-center gap-1.5 capitalize truncate">
-                        <span className="text-primary font-bold">{product.category || "Gear"}</span>
-                        {brand && (
-                          <>
-                            <span className="text-neutral-400">•</span>
-                            <span>{brand}</span>
-                          </>
-                        )}
-                      </p>
-                    </div>
-
-                    {/* Bottom-Right: Review / Rating Badge Overlapping on Product Image */}
-                    {(() => {
-                      const totalCount = genuineReviews.length > 0 ? genuineReviews.length : (product.reviews ? Number(product.reviews) : 0);
-                      const avgRating = totalCount > 0 && product.rating != null ? Number(product.rating) : (totalCount > 0 ? 5.0 : null);
-
-                      return (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            document.getElementById("customer-reviews-section")?.scrollIntoView({ behavior: "smooth" });
-                          }}
-                          title="View Customer Reviews"
-                          className="pointer-events-auto shrink-0 inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full bg-black/65 dark:bg-black/75 hover:bg-black/80 text-white backdrop-blur-md border border-white/20 shadow-md transition-all hover:scale-105 active:scale-95 cursor-pointer text-[11px] sm:text-xs select-none w-fit"
-                        >
-                          <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                          <span className="font-bold text-amber-300 font-mono">
-                            {avgRating != null ? avgRating.toFixed(1) : "5.0"}
-                          </span>
-                          <span className="text-neutral-300 font-medium text-[11px]">
-                            ({totalCount} {totalCount === 1 ? "review" : "reviews"})
-                          </span>
-                        </button>
-                      );
-                    })()}
-                  </div>
-                )}
-
-                {/* Top Controls: Status Badge & 10s Video Badge — overlapping directly on the image */}
-                <div className="absolute top-4 left-4 z-10 flex items-center gap-2 pointer-events-auto">
+                {/* Top Controls: Availability Status Badge & 10s Video Badge */}
+                <div className="absolute top-3.5 left-3.5 z-10 flex items-center gap-2 pointer-events-auto">
                   {product.available ? (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/60 dark:bg-black/75 text-primary font-semibold text-xs shadow-md backdrop-blur-md border border-primary/30 select-none">
-                      <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-neutral-950/80 text-white font-semibold text-xs shadow-sm backdrop-blur-md border border-white/15 select-none">
+                      <span className="h-2 w-2 rounded-full bg-emerald-400" />
                       Available
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/60 dark:bg-black/75 text-rose-400 font-semibold text-xs shadow-md backdrop-blur-md border border-rose-500/30 select-none">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-neutral-950/80 text-rose-300 font-semibold text-xs shadow-sm backdrop-blur-md border border-rose-500/30 select-none">
                       <span className="h-2 w-2 rounded-full bg-rose-500" />
                       Reserved
                     </span>
                   )}
 
-                  {/* 10s Equipment Video Badge */}
+                  {/* 10s Equipment Video Toggle */}
                   <button
                     type="button"
                     onClick={(e) => {
@@ -1562,20 +1629,19 @@ const productSchema = product ? {
                     }}
                     title="Watch 10-second verified equipment inspection video"
                     className={cn(
-                      "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all shadow-md backdrop-blur-md border cursor-pointer active:scale-95",
+                      "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-colors shadow-sm backdrop-blur-md border cursor-pointer",
                       isVideoActive
-                        ? "bg-primary text-white border-primary ring-2 ring-primary/30"
-                        : "bg-black/60 dark:bg-black/75 hover:bg-black/80 text-white border-white/20 hover:border-primary/40"
+                        ? "bg-white text-neutral-950 border-white"
+                        : "bg-neutral-950/80 hover:bg-neutral-950 text-white border-white/20"
                     )}
                   >
-                    <Video className="h-3.5 w-3.5 text-primary" />
+                    <Video className="h-3.5 w-3.5" aria-hidden="true" />
                     <span>{isVideoActive ? "Show Photos" : "10s Video"}</span>
                   </button>
                 </div>
 
-                {/* Top-Right: Fullscreen Button & Heart Wishlist Button — overlapping directly on the image */}
-                <div className="absolute top-4 right-4 z-10 flex items-center gap-2 pointer-events-auto">
-                  {/* Fullscreen Symbol Button */}
+                {/* Top-Right: Fullscreen Button & Heart Wishlist Button */}
+                <div className="absolute top-3.5 right-3.5 z-10 flex items-center gap-2 pointer-events-auto">
                   <button
                     type="button"
                     onClick={(e) => {
@@ -1585,28 +1651,33 @@ const productSchema = product ? {
                     }}
                     title={isVideoActive ? "View Video Full Screen" : "View Image Full Screen"}
                     aria-label={isVideoActive ? "View Video Full Screen" : "View Image Full Screen"}
-                    className="p-2.5 rounded-full bg-black/60 dark:bg-black/75 hover:bg-black/80 text-white hover:text-primary hover:scale-110 active:scale-95 transition-all shadow-md border border-white/20 backdrop-blur-md cursor-pointer"
+                    className="min-h-[40px] min-w-[40px] flex items-center justify-center rounded-full bg-neutral-950/80 hover:bg-neutral-950 text-white transition-colors shadow-sm border border-white/20 backdrop-blur-md cursor-pointer"
                   >
-                    <Maximize2 className="h-4.5 w-4.5 sm:h-5 sm:w-5" />
+                    <Maximize2 className="h-4 w-4" aria-hidden="true" />
                   </button>
 
-                  {/* Heart Wishlist Button */}
                   <button
                     type="button"
-                    onClick={() => {
-                      toggle(product.id);
-                      toast.success(isWishlisted ? "Removed from favourites" : "Saved to favourites!");
+                    onClick={async () => {
+                      const was = isWishlisted;
+                      const ok = await toggle(String(product.id));
+                      if (!ok) {
+                        toast.error("Failed to update wishlist. Please try again.");
+                        return;
+                      }
+                      toast.success(was ? "Removed from Wishlist" : "Added to Wishlist");
                     }}
-                    aria-label={isWishlisted ? "Remove from favourites" : "Add to favourites"}
-                    className="p-2.5 rounded-full bg-black/60 dark:bg-black/75 hover:bg-black/80 text-white hover:text-rose-500 hover:scale-110 active:scale-95 transition-all shadow-md border border-white/20 backdrop-blur-md cursor-pointer pointer-events-auto"
+                    aria-pressed={isWishlisted}
+                    aria-label={isWishlisted ? "Remove from Wishlist" : "Add to Wishlist"}
+                    className="min-h-[40px] min-w-[40px] flex items-center justify-center rounded-full bg-neutral-950/80 hover:bg-neutral-950 text-white transition-colors shadow-sm border border-white/20 backdrop-blur-md cursor-pointer pointer-events-auto"
                   >
-                    <Heart className={cn("h-4.5 w-4.5 sm:h-5 sm:w-5 transition-colors", isWishlisted ? "fill-rose-500 text-rose-500" : "")} />
+                    <Heart className={cn("h-4 w-4 transition-colors", isWishlisted ? "fill-white text-white" : "")} aria-hidden="true" />
                   </button>
                 </div>
               </div>
 
               {/* 5-Thumbnail Media Strip (Photos + 10s Video Option) */}
-              <div className="grid grid-cols-5 gap-1.5 sm:gap-3 w-full min-w-0">
+              <div className="grid grid-cols-5 gap-2 sm:gap-3 w-full min-w-0">
                 {thumbnails.map((thumb, idx) => {
                   const isActive = !isVideoActive && idx === selectedImageIndex;
                   const isFourth = idx === 3;
@@ -1615,19 +1686,25 @@ const productSchema = product ? {
                     <button
                       key={idx}
                       type="button"
+                      aria-label={`View photo ${idx + 1} of ${product.title}`}
                       onClick={() => {
                         setIsVideoActive(false);
                         setSelectedImageIndex(idx);
                       }}
-                      className={`relative aspect-square rounded-2xl overflow-hidden border-2 transition-all cursor-pointer p-1 sm:p-2 flex items-center justify-center bg-card min-w-0 ${
+                      className={cn(
+                        "relative aspect-square rounded-2xl overflow-hidden border-2 transition-colors cursor-pointer p-1 sm:p-2 flex items-center justify-center bg-white dark:bg-[#1E1E1E] min-w-0",
                         isActive
-                          ? "border-primary ring-2 ring-primary/20 shadow-xs"
-                          : "border-border/80 hover:border-primary/50"
-                      }`}
+                          ? "border-neutral-950 dark:border-white ring-1 ring-neutral-950/20 dark:ring-white/30 shadow-xs"
+                          : "border-neutral-200 dark:border-neutral-800 hover:border-neutral-400 dark:hover:border-neutral-600"
+                      )}
                     >
-                      <img src={thumb} alt="" className="w-full h-full object-contain" />
+                      <img
+                        src={thumb}
+                        alt={`${product.title} view ${idx + 1}`}
+                        className="w-full h-full object-contain"
+                      />
                       {isFourth && remainingCount > 0 && (
-                        <div className="absolute inset-0 bg-black/65 backdrop-blur-[2px] flex items-center justify-center text-white font-extrabold text-sm sm:text-base">
+                        <div className="absolute inset-0 bg-black/65 backdrop-blur-[2px] flex items-center justify-center text-white font-bold text-sm sm:text-base tabular-nums">
                           +{remainingCount}
                         </div>
                       )}
@@ -1640,49 +1717,51 @@ const productSchema = product ? {
                   type="button"
                   onClick={() => setIsVideoActive(true)}
                   title="Play 10s Inspection Video"
-                  className={`relative aspect-square rounded-2xl overflow-hidden border-2 transition-all cursor-pointer p-1 sm:p-2 flex flex-col items-center justify-center bg-neutral-950 text-white min-w-0 ${
+                  aria-label="Play 10-second equipment inspection video"
+                  className={cn(
+                    "relative aspect-square rounded-2xl overflow-hidden border-2 transition-colors cursor-pointer p-1 sm:p-2 flex flex-col items-center justify-center bg-neutral-950 text-white min-w-0",
                     isVideoActive
-                      ? "border-primary ring-2 ring-primary/30 shadow-xs"
-                      : "border-border/80 hover:border-primary/50"
-                  }`}
+                      ? "border-neutral-950 dark:border-white ring-1 ring-neutral-950/20 dark:ring-white/30 shadow-xs"
+                      : "border-neutral-200 dark:border-neutral-800 hover:border-neutral-400 dark:hover:border-neutral-600"
+                  )}
                 >
-                  <Video className="h-4 w-4 sm:h-5 sm:w-5 text-primary mb-0.5 sm:mb-1 shrink-0" />
-                  <span className="text-[8.5px] sm:text-[10px] font-bold tracking-tight text-neutral-200 truncate max-w-full">10s Video</span>
+                  <Video className="h-4 w-4 sm:h-5 sm:w-5 text-white mb-0.5 sm:mb-1 shrink-0 stroke-[1.75]" aria-hidden="true" />
+                  <span className="text-xs font-medium text-neutral-200 truncate max-w-full">10s Video</span>
                 </button>
               </div>
 
               </div>
 
-            {/* 2. Check Availability & Rental Booking Section (Mobile/Tablet: 1st after gallery (order-2), Desktop: Right Column Sticky) */}
+            {/* 2. Check Availability & Rental Booking Section */}
             <div id="rental-booking-section" className="order-2 lg:order-3 lg:col-span-6 lg:col-start-7 lg:row-start-1 lg:row-span-2 space-y-4 text-left lg:sticky lg:top-24 min-w-0 w-full">
-              <div className="relative rounded-2xl sm:rounded-3xl border border-neutral-300/80 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E] pt-5 sm:pt-6 p-4 sm:p-5 shadow-xs space-y-3.5">
+              <div className="relative rounded-2xl sm:rounded-3xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] pt-5 sm:pt-6 p-4 sm:p-5 shadow-xs space-y-3.5">
                 <div className="absolute -top-3 left-4 px-2 bg-white dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
-                  <Calendar className="h-3.5 w-3.5 text-primary" />
-                  <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
+                  <Calendar className="h-3.5 w-3.5 text-neutral-700 dark:text-neutral-300 stroke-[1.75]" aria-hidden="true" />
+                  <span className="text-xs sm:text-[13px] font-semibold text-neutral-950 dark:text-white">
                     Rental Booking
                   </span>
                 </div>
 
                 <div className="flex items-center justify-between pb-1 flex-wrap gap-2.5">
-                  <p className="text-[11px] text-muted-foreground">Select date, choose time slot, and verify availability.</p>
+                  <p className="text-xs text-neutral-600 dark:text-neutral-400">Select date, choose time slot, and verify availability.</p>
                 </div>
 
                 {/* Calendar Dropdown Selector */}
                 <div className="relative pt-1.5 space-y-1.5">
-                  <label className="absolute -top-2 left-3 px-1.5 bg-white dark:bg-[#1E1E1E] text-[10px] sm:text-[11px] font-bold text-foreground uppercase tracking-wider pointer-events-none select-none z-10">
+                  <label className="absolute -top-2 left-3 px-1.5 bg-white dark:bg-[#1E1E1E] text-xs font-semibold text-neutral-700 dark:text-neutral-300 pointer-events-none select-none z-10">
                     Rental Date
                   </label>
                   <button
                     type="button"
                     onClick={() => setShowFullCalendar((prev) => !prev)}
-                    className="w-full p-2.5 sm:p-3 rounded-xl border border-neutral-300/80 dark:border-neutral-700/80 bg-neutral-100/70 dark:bg-[#1E1E1E] hover:bg-neutral-100 dark:hover:bg-white/10 transition-all flex items-center justify-between cursor-pointer group"
+                    className="w-full p-2.5 sm:p-3 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 hover:bg-neutral-100 dark:hover:bg-neutral-800/80 transition-colors flex items-center justify-between cursor-pointer group"
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                        <Calendar className="h-4 w-4" />
+                      <div className="h-8 w-8 rounded-lg bg-neutral-200/80 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 flex items-center justify-center shrink-0">
+                        <Calendar className="h-4 w-4" aria-hidden="true" />
                       </div>
                       <div className="text-left truncate">
-                        <span className="text-xs sm:text-sm font-bold text-foreground font-mono block truncate">
+                        <span className="text-xs sm:text-sm font-semibold text-neutral-950 dark:text-white tabular-nums block truncate">
                           {startDate ? (
                             durationMode === "custom" && endDate && endDate !== startDate
                               ? `${startDate} → ${endDate} (${rentalDays} Days)`
@@ -1691,20 +1770,20 @@ const productSchema = product ? {
                             "Select date on calendar"
                           )}
                         </span>
-                        <span className="text-[10px] text-muted-foreground font-medium block">
+                        <span className="text-xs text-neutral-600 dark:text-neutral-400 block">
                           {showFullCalendar ? "Click to collapse calendar" : "Click to select date on calendar"}
                         </span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-primary shrink-0">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-neutral-900 dark:text-neutral-100 shrink-0">
                       <span>{showFullCalendar ? "Close" : "Open Calendar"}</span>
-                      <ChevronDown className={cn("h-3.5 w-3.5 transition-transform duration-200", showFullCalendar ? "rotate-180" : "")} />
+                      <ChevronDown className={cn("h-3.5 w-3.5 transition-transform duration-200", showFullCalendar ? "rotate-180" : "")} aria-hidden="true" />
                     </div>
                   </button>
 
                   {/* Dropdown Calendar Panel */}
                   {showFullCalendar && (
-                    <div className="pt-2 animate-in fade-in slide-in-from-top-2 duration-200 max-w-sm sm:max-w-md mx-auto">
+                    <div className="pt-2 max-w-sm sm:max-w-md mx-auto">
                       <RenterBookingCalendar
                         productId={product.id}
                         selectedStartDate={startDate}
@@ -1732,49 +1811,49 @@ const productSchema = product ? {
 
                 {/* Time Slot Dropdown Menu */}
                 <div ref={slotDropdownRef} className="relative pt-2 space-y-1.5">
-                  <label className="absolute -top-1.5 left-3 px-1.5 bg-white dark:bg-[#1E1E1E] text-[10px] sm:text-[11px] font-bold text-foreground uppercase tracking-wider pointer-events-none select-none z-10">
+                  <label className="absolute -top-1.5 left-3 px-1.5 bg-white dark:bg-[#1E1E1E] text-xs font-semibold text-neutral-700 dark:text-neutral-300 pointer-events-none select-none z-10">
                     Time Slot
                   </label>
                   <button
                     type="button"
                     onClick={() => setIsSlotDropdownOpen((prev) => !prev)}
                     className={cn(
-                      "w-full p-2.5 sm:p-3 rounded-xl border transition-all flex items-center justify-between cursor-pointer group text-left",
+                      "w-full p-2.5 sm:p-3 rounded-xl border transition-colors flex items-center justify-between cursor-pointer group text-left",
                       isSlotDropdownOpen
-                        ? "border-primary bg-primary/5 dark:bg-primary/10 ring-2 ring-primary/20"
-                        : "border-neutral-300/80 dark:border-neutral-700/80 bg-neutral-100/60 dark:bg-[#1E1E1E] hover:bg-neutral-100 dark:hover:bg-white/10"
+                        ? "border-neutral-950 dark:border-white bg-neutral-100 dark:bg-neutral-900"
+                        : "border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 hover:bg-neutral-100 dark:hover:bg-neutral-800/80"
                     )}
                     aria-haspopup="listbox"
                     aria-expanded={isSlotDropdownOpen}
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
                       <div className={cn("h-8 w-8 rounded-lg flex items-center justify-center shrink-0", currentSlotInfo.iconBg, currentSlotInfo.iconColor)}>
-                        <currentSlotInfo.icon className="h-4 w-4" />
+                        <currentSlotInfo.icon className="h-4 w-4" aria-hidden="true" />
                       </div>
                       <div className="text-left truncate min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="text-xs sm:text-sm font-bold text-foreground block truncate">
+                          <span className="text-xs sm:text-sm font-semibold text-neutral-950 dark:text-white block truncate">
                             {currentSlotInfo.title}
                           </span>
-                          <span className="text-[10px] font-bold text-primary font-mono bg-primary/10 px-1.5 py-0.5 rounded-md shrink-0">
+                          <span className="text-xs font-semibold text-neutral-900 dark:text-white tabular-nums bg-neutral-200/80 dark:bg-neutral-800 px-1.5 py-0.5 rounded-md shrink-0">
                             ₹{currentSlotInfo.price}{currentSlotInfo.priceSuffix}
                           </span>
                         </div>
-                        <span className="text-[10px] text-muted-foreground font-medium block truncate">
+                        <span className="text-xs text-neutral-600 dark:text-neutral-400 block truncate">
                           {currentSlotInfo.time}
                         </span>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-primary shrink-0 ml-2">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-neutral-900 dark:text-neutral-100 shrink-0 ml-2">
                       <span className="hidden xs:inline">{isSlotDropdownOpen ? "Close" : "Select Slot"}</span>
-                      <ChevronDown className={cn("h-3.5 w-3.5 transition-transform duration-200", isSlotDropdownOpen ? "rotate-180" : "")} />
+                      <ChevronDown className={cn("h-3.5 w-3.5 transition-transform duration-200", isSlotDropdownOpen ? "rotate-180" : "")} aria-hidden="true" />
                     </div>
                   </button>
 
                   {/* Dropdown Menu Options */}
                   {isSlotDropdownOpen && (
-                    <div className="absolute left-0 right-0 top-full mt-1.5 z-30 p-1.5 rounded-xl border border-neutral-300/90 dark:border-neutral-700 bg-white dark:bg-[#1E1E1E] shadow-xl space-y-1 animate-in fade-in slide-in-from-top-2 duration-150">
+                    <div className="absolute left-0 right-0 top-full mt-1.5 z-30 p-1.5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] shadow-xl space-y-1">
                       {slotOptions.map((opt) => {
                         const isSelected =
                           (opt.id === "custom" && durationMode === "custom") ||
@@ -1795,37 +1874,56 @@ const productSchema = product ? {
                               setIsSlotDropdownOpen(false);
                             }}
                             className={cn(
-                              "w-full p-2 sm:p-2.5 rounded-lg flex items-center justify-between gap-2.5 text-left transition-all cursor-pointer",
+                              "w-full p-2 sm:p-2.5 rounded-lg flex items-center justify-between gap-2.5 text-left transition-colors cursor-pointer",
                               isSelected
-                                ? "bg-primary/10 dark:bg-primary/20 border border-primary/30"
-                                : "hover:bg-neutral-100 dark:hover:bg-white/5 border border-transparent"
+                                ? "bg-neutral-950 text-white dark:bg-white dark:text-neutral-950"
+                                : "hover:bg-neutral-100 dark:hover:bg-neutral-800/70 border border-transparent text-neutral-900 dark:text-neutral-100"
                             )}
                           >
                             <div className="flex items-center gap-2.5 min-w-0">
-                              <div className={cn("h-7 w-7 rounded-md flex items-center justify-center shrink-0", opt.iconBg, opt.iconColor)}>
-                                <OptIcon className="h-3.5 w-3.5" />
+                              <div
+                                className={cn(
+                                  "h-7 w-7 rounded-md flex items-center justify-center shrink-0",
+                                  isSelected
+                                    ? "bg-white/15 text-white dark:bg-neutral-950/10 dark:text-neutral-950"
+                                    : cn(opt.iconBg, opt.iconColor)
+                                )}
+                              >
+                                <OptIcon className="h-3.5 w-3.5" aria-hidden="true" />
                               </div>
                               <div className="truncate min-w-0">
                                 <div className="flex items-center gap-1.5">
-                                  <span className={cn("text-xs font-bold truncate", isSelected ? "text-primary" : "text-foreground")}>
+                                  <span className="text-xs font-bold truncate">
                                     {opt.title}
                                   </span>
-                                  <span className="text-[9px] font-mono font-semibold px-1.5 py-0.2 rounded bg-neutral-200/60 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400">
+                                  <span
+                                    className={cn(
+                                      "text-[11px] font-medium tabular-nums px-1.5 py-0.5 rounded",
+                                      isSelected
+                                        ? "bg-white/20 text-white dark:bg-black/10 dark:text-neutral-950"
+                                        : "bg-neutral-200/70 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300"
+                                    )}
+                                  >
                                     {opt.tag}
                                   </span>
                                 </div>
-                                <span className="text-[10px] text-muted-foreground block truncate">
+                                <span
+                                  className={cn(
+                                    "text-[11px] block truncate",
+                                    isSelected ? "text-neutral-200 dark:text-neutral-700" : "text-neutral-600 dark:text-neutral-400"
+                                  )}
+                                >
                                   {opt.time}
                                 </span>
                               </div>
                             </div>
 
                             <div className="flex items-center gap-2 shrink-0">
-                              <span className="text-xs font-mono font-bold text-foreground">
+                              <span className="text-xs font-semibold tabular-nums">
                                 ₹{opt.price}{opt.priceSuffix}
                               </span>
-                              <div className={cn("w-4 h-4 rounded-full flex items-center justify-center", isSelected ? "text-primary" : "opacity-0")}>
-                                <Check className="h-3.5 w-3.5 stroke-[2.5]" />
+                              <div className={cn("w-4 h-4 rounded-full flex items-center justify-center", isSelected ? "opacity-100" : "opacity-0")}>
+                                <Check className="h-3.5 w-3.5 stroke-[1.75]" aria-hidden="true" />
                               </div>
                             </div>
                           </button>
@@ -1837,13 +1935,13 @@ const productSchema = product ? {
 
                 {/* Multi-Day Days Marker / Stepper */}
                 {durationMode === "custom" && (
-                    <div className="pt-2 animate-in fade-in slide-in-from-top-1 duration-150">
-                      <div className="flex items-center justify-between p-2.5 sm:p-3 rounded-xl bg-neutral-100/70 dark:bg-[#1E1E1E] border border-neutral-300/80 dark:border-neutral-700/80">
+                    <div className="pt-2">
+                      <div className="flex items-center justify-between p-2.5 sm:p-3 rounded-xl bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800">
                         <div>
-                          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+                          <span className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400 block">
                             Rental Duration
                           </span>
-                          <span className="text-xs sm:text-sm font-bold text-foreground">
+                          <span className="text-xs sm:text-sm font-bold text-neutral-950 dark:text-white tabular-nums">
                             {rentalDays} {rentalDays === 1 ? "Day" : "Days"} ({startDate} → {endDate})
                           </span>
                         </div>
@@ -1853,32 +1951,35 @@ const productSchema = product ? {
                             type="button"
                             onClick={() => handleDaysChange(rentalDays - 1)}
                             disabled={rentalDays <= 2}
-                            className="w-8 h-8 rounded-lg border border-neutral-300/80 dark:border-neutral-700/80 flex items-center justify-center font-bold text-base hover:bg-neutral-200/70 dark:hover:bg-white/10 disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer text-foreground"
+                            aria-label="Decrease rental days"
+                            className="w-8 h-8 rounded-lg border border-neutral-300 dark:border-neutral-700 flex items-center justify-center font-bold text-base hover:bg-neutral-200/70 dark:hover:bg-neutral-800 disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer text-neutral-950 dark:text-white"
                             title="Decrease days"
                           >
                             -
                           </button>
 
-                          <div className="flex items-center justify-center px-2 py-1 bg-white dark:bg-neutral-900 border border-neutral-300/80 dark:border-neutral-700/80 rounded-lg">
+                          <div className="flex items-center justify-center px-2 py-1 bg-white dark:bg-[#1E1E1E] border border-neutral-300 dark:border-neutral-700 rounded-lg">
                             <input
                               type="number"
                               min={2}
                               max={90}
+                              aria-label="Number of rental days"
                               value={rentalDays}
                               onChange={(e) => {
                                 const val = parseInt(e.target.value, 10);
                                 if (!isNaN(val)) handleDaysChange(val);
                               }}
-                              className="w-8 text-center font-mono font-bold text-xs sm:text-sm bg-transparent outline-none text-foreground"
+                              className="w-8 text-center font-semibold tabular-nums text-xs sm:text-sm bg-transparent outline-none text-neutral-950 dark:text-white"
                             />
-                            <span className="text-[10px] font-medium text-muted-foreground ml-0.5">d</span>
+                            <span className="text-xs font-medium text-neutral-600 dark:text-neutral-400 ml-0.5">d</span>
                           </div>
 
                           <button
                             type="button"
                             onClick={() => handleDaysChange(rentalDays + 1)}
                             disabled={rentalDays >= 90}
-                            className="w-8 h-8 rounded-lg border border-neutral-300/80 dark:border-neutral-700/80 flex items-center justify-center font-bold text-base hover:bg-neutral-200/70 dark:hover:bg-white/10 disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer text-foreground"
+                            aria-label="Increase rental days"
+                            className="w-8 h-8 rounded-lg border border-neutral-300 dark:border-neutral-700 flex items-center justify-center font-bold text-base hover:bg-neutral-200/70 dark:hover:bg-neutral-800 disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer text-neutral-950 dark:text-white"
                             title="Increase days"
                           >
                             +
@@ -1889,26 +1990,26 @@ const productSchema = product ? {
                   )}
 
                 {/* Booking Summary */}
-                <div className="relative rounded-2xl bg-neutral-100/70 dark:bg-[#1E1E1E] border border-neutral-300/80 dark:border-neutral-700/80 pt-4.5 pb-3 px-3.5 sm:px-4 flex items-center justify-between gap-3">
-                  <div className="absolute -top-2.5 left-3 px-1.5 bg-neutral-100 dark:bg-[#1E1E1E] text-[10px] sm:text-[11px] font-bold text-foreground pointer-events-none select-none z-10">
+                <div className="relative rounded-2xl bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 pt-4.5 pb-3 px-3.5 sm:px-4 flex items-center justify-between gap-3">
+                  <div className="absolute -top-2.5 left-3 px-1.5 bg-neutral-50 dark:bg-[#1E1E1E] text-xs font-semibold text-neutral-700 dark:text-neutral-300 pointer-events-none select-none z-10">
                     Booking Summary
                   </div>
                   <div>
-                    <div className="text-xs font-semibold text-foreground">
+                    <div className="text-xs font-semibold text-neutral-900 dark:text-neutral-100">
                       {durationMode === "half_day_morning"
                         ? "1 Day • Morning Slot"
                         : durationMode === "half_day_afternoon"
                         ? "1 Day • Afternoon Slot"
                         : durationMode === "full_day"
-                        ? `1 Day • Full Day (${startDate})`
+                        ? startDate ? `1 Day • Full Day (${startDate})` : "1 Day • Full Day"
                         : `${rentalDays} Days Rental (${startDate} → ${endDate})`}
                     </div>
                   </div>
                   <div className="text-right">
-                    <span className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                    <span className="block text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
                       Estimated Total
                     </span>
-                    <div className="text-xl sm:text-2xl font-black text-primary font-mono">
+                    <div className="text-xl sm:text-2xl font-semibold text-neutral-950 dark:text-white tabular-nums">
                       ₹{estimatedTotal.toLocaleString("en-IN")}
                     </div>
                   </div>
@@ -1917,117 +2018,48 @@ const productSchema = product ? {
                 {/* Slot Availability Banner & Direct Confirmation / Check Availability */}
                 {availabilityChecked && isAvailableForDates ? (
                   <div className="space-y-3">
-                    <div className="p-3 rounded-xl bg-primary/10 border border-primary/25 text-primary text-xs font-bold flex items-center gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
-                      <span>Available on your selected dates!</span>
+                    <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-800 dark:text-emerald-300 text-xs font-bold flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-700 dark:text-emerald-400 shrink-0" aria-hidden="true" />
+                      <span>Available on your selected dates.</span>
                     </div>
                     <div className="flex items-center justify-between flex-wrap gap-3 pt-1">
-                      {/* Circular Button with Image 2 Animated Swoosh & Protruding Tick + Clickable Terms Text */}
+                      {/* Accessible Monochrome Terms Checkbox + Agreement Trigger */}
                       <div className="flex items-center gap-2.5 select-none py-1">
                         <button
                           type="button"
                           role="checkbox"
                           aria-checked={termsAccepted}
                           onClick={() => setTermsAccepted((prev) => !prev)}
-                          className="relative flex h-7 w-7 items-center justify-center cursor-pointer transition-transform active:scale-90 focus:outline-hidden group"
+                          className="relative flex h-9 w-9 -m-1.5 items-center justify-center cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white rounded-md"
                           aria-label="Toggle terms and conditions acceptance"
                         >
-                          <AnimatePresence mode="wait">
-                            {termsAccepted ? (
-                              <motion.svg
-                                key="checked-swoosh-icon-right"
-                                width="28"
-                                height="28"
-                                viewBox="0 0 40 40"
-                                className="overflow-visible shrink-0 drop-shadow-xs text-emerald-600 dark:text-emerald-400"
-                                initial={{ scale: 0.5, rotate: -30, opacity: 0 }}
-                                animate={{ scale: 1, rotate: 0, opacity: 1 }}
-                                exit={{ scale: 0.5, rotate: -30, opacity: 0 }}
-                                transition={{ type: "spring", stiffness: 450, damping: 20 }}
-                              >
-                                <motion.path
-                                  d="M 28 8.5 A 13.5 13.5 0 0 0 11.5 29.5"
-                                  stroke="currentColor"
-                                  strokeWidth="3.2"
-                                  strokeLinecap="round"
-                                  fill="none"
-                                  initial={{ pathLength: 0 }}
-                                  animate={{ pathLength: 1 }}
-                                  transition={{ duration: 0.35, ease: "easeOut" }}
-                                />
-                                <motion.polygon
-                                  points="6,31.5 15,25 14,35"
-                                  fill="currentColor"
-                                  initial={{ scale: 0 }}
-                                  animate={{ scale: 1 }}
-                                  transition={{ delay: 0.12, duration: 0.2 }}
-                                />
-                                <motion.path
-                                  d="M 16 33.5 A 13.5 13.5 0 0 0 32.5 22"
-                                  stroke="currentColor"
-                                  strokeWidth="3.2"
-                                  strokeLinecap="round"
-                                  fill="none"
-                                  initial={{ pathLength: 0 }}
-                                  animate={{ pathLength: 1 }}
-                                  transition={{ duration: 0.3, ease: "easeOut" }}
-                                />
-                                <motion.path
-                                  d="M 11.5 21 L 18 27.5 L 34.5 8"
-                                  stroke="currentColor"
-                                  strokeWidth="4.5"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  fill="none"
-                                  initial={{ pathLength: 0 }}
-                                  animate={{ pathLength: 1 }}
-                                  transition={{
-                                    type: "spring",
-                                    stiffness: 420,
-                                    damping: 22,
-                                    delay: 0.08,
-                                  }}
-                                />
-                              </motion.svg>
-                            ) : (
-                              <motion.svg
-                                key="unchecked-circle-right"
-                                width="28"
-                                height="28"
-                                viewBox="0 0 40 40"
-                                className="overflow-visible shrink-0"
-                                initial={{ scale: 0.8, opacity: 0 }}
-                                animate={{ scale: 1, opacity: 1 }}
-                                exit={{ scale: 0.8, opacity: 0 }}
-                              >
-                                <circle
-                                  cx="20"
-                                  cy="20"
-                                  r="13.5"
-                                  stroke="currentColor"
-                                  strokeWidth="2.5"
-                                  fill="none"
-                                  className="text-neutral-400 dark:text-neutral-500 group-hover:text-neutral-600 dark:group-hover:text-neutral-300 transition-colors"
-                                />
-                              </motion.svg>
+                          <span
+                            aria-hidden="true"
+                            className={cn(
+                              "flex h-5 w-5 items-center justify-center rounded-[5px] border transition-colors",
+                              termsAccepted
+                                ? "bg-neutral-950 border-neutral-950 text-white dark:bg-white dark:border-white dark:text-neutral-950"
+                                : "border-neutral-400 dark:border-neutral-600 bg-white dark:bg-[#1E1E1E]"
                             )}
-                          </AnimatePresence>
+                          >
+                            {termsAccepted && <Check className="h-3.5 w-3.5 stroke-[2]" />}
+                          </span>
                         </button>
 
                         <button
                           type="button"
                           onClick={() => setShowTermsModal(true)}
-                          className="text-left text-xs sm:text-[13px] font-medium text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors cursor-pointer group flex items-center gap-1.5 focus:outline-hidden"
+                          className="text-left text-xs sm:text-[13px] font-medium text-neutral-900 dark:text-neutral-100 hover:text-neutral-700 dark:hover:text-neutral-300 transition-colors cursor-pointer group flex items-center gap-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white rounded"
                         >
                           <span
                             className={cn(
-                              "underline decoration-red-500/70 dark:decoration-red-400/70 group-hover:decoration-red-700 dark:group-hover:decoration-red-300 transition-all",
+                              "underline decoration-neutral-400 dark:decoration-neutral-500 group-hover:decoration-neutral-950 dark:group-hover:decoration-white transition-colors",
                               termsAccepted ? "font-semibold" : "font-medium"
                             )}
                           >
                             T&C will apply
                           </span>
-                          <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-red-500/10 text-red-600 dark:text-red-400 group-hover:bg-red-500/20 transition-colors">
+                          <span className="text-[11px] px-1.5 py-0.5 rounded-md bg-neutral-200/80 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 group-hover:bg-neutral-300 dark:group-hover:bg-neutral-700 transition-colors">
                             view
                           </span>
                         </button>
@@ -2037,18 +2069,18 @@ const productSchema = product ? {
                         type="button"
                         onClick={handleProceedToCheckout}
                         disabled={categoryRestriction?.restricted}
-                        className="py-1.5 sm:py-2 px-4 rounded-full font-semibold text-xs sm:text-sm shadow-xs transition-all duration-200 inline-flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 bg-neutral-950 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-100 min-h-[36px]"
+                        className="py-2 px-4 rounded-full font-semibold text-xs sm:text-sm shadow-xs transition-colors inline-flex items-center justify-center gap-1.5 cursor-pointer bg-neutral-950 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-200 min-h-[40px]"
                       >
-                        <ShoppingBag className="h-3.5 w-3.5 shrink-0" />
+                        <ShoppingBag className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                         <span>Confirm Booking & Rent (₹{estimatedTotal.toLocaleString("en-IN")})</span>
                       </Button>
                     </div>
                   </div>
                 ) : availabilityChecked && isAvailableForDates === false ? (
                   <div className="space-y-3">
-                    <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs font-bold flex items-center justify-between gap-2 flex-wrap">
+                    <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/25 text-red-700 dark:text-red-400 text-xs font-bold flex items-center justify-between gap-2 flex-wrap">
                       <div className="flex items-center gap-2">
-                        <CalendarX className="h-4 w-4 shrink-0" />
+                        <CalendarX className="h-4 w-4 shrink-0" aria-hidden="true" />
                         <span>{availabilityMessage}</span>
                       </div>
                       <LatticeLoader
@@ -2063,7 +2095,7 @@ const productSchema = product ? {
                         type="button"
                         onClick={handleCheckAvailability}
                         disabled={isCheckingAvailability}
-                        className="py-2 px-4 rounded-xl font-semibold text-xs bg-secondary hover:bg-secondary/80 text-foreground transition-all cursor-pointer inline-flex items-center justify-center gap-1.5 min-h-[36px]"
+                        className="py-2 px-4 rounded-xl font-semibold text-xs bg-neutral-200 hover:bg-neutral-300 text-neutral-950 dark:bg-neutral-800 dark:hover:bg-neutral-700 dark:text-white transition-colors cursor-pointer inline-flex items-center justify-center gap-1.5 min-h-[40px]"
                       >
                         {isCheckingAvailability ? (
                           <LatticeLoader
@@ -2076,7 +2108,7 @@ const productSchema = product ? {
                           />
                         ) : (
                           <>
-                            <CalendarCheck className="h-3.5 w-3.5 shrink-0" />
+                            <CalendarCheck className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                             <span>Re-check Availability</span>
                           </>
                         )}
@@ -2090,7 +2122,7 @@ const productSchema = product ? {
                       id="check-availability-action-btn"
                       onClick={handleCheckAvailability}
                       disabled={isCheckingAvailability || categoryRestriction?.restricted}
-                      className="py-2 px-4.5 rounded-full font-semibold text-xs sm:text-sm shadow-xs transition-all duration-200 inline-flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 bg-neutral-950 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-100 disabled:opacity-90 disabled:cursor-not-allowed min-h-[38px]"
+                      className="py-2 px-4.5 rounded-full font-semibold text-xs sm:text-sm shadow-xs transition-colors inline-flex items-center justify-center gap-1.5 cursor-pointer bg-neutral-950 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-200 disabled:opacity-70 disabled:cursor-not-allowed min-h-[40px]"
                     >
                       {isCheckingAvailability ? (
                         <LatticeLoader
@@ -2103,7 +2135,7 @@ const productSchema = product ? {
                         />
                       ) : (
                         <>
-                          <CalendarCheck className="h-3.5 w-3.5 shrink-0" />
+                          <CalendarCheck className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                           <span>CHECK AVAILABILITY</span>
                         </>
                       )}
@@ -2113,175 +2145,113 @@ const productSchema = product ? {
               </div>
             </div>
 
-            {/* 3. Product Details & Book Section (Mobile/Tablet: 2nd after check availability (order-3), Desktop: Left Column under Gallery (order-2)) */}
+            {/* 3. Product Overview & BOOK NOW Section */}
             <div className="order-3 lg:order-2 lg:col-span-6 lg:col-start-1 lg:row-start-2 min-w-0 w-full">
-              <div className="relative rounded-2xl sm:rounded-3xl border border-neutral-300/80 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E] pt-5 sm:pt-6 p-5 sm:p-6 shadow-xs space-y-5 text-left">
+              <div className="relative rounded-2xl sm:rounded-3xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] pt-5 sm:pt-6 p-5 sm:p-6 shadow-xs space-y-5 text-left">
                 <div className="absolute -top-3 left-4 px-2 bg-white dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
-                  <Info className="h-3.5 w-3.5 text-primary" />
-                  <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
+                  <Info className="h-3.5 w-3.5 text-neutral-700 dark:text-neutral-300 stroke-[1.75]" aria-hidden="true" />
+                  <span className="text-xs sm:text-[13px] font-semibold text-neutral-950 dark:text-white">
                     Product Overview
                   </span>
                 </div>
-                {/* 1. Product Description moved to top of this section */}
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  {product.description ||
-                    `Capture stunning photos and videos with the ${product.title}. Perfect for events, travel and professional shoots.`}
+                {/* Product Description */}
+                <p className="text-sm text-neutral-700 dark:text-neutral-300 leading-relaxed">
+                  {product.description || "Verified equipment available for rent on paYent."}
                 </p>
 
-                {/* 2. Price Display */}
+                {/* Price Display */}
                 <div className="flex items-center justify-between gap-3 flex-wrap">
                   <div className="flex items-baseline gap-1.5">
-                    <span className="text-3xl sm:text-4xl font-black text-foreground font-display font-mono">
+                    <span className="text-3xl sm:text-4xl font-semibold text-neutral-950 dark:text-white font-display tabular-nums">
                       ₹{(Number(product.price) || 0).toLocaleString("en-IN")}
                     </span>
-                    <span className="text-sm font-semibold text-muted-foreground">/ day</span>
+                    <span className="text-sm font-semibold text-neutral-600 dark:text-neutral-400">/ day</span>
                   </div>
-                  <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary border border-primary/20 text-xs font-semibold">
-                    <span className="h-2 w-2 rounded-full bg-primary shrink-0 animate-pulse" />
+                  <div
+                    className={cn(
+                      "flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-semibold",
+                      product.available
+                        ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/25"
+                        : "bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/25"
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "h-2 w-2 rounded-full shrink-0",
+                        product.available ? "bg-emerald-600 dark:bg-emerald-400" : "bg-rose-600 dark:bg-rose-400"
+                      )}
+                    />
                     <span>{product.available ? "Available for Rent" : "Currently Reserved"}</span>
                   </div>
                 </div>
 
-                {/* 3. Condition, Location, Lender all on one line */}
-                <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pt-3 border-t border-border/60 text-xs sm:text-sm">
-                  <div className="flex items-center gap-1.5 text-foreground">
-                    <ShieldCheck className="h-4 w-4 text-primary shrink-0" />
-                    <span className="font-medium text-muted-foreground">Condition:</span>
-                    <span className="font-bold">{(product as any).condition || "Like New"}</span>
+                {/* Condition, Location, Lender */}
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pt-3 border-t border-neutral-200 dark:border-neutral-800 text-xs sm:text-sm">
+                  <div className="flex items-center gap-1.5 text-neutral-950 dark:text-white">
+                    <ShieldCheck className="h-4 w-4 text-neutral-700 dark:text-neutral-300 shrink-0" aria-hidden="true" />
+                    <span className="font-medium text-neutral-600 dark:text-neutral-400">Condition:</span>
+                    <span className="font-bold">{product.condition || "Like New"}</span>
                   </div>
 
-                  <span className="hidden sm:inline text-neutral-300 dark:text-neutral-700">•</span>
+                  <span className="hidden sm:inline text-neutral-300 dark:text-neutral-700" aria-hidden="true">•</span>
 
-                  <div className="flex items-center gap-1.5 text-foreground">
-                    <MapPin className="h-4 w-4 text-primary shrink-0" />
-                    <span className="font-medium text-muted-foreground">Location:</span>
-                    <span className="font-bold">{formatOwnerAddress(product) || "Bengaluru"}</span>
+                  <div className="flex items-center gap-1.5 text-neutral-950 dark:text-white">
+                    <MapPin className="h-4 w-4 text-neutral-700 dark:text-neutral-300 shrink-0" aria-hidden="true" />
+                    <span className="font-medium text-neutral-600 dark:text-neutral-400">Location:</span>
+                    <span className="font-bold">{formatOwnerAddress(product)}</span>
                   </div>
 
-                  <span className="hidden sm:inline text-neutral-300 dark:text-neutral-700">•</span>
+                  <span className="hidden sm:inline text-neutral-300 dark:text-neutral-700" aria-hidden="true">•</span>
 
-                  <div className="flex items-center gap-1.5 text-foreground">
-                    <User className="h-4 w-4 text-primary shrink-0" />
-                    <span className="font-medium text-muted-foreground">Lender:</span>
-                    <span className="font-bold">{product.owner?.name || "Arun Kumar"}</span>
-                    <CheckCircle2 className="h-3.5 w-3.5 text-primary fill-primary/20 shrink-0" />
+                  <div className="flex items-center gap-1.5 text-neutral-950 dark:text-white">
+                    <User className="h-4 w-4 text-neutral-700 dark:text-neutral-300 shrink-0" aria-hidden="true" />
+                    <span className="font-medium text-neutral-600 dark:text-neutral-400">Lender:</span>
+                    <span className="font-bold">
+                      {product.owner?.name || product.ownerName || product.owner_name || "Verified Lender"}
+                    </span>
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-400 shrink-0" aria-hidden="true" />
                   </div>
                 </div>
 
                 {/* Action Row: Terms and Conditions Checkbox & BOOK NOW */}
-                <div className="pt-3 flex items-center justify-between flex-wrap gap-3 border-t border-border/40 mt-1">
-                  {/* Circular Button with Image 2 Animated Swoosh & Protruding Tick + Clickable Terms Text */}
+                <div className="pt-3 flex items-center justify-between flex-wrap gap-3 border-t border-neutral-200 dark:border-neutral-800 mt-1">
                   <div className="flex items-center gap-2.5 select-none py-1">
-                    {/* Circle Toggle Button: Animates to Image 2 curved arrow + protruding tick when active */}
                     <button
                       type="button"
                       role="checkbox"
                       aria-checked={termsAccepted}
                       onClick={() => setTermsAccepted((prev) => !prev)}
-                      className="relative flex h-7 w-7 items-center justify-center cursor-pointer transition-transform active:scale-90 focus:outline-hidden group"
+                      className="relative flex h-9 w-9 -m-1.5 items-center justify-center cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white rounded-md"
                       aria-label="Toggle terms and conditions acceptance"
                     >
-                      <AnimatePresence mode="wait">
-                        {termsAccepted ? (
-                          <motion.svg
-                            key="checked-swoosh-icon"
-                            width="28"
-                            height="28"
-                            viewBox="0 0 40 40"
-                            className="overflow-visible shrink-0 drop-shadow-xs text-emerald-600 dark:text-emerald-400"
-                            initial={{ scale: 0.5, rotate: -30, opacity: 0 }}
-                            animate={{ scale: 1, rotate: 0, opacity: 1 }}
-                            exit={{ scale: 0.5, rotate: -30, opacity: 0 }}
-                            transition={{ type: "spring", stiffness: 450, damping: 20 }}
-                          >
-                            {/* Upper-left circular arrow arc */}
-                            <motion.path
-                              d="M 28 8.5 A 13.5 13.5 0 0 0 11.5 29.5"
-                              stroke="currentColor"
-                              strokeWidth="3.2"
-                              strokeLinecap="round"
-                              fill="none"
-                              initial={{ pathLength: 0 }}
-                              animate={{ pathLength: 1 }}
-                              transition={{ duration: 0.35, ease: "easeOut" }}
-                            />
-                            {/* Arrowhead at bottom left pointing left */}
-                            <motion.polygon
-                              points="6,31.5 15,25 14,35"
-                              fill="currentColor"
-                              initial={{ scale: 0 }}
-                              animate={{ scale: 1 }}
-                              transition={{ delay: 0.12, duration: 0.2 }}
-                            />
-                            {/* Lower-right arc */}
-                            <motion.path
-                              d="M 16 33.5 A 13.5 13.5 0 0 0 32.5 22"
-                              stroke="currentColor"
-                              strokeWidth="3.2"
-                              strokeLinecap="round"
-                              fill="none"
-                              initial={{ pathLength: 0 }}
-                              animate={{ pathLength: 1 }}
-                              transition={{ duration: 0.3, ease: "easeOut" }}
-                            />
-                            {/* Bold checkmark extending OUTSIDE the circular perimeter */}
-                            <motion.path
-                              d="M 11.5 21 L 18 27.5 L 34.5 8"
-                              stroke="currentColor"
-                              strokeWidth="4.5"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              fill="none"
-                              initial={{ pathLength: 0 }}
-                              animate={{ pathLength: 1 }}
-                              transition={{
-                                type: "spring",
-                                stiffness: 420,
-                                damping: 22,
-                                delay: 0.08,
-                              }}
-                            />
-                          </motion.svg>
-                        ) : (
-                          <motion.svg
-                            key="unchecked-circle"
-                            width="28"
-                            height="28"
-                            viewBox="0 0 40 40"
-                            className="overflow-visible shrink-0"
-                            initial={{ scale: 0.8, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.8, opacity: 0 }}
-                          >
-                            <circle
-                              cx="20"
-                              cy="20"
-                              r="13.5"
-                              stroke="currentColor"
-                              strokeWidth="2.5"
-                              fill="none"
-                              className="text-neutral-400 dark:text-neutral-500 group-hover:text-neutral-600 dark:group-hover:text-neutral-300 transition-colors"
-                            />
-                          </motion.svg>
+                      <span
+                        aria-hidden="true"
+                        className={cn(
+                          "flex h-5 w-5 items-center justify-center rounded-[5px] border transition-colors",
+                          termsAccepted
+                            ? "bg-neutral-950 border-neutral-950 text-white dark:bg-white dark:border-white dark:text-neutral-950"
+                            : "border-neutral-400 dark:border-neutral-600 bg-white dark:bg-[#1E1E1E]"
                         )}
-                      </AnimatePresence>
+                      >
+                        {termsAccepted && <Check className="h-3.5 w-3.5 stroke-[2]" />}
+                      </span>
                     </button>
 
                     {/* Text: Clicking opens the Terms & Conditions popup modal */}
                     <button
                       type="button"
                       onClick={() => setShowTermsModal(true)}
-                      className="text-left text-xs sm:text-[13px] font-medium text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors cursor-pointer group flex items-center gap-1.5 focus:outline-hidden"
+                      className="text-left text-xs sm:text-[13px] font-medium text-neutral-900 dark:text-neutral-100 hover:text-neutral-700 dark:hover:text-neutral-300 transition-colors cursor-pointer group flex items-center gap-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white rounded"
                     >
                       <span
                         className={cn(
-                          "underline decoration-red-500/70 dark:decoration-red-400/70 group-hover:decoration-red-700 dark:group-hover:decoration-red-300 transition-all font-medium",
+                          "underline decoration-neutral-400 dark:decoration-neutral-500 group-hover:decoration-neutral-950 dark:group-hover:decoration-white transition-colors",
                           termsAccepted ? "font-semibold" : "font-medium"
                         )}
                       >
                         T&C will apply
                       </span>
-                      <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-red-500/10 text-red-600 dark:text-red-400 group-hover:bg-red-500/20 transition-colors">
+                      <span className="text-[11px] px-1.5 py-0.5 rounded-md bg-neutral-200/80 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 group-hover:bg-neutral-300 dark:group-hover:bg-neutral-700 transition-colors">
                         view
                       </span>
                     </button>
@@ -2292,10 +2262,10 @@ const productSchema = product ? {
                     id="product-details-book-now-btn"
                     onClick={handleBookNowAction}
                     disabled={categoryRestriction?.restricted || isCheckingAvailability}
-                    className={`py-2 px-4 rounded-full font-semibold text-xs sm:text-sm shadow-xs transition-all duration-200 inline-flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 min-h-[38px] ${
+                    className={`py-2 px-4 rounded-full font-semibold text-xs sm:text-sm shadow-xs transition-colors inline-flex items-center justify-center gap-1.5 cursor-pointer min-h-[40px] ${
                       categoryRestriction?.restricted
-                        ? "bg-amber-900/40 text-amber-300 border border-amber-500/30 cursor-not-allowed opacity-80"
-                        : "bg-neutral-950 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-100"
+                        ? "bg-amber-900/20 text-amber-800 dark:text-amber-300 border border-amber-500/30 cursor-not-allowed opacity-80"
+                        : "bg-neutral-950 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-200"
                     }`}
                   >
                     {isCheckingAvailability ? (
@@ -2309,8 +2279,8 @@ const productSchema = product ? {
                       />
                     ) : (
                       <>
-                        <ShoppingBag className="h-3.5 w-3.5 shrink-0" />
-                        <span>BOOK NOW</span>
+                        <ShoppingBag className="h-3.5 w-3.5 shrink-0 stroke-[1.75]" aria-hidden="true" />
+                        <span>Book Now</span>
                       </>
                     )}
                   </Button>
@@ -2319,11 +2289,10 @@ const productSchema = product ? {
             </div>
           </section>
 
-          {/* 2. RELATED PRODUCTS (Left-aligned title with overlapping details on image) */}
-          <section className="space-y-4 sm:space-y-6 pt-2">
-            <div className="flex items-center justify-start gap-2.5">
-              <span className="h-2 w-2 rounded-full bg-primary" />
-              <h2 className="text-lg sm:text-2xl font-extrabold text-foreground tracking-tight font-display">
+          {/* 2. RELATED PRODUCTS (Unified Storefront Card Grid: 2x2 Mobile, 4 cols Desktop) */}
+          <section className="space-y-4 sm:space-y-5 pt-2">
+            <div className="flex items-center justify-between gap-2.5">
+              <h2 className="text-lg sm:text-2xl font-semibold text-neutral-950 dark:text-white tracking-tight font-display">
                 Related Products
               </h2>
             </div>
@@ -2335,70 +2304,17 @@ const productSchema = product ? {
                   type="button"
                   onClick={() => setRelatedCarouselPage((p) => Math.max(0, p - 1))}
                   disabled={relatedCarouselPage === 0}
-                  className="absolute -left-2.5 sm:-left-5 top-1/2 -translate-y-1/2 z-10 p-1.5 sm:p-2.5 rounded-full bg-card/90 dark:bg-[#1E1E1E]/90 backdrop-blur-md border border-border shadow-md hover:bg-secondary disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer transition-all"
+                  className="hidden sm:flex absolute -left-4 top-1/2 -translate-y-1/2 z-10 h-10 w-10 items-center justify-center rounded-full bg-white/95 dark:bg-[#1E1E1E]/95 backdrop-blur-md border border-neutral-200 dark:border-neutral-800 shadow-md hover:bg-neutral-100 dark:hover:bg-neutral-800 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
                   aria-label="Previous related products"
                 >
-                  <ChevronLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-foreground" />
+                  <ChevronLeft className="h-4 w-4 text-neutral-900 dark:text-white" aria-hidden="true" />
                 </button>
               )}
 
-              {/* 3 Related Product Cards on Mobile (1 row of 3) / 4 on Desktop */}
-              <div className="grid grid-cols-3 sm:grid-cols-2 lg:grid-cols-4 gap-1.5 xs:gap-2 sm:gap-4 lg:gap-5">
-                {displayedRelated.map((rel, idx) => (
-                  <Link
-                    key={rel.id}
-                    to="/payent/products/$id"
-                    params={{ id: rel.id }}
-                    className={cn(
-                      "group relative aspect-[4/5] xs:aspect-square sm:aspect-[4/3] rounded-xl sm:rounded-3xl overflow-hidden bg-neutral-950 border border-neutral-800/80 hover:border-primary/50 shadow-sm hover:shadow-xl transition-all block text-left",
-                      idx === 3 && "hidden sm:block"
-                    )}
-                  >
-                    {/* Edge-to-Edge Product Image */}
-                    <img
-                      src={rel.image || "/brand/payent-logo-icon.png"}
-                      alt={rel.title}
-                      loading="lazy"
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src =
-                          "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=600&auto=format&fit=crop&q=80";
-                      }}
-                    />
-
-                    {/* Smooth dark gradient overlay for text readability */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/50 to-transparent pointer-events-none" />
-
-                    {/* Overlap: Top Rating Badge */}
-                    <div className="absolute top-1.5 right-1.5 sm:top-3 sm:right-3 flex items-center gap-0.5 sm:gap-1 px-1.5 py-0.5 sm:px-2.5 sm:py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/15 text-[8.5px] xs:text-[9.5px] sm:text-[11px] font-bold text-amber-400 shadow-sm pointer-events-none">
-                      <Star className="h-2 w-2 sm:h-3 sm:w-3 fill-amber-400 text-amber-400 shrink-0" />
-                      <span>{(rel.rating != null ? Number(rel.rating) : 4.7).toFixed(1)}</span>
-                      <span className="hidden sm:inline text-white/60 font-normal text-[10px]">({rel.reviews || 84})</span>
-                    </div>
-
-                    {/* Overlap: Bottom Details */}
-                    <div className="absolute inset-x-0 bottom-0 p-1.5 xs:p-2 sm:p-4 space-y-0.5 sm:space-y-1">
-                      <div>
-                        <h3 className="font-bold text-[10px] xs:text-[11.5px] sm:text-base text-white group-hover:text-primary transition-colors truncate drop-shadow-sm leading-tight">
-                          {rel.title}
-                        </h3>
-                        <p className="text-[8px] xs:text-[9px] sm:text-xs text-neutral-300 capitalize truncate leading-none">
-                          {rel.category || "Gear"}
-                        </p>
-                      </div>
-
-                      <div className="flex items-center justify-between pt-0.5 sm:pt-1.5 border-t border-white/15">
-                        <span className="font-extrabold text-[9.5px] xs:text-[11px] sm:text-sm text-white font-mono drop-shadow-sm leading-tight">
-                          ₹{(Number(rel.price) || 0).toLocaleString("en-IN")}{" "}
-                          <span className="text-[7.5px] xs:text-[8.5px] sm:text-[11px] text-neutral-300 font-normal font-sans">/ day</span>
-                        </span>
-                        <span className="hidden sm:inline-flex text-[11px] font-semibold text-primary items-center gap-1 drop-shadow-sm">
-                          <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-                          Available
-                        </span>
-                      </div>
-                    </div>
-                  </Link>
+              {/* 4 Related Product Cards (2x2 on Mobile / 4 on Desktop) */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-5">
+                {displayedRelated.map((rel) => (
+                  <RentalProductCard key={rel.id} product={rel} />
                 ))}
               </div>
 
@@ -2408,32 +2324,31 @@ const productSchema = product ? {
                   type="button"
                   onClick={() => setRelatedCarouselPage((p) => p + 1)}
                   disabled={(relatedCarouselPage + 1) * relatedPageSize >= relatedProductsList.length}
-                  className="absolute -right-2.5 sm:-right-5 top-1/2 -translate-y-1/2 z-10 p-1.5 sm:p-2.5 rounded-full bg-card/90 dark:bg-[#1E1E1E]/90 backdrop-blur-md border border-border shadow-md hover:bg-secondary disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer transition-all"
+                  className="hidden sm:flex absolute -right-4 top-1/2 -translate-y-1/2 z-10 h-10 w-10 items-center justify-center rounded-full bg-white/95 dark:bg-[#1E1E1E]/95 backdrop-blur-md border border-neutral-200 dark:border-neutral-800 shadow-md hover:bg-neutral-100 dark:hover:bg-neutral-800 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
                   aria-label="Next related products"
                 >
-                  <ChevronRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-foreground" />
+                  <ChevronRight className="h-4 w-4 text-neutral-900 dark:text-white" aria-hidden="true" />
                 </button>
               )}
             </div>
           </section>
 
-          {/* 3. CUSTOMER REVIEWS (Left-aligned title with modern Payent theme card) */}
+          {/* 3. CUSTOMER REVIEWS (Monochrome Storefront Surface) */}
           <section id="customer-reviews-section" className="space-y-6 pt-2">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-left">
               <div className="flex items-center gap-2.5">
-                <span className="h-2 w-2 rounded-full bg-primary" />
-                <h2 className="text-xl sm:text-2xl font-extrabold text-foreground tracking-tight font-display">
+                <h2 className="text-xl sm:text-2xl font-semibold text-neutral-950 dark:text-white tracking-tight font-display">
                   Customer Reviews
                 </h2>
-                <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-secondary text-muted-foreground">
+                <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-neutral-200/80 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 tabular-nums">
                   {genuineReviews.length} {genuineReviews.length === 1 ? "review" : "reviews"}
                 </span>
               </div>
               <Link
                 to="/reviews"
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-neutral-950 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-100 text-xs sm:text-sm font-bold shadow-sm active:scale-95 transition-all self-start sm:self-auto cursor-pointer"
+                className="inline-flex items-center gap-2 min-h-[40px] px-4 py-2 rounded-full bg-neutral-950 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-200 text-xs sm:text-sm font-semibold shadow-xs transition-colors self-start sm:self-auto cursor-pointer"
               >
-                <Sparkles className="h-3.5 w-3.5 text-primary" />
+                <MessageSquareQuote className="h-3.5 w-3.5" aria-hidden="true" />
                 <span>Write a Review</span>
               </Link>
             </div>
@@ -2446,7 +2361,7 @@ const productSchema = product ? {
                   return (
                     <div
                       key={rev.id}
-                      className="p-6 rounded-3xl bg-white dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 shadow-xs space-y-3.5 flex flex-col justify-between transition-all hover:border-primary/40"
+                      className="p-6 rounded-3xl bg-white dark:bg-[#1E1E1E] border border-neutral-200 dark:border-neutral-800 shadow-xs space-y-3.5 flex flex-col justify-between transition-colors hover:border-neutral-400 dark:hover:border-neutral-600"
                     >
                       <div className="space-y-3.5">
                         <div className="flex items-center justify-between gap-3">
@@ -2455,18 +2370,18 @@ const productSchema = product ? {
                               <img
                                 src={photo}
                                 alt={rev.userName}
-                                className="h-11 w-11 rounded-full object-cover border border-primary/20 shadow-xs shrink-0"
+                                className="h-11 w-11 rounded-full object-cover border border-neutral-200 dark:border-neutral-700 shadow-xs shrink-0"
                               />
                             ) : (
-                              <div className="h-11 w-11 rounded-full bg-primary/10 text-primary font-bold flex items-center justify-center border border-primary/20 shadow-xs shrink-0 text-sm">
+                              <div className="h-11 w-11 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-white font-bold flex items-center justify-center border border-neutral-200 dark:border-neutral-700 shadow-xs shrink-0 text-sm">
                                 {(rev.userName || "U").charAt(0).toUpperCase()}
                               </div>
                             )}
                             <div className="min-w-0">
-                              <h4 className="font-bold text-sm text-foreground truncate">{rev.userName}</h4>
+                              <h3 className="font-bold text-sm text-neutral-950 dark:text-white truncate">{rev.userName}</h3>
                               {rev.isVerified && (
-                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-primary">
-                                  <CheckCircle2 className="h-2.5 w-2.5" />
+                                <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+                                  <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
                                   <span>Verified Rental</span>
                                 </span>
                               )}
@@ -2482,15 +2397,16 @@ const productSchema = product ? {
                                     ? "fill-amber-400 text-amber-400"
                                     : "fill-neutral-200 text-neutral-200 dark:fill-neutral-800 dark:text-neutral-800"
                                 )}
+                                aria-hidden="true"
                               />
                             ))}
                           </div>
                         </div>
-                        <p className="text-xs text-muted-foreground leading-relaxed italic">
+                        <p className="text-xs text-neutral-700 dark:text-neutral-300 leading-relaxed">
                           &ldquo;{rev.comment}&rdquo;
                         </p>
                       </div>
-                      <div className="text-[11px] text-muted-foreground/75 font-medium pt-2 border-t border-border/40">
+                      <div className="text-xs text-neutral-600 dark:text-neutral-400 font-medium pt-2 border-t border-neutral-200 dark:border-neutral-800">
                         {formatRelativeTime(rev.createdAt)}
                       </div>
                     </div>
@@ -2498,13 +2414,10 @@ const productSchema = product ? {
                 })}
               </div>
             ) : (
-              <div className="w-full rounded-3xl border border-black/10 dark:border-white/10 bg-white/80 dark:bg-[#1E1E1E]/90 backdrop-blur-sm p-8 sm:p-12 text-center flex flex-col items-center justify-center space-y-5 shadow-xs relative overflow-hidden">
-                {/* Subtle ambient aura */}
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-80 h-28 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
-
+              <div className="w-full rounded-3xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] p-8 sm:p-12 text-center flex flex-col items-center justify-center space-y-5 shadow-xs">
                 {/* Product Preview Card */}
                 {product && (
-                  <div className="flex items-center gap-3.5 px-4 py-2.5 rounded-2xl bg-neutral-100/80 dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 backdrop-blur-md max-w-sm w-full text-left">
+                  <div className="flex items-center gap-3.5 px-4 py-2.5 rounded-2xl bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 max-w-sm w-full text-left">
                     <div className="h-12 w-12 flex items-center justify-center shrink-0">
                       <img
                         src={product.image || "/brand/payent-logo-icon.png"}
@@ -2513,30 +2426,34 @@ const productSchema = product ? {
                       />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <h4 className="text-xs font-bold text-foreground truncate">{product.title}</h4>
-                      <p className="text-[11px] text-muted-foreground capitalize truncate">{product.category || "Gear"}</p>
+                      <h3 className="text-xs font-bold text-neutral-950 dark:text-white truncate">{product.title}</h3>
+                      <p className="text-xs text-neutral-600 dark:text-neutral-400 capitalize truncate">{product.category || "Gear"}</p>
                     </div>
-                    <div className="flex items-center gap-1 text-xs font-bold text-amber-500 shrink-0">
-                      <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-                      <span>{(product.rating != null ? Number(product.rating) : 4.9).toFixed(1)}</span>
+                    <div className="flex items-center gap-1 text-xs font-bold text-amber-600 dark:text-amber-400 shrink-0 tabular-nums">
+                      <Star className="h-3 w-3 fill-amber-400 text-amber-400" aria-hidden="true" />
+                      <span>
+                        {product.rating != null && Number(product.reviews || 0) > 0
+                          ? Number(product.rating).toFixed(1)
+                          : "New"}
+                      </span>
                     </div>
                   </div>
                 )}
 
                 <div className="space-y-1.5 max-w-md">
-                  <h3 className="text-base sm:text-lg font-bold text-foreground">
-                    Be the First to Review
+                  <h3 className="text-base sm:text-lg font-bold text-neutral-950 dark:text-white">
+                    No customer reviews yet
                   </h3>
-                  <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-                    Have you rented this gear through PAYENT? Share your verified feedback to help other creators in the community.
+                  <p className="text-xs sm:text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
+                    Have you rented this gear through paYent? Share verified feedback to help other renters decide.
                   </p>
                 </div>
 
                 <Link
                   to="/reviews"
-                  className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-neutral-950 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-100 text-xs sm:text-sm font-bold shadow-sm transition-all active:scale-95 cursor-pointer"
+                  className="inline-flex items-center gap-2 min-h-[40px] px-6 py-2.5 rounded-full bg-neutral-950 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-200 text-xs sm:text-sm font-semibold shadow-xs transition-colors cursor-pointer"
                 >
-                  <Sparkles className="h-4 w-4" />
+                  <MessageSquareQuote className="h-4 w-4" aria-hidden="true" />
                   <span>Write a Review</span>
                 </Link>
               </div>
@@ -2548,7 +2465,10 @@ const productSchema = product ? {
         {/* Full-Screen Photo Detail Viewer Lightbox Modal (Supports Photos & 10s Video) */}
         {isPhotoViewerOpen && (
           <div
-            className="fixed inset-0 z-50 flex flex-col items-center justify-between bg-black/95 backdrop-blur-md p-4 sm:p-6 animate-in fade-in duration-200 select-none"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="fullscreen-viewer-title"
+            className="fixed inset-0 z-50 flex flex-col items-center justify-between bg-black/95 backdrop-blur-md p-4 sm:p-6 select-none"
             onClick={() => {
               setIsPhotoViewerOpen(false);
               setIsFullscreenGridView(false);
@@ -2561,20 +2481,20 @@ const productSchema = product ? {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center gap-3 min-w-0">
-                <span className="px-3 py-1 rounded-full bg-white/10 text-xs font-semibold backdrop-blur-md border border-white/20 shrink-0 font-mono">
+                <span className="px-3 py-1 rounded-full bg-white/10 text-xs font-semibold backdrop-blur-md border border-white/20 shrink-0 tabular-nums">
                   {isFullscreenVideoActive
                     ? "Verified 10s Video"
                     : isFullscreenGridView
                     ? `All Photos (${gallery.length})`
                     : `Photo ${selectedImageIndex + 1} of ${gallery.length}`}
                 </span>
-                <h3 className="text-sm sm:text-base font-bold text-white truncate max-w-md">
+                <h3 id="fullscreen-viewer-title" className="text-sm sm:text-base font-bold text-white truncate max-w-md">
                   {product.title}
                 </h3>
               </div>
 
               <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
-                {/* Watch 10s Video Toggle button if video is available */}
+                {/* Watch 10s Video Toggle button */}
                 {activeVideoUrl && (
                   <button
                     type="button"
@@ -2583,18 +2503,18 @@ const productSchema = product ? {
                       setIsFullscreenGridView(false);
                     }}
                     className={cn(
-                      "px-3 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer backdrop-blur-md border flex items-center gap-1.5",
+                      "px-3 py-1.5 rounded-full text-xs font-semibold transition-colors cursor-pointer backdrop-blur-md border flex items-center gap-1.5",
                       isFullscreenVideoActive
-                        ? "bg-primary text-white border-primary ring-2 ring-primary/30 shadow-md"
+                        ? "bg-white text-neutral-950 border-white shadow-md"
                         : "bg-white/10 hover:bg-white/20 text-white border-white/20"
                     )}
                   >
-                    <Video className="h-3.5 w-3.5 text-primary" />
+                    <Video className="h-3.5 w-3.5" aria-hidden="true" />
                     <span>{isFullscreenVideoActive ? "Show Photos" : "10s Video"}</span>
                   </button>
                 )}
 
-                {/* Toggle Grid View to see ALL product photos at once */}
+                {/* Toggle Grid View */}
                 <button
                   type="button"
                   onClick={() => {
@@ -2602,13 +2522,13 @@ const productSchema = product ? {
                     setIsFullscreenVideoActive(false);
                   }}
                   className={cn(
-                    "px-3 py-1.5 rounded-full text-xs font-semibold text-white transition-all cursor-pointer backdrop-blur-md border flex items-center gap-1.5",
+                    "px-3 py-1.5 rounded-full text-xs font-semibold transition-colors cursor-pointer backdrop-blur-md border flex items-center gap-1.5",
                     isFullscreenGridView
-                      ? "bg-primary border-primary"
-                      : "bg-white/10 hover:bg-white/20 border-white/20"
+                      ? "bg-white text-neutral-950 border-white"
+                      : "bg-white/10 hover:bg-white/20 text-white border-white/20"
                   )}
                 >
-                  <LayoutGrid className="h-3.5 w-3.5" />
+                  <LayoutGrid className="h-3.5 w-3.5" aria-hidden="true" />
                   <span>{isFullscreenGridView ? "Single View" : "All Photos"}</span>
                 </button>
 
@@ -2619,10 +2539,10 @@ const productSchema = product ? {
                     setIsFullscreenGridView(false);
                     setIsFullscreenVideoActive(false);
                   }}
-                  className="p-2 sm:p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all cursor-pointer backdrop-blur-md border border-white/20 shadow-md"
+                  className="min-h-[40px] min-w-[40px] flex items-center justify-center p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer backdrop-blur-md border border-white/20 shadow-md"
                   aria-label="Close full screen viewer"
                 >
-                  <X className="h-5 w-5" />
+                  <X className="h-5 w-5" aria-hidden="true" />
                 </button>
               </div>
             </div>
@@ -2637,15 +2557,16 @@ const productSchema = product ? {
                 {activeVideoUrl && (
                   <button
                     type="button"
+                    aria-label="Watch 10-second verification video"
                     onClick={() => {
                       setIsFullscreenVideoActive(true);
                       setIsFullscreenGridView(false);
                     }}
                     className={cn(
-                      "group relative aspect-[4/3] rounded-2xl overflow-hidden bg-black/60 border-2 transition-all cursor-pointer shadow-lg hover:scale-[1.03] p-2 flex flex-col items-center justify-center",
+                      "group relative aspect-[4/3] rounded-2xl overflow-hidden bg-black/60 border-2 transition-colors cursor-pointer shadow-lg p-2 flex flex-col items-center justify-center",
                       isFullscreenVideoActive
-                        ? "border-primary ring-2 ring-primary/30"
-                        : "border-white/20 hover:border-primary/50"
+                        ? "border-white ring-2 ring-white/40"
+                        : "border-white/20 hover:border-white/60"
                     )}
                   >
                     <div className="relative w-full h-full rounded-xl overflow-hidden bg-black flex items-center justify-center">
@@ -2657,15 +2578,15 @@ const productSchema = product ? {
                         playsInline
                       />
                       <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-black/40">
-                        <div className="h-10 w-10 rounded-full bg-primary/90 text-white flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
-                          <Video className="h-5 w-5" />
+                        <div className="h-10 w-10 rounded-full bg-white text-neutral-950 flex items-center justify-center shadow-lg">
+                          <Video className="h-5 w-5" aria-hidden="true" />
                         </div>
-                        <span className="px-2.5 py-0.5 rounded-full bg-black/80 text-primary text-[11px] font-bold border border-primary/30">
+                        <span className="px-2.5 py-0.5 rounded-full bg-black/80 text-white text-xs font-semibold border border-white/20">
                           10s Video
                         </span>
                       </div>
                     </div>
-                    <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded-md bg-black/70 text-primary text-[10px] font-bold">
+                    <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded-md bg-black/75 text-white text-xs font-medium">
                       Video
                     </span>
                   </button>
@@ -2675,25 +2596,26 @@ const productSchema = product ? {
                   <button
                     key={idx}
                     type="button"
+                    aria-label={`Select photo ${idx + 1} of ${product.title}`}
                     onClick={() => {
                       setSelectedImageIndex(idx);
                       setIsFullscreenVideoActive(false);
                       setIsFullscreenGridView(false);
                     }}
                     className={cn(
-                      "group relative aspect-[4/3] rounded-2xl overflow-hidden bg-black/50 border-2 transition-all cursor-pointer shadow-lg hover:scale-[1.03] p-2 flex items-center justify-center",
+                      "group relative aspect-[4/3] rounded-2xl overflow-hidden bg-black/50 border-2 transition-colors cursor-pointer shadow-lg p-2 flex items-center justify-center",
                       !isFullscreenVideoActive && idx === selectedImageIndex
-                        ? "border-primary ring-2 ring-primary/30"
-                        : "border-white/20 hover:border-primary/50"
+                        ? "border-white ring-2 ring-white/40"
+                        : "border-white/20 hover:border-white/60"
                     )}
                   >
-                    <img src={src} alt="" className="w-full h-full object-contain" />
+                    <img src={src} alt={`${product.title} angle ${idx + 1}`} className="w-full h-full object-contain" />
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <span className="px-3 py-1 rounded-full bg-primary text-white text-[11px] font-bold shadow-md">
+                      <span className="px-3 py-1 rounded-full bg-white text-neutral-950 text-xs font-semibold shadow-md">
                         Photo #{idx + 1}
                       </span>
                     </div>
-                    <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded-md bg-black/70 text-white text-[10px] font-mono">
+                    <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded-md bg-black/70 text-white text-xs font-medium tabular-nums">
                       #{idx + 1}
                     </span>
                   </button>
@@ -2728,8 +2650,8 @@ const productSchema = product ? {
                         <source src={activeVideoUrl} type="video/mp4" />
                         <source src={activeVideoUrl.replace(/\.mp4$/, ".webm")} type="video/webm" />
                       </video>
-                      <div className="absolute top-3 left-3 px-3 py-1 rounded-full bg-black/70 backdrop-blur-md text-[11px] text-primary font-bold border border-primary/30 flex items-center gap-1.5 select-none pointer-events-none">
-                        <ShieldCheck className="h-3.5 w-3.5" />
+                      <div className="absolute top-3 left-3 px-3 py-1 rounded-full bg-black/75 backdrop-blur-md text-xs text-white font-semibold border border-white/20 flex items-center gap-1.5 select-none pointer-events-none">
+                        <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
                         <span>Verified 10s Inspection Video</span>
                       </div>
                     </div>
@@ -2749,10 +2671,10 @@ const productSchema = product ? {
                               e.stopPropagation();
                               setSelectedImageIndex((prev) => (prev > 0 ? prev - 1 : gallery.length - 1));
                             }}
-                            className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-black/60 hover:bg-black/90 text-white border border-white/20 transition-all cursor-pointer backdrop-blur-md shadow-xl"
+                            className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-black/60 hover:bg-black/90 text-white border border-white/20 transition-colors cursor-pointer backdrop-blur-md shadow-xl"
                             aria-label="Previous image"
                           >
-                            <ChevronLeft className="h-6 w-6" />
+                            <ChevronLeft className="h-6 w-6" aria-hidden="true" />
                           </button>
 
                           <button
@@ -2761,10 +2683,10 @@ const productSchema = product ? {
                               e.stopPropagation();
                               setSelectedImageIndex((prev) => (prev < gallery.length - 1 ? prev + 1 : 0));
                             }}
-                            className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-black/60 hover:bg-black/90 text-white border border-white/20 transition-all cursor-pointer backdrop-blur-md shadow-xl"
+                            className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-black/60 hover:bg-black/90 text-white border border-white/20 transition-colors cursor-pointer backdrop-blur-md shadow-xl"
                             aria-label="Next image"
                           >
-                            <ChevronRight className="h-6 w-6" />
+                            <ChevronRight className="h-6 w-6" aria-hidden="true" />
                           </button>
                         </>
                       )}
@@ -2772,46 +2694,46 @@ const productSchema = product ? {
                   )}
                 </div>
 
-                {/* Bottom Thumbnails Row — ALWAYS shows all product images + 10s video option! */}
+                {/* Bottom Thumbnails Row */}
                 <div
                   className="flex items-center justify-center gap-2.5 pt-2 max-w-full overflow-x-auto z-10 pb-1"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  {/* 10s Video Thumbnail Button */}
                   {activeVideoUrl && (
                     <button
                       type="button"
                       onClick={() => setIsFullscreenVideoActive(true)}
+                      aria-label="Watch 10s Inspection Video"
                       className={cn(
-                        "h-14 w-14 sm:h-16 sm:w-16 rounded-xl overflow-hidden border-2 transition-all p-1 bg-black/60 shrink-0 cursor-pointer flex flex-col items-center justify-center gap-0.5 relative group",
+                        "h-14 w-14 sm:h-16 sm:w-16 rounded-xl overflow-hidden border-2 transition-colors p-1 bg-black/60 shrink-0 cursor-pointer flex flex-col items-center justify-center gap-0.5 relative group",
                         isFullscreenVideoActive
-                          ? "border-primary ring-2 ring-primary/30 scale-105"
-                          : "border-white/20 hover:border-white/50 opacity-70 hover:opacity-100"
+                          ? "border-white ring-2 ring-white/40"
+                          : "border-white/20 hover:border-white/50 opacity-75 hover:opacity-100"
                       )}
                       title="Watch 10s Inspection Video"
                     >
-                      <Video className={cn("h-5 w-5", isFullscreenVideoActive ? "text-primary" : "text-white")} />
-                      <span className="text-[9px] font-bold text-white uppercase tracking-tight">Video</span>
+                      <Video className="h-5 w-5 text-white stroke-[1.75]" aria-hidden="true" />
+                      <span className="text-xs font-medium text-white">Video</span>
                     </button>
                   )}
 
-                  {/* Photo Thumbnails */}
                   {gallery.map((src, idx) => (
                     <button
                       key={idx}
                       type="button"
+                      aria-label={`View photo ${idx + 1} of ${product.title}`}
                       onClick={() => {
                         setIsFullscreenVideoActive(false);
                         setSelectedImageIndex(idx);
                       }}
                       className={cn(
-                        "h-14 w-14 sm:h-16 sm:w-16 rounded-xl overflow-hidden border-2 transition-all p-1 bg-black/40 shrink-0 cursor-pointer",
+                        "h-14 w-14 sm:h-16 sm:w-16 rounded-xl overflow-hidden border-2 transition-colors p-1 bg-black/40 shrink-0 cursor-pointer",
                         !isFullscreenVideoActive && idx === selectedImageIndex
-                          ? "border-primary ring-2 ring-primary/30 scale-105"
-                          : "border-white/20 opacity-60 hover:opacity-100"
+                          ? "border-white ring-2 ring-white/40"
+                          : "border-white/20 opacity-65 hover:opacity-100"
                       )}
                     >
-                      <img src={src} alt="" className="h-full w-full object-contain" />
+                      <img src={src} alt={`${product.title} thumbnail ${idx + 1}`} className="h-full w-full object-contain" />
                     </button>
                   ))}
                 </div>
@@ -2835,7 +2757,7 @@ const productSchema = product ? {
           onClose={() => setShowTermsModal(false)}
           onAccept={() => {
             setTermsAccepted(true);
-            toast.success("Terms & conditions accepted!");
+            toast.success("Terms and conditions accepted");
           }}
           productTitle={product?.title}
           isAccepted={termsAccepted}

@@ -49,14 +49,35 @@ export const getApiBase = () => {
 export const API_BASE = getApiBase();
 
 function parseApiError(data: unknown, fallback: string): string {
+  if (!data) return fallback;
+  if (typeof data === "string") return data.trim() || fallback;
+
   const obj = data as {
-    detail?: string | Array<{ msg?: string }>;
+    detail?: string | Record<string, any> | Array<{ msg?: string; message?: string }>;
     message?: string;
+    error?: string;
   };
-  if (typeof obj?.detail === "string") return obj.detail;
-  if (Array.isArray(obj?.detail) && obj.detail[0]?.msg)
-    return obj.detail[0].msg;
-  if (typeof obj?.message === "string") return obj.message;
+
+  if (typeof obj?.detail === "string" && obj.detail.trim()) return obj.detail.trim();
+
+  if (Array.isArray(obj?.detail) && obj.detail.length > 0) {
+    const first = obj.detail[0];
+    if (first && typeof first === "object") {
+      const msg = first.msg || first.message;
+      if (typeof msg === "string" && msg.trim()) return msg.trim();
+    }
+  }
+
+  if (obj?.detail && typeof obj.detail === "object" && !Array.isArray(obj.detail)) {
+    if (typeof obj.detail.message === "string" && obj.detail.message.trim()) return obj.detail.message.trim();
+    if (typeof obj.detail.error === "string" && obj.detail.error.trim()) return obj.detail.error.trim();
+    if (typeof obj.detail.msg === "string" && obj.detail.msg.trim()) return obj.detail.msg.trim();
+    if (typeof obj.detail.rejectionReason === "string" && obj.detail.rejectionReason.trim()) return obj.detail.rejectionReason.trim();
+  }
+
+  if (typeof obj?.message === "string" && obj.message.trim()) return obj.message.trim();
+  if (typeof obj?.error === "string" && obj.error.trim()) return obj.error.trim();
+
   return fallback;
 }
 
@@ -426,6 +447,7 @@ export const api = {
   },
 
   async login(email: string, password: string) {
+    const cleanEmail = (email || "").trim().toLowerCase();
     try {
       if (API_BASE) {
         const res = await fetchWithTimeout(
@@ -433,7 +455,7 @@ export const api = {
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email, password }),
+            body: JSON.stringify({ email: cleanEmail, password }),
           },
           12000
         );
@@ -446,55 +468,39 @@ export const api = {
         }
         if (res.status === 403) {
           const data = await res.json().catch(() => ({}));
-          const detail = typeof data?.detail === "object" ? data.detail : {};
+          const detail = typeof data?.detail === "object" && data?.detail !== null ? data.detail : {};
           const statusVal = detail.status || data.status || "PENDING_REVIEW";
           const err = new Error(detail.message || data.message || "Your account is currently under administrative review.");
           (err as any).status = statusVal;
           (err as any).accountStatus = statusVal;
           (err as any).rejectionReason = detail.rejectionReason || data.rejectionReason;
           (err as any).accountType = detail.accountType || data.accountType || "Payrent";
-          (err as any).email = detail.email || email;
+          (err as any).email = detail.email || cleanEmail;
           throw err;
+        }
+        if (res.status === 429) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(parseApiError(data, "Too many failed login attempts. Please try again in a few minutes."));
         }
         if (res.status === 400 || res.status === 401) {
           const data = await res.json().catch(() => ({}));
           throw new Error(parseApiError(data, "Invalid email or password."));
         }
+        if (res.status === 422) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(parseApiError(data, "Please enter a valid email address and password."));
+        }
+        if (res.status >= 500) {
+          throw new Error("Login service is temporarily unavailable. Please try again shortly.");
+        }
+        const data = await res.json().catch(() => ({}));
+        throw new Error(parseApiError(data, "Login failed. Please check your credentials and try again."));
       }
     } catch (err: unknown) {
-      const errorMsg = (err as Error)?.message || "";
-      if (
-        errorMsg.includes("Invalid") ||
-        errorMsg.includes("Incorrect") ||
-        errorMsg.includes("under review") ||
-        errorMsg.includes("not approved") ||
-        errorMsg.includes("suspended") ||
-        (err as any)?.accountStatus ||
-        (err as any)?.status === "PENDING_REVIEW" ||
-        (err as any)?.status === "REJECTED"
-      ) {
-        throw err;
-      }
+      throw err;
     }
 
-    // Backend disconnected / offline mode fallback
-    const name = email.split("@")[0] || "User";
-    const isAdmin = email.toLowerCase().includes("admin");
-    const mockUser: User = {
-      id: email,
-      fullName: name.charAt(0).toUpperCase() + name.slice(1),
-      email: email,
-      role: isAdmin ? "admin" : "customer",
-      status: "active",
-      country: "India",
-    };
-    const token = `mock-jwt-token-${Date.now()}`;
-    return {
-      success: true,
-      token,
-      role: mockUser.role,
-      user: mockUser,
-    };
+    throw new Error("Unable to connect to the login service. Please check your network connection and try again.");
   },
 
   async getAuthStatus(token?: string | null, email?: string | null, type?: string | null) {
@@ -939,7 +945,7 @@ export const api = {
 
     if (
       res.status === 401 &&
-      !url.includes("/api/login") &&
+      !url.includes("/login") &&
       !url.includes("/api/auth/refresh")
     ) {
       const newToken = await this.refreshToken();
@@ -1063,71 +1069,69 @@ export const api = {
     return getCachedOrFetch<Order[]>(
       "user_orders",
       async () => {
-        try {
-          const res = await this.fetchWithAuth(`${API_BASE}/api/orders`, {
-            method: "GET",
-            timeoutMs: 15000,
-          });
-          if (!res.ok) {
-            return storage.get<Order[]>(STORAGE_KEYS.orders, []);
-          }
-          const data = await res.json();
-          const rawOrders = Array.isArray(data) ? data : [];
-          const normalized = rawOrders.map((o: Record<string, unknown>) => {
-            const pid = String(o.productId || o.product_id || "");
-            const title = String(o.productTitle || o.product_title || "Gear Rental");
-            const img = String(
-              o.productImage ||
-                o.product_image ||
-                "",
-            );
-            const start = String(o.startDate || o.start_date || "Today");
-            const end = String(o.endDate || o.end_date || "Tomorrow");
-            const created = String(
-              o.createdAt || o.created_at || (o as any).requestDate || (o as any).request_date || "",
-            );
-            return {
-              id: String(o.id || ""),
-              productId: pid,
-              product_id: pid,
-              productTitle: title,
-              product_title: title,
-              productImage: img,
-              product_image: img,
-              startDate: start,
-              start_date: start,
-              endDate: end,
-              end_date: end,
-              total: Number(o.total || 0),
-              status: (o.status as Order["status"]) || "active",
-              category: String(o.category || ""),
-              createdAt: created,
-              created_at: created,
-              deliveryMethod: (o.deliveryMethod || o.delivery_method || "delivery") as string,
-              deliveryAddress: (o.deliveryAddress || o.delivery_address || "") as string,
-              pickupLocation: (o.pickupLocation || o.pickup_location || "") as string,
-              customLocation: (o.customLocation || o.custom_location || "") as string,
-              locationDirections: (o.locationDirections || o.location_directions || "") as string,
-              latitude: (o.latitude ?? o.location_latitude ?? null) as number | null,
-              longitude: (o.longitude ?? o.location_longitude ?? null) as number | null,
-              mapUrl: (o.mapUrl || o.map_url || "") as string,
-              locationChangeRequest: (o.locationChangeRequest || o.location_change_request || null) as any,
-              paymentStatus: String(o.paymentStatus || o.payment_status || "unpaid"),
-              payment_status: String(o.payment_status || o.paymentStatus || "unpaid"),
-              razorpayOrderId: (o.razorpayOrderId || o.razorpay_order_id || undefined) as string | undefined,
-              razorpayPaymentId: (o.razorpayPaymentId || o.razorpay_payment_id || undefined) as string | undefined,
-              refundId: (o.refundId || o.refund_id || undefined) as string | undefined,
-              refundStatus: (o.refundStatus || o.refund_status || undefined) as string | undefined,
-            };
-          }) as Order[];
-          storage.set(STORAGE_KEYS.orders, normalized);
-          return normalized;
-        } catch (err) {
-          console.warn("[API] getOrders request notice, falling back to local storage:", err);
-          return storage.get<Order[]>(STORAGE_KEYS.orders, []);
+        const res = await this.fetchWithAuth(`${API_BASE}/api/orders`, {
+          method: "GET",
+          timeoutMs: 15000,
+        });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(
+            parseApiError(errData, "Unable to load your rental bookings right now.")
+          );
         }
+        const data = await res.json();
+        const rawOrders = Array.isArray(data) ? data : [];
+        const normalized = rawOrders.map((o: Record<string, unknown>) => {
+          const pid = String(o.productId || o.product_id || "");
+          const title = String(o.productTitle || o.product_title || "Gear Rental");
+          const img = String(
+            o.productImage ||
+              o.product_image ||
+              "",
+          );
+          const start = String(o.startDate || o.start_date || "Today");
+          const end = String(o.endDate || o.end_date || "Tomorrow");
+          const created = String(
+            o.createdAt || o.created_at || (o as any).requestDate || (o as any).request_date || "",
+          );
+          return {
+            id: String(o.id || ""),
+            productId: pid,
+            product_id: pid,
+            productTitle: title,
+            product_title: title,
+            productImage: img,
+            product_image: img,
+            startDate: start,
+            start_date: start,
+            endDate: end,
+            end_date: end,
+            total: Number(o.total || 0),
+            status: (o.status as Order["status"]) || "active",
+            category: String(o.category || ""),
+            createdAt: created,
+            created_at: created,
+            deliveryMethod: (o.deliveryMethod || o.delivery_method || "delivery") as string,
+            deliveryAddress: (o.deliveryAddress || o.delivery_address || "") as string,
+            pickupLocation: (o.pickupLocation || o.pickup_location || "") as string,
+            customLocation: (o.customLocation || o.custom_location || "") as string,
+            locationDirections: (o.locationDirections || o.location_directions || "") as string,
+            latitude: (o.latitude ?? o.location_latitude ?? null) as number | null,
+            longitude: (o.longitude ?? o.location_longitude ?? null) as number | null,
+            mapUrl: (o.mapUrl || o.map_url || "") as string,
+            locationChangeRequest: (o.locationChangeRequest || o.location_change_request || null) as any,
+            paymentStatus: String(o.paymentStatus || o.payment_status || "unpaid"),
+            payment_status: String(o.payment_status || o.paymentStatus || "unpaid"),
+            razorpayOrderId: (o.razorpayOrderId || o.razorpay_order_id || undefined) as string | undefined,
+            razorpayPaymentId: (o.razorpayPaymentId || o.razorpay_payment_id || undefined) as string | undefined,
+            refundId: (o.refundId || o.refund_id || undefined) as string | undefined,
+            refundStatus: (o.refundStatus || o.refund_status || undefined) as string | undefined,
+          };
+        }) as Order[];
+        storage.set(STORAGE_KEYS.orders, normalized);
+        return normalized;
       },
-      { ttlMs: 15000, userIsolated: true, staleWhileRevalidate: true }
+      { ttlMs: 10000, userIsolated: true, staleWhileRevalidate: false }
     );
   },
 
@@ -1663,6 +1667,8 @@ export const api = {
     });
     storage.set(STORAGE_KEYS.orders, updatedOrders);
     this.invalidateCache("user_orders");
+    this.invalidateCache("user_notifications");
+    this.invalidateCache("orders");
 
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("payent_orders_updated"));
@@ -1760,6 +1766,7 @@ export const api = {
   },
 
   async getFilteredProducts(filters: {
+    q?: string;
     categories?: string;
     minPrice?: number;
     maxPrice?: number;
@@ -1769,8 +1776,11 @@ export const api = {
     startDate?: string;
     endDate?: string;
     sort?: string;
-  } = {}): Promise<Product[]> {
+    limit?: number;
+    page?: number;
+  } = {}, signal?: AbortSignal): Promise<Product[]> {
     const params = new URLSearchParams();
+    if (filters.q) params.set("q", filters.q);
     if (filters.categories) params.set("categories", filters.categories);
     if (filters.minPrice !== undefined && filters.minPrice > 0) params.set("min_price", String(filters.minPrice));
     if (filters.maxPrice !== undefined && filters.maxPrice < 10000) params.set("max_price", String(filters.maxPrice));
@@ -1780,6 +1790,8 @@ export const api = {
     if (filters.startDate) params.set("start_date", filters.startDate);
     if (filters.endDate) params.set("end_date", filters.endDate);
     if (filters.sort) params.set("sort", filters.sort);
+    if (filters.limit !== undefined && filters.limit > 0) params.set("limit", String(filters.limit));
+    if (filters.page !== undefined && filters.page > 0) params.set("page", String(filters.page));
 
     const qs = params.toString();
     const url = `${API_BASE}/api/products${qs ? `?${qs}` : ""}`;
@@ -1788,7 +1800,7 @@ export const api = {
     if (token) headers["Authorization"] = `Bearer ${token}`;
 
     try {
-      const res = await fetchWithTimeout(url, { method: "GET", headers }, 8000);
+      const res = await fetchWithTimeout(url, { method: "GET", headers, signal }, 8000);
       if (res.ok) {
         const json = await res.json();
         const raw = Array.isArray(json) ? json : json?.data || json?.products || [];
@@ -1802,6 +1814,72 @@ export const api = {
       console.warn("[API] getFilteredProducts notice:", err);
     }
     return [];
+  },
+
+  async getFilteredProductsPage(
+    filters: {
+      q?: string;
+      categories?: string;
+      minPrice?: number;
+      maxPrice?: number;
+      city?: string;
+      pincode?: string;
+      condition?: string;
+      startDate?: string;
+      endDate?: string;
+      sort?: string;
+      limit?: number;
+      page?: number;
+    } = {},
+    signal?: AbortSignal
+  ): Promise<{ items: Product[]; total: number; page: number; limit: number }> {
+    const page = Math.max(1, filters.page ?? 1);
+    const limit = Math.max(1, filters.limit ?? 8);
+    const params = new URLSearchParams();
+    if (filters.q) params.set("q", filters.q);
+    if (filters.categories) params.set("categories", filters.categories);
+    if (filters.minPrice !== undefined && filters.minPrice > 0) params.set("min_price", String(filters.minPrice));
+    if (filters.maxPrice !== undefined && filters.maxPrice < 10000) params.set("max_price", String(filters.maxPrice));
+    if (filters.city) params.set("city", filters.city);
+    if (filters.pincode) params.set("pincode", filters.pincode);
+    if (filters.condition) params.set("condition", filters.condition);
+    if (filters.startDate) params.set("start_date", filters.startDate);
+    if (filters.endDate) params.set("end_date", filters.endDate);
+    if (filters.sort) params.set("sort", filters.sort);
+    params.set("page", String(page));
+    params.set("limit", String(limit));
+
+    const url = `${API_BASE}/api/products?${params.toString()}`;
+    const token = typeof window !== "undefined" ? storage.get<string | null>(STORAGE_KEYS.token, null) : null;
+    const headers: Record<string, string> = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
+    const res = await fetchWithTimeout(url, { method: "GET", headers, signal }, 8000);
+    if (!res.ok) {
+      throw new Error(`Failed to load products (HTTP ${res.status})`);
+    }
+    const json = await res.json();
+    const raw = Array.isArray(json) ? json : json?.data || json?.products || [];
+    const normalized = Array.isArray(raw)
+      ? raw.filter((p) => !isFakeOrDeletedProduct(p)).map((p) => normalizeProductData(p))
+      : [];
+
+    const totalHeader = res.headers?.get("X-Total-Count");
+    const parsedHeader = totalHeader !== null && totalHeader !== "" ? Number(totalHeader) : NaN;
+    const hasHeaderTotal = Number.isFinite(parsedHeader) && parsedHeader >= 0;
+
+    // Client slice fallback only if an intermediary mock/proxy returns an unpaginated full list without X-Total-Count
+    const isUnpaginatedFallback = !hasHeaderTotal && normalized.length > limit;
+    const items = isUnpaginatedFallback
+      ? normalized.slice((page - 1) * limit, page * limit)
+      : normalized;
+    const total = hasHeaderTotal
+      ? parsedHeader
+      : isUnpaginatedFallback
+      ? normalized.length
+      : (page - 1) * limit + items.length;
+
+    return { items, total, page, limit };
   },
 
   async getPublicCategories() {
@@ -1819,6 +1897,10 @@ export const api = {
       },
       { ttlMs: 60000, staleWhileRevalidate: true }
     );
+  },
+
+  async getCategories() {
+    return this.getPublicCategories();
   },
 
   async createCustomProduct(token: string, productData: Product) {
@@ -1905,19 +1987,6 @@ export const api = {
     if (!res.ok) throw new Error("Failed to mark notification as read");
     this.invalidateCache("user_notifications");
     return res.json();
-  },
-
-  async rejectOrder(token: string, orderId: string, reason?: string) {
-    const res = await this.fetchWithAuth(`${API_BASE}/api/orders/${orderId}/reject`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ reason }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(parseApiError(data, "Failed to reject order"));
-    this.invalidateCache("user_notifications");
-    this.invalidateCache("orders");
-    return data;
   },
 
   async getLenderOrders(token: string) {
@@ -2413,6 +2482,109 @@ export const api = {
       return await res.json();
     } catch {
       return null;
+    }
+  },
+
+  async getRecentlyViewed(token?: string | null, email?: string | null): Promise<Product[]> {
+    if (!API_BASE) return [];
+    try {
+      const headers: Record<string, string> = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      const url = `${API_BASE}/api/products/recently-viewed${email ? `?user_email=${encodeURIComponent(email)}` : ""}`;
+      const res = await fetchWithTimeout(url, { headers }, 5000);
+      if (!res.ok) return [];
+      const data = await res.json();
+      if (!Array.isArray(data)) return [];
+      return data
+        .filter((p) => !isFakeOrDeletedProduct(p))
+        .map((p) => normalizeProductData(p));
+    } catch {
+      return [];
+    }
+  },
+
+  async getSearchHistory(token?: string | null, email?: string | null): Promise<string[]> {
+    if (!API_BASE) return [];
+    try {
+      const headers: Record<string, string> = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      const url = `${API_BASE}/api/search/history${email ? `?user_email=${encodeURIComponent(email)}` : ""}`;
+      const res = await fetchWithTimeout(url, { headers }, 5000);
+      if (!res.ok) return [];
+      const data = await res.json();
+      return Array.isArray(data?.queries) ? data.queries : [];
+    } catch {
+      return [];
+    }
+  },
+
+  async clearSearchHistory(token?: string | null, email?: string | null): Promise<boolean> {
+    if (!API_BASE) return false;
+    try {
+      const headers: Record<string, string> = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      const url = `${API_BASE}/api/search/history${email ? `?user_email=${encodeURIComponent(email)}` : ""}`;
+      const res = await fetchWithTimeout(url, { method: "DELETE", headers }, 5000);
+      return res.ok;
+    } catch {
+      return false;
+    }
+  },
+
+  async recordSearch(query: string, token?: string | null, sessionId?: string | null): Promise<void> {
+    if (!API_BASE || !query.trim()) return;
+    try {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      await fetchWithTimeout(`${API_BASE}/api/search/record`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ query: query.trim(), session_id: sessionId }),
+      }, 3000);
+    } catch {}
+  },
+
+  async getPopularSearches(): Promise<string[]> {
+    if (!API_BASE) return [];
+    try {
+      const stats = await this.getSearchStats();
+      if (Array.isArray(stats?.popular_queries)) {
+        return stats.popular_queries.filter((q: unknown): q is string => typeof q === "string" && q.trim().length > 0);
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  },
+
+  async getPublicReviews(options: {
+    page?: number;
+    limit?: number;
+    sort?: string;
+    rating?: number;
+    productId?: string;
+  } = {}): Promise<{ reviews: any[]; total: number; total_pages: number }> {
+    if (!API_BASE) return { reviews: [], total: 0, total_pages: 1 };
+    try {
+      const params = new URLSearchParams();
+      if (options.page) params.set("page", String(options.page));
+      if (options.limit) params.set("limit", String(options.limit));
+      if (options.sort) params.set("sort", options.sort);
+      if (options.rating) params.set("rating", String(options.rating));
+      if (options.productId) params.set("product_id", options.productId);
+
+      const qs = params.toString();
+      const url = `${API_BASE}/api/reviews${qs ? `?${qs}` : ""}`;
+      const res = await fetchWithTimeout(url, {}, 5000);
+      if (!res.ok) return { reviews: [], total: 0, total_pages: 1 };
+      const data = await res.json();
+      return {
+        reviews: Array.isArray(data?.reviews) ? data.reviews : [],
+        total: Number(data?.total) || 0,
+        total_pages: Number(data?.total_pages) || 1,
+      };
+    } catch {
+      return { reviews: [], total: 0, total_pages: 1 };
     }
   },
 

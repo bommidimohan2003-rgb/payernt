@@ -1,15 +1,15 @@
 /**
- * PAYENT — Official Brand Configuration & Asset References
- * 
- * Master source of truth for the official PAYENT brand identity:
- * Green P logo mark on pure black background with green light orbit effect.
+ * paYent — Official Brand Configuration & Asset References
+ *
+ * Master source of truth for the official paYent brand identity.
  */
 
 export const BRAND_CONFIG = {
-  name: "Payent",
-  tagline: "Gear Rental for Creators",
-  shortTagline: "Gear Rental",
-  description: "Rent flagship tech gear from verified lenders in your city.",
+  name: "paYent",
+  tagline: "Get What You Need, Without Owning It.",
+  shortTagline: "Get What You Need",
+  description:
+    "Get What You Need, Without Owning It. Rent verified cameras, laptops, audio gear, and more.",
   url: "https://payent.com",
 } as const;
 

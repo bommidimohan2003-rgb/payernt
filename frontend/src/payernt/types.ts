@@ -185,6 +185,8 @@ export interface PayerntProduct {
   securityDeposit?: number;
   replacementValue?: number;
   isAvailable?: boolean;
+  rating?: number;
+  reviews?: number;
   daily_rate?: number;
   dailyRate?: number;
   weekly_rate?: number;

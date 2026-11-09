@@ -79,7 +79,7 @@ export function PermissionDenied({
         <button
           type="button"
           onClick={() => navigate({ to: "/login" })}
-          className="btn-gradient text-xs md:text-sm px-6 py-2.5 rounded-xl font-bold transition-all w-full sm:w-auto active:scale-95 shadow-md"
+          className="bg-neutral-950 text-white hover:bg-neutral-800 dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-200 text-xs md:text-sm px-6 py-2.5 rounded-xl font-semibold transition-colors w-full sm:w-auto cursor-pointer"
         >
           Sign in with another account
         </button>

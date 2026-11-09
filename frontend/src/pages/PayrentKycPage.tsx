@@ -84,6 +84,14 @@ export function PayrentKycPage() {
     fetchKycStatus();
   }, [user?.email]);
 
+  useEffect(() => {
+    const inputEl = fileInputRef.current;
+    if (!inputEl) return;
+    const handleDialogCancel = () => setFileDialogOpen(false);
+    inputEl.addEventListener("cancel", handleDialogCancel);
+    return () => inputEl.removeEventListener("cancel", handleDialogCancel);
+  }, [setFileDialogOpen]);
+
   // PAN Input change: normalize to uppercase, strip non-alphanumeric and spaces
   const handlePanChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const clean = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10);
@@ -505,7 +513,6 @@ export function PayrentKycPage() {
                       setFileDialogOpen(false);
                       handleFileChange(e);
                     }}
-                    onCancel={() => setFileDialogOpen(false)}
                     className="hidden"
                   />
 

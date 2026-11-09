@@ -658,7 +658,7 @@ def get_payernt_account_by_email(email: str) -> Optional[Dict[str, Any]]:
         return None
 
     try:
-        row = fetch_one("SELECT * FROM payernt_accounts WHERE email = %s LIMIT 1", (clean_email,))
+        row = fetch_one("SELECT * FROM payernt_accounts WHERE LOWER(email) = %s LIMIT 1", (clean_email,))
         if row:
             return row
     except Exception as e:

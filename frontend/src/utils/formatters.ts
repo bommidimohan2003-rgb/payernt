@@ -5,69 +5,142 @@ import type { Product } from "@/types";
  * Example output: "Hyderabad, Telangana" or "Vijayawada, Andhra Pradesh"
  * Fallback: "Location unavailable"
  */
+const LOCATION_PLACEHOLDERS = new Set([
+  "",
+  "null",
+  "none",
+  "undefined",
+  "n/a",
+  "na",
+  "not provided",
+  "location unavailable",
+]);
+
 function safeTrim(val: unknown): string {
   if (typeof val === "string") return val.trim();
   if (typeof val === "number") return String(val).trim();
   return "";
 }
 
+function cleanLocToken(val: unknown, allowCountryOnly = false): string {
+  const raw = safeTrim(val);
+  if (!raw) return "";
+  const lower = raw.toLowerCase();
+  if (LOCATION_PLACEHOLDERS.has(lower)) return "";
+  if (!allowCountryOnly && (lower === "india" || lower === "in")) return "";
+  if (raw === lower && /[a-z]/i.test(raw)) {
+    return raw.replace(/\b[a-z]/g, (ch) => ch.toUpperCase());
+  }
+  return raw;
+}
+
 function parseLocationValue(loc: unknown): string {
   if (!loc) return "";
-  if (typeof loc === "string") return loc.trim();
+  if (typeof loc === "string") return cleanLocToken(loc);
   if (typeof loc === "object" && loc !== null) {
     const obj = loc as Record<string, unknown>;
-    const area = safeTrim(obj.area || obj.address || obj.landmark || obj.street);
-    const city = safeTrim(obj.city);
-    const state = safeTrim(obj.state);
+    const area = cleanLocToken(obj.area || obj.address || obj.landmark || obj.street);
+    const city = cleanLocToken(obj.city);
+    const state = cleanLocToken(obj.state);
     const parts = [area, city, state].filter(Boolean);
     if (parts.length > 0) return parts.join(", ");
-    const pincode = safeTrim(obj.pincode || obj.postalCode);
+    const pincode = cleanLocToken(obj.pincode || obj.postalCode);
     if (pincode) return pincode;
   }
   return "";
 }
 
-export function formatOwnerAddress(product: Product | null | undefined): string {
+function joinUniqueLocationParts(parts: string[]): string {
+  const unique: string[] = [];
+  for (const part of parts) {
+    const clean = cleanLocToken(part);
+    if (!clean) continue;
+    const lower = clean.toLowerCase();
+    const alreadyPresent = unique.some(
+      (existing) =>
+        existing.toLowerCase() === lower ||
+        existing.toLowerCase().includes(lower) ||
+        lower.includes(existing.toLowerCase())
+    );
+    if (!alreadyPresent) {
+      unique.push(clean);
+    }
+  }
+  return unique.join(", ");
+}
+
+/**
+ * Resolves the genuine locality of a listed product (Area / City / State)
+ * without fabricating locations or masking real cities behind generic "India".
+ */
+export function formatProductLocation(product: Product | null | undefined): string {
   if (!product) return "Location unavailable";
 
+  const prod = product as any;
   const owner = product.owner;
-  const ownerCity = safeTrim(owner?.city) || safeTrim((product as any)?.owner_city);
-  const ownerState = safeTrim(owner?.state) || safeTrim((product as any)?.owner_state);
-  const ownerAddr = safeTrim(owner?.address) || safeTrim((product as any)?.owner_address);
-  const ownerLoc = parseLocationValue(owner?.location);
+  const prodArea = cleanLocToken(prod?.product_area ?? prod?.area);
+  const prodCity = cleanLocToken(prod?.product_city ?? prod?.city);
+  const ownerCity = cleanLocToken(owner?.city ?? prod?.owner_city);
+  const ownerState = cleanLocToken(prod?.product_state ?? owner?.state ?? prod?.owner_state ?? prod?.state);
+  const ownerAddr = cleanLocToken(owner?.address ?? prod?.owner_address);
   const prodLoc = parseLocationValue(product.location);
+  const ownerLoc = parseLocationValue(owner?.location);
 
-  // 1. Prefer City, State format
+  // 1. Product's own locality (area + city, deduplicated case-insensitively)
+  const effectiveCity = prodCity || ownerCity;
+  if (prodArea && effectiveCity) {
+    return joinUniqueLocationParts([prodArea, effectiveCity]);
+  }
+  if (prodCity && ownerState) {
+    return joinUniqueLocationParts([prodCity, ownerState]);
+  }
+  if (prodCity) return prodCity;
+  if (prodArea) return prodArea;
+
+  // 2. Valid structured product top-level location (e.g. "Hyderabad, Telangana")
+  if (prodLoc) return prodLoc;
+
+  // 3. Owner City, State
   if (ownerCity && ownerState) {
-    return `${ownerCity}, ${ownerState}`;
+    return joinUniqueLocationParts([ownerCity, ownerState]);
   }
+  if (ownerCity) return ownerCity;
+  if (ownerState) return ownerState;
 
-  // 2. City only
-  if (ownerCity) {
-    return ownerCity;
-  }
-
-  // 3. State only
-  if (ownerState) {
-    return ownerState;
-  }
-
-  // 4. Product top-level location if valid
-  if (prodLoc && prodLoc !== "Location unavailable") {
-    return prodLoc;
-  }
-
-  // 5. Owner location if valid
-  if (ownerLoc && ownerLoc !== "Location unavailable") {
-    return ownerLoc;
-  }
-
-  // 6. Owner street address
-  if (ownerAddr) {
-    return ownerAddr;
-  }
+  // 4. Owner location string or address fallback
+  if (ownerLoc) return ownerLoc;
+  if (ownerAddr) return ownerAddr;
 
   return "Location unavailable";
+}
+
+export function formatOwnerAddress(product: Product | null | undefined): string {
+  return formatProductLocation(product);
+}
+
+/**
+ * Evaluates authoritative product availability from backend flags without
+ * fabricating "Available" for paused, pending, or booked listings.
+ */
+export function isProductAvailable(product: Partial<Product> | null | undefined): boolean {
+  if (!product) return false;
+  const statusStr = String(product.availability_status || "").toLowerCase().trim();
+  if (
+    statusStr === "unavailable" ||
+    statusStr === "pending" ||
+    statusStr === "rejected" ||
+    statusStr === "suspended" ||
+    statusStr === "paused" ||
+    statusStr === "deleted"
+  ) {
+    return false;
+  }
+  if (product.available === false) return false;
+  const availObj = (product as any).availability;
+  if (availObj && typeof availObj === "object" && availObj.availableNow === false) {
+    return false;
+  }
+  return Boolean(product.available ?? statusStr === "available");
 }
 
 /**

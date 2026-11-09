@@ -6,7 +6,7 @@ import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "relative inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md text-sm font-medium cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed [&_svg]:pointer-events-none [&_svg]:size-3.5 [&_svg]:shrink-0 [&_svg]:order-first select-none",
+  "relative inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md text-sm font-medium cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed [&_svg]:pointer-events-none [&_svg]:size-3.5 [&_svg]:shrink-0 select-none",
   {
     variants: {
       variant: {
@@ -43,9 +43,10 @@ export interface ButtonProps
     VariantProps<typeof buttonVariants> {
   asChild?: boolean;
   loading?: boolean;
-  /** Primary symbol/icon displayed first before button name */
+  /** Primary symbol/icon displayed before button name */
   icon?: React.ReactNode;
   leftIcon?: React.ReactNode;
+  rightIcon?: React.ReactNode;
   animationStatus?: DualFillStatus;
   isSuccess?: boolean;
   isError?: boolean;
@@ -66,6 +67,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       loading = false,
       icon,
       leftIcon,
+      rightIcon,
       animationStatus: _animationStatus,
       isSuccess,
       isError,
@@ -108,6 +110,8 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         ? errorText
         : children;
 
+    const leadingIcon = icon || leftIcon || null;
+
     return (
       <button
         className={cn(buttonVariants({ variant, size, className }))}
@@ -117,15 +121,18 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         aria-busy={loading}
         {...props}
       >
-        <span className="relative flex items-center justify-center gap-1.5 text-inherit transition-colors duration-150 [&_svg]:order-first">
+        <span className="relative inline-flex items-center justify-center gap-1.5 text-inherit transition-colors duration-150">
           {loading ? (
             <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
           ) : (
-            icon || leftIcon || null
+            leadingIcon
           )}
-          <span className="inline-flex items-center gap-1.5 [&_svg]:order-first">
-            {displayText}
-          </span>
+          {displayText !== undefined && displayText !== null && displayText !== false && (
+            <span className="inline-flex items-center gap-1.5">
+              {displayText}
+            </span>
+          )}
+          {!loading && rightIcon ? rightIcon : null}
         </span>
       </button>
     );

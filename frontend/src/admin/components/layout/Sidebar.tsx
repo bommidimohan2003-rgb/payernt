@@ -283,7 +283,7 @@ export function Sidebar() {
                     >
                       <span>{it.label}</span>
                       {badgeVal > 0 && (
-                        <span className="px-1.5 py-0.2 rounded-full bg-[#FF7655] text-white text-[10px] font-mono">
+                        <span className="px-1.5 py-0.5 rounded-full bg-[#FF7655] text-white text-[10px] font-mono">
                           {badgeVal}
                         </span>
                       )}

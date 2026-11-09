@@ -1,7 +1,7 @@
 import React, { forwardRef, type HTMLAttributes, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
-export interface SectionBoxProps extends HTMLAttributes<HTMLDivElement> {
+export interface SectionBoxProps extends Omit<HTMLAttributes<HTMLDivElement>, "title"> {
   /** The text or element positioned directly on the top border with a cut-out */
   title?: ReactNode;
   /** Optional icon rendered immediately before the title */
@@ -10,7 +10,7 @@ export interface SectionBoxProps extends HTMLAttributes<HTMLDivElement> {
   badge?: ReactNode;
   /** Optional action button or link positioned on the top-right border */
   action?: ReactNode;
-  /** Background color class for the cutout masking behind the title/action. Defaults to 'bg-card dark:bg-[#1E1E1E]' */
+  /** Background color class for the cutout masking behind the title/action. Defaults to 'bg-card dark:bg-[#141414]' */
   cutoutBgClass?: string;
   /** Additional styling for the title text element */
   titleClassName?: string;
@@ -33,7 +33,7 @@ export const SectionBox = forwardRef<HTMLDivElement, SectionBoxProps>(
       icon,
       badge,
       action,
-      cutoutBgClass = "bg-card dark:bg-[#1E1E1E]",
+      cutoutBgClass = "bg-card dark:bg-[#141414]",
       titleClassName,
       variant = "default",
       className,

@@ -515,7 +515,7 @@ export default function Bookings() {
             <span>{tab.label}</span>
             <span
               className={cn(
-                "px-1.5 py-0.2 rounded-full text-[10px] font-mono",
+                "px-1.5 py-0.5 rounded-full text-[10px] font-mono",
                 statusFilter === tab.id
                   ? "bg-black/15 text-black dark:text-black font-bold"
                   : "bg-black/5 dark:bg-white/10 text-[var(--admin-text-secondary)]"
@@ -584,7 +584,7 @@ export default function Bookings() {
               )}
             >
               <span>All Reasons</span>
-              <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-black/10 dark:bg-white/10 font-bold">
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-black/10 dark:bg-white/10 font-bold">
                 {cancellationStats.total}
               </span>
             </button>
@@ -610,7 +610,7 @@ export default function Bookings() {
                   <span className="truncate max-w-[240px]">{reason}</span>
                   <span
                     className={cn(
-                      "text-[10px] font-mono px-1.5 py-0.2 rounded-full font-bold",
+                      "text-[10px] font-mono px-1.5 py-0.5 rounded-full font-bold",
                       isSelected ? "bg-white/20 text-white" : "bg-black/10 dark:bg-white/10 text-[var(--admin-text)]"
                     )}
                   >

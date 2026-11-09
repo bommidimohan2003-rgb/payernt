@@ -23,7 +23,6 @@ import {
   Laptop,
   Smartphone,
   Trash2,
-  Sparkles,
   Save,
   HelpCircle,
   Upload,
@@ -33,8 +32,9 @@ import {
   Eye,
   EyeOff,
   ExternalLink,
+  RefreshCw,
 } from "lucide-react";
-import { useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
 import { BackButton } from "@/components/common/BackButton";
 import { Button } from "@/components/common/Button";
@@ -45,6 +45,7 @@ import { api } from "@/utils/api";
 import { storage, STORAGE_KEYS } from "@/utils/storage";
 import { ProfilePhoto, isRealProfilePhoto } from "@/components/common/ProfilePhoto";
 import { ProfilePhotoModal } from "@/components/profile/ProfilePhotoModal";
+import { parseKycStatusResponse, type NormalizedKycStatus } from "@/utils/kyc";
 import type { User, UserProfileStats } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -56,91 +57,133 @@ export default function Profile() {
   const [activeTab, setActiveTab] = useState<"details" | "location" | "payout" | "security">("details");
   const [showPan, setShowPan] = useState(false);
 
-  const [stats, setStats] = useState<UserProfileStats | null>(() => {
-    return storage.get<UserProfileStats | null>("user_profile_stats", null);
-  });
-  const [loadingStats, setLoadingStats] = useState(() => {
-    const cached = storage.get<UserProfileStats | null>("user_profile_stats", null);
-    return !cached;
-  });
+  const [stats, setStats] = useState<UserProfileStats | null>(null);
+  const [loadingStats, setLoadingStats] = useState<boolean>(true);
+  const [statsError, setStatsError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let isMounted = true;
+  const loadUserStats = useCallback(() => {
+    const cached = storage.get<UserProfileStats | null>("user_profile_stats", null);
+    if (cached) {
+      setStats(cached);
+    }
     const token = storage.get<string | null>(STORAGE_KEYS.token, null);
     if (!token) {
       setLoadingStats(false);
+      setStatsError(null);
       return;
     }
+    setStatsError(null);
     api
       .getUserStats(token)
       .then((data) => {
-        if (isMounted && data) {
+        if (data) {
           setStats(data);
           storage.set("user_profile_stats", data);
         }
       })
       .catch((err) => {
         console.warn("[Profile] Stats load notice:", err);
+        setStatsError(
+          err instanceof Error && err.message
+            ? err.message
+            : "Unable to load marketplace stats."
+        );
       })
       .finally(() => {
-        if (isMounted) setLoadingStats(false);
+        setLoadingStats(false);
       });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [user?.email]);
-
-  const [kycData, setKycData] = useState<{
-    status: "NOT_STARTED" | "PENDING" | "APPROVED" | "REJECTED";
-    documentType: string;
-    maskedNumber: string | null;
-    submittedAt?: string | null;
-    verifiedAt?: string | null;
-    rejectionReason?: string | null;
-    providerStatus?: string | null;
-  } | null>(null);
+  }, []);
 
   useEffect(() => {
-    let isMounted = true;
+    loadUserStats();
+  }, [user?.email, loadUserStats]);
+
+  const [kycData, setKycData] = useState<NormalizedKycStatus | null>(null);
+  const [kycLoading, setKycLoading] = useState<boolean>(false);
+  const [kycError, setKycError] = useState<string | null>(null);
+
+  const loadKycStatus = useCallback(async () => {
     const token = storage.get<string | null>(STORAGE_KEYS.token, null);
-    if (!token) return;
+    if (!token) {
+      setKycData(null);
+      setKycError(null);
+      setKycLoading(false);
+      return;
+    }
+    setKycLoading(true);
+    setKycError(null);
+    try {
+      const res = await api.getKycStatus(token);
+      const parsed = parseKycStatusResponse(res);
+      if (!parsed) {
+        setKycData(null);
+        setKycError("Invalid KYC status response received.");
+      } else {
+        setKycData(parsed);
+      }
+    } catch (err: unknown) {
+      console.warn("[Profile] KYC status load notice:", err);
+      setKycData(null);
+      setKycError(
+        err instanceof Error && err.message
+          ? err.message
+          : "Unable to load KYC verification status."
+      );
+    } finally {
+      setKycLoading(false);
+    }
+  }, []);
 
-    api
-      .getKycStatus(token)
-      .then((res) => {
-        if (isMounted && res.success && res.data) {
-          setKycData(res.data);
-        }
-      })
-      .catch((err) => {
-        console.warn("[Profile] KYC status load notice:", err);
-      });
-
+  useEffect(() => {
+    void loadKycStatus();
+    if (typeof window === "undefined") return;
+    const handleKycUpdated = () => {
+      void loadKycStatus();
+    };
+    window.addEventListener("payent_kyc_updated", handleKycUpdated);
     return () => {
-      isMounted = false;
+      window.removeEventListener("payent_kyc_updated", handleKycUpdated);
     };
-  }, [user?.email]);
+  }, [user?.email, loadKycStatus]);
 
-  const [form, setForm] = useState(() => {
-    const cachedUser = storage.get<User | null>(STORAGE_KEYS.currentUser, null);
-    return {
-      fullName: cachedUser?.fullName || user?.fullName || "",
-      email: cachedUser?.email || user?.email || "",
-      phone: cachedUser?.phone || user?.phone || "",
-      occupation: cachedUser?.occupation || user?.occupation || "",
-      bio: cachedUser?.bio || user?.bio || "",
-      address: cachedUser?.address || user?.address || "",
-      city: cachedUser?.city || user?.city || "",
-      state: cachedUser?.state || user?.state || "",
-      country: cachedUser?.country || user?.country || "India",
-      pincode: cachedUser?.pincode || user?.pincode || "",
-      latitude: (cachedUser?.latitude ?? user?.latitude) ?? null,
-      longitude: (cachedUser?.longitude ?? user?.longitude) ?? null,
-      website: cachedUser?.website || user?.website || "",
-      upiId: cachedUser?.upiId || user?.upiId || "",
-    };
+  const [form, setForm] = useState({
+    fullName: "",
+    email: "",
+    phone: "",
+    occupation: "",
+    bio: "",
+    address: "",
+    city: "",
+    state: "",
+    country: "India",
+    pincode: "",
+    latitude: null as number | null,
+    longitude: null as number | null,
+    website: "",
+    upiId: "",
   });
+
+  useEffect(() => {
+    const cachedUser = storage.get<User | null>(STORAGE_KEYS.currentUser, null);
+    if (!cachedUser) return;
+    setForm((prev) => ({
+      ...prev,
+      fullName: cachedUser.fullName || prev.fullName,
+      email: cachedUser.email || prev.email,
+      phone: cachedUser.phone || prev.phone,
+      occupation: cachedUser.occupation || prev.occupation,
+      bio: cachedUser.bio || prev.bio,
+      address: cachedUser.address || prev.address,
+      city: cachedUser.city || prev.city,
+      state: cachedUser.state || prev.state,
+      country: cachedUser.country || prev.country || "India",
+      pincode: cachedUser.pincode || prev.pincode,
+      latitude: cachedUser.latitude ?? prev.latitude ?? null,
+      longitude: cachedUser.longitude ?? prev.longitude ?? null,
+      website: cachedUser.website || prev.website,
+      upiId: cachedUser.upiId || prev.upiId,
+    }));
+  }, []);
 
   const [detectingLocation, setDetectingLocation] = useState(false);
   const [locationStatus, setLocationStatus] = useState<string | null>(null);
@@ -220,19 +263,23 @@ export default function Profile() {
 
   const saveProfile = async () => {
     if (!user) return;
-    updateUser(form);
     const token = storage.get<string | null>(STORAGE_KEYS.token, null);
     if (token) {
       try {
         const updated = await api.updateProfile(token, form);
-        if (updated) {
-          updateUser(updated);
-        }
+        updateUser(updated || form);
+        setLocationStatus(null);
+        toast.success("Profile details saved successfully.");
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : "Failed to sync profile.";
-        console.warn("Notice: Profile sync issue:", msg);
+        const msg =
+          err instanceof Error && err.message
+            ? err.message
+            : "Failed to save profile details.";
+        toast.error(msg);
       }
+      return;
     }
+    updateUser(form);
     setLocationStatus(null);
     toast.success("Profile details saved successfully.");
   };
@@ -373,7 +420,7 @@ export default function Profile() {
         window.dispatchEvent(new CustomEvent("payent:profile_photo_updated"));
         window.dispatchEvent(new CustomEvent("payent:storage_change"));
       }
-      toast.success("Profile photo updated successfully!");
+      toast.success("Profile photo updated");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to upload profile photo.";
       toast.error(msg);
@@ -406,6 +453,17 @@ export default function Profile() {
 
   const isPendingApproval = user?.status === "pending";
 
+  if (!ready && !user) {
+    return (
+      <DashboardLayout>
+        <div className="min-h-[60vh] flex flex-col items-center justify-center gap-3 text-neutral-600 dark:text-neutral-400">
+          <Loader2 className="h-6 w-6 animate-spin text-neutral-900 dark:text-white" aria-hidden="true" />
+          <p className="text-xs font-medium">Loading your profile...</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout>
       <div className="space-y-8 max-w-7xl mx-auto pb-12">
@@ -413,13 +471,13 @@ export default function Profile() {
         {/* Pending Approval Notice Banner */}
         {isPendingApproval && (
           <div className="rounded-2xl bg-amber-500/10 border border-amber-500/30 p-4 sm:p-5 flex items-start gap-3.5 text-amber-900 dark:text-amber-200">
-            <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+            <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" aria-hidden="true" />
             <div className="space-y-1">
-              <h4 className="text-sm font-bold text-amber-600 dark:text-amber-400">
+              <h2 className="text-sm font-bold text-amber-800 dark:text-amber-300">
                 Account Awaiting Administrative Approval
-              </h4>
-              <p className="text-xs text-amber-700/80 dark:text-amber-300/80 leading-relaxed">
-                Your account registration has been submitted and is currently being verified by the Payent team. You can update your profile, take your identity photo, and browse equipment. Full rental and listing privileges will unlock once an admin approves your profile.
+              </h2>
+              <p className="text-xs text-amber-800/90 dark:text-amber-200/90 leading-relaxed">
+                Your account registration has been submitted and is currently being verified by the paYent team. You can update your profile, take your identity photo, and browse equipment. Full listing and rental privileges unlock once approved.
               </p>
             </div>
           </div>
@@ -430,56 +488,54 @@ export default function Profile() {
           <div className="flex items-center gap-3">
             <BackButton fallback="/categories" />
             <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-3xl font-extrabold text-foreground font-display tracking-tight">
-                  Profile & Identity
-                </h1>
-                <span className="px-2.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 text-xs font-bold uppercase tracking-wider flex items-center gap-1">
-                  <Sparkles className="h-3 w-3" />
-                  <span>{isPendingApproval ? "Pending Verification" : "Verified Account"}</span>
-                </span>
-              </div>
-              <p className="text-sm text-muted-foreground mt-1 font-medium">
-                Manage your personal identity, device camera profile picture, payout channels, and security.
+              <h1 className="text-2xl sm:text-3xl font-semibold text-neutral-950 dark:text-white font-display tracking-tight">
+                Profile &amp; Identity
+              </h1>
+              <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1 font-medium">
+                Manage your personal identity, profile picture, payout channels, and security.
               </p>
             </div>
           </div>
 
           <Button
             onClick={saveProfile}
-            className="btn-gradient font-bold text-xs px-6 py-2.5 rounded-xl shadow-lg active:scale-95 flex items-center justify-center gap-2 self-start md:self-auto cursor-pointer"
+            className="min-h-[42px] bg-neutral-950 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-200 font-semibold text-xs px-5 py-2.5 rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 self-start md:self-auto cursor-pointer"
           >
-            <Save className="h-4 w-4" />
+            <Save className="h-4 w-4" aria-hidden="true" />
             <span>Save Profile Changes</span>
           </Button>
         </div>
 
-        {/* Hero Glass Banner Card */}
-        <div className="relative rounded-3xl overflow-hidden border border-border/80 bg-card/40 backdrop-blur-xl shadow-2xl">
-          {/* Animated Gradient Cover */}
-          <div className="h-44 sm:h-52 bg-gradient-to-r from-zinc-950 via-zinc-900 to-black relative p-6 flex items-start justify-between border-b border-border/50">
-            <div className="absolute inset-0 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] dark:bg-[radial-gradient(#1f2937_1px,transparent_1px)] [background-size:16px_16px] opacity-25 pointer-events-none" />
-            <div className="relative z-10 flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white text-xs font-extrabold shadow-md">
-              <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-              <span>{isPendingApproval ? "Pending Approval" : "Verified Creator & Lender"}</span>
+        {/* Profile Overview Surface (Monochrome — zero overlapping -mt-16 occlusion) */}
+        <div className="rounded-3xl overflow-hidden border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] shadow-xs">
+          {/* Clean Header Strip */}
+          <div className="px-6 py-4 bg-neutral-950 dark:bg-[#1E1E1E] text-white flex items-center justify-between gap-4 border-b border-neutral-200 dark:border-neutral-800">
+            <div className="inline-flex items-center gap-2 text-xs font-semibold">
+              <CheckCircle2
+                className={cn("h-4 w-4 shrink-0", isPendingApproval ? "text-amber-400" : "text-emerald-400")}
+                aria-hidden="true"
+              />
+              <span>{isPendingApproval ? "Pending Verification" : "Creator & Lender Account"}</span>
             </div>
-            <div className="relative z-10 text-right hidden sm:block">
-              <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest block">Account Status</span>
-              <span className={cn(
-                "text-xs font-black uppercase",
-                isPendingApproval ? "text-amber-400" : "text-emerald-400"
-              )}>
-                {isPendingApproval ? "Pending Review" : "Active & Protected"}
+            <div className="text-right hidden sm:flex items-center gap-2 text-xs">
+              <span className="text-neutral-400 font-medium">Account Status:</span>
+              <span
+                className={cn(
+                  "font-semibold",
+                  isPendingApproval ? "text-amber-400" : "text-emerald-400"
+                )}
+              >
+                {isPendingApproval ? "Pending Review" : "Active"}
               </span>
             </div>
           </div>
 
           {/* User Details Row */}
-          <div className="p-6 sm:p-8 pt-0 relative flex flex-col md:flex-row md:items-end justify-between gap-6 -mt-16 sm:-mt-20">
+          <div className="p-6 sm:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
             {/* Real Profile Photo & Key Info */}
-            <div className="flex flex-col sm:flex-row items-center sm:items-end gap-6 text-center sm:text-left">
+            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 text-center sm:text-left">
               {/* Photo Box */}
-              <div className="flex flex-col items-center gap-3 shrink-0 relative">
+              <div className="flex flex-col items-center gap-3 shrink-0">
                 <ProfilePhoto
                   src={activePhoto}
                   alt={user?.fullName || "User Profile Photo"}
@@ -489,62 +545,76 @@ export default function Profile() {
                   onEdit={() => setIsPhotoModalOpen(true)}
                   status={isPendingApproval ? "pending" : "active"}
                   statusTitle={isPendingApproval ? "Pending Admin Approval" : "Active Account"}
-                  className="border-4 border-card shadow-2xl"
+                  className="border-2 border-neutral-200 dark:border-neutral-800 shadow-sm"
                 />
 
-                {/* Change Photo Trigger */}
                 <button
                   type="button"
                   onClick={() => setIsPhotoModalOpen(true)}
-                  className="w-full btn-gradient text-xs py-2 px-3.5 rounded-xl font-bold flex items-center justify-center gap-1.5 shadow-md hover:scale-102 active:scale-95 transition-all cursor-pointer"
+                  className="w-full min-h-[40px] bg-neutral-950 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-200 text-xs py-2 px-3.5 rounded-xl font-semibold flex items-center justify-center gap-1.5 shadow-xs transition-colors cursor-pointer"
                 >
-                  <Camera className="h-3.5 w-3.5" />
+                  <Camera className="h-3.5 w-3.5" aria-hidden="true" />
                   <span>Take Selfie</span>
                 </button>
               </div>
 
               {/* Bio & Identity Chips */}
-              <div className="space-y-2.5 pb-2">
+              <div className="space-y-3">
                 <div className="flex items-center gap-3 flex-wrap justify-center sm:justify-start">
-                  <h2 className="text-2xl sm:text-3xl font-black text-foreground font-display tracking-tight">
-                    {user?.fullName || "Verified User"}
+                  <h2 className="text-2xl sm:text-3xl font-semibold text-neutral-950 dark:text-white font-display tracking-tight">
+                    {user?.fullName || "Account Holder"}
                   </h2>
-                  <span className={cn(
-                    "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider border",
-                    isPendingApproval
-                      ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
-                      : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
-                  )}>
-                    <ShieldCheck className="h-3.5 w-3.5" />
+                  <span
+                    className={cn(
+                      "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border",
+                      isPendingApproval
+                        ? "bg-amber-500/10 text-amber-800 dark:text-amber-300 border-amber-500/30"
+                        : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/25"
+                    )}
+                  >
+                    <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
                     <span>{isPendingApproval ? "Pending Verification" : "Identity Verified"}</span>
                   </span>
                 </div>
 
-                <p className="text-xs sm:text-sm text-muted-foreground font-semibold flex items-center gap-2 justify-center sm:justify-start flex-wrap">
-                  <span className="flex items-center gap-1">
-                    <Briefcase className="h-4 w-4 text-primary shrink-0" />
-                    <span>{form.occupation}</span>
-                  </span>
-                  <span className="hidden sm:inline">·</span>
-                  <span className="flex items-center gap-1">
-                    <MapPin className="h-4 w-4 text-emerald-500 shrink-0" />
+                <p className="text-xs sm:text-sm text-neutral-600 dark:text-neutral-400 font-medium flex items-center gap-2.5 justify-center sm:justify-start flex-wrap">
+                  {form.occupation && (
+                    <span className="flex items-center gap-1.5">
+                      <Briefcase className="h-4 w-4 text-neutral-700 dark:text-neutral-300 shrink-0" aria-hidden="true" />
+                      <span>{form.occupation}</span>
+                    </span>
+                  )}
+                  {form.occupation && <span className="hidden sm:inline" aria-hidden="true">·</span>}
+                  <span className="flex items-center gap-1.5">
+                    <MapPin className="h-4 w-4 text-neutral-700 dark:text-neutral-300 shrink-0" aria-hidden="true" />
                     <span>{form.address || form.city || "India"}</span>
                   </span>
                 </p>
 
                 {/* Identity Summary Badges */}
-                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-2">
-                  <div className="px-3 py-1 rounded-xl bg-secondary/80 border border-border text-xs font-medium text-foreground flex items-center gap-1.5">
-                    <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
-                    <span>PAN: <strong className="font-mono text-foreground font-bold">{kycData?.maskedNumber || user?.panMasked || (user?.panNumber ? `XXXXX${user.panNumber.slice(-5)}` : "Not linked")}</strong></span>
+                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-1">
+                  <div className="px-3 py-1.5 rounded-xl bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-xs font-medium text-neutral-900 dark:text-neutral-100 flex items-center gap-1.5">
+                    <ShieldCheck className="h-3.5 w-3.5 text-neutral-700 dark:text-neutral-300" aria-hidden="true" />
+                    <span>
+                      PAN:{" "}
+                      <strong className="font-mono text-neutral-950 dark:text-white font-bold">
+                        {kycLoading
+                          ? "Checking..."
+                          : kycError
+                          ? "Unavailable"
+                          : kycData?.maskedNumber ||
+                            user?.panMasked ||
+                            (user?.panNumber ? `XXXXX${user.panNumber.slice(-5)}` : "Not linked")}
+                      </strong>
+                    </span>
                   </div>
-                  <div className="px-3 py-1 rounded-xl bg-secondary/80 border border-border text-xs font-medium text-foreground flex items-center gap-1.5">
-                    <Mail className="h-3.5 w-3.5 text-primary" />
-                    <span className="text-foreground font-semibold">{user?.email || "—"}</span>
+                  <div className="px-3 py-1.5 rounded-xl bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-xs font-medium text-neutral-900 dark:text-neutral-100 flex items-center gap-1.5">
+                    <Mail className="h-3.5 w-3.5 text-neutral-700 dark:text-neutral-300" aria-hidden="true" />
+                    <span className="font-semibold">{user?.email || "—"}</span>
                   </div>
-                  <div className="px-3 py-1 rounded-xl bg-secondary/80 border border-border text-xs font-medium text-foreground flex items-center gap-1.5">
-                    <Phone className="h-3.5 w-3.5 text-purple-500" />
-                    <span className="text-foreground font-semibold">{user?.phone || "Not provided"}</span>
+                  <div className="px-3 py-1.5 rounded-xl bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-xs font-medium text-neutral-900 dark:text-neutral-100 flex items-center gap-1.5">
+                    <Phone className="h-3.5 w-3.5 text-neutral-700 dark:text-neutral-300" aria-hidden="true" />
+                    <span className="font-semibold">{user?.phone || "Not provided"}</span>
                   </div>
                 </div>
               </div>
@@ -552,134 +622,168 @@ export default function Profile() {
           </div>
 
           {/* Marketplace Stats Row */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 p-3 sm:p-4 mx-3 sm:mx-6 mb-4 sm:mb-6 rounded-2xl bg-secondary/30 border border-border/60 text-center backdrop-blur-md">
-            {/* Metric 1: Completed Rentals */}
-            <div className="p-2 space-y-0.5">
-              {loadingStats ? (
-                <div className="h-7 w-12 bg-secondary/80 animate-pulse rounded-lg mx-auto" />
-              ) : (
-                <div className="text-xl font-black text-foreground font-display">
-                  {stats?.completed_rentals ?? 0}
-                </div>
-              )}
-              <div className="text-xs font-semibold text-muted-foreground">Completed Rentals</div>
+          {statsError && !stats && !loadingStats ? (
+            <div className="flex items-center justify-between gap-3 p-4 mx-3 sm:mx-6 mb-4 sm:mb-6 rounded-2xl bg-red-500/10 border border-red-500/25 text-xs">
+              <div className="flex items-center gap-2 text-red-700 dark:text-red-400 font-medium">
+                <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
+                <span>{statsError}</span>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setLoadingStats(true);
+                  loadUserStats();
+                }}
+                className="text-xs font-bold shrink-0"
+              >
+                <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+                <span>Retry</span>
+              </Button>
             </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 p-3 sm:p-4 mx-3 sm:mx-6 mb-4 sm:mb-6 rounded-2xl bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-center">
+              {/* Metric 1: Completed Rentals */}
+              <div className="p-2 space-y-0.5">
+                {loadingStats ? (
+                  <div className="h-7 w-12 bg-neutral-200 dark:bg-neutral-800 rounded-lg mx-auto" />
+                ) : (
+                  <div className="text-xl font-semibold text-neutral-950 dark:text-white font-display tabular-nums">
+                    {stats?.completed_rentals ?? 0}
+                  </div>
+                )}
+                <div className="text-xs font-semibold text-neutral-600 dark:text-neutral-400">Completed Rentals</div>
+              </div>
 
-            {/* Metric 2: Lender Rating & Reviews */}
-            <div className="p-2 space-y-0.5">
-              {loadingStats ? (
-                <div className="h-7 w-16 bg-secondary/80 animate-pulse rounded-lg mx-auto" />
-              ) : (
-                <div className="text-xl font-black text-foreground font-display flex items-center justify-center gap-1">
-                  <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-                  <span>
-                    {stats?.lender_rating !== null && stats?.lender_rating !== undefined
-                      ? stats.lender_rating.toFixed(1)
-                      : "New"}
-                  </span>
+              {/* Metric 2: Lender Rating & Reviews */}
+              <div className="p-2 space-y-0.5">
+                {loadingStats ? (
+                  <div className="h-7 w-16 bg-neutral-200 dark:bg-neutral-800 rounded-lg mx-auto" />
+                ) : (
+                  <div className="text-xl font-semibold text-neutral-950 dark:text-white font-display flex items-center justify-center gap-1 tabular-nums">
+                    <Star className="h-4 w-4 fill-amber-400 text-amber-400" aria-hidden="true" />
+                    <span>
+                      {stats?.lender_rating !== null && stats?.lender_rating !== undefined
+                        ? stats.lender_rating.toFixed(1)
+                        : "New"}
+                    </span>
+                  </div>
+                )}
+                <div className="text-xs font-semibold text-neutral-600 dark:text-neutral-400">
+                  {stats?.review_count && stats.review_count > 0
+                    ? `Lender Rating (${stats.review_count})`
+                    : "No ratings yet"}
                 </div>
-              )}
-              <div className="text-xs font-semibold text-muted-foreground">
-                {stats?.review_count && stats.review_count > 0
-                  ? `Lender Rating (${stats.review_count})`
-                  : "No ratings yet"}
+              </div>
+
+              {/* Metric 3: On-Time Return Rate */}
+              <div className="p-2 space-y-0.5">
+                {loadingStats ? (
+                  <div className="h-7 w-14 bg-neutral-200 dark:bg-neutral-800 rounded-lg mx-auto" />
+                ) : (
+                  <div className="text-xl font-semibold text-neutral-950 dark:text-white font-display flex items-center justify-center gap-1 tabular-nums">
+                    <Award className="h-4 w-4 text-neutral-700 dark:text-neutral-300 stroke-[1.75]" aria-hidden="true" />
+                    <span>
+                      {stats?.on_time_return_rate !== null && stats?.on_time_return_rate !== undefined
+                        ? `${stats.on_time_return_rate}%`
+                        : "N/A"}
+                    </span>
+                  </div>
+                )}
+                <div className="text-xs font-semibold text-neutral-600 dark:text-neutral-400">
+                  {stats?.on_time_return_rate !== null && stats?.on_time_return_rate !== undefined
+                    ? "On-Time Return Rate"
+                    : "No return history"}
+                </div>
+              </div>
+
+              {/* Metric 4: Avg Response Time */}
+              <div className="p-2 space-y-0.5">
+                {loadingStats ? (
+                  <div className="h-7 w-14 bg-neutral-200 dark:bg-neutral-800 rounded-lg mx-auto" />
+                ) : (
+                  <div className="text-xl font-semibold text-neutral-950 dark:text-white font-display flex items-center justify-center gap-1 tabular-nums">
+                    <Clock className="h-4 w-4 text-neutral-700 dark:text-neutral-300 stroke-[1.75]" aria-hidden="true" />
+                    <span>
+                      {stats?.average_response_time_minutes !== null && stats?.average_response_time_minutes !== undefined
+                        ? stats.average_response_time_minutes < 60
+                          ? `< 1 hr`
+                          : `${Math.round(stats.average_response_time_minutes / 60)} hrs`
+                        : "No data"}
+                    </span>
+                  </div>
+                )}
+                <div className="text-xs font-semibold text-neutral-600 dark:text-neutral-400">Avg Response Time</div>
               </div>
             </div>
-
-            {/* Metric 3: On-Time Return Rate */}
-            <div className="p-2 space-y-0.5">
-              {loadingStats ? (
-                <div className="h-7 w-14 bg-secondary/80 animate-pulse rounded-lg mx-auto" />
-              ) : (
-                <div className="text-xl font-black text-foreground font-display flex items-center justify-center gap-1">
-                  <Award className="h-4 w-4 text-emerald-500" />
-                  <span>
-                    {stats?.on_time_return_rate !== null && stats?.on_time_return_rate !== undefined
-                      ? `${stats.on_time_return_rate}%`
-                      : "N/A"}
-                  </span>
-                </div>
-              )}
-              <div className="text-xs font-semibold text-muted-foreground">
-                {stats?.on_time_return_rate !== null && stats?.on_time_return_rate !== undefined
-                  ? "On-Time Return Rate"
-                  : "No return history"}
-              </div>
-            </div>
-
-            {/* Metric 4: Avg Response Time */}
-            <div className="p-2 space-y-0.5">
-              {loadingStats ? (
-                <div className="h-7 w-14 bg-secondary/80 animate-pulse rounded-lg mx-auto" />
-              ) : (
-                <div className="text-xl font-black text-foreground font-display flex items-center justify-center gap-1">
-                  <Clock className="h-4 w-4 text-primary" />
-                  <span>
-                    {stats?.average_response_time_minutes !== null && stats?.average_response_time_minutes !== undefined
-                      ? stats.average_response_time_minutes < 60
-                        ? `< 1 hr`
-                        : `${Math.round(stats.average_response_time_minutes / 60)} hrs`
-                      : "No data"}
-                  </span>
-                </div>
-              )}
-              <div className="text-xs font-semibold text-muted-foreground">Avg Response Time</div>
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Section Navigation Tabs */}
-        <div className="flex items-center gap-2 border-b border-border pb-1 overflow-x-auto">
+        <div role="tablist" aria-label="Profile sections" className="flex items-center gap-2 border-b border-neutral-200 dark:border-neutral-800 pb-2 overflow-x-auto">
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === "details"}
             onClick={() => setActiveTab("details")}
-            className={`px-4 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
+            className={cn(
+              "min-h-[44px] px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-colors cursor-pointer whitespace-nowrap",
               activeTab === "details"
-                ? "bg-primary text-primary-foreground shadow-md"
-                : "bg-secondary/40 text-muted-foreground hover:text-foreground hover:bg-secondary"
-            }`}
+                ? "bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 shadow-xs"
+                : "bg-neutral-100 dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white hover:bg-neutral-200/70 dark:hover:bg-neutral-800"
+            )}
           >
-            <UserIcon className="h-4 w-4" />
+            <UserIcon className="h-4 w-4" aria-hidden="true" />
             <span>General Creator Details</span>
           </button>
 
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === "location"}
             onClick={() => setActiveTab("location")}
-            className={`px-4 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
+            className={cn(
+              "min-h-[44px] px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-colors cursor-pointer whitespace-nowrap",
               activeTab === "location"
-                ? "bg-primary text-primary-foreground shadow-md"
-                : "bg-secondary/40 text-muted-foreground hover:text-foreground hover:bg-secondary"
-            }`}
+                ? "bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 shadow-xs"
+                : "bg-neutral-100 dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white hover:bg-neutral-200/70 dark:hover:bg-neutral-800"
+            )}
           >
-            <MapPin className="h-4 w-4" />
-            <span>Realtime Location & Address</span>
+            <MapPin className="h-4 w-4" aria-hidden="true" />
+            <span>Realtime Location &amp; Address</span>
           </button>
 
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === "payout"}
             onClick={() => setActiveTab("payout")}
-            className={`px-4 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
+            className={cn(
+              "min-h-[44px] px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-colors cursor-pointer whitespace-nowrap",
               activeTab === "payout"
-                ? "bg-primary text-primary-foreground shadow-md"
-                : "bg-secondary/40 text-muted-foreground hover:text-foreground hover:bg-secondary"
-            }`}
+                ? "bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 shadow-xs"
+                : "bg-neutral-100 dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white hover:bg-neutral-200/70 dark:hover:bg-neutral-800"
+            )}
           >
-            <CreditCard className="h-4 w-4" />
-            <span>Payout & Contact</span>
+            <CreditCard className="h-4 w-4" aria-hidden="true" />
+            <span>Payout &amp; Contact</span>
           </button>
 
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === "security"}
             onClick={() => setActiveTab("security")}
-            className={`px-4 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
+            className={cn(
+              "min-h-[44px] px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-colors cursor-pointer whitespace-nowrap",
               activeTab === "security"
-                ? "bg-primary text-primary-foreground shadow-md"
-                : "bg-secondary/40 text-muted-foreground hover:text-foreground hover:bg-secondary"
-            }`}
+                ? "bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 shadow-xs"
+                : "bg-neutral-100 dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white hover:bg-neutral-200/70 dark:hover:bg-neutral-800"
+            )}
           >
-            <Lock className="h-4 w-4" />
-            <span>Security & Devices</span>
+            <Lock className="h-4 w-4" aria-hidden="true" />
+            <span>Security &amp; Devices</span>
           </button>
         </div>
 
@@ -688,15 +792,15 @@ export default function Profile() {
           {/* Left 2 Columns: Active Tab Form Container */}
           <div className="lg:col-span-2 space-y-6">
             {activeTab === "details" && (
-              <div className="relative rounded-2xl sm:rounded-3xl border border-neutral-300/80 dark:border-neutral-700/80 bg-card dark:bg-[#1E1E1E] pt-5 sm:pt-6 p-6 sm:p-8 space-y-6 animate-in fade-in duration-300 text-left">
-                <div className="absolute -top-3 left-4 px-2 bg-card dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
-                  <UserIcon className="h-3.5 w-3.5 text-primary" />
-                  <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
+              <div className="relative rounded-2xl sm:rounded-3xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] pt-5 sm:pt-6 p-6 sm:p-8 space-y-6 text-left">
+                <div className="absolute -top-3 left-4 px-2 bg-white dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
+                  <UserIcon className="h-3.5 w-3.5 text-neutral-700 dark:text-neutral-300 stroke-[1.75]" aria-hidden="true" />
+                  <span className="text-xs sm:text-[13px] font-semibold text-neutral-950 dark:text-white">
                     General Creator Details
                   </span>
                 </div>
-                <div className="absolute -top-3 right-4 px-1.5 bg-card dark:bg-[#1E1E1E] z-10">
-                  <span className="text-xs text-muted-foreground font-semibold">
+                <div className="absolute -top-3 right-4 px-1.5 bg-white dark:bg-[#1E1E1E] z-10">
+                  <span className="text-xs text-neutral-600 dark:text-neutral-400 font-semibold">
                     Public Marketplace Info
                   </span>
                 </div>
@@ -705,6 +809,7 @@ export default function Profile() {
                   <Input
                     label="Full Name"
                     icon={<UserIcon className="h-4 w-4" />}
+                    cutoutBgClass="bg-white dark:bg-[#1E1E1E]"
                     value={form.fullName}
                     onChange={(e) =>
                       setForm({ ...form, fullName: e.target.value })
@@ -713,6 +818,7 @@ export default function Profile() {
                   <Input
                     label="Role / Occupation"
                     icon={<Briefcase className="h-4 w-4" />}
+                    cutoutBgClass="bg-white dark:bg-[#1E1E1E]"
                     value={form.occupation}
                     onChange={(e) =>
                       setForm({ ...form, occupation: e.target.value })
@@ -722,24 +828,29 @@ export default function Profile() {
 
                 {/* Bio Textarea */}
                 <div className="space-y-2">
-                  <label className="text-xs font-extrabold text-foreground flex items-center justify-between">
+                  <label
+                    htmlFor="profile-bio-input"
+                    className="text-xs font-bold text-neutral-900 dark:text-neutral-100 flex items-center justify-between"
+                  >
                     <span>Creator Bio / Rental Notes</span>
-                    <span className="text-[11px] text-muted-foreground font-normal">
+                    <span className="text-xs text-neutral-600 dark:text-neutral-400 font-normal tabular-nums">
                       {(form.bio || "").length} characters
                     </span>
                   </label>
                   <textarea
+                    id="profile-bio-input"
                     rows={4}
                     value={form.bio || ""}
                     onChange={(e) => setForm({ ...form, bio: e.target.value })}
                     placeholder="Tell renters about your filmmaking background and equipment care guidelines..."
-                    className="w-full bg-secondary/50 text-foreground text-xs rounded-2xl p-4 border border-border focus:outline-none focus:border-primary transition-all font-medium resize-none"
+                    className="w-full bg-neutral-50 dark:bg-neutral-900 text-neutral-950 dark:text-white placeholder:text-neutral-500 text-xs rounded-2xl p-4 border border-neutral-200 dark:border-neutral-800 focus:outline-none focus:border-neutral-950 dark:focus:border-white transition-colors font-medium resize-none"
                   />
                 </div>
 
                 <Input
                   label="Portfolio / Showreel URL"
                   icon={<Globe className="h-4 w-4" />}
+                  cutoutBgClass="bg-white dark:bg-[#1E1E1E]"
                   value={form.website}
                   onChange={(e) => setForm({ ...form, website: e.target.value })}
                   placeholder="https://yourportfolio.com"
@@ -749,7 +860,7 @@ export default function Profile() {
                   <Button
                     onClick={saveProfile}
                     size="sm"
-                    className="font-bold text-xs px-6 py-2.5"
+                    className="min-h-[40px] font-semibold text-xs px-6 py-2.5 bg-neutral-950 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-200"
                   >
                     Save Creator Info
                   </Button>
@@ -758,30 +869,30 @@ export default function Profile() {
             )}
 
             {activeTab === "location" && (
-              <div className="relative rounded-2xl sm:rounded-3xl border border-neutral-300/80 dark:border-neutral-700/80 bg-card dark:bg-[#1E1E1E] pt-5 sm:pt-6 p-6 sm:p-8 space-y-6 animate-in fade-in duration-300 text-left">
-                <div className="absolute -top-3 left-4 px-2 bg-card dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
-                  <MapPin className="h-3.5 w-3.5 text-primary" />
-                  <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
-                    Realtime Location & Address
+              <div className="relative rounded-2xl sm:rounded-3xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] pt-5 sm:pt-6 p-6 sm:p-8 space-y-6 text-left">
+                <div className="absolute -top-3 left-4 px-2 bg-white dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
+                  <MapPin className="h-3.5 w-3.5 text-neutral-700 dark:text-neutral-300 stroke-[1.75]" aria-hidden="true" />
+                  <span className="text-xs sm:text-[13px] font-semibold text-neutral-950 dark:text-white">
+                    Realtime Location &amp; Address
                   </span>
                 </div>
-                <div className="flex items-center justify-end pb-4 border-b border-border flex-wrap gap-2">
+                <div className="flex items-center justify-end pb-4 border-b border-neutral-200 dark:border-neutral-800 flex-wrap gap-2">
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
                     disabled={detectingLocation}
                     onClick={detectCurrentLocation}
-                    className="gap-2 font-bold text-xs border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 cursor-pointer py-2 px-4"
+                    className="min-h-[40px] gap-2 font-semibold text-xs border-neutral-300 dark:border-neutral-700 text-neutral-900 dark:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer py-2 px-4"
                   >
                     {detectingLocation ? (
                       <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                         <span>Detecting GPS...</span>
                       </>
                     ) : (
                       <>
-                        <LocateFixed className="h-4 w-4 text-emerald-500" />
+                        <LocateFixed className="h-4 w-4" aria-hidden="true" />
                         <span>Use Current Location</span>
                       </>
                     )}
@@ -789,13 +900,13 @@ export default function Profile() {
                 </div>
 
                 {locationStatus && (
-                  <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center justify-between gap-3">
+                  <div className="p-4 rounded-2xl bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
-                      <Navigation className="h-4 w-4 shrink-0" />
+                      <Navigation className="h-4 w-4 shrink-0" aria-hidden="true" />
                       <span>{locationStatus}</span>
                     </div>
                     {form.latitude !== null && form.longitude !== null && (
-                      <span className="text-[10px] font-mono opacity-80 shrink-0">
+                      <span className="text-xs font-mono text-neutral-600 dark:text-neutral-400 shrink-0 tabular-nums">
                         GPS: {form.latitude.toFixed(4)}, {form.longitude.toFixed(4)}
                       </span>
                     )}
@@ -805,6 +916,7 @@ export default function Profile() {
                 <Input
                   label="Street Address / Location"
                   icon={<MapPin className="h-4 w-4" />}
+                  cutoutBgClass="bg-white dark:bg-[#1E1E1E]"
                   value={form.address}
                   onChange={(e) => setForm({ ...form, address: e.target.value })}
                   placeholder="e.g. 123 Indiranagar, 100ft Road"
@@ -814,6 +926,7 @@ export default function Profile() {
                   <Input
                     label="Primary City"
                     icon={<Building className="h-4 w-4" />}
+                    cutoutBgClass="bg-white dark:bg-[#1E1E1E]"
                     value={form.city}
                     onChange={(e) => setForm({ ...form, city: e.target.value })}
                     placeholder="e.g. Bengaluru"
@@ -821,6 +934,7 @@ export default function Profile() {
                   <Input
                     label="State / Region"
                     icon={<MapPin className="h-4 w-4" />}
+                    cutoutBgClass="bg-white dark:bg-[#1E1E1E]"
                     value={form.state}
                     onChange={(e) => setForm({ ...form, state: e.target.value })}
                     placeholder="e.g. Karnataka"
@@ -831,6 +945,7 @@ export default function Profile() {
                   <Input
                     label="Country"
                     icon={<Globe className="h-4 w-4" />}
+                    cutoutBgClass="bg-white dark:bg-[#1E1E1E]"
                     value={form.country}
                     onChange={(e) => setForm({ ...form, country: e.target.value })}
                     placeholder="e.g. India"
@@ -838,6 +953,7 @@ export default function Profile() {
                   <Input
                     label="Pincode / Postal Code"
                     icon={<MapPin className="h-4 w-4" />}
+                    cutoutBgClass="bg-white dark:bg-[#1E1E1E]"
                     value={form.pincode}
                     onChange={(e) => setForm({ ...form, pincode: e.target.value })}
                     placeholder="e.g. 560038"
@@ -848,7 +964,7 @@ export default function Profile() {
                   <Button
                     onClick={saveProfile}
                     size="sm"
-                    className="font-bold text-xs px-6 py-2.5"
+                    className="min-h-[40px] font-semibold text-xs px-6 py-2.5 bg-neutral-950 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-200"
                   >
                     Save Location Details
                   </Button>
@@ -857,42 +973,52 @@ export default function Profile() {
             )}
 
             {activeTab === "payout" && (
-              <div className="relative rounded-2xl sm:rounded-3xl border border-neutral-300/80 dark:border-neutral-700/80 bg-card dark:bg-[#1E1E1E] pt-5 sm:pt-6 p-6 sm:p-8 space-y-6 animate-in fade-in duration-300 text-left">
-                <div className="absolute -top-3 left-4 px-2 bg-card dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
-                  <CreditCard className="h-3.5 w-3.5 text-primary" />
-                  <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
-                    Contact & Payout Channels
+              <div className="relative rounded-2xl sm:rounded-3xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] pt-5 sm:pt-6 p-6 sm:p-8 space-y-6 text-left">
+                <div className="absolute -top-3 left-4 px-2 bg-white dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
+                  <CreditCard className="h-3.5 w-3.5 text-neutral-700 dark:text-neutral-300 stroke-[1.75]" aria-hidden="true" />
+                  <span className="text-xs sm:text-[13px] font-semibold text-neutral-950 dark:text-white">
+                    Contact &amp; Payout Channels
                   </span>
                 </div>
-                <div className="absolute -top-3 right-4 px-1.5 bg-card dark:bg-[#1E1E1E] z-10">
-                  <span className="text-xs text-muted-foreground font-semibold">
-                    Financial & Settlement
+                <div className="absolute -top-3 right-4 px-1.5 bg-white dark:bg-[#1E1E1E] z-10">
+                  <span className="text-xs text-neutral-600 dark:text-neutral-400 font-semibold">
+                    Financial &amp; Settlement
                   </span>
                 </div>
 
                 <div className="grid sm:grid-cols-3 gap-5">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-foreground flex items-center justify-between">
+                    <label
+                      htmlFor="profile-pan-input"
+                      className="text-xs font-bold text-neutral-900 dark:text-neutral-100 flex items-center justify-between"
+                    >
                       <span className="flex items-center gap-1.5">
-                        <ShieldCheck className="h-4 w-4 text-emerald-500" />
+                        <ShieldCheck className="h-4 w-4 text-neutral-700 dark:text-neutral-300" aria-hidden="true" />
                         PAN Number
                       </span>
                       {user?.panNumber && user.panNumber.length > 5 && (
                         <button
                           type="button"
                           onClick={() => setShowPan(!showPan)}
-                          className="text-[11px] text-primary hover:underline flex items-center gap-1 cursor-pointer font-medium"
+                          className="text-xs text-neutral-900 dark:text-neutral-100 hover:underline flex items-center gap-1 cursor-pointer font-medium"
                         >
-                          {showPan ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                          {showPan ? <EyeOff className="h-3.5 w-3.5" aria-hidden="true" /> : <Eye className="h-3.5 w-3.5" aria-hidden="true" />}
                           {showPan ? "Mask" : "Show Full"}
                         </button>
                       )}
                     </label>
                     <Input
+                      id="profile-pan-input"
+                      cutoutBgClass="bg-white dark:bg-[#1E1E1E]"
                       value={
                         showPan
-                          ? user?.panNumber || user?.panMasked || "XXXXX1234F"
-                          : user?.panMasked || (user?.panNumber ? `XXXXX${user.panNumber.slice(-5)}` : "XXXXX1234F")
+                          ? user?.panNumber ||
+                            kycData?.maskedNumber ||
+                            user?.panMasked ||
+                            "Not linked"
+                          : kycData?.maskedNumber ||
+                            user?.panMasked ||
+                            (user?.panNumber ? `XXXXX${user.panNumber.slice(-5)}` : "Not linked")
                       }
                       disabled
                       className="font-mono uppercase font-bold tracking-wider"
@@ -901,6 +1027,7 @@ export default function Profile() {
                   <Input
                     label="Email Address"
                     icon={<Mail className="h-4 w-4" />}
+                    cutoutBgClass="bg-white dark:bg-[#1E1E1E]"
                     value={form.email}
                     onChange={(e) => setForm({ ...form, email: e.target.value })}
                     disabled
@@ -908,6 +1035,7 @@ export default function Profile() {
                   <Input
                     label="Phone Number"
                     icon={<Phone className="h-4 w-4" />}
+                    cutoutBgClass="bg-white dark:bg-[#1E1E1E]"
                     value={form.phone}
                     onChange={(e) => setForm({ ...form, phone: e.target.value })}
                   />
@@ -916,6 +1044,7 @@ export default function Profile() {
                 <Input
                   label="Lender Payout UPI ID (For Rental Earnings)"
                   icon={<CreditCard className="h-4 w-4" />}
+                  cutoutBgClass="bg-white dark:bg-[#1E1E1E]"
                   value={form.upiId}
                   onChange={(e) => setForm({ ...form, upiId: e.target.value })}
                   placeholder="you@upi"
@@ -925,7 +1054,7 @@ export default function Profile() {
                   <Button
                     onClick={saveProfile}
                     size="sm"
-                    className="font-bold text-xs px-6 py-2.5"
+                    className="min-h-[40px] font-semibold text-xs px-6 py-2.5 bg-neutral-950 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-200"
                   >
                     Update Payout Info
                   </Button>
@@ -934,17 +1063,17 @@ export default function Profile() {
             )}
 
             {activeTab === "security" && (
-              <div className="space-y-6 animate-in fade-in duration-300">
+              <div className="space-y-6">
                 {/* Security & Password Change */}
-                <div className="relative rounded-2xl sm:rounded-3xl border border-neutral-300/80 dark:border-neutral-700/80 bg-card dark:bg-[#1E1E1E] pt-5 sm:pt-6 p-6 sm:p-8 space-y-6 text-left">
-                  <div className="absolute -top-3 left-4 px-2 bg-card dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
-                    <Lock className="h-3.5 w-3.5 text-primary" />
-                    <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
-                      Security & Password
+                <div className="relative rounded-2xl sm:rounded-3xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] pt-5 sm:pt-6 p-6 sm:p-8 space-y-6 text-left">
+                  <div className="absolute -top-3 left-4 px-2 bg-white dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
+                    <Lock className="h-3.5 w-3.5 text-neutral-700 dark:text-neutral-300 stroke-[1.75]" aria-hidden="true" />
+                    <span className="text-xs sm:text-[13px] font-semibold text-neutral-950 dark:text-white">
+                      Security &amp; Password
                     </span>
                   </div>
-                  <div className="absolute -top-3 right-4 px-1.5 bg-card dark:bg-[#1E1E1E] z-10">
-                    <span className="text-xs text-muted-foreground font-semibold">
+                  <div className="absolute -top-3 right-4 px-1.5 bg-white dark:bg-[#1E1E1E] z-10">
+                    <span className="text-xs text-neutral-600 dark:text-neutral-400 font-semibold">
                       Account Protection
                     </span>
                   </div>
@@ -954,6 +1083,7 @@ export default function Profile() {
                       type="password"
                       label="Current Password"
                       icon={<Key className="h-4 w-4" />}
+                      cutoutBgClass="bg-white dark:bg-[#1E1E1E]"
                       value={passwordForm.currentPassword}
                       onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
                       placeholder="Enter current password"
@@ -964,6 +1094,7 @@ export default function Profile() {
                         type="password"
                         label="New Password"
                         icon={<Lock className="h-4 w-4" />}
+                        cutoutBgClass="bg-white dark:bg-[#1E1E1E]"
                         value={passwordForm.newPassword}
                         onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
                         placeholder="At least 6 characters"
@@ -972,6 +1103,7 @@ export default function Profile() {
                         type="password"
                         label="Confirm New Password"
                         icon={<Lock className="h-4 w-4" />}
+                        cutoutBgClass="bg-white dark:bg-[#1E1E1E]"
                         value={passwordForm.confirmPassword}
                         onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
                         placeholder="Repeat new password"
@@ -983,7 +1115,7 @@ export default function Profile() {
                         type="submit"
                         disabled={changingPassword}
                         size="sm"
-                        className="font-bold text-xs px-6 py-2.5"
+                        className="min-h-[40px] font-semibold text-xs px-6 py-2.5 bg-neutral-950 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-200"
                       >
                         {changingPassword ? "Updating Password..." : "Update Password"}
                       </Button>
@@ -992,12 +1124,12 @@ export default function Profile() {
                 </div>
 
                 {/* Active Sessions & Devices */}
-                <div className="card-premium p-6 sm:p-8 border border-border/80 space-y-6">
-                  <div className="flex items-center justify-between pb-4 border-b border-border flex-wrap gap-2">
+                <div className="rounded-3xl bg-white dark:bg-[#1E1E1E] p-6 sm:p-8 border border-neutral-200 dark:border-neutral-800 space-y-6">
+                  <div className="flex items-center justify-between pb-4 border-b border-neutral-200 dark:border-neutral-800 flex-wrap gap-2">
                     <div className="flex items-center gap-2">
-                      <Laptop className="h-5 w-5 text-primary" />
-                      <h3 className="font-extrabold text-lg text-foreground">
-                        Active Devices & Multi-Sessions
+                      <Laptop className="h-5 w-5 text-neutral-700 dark:text-neutral-300 stroke-[1.75]" aria-hidden="true" />
+                      <h3 className="font-semibold text-lg text-neutral-950 dark:text-white">
+                        Active Devices &amp; Multi-Sessions
                       </h3>
                     </div>
                     <Button
@@ -1005,13 +1137,13 @@ export default function Profile() {
                       variant="outline"
                       size="sm"
                       onClick={handleLogoutAllDevices}
-                      className="font-bold text-xs text-destructive border-destructive/30 hover:bg-destructive/10 cursor-pointer py-2 px-4"
+                      className="font-bold text-xs text-red-700 dark:text-red-400 border-red-500/30 hover:bg-red-500/10 cursor-pointer py-2 px-4"
                     >
                       Log Out All Other Devices
                     </Button>
                   </div>
 
-                  <p className="text-xs text-muted-foreground font-medium">
+                  <p className="text-xs text-neutral-600 dark:text-neutral-400 font-medium">
                     Manage active multi-device logins. Each active session uses a 30-minute access token and a 7-day refresh session.
                   </p>
 
@@ -1020,26 +1152,26 @@ export default function Profile() {
                       sessions.map((s) => (
                         <div
                           key={s.id}
-                          className="flex items-center justify-between p-4 rounded-2xl bg-secondary/40 border border-border/60 flex-wrap gap-4"
+                          className="flex items-center justify-between p-4 rounded-2xl bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 flex-wrap gap-4"
                         >
                           <div className="flex items-center gap-3.5">
                             {s.deviceName?.includes("Mobile") ? (
-                              <Smartphone className="h-6 w-6 text-emerald-500 shrink-0" />
+                              <Smartphone className="h-6 w-6 text-neutral-700 dark:text-neutral-300 shrink-0" aria-hidden="true" />
                             ) : (
-                              <Laptop className="h-6 w-6 text-emerald-500 shrink-0" />
+                              <Laptop className="h-6 w-6 text-neutral-700 dark:text-neutral-300 shrink-0" aria-hidden="true" />
                             )}
                             <div>
                               <div className="flex items-center gap-2">
-                                <p className="text-xs font-bold text-foreground">
+                                <p className="text-xs font-bold text-neutral-950 dark:text-white">
                                   {s.deviceName || "Web Browser"}
                                 </p>
                                 {s.isCurrent && (
-                                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-black uppercase">
-                                    Current Device
+                                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 text-xs font-semibold">
+                                    Current device
                                   </span>
                                 )}
                               </div>
-                              <p className="text-[11px] text-muted-foreground font-medium mt-0.5">
+                              <p className="text-xs text-neutral-600 dark:text-neutral-400 font-medium mt-0.5">
                                 IP: {s.ipAddress || "127.0.0.1"} · Last active:{" "}
                                 {s.lastUsedAt ? new Date(s.lastUsedAt).toLocaleString() : "Recently"}
                               </p>
@@ -1052,16 +1184,16 @@ export default function Profile() {
                               variant="ghost"
                               size="sm"
                               onClick={() => handleRevokeSession(s.id)}
-                              className="text-xs font-bold text-destructive hover:bg-destructive/10 cursor-pointer gap-1.5"
+                              className="text-xs font-bold text-red-700 dark:text-red-400 hover:bg-red-500/10 cursor-pointer gap-1.5"
                             >
-                              <Trash2 className="h-4 w-4" />
+                              <Trash2 className="h-4 w-4" aria-hidden="true" />
                               <span>Revoke Session</span>
                             </Button>
                           )}
                         </div>
                       ))
                     ) : (
-                      <div className="p-4 rounded-2xl bg-secondary/20 border border-border text-center text-xs text-muted-foreground font-medium">
+                      <div className="p-4 rounded-2xl bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-center text-xs text-neutral-600 dark:text-neutral-400 font-medium">
                         Active device session securely stored (30-min access / 7-day refresh).
                       </div>
                     )}
@@ -1074,71 +1206,106 @@ export default function Profile() {
           {/* Right Column: Verification & Trust Badges */}
           <div className="space-y-6">
             {/* Verification Status Card */}
-            <div className="card-premium p-6 border border-border/80 space-y-5">
-              <div className="flex items-center justify-between border-b border-border pb-3">
-                <h3 className="font-extrabold text-base text-foreground flex items-center gap-2">
-                  <ShieldCheck className="h-5 w-5 text-emerald-500" />
-                  <span>Verification & Trust Status</span>
+            <div className="rounded-3xl bg-white dark:bg-[#1E1E1E] p-6 border border-neutral-200 dark:border-neutral-800 space-y-5 shadow-xs">
+              <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-800 pb-3">
+                <h3 className="font-semibold text-base text-neutral-950 dark:text-white flex items-center gap-2">
+                  <ShieldCheck className="h-5 w-5 text-neutral-700 dark:text-neutral-300 stroke-[1.75]" aria-hidden="true" />
+                  <span>Verification &amp; Trust Status</span>
                 </h3>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => navigate({ to: "/payent/kyc" })}
-                  className="gap-1.5 text-xs font-bold py-1.5 px-3 border-primary/30 text-primary hover:bg-primary/10"
+                  className="gap-1.5 text-xs font-semibold py-1.5 px-3 border-neutral-300 dark:border-neutral-700 text-neutral-900 dark:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800"
                 >
                   <span>{kycData?.status === "APPROVED" ? "View PAN KYC" : "Manage PAN KYC"}</span>
-                  <ExternalLink className="h-3.5 w-3.5" />
+                  <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
                 </Button>
               </div>
 
               <div className="space-y-3">
-                <div className="p-3.5 rounded-2xl bg-secondary/40 border border-border/60 space-y-2.5">
+                <div className="p-3.5 rounded-2xl bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 space-y-2.5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      {kycData?.status === "APPROVED" ? (
-                        <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
+                      {kycLoading ? (
+                        <Loader2 className="h-5 w-5 animate-spin text-neutral-600 dark:text-neutral-400 shrink-0" aria-hidden="true" />
+                      ) : kycError ? (
+                        <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 shrink-0" aria-hidden="true" />
+                      ) : kycData?.status === "APPROVED" ? (
+                        <CheckCircle2 className="h-5 w-5 text-emerald-700 dark:text-emerald-400 shrink-0" aria-hidden="true" />
                       ) : kycData?.status === "REJECTED" ? (
-                        <X className="h-5 w-5 text-destructive shrink-0" />
+                        <X className="h-5 w-5 text-red-600 dark:text-red-400 shrink-0" aria-hidden="true" />
                       ) : kycData?.status === "PENDING" ? (
-                        <Clock className="h-5 w-5 text-amber-500 shrink-0" />
+                        <Clock className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" aria-hidden="true" />
                       ) : (
-                        <ShieldCheck className="h-5 w-5 text-muted-foreground shrink-0" />
+                        <ShieldCheck className="h-5 w-5 text-neutral-600 dark:text-neutral-400 shrink-0" aria-hidden="true" />
                       )}
                       <div>
-                        <p className="text-xs font-bold text-foreground">
+                        <p className="text-xs font-bold text-neutral-950 dark:text-white">
                           Govt PAN Card Verification
                         </p>
-                        <p className="text-[10px] text-muted-foreground font-medium font-mono">
-                          PAN: {kycData?.maskedNumber || user?.panMasked || (user?.panNumber ? `XXXXX${user.panNumber.slice(-5)}` : "Not linked")}
+                        <p className="text-xs text-neutral-600 dark:text-neutral-400 font-medium font-mono">
+                          PAN:{" "}
+                          {kycLoading
+                            ? "Checking..."
+                            : kycError
+                            ? "Unavailable"
+                            : kycData?.maskedNumber ||
+                              user?.panMasked ||
+                              (user?.panNumber ? `XXXXX${user.panNumber.slice(-5)}` : "Not linked")}
                         </p>
                       </div>
                     </div>
-                    <span className={cn(
-                      "text-[10px] font-black uppercase px-2 py-0.5 rounded-full border",
-                      kycData?.status === "APPROVED"
-                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
-                        : kycData?.status === "REJECTED"
-                        ? "bg-destructive/10 text-destructive border-destructive/30"
-                        : kycData?.status === "PENDING"
-                        ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
-                        : "bg-secondary text-muted-foreground border-border"
-                    )}>
-                      {kycData?.status || (user?.kycStatus ?? "NOT_STARTED")}
+                    <span
+                      className={cn(
+                        "text-xs font-semibold px-2 py-0.5 rounded-full border capitalize",
+                        kycLoading
+                          ? "bg-neutral-200 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border-neutral-300 dark:border-neutral-700"
+                          : kycError
+                          ? "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30"
+                          : kycData?.status === "APPROVED"
+                          ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
+                          : kycData?.status === "REJECTED"
+                          ? "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30"
+                          : kycData?.status === "PENDING"
+                          ? "bg-amber-500/10 text-amber-800 dark:text-amber-300 border-amber-500/30"
+                          : "bg-neutral-200 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border-neutral-300 dark:border-neutral-700"
+                      )}
+                    >
+                      {kycLoading
+                        ? "Checking"
+                        : kycError
+                        ? "Unavailable"
+                        : (kycData?.status || "Not started").replace(/_/g, " ").toLowerCase()}
                     </span>
                   </div>
 
-                  {kycData?.status === "REJECTED" && kycData.rejectionReason && (
-                    <div className="text-[11px] text-destructive bg-destructive/10 rounded-xl p-2 font-medium">
+                  {kycError && (
+                    <div className="flex items-center justify-between gap-2 text-xs text-red-700 dark:text-red-400 bg-red-500/10 rounded-xl p-2 font-medium">
+                      <span>{kycError}</span>
+                      <button
+                        type="button"
+                        onClick={() => void loadKycStatus()}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white dark:bg-[#1E1E1E] border border-neutral-300 dark:border-neutral-700 text-neutral-950 dark:text-white font-bold cursor-pointer shrink-0 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                      >
+                        <RefreshCw className="h-3 w-3" aria-hidden="true" />
+                        <span>Retry</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {!kycError && kycData?.status === "REJECTED" && kycData.rejectionReason && (
+                    <div className="text-xs text-red-700 dark:text-red-400 bg-red-500/10 rounded-xl p-2 font-medium">
                       Rejection Reason: {kycData.rejectionReason}
                     </div>
                   )}
 
-                  {kycData?.status !== "APPROVED" && (
+                  {!kycLoading && !kycError && kycData?.status !== "APPROVED" && (
                     <div className="pt-1">
                       <Button
                         size="sm"
                         onClick={() => navigate({ to: "/payent/kyc" })}
-                        className="w-full text-xs font-bold btn-gradient py-1.5"
+                        className="w-full min-h-[40px] text-xs font-semibold bg-neutral-950 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-200 py-1.5"
                       >
                         {kycData?.status === "PENDING" ? "Check PAN Verification Status" : "Verify PAN Card Now"}
                       </Button>
@@ -1146,36 +1313,36 @@ export default function Profile() {
                   )}
                 </div>
 
-                <div className="flex items-center justify-between p-3.5 rounded-2xl bg-secondary/40 border border-border/60">
+                <div className="flex items-center justify-between p-3.5 rounded-2xl bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800">
                   <div className="flex items-center gap-3">
-                    <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
+                    <CheckCircle2 className="h-5 w-5 text-emerald-700 dark:text-emerald-400 shrink-0" aria-hidden="true" />
                     <div>
-                      <p className="text-xs font-bold text-foreground">
-                        Phone & Email Check
+                      <p className="text-xs font-bold text-neutral-950 dark:text-white">
+                        Phone &amp; Email Check
                       </p>
-                      <p className="text-[10px] text-muted-foreground font-medium">
-                        OTP & Security confirmed
+                      <p className="text-xs text-neutral-600 dark:text-neutral-400 font-medium">
+                        OTP &amp; Security confirmed
                       </p>
                     </div>
                   </div>
-                  <span className="text-[10px] font-black text-emerald-500 uppercase">
+                  <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">
                     Verified
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between p-3.5 rounded-2xl bg-secondary/40 border border-border/60">
+                <div className="flex items-center justify-between p-3.5 rounded-2xl bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800">
                   <div className="flex items-center gap-3">
-                    <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
+                    <ShieldCheck className="h-5 w-5 text-emerald-700 dark:text-emerald-400 shrink-0 stroke-[1.75]" aria-hidden="true" />
                     <div>
-                      <p className="text-xs font-bold text-foreground">
+                      <p className="text-xs font-semibold text-neutral-950 dark:text-white">
                         Equipment Protection Shield
                       </p>
-                      <p className="text-[10px] text-muted-foreground font-medium">
+                      <p className="text-xs text-neutral-600 dark:text-neutral-400 font-medium tabular-nums">
                         ₹5,00,000 Equipment Coverage
                       </p>
                     </div>
                   </div>
-                  <span className="text-[10px] font-black text-emerald-500 uppercase">
+                  <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">
                     Active
                   </span>
                 </div>
@@ -1183,28 +1350,28 @@ export default function Profile() {
             </div>
 
             {/* Handover & Pickup Info */}
-            <div className="card-premium p-6 border border-border/80 space-y-4">
-              <h3 className="font-extrabold text-base text-foreground flex items-center gap-2 border-b border-border pb-3">
-                <MapPin className="h-5 w-5 text-primary" />
+            <div className="rounded-3xl bg-white dark:bg-[#1E1E1E] p-6 border border-neutral-200 dark:border-neutral-800 space-y-4 shadow-xs">
+              <h3 className="font-semibold text-base text-neutral-950 dark:text-white flex items-center gap-2 border-b border-neutral-200 dark:border-neutral-800 pb-3">
+                <MapPin className="h-5 w-5 text-neutral-700 dark:text-neutral-300 stroke-[1.75]" aria-hidden="true" />
                 <span>Handover Preferences</span>
               </h3>
 
               <div className="space-y-3 text-xs font-medium">
-                <div className="flex justify-between text-muted-foreground">
+                <div className="flex justify-between text-neutral-600 dark:text-neutral-400">
                   <span>Handover Mode:</span>
-                  <span className="font-bold text-foreground">
+                  <span className="font-semibold text-neutral-950 dark:text-white">
                     Self Pickup / Local Courier
                   </span>
                 </div>
-                <div className="flex justify-between text-muted-foreground">
+                <div className="flex justify-between text-neutral-600 dark:text-neutral-400">
                   <span>Pickup Operating Hours:</span>
-                  <span className="font-bold text-foreground">
+                  <span className="font-semibold text-neutral-950 dark:text-white tabular-nums">
                     09:00 AM - 08:00 PM
                   </span>
                 </div>
-                <div className="flex justify-between text-muted-foreground">
+                <div className="flex justify-between text-neutral-600 dark:text-neutral-400">
                   <span>Deposit Security:</span>
-                  <span className="font-bold text-foreground">
+                  <span className="font-semibold text-neutral-950 dark:text-white">
                     Zero-Hold Authorization
                   </span>
                 </div>
@@ -1212,33 +1379,33 @@ export default function Profile() {
             </div>
 
             {/* Support Callout */}
-            <div className="card-premium p-6 border border-border/80 bg-secondary/30 space-y-3 text-center">
-              <HelpCircle className="h-8 w-8 text-primary mx-auto opacity-90" />
-              <h4 className="text-xs font-extrabold text-foreground">
+            <div className="rounded-3xl bg-neutral-100/70 dark:bg-[#1E1E1E] p-6 border border-neutral-200 dark:border-neutral-800 space-y-3 text-center shadow-xs">
+              <HelpCircle className="h-8 w-8 text-neutral-700 dark:text-neutral-300 mx-auto stroke-[1.75]" aria-hidden="true" />
+              <h4 className="text-xs font-semibold text-neutral-950 dark:text-white">
                 Need help updating account credentials?
               </h4>
-              <p className="text-[11px] text-muted-foreground font-medium">
-                Contact Payent 24/7 Creator Support for GST billing updates or identity re-verification.
+              <p className="text-xs text-neutral-600 dark:text-neutral-400 font-medium">
+                Contact paYent 24/7 Support for GST billing updates or identity re-verification.
               </p>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => navigate({ to: "/contact" })}
-                className="w-full font-bold text-xs mt-2 py-2"
+                className="w-full min-h-[40px] font-semibold text-xs mt-2 py-2"
               >
                 Contact Support
               </Button>
             </div>
 
             {/* Account Security & Sign Out Section */}
-            <div className="card-premium p-6 border border-destructive/30 bg-destructive/5 space-y-4">
+            <div className="rounded-3xl p-6 border border-red-500/30 bg-red-500/5 space-y-4">
               <div>
-                <h3 className="font-extrabold text-sm text-destructive flex items-center gap-2">
-                  <LogOut className="h-4 w-4" />
+                <h3 className="font-semibold text-sm text-red-700 dark:text-red-400 flex items-center gap-2">
+                  <LogOut className="h-4 w-4 stroke-[1.75]" aria-hidden="true" />
                   <span>Account Session</span>
                 </h3>
-                <p className="text-xs text-muted-foreground font-medium mt-1">
-                  Logged in as <span className="font-bold text-foreground">{user?.email}</span>.
+                <p className="text-xs text-neutral-600 dark:text-neutral-400 font-medium mt-1">
+                  Logged in as <span className="font-bold text-neutral-950 dark:text-white">{user?.email}</span>.
                 </p>
               </div>
               <Button
@@ -1248,10 +1415,10 @@ export default function Profile() {
                   toast.success("Logged out successfully.");
                   navigate({ to: "/" });
                 }}
-                className="w-full font-bold text-xs flex items-center justify-center gap-2 py-2.5 shadow-md hover:shadow-lg transition-all cursor-pointer"
+                className="w-full min-h-[42px] font-semibold text-xs flex items-center justify-center gap-2 py-2.5 shadow-xs transition-colors cursor-pointer"
               >
-                <LogOut className="h-4 w-4" />
-                <span>Log Out of Payent</span>
+                <LogOut className="h-4 w-4" aria-hidden="true" />
+                <span>Log Out of paYent</span>
               </Button>
             </div>
           </div>

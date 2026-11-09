@@ -34,6 +34,7 @@ import {
   Download,
   RefreshCw,
   FileText,
+  Loader2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/common/Button";
@@ -47,6 +48,7 @@ import { getOptimizedImageUrl } from "@/utils/images";
 import { SecretPinDisplay } from "@/components/common/SecretPinDisplay";
 import { LiveRentalQueue } from "@/components/rental/LiveRentalQueue";
 import { formatBookingDateTime } from "@/utils/formatters";
+import { cn } from "@/lib/utils";
 
 export type BookingFilter = "all" | "pending" | "ongoing" | "cancelled" | "completed";
 
@@ -76,80 +78,17 @@ export const isEligibleForCancellation = (order: Order | null | undefined): bool
   return true;
 };
 
-export const DEFAULT_SAMPLE_ORDERS: Order[] = [
-  {
-    id: "ord_1793113916585",
-    productId: "prod_vivobook_15",
-    productTitle: "Asus Vivobook 15",
-    productImage: "https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=600",
-    category: "Computers",
-    startDate: "2026-10-28",
-    endDate: "2026-10-30",
-    total: 1500,
-    status: "cancelled" as any,
-    confirmedAt: "2026-10-27T20:41:00.000Z",
-    createdAt: "2026-10-27T20:41:00.000Z",
-    created_at: "2026-10-27T20:41:00.000Z",
-    cancelledAt: "2026-10-28T09:00:00.000Z",
-    cancellationReason: "User requested schedule alteration",
-    deliveryMethod: "delivery",
-    deliveryAddress: "Koramangala 5th Block, Bengaluru, Karnataka 560095",
-  },
-  {
-    id: "ord_1793113916123",
-    productId: "prod_canon_r50",
-    productTitle: "Canon EOS R50",
-    productImage: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=600",
-    category: "Cameras",
-    startDate: "2026-10-13",
-    endDate: "2026-10-15",
-    total: 2400,
-    status: "cancelled" as any,
-    confirmedAt: "2026-10-12T11:20:00.000Z",
-    createdAt: "2026-10-12T11:20:00.000Z",
-    created_at: "2026-10-12T11:20:00.000Z",
-    cancelledAt: "2026-10-12T14:30:00.000Z",
-    cancellationReason: "Shoot postponed by production crew",
-    deliveryMethod: "pickup",
-    pickupLocation: "Indiranagar Hub, 100ft Road, Bengaluru",
-  },
-  {
-    id: "ord_1793113915678",
-    productId: "prod_hero_sprint_mtb",
-    productTitle: "Hero Sprint MTB",
-    productImage: "https://images.unsplash.com/photo-1485965120184-e220f721d03e?w=600",
-    category: "Bicycles",
-    startDate: "2026-10-06",
-    endDate: "2026-10-08",
-    total: 600,
-    status: "cancelled" as any,
-    confirmedAt: "2026-10-05T16:10:00.000Z",
-    createdAt: "2026-10-05T16:10:00.000Z",
-    created_at: "2026-10-05T16:10:00.000Z",
-    cancelledAt: "2026-10-06T08:00:00.000Z",
-    cancellationReason: "Weather advisories",
-    deliveryMethod: "delivery",
-    deliveryAddress: "HSR Layout Sector 2, Bengaluru",
-  },
-  {
-    id: "ord_1793113915432",
-    productId: "prod_sony_wh720n",
-    productTitle: "Sony WH-CH720N",
-    productImage: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600",
-    category: "Audio",
-    startDate: "2026-09-29",
-    endDate: "2026-10-01",
-    total: 450,
-    status: "cancelled" as any,
-    confirmedAt: "2026-09-28T14:15:00.000Z",
-    createdAt: "2026-09-28T14:15:00.000Z",
-    created_at: "2026-09-28T14:15:00.000Z",
-    cancelledAt: "2026-09-29T10:00:00.000Z",
-    cancellationReason: "Booking rescheduled",
-    deliveryMethod: "delivery",
-    deliveryAddress: "Whitefield Main Road, Bengaluru",
-  },
-];
+const LEGACY_SAMPLE_ORDER_IDS = new Set([
+  "ord_1793113916585",
+  "ord_1793113916123",
+  "ord_1793113915678",
+  "ord_1793113915432",
+]);
+
+export const stripLegacySampleOrders = (items: Order[]): Order[] => {
+  if (!Array.isArray(items)) return [];
+  return items.filter((o) => !LEGACY_SAMPLE_ORDER_IDS.has(String(o?.id || "")));
+};
 
 /**
  * Status categorization logic mapped to backend booking statuses
@@ -240,7 +179,7 @@ export function getOrderCategory(order: Order): string {
 export function getOrderDates(order: Order) {
   const createdRaw =
     order.createdAt || (order as any).created_at || (order as any).confirmedAt || (order as any).confirmed_at;
-  let bookedOnText = "27 Oct 2026, 08:41 PM";
+  let bookedOnText = "Date unavailable";
   if (createdRaw) {
     try {
       const dt = new Date(createdRaw);
@@ -395,49 +334,46 @@ function BookingProgressTracker({ status, isCancelled }: { status: string; isCan
 
   return (
     <div className="rounded-xl border border-neutral-200/80 dark:border-white/10 bg-neutral-50/60 dark:bg-white/[0.02] p-3 space-y-2.5">
-      <div className="flex items-center justify-between text-[11px] font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+      <div className="flex items-center justify-between text-xs font-semibold text-neutral-700 dark:text-neutral-300">
         <span>Order Lifecycle Progress</span>
-        <span className="text-[10px] font-mono lowercase font-normal text-neutral-400 dark:text-neutral-500">Real-time status</span>
+        <span className="text-xs font-normal text-neutral-600 dark:text-neutral-400">Real-time status</span>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
         {steps.map((step) => (
           <div
             key={step.id}
-            className={`p-2.5 rounded-lg border text-left transition-all ${
+            className={`p-2.5 rounded-lg border text-left transition-colors ${
               step.done
                 ? "bg-emerald-500/10 border-emerald-500/25"
                 : step.current
                 ? "bg-neutral-900 text-white dark:bg-white dark:text-black border-transparent shadow-xs"
-                : "bg-white/70 dark:bg-white/5 border-neutral-200/60 dark:border-white/5 opacity-60 text-neutral-500 dark:text-neutral-400"
+                : "bg-white/70 dark:bg-white/5 border-neutral-200/60 dark:border-white/5 opacity-75 text-neutral-600 dark:text-neutral-400"
             }`}
           >
             <div className="flex items-center justify-between mb-1">
               <span
-                className={`text-[9px] font-mono font-bold px-1.5 py-0.2 rounded-md ${
+                className={`text-[11px] font-semibold tabular-nums px-1.5 py-0.5 rounded-md ${
                   step.done
                     ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-400"
                     : step.current
                     ? "bg-white/20 dark:bg-black/20 text-inherit"
-                    : "bg-neutral-100 dark:bg-white/10 text-neutral-500 dark:text-neutral-400"
+                    : "bg-neutral-100 dark:bg-white/10 text-neutral-600 dark:text-neutral-400"
                 }`}
               >
                 0{step.id}
               </span>
               {step.done ? (
-                <CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                <CheckCircle2 className="h-3.5 w-3.5 stroke-[1.75] text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
               ) : step.current ? (
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                </span>
+                <span className="inline-flex rounded-full h-2 w-2 bg-emerald-500" aria-hidden="true"></span>
               ) : (
-                <Clock className="h-3 w-3 text-neutral-400 dark:text-neutral-600" />
+                <Clock className="h-3.5 w-3.5 stroke-[1.75] text-neutral-500 dark:text-neutral-400" aria-hidden="true" />
               )}
             </div>
-            <div className={`text-[11px] font-bold leading-tight ${step.done ? "text-neutral-900 dark:text-white" : step.current ? "text-inherit" : "text-neutral-600 dark:text-neutral-400"}`}>
+            <div className={`text-xs font-semibold leading-tight ${step.done ? "text-neutral-900 dark:text-white" : step.current ? "text-inherit" : "text-neutral-700 dark:text-neutral-300"}`}>
               {step.label}
             </div>
-            <div className={`text-[9px] mt-0.5 truncate ${step.current ? "text-white/80 dark:text-black/80" : "text-neutral-400 dark:text-neutral-500"}`}>
+            <div className={`text-[11px] mt-0.5 truncate ${step.current ? "text-white/80 dark:text-black/80" : "text-neutral-600 dark:text-neutral-400"}`}>
               {step.description}
             </div>
           </div>
@@ -451,6 +387,7 @@ export default function Orders() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setErrorState] = useState<string | null>(null);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
   // Cancellation Modal & Flow State
   const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null);
   const [selectedReason, setSelectedReason] = useState<string>("");
@@ -510,33 +447,65 @@ export default function Orders() {
 
   // Payment Receipt Modal & Status Checker State
   const [receiptOrder, setReceiptOrder] = useState<Order | null>(null);
-  const [receiptData, setReceiptData] = useState<any | null>(null);
+  const [receiptData, setReceiptData] = useState<{
+    receipt_number?: string;
+    order_id?: string;
+    product_title?: string;
+    transaction_id?: string;
+    total_amount?: number;
+    payment_status?: string;
+    issued_at?: string;
+    escrow_guarantee?: string;
+  } | null>(null);
   const [receiptLoading, setReceiptLoading] = useState(false);
+  const [receiptError, setReceiptError] = useState<string | null>(null);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const receiptReqSeqRef = useRef(0);
+
+  const handleCloseReceipt = useCallback(() => {
+    receiptReqSeqRef.current += 1;
+    setShowReceiptModal(false);
+    setReceiptLoading(false);
+    setReceiptData(null);
+    setReceiptError(null);
+    setReceiptOrder(null);
+  }, []);
 
   const handleOpenReceipt = async (order: Order) => {
+    const seq = ++receiptReqSeqRef.current;
     setReceiptOrder(order);
+    setReceiptData(null);
+    setReceiptError(null);
     setShowReceiptModal(true);
+
     const token = storage.get<string | null>(STORAGE_KEYS.token, null);
-    if (!token) return;
+    if (!token) {
+      setReceiptLoading(false);
+      setReceiptError("Please sign in to view your official rental receipt.");
+      return;
+    }
 
     setReceiptLoading(true);
     try {
       const data = await api.getPaymentReceipt(token, order.id);
-      setReceiptData(data);
-    } catch {
-      setReceiptData({
-        receipt_number: `REC-${order.id.replace("ord_", "")}`,
-        order_id: order.id,
-        product_title: order.productTitle || (order as any).product_title || "Equipment Rental",
-        transaction_id: order.razorpayPaymentId || (order as any).razorpay_payment_id || `pay_${order.id}`,
-        total_amount: order.total,
-        payment_status: order.paymentStatus || (order as any).payment_status || "paid",
-        issued_at: order.confirmedAt || order.createdAt || new Date().toISOString(),
-        escrow_guarantee: "100% Escrow Secured by Payent Protection",
-      });
+      if (receiptReqSeqRef.current !== seq) return;
+      if (!data || typeof data !== "object") {
+        setReceiptError("Official receipt data is unavailable for this booking.");
+      } else {
+        setReceiptData(data);
+      }
+    } catch (err: unknown) {
+      if (receiptReqSeqRef.current !== seq) return;
+      const msg =
+        err instanceof Error && err.message
+          ? err.message
+          : "Unable to retrieve the official receipt for this booking.";
+      setReceiptData(null);
+      setReceiptError(msg);
     } finally {
-      setReceiptLoading(false);
+      if (receiptReqSeqRef.current === seq) {
+        setReceiptLoading(false);
+      }
     }
   };
 
@@ -550,7 +519,7 @@ export default function Orders() {
       toast.dismiss("check-pay");
       const st = String(res.payment_status || "").toLowerCase();
       if (st === "paid" || st === "successful") {
-        toast.success("Payment verified! Booking is confirmed.");
+        toast.success("Payment verified. Booking is confirmed.");
         void loadOrders();
       } else if (st === "failed") {
         toast.error("Payment failed. Please retry payment.");
@@ -572,7 +541,7 @@ export default function Orders() {
       return;
     }
     navigator.clipboard.writeText(text);
-    toast.success("Location address copied to clipboard!");
+    toast.success("Location address copied to clipboard");
   };
 
   const handleOpenLocationModal = (order: Order) => {
@@ -627,7 +596,7 @@ export default function Orders() {
         res.message ||
           (isAccepted
             ? "Location change request submitted for lender approval."
-            : "Booking location updated successfully!")
+            : "Booking location updated.")
       );
 
       loadOrders();
@@ -641,27 +610,46 @@ export default function Orders() {
 
   const loadOrders = useCallback(() => {
     if (isFetchingOrdersRef.current) return;
+    const rawLocal = storage.get<Order[]>(STORAGE_KEYS.orders, []);
+    const cleanLocal = stripLegacySampleOrders(rawLocal);
+    if (cleanLocal.length !== rawLocal.length) {
+      storage.set(STORAGE_KEYS.orders, cleanLocal);
+    }
+
     const currentToken = storage.get<string | null>(STORAGE_KEYS.token, null);
     if (!currentToken) {
-      const localOrders = storage.get<Order[]>(STORAGE_KEYS.orders, DEFAULT_SAMPLE_ORDERS);
-      setOrders(localOrders.length > 0 ? localOrders : DEFAULT_SAMPLE_ORDERS);
+      setErrorState(null);
+      setOrders(cleanLocal);
       setLoading(false);
       return;
     }
+
     isFetchingOrdersRef.current = true;
     setErrorState(null);
+    setRefreshError(null);
     api
       .getOrders(currentToken)
       .then((data) => {
-        const localOrders = storage.get<Order[]>(STORAGE_KEYS.orders, DEFAULT_SAMPLE_ORDERS);
-        const backendOrderIds = new Set(data.map((o) => o.id));
-        const missingLocal = localOrders.filter((o) => !backendOrderIds.has(o.id));
-        setOrders([...data, ...missingLocal]);
+        const backendOrders = Array.isArray(data) ? data : [];
+        const backendOrderIds = new Set(backendOrders.map((o) => o.id));
+        const missingLocal = cleanLocal.filter((o) => !backendOrderIds.has(o.id));
+        const merged = [...backendOrders, ...missingLocal];
+        setOrders(merged);
+        setRefreshError(null);
+        storage.set(STORAGE_KEYS.orders, merged);
       })
       .catch((err) => {
         console.error("Failed to load orders:", err);
-        const localOrders = storage.get<Order[]>(STORAGE_KEYS.orders, DEFAULT_SAMPLE_ORDERS);
-        setOrders(localOrders.length > 0 ? localOrders : DEFAULT_SAMPLE_ORDERS);
+        const message =
+          err instanceof Error && err.message
+            ? err.message
+            : "Unable to load your bookings. Please try again.";
+        setOrders(cleanLocal);
+        if (cleanLocal.length === 0) {
+          setErrorState(message);
+        } else {
+          setRefreshError(message);
+        }
       })
       .finally(() => {
         isFetchingOrdersRef.current = false;
@@ -670,13 +658,41 @@ export default function Orders() {
   }, []);
 
   useEffect(() => {
-    const cachedOrders = storage.get<Order[]>(STORAGE_KEYS.orders, DEFAULT_SAMPLE_ORDERS);
+    if (!showReceiptModal && !locationModalOrder && !(cancellingOrderId && cancellingOrder)) {
+      return;
+    }
+    const handleModalEscape = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      if (showReceiptModal) {
+        handleCloseReceipt();
+      } else if (locationModalOrder && !isSavingLocation) {
+        setLocationModalOrder(null);
+      } else if (cancellingOrderId && !isCancelling) {
+        closeCancellationModal();
+      }
+    };
+    window.addEventListener("keydown", handleModalEscape);
+    return () => window.removeEventListener("keydown", handleModalEscape);
+  }, [
+    showReceiptModal,
+    locationModalOrder,
+    isSavingLocation,
+    cancellingOrderId,
+    cancellingOrder,
+    isCancelling,
+    handleCloseReceipt,
+    closeCancellationModal,
+  ]);
+
+  useEffect(() => {
+    const rawCached = storage.get<Order[]>(STORAGE_KEYS.orders, []);
+    const cachedOrders = stripLegacySampleOrders(rawCached);
+    if (cachedOrders.length !== rawCached.length) {
+      storage.set(STORAGE_KEYS.orders, cachedOrders);
+    }
     if (cachedOrders.length > 0) {
       setOrders(cachedOrders);
-      setLoading(false);
-    } else {
-      setOrders(DEFAULT_SAMPLE_ORDERS);
-      storage.set(STORAGE_KEYS.orders, DEFAULT_SAMPLE_ORDERS);
       setLoading(false);
     }
 
@@ -912,15 +928,15 @@ export default function Orders() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1 border-b border-neutral-200/70 dark:border-white/10">
           <div>
             <div className="flex items-center gap-2.5">
-              <Package className="h-6 w-6 text-neutral-800 dark:text-white shrink-0" />
-              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-neutral-950 dark:text-white font-display">
+              <Package className="h-6 w-6 stroke-[1.75] text-neutral-800 dark:text-white shrink-0" />
+              <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-neutral-950 dark:text-white font-display">
                 My Rental Bookings
               </h1>
-              <span className="px-2 py-0.2 rounded-full text-xs font-mono font-semibold bg-neutral-200/80 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-300">
+              <span className="px-2 py-0.5 rounded-full text-xs font-semibold tabular-nums bg-neutral-200/80 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-300">
                 {orders.length}
               </span>
             </div>
-            <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
+            <p className="mt-0.5 text-xs text-neutral-600 dark:text-neutral-400">
               Manage your rentals, track deliveries and view booking history.
             </p>
           </div>
@@ -928,61 +944,58 @@ export default function Orders() {
           <button
             type="button"
             onClick={() => navigate({ to: "/categories" })}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-neutral-200/90 dark:border-white/10 bg-white dark:bg-white/5 hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-800 dark:text-white text-xs font-medium transition-colors shrink-0 w-fit cursor-pointer shadow-xs"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-neutral-200/90 dark:border-white/10 bg-white dark:bg-white/5 hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-800 dark:text-white text-xs font-medium transition-colors shrink-0 w-fit cursor-pointer shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
           >
-            <Store className="h-3.5 w-3.5" />
+            <Store className="h-3.5 w-3.5 stroke-[1.75]" />
             <span>Browse Marketplace</span>
           </button>
         </div>
 
-        {/* Four Summary KPI Metric Cards (Compact & Theme Adaptive) */}
+        {/* Four Summary KPI Metric Cards (Compact Monochrome Surface + Crisp Active Ring) */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5">
           {/* Card 1: Total Bookings */}
           <button
             type="button"
             onClick={() => setActiveFilter("all")}
-            className={`p-3 sm:p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
+            className={`p-3 sm:p-3.5 rounded-xl border text-left transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white ${
               activeFilter === "all"
-                ? "border-neutral-900 dark:border-white/30 bg-neutral-100/70 dark:bg-white/[0.08] ring-1 ring-neutral-900 dark:ring-white/20"
+                ? "border-neutral-950 dark:border-white bg-neutral-100/80 dark:bg-white/[0.08] ring-1 ring-neutral-950 dark:ring-white/30"
                 : "border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#1E1E1E] hover:border-neutral-300 dark:hover:border-white/20 shadow-xs"
             }`}
           >
             <div className="flex items-start gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-neutral-100 dark:bg-white/5 border border-neutral-200/70 dark:border-white/10 flex items-center justify-center text-neutral-600 dark:text-neutral-300 shrink-0">
-                <Package className="h-4 w-4" />
+              <div className="w-8 h-8 rounded-lg bg-neutral-100 dark:bg-white/5 border border-neutral-200/70 dark:border-white/10 flex items-center justify-center text-neutral-700 dark:text-neutral-300 shrink-0">
+                <Package className="h-4 w-4 stroke-[1.75]" />
               </div>
               <div className="min-w-0 flex-1">
-                <div className="text-[11px] text-neutral-500 dark:text-neutral-400 font-medium">Total Bookings</div>
-                <div className="text-xl sm:text-2xl font-bold font-mono text-neutral-950 dark:text-white mt-0.5">{filterCounts.all}</div>
-                <div className="text-[10px] text-neutral-400 dark:text-neutral-500 mt-0.5 truncate">All-time rentals</div>
+                <div className="text-[11px] text-neutral-600 dark:text-neutral-400 font-medium">Total Bookings</div>
+                <div className="text-xl sm:text-2xl font-semibold tabular-nums text-neutral-950 dark:text-white mt-0.5">{filterCounts.all}</div>
+                <div className="text-[11px] text-neutral-600 dark:text-neutral-400 mt-0.5 truncate">All-time rentals</div>
               </div>
             </div>
           </button>
 
-          {/* Card 2: Active & Ongoing (Signature Green Border) */}
+          {/* Card 2: Active & Ongoing */}
           <button
             type="button"
             onClick={() => setActiveFilter("ongoing")}
-            className={`p-3 sm:p-3.5 rounded-xl border text-left transition-all cursor-pointer border-emerald-500/50 ${
+            className={`p-3 sm:p-3.5 rounded-xl border text-left transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white ${
               activeFilter === "ongoing"
-                ? "bg-emerald-50 dark:bg-emerald-950/30 ring-1 ring-emerald-500"
-                : "bg-emerald-50/40 dark:bg-[#1E1E1E] hover:border-emerald-500/70 shadow-xs"
+                ? "border-neutral-950 dark:border-white bg-neutral-100/80 dark:bg-white/[0.08] ring-1 ring-neutral-950 dark:ring-white/30"
+                : "border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#1E1E1E] hover:border-neutral-300 dark:hover:border-white/20 shadow-xs"
             }`}
           >
             <div className="flex items-start gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
-                <Calendar className="h-4 w-4" />
+              <div className="w-8 h-8 rounded-lg bg-neutral-100 dark:bg-white/5 border border-neutral-200/70 dark:border-white/10 flex items-center justify-center text-emerald-700 dark:text-emerald-400 shrink-0">
+                <Calendar className="h-4 w-4 stroke-[1.75]" />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-emerald-700 dark:text-emerald-400 font-medium">Active & Ongoing</span>
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                  </span>
+                  <span className="text-[11px] text-neutral-600 dark:text-neutral-400 font-medium">Active & Ongoing</span>
+                  <span className="inline-flex rounded-full h-2 w-2 bg-emerald-600 dark:bg-emerald-400" aria-hidden="true"></span>
                 </div>
-                <div className="text-xl sm:text-2xl font-bold font-mono text-neutral-950 dark:text-white mt-0.5">{filterCounts.ongoing}</div>
-                <div className="text-[10px] text-emerald-600/80 dark:text-neutral-400 mt-0.5 truncate">Currently rented</div>
+                <div className="text-xl sm:text-2xl font-semibold tabular-nums text-neutral-950 dark:text-white mt-0.5">{filterCounts.ongoing}</div>
+                <div className="text-[11px] text-neutral-600 dark:text-neutral-400 mt-0.5 truncate">Currently rented</div>
               </div>
             </div>
           </button>
@@ -991,23 +1004,23 @@ export default function Orders() {
           <button
             type="button"
             onClick={() => setActiveFilter("pending")}
-            className={`p-3 sm:p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
+            className={`p-3 sm:p-3.5 rounded-xl border text-left transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white ${
               activeFilter === "pending"
-                ? "border-amber-500 bg-amber-50 dark:bg-amber-950/30 ring-1 ring-amber-500"
+                ? "border-neutral-950 dark:border-white bg-neutral-100/80 dark:bg-white/[0.08] ring-1 ring-neutral-950 dark:ring-white/30"
                 : "border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#1E1E1E] hover:border-neutral-300 dark:hover:border-white/20 shadow-xs"
             }`}
           >
             <div className="flex items-start gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
-                <Clock className="h-4 w-4" />
+              <div className="w-8 h-8 rounded-lg bg-neutral-100 dark:bg-white/5 border border-neutral-200/70 dark:border-white/10 flex items-center justify-center text-amber-700 dark:text-amber-400 shrink-0">
+                <Clock className="h-4 w-4 stroke-[1.75]" />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-amber-700 dark:text-amber-400 font-medium">Pending Action</span>
-                  <span className="h-2 w-2 rounded-full bg-amber-400"></span>
+                  <span className="text-[11px] text-neutral-600 dark:text-neutral-400 font-medium">Pending Action</span>
+                  <span className="h-2 w-2 rounded-full bg-amber-600 dark:bg-amber-400" aria-hidden="true"></span>
                 </div>
-                <div className="text-xl sm:text-2xl font-bold font-mono text-neutral-950 dark:text-white mt-0.5">{filterCounts.pending}</div>
-                <div className="text-[10px] text-neutral-400 dark:text-neutral-500 mt-0.5 truncate">Awaiting response</div>
+                <div className="text-xl sm:text-2xl font-semibold tabular-nums text-neutral-950 dark:text-white mt-0.5">{filterCounts.pending}</div>
+                <div className="text-[11px] text-neutral-600 dark:text-neutral-400 mt-0.5 truncate">Awaiting response</div>
               </div>
             </div>
           </button>
@@ -1024,22 +1037,22 @@ export default function Orders() {
                 setActiveFilter(filterCounts.completed > 0 ? "completed" : filterCounts.cancelled > 0 ? "cancelled" : "completed");
               }
             }}
-            className={`p-3 sm:p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
+            className={`p-3 sm:p-3.5 rounded-xl border text-left transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white ${
               activeFilter === "cancelled" || activeFilter === "completed"
-                ? "border-neutral-900 dark:border-white/30 bg-neutral-100/70 dark:bg-white/[0.08] ring-1 ring-neutral-900 dark:ring-white/20"
+                ? "border-neutral-950 dark:border-white bg-neutral-100/80 dark:bg-white/[0.08] ring-1 ring-neutral-950 dark:ring-white/30"
                 : "border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#1E1E1E] hover:border-neutral-300 dark:hover:border-white/20 shadow-xs"
             }`}
           >
             <div className="flex items-start gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-neutral-100 dark:bg-white/5 border border-neutral-200/70 dark:border-white/10 flex items-center justify-center text-neutral-600 dark:text-neutral-300 shrink-0">
-                <CheckCircle2 className="h-4 w-4" />
+              <div className="w-8 h-8 rounded-lg bg-neutral-100 dark:bg-white/5 border border-neutral-200/70 dark:border-white/10 flex items-center justify-center text-neutral-700 dark:text-neutral-300 shrink-0">
+                <CheckCircle2 className="h-4 w-4 stroke-[1.75]" />
               </div>
               <div className="min-w-0 flex-1">
-                <div className="text-[11px] text-neutral-500 dark:text-neutral-400 font-medium">Past Bookings</div>
-                <div className="text-xl sm:text-2xl font-bold font-mono text-neutral-950 dark:text-white mt-0.5">
+                <div className="text-[11px] text-neutral-600 dark:text-neutral-400 font-medium">Past Bookings</div>
+                <div className="text-xl sm:text-2xl font-semibold tabular-nums text-neutral-950 dark:text-white mt-0.5">
                   {filterCounts.completed + filterCounts.cancelled}
                 </div>
-                <div className="text-[10px] text-neutral-400 dark:text-neutral-500 mt-0.5 truncate">
+                <div className="text-[11px] text-neutral-600 dark:text-neutral-400 mt-0.5 truncate tabular-nums">
                   Cancelled • {filterCounts.cancelled} | Done • {filterCounts.completed}
                 </div>
               </div>
@@ -1058,18 +1071,18 @@ export default function Orders() {
                   key={tab.key}
                   type="button"
                   onClick={() => setActiveFilter(tab.key)}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white ${
                     isActive
-                      ? "border border-emerald-500 bg-emerald-500/10 text-emerald-800 dark:text-white"
-                      : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/5 border border-transparent"
+                      ? "border border-neutral-950 bg-neutral-950 text-white dark:border-white dark:bg-white dark:text-neutral-950"
+                      : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/5 border border-transparent"
                   }`}
                 >
                   <span>{tab.label}</span>
                   <span
-                    className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+                    className={`px-1.5 py-0.5 rounded-full text-[11px] tabular-nums ${
                       isActive
-                        ? "bg-emerald-500/20 dark:bg-neutral-800 text-emerald-800 dark:text-neutral-200"
-                        : "bg-neutral-200/80 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400"
+                        ? "bg-white/20 text-white dark:bg-neutral-950/15 dark:text-neutral-950"
+                        : "bg-neutral-200/80 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300"
                     }`}
                   >
                     {tab.count}
@@ -1083,64 +1096,99 @@ export default function Orders() {
           <div className="flex items-center gap-2 w-full md:w-auto">
             {/* Search */}
             <div className="relative flex-1 md:w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-neutral-400 pointer-events-none" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-neutral-500 pointer-events-none" aria-hidden="true" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search gear or order ID..."
-                className="w-full pl-8 pr-7 py-1.5 rounded-full text-xs bg-white dark:bg-[#1E1E1E] border border-neutral-200/90 dark:border-white/10 text-neutral-900 dark:text-white placeholder:text-neutral-400 focus:outline-hidden focus:border-emerald-500 shadow-xs"
+                aria-label="Search gear or order ID"
+                className="w-full pl-8 pr-7 py-1.5 rounded-full text-xs bg-white dark:bg-[#1E1E1E] border border-neutral-200/90 dark:border-white/10 text-neutral-900 dark:text-white placeholder:text-neutral-500 focus:outline-hidden focus:border-neutral-950 dark:focus:border-white shadow-xs"
               />
               {searchQuery && (
                 <button
                   type="button"
                   onClick={() => setSearchQuery("")}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-900 dark:hover:text-white p-0.5 cursor-pointer"
+                  aria-label="Clear search"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-950 dark:hover:text-white p-0.5 cursor-pointer"
                   title="Clear search"
                 >
-                  <X className="h-3 w-3" />
+                  <X className="h-3 w-3" aria-hidden="true" />
                 </button>
               )}
             </div>
 
             {/* Sort */}
             <div className="relative shrink-0">
-              <ArrowUpDown className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-neutral-400 pointer-events-none" />
+              <ArrowUpDown className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-neutral-500 pointer-events-none" aria-hidden="true" />
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as any)}
-                className="appearance-none pl-7 pr-6 py-1.5 rounded-full text-xs font-semibold bg-white dark:bg-[#1E1E1E] border border-neutral-200/90 dark:border-white/10 text-neutral-800 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-white/5 cursor-pointer focus:outline-hidden focus:border-emerald-500 shadow-xs"
+                aria-label="Sort bookings"
+                className="appearance-none pl-7 pr-6 py-1.5 rounded-full text-xs font-semibold bg-white dark:bg-[#1E1E1E] border border-neutral-200/90 dark:border-white/10 text-neutral-800 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-white/5 cursor-pointer focus:outline-hidden focus:border-neutral-950 dark:focus:border-white shadow-xs"
               >
                 <option value="newest">Newest First</option>
                 <option value="oldest">Oldest First</option>
                 <option value="amount_high">Highest Price</option>
                 <option value="amount_low">Lowest Price</option>
               </select>
-              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-neutral-400 pointer-events-none" />
+              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-neutral-500 pointer-events-none" aria-hidden="true" />
             </div>
 
             {/* Payment History Navigation Button */}
             <button
               type="button"
-              onClick={() => navigate({ to: "/payments" })}
+              onClick={() =>
+                navigate({ to: "/payments", search: { q: "", status: "all" } })
+              }
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-white dark:bg-[#1E1E1E] border border-neutral-200/90 dark:border-white/10 text-neutral-800 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-white/5 cursor-pointer shadow-xs transition-colors shrink-0"
               title="View all payments & receipts"
             >
-              <CreditCard className="h-3 w-3 text-neutral-400" />
+              <CreditCard className="h-3 w-3 text-neutral-500 dark:text-neutral-400" aria-hidden="true" />
               <span>Payment History</span>
             </button>
           </div>
         </div>
 
+        {/* Non-blocking sync warning if cached orders exist but refresh failed */}
+        {refreshError && orders.length > 0 && (
+          <div
+            role="status"
+            className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3.5 py-2 text-xs text-amber-800 dark:text-amber-300"
+          >
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <span>Showing locally cached orders. Live sync failed: {refreshError}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                api.invalidateCache("user_orders");
+                loadOrders();
+              }}
+              className="font-semibold underline hover:no-underline cursor-pointer"
+            >
+              Retry sync
+            </button>
+          </div>
+        )}
+
         {/* Bookings Content */}
         {loading ? (
           <LoadingState type="list" count={4} />
         ) : error ? (
-          <ErrorState title="Unable to load orders" error={error} onRetry={loadOrders} />
+          <ErrorState
+            title="Unable to load orders"
+            error={error}
+            onRetry={() => {
+              api.invalidateCache("user_orders");
+              loadOrders();
+            }}
+          />
         ) : orders.length === 0 ? (
           <EmptyState
             title="No orders yet"
-            description="You haven't booked any tech gear rentals yet. Explore the marketplace to find gear!"
+            description="You haven't booked any tech gear rentals yet. Explore the marketplace to find gear."
             icon={Package}
             actionLabel="Browse Marketplace"
             onAction={() => navigate({ to: "/categories" })}
@@ -1148,10 +1196,10 @@ export default function Orders() {
         ) : filteredOrders.length === 0 ? (
           <div className="rounded-2xl border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#1E1E1E] p-6 sm:p-8 text-center space-y-3 shadow-xs">
             <div className="h-10 w-10 rounded-xl bg-neutral-100 dark:bg-white/5 flex items-center justify-center mx-auto text-neutral-400">
-              <Filter className="h-5 w-5" />
+              <Filter className="h-5 w-5 stroke-[1.75]" />
             </div>
             <div className="space-y-1">
-              <h3 className="text-sm font-bold text-neutral-900 dark:text-white">
+              <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">
                 {searchQuery
                   ? `No bookings match "${searchQuery}"`
                   : activeFilter === "cancelled"
@@ -1164,7 +1212,7 @@ export default function Orders() {
                   ? "No completed bookings found."
                   : "No bookings found."}
               </h3>
-              <p className="text-xs text-neutral-500 dark:text-neutral-400 max-w-sm mx-auto">
+              <p className="text-xs text-neutral-600 dark:text-neutral-400 max-w-sm mx-auto">
                 {searchQuery
                   ? "Try searching by a different product title, keyword, or order ID reference."
                   : activeFilter === "cancelled"
@@ -1211,7 +1259,7 @@ export default function Orders() {
                 <div
                   key={o.id}
                   id={`booking-card-${o.id}`}
-                  className="rounded-2xl border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#1E1E1E] hover:border-neutral-300 dark:hover:border-white/20 transition-all p-3.5 sm:p-4 text-left shadow-xs"
+                  className="rounded-2xl border border-neutral-200/80 dark:border-white/10 bg-white dark:bg-[#1E1E1E] hover:border-neutral-300 dark:hover:border-white/20 transition-colors p-3.5 sm:p-4 text-left shadow-xs"
                 >
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
                     {/* Left + Middle: Thumbnail + Info */}
@@ -1226,18 +1274,18 @@ export default function Orders() {
                             className="w-full h-full object-cover rounded-lg"
                           />
                         ) : (
-                          <Package className="h-6 w-6 text-neutral-400 dark:text-neutral-500 opacity-60" />
+                          <Package className="h-6 w-6 stroke-[1.75] text-neutral-400 dark:text-neutral-500 opacity-60" />
                         )}
                       </div>
 
                       {/* Middle Info */}
                       <div className="min-w-0 flex-1 space-y-1">
-                        <h3 className="font-bold text-sm sm:text-base text-neutral-950 dark:text-white font-display truncate">
+                        <h3 className="font-semibold text-sm sm:text-base text-neutral-950 dark:text-white font-display truncate">
                           {o.productTitle || (o as any).product_title || "Gear Rental"}
                         </h3>
 
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-xs font-mono text-neutral-500 dark:text-neutral-400">
+                          <span className="text-xs font-mono text-neutral-600 dark:text-neutral-400">
                             #{o.id}
                           </span>
                           <button
@@ -1245,25 +1293,26 @@ export default function Orders() {
                             onClick={(e) => {
                               e.stopPropagation();
                               navigator.clipboard.writeText(String(o.id));
-                              toast.success(`Order #${o.id} copied to clipboard!`);
+                              toast.success(`Order #${o.id} copied to clipboard`);
                             }}
-                            className="text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer p-0.5"
+                            aria-label={`Copy Order #${o.id}`}
+                            className="text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer p-0.5"
                             title="Copy Order ID"
                           >
-                            <Copy className="h-3 w-3" />
+                            <Copy className="h-3 w-3" aria-hidden="true" />
                           </button>
-                          <span className="px-2 py-0.2 rounded-full text-[10px] font-medium bg-neutral-100 dark:bg-white/5 border border-neutral-200 dark:border-white/10 text-neutral-700 dark:text-neutral-300">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-neutral-100 dark:bg-white/5 border border-neutral-200 dark:border-white/10 text-neutral-700 dark:text-neutral-300">
                             {getOrderCategory(o)}
                           </span>
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5 text-xs text-neutral-500 dark:text-neutral-400 pt-0.5">
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5 text-xs text-neutral-600 dark:text-neutral-400 pt-0.5">
                           <div className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3 text-neutral-400 shrink-0" />
+                            <Calendar className="h-3 w-3 text-neutral-500 dark:text-neutral-400 shrink-0" aria-hidden="true" />
                             <span>Booked: {orderDates.bookedOnText}</span>
                           </div>
                           <div className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3 text-neutral-400 shrink-0" />
+                            <Calendar className="h-3 w-3 text-neutral-500 dark:text-neutral-400 shrink-0" aria-hidden="true" />
                             <span>{orderDates.rentalText}</span>
                           </div>
                         </div>
@@ -1275,26 +1324,23 @@ export default function Orders() {
                       {/* Status Badges: Booking & Payment Status */}
                       <div className="flex flex-wrap items-center md:justify-end gap-1.5">
                         {isCancelled ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20">
-                            <XCircle className="h-3 w-3" />
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-red-500/10 text-red-700 dark:text-red-400 border border-red-500/20">
+                            <XCircle className="h-3 w-3" aria-hidden="true" />
                             <span>Cancelled</span>
                           </span>
                         ) : isCompleted ? (
                           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-neutral-100 dark:bg-white/10 text-neutral-800 dark:text-white/90 border border-neutral-200 dark:border-white/20">
-                            <CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                            <CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
                             <span>Completed</span>
                           </span>
                         ) : isPending ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
-                            <Clock className="h-3 w-3" />
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/10 text-amber-800 dark:text-amber-300 border border-amber-500/20">
+                            <Clock className="h-3 w-3" aria-hidden="true" />
                             <span>{badge.label}</span>
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
-                            <span className="relative flex h-1.5 w-1.5">
-                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
-                            </span>
+                            <span className="inline-flex rounded-full h-1.5 w-1.5 bg-emerald-600 dark:bg-emerald-400" aria-hidden="true"></span>
                             <span>{badge.label}</span>
                           </span>
                         )}
@@ -1355,8 +1401,8 @@ export default function Orders() {
 
                       {/* Rental Total */}
                       <div className="text-right">
-                        <div className="text-[10px] text-neutral-400 font-medium">Rental Total</div>
-                        <div className="text-lg sm:text-xl font-bold font-mono text-neutral-950 dark:text-white tracking-tight">
+                        <div className="text-[11px] text-neutral-600 dark:text-neutral-400 font-medium">Rental Total</div>
+                        <div className="text-lg sm:text-xl font-semibold tabular-nums text-neutral-950 dark:text-white">
                           ₹{Number(o.total || 0).toLocaleString("en-IN")}
                         </div>
                       </div>
@@ -1365,11 +1411,11 @@ export default function Orders() {
                       <button
                         type="button"
                         onClick={() => toggleBookingDetails(o.id)}
-                        className="inline-flex items-center gap-1 px-3 py-1 rounded-full border border-neutral-200/90 dark:border-white/15 bg-neutral-50 dark:bg-white/5 hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-800 dark:text-white text-xs font-medium transition-colors cursor-pointer"
+                        className="inline-flex items-center gap-1 px-3 py-1 rounded-full border border-neutral-200/90 dark:border-white/15 bg-neutral-50 dark:bg-white/5 hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-800 dark:text-white text-xs font-medium transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
                       >
                         <span>{isCardExpanded ? "Close" : "View Details"}</span>
                         <ChevronRight
-                          className={`h-3 w-3 transition-transform duration-200 ${
+                          className={`h-3 w-3 stroke-[1.75] transition-transform duration-200 ${
                             isCardExpanded ? "rotate-90" : ""
                           }`}
                         />
@@ -1385,7 +1431,7 @@ export default function Orders() {
                     >
                       {/* Close Details Top Bar */}
                       <div className="flex items-center justify-between pb-1.5 border-b border-neutral-200/70 dark:border-white/10">
-                        <span className="text-[11px] font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+                        <span className="text-xs font-semibold text-neutral-600 dark:text-neutral-400">
                           Booking Details & Operations
                         </span>
                         <button
@@ -1394,9 +1440,9 @@ export default function Orders() {
                             e.stopPropagation();
                             closeBookingDetails();
                           }}
-                          className="inline-flex items-center gap-1 text-xs text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white font-semibold cursor-pointer transition-colors"
+                          className="inline-flex items-center gap-1 text-xs text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white font-semibold cursor-pointer transition-colors"
                         >
-                          <X className="h-3 w-3" />
+                          <X className="h-3 w-3 stroke-[1.75]" />
                           <span>Hide Details</span>
                         </button>
                       </div>
@@ -1407,9 +1453,9 @@ export default function Orders() {
                       {/* Cancelled Booking Banner (if cancelled) */}
                       {isCancelled && (
                         <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/20 flex items-start gap-3">
-                          <Ban className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
+                          <Ban className="h-4 w-4 stroke-[1.75] text-red-500 shrink-0 mt-0.5" />
                           <div className="space-y-1 text-left text-xs">
-                            <div className="font-bold text-red-600 dark:text-red-400">
+                            <div className="font-semibold text-red-600 dark:text-red-400">
                               {(o as any).cancelled_by === "LENDER" || (o as any).cancelledBy === "LENDER"
                                 ? "Booking Cancelled by Lender"
                                 : "Booking Cancelled"}
@@ -1425,17 +1471,17 @@ export default function Orders() {
                               </p>
                             )}
                             {((o as any).cancellationExplanation || (o as any).cancellation_explanation) && (
-                              <p className="text-[11px] text-neutral-600 dark:text-neutral-300 italic">
+                              <p className="text-[11px] text-neutral-600 dark:text-neutral-300">
                                 Note: &ldquo;{(o as any).cancellationExplanation || (o as any).cancellation_explanation}&rdquo;
                               </p>
                             )}
                             {((o as any).refund_status || (o as any).refundStatus) && (
-                              <p className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold">
-                                Refund Status: {String((o as any).refund_status || (o as any).refundStatus).replace(/_/g, " ").toUpperCase()}
+                              <p className="text-[11px] text-amber-700 dark:text-amber-400 font-semibold capitalize">
+                                Refund Status: {String((o as any).refund_status || (o as any).refundStatus).replace(/_/g, " ").toLowerCase()}
                               </p>
                             )}
                             {((o as any).cancelledAt || (o as any).cancelled_at) && (
-                              <p className="text-[10px] text-neutral-400 dark:text-neutral-500 font-mono">
+                              <p className="text-[11px] text-neutral-600 dark:text-neutral-400 font-mono">
                                 Cancelled on: {formatBookingDateTime((o as any).cancelledAt || (o as any).cancelled_at) || String((o as any).cancelledAt || (o as any).cancelled_at)}
                               </p>
                             )}
@@ -1449,9 +1495,9 @@ export default function Orders() {
                         <div className="lg:col-span-2 rounded-xl border border-neutral-200/80 dark:border-white/10 bg-neutral-50/50 dark:bg-white/[0.02] p-4 space-y-3.5 text-left">
                           <div className="flex items-center gap-2 pb-2 border-b border-neutral-200/60 dark:border-white/10">
                             <div className="h-6 w-6 rounded-md bg-neutral-100 dark:bg-white/5 border border-neutral-200/70 dark:border-white/10 grid place-items-center text-neutral-700 dark:text-neutral-200">
-                              <Package className="h-3 w-3" />
+                              <Package className="h-3.5 w-3.5 stroke-[1.75]" />
                             </div>
-                            <span className="text-xs font-bold tracking-tight text-neutral-900 dark:text-white">
+                            <span className="text-xs font-semibold text-neutral-900 dark:text-white">
                               Product & Rental Details
                             </span>
                           </div>
@@ -1466,15 +1512,15 @@ export default function Orders() {
                               />
                             ) : (
                               <div className="h-16 w-16 sm:h-18 sm:w-18 rounded-xl border border-neutral-200 dark:border-white/10 bg-neutral-100 dark:bg-white/5 flex items-center justify-center text-neutral-400 shrink-0">
-                                <Package className="h-6 w-6 opacity-60" />
+                                <Package className="h-6 w-6 stroke-[1.75] opacity-60" />
                               </div>
                             )}
 
                             <div className="space-y-1 min-w-0 flex-1">
-                              <h2 className="text-base font-bold text-neutral-900 dark:text-white leading-snug">
+                              <h2 className="text-base font-semibold text-neutral-900 dark:text-white leading-snug">
                                 {o.productTitle || (o as any).product_title || "Gear Rental"}
                               </h2>
-                              <div className="text-[11px] text-neutral-500 dark:text-neutral-400 font-mono">
+                              <div className="text-[11px] text-neutral-600 dark:text-neutral-400 font-mono">
                                 Booking Reference #{o.id}
                               </div>
 
@@ -1483,13 +1529,13 @@ export default function Orders() {
                                   {!o.pickedUpAt &&
                                   !(o as any).picked_up_at &&
                                   !["cancelled", "rejected", "failed", "completed"].includes(o.status) ? (
-                                    <span className="inline-flex items-center gap-1 px-2 py-0.2 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
-                                      <Lock className="w-2.5 h-2.5" />
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/10 text-amber-800 dark:text-amber-300 border border-amber-500/20">
+                                      <Lock className="w-3 h-3 stroke-[1.75]" aria-hidden="true" />
                                       {o.category}: Awaiting Handover (Locked)
                                     </span>
                                   ) : (
-                                    <span className="inline-flex items-center gap-1 px-2 py-0.2 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
-                                      <CheckCircle className="w-2.5 h-2.5" />
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                                      <CheckCircle className="w-3 h-3 stroke-[1.75]" aria-hidden="true" />
                                       {o.category}: Handover Complete (Unlocked)
                                     </span>
                                   )}
@@ -1501,44 +1547,44 @@ export default function Orders() {
                           {/* Rental Details & Payment/Escrow Grid */}
                           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2 border-t border-neutral-200/60 dark:border-white/10 text-xs">
                             <div className="p-2.5 rounded-lg bg-white dark:bg-white/[0.03] border border-neutral-200/70 dark:border-white/5 space-y-0.5">
-                              <div className="text-neutral-500 dark:text-neutral-400 text-[11px] font-medium flex items-center gap-1">
-                                <Clock className="h-3 w-3" />
+                              <div className="text-neutral-600 dark:text-neutral-400 text-[11px] font-medium flex items-center gap-1">
+                                <Clock className="h-3 w-3 stroke-[1.75]" aria-hidden="true" />
                                 <span>Booking Placed</span>
                               </div>
-                              <div className="text-xs font-bold text-neutral-900 dark:text-white">
+                              <div className="text-xs font-semibold text-neutral-900 dark:text-white">
                                 {orderDates.bookedOnText}
                               </div>
-                              <div className="text-[10px] text-neutral-400">
+                              <div className="text-[11px] text-neutral-600 dark:text-neutral-400">
                                 Asia/Kolkata official timestamp
                               </div>
                             </div>
 
                             <div className="p-2.5 rounded-lg bg-white dark:bg-white/[0.03] border border-neutral-200/70 dark:border-white/5 space-y-0.5">
-                              <div className="text-neutral-500 dark:text-neutral-400 text-[11px] font-medium flex items-center gap-1">
-                                <Calendar className="h-3 w-3" />
+                              <div className="text-neutral-600 dark:text-neutral-400 text-[11px] font-medium flex items-center gap-1">
+                                <Calendar className="h-3 w-3 stroke-[1.75]" aria-hidden="true" />
                                 <span>Rental Duration</span>
                               </div>
-                              <div className="text-xs font-bold text-neutral-900 dark:text-white">
+                              <div className="text-xs font-semibold text-neutral-900 dark:text-white">
                                 {orderDates.rentalText}
                               </div>
                               {((o as any).timeSlot || (o as any).time_slot) && (
-                                <div className="inline-flex items-center gap-1 mt-0.5 px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-neutral-100 dark:bg-white/10 text-neutral-700 dark:text-white uppercase">
-                                  <Clock className="h-2.5 w-2.5" />
-                                  {String((o as any).timeSlot || (o as any).time_slot).replace(/_/g, " ")}
+                                <div className="inline-flex items-center gap-1 mt-0.5 px-1.5 py-0.5 rounded text-xs font-medium bg-neutral-100 dark:bg-white/10 text-neutral-700 dark:text-white capitalize">
+                                  <Clock className="h-3 w-3 stroke-[1.75]" />
+                                  {String((o as any).timeSlot || (o as any).time_slot).replace(/_/g, " ").toLowerCase()}
                                 </div>
                               )}
                             </div>
 
                             <div className="p-2.5 rounded-lg bg-white dark:bg-white/[0.03] border border-neutral-200/70 dark:border-white/5 space-y-0.5">
-                              <div className="text-neutral-500 dark:text-neutral-400 text-[11px] font-medium flex items-center gap-1">
-                                <ShieldCheck className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                              <div className="text-neutral-600 dark:text-neutral-400 text-[11px] font-medium flex items-center gap-1">
+                                <ShieldCheck className="h-3 w-3 stroke-[1.75] text-emerald-600 dark:text-emerald-400" />
                                 <span>Total Payment</span>
                               </div>
-                              <div className="text-base font-bold font-mono text-neutral-900 dark:text-white">
+                              <div className="text-base font-semibold tabular-nums text-neutral-900 dark:text-white">
                                 ₹{Number(o.total || 0).toLocaleString("en-IN")}
                               </div>
-                              <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
-                                <CheckCircle2 className="h-2.5 w-2.5" />
+                              <div className="text-[11px] text-emerald-700 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                                <CheckCircle2 className="h-3 w-3 stroke-[1.75]" />
                                 <span>Escrow Secured</span>
                               </div>
                             </div>
@@ -1636,26 +1682,26 @@ export default function Orders() {
 
                                 {address ? (
                                   <div className="text-[11px] text-neutral-700 dark:text-neutral-300 leading-snug">
-                                    <span className="font-semibold text-neutral-500 dark:text-neutral-400">Location: </span>
+                                    <span className="font-semibold text-neutral-600 dark:text-neutral-400">Location: </span>
                                     <span>{address}</span>
                                     {directions && (
-                                      <span className="text-[10px] text-neutral-500 dark:text-neutral-400 italic block mt-0.5">
+                                      <span className="text-[11px] text-neutral-600 dark:text-neutral-400 block mt-0.5">
                                         Directions: {directions}
                                       </span>
                                     )}
                                   </div>
                                 ) : (
-                                  <p className="text-[11px] text-neutral-400 flex items-center gap-1 font-medium">
-                                    <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />
+                                  <p className="text-[11px] text-neutral-600 dark:text-neutral-400 flex items-center gap-1 font-medium">
+                                    <AlertTriangle className="h-3 w-3 stroke-[1.75] text-amber-600 dark:text-amber-400 shrink-0" aria-hidden="true" />
                                     <span>Location not provided</span>
                                   </p>
                                 )}
 
                                 {changeReq && (
                                   <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-800 dark:text-amber-300 flex items-start gap-1.5">
-                                    <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5 text-amber-600" />
+                                    <AlertTriangle className="h-3.5 w-3.5 stroke-[1.75] shrink-0 mt-0.5 text-amber-600" />
                                     <div>
-                                      <span className="font-bold">
+                                      <span className="font-semibold">
                                         Change Request ({changeReq.status || "Pending"}):{" "}
                                       </span>
                                       <span>
@@ -1663,7 +1709,7 @@ export default function Orders() {
                                         {changeReq.requestedAddress || changeReq.requestedPickupLocation || changeReq.requestedCustomLocation}
                                       </span>
                                       {changeReq.reason && (
-                                        <p className="text-[10px] text-amber-700 dark:text-amber-400 italic mt-0.5">
+                                        <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-0.5">
                                           Reason: {changeReq.reason}
                                         </p>
                                       )}
@@ -1682,14 +1728,14 @@ export default function Orders() {
                             <div className="rounded-xl border border-neutral-200/80 dark:border-white/10 bg-neutral-50/50 dark:bg-white/[0.02] p-3.5 space-y-3 text-left">
                               <div className="flex items-center gap-2 pb-2 border-b border-neutral-200/60 dark:border-white/10">
                                 <div className="h-6 w-6 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 grid place-items-center">
-                                  <Lock className="h-3 w-3" />
+                                  <Lock className="h-3.5 w-3.5 stroke-[1.75]" />
                                 </div>
-                                <span className="text-xs font-bold tracking-tight text-neutral-900 dark:text-white">
+                                <span className="text-xs font-semibold text-neutral-900 dark:text-white">
                                   Equipment Handover PIN
                                 </span>
                               </div>
 
-                              <p className="text-[11px] text-neutral-500 dark:text-neutral-400 leading-relaxed">
+                              <p className="text-[11px] text-neutral-600 dark:text-neutral-400 leading-relaxed">
                                 Present this secure OTP to the lender during equipment handover or return verification.
                               </p>
 
@@ -1712,9 +1758,9 @@ export default function Orders() {
                                       handleRevealSecretPin(o.id);
                                     }}
                                     disabled={loadingPinOrderId === o.id}
-                                    className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-emerald-500/30 bg-emerald-50/40 dark:bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 text-xs font-bold transition-all shadow-xs cursor-pointer disabled:opacity-50"
+                                    className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-neutral-300 dark:border-white/20 bg-white dark:bg-white/5 hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-900 dark:text-white text-xs font-semibold transition-colors shadow-xs cursor-pointer disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
                                   >
-                                    <KeyRound className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                                    <KeyRound className="h-3.5 w-3.5 stroke-[1.75] text-neutral-700 dark:text-neutral-300" aria-hidden="true" />
                                     <span>{loadingPinOrderId === o.id ? "Retrieving PIN..." : "Reveal Secret PIN"}</span>
                                   </button>
                                 )}
@@ -1726,9 +1772,9 @@ export default function Orders() {
                           <div className="rounded-xl border border-neutral-200/80 dark:border-white/10 bg-neutral-50/50 dark:bg-white/[0.02] p-3.5 space-y-3 text-left">
                             <div className="flex items-center gap-2 pb-2 border-b border-neutral-200/60 dark:border-white/10">
                               <div className="h-6 w-6 rounded-md bg-neutral-100 dark:bg-white/5 border border-neutral-200/70 dark:border-white/10 grid place-items-center text-neutral-700 dark:text-neutral-200">
-                                <SlidersHorizontal className="h-3 w-3" />
+                                <SlidersHorizontal className="h-3.5 w-3.5 stroke-[1.75]" />
                               </div>
-                              <span className="text-xs font-bold tracking-tight text-neutral-900 dark:text-white">
+                              <span className="text-xs font-semibold text-neutral-900 dark:text-white">
                                 Quick Actions
                               </span>
                             </div>
@@ -1746,9 +1792,9 @@ export default function Orders() {
                                           e.stopPropagation();
                                           navigate({ to: "/payment", search: { orderId: o.id } as any });
                                         }}
-                                        className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                                        className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-neutral-950 hover:bg-neutral-800 text-white dark:bg-white dark:hover:bg-neutral-200 dark:text-neutral-950 font-semibold text-xs shadow-xs transition-colors cursor-pointer tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
                                       >
-                                        <Lock className="h-3.5 w-3.5" />
+                                        <Lock className="h-3.5 w-3.5 stroke-[1.75]" aria-hidden="true" />
                                         <span>Pay Now • ₹{Number(o.total || 0).toLocaleString("en-IN")}</span>
                                       </button>
                                     );
@@ -1761,9 +1807,9 @@ export default function Orders() {
                                           e.stopPropagation();
                                           navigate({ to: "/payment", search: { orderId: o.id } as any });
                                         }}
-                                        className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                                        className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs shadow-xs transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
                                       >
-                                        <RotateCcw className="h-3.5 w-3.5" />
+                                        <RotateCcw className="h-3.5 w-3.5 stroke-[1.75]" />
                                         <span>Retry Payment</span>
                                       </button>
                                     );
@@ -1776,9 +1822,9 @@ export default function Orders() {
                                           e.stopPropagation();
                                           handleCheckOrderPaymentStatus(o.id);
                                         }}
-                                        className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 font-bold text-xs transition-colors cursor-pointer"
+                                        className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 font-semibold text-xs transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
                                       >
-                                        <RefreshCw className="h-3.5 w-3.5" />
+                                        <RefreshCw className="h-3.5 w-3.5 stroke-[1.75]" />
                                         <span>Check Payment Status</span>
                                       </button>
                                     );
@@ -1791,9 +1837,9 @@ export default function Orders() {
                                           e.stopPropagation();
                                           handleOpenReceipt(o);
                                         }}
-                                        className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-neutral-200/90 dark:border-white/15 bg-white dark:bg-white/5 hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-800 dark:text-white font-semibold text-xs transition-all cursor-pointer shadow-xs"
+                                        className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-neutral-200/90 dark:border-white/15 bg-white dark:bg-white/5 hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-800 dark:text-white font-semibold text-xs transition-colors cursor-pointer shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
                                       >
-                                        <Receipt className="h-3.5 w-3.5 text-neutral-400" />
+                                        <Receipt className="h-3.5 w-3.5 stroke-[1.75] text-neutral-500 dark:text-neutral-400" />
                                         <span>View Receipt</span>
                                       </button>
                                     );
@@ -1808,9 +1854,9 @@ export default function Orders() {
                                   e.stopPropagation();
                                   navigate({ to: `/delivery/${o.id}` });
                                 }}
-                                className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-neutral-900 text-white dark:bg-white dark:text-black font-bold text-xs shadow-xs hover:opacity-90 transition-all cursor-pointer"
+                                className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-neutral-900 text-white dark:bg-white dark:text-black font-semibold text-xs shadow-xs hover:opacity-90 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
                               >
-                                <Truck className="h-3.5 w-3.5" />
+                                <Truck className="h-3.5 w-3.5 stroke-[1.75]" />
                                 <span>Track Delivery</span>
                               </button>
 
@@ -1820,9 +1866,9 @@ export default function Orders() {
                                   e.stopPropagation();
                                   navigate({ to: "/messages", search: { bookingId: o.id } as any });
                                 }}
-                                className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-neutral-200/90 dark:border-white/15 bg-white dark:bg-white/5 hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-800 dark:text-white font-semibold text-xs transition-all cursor-pointer shadow-xs"
+                                className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-neutral-200/90 dark:border-white/15 bg-white dark:bg-white/5 hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-800 dark:text-white font-semibold text-xs transition-colors cursor-pointer shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
                               >
-                                <MessageSquare className="h-3.5 w-3.5 text-neutral-400" />
+                                <MessageSquare className="h-3.5 w-3.5 stroke-[1.75] text-neutral-500 dark:text-neutral-400" />
                                 <span>Chat with Lender</span>
                               </button>
 
@@ -1924,32 +1970,36 @@ export default function Orders() {
       {/* Cancellation Confirmation Modal */}
       <AnimatePresence>
         {cancellingOrderId && cancellingOrder && (
-          <div className="fixed inset-0 z-50 grid place-items-center p-3 sm:p-4 overflow-y-auto">
+          <div key="cancel-modal" className="fixed inset-0 z-50 grid place-items-center p-3 sm:p-4 overflow-y-auto">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
+              transition={{ duration: 0.12 }}
               onClick={closeCancellationModal}
               className="fixed inset-0 bg-black/60 dark:bg-[#050709]/85 backdrop-blur-sm"
             />
             <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="cancel-modal-title"
               initial={{ opacity: 0, scale: 0.96, y: 12 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 12 }}
-              transition={{ type: "spring", damping: 25, stiffness: 350 }}
+              transition={{ duration: 0.14, ease: "easeOut" }}
               className="relative w-full max-w-3xl max-h-[85vh] flex flex-col overflow-hidden rounded-2xl border border-neutral-200 dark:border-white/15 bg-white dark:bg-[#1E1E1E] shadow-2xl z-10 text-left my-auto"
             >
               {/* Modal Header */}
               <div className="flex items-center justify-between px-5 py-3.5 border-b border-neutral-200/80 dark:border-white/10 shrink-0">
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-lg bg-red-500/10 text-red-600 dark:text-red-400 grid place-items-center">
-                    <Ban className="h-4 w-4" />
+                    <Ban className="h-4 w-4" aria-hidden="true" />
                   </div>
                   <div>
-                    <h3 className="text-sm sm:text-base font-bold text-neutral-900 dark:text-white leading-tight">
+                    <h3 id="cancel-modal-title" className="text-sm sm:text-base font-bold text-neutral-900 dark:text-white leading-tight">
                       Cancel Rental Booking
                     </h3>
-                    <p className="text-[11px] text-neutral-500 dark:text-neutral-400 font-mono mt-0.5">
+                    <p className="text-[11px] text-neutral-600 dark:text-neutral-400 font-mono mt-0.5">
                       Order #{cancellingOrder.id} • {cancellingOrder.productTitle || (cancellingOrder as any).product_title || "Rental Gear"}
                     </p>
                   </div>
@@ -1958,10 +2008,10 @@ export default function Orders() {
                   type="button"
                   onClick={closeCancellationModal}
                   disabled={isCancelling}
-                  className="h-8 w-8 rounded-lg grid place-items-center text-neutral-400 hover:text-neutral-700 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/10 transition-colors cursor-pointer"
-                  aria-label="Close"
+                  className="h-8 w-8 rounded-lg grid place-items-center text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                  aria-label="Close cancellation dialog"
                 >
-                  <X className="h-4 w-4" />
+                  <X className="h-4 w-4" aria-hidden="true" />
                 </button>
               </div>
 
@@ -1970,16 +2020,16 @@ export default function Orders() {
                 {/* Left Column: Reasons Selection (7 cols) */}
                 <div className="md:col-span-7 space-y-2.5">
                   <div className="space-y-0.5">
-                    <label className="text-xs font-bold text-neutral-900 dark:text-white block">
+                    <p id="cancel-reasons-label" className="text-xs font-bold text-neutral-900 dark:text-white block">
                       Why do you want to cancel this booking?
-                    </label>
-                    <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                    </p>
+                    <p className="text-[11px] text-neutral-600 dark:text-neutral-400">
                       Select one primary reason below to proceed.
                     </p>
                   </div>
 
                   {/* Compact Radio Selection List */}
-                  <div className="space-y-1.5" role="radiogroup" aria-label="Cancellation reason">
+                  <div className="space-y-1.5" role="radiogroup" aria-labelledby="cancel-reasons-label">
                     {CANCELLATION_REASONS.map((reason, idx) => {
                       const isSelected = selectedReason === reason;
                       return (
@@ -1995,20 +2045,20 @@ export default function Orders() {
                               setSelectedReason(reason);
                             }
                           }}
-                          className={`flex items-center gap-2.5 px-3 py-2 rounded-xl border text-xs cursor-pointer transition-all select-none ${
+                          className={`flex items-center gap-2.5 px-3 py-2 rounded-xl border text-xs cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white ${
                             isSelected
-                              ? "border-emerald-600 dark:border-emerald-500 bg-emerald-500/10 dark:bg-emerald-500/15 text-neutral-950 dark:text-white shadow-xs font-semibold"
+                              ? "border-neutral-950 dark:border-white bg-neutral-100 dark:bg-white/10 text-neutral-950 dark:text-white shadow-xs font-semibold"
                               : "border-neutral-200/80 dark:border-white/10 bg-neutral-50/50 dark:bg-white/[0.02] text-neutral-700 dark:text-neutral-300 hover:border-neutral-300 dark:hover:border-white/20 hover:bg-neutral-100/50 dark:hover:bg-white/[0.04]"
                           }`}
                         >
                           <div
-                            className={`h-3.5 w-3.5 rounded-full border flex items-center justify-center shrink-0 transition-all ${
+                            className={`h-3.5 w-3.5 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
                               isSelected
-                                ? "border-emerald-600 dark:border-emerald-500 bg-emerald-600 dark:bg-emerald-500"
-                                : "border-neutral-300 dark:border-white/30 bg-transparent"
+                                ? "border-neutral-950 dark:border-white bg-neutral-950 dark:bg-white"
+                                : "border-neutral-400 dark:border-white/30 bg-transparent"
                             }`}
                           >
-                            {isSelected && <div className="h-1.5 w-1.5 rounded-full bg-white" />}
+                            {isSelected && <div className="h-1.5 w-1.5 rounded-full bg-white dark:bg-neutral-950" />}
                           </div>
                           <span className="flex-1 leading-snug">{reason}</span>
                         </div>
@@ -2025,26 +2075,27 @@ export default function Orders() {
                       className="space-y-1 pt-0.5"
                     >
                       <div className="flex items-center justify-between text-[11px]">
-                        <span className="font-semibold text-neutral-700 dark:text-neutral-300">
+                        <label htmlFor="cancel-explanation-input" className="font-semibold text-neutral-700 dark:text-neutral-300">
                           Additional explanation (optional):
-                        </span>
+                        </label>
                         <span
-                          className={`font-mono text-[10px] ${
+                          className={`tabular-nums text-[11px] ${
                             cancellationExplanation.length >= 480
-                              ? "text-red-500 font-bold"
-                              : "text-neutral-400"
+                              ? "text-red-600 dark:text-red-400 font-semibold"
+                              : "text-neutral-600 dark:text-neutral-400"
                           }`}
                         >
                           {cancellationExplanation.length}/500
                         </span>
                       </div>
                       <textarea
+                        id="cancel-explanation-input"
                         rows={2}
                         maxLength={500}
                         value={cancellationExplanation}
                         onChange={(e) => setCancellationExplanation(e.target.value)}
                         placeholder="Help us understand your reason for cancellation..."
-                        className="w-full rounded-xl border border-neutral-300 dark:border-white/15 bg-white dark:bg-neutral-900/60 p-2.5 text-xs text-neutral-900 dark:text-white placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 resize-none transition-all"
+                        className="w-full rounded-xl border border-neutral-300 dark:border-white/15 bg-white dark:bg-neutral-900/60 p-2.5 text-xs text-neutral-900 dark:text-white placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-neutral-900/20 dark:focus:ring-white/30 focus:border-neutral-950 dark:focus:border-white resize-none transition-colors"
                       />
                     </motion.div>
                   )}
@@ -2055,33 +2106,42 @@ export default function Orders() {
                   {/* Booking Summary Box */}
                   <div className="rounded-xl border border-neutral-200/90 dark:border-white/10 bg-neutral-50/60 dark:bg-white/[0.02] p-3 space-y-2.5">
                     <div className="flex items-center gap-2.5">
-                      <img
-                        src={
-                          cancellingOrder.productImage ||
-                          (cancellingOrder as any).product_image ||
-                          "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=600"
-                        }
-                        alt=""
-                        className="w-11 h-11 rounded-lg object-cover bg-neutral-100 dark:bg-white/5 shrink-0 border border-neutral-200/80 dark:border-white/10"
-                      />
+                      {cancellingOrder.productImage || (cancellingOrder as any).product_image ? (
+                        <img
+                          src={getOptimizedImageUrl(
+                            cancellingOrder.productImage || (cancellingOrder as any).product_image,
+                            "thumb"
+                          )}
+                          alt={
+                            cancellingOrder.productTitle ||
+                            (cancellingOrder as any).product_title ||
+                            "Rental Gear"
+                          }
+                          className="w-11 h-11 rounded-lg object-cover bg-neutral-100 dark:bg-white/5 shrink-0 border border-neutral-200/80 dark:border-white/10"
+                        />
+                      ) : (
+                        <div className="w-11 h-11 rounded-lg bg-neutral-100 dark:bg-white/5 shrink-0 border border-neutral-200/80 dark:border-white/10 flex items-center justify-center text-neutral-500 dark:text-neutral-400">
+                          <Package className="h-5 w-5 stroke-[1.75]" aria-hidden="true" />
+                        </div>
+                      )}
                       <div className="min-w-0 flex-1">
-                        <div className="text-xs font-bold text-neutral-900 dark:text-white truncate">
+                        <div className="text-xs font-semibold text-neutral-900 dark:text-white truncate">
                           {cancellingOrder.productTitle || (cancellingOrder as any).product_title || "Rental Gear"}
                         </div>
-                        <div className="text-[11px] text-neutral-500 dark:text-neutral-400 font-medium truncate">
+                        <div className="text-[11px] text-neutral-600 dark:text-neutral-400 font-medium truncate">
                           {cancellingOrder.startDate || (cancellingOrder as any).start_date || "—"} – {cancellingOrder.endDate || (cancellingOrder as any).end_date || "—"}
                         </div>
                       </div>
                     </div>
 
                     <div className="pt-2 border-t border-neutral-200/70 dark:border-white/10 space-y-1.5 text-xs">
-                      <div className="flex items-center justify-between text-neutral-600 dark:text-neutral-300">
+                      <div className="flex items-center justify-between text-neutral-700 dark:text-neutral-300">
                         <span>Cancellation Fee:</span>
-                        <span className="font-bold text-emerald-600 dark:text-emerald-400">₹0 (Free)</span>
+                        <span className="font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums">₹0 (Free)</span>
                       </div>
                       <div className="flex items-center justify-between font-medium">
-                        <span className="text-neutral-700 dark:text-neutral-200">Expected Refund:</span>
-                        <span className="font-bold font-mono text-neutral-900 dark:text-white">
+                        <span className="text-neutral-800 dark:text-neutral-200">Expected Refund:</span>
+                        <span className="font-semibold tabular-nums text-neutral-900 dark:text-white">
                           ₹{Number(cancellingOrder.total || 0).toLocaleString("en-IN")} (100%)
                         </span>
                       </div>
@@ -2089,9 +2149,9 @@ export default function Orders() {
                   </div>
 
                   {/* Refund Policy and Escrow Guarantee Note */}
-                  <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/[0.04] p-3 space-y-1.5 text-[11px] text-neutral-600 dark:text-neutral-400 leading-relaxed">
-                    <div className="flex items-center gap-1.5 font-bold text-emerald-700 dark:text-emerald-400">
-                      <ShieldCheck className="h-3.5 w-3.5" />
+                  <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/[0.04] p-3 space-y-1.5 text-[11px] text-neutral-700 dark:text-neutral-300 leading-relaxed">
+                    <div className="flex items-center gap-1.5 font-semibold text-emerald-700 dark:text-emerald-400">
+                      <ShieldCheck className="h-3.5 w-3.5 stroke-[1.75]" aria-hidden="true" />
                       <span>100% Escrow Protected</span>
                     </div>
                     <p className="text-[11px]">
@@ -2101,16 +2161,16 @@ export default function Orders() {
 
                   {/* Selected Reason Status Box */}
                   <div className="rounded-xl border border-neutral-200/70 dark:border-white/10 p-2.5 bg-neutral-50/50 dark:bg-white/[0.02]">
-                    <span className="text-[10px] text-neutral-400 uppercase tracking-wider font-bold block mb-1">
+                    <span className="text-xs text-neutral-600 dark:text-neutral-400 font-semibold block mb-1">
                       Selected Reason
                     </span>
                     {selectedReason ? (
-                      <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 text-xs font-semibold">
-                        <CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-neutral-900 text-white dark:bg-white dark:text-neutral-950 text-xs font-semibold">
+                        <CheckCircle2 className="h-3 w-3 shrink-0 stroke-[1.75]" aria-hidden="true" />
                         <span className="truncate">{selectedReason}</span>
                       </div>
                     ) : (
-                      <span className="text-[11px] text-neutral-400 italic">
+                      <span className="text-xs text-neutral-600 dark:text-neutral-400">
                         Please choose a reason on the left to proceed
                       </span>
                     )}
@@ -2120,15 +2180,15 @@ export default function Orders() {
 
               {/* Footer Action Bar */}
               <div className="px-5 py-3 border-t border-neutral-200/80 dark:border-white/10 flex items-center justify-between gap-3 bg-neutral-50/60 dark:bg-white/[0.02] shrink-0">
-                <div className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                <div className="text-[11px] text-neutral-600 dark:text-neutral-400">
                   {!selectedReason ? (
-                    <span className="text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1">
-                      <AlertTriangle className="h-3 w-3 shrink-0" />
+                    <span className="text-amber-700 dark:text-amber-400 font-medium flex items-center gap-1">
+                      <AlertTriangle className="h-3 w-3 shrink-0" aria-hidden="true" />
                       <span>Select a reason to confirm</span>
                     </span>
                   ) : (
-                    <span className="text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
-                      <CheckCircle2 className="h-3 w-3 shrink-0" />
+                    <span className="text-emerald-700 dark:text-emerald-400 font-medium flex items-center gap-1">
+                      <CheckCircle2 className="h-3 w-3 shrink-0" aria-hidden="true" />
                       <span>Ready to confirm cancellation</span>
                     </span>
                   )}
@@ -2141,9 +2201,9 @@ export default function Orders() {
                     size="sm"
                     disabled={isCancelling}
                     onClick={closeCancellationModal}
-                    className="text-xs px-3 py-1.5 h-auto text-neutral-700 dark:text-neutral-300 border-neutral-300 dark:border-white/15 hover:bg-neutral-100 dark:hover:bg-white/10 inline-flex items-center gap-1.5"
+                    className="text-xs px-3 py-1.5 h-auto text-neutral-800 dark:text-neutral-200 border-neutral-300 dark:border-white/15 hover:bg-neutral-100 dark:hover:bg-white/10 inline-flex items-center gap-1.5"
                   >
-                    <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                    <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
                     <span>Keep My Booking</span>
                   </Button>
                   <Button
@@ -2158,7 +2218,7 @@ export default function Orders() {
                     }}
                     className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs px-3.5 py-1.5 h-auto shadow-xs disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
                   >
-                    <Ban className="h-3.5 w-3.5 shrink-0" />
+                    <Ban className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                     <span>{isCancelling ? "Processing..." : "Confirm Cancellation"}</span>
                   </Button>
                 </div>
@@ -2169,80 +2229,88 @@ export default function Orders() {
 
         {/* Location Edit / Change-Request Modal */}
         {locationModalOrder && (
-          <div className="fixed inset-0 z-50 grid place-items-center p-4">
+          <div key="location-modal" className="fixed inset-0 z-50 grid place-items-center p-4">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
+              transition={{ duration: 0.12 }}
               onClick={() => setLocationModalOrder(null)}
               className="fixed inset-0 bg-black/60 dark:bg-[#050709]/85 backdrop-blur-sm"
             />
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="location-modal-title"
+              initial={{ opacity: 0, scale: 0.96, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 15 }}
-              transition={{ type: "spring", damping: 25, stiffness: 350 }}
+              exit={{ opacity: 0, scale: 0.96, y: 10 }}
+              transition={{ duration: 0.14, ease: "easeOut" }}
               className="relative w-full max-w-lg overflow-hidden rounded-2xl border border-neutral-200 dark:border-white/20 bg-white dark:bg-[#1E1E1E] p-5 sm:p-6 shadow-2xl z-10 space-y-4 text-left"
             >
               <div className="flex items-center justify-between border-b border-neutral-200/70 dark:border-white/10 pb-2.5">
                 <div>
-                  <h3 className="text-base font-bold text-neutral-900 dark:text-white flex items-center gap-2">
-                    <MapPin className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                  <h3 id="location-modal-title" className="text-base font-bold text-neutral-900 dark:text-white flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-neutral-700 dark:text-neutral-300" aria-hidden="true" />
                     <span>
                       {!["requested", "pending"].includes(String(locationModalOrder.status).toLowerCase())
                         ? "Request Location Change"
                         : "Update Booking Location"}
                     </span>
                   </h3>
-                  <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
+                  <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-0.5">
                     Order #{locationModalOrder.id} • {locationModalOrder.productTitle || "Gear Rental"}
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setLocationModalOrder(null)}
-                  className="p-1 rounded-lg text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/10 transition-colors"
+                  aria-label="Close location modal"
+                  className="p-1.5 rounded-lg text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/10 transition-colors cursor-pointer"
                 >
-                  <X className="h-4 w-4" />
+                  <X className="h-4 w-4" aria-hidden="true" />
                 </button>
               </div>
 
               {/* Form Content */}
               <div className="space-y-3">
                 <div>
-                  <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block mb-1">
+                  <span id="fulfillment-method-label" className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block mb-1">
                     Fulfillment Method
-                  </label>
-                  <div className="grid grid-cols-3 gap-2">
+                  </span>
+                  <div className="grid grid-cols-3 gap-2" role="group" aria-labelledby="fulfillment-method-label">
                     <button
                       type="button"
+                      aria-pressed={editMethod === "delivery"}
                       onClick={() => setEditMethod("delivery")}
-                      className={`p-2 rounded-lg border text-xs font-bold transition-all ${
+                      className={`p-2 rounded-lg border text-xs font-semibold transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white ${
                         editMethod === "delivery"
-                          ? "border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
-                          : "border-neutral-200 dark:border-white/10 bg-neutral-50 dark:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:text-white"
+                          ? "border-neutral-950 bg-neutral-950 text-white dark:border-white dark:bg-white dark:text-neutral-950"
+                          : "border-neutral-200 dark:border-white/10 bg-neutral-50 dark:bg-white/5 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:text-white"
                       }`}
                     >
                       Delivery
                     </button>
                     <button
                       type="button"
+                      aria-pressed={editMethod === "pickup"}
                       onClick={() => setEditMethod("pickup")}
-                      className={`p-2 rounded-lg border text-xs font-bold transition-all ${
+                      className={`p-2 rounded-lg border text-xs font-semibold transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white ${
                         editMethod === "pickup"
-                          ? "border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
-                          : "border-neutral-200 dark:border-white/10 bg-neutral-50 dark:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:text-white"
+                          ? "border-neutral-950 bg-neutral-950 text-white dark:border-white dark:bg-white dark:text-neutral-950"
+                          : "border-neutral-200 dark:border-white/10 bg-neutral-50 dark:bg-white/5 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:text-white"
                       }`}
                     >
                       Pickup
                     </button>
                     <button
                       type="button"
+                      aria-pressed={editMethod === "custom"}
                       onClick={() => setEditMethod("custom")}
-                      className={`p-2 rounded-lg border text-xs font-bold transition-all ${
+                      className={`p-2 rounded-lg border text-xs font-semibold transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white ${
                         editMethod === "custom"
-                          ? "border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
-                          : "border-neutral-200 dark:border-white/10 bg-neutral-50 dark:bg-white/5 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:text-white"
+                          ? "border-neutral-950 bg-neutral-950 text-white dark:border-white dark:bg-white dark:text-neutral-950"
+                          : "border-neutral-200 dark:border-white/10 bg-neutral-50 dark:bg-white/5 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:text-white"
                       }`}
                     >
                       Custom
@@ -2251,42 +2319,45 @@ export default function Orders() {
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block mb-1">
+                  <label htmlFor="order-location-address" className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block mb-1">
                     {editMethod === "delivery" ? "Delivery Address" : editMethod === "pickup" ? "Pickup Hub" : "Custom Meetup Address"}
                   </label>
                   <input
+                    id="order-location-address"
                     type="text"
                     value={editAddress}
                     onChange={(e) => setEditAddress(e.target.value)}
                     placeholder="Enter complete street address..."
-                    className="w-full px-3 py-2 rounded-lg text-xs bg-neutral-50 dark:bg-black/40 border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-white placeholder:text-neutral-400 focus:outline-hidden focus:border-emerald-500"
+                    className="w-full px-3 py-2 rounded-lg text-xs bg-neutral-50 dark:bg-black/40 border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-white placeholder:text-neutral-500 focus:outline-hidden focus:border-neutral-950 dark:focus:border-white"
                   />
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block mb-1">
+                  <label htmlFor="order-location-directions" className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block mb-1">
                     Directions or Notes (Optional)
                   </label>
                   <input
+                    id="order-location-directions"
                     type="text"
                     value={editDirections}
                     onChange={(e) => setEditDirections(e.target.value)}
                     placeholder="Nearby landmark, gate code..."
-                    className="w-full px-3 py-2 rounded-lg text-xs bg-neutral-50 dark:bg-black/40 border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-white placeholder:text-neutral-400 focus:outline-hidden focus:border-emerald-500"
+                    className="w-full px-3 py-2 rounded-lg text-xs bg-neutral-50 dark:bg-black/40 border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-white placeholder:text-neutral-500 focus:outline-hidden focus:border-neutral-950 dark:focus:border-white"
                   />
                 </div>
 
                 {!["requested", "pending"].includes(String(locationModalOrder.status).toLowerCase()) && (
                   <div>
-                    <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block mb-1">
+                    <label htmlFor="order-location-reason" className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block mb-1">
                       Reason for Location Change Request *
                     </label>
                     <input
+                      id="order-location-reason"
                       type="text"
                       value={editReason}
                       onChange={(e) => setEditReason(e.target.value)}
                       placeholder="e.g., Shoot relocated to new studio location"
-                      className="w-full px-3 py-2 rounded-lg text-xs bg-neutral-50 dark:bg-black/40 border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-white placeholder:text-neutral-400 focus:outline-hidden focus:border-emerald-500"
+                      className="w-full px-3 py-2 rounded-lg text-xs bg-neutral-50 dark:bg-black/40 border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-white placeholder:text-neutral-500 focus:outline-hidden focus:border-neutral-950 dark:focus:border-white"
                     />
                   </div>
                 )}
@@ -2298,9 +2369,9 @@ export default function Orders() {
                   size="sm"
                   onClick={() => setLocationModalOrder(null)}
                   disabled={isSavingLocation}
-                  className="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white text-xs px-3 py-1.5 inline-flex items-center gap-1.5"
+                  className="text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white text-xs px-3 py-1.5 inline-flex items-center gap-1.5"
                 >
-                  <X className="h-3.5 w-3.5 shrink-0" />
+                  <X className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                   <span>Cancel</span>
                 </Button>
                 <Button
@@ -2308,9 +2379,9 @@ export default function Orders() {
                   size="sm"
                   onClick={handleSaveLocation}
                   disabled={isSavingLocation}
-                  className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3.5 py-1.5 inline-flex items-center gap-1.5"
+                  className="bg-neutral-950 hover:bg-neutral-800 text-white dark:bg-white dark:hover:bg-neutral-200 dark:text-neutral-950 text-xs font-bold px-3.5 py-1.5 inline-flex items-center gap-1.5"
                 >
-                  <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                  <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                   <span>{isSavingLocation ? "Saving..." : "Update Location"}</span>
                 </Button>
               </div>
@@ -2320,70 +2391,106 @@ export default function Orders() {
 
         {/* Receipt Modal */}
         {showReceiptModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-            <div className="w-full max-w-md p-6 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] shadow-2xl space-y-5 text-left">
+          <div key="receipt-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="receipt-modal-title"
+              className="w-full max-w-md p-6 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] shadow-2xl space-y-5 text-left"
+            >
               <div className="flex items-center justify-between pb-3 border-b border-neutral-200 dark:border-neutral-800">
                 <div className="flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-neutral-700 dark:text-neutral-300" />
-                  <h3 className="text-base font-extrabold text-neutral-900 dark:text-white">
+                  <FileText className="h-5 w-5 stroke-[1.75] text-neutral-700 dark:text-neutral-300" aria-hidden="true" />
+                  <h3 id="receipt-modal-title" className="text-base font-semibold text-neutral-900 dark:text-white">
                     Official Rental Receipt
                   </h3>
                 </div>
                 <button
                   type="button"
-                  onClick={() => setShowReceiptModal(false)}
-                  className="p-1 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-400 hover:text-neutral-900 dark:hover:text-white cursor-pointer"
+                  onClick={handleCloseReceipt}
+                  aria-label="Close receipt modal"
+                  className="p-1.5 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white cursor-pointer transition-colors"
                 >
-                  ✕
+                  <X className="h-4 w-4 stroke-[1.75]" aria-hidden="true" />
                 </button>
               </div>
 
               {receiptLoading ? (
                 <div className="p-8 text-center space-y-2">
                   <Loader2 className="h-6 w-6 animate-spin mx-auto text-neutral-700 dark:text-neutral-300" />
-                  <p className="text-xs text-neutral-500">Retrieving official receipt...</p>
+                  <p className="text-xs text-neutral-600 dark:text-neutral-400">Retrieving official receipt...</p>
+                </div>
+              ) : receiptError || !receiptData ? (
+                <div className="p-5 rounded-xl bg-red-500/10 border border-red-500/20 space-y-3 text-center">
+                  <AlertTriangle className="h-6 w-6 stroke-[1.75] text-red-600 dark:text-red-400 mx-auto" aria-hidden="true" />
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold text-neutral-900 dark:text-white">
+                      Receipt unavailable
+                    </p>
+                    <p className="text-xs text-neutral-700 dark:text-neutral-300">
+                      {receiptError || "Official receipt data could not be loaded for this booking."}
+                    </p>
+                  </div>
+                  {receiptOrder && (
+                    <button
+                      type="button"
+                      onClick={() => handleOpenReceipt(receiptOrder)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-900 text-white dark:bg-white dark:text-black text-xs font-semibold cursor-pointer hover:opacity-90 transition-opacity"
+                    >
+                      <RefreshCw className="h-3.5 w-3.5 stroke-[1.75]" aria-hidden="true" />
+                      <span>Retry</span>
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-3 text-xs">
                   <div className="flex justify-between">
-                    <span className="text-neutral-400">Receipt No:</span>
-                    <span className="font-mono font-bold text-neutral-800 dark:text-neutral-200">
-                      {receiptData?.receipt_number || `REC-${receiptOrder?.id.replace("ord_", "")}`}
+                    <span className="text-neutral-600 dark:text-neutral-400">Receipt No:</span>
+                    <span className="font-mono font-semibold text-neutral-800 dark:text-neutral-200">
+                      {receiptData.receipt_number || "Pending"}
                     </span>
                   </div>
 
                   <div className="flex justify-between">
-                    <span className="text-neutral-400">Order Reference:</span>
+                    <span className="text-neutral-600 dark:text-neutral-400">Order Reference:</span>
                     <span className="font-mono text-neutral-800 dark:text-neutral-200">
-                      #{receiptData?.order_id || receiptOrder?.id}
+                      #{receiptData.order_id || receiptOrder?.id}
                     </span>
                   </div>
 
                   <div className="flex justify-between">
-                    <span className="text-neutral-400">Transaction ID:</span>
+                    <span className="text-neutral-600 dark:text-neutral-400">Transaction ID:</span>
                     <span className="font-mono text-neutral-800 dark:text-neutral-200 truncate max-w-[200px]">
-                      {receiptData?.transaction_id || receiptOrder?.razorpayPaymentId || `pay_${receiptOrder?.id}`}
+                      {receiptData.transaction_id || receiptOrder?.razorpayPaymentId || "Pending"}
                     </span>
                   </div>
 
                   <div className="flex justify-between">
-                    <span className="text-neutral-400">Item:</span>
+                    <span className="text-neutral-600 dark:text-neutral-400">Item:</span>
                     <span className="font-semibold text-neutral-800 dark:text-neutral-200 truncate max-w-[200px]">
-                      {receiptData?.product_title || receiptOrder?.productTitle || (receiptOrder as any)?.product_title}
+                      {receiptData.product_title || receiptOrder?.productTitle || (receiptOrder as any)?.product_title}
                     </span>
                   </div>
 
                   <div className="flex justify-between">
-                    <span className="text-neutral-400">Payment Status:</span>
-                    <span className="font-bold text-emerald-600 dark:text-emerald-400 uppercase">
-                      {receiptData?.payment_status || receiptOrder?.paymentStatus || "PAID"}
+                    <span className="text-neutral-600 dark:text-neutral-400">Payment Status:</span>
+                    <span
+                      className={cn(
+                        "font-semibold capitalize",
+                        String(receiptData.payment_status || "").toLowerCase() === "paid" ||
+                          String(receiptData.payment_status || "").toLowerCase() === "successful"
+                          ? "text-emerald-700 dark:text-emerald-400"
+                          : "text-amber-700 dark:text-amber-400"
+                      )}
+                    >
+                      {String(receiptData.payment_status || receiptOrder?.paymentStatus || "Unknown").toLowerCase()}
                     </span>
                   </div>
 
                   <div className="flex justify-between items-center pt-2 border-t border-neutral-200 dark:border-neutral-800">
-                    <span className="font-bold text-neutral-900 dark:text-white">Amount:</span>
-                    <span className="font-mono font-extrabold text-base text-neutral-900 dark:text-white">
-                      ₹{Number(receiptData?.total_amount || receiptOrder?.total || 0).toLocaleString("en-IN")}
+                    <span className="font-semibold text-neutral-900 dark:text-white">Amount:</span>
+                    <span className="font-semibold tabular-nums text-base text-neutral-900 dark:text-white">
+                      ₹{Number(receiptData.total_amount ?? receiptOrder?.total ?? 0).toLocaleString("en-IN")}
                     </span>
                   </div>
                 </div>
@@ -2392,17 +2499,18 @@ export default function Orders() {
               <div className="flex gap-2 pt-2">
                 <button
                   type="button"
+                  disabled={receiptLoading || Boolean(receiptError) || !receiptData}
                   onClick={() => {
                     if (typeof window !== "undefined") window.print();
                   }}
-                  className="flex-1 py-2 px-3 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white dark:bg-white dark:text-black dark:hover:bg-neutral-100 font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                  className="flex-1 py-2 px-3 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white dark:bg-white dark:text-black dark:hover:bg-neutral-100 font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Download className="h-3.5 w-3.5" />
+                  <Download className="h-3.5 w-3.5" aria-hidden="true" />
                   <span>Print / Save Receipt</span>
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowReceiptModal(false)}
+                  onClick={handleCloseReceipt}
                   className="py-2 px-4 rounded-xl border border-neutral-300 dark:border-neutral-700 text-xs font-semibold text-neutral-700 dark:text-neutral-300 cursor-pointer"
                 >
                   Close

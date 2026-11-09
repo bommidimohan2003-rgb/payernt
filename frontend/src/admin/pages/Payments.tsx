@@ -312,7 +312,7 @@ export default function Payments() {
             <span>{tab.label}</span>
             <span
               className={cn(
-                "px-1.5 py-0.2 rounded-full text-[10px] font-mono",
+                "px-1.5 py-0.5 rounded-full text-[10px] font-mono",
                 (statusFilter === tab.id || (tab.id === "platform" && statusFilter === "successful"))
                   ? "bg-black/15 text-black font-bold"
                   : "bg-white/10 text-[#A1A1AA]"

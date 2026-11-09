@@ -14,10 +14,9 @@ import {
   Compass,
   ShoppingBag,
   LayoutGrid,
-  CircleHelp,
+  User,
 } from "lucide-react";
 import { useCart } from "@/hooks/useCart";
-import { useLanguage } from "@/i18n";
 
 export interface Navigation4Item {
   id: string;
@@ -77,17 +76,17 @@ function Nav4DockItem({
           width: size,
           height: size,
         }}
-        whileHover={{ y: -2, transition: { type: "spring", stiffness: 400, damping: 25 } }}
+        whileHover={{ y: -2, transition: { duration: 0.18, ease: [0.22, 1, 0.36, 1] } }}
         whileTap={{ scale: 0.96, transition: { duration: 0.12, ease: "easeOut" } }}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         onFocus={() => setIsHovered(true)}
         onBlur={() => setIsHovered(false)}
         onClick={handleClick}
-        className={`relative flex items-center justify-center rounded-2xl transition-all duration-200 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring shrink-0 ${
+        className={`relative flex flex-col items-center justify-center gap-0.5 min-w-[46px] min-h-[46px] px-1 rounded-2xl transition-colors duration-200 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white shrink-0 ${
           item.isActive
-            ? "bg-accent-primary text-white shadow-md font-bold"
-            : "hover:bg-secondary text-text-secondary hover:text-text-primary"
+            ? "bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 shadow-xs font-semibold"
+            : "hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white"
         }`}
         aria-label={item.label}
         aria-current={item.isActive ? "page" : undefined}
@@ -96,8 +95,8 @@ function Nav4DockItem({
         {item.isActive && (
           <motion.span
             layoutId="nav4-active-pill"
-            className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-4 sm:w-5 h-1 sm:h-1 rounded-full bg-accent-primary"
-            transition={{ type: "spring", stiffness: 350, damping: 30 }}
+            className="hidden md:block absolute -bottom-1 left-1/2 -translate-x-1/2 w-5 h-1 rounded-full bg-neutral-950 dark:bg-white"
+            transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
           />
         )}
 
@@ -105,14 +104,17 @@ function Nav4DockItem({
           {item.icon}
 
           {item.badge !== undefined && item.badge !== 0 && (
-            <span className="absolute -top-1.5 -right-1.5 px-1.5 min-w-[16px] h-[16px] rounded-full bg-destructive text-white text-[9px] font-bold flex items-center justify-center shadow-md pointer-events-none z-20">
+            <span className="absolute -top-1.5 -right-2 px-1 min-w-[16px] h-[16px] rounded-full bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 ring-2 ring-white dark:ring-neutral-950 text-[9px] font-semibold flex items-center justify-center shadow-xs pointer-events-none z-20 tabular-nums">
               {item.badge}
             </span>
           )}
         </div>
+        <span className="md:hidden text-[10px] leading-none font-medium pointer-events-none">
+          {item.label}
+        </span>
       </motion.button>
 
-      {/* Tooltip positioned above dock item */}
+      {/* Desktop tooltip positioned above dock item */}
       <AnimatePresence>
         {isHovered && (
           <motion.div
@@ -120,12 +122,12 @@ function Nav4DockItem({
             animate={{ opacity: 1, y: -10, scale: 1 }}
             exit={{ opacity: 0, y: 4, scale: 0.95 }}
             transition={{ duration: 0.15, ease: "easeOut" }}
-            className="absolute bottom-full mb-2.5 left-1/2 -translate-x-1/2 pointer-events-none z-50 whitespace-nowrap px-3 sm:px-3.5 py-1.5 rounded-xl bg-neutral-950/90 dark:bg-white/95 text-white dark:text-neutral-950 text-xs sm:text-sm font-bold shadow-xl border border-white/15 dark:border-black/10 backdrop-blur-md flex items-center gap-1.5"
+            className="hidden md:flex absolute bottom-full mb-2.5 left-1/2 -translate-x-1/2 pointer-events-none z-50 whitespace-nowrap px-3.5 py-1.5 rounded-xl bg-neutral-950/90 dark:bg-white/95 text-white dark:text-neutral-950 text-xs sm:text-sm font-semibold shadow-xl border border-white/15 dark:border-black/10 backdrop-blur-md items-center gap-1.5"
             role="tooltip"
           >
             <span>{item.label}</span>
             {item.badge !== undefined && item.badge !== 0 && (
-              <span className="px-1.5 py-0.2 rounded-full bg-neutral-800 text-white dark:bg-neutral-200 dark:text-neutral-950 text-[10px] font-extrabold">
+              <span className="px-1.5 py-0.5 rounded-full bg-neutral-800 text-white dark:bg-neutral-200 dark:text-neutral-950 text-[10px] font-semibold tabular-nums">
                 {item.badge}
               </span>
             )}
@@ -145,19 +147,20 @@ export interface Navigation4Props {
 }
 
 /**
- * Universal Navigation Dock for pay₹ent
- * Exactly 4 items:
+ * Universal Navigation Dock for paYent
+ * Renders 5 primary destinations:
  * 1. Home
  * 2. Explore
- * 3. Cart
- * 4. User Dashboard
+ * 3. Orders
+ * 4. Profile
+ * 5. More
  */
 export function Navigation4({
   className = "",
   baseItemSize,
   magnification,
   distance,
-  spring = { mass: 0.1, stiffness: 200, damping: 15 },
+  spring = { mass: 0.25, stiffness: 260, damping: 24 },
 }: Navigation4Props) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
@@ -172,9 +175,9 @@ export function Navigation4({
     return () => window.removeEventListener("resize", checkDesktop);
   }, []);
 
-  const effectiveBaseItemSize = baseItemSize ?? (isDesktop ? 44 : 38);
-  const effectiveMagnification = magnification ?? (isDesktop ? 56 : 46);
-  const effectiveDistance = distance ?? (isDesktop ? 115 : 95);
+  const effectiveBaseItemSize = baseItemSize ?? (isDesktop ? 46 : 48);
+  const effectiveMagnification = magnification ?? (isDesktop ? 52 : 48);
+  const effectiveDistance = distance ?? (isDesktop ? 105 : 0);
 
   const mouseX = useMotionValue(Infinity);
   const isHovered = useMotionValue(0);
@@ -210,62 +213,50 @@ export function Navigation4({
     return pathname === to;
   };
 
-  const { tCommon } = useLanguage();
-
-  // Exact 5 Buttons in required order:
-  // 1. Dashboard — Home icon
-  // 2. Explore — Compass icon
-  // 3. Bookings — ShoppingBag icon
-  // 4. More — LayoutGrid icon
-  // 5. FAQ + Support — CircleHelp icon
+  // 5 Navigation Items:
+  // 1. Home
+  // 2. Explore
+  // 3. Orders
+  // 4. Profile
+  // 5. More
   const mainItems: Navigation4Item[] = [
     {
-      id: "dashboard",
-      label: "Dashboard",
-      icon: <Home className="h-4 w-4 sm:h-[18px] sm:w-[18px] md:h-[19px] md:w-[19px] stroke-[1.6]" />,
+      id: "home",
+      label: "Home",
+      icon: <Home className="h-4 w-4 sm:h-[18px] sm:w-[18px] md:h-[19px] md:w-[19px] stroke-[1.75]" />,
       isActive: pathname === "/" || pathname === "/payant" || pathname === "/payent" || pathname === "/payent/",
-      onClick: () => navigate({ to: "/payant" }),
+      onClick: () => navigate({ to: "/payent" }),
     },
     {
       id: "explore",
-      label: tCommon.explore || "Explore",
-      icon: <Compass className="h-4 w-4 sm:h-[18px] sm:w-[18px] md:h-[19px] md:w-[19px] stroke-[1.6]" />,
+      label: "Explore",
+      icon: <Compass className="h-4 w-4 sm:h-[18px] sm:w-[18px] md:h-[19px] md:w-[19px] stroke-[1.75]" />,
       isActive: isRouteActive("/browse"),
       onClick: () => navigate({ to: "/browse" }),
     },
     {
-      id: "bookings",
-      label: "Bookings",
-      icon: <ShoppingBag className="h-4 w-4 sm:h-[18px] sm:w-[18px] md:h-[19px] md:w-[19px] stroke-[1.6]" />,
+      id: "orders",
+      label: "Orders",
+      icon: <ShoppingBag className="h-4 w-4 sm:h-[18px] sm:w-[18px] md:h-[19px] md:w-[19px] stroke-[1.75]" />,
       badge: cartCount > 0 ? cartCount : undefined,
       isActive: isRouteActive("/orders"),
       onClick: () => navigate({ to: "/orders" }),
     },
     {
-      id: "more",
-      label: "More",
-      icon: <LayoutGrid className="h-4 w-4 sm:h-[18px] sm:w-[18px] md:h-[19px] md:w-[19px] stroke-[1.6]" />,
-      isActive: isRouteActive("/dashboard"),
-      onClick: () => navigate({ to: "/dashboard" }),
+      id: "profile",
+      label: "Profile",
+      icon: <User className="h-4 w-4 sm:h-[18px] sm:w-[18px] md:h-[19px] md:w-[19px] stroke-[1.75]" />,
+      isActive: pathname.startsWith("/profile") || pathname.startsWith("/settings"),
+      onClick: () => navigate({ to: "/profile" }),
     },
     {
-      id: "support",
-      label: "FAQ + Support",
-      icon: <CircleHelp className="h-4 w-4 sm:h-[18px] sm:w-[18px] md:h-[19px] md:w-[19px] stroke-[1.6]" />,
-      isActive: isRouteActive("/support"),
-      onClick: () => navigate({ to: "/support" }),
+      id: "more",
+      label: "More",
+      icon: <LayoutGrid className="h-4 w-4 sm:h-[18px] sm:w-[18px] md:h-[19px] md:w-[19px] stroke-[1.75]" />,
+      isActive: isRouteActive("/dashboard") && !pathname.startsWith("/profile") && !pathname.startsWith("/settings"),
+      onClick: () => navigate({ to: "/dashboard" }),
     },
   ];
-
-  const isDashboardRoute =
-    pathname.startsWith("/dashboard") ||
-    pathname.startsWith("/orders") ||
-    pathname.startsWith("/wishlist") ||
-    pathname.startsWith("/profile") ||
-    pathname.startsWith("/settings") ||
-    pathname.startsWith("/messages") ||
-    pathname.startsWith("/notifications") ||
-    pathname.startsWith("/kyc");
 
   if (
     pathname.startsWith("/admin") ||
@@ -277,7 +268,7 @@ export function Navigation4({
 
   return (
     <aside
-      aria-label="pay₹ent Navigation Dock"
+      aria-label="paYent Navigation Dock"
       className={`fixed bottom-[calc(0.75rem+env(safe-area-inset-bottom,0px))] md:bottom-6 inset-x-0 mx-auto z-50 flex justify-center items-center pointer-events-none select-none px-2 sm:px-4 w-full max-w-full ${className}`}
     >
       <motion.div
@@ -300,7 +291,7 @@ export function Navigation4({
           isHovered.set(0);
           mouseX.set(Infinity);
         }}
-        className="pointer-events-auto py-1.5 sm:py-2 px-2.5 sm:px-5 md:px-7 rounded-2xl bg-surface-navigation/95 backdrop-blur-2xl border border-border shadow-elevation-2 flex items-center justify-center gap-1 sm:gap-2.5 md:gap-3.5 w-auto min-w-0 xs:min-w-[290px] sm:min-w-[360px] md:min-w-[420px] max-w-[calc(100vw-1rem)] overflow-visible transition-colors duration-200"
+        className="pointer-events-auto py-1.5 sm:py-2 px-2 sm:px-5 md:px-7 rounded-2xl bg-surface-navigation/95 backdrop-blur-2xl border border-border shadow-elevation-2 flex items-center justify-center gap-1 sm:gap-2.5 md:gap-3.5 w-auto sm:min-w-[360px] md:min-w-[420px] max-w-[calc(100vw-1rem)] overflow-visible transition-colors duration-200"
       >
         {/* The 5 Main Items in exact required order */}
         <div className="flex items-center justify-between sm:justify-around w-full gap-1.5 sm:gap-2.5 md:gap-4 shrink-0">

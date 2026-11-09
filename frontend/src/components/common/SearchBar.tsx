@@ -26,12 +26,13 @@ export function SearchBar({
       <input
         value={q}
         onChange={(e) => setQ(e.target.value)}
-        placeholder="Search cameras, drones, MacBooks..."
+        placeholder="Search rentals"
+        aria-label="Search rentals"
         className="flex-1 bg-transparent outline-none text-sm"
       />
       <button
         type="submit"
-        className="btn-gradient rounded-full px-5 h-9 text-sm font-medium"
+        className="rounded-full px-5 h-9 text-sm font-medium bg-neutral-950 text-white hover:bg-neutral-800 dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-200 transition-colors cursor-pointer"
       >
         Search
       </button>

@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import Categories from "@/pages/Categories";
 import { getSeoMetadata } from "@/utils/seo";
+import { normalizeCategoryParam } from "@/utils/categoryFilter";
 
 type SearchParams = {
   q?: string;
@@ -11,7 +12,7 @@ type SearchParams = {
 export const Route = createFileRoute("/payent/explore")({
   validateSearch: (search: Record<string, unknown>): SearchParams => ({
     q: (search.q as string) || undefined,
-    cat: (search.cat as string) || undefined,
+    cat: normalizeCategoryParam(search),
     city: (search.city as string) || undefined,
   }),
   head: () =>

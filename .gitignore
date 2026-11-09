@@ -56,3 +56,6 @@ backend/backups/*.sql
 frontend/.tanstack/
 backend/storage/secure_kyc_documents/*
 !backend/storage/secure_kyc_documents/.gitkeep
+
+.agents/
+frontend/.agents/

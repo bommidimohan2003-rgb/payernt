@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import FiltersPage from "@/pages/Filters";
 import { getSeoMetadata } from "@/utils/seo";
+import { normalizeCategoryParam } from "@/utils/categoryFilter";
 
 type SearchParams = {
   q?: string;
@@ -19,7 +20,7 @@ export const Route = createFileRoute("/filters")({
   validateSearch: (search: Record<string, unknown>): SearchParams => {
     return {
       q: (search.q as string) || undefined,
-      cat: (search.cat as string) || undefined,
+      cat: normalizeCategoryParam(search),
       min_p: (search.min_p as string) || undefined,
       max_p: (search.max_p as string) || undefined,
       city: (search.city as string) || undefined,
@@ -32,9 +33,9 @@ export const Route = createFileRoute("/filters")({
   },
   head: () =>
     getSeoMetadata({
-      title: "PAYENT — Filter Products",
+      title: "paYent — Filter Products",
       description:
-        "Filter verified rental cameras, drones, laptops, audio gear, and equipment on PAYENT.",
+        "Filter verified rental cameras, drones, laptops, audio gear, and equipment on paYent.",
       path: "/filters",
     }),
   component: FiltersPage,

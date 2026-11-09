@@ -88,7 +88,11 @@ export default function KycApplicationDetails() {
   const applicationId = routeId === "kyc" ? "" : routeId;
 
   // Search parameters for preserving back navigation
-  const searchParams = new URLSearchParams(location?.search || "");
+  const rawSearch =
+    typeof location?.search === "string"
+      ? location.search
+      : (location as { searchStr?: string })?.searchStr || "";
+  const searchParams = new URLSearchParams(rawSearch);
   const returnStatus = searchParams.get("status") || undefined;
   const returnType = searchParams.get("type") || undefined;
   const returnQuery = searchParams.get("q") || undefined;
@@ -429,7 +433,7 @@ export default function KycApplicationDetails() {
           <div className="flex items-start sm:items-center gap-4">
             <ProfilePhoto
               src={verification.applicant_avatar || undefined}
-              name={verification.applicant_name || verification.email}
+              alt={verification.applicant_name || verification.email}
               size="lg"
             />
             <div className="space-y-1">

@@ -46,7 +46,7 @@ export function EmptyState({
         <button
           type="button"
           onClick={onAction}
-          className="btn-gradient text-xs md:text-sm px-5 py-2.5 rounded-xl font-bold transition-transform active:scale-95 shadow-md"
+          className="bg-neutral-950 text-white hover:bg-neutral-800 dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-200 text-xs md:text-sm px-5 py-2.5 rounded-xl font-semibold transition-colors cursor-pointer"
         >
           {actionLabel}
         </button>

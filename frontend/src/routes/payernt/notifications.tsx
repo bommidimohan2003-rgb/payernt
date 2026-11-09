@@ -105,7 +105,7 @@ function PayerntNotificationsRoute() {
           }`}
         >
           All
-          <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+          <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${
             activeFilter === "all" ? "bg-white/20 text-white" : "bg-muted text-muted-foreground"
           }`}>
             {notifications.length}
@@ -123,7 +123,7 @@ function PayerntNotificationsRoute() {
         >
           Unread
           {unreadCount > 0 && (
-            <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+            <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${
               activeFilter === "unread" ? "bg-white/20 text-white" : "bg-red-500/20 text-red-500"
             }`}>
               {unreadCount}
@@ -141,7 +141,7 @@ function PayerntNotificationsRoute() {
           }`}
         >
           Booking Requests
-          <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+          <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${
             activeFilter === "requests" ? "bg-white/20 text-white" : "bg-muted text-muted-foreground"
           }`}>
             {requestCount}

@@ -292,7 +292,7 @@ export default function Analytics() {
 
   if (loading && !dataset) {
     return (
-      <div className="space-y-4 max-w-[1520px] mx-auto pb-12 animate-pulse antialiased">
+      <div className="space-y-4 max-w-[1520px] mx-auto pb-12 antialiased">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-[#E4E4E7] dark:border-[#27272A]">
           <div className="space-y-1.5">
             <div className="h-6 w-32 bg-[#E4E4E7] dark:bg-[#1E1E1E] rounded-md" />

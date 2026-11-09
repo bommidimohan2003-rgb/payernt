@@ -199,7 +199,7 @@ export default function Notifications() {
             }`}
           >
             All
-            <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+            <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${
               activeTab === "all" ? "bg-white/20 text-white" : "bg-muted text-muted-foreground"
             }`}>
               {list.length}
@@ -217,7 +217,7 @@ export default function Notifications() {
           >
             Unread
             {unreadCount > 0 && (
-              <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+              <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${
                 activeTab === "unread" ? "bg-white/20 text-white" : "bg-red-500/20 text-red-500"
               }`}>
                 {unreadCount}
@@ -235,7 +235,7 @@ export default function Notifications() {
             }`}
           >
             Rentals & Bookings
-            <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+            <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${
               activeTab === "bookings" ? "bg-white/20 text-white" : "bg-muted text-muted-foreground"
             }`}>
               {bookingCount}

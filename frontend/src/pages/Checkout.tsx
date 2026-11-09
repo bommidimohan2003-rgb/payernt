@@ -402,13 +402,13 @@ export default function Checkout() {
     const effectiveFullName = (
       fullName.trim() ||
       user?.fullName ||
-      ((user as Record<string, unknown>)?.name as string) ||
+      ((user as unknown as Record<string, unknown>)?.name as string) ||
       "Valued Customer"
     ).trim();
     const rawPhone = (
       phone ||
       user?.phone ||
-      ((user as Record<string, unknown>)?.phoneNumber as string) ||
+      ((user as unknown as Record<string, unknown>)?.phoneNumber as string) ||
       ""
     ).replace(/\D/g, "");
     const effectivePhone =
@@ -597,6 +597,11 @@ export default function Checkout() {
         "Please save your delivery address before proceeding to payment.",
       );
       setActiveStep("address");
+      return;
+    }
+
+    if (!product) {
+      toast.error("Product details are still loading.");
       return;
     }
 
@@ -1084,7 +1089,7 @@ export default function Checkout() {
                       <div className="flex items-center gap-2">
                         <span className="font-semibold text-foreground">
                           {user?.fullName ||
-                            ((user as Record<string, unknown>)
+                            ((user as unknown as Record<string, unknown>)
                               ?.name as string) ||
                             "Recipient"}
                         </span>

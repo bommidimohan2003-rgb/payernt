@@ -38,6 +38,8 @@ import {
 
   Info,
 
+  Package,
+
 } from "lucide-react";
 
 import { motion } from "framer-motion";
@@ -383,7 +385,7 @@ export function BookingDetails() {
   if (loading) {
     return (
       <div className="min-h-screen bg-background py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-        <div className="animate-pulse space-y-6">
+        <div className="space-y-6">
 
           <div className="h-6 w-32 bg-muted/60 rounded-xl" />
 
@@ -701,11 +703,7 @@ export function BookingDetails() {
 
                   <img
 
-                    src={getOptimizedImageUrl(booking.productImage, {
-
-                      width: 300,
-
-                    })}
+                    src={getOptimizedImageUrl(booking.productImage, 300)}
 
                     alt={booking.productTitle}
 

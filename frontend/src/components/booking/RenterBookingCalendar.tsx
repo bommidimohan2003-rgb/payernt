@@ -380,6 +380,7 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
       isPast: boolean;
       isBlocked: boolean;
       isBooked: boolean;
+      isPrepBlocked?: boolean;
     }> = [];
 
     // Empty lead cells

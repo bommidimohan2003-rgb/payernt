@@ -11,6 +11,7 @@ interface StatsCardProps {
   loading?: boolean;
   error?: boolean;
   onRetry?: () => void;
+  onClick?: () => void;
   className?: string;
 }
 
@@ -24,11 +25,12 @@ export function StatsCard({
   loading = false,
   error = false,
   onRetry,
+  onClick,
   className,
 }: StatsCardProps) {
   if (loading) {
     return (
-      <div className={cn("p-5 rounded-2xl bg-card border border-border/80 shadow-xs animate-pulse", className)}>
+      <div className={cn("p-5 rounded-2xl bg-card border border-border/80 shadow-xs", className)}>
         <div className="flex items-center justify-between mb-3">
           <div className="h-3 w-24 bg-muted rounded"></div>
           <div className="h-8 w-8 bg-muted rounded-xl"></div>
@@ -63,8 +65,21 @@ export function StatsCard({
 
   return (
     <div
+      onClick={onClick}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={
+        onClick
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onClick();
+              }
+            }
+          : undefined
+      }
       className={cn(
-        "p-5 rounded-2xl bg-card border border-border/80 hover:border-border transition-all shadow-xs flex flex-col justify-between",
+        "p-5 rounded-2xl bg-card border border-border/80 hover:border-border transition-colors shadow-xs flex flex-col justify-between",
         className
       )}
     >

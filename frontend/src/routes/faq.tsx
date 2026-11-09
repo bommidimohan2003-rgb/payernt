@@ -18,9 +18,9 @@ export const Route = createFileRoute("/faq")({
   }),
   head: () =>
     getSeoMetadata({
-      title: "PAYENT — FAQ & Support",
+      title: "paYent — FAQ & Support",
       description:
-        "Frequently asked questions, guided troubleshooting, and support for PAYENT rentals.",
+        "Frequently asked questions, guided troubleshooting, and support for paYent rentals.",
       path: "/faq",
     }),
   component: Support,

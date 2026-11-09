@@ -203,7 +203,7 @@ export function ProductMessageModal({
               <div>
                 <div className="flex items-center gap-1.5">
                   <h3 className="font-bold text-sm text-foreground">{ownerName}</h3>
-                  <span className="inline-flex items-center gap-0.5 text-[10px] font-extrabold text-amber-500 bg-amber-500/10 px-1.5 py-0.2 rounded">
+                  <span className="inline-flex items-center gap-0.5 text-[10px] font-extrabold text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded">
                     ★ {product.owner?.rating?.toFixed(1) || "5.0"}
                   </span>
                 </div>

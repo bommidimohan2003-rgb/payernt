@@ -11,7 +11,15 @@ export const Route = createFileRoute("/checkout")({
         "Complete your secure rental booking with insurance options on Payent.",
       path: "/checkout",
     }),
-  validateSearch: (s: Record<string, unknown>) => ({
+  validateSearch: (
+    s: Record<string, unknown>,
+  ): {
+    id?: string;
+    start?: string;
+    end?: string;
+    slot?: string;
+    mode?: string;
+  } => ({
     id: (s.id as string) ?? undefined,
     start: (s.start as string) ?? undefined,
     end: (s.end as string) ?? undefined,

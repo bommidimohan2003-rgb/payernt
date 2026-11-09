@@ -197,10 +197,10 @@ export function HelpChatbot() {
       {/* Floating Launcher Button */}
       <motion.button
         id="payent-chatbot-launcher"
-        whileHover={{ scale: 1.05, y: -2 }}
-        whileTap={{ scale: 0.95 }}
+        whileHover={{ y: -2 }}
+        whileTap={{ scale: 0.96 }}
         onClick={() => setIsOpen((prev) => !prev)}
-        className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] md:bottom-6 right-3 sm:right-6 z-40 h-12 w-12 sm:h-14 sm:w-14 rounded-2xl bg-[#17191C] text-white shadow-[0_12px_32px_-4px_rgba(23,25,28,0.38)] flex items-center justify-center border border-white/10 hover:bg-[#252930] transition-colors focus:outline-none focus:ring-2 focus:ring-[#16A36A] focus:ring-offset-2 cursor-pointer"
+        className="fixed bottom-[calc(5.25rem+env(safe-area-inset-bottom,0px))] md:bottom-6 right-3 sm:right-6 z-40 h-12 w-12 sm:h-14 sm:w-14 rounded-2xl bg-[#17191C] text-white shadow-[0_12px_32px_-4px_rgba(23,25,28,0.38)] flex items-center justify-center border border-white/10 hover:bg-[#252930] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white focus-visible:ring-offset-2 cursor-pointer"
         aria-label="Payent Support Assistant"
       >
         <AnimatePresence mode="wait">
@@ -222,10 +222,10 @@ export function HelpChatbot() {
               className="relative flex items-center justify-center"
             >
               <PayentAgentIcon size={30} />
-              <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#16A36A] opacity-75" />
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-[#16A36A] border-2 border-[#17191C]" />
-              </span>
+              <span
+                className="absolute -top-1 -right-1 flex h-2.5 w-2.5 rounded-full bg-white border-2 border-[#17191C]"
+                aria-hidden="true"
+              />
             </motion.div>
           )}
         </AnimatePresence>
@@ -241,7 +241,7 @@ export function HelpChatbot() {
             transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
             className="fixed inset-x-3 bottom-3 sm:inset-auto sm:bottom-24 sm:right-6 z-50 w-auto sm:w-[420px] max-w-[calc(100vw-1.5rem)] h-[calc(100dvh-1.5rem)] sm:h-[620px] max-h-[calc(100vh-6.5rem)] rounded-2xl bg-white border border-[#E1E4E8] shadow-[0_24px_64px_-12px_rgba(23,25,28,0.28)] flex flex-col overflow-hidden"
           >
-            {/* Header: Premium Dark Charcoal (#17191C) with Custom P Symbol & Payent Agent */}
+            {/* Header: Monochrome Dark Charcoal (#17191C) with Custom P Symbol & Payent Agent */}
             <div className="px-4 py-3.5 bg-[#17191C] text-white flex items-center justify-between border-b border-white/10 shrink-0">
               <div className="flex items-center gap-2.5 min-w-0">
                 <PayentAgentIcon size={26} />
@@ -249,12 +249,15 @@ export function HelpChatbot() {
                   <span className="font-semibold text-sm text-white tracking-tight truncate">
                     Payent Agent
                   </span>
-                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#16A36A]" />
+                  <span
+                    className="inline-block h-1.5 w-1.5 rounded-full bg-neutral-300"
+                    aria-hidden="true"
+                  />
                 </div>
               </div>
               <button
                 onClick={() => setIsOpen(false)}
-                className="hover:bg-white/10 p-1.5 rounded-lg transition-colors text-white/70 hover:text-white focus:outline-none focus:ring-1 focus:ring-[#16A36A] cursor-pointer"
+                className="hover:bg-white/10 p-2 rounded-lg transition-colors text-white/80 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white cursor-pointer"
                 aria-label="Close Chat"
               >
                 <X className="h-4 w-4" />

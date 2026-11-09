@@ -3,6 +3,7 @@ import { advancedSearch } from "./searchEngine";
 import { getSessionId } from "./eventTracker";
 import { storage, STORAGE_KEYS } from "./storage";
 import { fetchWithTimeout } from "./api";
+import { matchesProductCategory } from "./categoryFilter";
 
 export interface MLSearchResult {
   results: Product[];
@@ -126,7 +127,7 @@ export async function searchWithML(
 
   // Fallback to client-side advanced search
   let filtered = productsList.filter((p) =>
-    !selectedCat ? true : p.category === selectedCat,
+    !selectedCat ? true : matchesProductCategory(p.category, selectedCat),
   );
   if (trimmed) {
     filtered = advancedSearch(filtered, trimmed);
@@ -148,12 +149,13 @@ export async function getSearchStats(): Promise<SearchStats> {
     const res = await fetchWithTimeout(`${API_BASE}/api/search/stats`, {}, 5000);
     if (res.ok) {
       const data = await res.json();
+      const count = Number(data.indexed_products_count ?? data.total_indexed ?? 0);
       return {
-        isIndexed: Boolean(data.is_indexed),
-        indexedProductsCount: Number(data.indexed_products_count || 0),
+        isIndexed: Boolean(data.is_indexed ?? count > 0),
+        indexedProductsCount: count,
         vocabularySize: Number(data.vocabulary_size || 0),
         popularQueries: Array.isArray(data.popular_queries)
-          ? data.popular_queries
+          ? data.popular_queries.filter((q: unknown): q is string => typeof q === "string" && q.trim().length > 0)
           : [],
       };
     }
@@ -165,12 +167,6 @@ export async function getSearchStats(): Promise<SearchStats> {
     isIndexed: false,
     indexedProductsCount: 0,
     vocabularySize: 0,
-    popularQueries: [
-      "Sony Alpha",
-      "MacBook Pro",
-      "DJI Mavic",
-      "Royal Enfield",
-      "DeWalt Drill",
-    ],
+    popularQueries: [],
   };
 }

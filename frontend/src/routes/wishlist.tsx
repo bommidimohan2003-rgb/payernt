@@ -6,9 +6,9 @@ import { ProtectedRoute } from "@/components/common/ProtectedRoute";
 export const Route = createFileRoute("/wishlist")({
   head: () =>
     getSeoMetadata({
-      title: "Your Wishlist | Payent",
+      title: "Your Wishlist | paYent",
       description:
-        "View and manage the premium tech gear you have saved to rent later.",
+        "View and manage the verified tech gear you have saved to rent later on paYent.",
       path: "/wishlist",
     }),
   component: () => (

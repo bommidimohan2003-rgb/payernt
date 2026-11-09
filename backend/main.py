@@ -340,7 +340,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"],
     allow_headers=["*"],
-    expose_headers=["X-Request-ID"],
+    expose_headers=["X-Request-ID", "X-Total-Count"],
 )
 
 # Enable GZip compression for payloads >= 500 bytes (reduces large JSON payloads by 85-90%)
@@ -1543,16 +1543,18 @@ def login(data: LoginRequestSchema, request: Request, response: Response):
     # Fast read-only lockout check (zero DB queries on legitimate logins)
     is_locked_ip, secs_ip = check_auth_lockout(ip_key)
     if is_locked_ip:
+        mins = max(1, (secs_ip + 59) // 60)
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=f"Too many failed login attempts from this IP. Please try again in {secs_ip // 60} minutes."
+            detail=f"Too many failed login attempts from this IP. Please try again in {mins} minute{'s' if mins > 1 else ''}."
         )
         
     is_locked_user, secs_user = check_auth_lockout(user_key)
     if is_locked_user:
+        mins = max(1, (secs_user + 59) // 60)
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=f"Account locked due to multiple failed logins. Please try again in {secs_user // 60} minutes or reset your password."
+            detail=f"Account locked due to multiple failed logins. Please try again in {mins} minute{'s' if mins > 1 else ''} or reset your password."
         )
 
     user = get_user(clean_email)
@@ -5604,6 +5606,75 @@ def validate_cart_checkout_endpoint(current_user: dict = Depends(get_approved_us
         "total": total
     }
 
+_LOCATION_PLACEHOLDERS = {
+    "",
+    "null",
+    "none",
+    "undefined",
+    "n/a",
+    "na",
+    "not provided",
+    "location unavailable",
+}
+
+
+def _clean_location_token(value: Any, allow_country_only: bool = False) -> str:
+    if value is None:
+        return ""
+    text = str(value).strip()
+    if not text:
+        return ""
+    lowered = text.lower()
+    if lowered in _LOCATION_PLACEHOLDERS:
+        return ""
+    if not allow_country_only and lowered in ("india", "in"):
+        return ""
+    # Normalize all-lowercase locality inputs like "visakhapatnam" or "gajuwaka"
+    if text == lowered and any(ch.isalpha() for ch in text):
+        return text.title()
+    return text
+
+
+def _resolve_product_location(p: dict, owner_info: dict, is_public: bool = False) -> tuple[str, str, str, str, str]:
+    prod_area = _clean_location_token(p.get("product_area") or p.get("area"))
+    prod_city = _clean_location_token(p.get("product_city") or p.get("city"))
+    owner_city = _clean_location_token(p.get("owner_city") or owner_info.get("city"))
+    city = prod_city or owner_city
+    state = _clean_location_token(
+        p.get("product_state") or p.get("owner_state") or owner_info.get("state") or p.get("state")
+    )
+    address = _clean_location_token(
+        p.get("owner_address") or owner_info.get("address") or p.get("address")
+    )
+
+    loc_parts: list[str] = []
+    if prod_area:
+        loc_parts.append(prod_area)
+    if city and not any(city.lower() in part.lower() or part.lower() in city.lower() for part in loc_parts):
+        loc_parts.append(city)
+    elif not loc_parts and state:
+        loc_parts.append(state)
+
+    if (
+        len(loc_parts) == 1
+        and city
+        and state
+        and state.lower() not in loc_parts[0].lower()
+        and (not prod_area or prod_area.lower() == city.lower())
+    ):
+        loc_parts.append(state)
+
+    if loc_parts:
+        location_str = ", ".join(loc_parts)
+    elif address and not is_public:
+        location_str = address
+    else:
+        raw_loc = _clean_location_token(p.get("location")) or _clean_location_token(owner_info.get("location"))
+        location_str = raw_loc or "Location unavailable"
+
+    return location_str, city, prod_area, state, owner_city
+
+
 def format_product_dict(p: dict, is_summary: bool = False, booked_pids_set: Optional[Set[str]] = None, is_public: bool = False) -> dict:
     owner_info = p.get("owner") if isinstance(p.get("owner"), dict) else {}
     owner_name = p.get("owner_full_name") or p.get("owner_name") or owner_info.get("name") or "Lender"
@@ -5613,20 +5684,9 @@ def format_product_dict(p: dict, is_summary: bool = False, booked_pids_set: Opti
     owner_id_val = str(p.get("owner_id") or p.get("ownerId") or p.get("user_id") or p.get("userId") or owner_info.get("id") or "").strip()
     owner_status = str(p.get("owner_status") or owner_info.get("status") or "active").strip()
 
-    city = str(p.get("owner_city") or owner_info.get("city") or p.get("city") or "").strip()
-    state = str(p.get("owner_state") or owner_info.get("state") or p.get("state") or "").strip()
+    location_str, city, area, state, owner_city = _resolve_product_location(p, owner_info, is_public=is_public)
     address = str(p.get("owner_address") or owner_info.get("address") or p.get("address") or "").strip()
-    pincode = str(p.get("owner_pincode") or owner_info.get("pincode") or p.get("pincode") or "").strip()
-
-    loc_parts = [part for part in [city, state] if part]
-    if loc_parts:
-        location_str = ", ".join(loc_parts)
-    elif address and not is_public:
-        location_str = address
-    elif p.get("location"):
-        location_str = str(p["location"]).strip()
-    else:
-        location_str = "Location unavailable"
+    pincode = str(p.get("owner_pincode") or owner_info.get("pincode") or p.get("pincode") or p.get("product_pincode") or "").strip()
 
     # Authoritative lender and product availability evaluation (batched if set provided)
     is_avail, avail_status, reason = evaluate_product_availability(p, booked_pids_set=booked_pids_set)
@@ -5686,14 +5746,14 @@ def format_product_dict(p: dict, is_summary: bool = False, booked_pids_set: Opti
         "status": str(p.get("status") or "approved"),
         "location": location_str,
         "city": city or None,
-        "area": str(p.get("area") or ""),
+        "area": area,
         "owner": {
             "id": owner_id_val or None,
             "name": owner_name,
             "email": owner_email or None,
             "avatar": owner_avatar,
             "rating": owner_rating,
-            "city": city or None,
+            "city": (owner_city or city) or None,
             "state": state or None,
             "address": None if is_public else (address or None),
             "pincode": None if is_public else (pincode or None),
@@ -5725,6 +5785,7 @@ def fetch_public_listings(
     response: Response,
     limit: Optional[int] = Query(None, ge=1, le=100),
     page: Optional[int] = Query(1, ge=1),
+    q: Optional[str] = Query(None, description="Search query for title, category, brand, or description"),
     categories: Optional[str] = Query(None, description="Comma-separated category IDs or names"),
     min_price: Optional[float] = Query(None, ge=0),
     max_price: Optional[float] = Query(None, ge=0),
@@ -5737,9 +5798,10 @@ def fetch_public_listings(
     authorization: Optional[str] = Header(None)
 ):
     response.headers["Cache-Control"] = "public, max-age=30, stale-while-revalidate=120"
-    offset = (page - 1) * limit if limit is not None else 0
+    page_num = page or 1
+    offset = (page_num - 1) * limit if limit is not None else 0
     cache_key = (
-        f"public_custom_products:p{page}:l{limit}:cat{categories}:min{min_price}:"
+        f"public_custom_products:q{q}:cat{categories}:min{min_price}:"
         f"max{max_price}:c{city}:pin{pincode}:cond{condition}:s{start_date}:e{end_date}:sort{sort}"
     )
 
@@ -5764,11 +5826,7 @@ def fetch_public_listings(
                     pass
 
     def _load():
-        has_filters = any([categories, min_price is not None, max_price is not None, city, pincode, condition, start_date, end_date, sort])
-        fetch_limit = None if has_filters else limit
-        fetch_offset = 0 if has_filters else offset
-
-        listings = get_all_approved_custom_products(limit=fetch_limit, offset=fetch_offset) or []
+        listings = get_all_approved_custom_products(limit=None, offset=0) or []
         try:
             from payernt_database import get_all_active_payernt_products
             payernt_items = get_all_active_payernt_products()
@@ -5823,6 +5881,12 @@ def fetch_public_listings(
                         "owner_name": p.get("owner_name", "Payent Verified Vendor"),
                         "owner_avatar": p.get("owner_avatar") or "",
                         "owner_rating": 4.9,
+                        "city": p.get("city"),
+                        "area": p.get("area"),
+                        "pincode": p.get("pincode"),
+                        "state": p.get("state"),
+                        "owner_city": p.get("owner_city") or p.get("city"),
+                        "owner_state": p.get("owner_state") or p.get("state"),
                         "created_at": p.get("created_at"),
                         "status": "approved",
                         "featured": True,
@@ -5847,6 +5911,18 @@ def fetch_public_listings(
         if not listings:
             return []
 
+        # 0. Filter by Search Query (q)
+        if q and q.strip():
+            q_term = q.strip().lower()
+            listings = [
+                p for p in listings
+                if q_term in str(p.get("title") or p.get("name") or "").lower()
+                or q_term in str(p.get("category") or "").lower()
+                or q_term in str(p.get("brand") or "").lower()
+                or q_term in str(p.get("model") or "").lower()
+                or q_term in str(p.get("description") or "").lower()
+            ]
+
         # 1. Filter by Categories (OR logic within selected categories)
         if categories and categories.strip() and categories.strip().lower() != "all":
             selected_cats = [c.strip().lower() for c in categories.split(",") if c.strip() and c.strip().lower() != "all"]
@@ -5858,19 +5934,31 @@ def fetch_public_listings(
                     for sc in selected_cats:
                         if sc == low:
                             return True
-                        if sc in ["cameras", "camera"] and "camera" in low:
-                            return True
+                        if sc in ["electronics", "electronic"]:
+                            if any(k in low for k in ["electron", "laptop", "pc", "mac", "computer", "audio", "sound", "headphone", "speaker", "powerbank", "power", "display", "monitor"]):
+                                return True
+                        if sc in ["vehicles", "vehicle"]:
+                            if any(k in low for k in ["vehicle", "bike", "classic 350", "royal enfield", "cycle", "motorcycle", "ride", "scooter"]):
+                                return True
+                        if sc in ["cameras", "camera", "cameras & photography", "photography"]:
+                            if any(k in low for k in ["camera", "cinema", "drone", "lens", "photo", "lighting", "studio"]):
+                                return True
+                        if sc in ["tools", "tool", "tools & equipment", "drills"]:
+                            if any(k in low for k in ["tool", "drill", "equip"]):
+                                return True
+                        if sc in ["music", "musical", "musical instruments"]:
+                            if any(k in low for k in ["music", "guitar", "keyboard", "instrument", "audio", "sound"]):
+                                return True
+                        if sc in ["gaming", "game"]:
+                            if any(k in low for k in ["game", "gaming", "console", "vr", "playstation", "xbox"]):
+                                return True
                         if sc in ["laptops", "laptop"] and ("laptop" in low or "pc" in low or "mac" in low or "computer" in low):
                             return True
                         if sc in ["drones", "drone"] and "drone" in low:
                             return True
                         if sc in ["audio", "sound"] and ("audio" in low or "sound" in low or "headphone" in low or "speaker" in low or "mic" in low):
                             return True
-                        if sc in ["tools", "tool", "drills"] and ("tool" in low or "drill" in low):
-                            return True
                         if sc in ["powerbanks", "powerbank", "power"] and ("power" in low or "battery" in low or "station" in low):
-                            return True
-                        if sc in ["lighting", "light"] and ("light" in low or "studio" in low):
                             return True
                         if sc in ["bikes", "bike"] and ("bike" in low or "cycle" in low or "ride" in low):
                             return True
@@ -5885,12 +5973,22 @@ def fetch_public_listings(
         if max_price is not None and max_price < 10000:
             listings = [p for p in listings if float(p.get("daily_rate") or p.get("price") or 0) <= max_price]
 
-        # 3. Filter by Location (City / Pincode)
+        # 3. Filter by Location (City / Area / Pincode)
         if city and city.strip() and city.strip().lower() != "all cities":
             c_term = city.strip().lower()
             listings = [
                 p for p in listings
-                if c_term in str(p.get("owner_city") or p.get("city") or p.get("owner_address") or "").lower()
+                if c_term in " ".join(
+                    str(x or "") for x in (
+                        p.get("product_city"),
+                        p.get("product_area"),
+                        p.get("city"),
+                        p.get("area"),
+                        p.get("owner_city"),
+                        p.get("owner_address"),
+                        p.get("location"),
+                    )
+                ).lower()
             ]
         if pincode and pincode.strip():
             pin_term = pincode.strip()
@@ -5935,19 +6033,22 @@ def fetch_public_listings(
         elif sort == "newest":
             listings.sort(key=lambda p: str(p.get("created_at") or ""), reverse=True)
 
-        # 7. Apply Pagination if filters were active
-        if has_filters and limit is not None and limit > 0:
-            listings = listings[offset : offset + limit]
-
         return [format_product_dict(p, is_summary=True, booked_pids_set=booked_set, is_public=True) for p in listings]
 
-    all_listings = get_cached(cache_key, 30, _load)
+    all_listings = get_cached(cache_key, 30, _load) or []
     if caller_email and all_listings:
-        return [
+        visible_listings = [
             p for p in all_listings
             if str(p.get("owner_email") or p.get("user_email") or (p.get("owner") or {}).get("email") or "").strip().lower() != caller_email
         ]
-    return all_listings
+    else:
+        visible_listings = list(all_listings)
+
+    response.headers["X-Total-Count"] = str(len(visible_listings))
+
+    if limit is not None and limit > 0:
+        return visible_listings[offset : offset + limit]
+    return visible_listings
 
 @app.get("/api/products/custom/{id}")
 @app.get("/api/products/{id}")
@@ -5973,6 +6074,9 @@ def fetch_product_by_id(id: str, response: Response):
                         parsed_imgs = raw_imgs
                     else:
                         parsed_imgs = [p.get("primary_image")] if p.get("primary_image") else []
+
+                    loc_str, clean_city, clean_area, clean_state, _ = _resolve_product_location(p, {}, is_public=True)
+                    is_avail, avail_status, reason = evaluate_product_availability(p)
 
                     return {
                         "id": p.get("id"),
@@ -6004,16 +6108,30 @@ def fetch_product_by_id(id: str, response: Response):
                         "category": p.get("category", "tech"),
                         "condition": p.get("condition_grade", "Like New"),
                         "accessories": p.get("accessories", ""),
-                        "city": p.get("city", ""),
-                        "area": p.get("area", ""),
+                        "location": loc_str,
+                        "city": clean_city or None,
+                        "area": clean_area,
                         "pincode": p.get("pincode", ""),
                         "rating": 4.9,
                         "reviews": 12,
-                        "available": p.get("available", True),
+                        "available": bool(is_avail),
+                        "availability_status": avail_status,
+                        "availability_reason": reason,
                         "owner_name": p.get("owner_name", "Payent Verified Vendor"),
                         "owner_avatar": p.get("owner_avatar") or "",
                         "owner_rating": 4.9,
                         "owner_id": p.get("owner_id"),
+                        "owner": {
+                            "id": p.get("owner_id") or None,
+                            "name": p.get("owner_name", "Payent Verified Vendor"),
+                            "avatar": p.get("owner_avatar") or "",
+                            "rating": 4.9,
+                            "city": clean_city or None,
+                            "state": clean_state or None,
+                            "address": None,
+                            "pincode": None,
+                            "location": loc_str,
+                        },
                         "status": "approved",
                         "isReference": False,
                     }
@@ -6391,16 +6509,65 @@ def submit_contact_inquiry(data: ContactInquirySchema):
 def fetch_public_categories(response: Response):
     response.headers["Cache-Control"] = "public, max-age=60, stale-while-revalidate=300"
     def _load_categories():
+        canonical_categories = [
+            {
+                "id": "electronics",
+                "name": "Electronics",
+                "icon": "Laptop",
+                "count": 14,
+                "subcategories": ["Laptops", "Audio & Sound", "Power Banks", "Monitors & Displays"],
+                "color": "bg-neutral-800 text-white",
+                "enabled": True
+            },
+            {
+                "id": "vehicles",
+                "name": "Vehicles",
+                "icon": "Bike",
+                "count": 8,
+                "subcategories": ["Bikes", "Electric Scooters", "Motorcycles", "Cycles"],
+                "color": "bg-neutral-800 text-white",
+                "enabled": True
+            },
+            {
+                "id": "cameras",
+                "name": "Cameras & Photography",
+                "icon": "Camera",
+                "count": 18,
+                "subcategories": ["Cinema Cameras", "Lenses", "Drones", "Lighting"],
+                "color": "bg-neutral-800 text-white",
+                "enabled": True
+            },
+            {
+                "id": "tools",
+                "name": "Tools & Equipment",
+                "icon": "Hammer",
+                "count": 12,
+                "subcategories": ["Power Drills", "Hand Tools", "Generators"],
+                "color": "bg-neutral-800 text-white",
+                "enabled": True
+            },
+            {
+                "id": "music",
+                "name": "Musical Instruments",
+                "icon": "Music",
+                "count": 6,
+                "subcategories": ["Guitars", "Keyboards", "Microphones", "Audio Interfaces"],
+                "color": "bg-neutral-800 text-white",
+                "enabled": True
+            },
+            {
+                "id": "gaming",
+                "name": "Gaming",
+                "icon": "Gamepad2",
+                "count": 10,
+                "subcategories": ["Consoles", "VR Headsets", "Controllers", "Gaming PCs"],
+                "color": "bg-neutral-800 text-white",
+                "enabled": True
+            },
+        ]
         conn = get_db_connection()
         if not conn:
-            return [
-                {"id": "cameras", "name": "Cameras", "icon": "Camera", "count": 0, "color": "bg-blue-100 text-blue-800", "enabled": True},
-                {"id": "laptops", "name": "Laptops", "icon": "Laptop", "count": 0, "color": "bg-purple-100 text-purple-800", "enabled": True},
-                {"id": "drones", "name": "Drones", "icon": "Plane", "count": 0, "color": "bg-emerald-100 text-emerald-800", "enabled": True},
-                {"id": "bikes", "name": "Bikes & Rides", "icon": "Bike", "count": 0, "color": "bg-amber-100 text-amber-800", "enabled": True},
-                {"id": "tools", "name": "Electronic Drilling Tools", "icon": "Hammer", "count": 0, "color": "bg-red-100 text-red-800", "enabled": True},
-                {"id": "powerbanks", "name": "Power Banks", "icon": "Zap", "count": 0, "color": "bg-slate-100 text-slate-800", "enabled": True},
-            ]
+            return canonical_categories
         try:
             with conn.cursor() as cursor:
                 cursor.execute("""
@@ -6416,6 +6583,9 @@ def fetch_public_categories(response: Response):
                     WHERE c.enabled = 1
                 """)
                 rows = cursor.fetchall()
+                if not rows:
+                    return canonical_categories
+                
                 res = []
                 for r in rows:
                     res.append({
@@ -6426,7 +6596,7 @@ def fetch_public_categories(response: Response):
                         "color": r["color"] or "bg-secondary text-foreground",
                         "enabled": bool(r["enabled"])
                     })
-                return res
+                return res if res else canonical_categories
         finally:
             conn.close()
 
@@ -6510,6 +6680,9 @@ def fetch_one_product(product_id: str):
             with conn.cursor() as cursor:
                 cursor.execute("""
                     SELECT cp.*, 
+                           pp.city AS product_city,
+                           pp.area AS product_area,
+                           pp.pincode AS product_pincode,
                            u.address AS owner_address, 
                            u.city AS owner_city, 
                            u.state AS owner_state, 
@@ -6518,6 +6691,7 @@ def fetch_one_product(product_id: str):
                            u.verified AS owner_verified,
                            a.status AS agent_status
                     FROM custom_products cp
+                    LEFT JOIN payernt_products pp ON cp.id = pp.id
                     LEFT JOIN users u ON cp.user_email = u.email
                     LEFT JOIN agents a ON cp.user_email = a.user_email
                     WHERE cp.id = %s
@@ -8886,16 +9060,18 @@ def admin_login(data: LoginRequestSchema, request: Request, response: Response):
 
     is_locked_ip, secs_ip = check_auth_lockout(ip_key, max_attempts=10, lock_duration_secs=900)
     if is_locked_ip:
+        mins = max(1, (secs_ip + 59) // 60)
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=f"Too many admin login attempts from this IP. Locked out for {secs_ip // 60} minutes."
+            detail=f"Too many admin login attempts from this IP. Locked out for {mins} minute{'s' if mins > 1 else ''}."
         )
 
     is_locked_user, secs_user = check_auth_lockout(user_key, max_attempts=5, lock_duration_secs=900)
     if is_locked_user:
+        mins = max(1, (secs_user + 59) // 60)
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=f"Admin account locked due to repeated failed logins. Locked out for {secs_user // 60} minutes."
+            detail=f"Admin account locked due to repeated failed logins. Locked out for {mins} minute{'s' if mins > 1 else ''}."
         )
 
     user = get_user(clean_email)
@@ -8916,7 +9092,7 @@ def admin_login(data: LoginRequestSchema, request: Request, response: Response):
             detail="Invalid email or password."
         )
 
-    if user["role"] != "admin":
+    if str(user.get("role", "")).lower() not in ("admin", "superadmin"):
         record_failed_auth_attempt(ip_key, max_attempts=10, lock_duration_secs=900)
         record_failed_auth_attempt(user_key, max_attempts=5, lock_duration_secs=900)
         logger.warning(f"Non-admin user {clean_email} attempted admin login from IP {client_ip}")
@@ -14632,15 +14808,193 @@ def get_search_stats():
     Returns index stats and top trending search queries.
     """
     if not ml_search_engine.is_indexed:
-        catalog = get_recommendation_catalog()
+        catalog = get_recommendation_catalog() or []
         ml_search_engine.build_index(catalog)
 
-    popular_queries = get_popular_search_queries(limit=6)
+    popular_queries = get_popular_search_queries(limit=6) or []
+    total_indexed = ml_search_engine.total_documents
     return {
         "success": True,
-        "total_indexed": ml_search_engine.total_documents,
-        "popular_queries": popular_queries
+        "is_indexed": bool(ml_search_engine.is_indexed),
+        "total_indexed": total_indexed,
+        "indexed_products_count": total_indexed,
+        "vocabulary_size": len(ml_search_engine.vocabulary),
+        "popular_queries": popular_queries,
     }
+
+def _extract_caller_email_optional(authorization: Optional[str] = None, user_email: Optional[str] = None) -> Optional[str]:
+    if user_email and "@" in user_email:
+        return user_email.strip().lower()
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.split(" ")[1].strip()
+        if token:
+            if HAS_FIREBASE and firebase_admin and firebase_admin._apps:
+                try:
+                    decoded = firebase_auth.verify_id_token(token)
+                    if decoded and decoded.get("email"):
+                        return str(decoded["email"]).strip().lower()
+                except Exception:
+                    pass
+            try:
+                payload = decode_access_token(token, expected_type="access")
+                if payload and payload.get("sub"):
+                    return str(payload["sub"]).strip().lower()
+            except Exception:
+                pass
+    return None
+
+class SearchRecordSchema(BaseModel):
+    query: str
+    user_email: Optional[str] = None
+    session_id: Optional[str] = None
+
+@app.post("/api/search/record")
+def record_search_event(
+    data: SearchRecordSchema,
+    authorization: Optional[str] = Header(None)
+):
+    caller_email = _extract_caller_email_optional(authorization, data.user_email)
+    q = (data.query or "").strip()
+    if not q:
+        return {"success": False, "message": "Empty query"}
+    
+    record_user_events_batch([{
+        "user_email": caller_email,
+        "session_id": data.session_id,
+        "event_type": "search",
+        "search_query": q,
+    }])
+    return {"success": True}
+
+@app.get("/api/search/history")
+def get_user_search_history_api(
+    authorization: Optional[str] = Header(None),
+    user_email: Optional[str] = Query(None),
+    limit: int = Query(8, ge=1, le=20)
+):
+    caller_email = _extract_caller_email_optional(authorization, user_email)
+    if not caller_email:
+        return {"queries": []}
+    
+    conn = get_db_connection()
+    queries = []
+    if conn:
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT search_query, MAX(created_at) as last_searched
+                    FROM user_events
+                    WHERE event_type = 'search' AND LOWER(user_email) = LOWER(%s) AND search_query IS NOT NULL AND TRIM(search_query) != ''
+                    GROUP BY search_query
+                    ORDER BY last_searched DESC
+                    LIMIT %s
+                """, (caller_email, limit))
+                rows = cursor.fetchall()
+                queries = [r["search_query"] for r in rows if r.get("search_query")]
+        except Exception as e:
+            print(f"Notice: search_history query fallback: {e}")
+        finally:
+            conn.close()
+    
+    if not queries:
+        seen = set()
+        from database import MOCK_USER_EVENTS
+        for ev in reversed(MOCK_USER_EVENTS):
+            if ev.get("event_type") == "search" and str(ev.get("user_email") or "").strip().lower() == caller_email:
+                sq = (ev.get("search_query") or "").strip()
+                if sq and sq not in seen:
+                    seen.add(sq)
+                    queries.append(sq)
+                    if len(queries) >= limit:
+                        break
+                        
+    return {"queries": queries}
+
+@app.delete("/api/search/history")
+def clear_user_search_history_api(
+    authorization: Optional[str] = Header(None),
+    user_email: Optional[str] = Query(None)
+):
+    caller_email = _extract_caller_email_optional(authorization, user_email)
+    if not caller_email:
+        return {"success": False, "message": "Not authenticated"}
+    
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    DELETE FROM user_events
+                    WHERE event_type = 'search' AND LOWER(user_email) = LOWER(%s)
+                """, (caller_email,))
+                conn.commit()
+        except Exception as e:
+            print(f"Notice: clear_search_history error: {e}")
+        finally:
+            conn.close()
+    
+    from database import MOCK_USER_EVENTS
+    for i in range(len(MOCK_USER_EVENTS) - 1, -1, -1):
+        ev = MOCK_USER_EVENTS[i]
+        if ev.get("event_type") == "search" and str(ev.get("user_email") or "").strip().lower() == caller_email:
+            MOCK_USER_EVENTS.pop(i)
+            
+    return {"success": True}
+
+@app.get("/api/products/recently-viewed")
+def get_recently_viewed_products(
+    authorization: Optional[str] = Header(None),
+    user_email: Optional[str] = Query(None),
+    limit: int = Query(8, ge=1, le=20)
+):
+    caller_email = _extract_caller_email_optional(authorization, user_email)
+    if not caller_email:
+        return []
+    
+    conn = get_db_connection()
+    recent_pids = []
+    if conn:
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT product_id, MAX(created_at) as last_viewed
+                    FROM user_events
+                    WHERE event_type = 'view_product' AND LOWER(user_email) = LOWER(%s) AND product_id IS NOT NULL AND TRIM(product_id) != ''
+                    GROUP BY product_id
+                    ORDER BY last_viewed DESC
+                    LIMIT %s
+                """, (caller_email, limit))
+                rows = cursor.fetchall()
+                recent_pids = [r["product_id"] for r in rows if r.get("product_id")]
+        except Exception as e:
+            print(f"Notice: recently_viewed query fallback: {e}")
+        finally:
+            conn.close()
+    
+    if not recent_pids:
+        seen = set()
+        from database import MOCK_USER_EVENTS
+        for ev in reversed(MOCK_USER_EVENTS):
+            if ev.get("event_type") == "view_product" and str(ev.get("user_email") or "").strip().lower() == caller_email:
+                pid = ev.get("product_id")
+                if pid and pid not in seen:
+                    seen.add(pid)
+                    recent_pids.append(pid)
+                    if len(recent_pids) >= limit:
+                        break
+
+    if not recent_pids:
+        return []
+
+    catalog = get_recommendation_catalog()
+    catalog_by_id = {str(item.get("id")): item for item in catalog}
+    
+    products = []
+    for pid in recent_pids:
+        if pid in catalog_by_id:
+            products.append(catalog_by_id[pid])
+    
+    return products
 
 # ===========================================================================
 # SECURE DEVICE IDENTITY & MY SECURITY QR ENDPOINTS

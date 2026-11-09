@@ -152,19 +152,19 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           content:
             "width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover",
         },
-        { title: "Payent — Rent premium tech gear" },
+        { title: "paYent — Get What You Need, Without Owning It." },
         {
           name: "description",
           content:
-            "Peer-to-peer marketplace to rent cameras, drones, laptops and more. Insured. Delivered fast.",
+            "Get What You Need, Without Owning It. Rent verified cameras, drones, laptops and more on paYent.",
         },
-        { name: "author", content: "Payent" },
+        { name: "author", content: "paYent" },
         { name: "theme-color", content: "#161616" },
-        { property: "og:title", content: "Payent — Rent premium tech gear" },
+        { property: "og:title", content: "paYent — Get What You Need, Without Owning It." },
         {
           property: "og:description",
           content:
-            "Rent flagship tech gear from verified lenders in your city.",
+            "Get What You Need, Without Owning It. Rent verified tech gear from trusted lenders in your city.",
         },
         { property: "og:type", content: "website" },
         { property: "og:image", content: "/brand/payent-logo-og.png" },

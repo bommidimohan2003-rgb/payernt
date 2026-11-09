@@ -172,7 +172,7 @@ export function LenderSettingsView({
             <Laptop className="h-3.5 w-3.5" />
             My Devices
             {devices.length > 0 && (
-              <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-neutral-200 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-200">
+              <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] bg-neutral-200 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-200">
                 {devices.length}
               </span>
             )}

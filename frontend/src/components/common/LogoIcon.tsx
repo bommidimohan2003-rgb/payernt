@@ -9,10 +9,6 @@ interface LogoIconProps {
   iconOnly?: boolean;
 }
 
-export function PayentLogoMark({ className }: { className?: string }) {
-  return null;
-}
-
 export function LogoIcon({
   className,
   showDetails = true,
@@ -21,7 +17,7 @@ export function LogoIcon({
 }: LogoIconProps) {
   if (iconOnly) {
     return (
-      <span className={cn("font-sans font-black tracking-tight text-xl text-neutral-950 dark:text-white select-none", className)}>
+      <span className={cn("font-sans font-semibold text-xl text-neutral-950 dark:text-white select-none", className)}>
         {BRAND_CONFIG.name}
       </span>
     );
@@ -31,11 +27,11 @@ export function LogoIcon({
     <div className={cn("flex items-center gap-2.5 select-none group", className)}>
       {showDetails && (
         <div className="flex flex-col text-left justify-center">
-          <span className="font-sans font-black tracking-tight text-xl text-neutral-950 dark:text-white leading-none">
+          <span className="font-sans font-semibold text-xl text-neutral-950 dark:text-white leading-none">
             {BRAND_CONFIG.name}
           </span>
           {showTagline && (
-            <span className="text-[7.5px] font-sans font-bold tracking-[0.2em] text-neutral-400 dark:text-[#8E9CA8] uppercase mt-1 leading-none">
+            <span className="text-xs font-sans font-medium text-neutral-600 dark:text-neutral-400 mt-1 leading-none">
               {BRAND_CONFIG.shortTagline}
             </span>
           )}

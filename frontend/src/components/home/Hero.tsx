@@ -1,230 +1,214 @@
-import { useEffect, useState } from "react";
-import {
-  ArrowRight,
-  MapPin,
-  Search,
-} from "lucide-react";
-import { AnimatePresence, motion } from "framer-motion";
-import { Link, useNavigate } from "@tanstack/react-router";
-import { useUserLocation } from "@/hooks/useUserLocation";
-import { Button } from "@/components/common/Button";
+import React, { useState, useEffect } from "react";
+import { ArrowRight } from "lucide-react";
 
-import cameraImg from "@/assets/images/camera.webp";
-import laptopImg from "@/assets/images/laptop.webp";
-import bikeImg from "@/assets/images/re_classic350.webp";
-import droneImg from "@/assets/images/drone.webp";
-import toolImg from "@/assets/images/tool.webp";
-import powerbankImg from "@/assets/images/powerbank.webp";
-
-const gearItems = [
-  {
-    id: "bike",
-    title: "Classic 350",
-    name: "Royal Enfield Classic 350",
-    image: bikeImg,
-  },
-  {
-    id: "camera",
-    title: "Camera",
-    name: "Sony Alpha Cinema Camera",
-    image: cameraImg,
-  },
-  {
-    id: "drone",
-    title: "Drone",
-    name: "DJI Mavic 3 Pro Drone",
-    image: droneImg,
-  },
-  {
-    id: "laptop",
-    title: "Laptop",
-    name: "Apple MacBook Pro M3 Max",
-    image: laptopImg,
-  },
-  {
-    id: "powerbank",
-    title: "Powerbank",
-    name: "Fast-Charging Power Station",
-    image: powerbankImg,
-  },
-  {
-    id: "tool",
-    title: "Drilling Machine",
-    name: "Heavy-Duty Cordless Drill",
-    image: toolImg,
-  },
-];
-
-const searchSuggestions = [
-  "Cameras...",
-  "Laptops...",
-  "Royal Enfield bikes...",
-  "Drones...",
-  "Lighting kits...",
-  "Audio gear...",
-  "Drills & tools...",
-];
+const HERO_CAPTION = "Get What You Need, Without Owning It.";
 
 export function Hero() {
-  const navigate = useNavigate();
-  const [searchTerm, setSearchTerm] = useState("");
-  const [activeGearIndex, setActiveGearIndex] = useState(0);
-
-  // Typewriter placeholder animation (slower, natural pace)
-  const [placeholderText, setPlaceholderText] = useState("");
-  const [suggestionIndex, setSuggestionIndex] = useState(0);
+  const [currentText, setCurrentText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isDarkTheme, setIsDarkTheme] = useState(false);
 
+  // Sync rendered studio product assets with root .dark class without SSR/CSR hydration mismatch
   useEffect(() => {
-    const currentWord = searchSuggestions[suggestionIndex];
+    if (typeof document === "undefined") return;
+    const root = document.documentElement;
+    const syncTheme = () => setIsDarkTheme(root.classList.contains("dark"));
+    syncTheme();
+
+    const observer = new MutationObserver(syncTheme);
+    observer.observe(root, { attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
+  }, []);
+
+  // Smooth continuous typewriter animation on the single caption, respecting reduced motion
+  useEffect(() => {
+    if (
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
+      setCurrentText(HERO_CAPTION);
+      return;
+    }
+
     let timer: ReturnType<typeof setTimeout>;
 
     if (!isDeleting) {
-      if (placeholderText.length < currentWord.length) {
+      if (currentText.length < HERO_CAPTION.length) {
         timer = setTimeout(() => {
-          setPlaceholderText(currentWord.slice(0, placeholderText.length + 1));
-        }, 140);
+          setCurrentText(HERO_CAPTION.slice(0, currentText.length + 1));
+        }, 46);
       } else {
         timer = setTimeout(() => {
           setIsDeleting(true);
-        }, 2000);
+        }, 2200);
       }
     } else {
-      if (placeholderText.length > 0) {
+      if (currentText.length > 0) {
         timer = setTimeout(() => {
-          setPlaceholderText(currentWord.slice(0, placeholderText.length - 1));
-        }, 65);
+          setCurrentText(HERO_CAPTION.slice(0, currentText.length - 1));
+        }, 24);
       } else {
-        setIsDeleting(false);
-        setSuggestionIndex((prev) => (prev + 1) % searchSuggestions.length);
+        timer = setTimeout(() => {
+          setIsDeleting(false);
+        }, 320);
       }
     }
 
     return () => clearTimeout(timer);
-  }, [placeholderText, isDeleting, suggestionIndex]);
+  }, [currentText, isDeleting]);
 
-  // Auto-advance gear showcase every 4 seconds
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setActiveGearIndex((prev) => (prev + 1) % gearItems.length);
-    }, 4000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const activeGear = gearItems[activeGearIndex];
-
-  const { city: selectedCity } = useUserLocation();
-
-  const handleSearch = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    navigate({
-      to: "/categories",
-      search: {
-        q: searchTerm.trim() || undefined,
-      },
-    });
+  const handleScrollToExplore = () => {
+    const section = document.getElementById("explore-rentals");
+    if (section) {
+      section.scrollIntoView({ behavior: "smooth" });
+    }
   };
 
   return (
-    <section className="relative overflow-hidden bg-neutral-50/60 dark:bg-[#1E1E1E] text-neutral-900 dark:text-white pt-12 sm:pt-16 lg:pt-20 pb-12 lg:pb-16 transition-colors duration-300">
-      {/* Ambient background glow matching dark cinematic reference */}
-      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[850px] h-[550px] bg-gradient-to-b from-neutral-200/40 via-neutral-100/10 to-transparent dark:from-[#0B1522] dark:via-[#071017] dark:to-transparent rounded-full blur-[160px] pointer-events-none opacity-60" />
-      <div className="absolute top-28 left-1/2 -translate-x-1/2 w-[400px] h-[400px] bg-primary/5 dark:bg-white/5 rounded-full blur-[120px] pointer-events-none" />
-
-      {/* Full-Bleed Transparent Gear Image Cycling One After Another */}
-      <div className="absolute inset-0 w-full h-full pointer-events-none select-none z-0 overflow-hidden">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={activeGear.id}
-            initial={{ opacity: 0, scale: 1.05 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.96 }}
-            transition={{ duration: 0.8, ease: "easeInOut" }}
-            className="absolute inset-0 w-full h-full"
-          >
-            <img
-              src={activeGear.image}
-              alt={activeGear.name}
-              fetchPriority="high"
-              loading="eager"
-              decoding="async"
-              className="w-full h-full object-cover object-center opacity-90 dark:opacity-65 filter contrast-110 saturate-120 brightness-[0.95] dark:brightness-90 transition-all pointer-events-none"
-            />
-          </motion.div>
-        </AnimatePresence>
-
-        {/* Soft center ambient backlight glow */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[500px] bg-primary/5 dark:bg-white/10 rounded-full blur-[160px] pointer-events-none" />
-
-        {/* Seamless full-screen vignettes and edge fades */}
-        <div className="absolute inset-0 bg-gradient-to-r from-neutral-50/95 via-transparent to-neutral-50/95 dark:from-[#05090D] dark:via-transparent dark:to-[#05090D] pointer-events-none" />
-        <div className="absolute inset-0 bg-radial from-white/30 via-white/10 to-transparent dark:from-[#05090D]/60 dark:via-[#05090D]/30 dark:to-transparent pointer-events-none" />
-        <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-neutral-50 dark:from-[#05090D] via-neutral-50/60 dark:via-[#05090D]/80 to-transparent pointer-events-none" />
-        <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-neutral-50/80 dark:from-[#05090D]/90 via-transparent to-transparent pointer-events-none" />
+    <section
+      aria-label="paYent Rentals Hero"
+      className="relative w-full overflow-hidden bg-white dark:bg-[#1E1E1E] border-b border-neutral-200/80 dark:border-neutral-800/80 py-2.5 sm:py-3.5 md:py-4 lg:py-5 transition-colors duration-200"
+    >
+      {/* Studio Window-Pane Lighting (Light Mode) & Overhead Softbox (Dark Mode) */}
+      <div
+        className="pointer-events-none absolute inset-y-0 right-0 w-[82%] sm:w-[74%] md:w-[68%] opacity-[0.1] dark:opacity-0"
+        style={{
+          maskImage: "linear-gradient(to left, rgba(0,0,0,1) 45%, rgba(0,0,0,0) 100%)",
+          WebkitMaskImage: "linear-gradient(to left, rgba(0,0,0,1) 45%, rgba(0,0,0,0) 100%)",
+        }}
+        aria-hidden="true"
+      >
+        <div className="absolute inset-0 bg-[linear-gradient(126deg,transparent_12%,rgba(0,0,0,0.6)_24%,transparent_36%,rgba(0,0,0,0.65)_48%,transparent_60%,rgba(0,0,0,0.45)_72%,transparent_82%)]" />
       </div>
 
-      <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-2 sm:pt-4 pb-8 sm:pb-14">
-        {/* 1. Value Proposition Headline & Tagline */}
-        <div className="text-center max-w-4xl mx-auto space-y-4 sm:space-y-6 mb-8 sm:mb-10">
-          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black tracking-tight text-neutral-950 dark:text-white leading-[1.08]">
-            Rent Professional Tech. <br />
-            <span className="text-neutral-950 dark:text-white font-extrabold underline decoration-neutral-400 dark:decoration-neutral-600 underline-offset-8">
-              Create Without Limits.
-            </span>
-          </h1>
+      <div
+        className="pointer-events-none absolute inset-y-0 right-0 w-[82%] sm:w-[74%] md:w-[68%] opacity-0 dark:opacity-100"
+        style={{
+          maskImage: "linear-gradient(to left, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 100%)",
+          WebkitMaskImage: "linear-gradient(to left, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 100%)",
+        }}
+        aria-hidden="true"
+      >
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_68%_46%,rgba(255,255,255,0.065)_0%,rgba(255,255,255,0.02)_42%,transparent_72%)]" />
+      </div>
 
-          <p className="text-sm sm:text-base text-neutral-600 dark:text-[#A8B1BA] max-w-xl mx-auto leading-relaxed">
-            Peer-to-peer marketplace to rent cinema cameras, drones, laptops, and production gear with instant escrow protection.
-          </p>
-        </div>
+      <div className="relative mx-auto max-w-7xl px-3 sm:px-6 lg:px-8">
+        {/* Identical two-column composition across mobile, tablet, and desktop */}
+        <div className="grid grid-cols-[minmax(0,48fr)_minmax(0,52fr)] items-center gap-2 sm:gap-4 md:gap-5 lg:gap-6 min-h-[140px] sm:min-h-[180px] md:min-h-[220px] lg:min-h-[300px]">
+          {/* ========================================================
+              LEFT COLUMN (48%): Editorial Typography & CTA
+              ======================================================== */}
+          <div className="z-10 text-left max-w-xl py-1 pr-1 sm:pr-2 md:pr-4">
+            {/* Main Heading: Light font for Rent / Anything, Bold for You Need */}
+            <h1 className="text-[1.25rem] sm:text-[1.85rem] md:text-[2.25rem] lg:text-[2.85rem] xl:text-[3.15rem] font-sans tracking-tight leading-[1.08] text-balance">
+              <span className="sr-only">Rent Anything</span>
+              <span aria-hidden="true" className="block font-light text-neutral-900 dark:text-neutral-100">
+                <span className="block">Rent</span>
+                <span className="block">Anything</span>
+              </span>
+              <span className="block font-bold text-neutral-950 dark:text-white mt-0.5 sm:mt-1">
+                You Need
+              </span>
+            </h1>
 
-        {/* 2. High-Contrast Integrated Search Bar Module */}
-        <div className="max-w-xl sm:max-w-2xl mx-auto mb-8 sm:mb-10">
-          <form
-            onSubmit={handleSearch}
-            className="p-1.5 sm:p-2 rounded-2xl sm:rounded-full bg-white dark:bg-[#1E1E1E] border border-black/15 dark:border-white/20 shadow-2xl flex items-center gap-1.5 sm:gap-2 transition-all focus-within:ring-2 focus-within:ring-primary/20 dark:focus-within:ring-white/20"
-          >
-            {/* Keyword Search Input */}
-            <div className="flex-1 min-w-0 flex items-center gap-2.5 pl-3 sm:pl-4 py-1 bg-transparent">
-              <Search className="h-4 w-4 text-neutral-400 dark:text-neutral-400 shrink-0" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder={placeholderText || "Cameras, laptops, drones..."}
-                className="w-full bg-transparent text-xs sm:text-sm text-neutral-900 dark:text-white placeholder:text-neutral-400 dark:placeholder:text-neutral-500 focus:outline-none truncate font-medium"
+            {/* Horizontal Monochrome Accent Divider */}
+            <div
+              className="w-10 sm:w-12 md:w-14 h-[3px] sm:h-[3.5px] md:h-1 bg-neutral-950 dark:bg-white rounded-full mt-2.5 mb-2.5 sm:mt-3 sm:mb-3"
+              aria-hidden="true"
+            />
+
+            {/* Single Fixed Caption with Continuous Typing Animation */}
+            <div className="min-h-[2rem] sm:min-h-[2.25rem] md:min-h-[2.4rem] flex items-center">
+              <p className="sr-only">{HERO_CAPTION}</p>
+              <p
+                aria-hidden="true"
+                className="text-xs sm:text-sm md:text-[0.95rem] lg:text-[1.0625rem] xl:text-lg font-normal tracking-normal leading-snug text-neutral-600 dark:text-neutral-300 lg:whitespace-nowrap"
+              >
+                <span>{currentText}</span>
+                <span
+                  className="inline-block w-[1.5px] sm:w-[2px] h-3.5 sm:h-4 md:h-[1.125rem] ml-0.5 sm:ml-1 bg-neutral-950 dark:bg-white align-middle"
+                  aria-hidden="true"
+                />
+              </p>
+            </div>
+
+            {/* Outlined Pill CTA Button */}
+            <div className="mt-2 sm:mt-3 md:mt-3.5 flex items-center">
+              <button
+                type="button"
+                onClick={handleScrollToExplore}
+                id="hero-explore-rentals-cta"
+                className="group inline-flex items-center gap-1.5 sm:gap-2.5 min-h-[44px] px-5 py-2.5 sm:px-6 sm:py-2.5 rounded-full border border-neutral-950 dark:border-white bg-transparent text-neutral-950 dark:text-white hover:bg-neutral-950 hover:text-white dark:hover:bg-white dark:hover:text-neutral-950 text-xs md:text-sm font-semibold transition-colors duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white whitespace-nowrap"
+              >
+                <span>Explore Rentals</span>
+                <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 stroke-[1.75] group-hover:translate-x-1 transition-transform motion-reduce:transform-none" aria-hidden="true" />
+              </button>
+            </div>
+          </div>
+
+          {/* ========================================================
+              RIGHT COLUMN (52%): Standalone Studio Trio with Grounded Contact Shadows
+              Single <img> per product swapped dynamically via isDarkTheme
+              ======================================================== */}
+          <div className="relative w-full h-[140px] sm:h-[180px] md:h-[220px] lg:h-[300px] select-none">
+            {/* 1. SILVER LAPTOP */}
+            <div className="absolute top-[1%] right-[5%] sm:top-[2%] sm:right-[8%] md:top-[2%] md:right-[9%] lg:top-[2%] lg:right-[10%] w-[58%] sm:w-[53%] md:w-[51%] lg:w-[50%] max-w-[320px] z-10">
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute -bottom-[3%] left-[10%] right-[8%] h-[20%] rounded-full bg-black/18 dark:bg-black/75 blur-md rotate-[26deg]"
+              />
+              <img
+                src={isDarkTheme ? "/hero_laptop_dark.webp" : "/hero_laptop.webp"}
+                alt="Brushed silver laptop"
+                width={944}
+                height={680}
+                className="relative w-full h-auto object-contain drop-shadow-[8px_16px_18px_rgba(0,0,0,0.20)] dark:drop-shadow-[0_18px_28px_rgba(0,0,0,0.92)]"
+                loading="eager"
+                fetchPriority="high"
+                decoding="async"
               />
             </div>
 
-            {/* Informational Location Indicator (DISPLAY ONLY) */}
-            {selectedCity && selectedCity !== "All Cities" && (
-              <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/5 dark:bg-white/10 backdrop-blur-sm border border-black/5 dark:border-white/10 text-xs text-neutral-700 dark:text-neutral-200">
-                <MapPin className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-                <span suppressHydrationWarning className="truncate text-xs font-medium max-w-[110px]">{selectedCity}</span>
-              </div>
-            )}
+            {/* 2. BLACK OVER-EAR HEADPHONES */}
+            <div className="absolute top-[16%] left-[1%] sm:top-[17%] sm:left-[2%] md:top-[18%] md:left-[3%] lg:top-[18%] lg:left-[3%] w-[38%] sm:w-[35%] md:w-[34%] lg:w-[33%] max-w-[195px] z-20 rotate-[6deg]">
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute bottom-[1%] left-[14%] right-[4%] h-[18%] rounded-full bg-black/22 dark:bg-black/80 blur-md"
+              />
+              <img
+                src={isDarkTheme ? "/hero_headphones_dark.webp" : "/hero_headphones.webp"}
+                alt="Matte black wireless over-ear headphones"
+                width={746}
+                height={819}
+                className="relative w-full h-auto object-contain drop-shadow-[10px_18px_18px_rgba(0,0,0,0.26)] dark:drop-shadow-[0_20px_28px_rgba(0,0,0,0.95)]"
+                loading="eager"
+                fetchPriority="high"
+                decoding="async"
+              />
+            </div>
 
-            {/* Search Submit Button */}
-            <Button
-              type="submit"
-              className="h-9 sm:h-10 px-3.5 sm:px-6 rounded-xl sm:rounded-full bg-[#161616] hover:bg-[#262626] text-[#F2F0EA] dark:bg-[#F2F0EA] dark:text-[#161616] dark:hover:bg-white text-xs sm:text-sm font-bold transition-all shrink-0 shadow-sm cursor-pointer flex items-center gap-1.5"
-            >
-              <span>Search</span>
-            </Button>
-          </form>
-        </div>
-
-        {/* 3. Secondary Navigation Link: Browse All Gear (De-emphasized to prioritize Search) */}
-        <div className="flex flex-wrap items-center justify-center gap-4">
-          <Link
-            to="/categories"
-            className="inline-flex items-center justify-center gap-1.5 text-xs sm:text-sm font-semibold text-neutral-600 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white transition-colors duration-200 group py-1 px-3 rounded-full hover:bg-black/5 dark:hover:bg-white/5"
-          >
-            <span>Or browse all gear categories</span>
-            <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
-          </Link>
+            {/* 3. MONOCHROME DSLR CAMERA */}
+            <div className="absolute bottom-[-3%] right-[22%] sm:bottom-[-2%] sm:right-[25%] md:bottom-[-2%] md:right-[27%] lg:bottom-[-2%] lg:right-[28%] w-[31%] sm:w-[30%] md:w-[28%] lg:w-[27%] max-w-[170px] z-30">
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute -bottom-[3%] left-[8%] right-[2%] h-[18%] rounded-full bg-black/25 dark:bg-black/85 blur-md"
+              />
+              <img
+                src={isDarkTheme ? "/hero_camera_dark.webp" : "/hero_camera.webp"}
+                alt="Monochrome professional DSLR camera with zoom lens"
+                width={781}
+                height={782}
+                className="relative w-full h-auto object-contain drop-shadow-[10px_18px_20px_rgba(0,0,0,0.28)] dark:drop-shadow-[0_22px_30px_rgba(0,0,0,0.95)]"
+                loading="eager"
+                fetchPriority="high"
+                decoding="async"
+              />
+            </div>
+          </div>
         </div>
       </div>
     </section>
   );
 }
+
+export default Hero;

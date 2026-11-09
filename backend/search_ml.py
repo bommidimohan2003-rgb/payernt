@@ -46,6 +46,11 @@ class MLSearchEngine:
         self.category_products: Dict[str, List[str]] = defaultdict(list)
         self.is_indexed: bool = False
 
+    @property
+    def total_documents(self) -> int:
+        """Total number of indexed products in the search engine."""
+        return len(self.products)
+
     def build_index(self, products: List[Dict]):
         """
         Build TF-IDF search index from product list.

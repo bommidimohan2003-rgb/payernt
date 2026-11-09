@@ -190,7 +190,7 @@ export default function Support() {
             <span>{tab.label}</span>
             <span
               className={cn(
-                "px-1.5 py-0.2 rounded-full text-[10px] font-mono",
+                "px-1.5 py-0.5 rounded-full text-[10px] font-mono",
                 statusFilter === tab.id ? "bg-black/15 text-black font-bold" : "bg-white/10 text-[#A1A1AA]"
               )}
             >
@@ -287,7 +287,7 @@ export default function Support() {
                       <span className="font-semibold text-[#F5F5F5] truncate max-w-[180px]">{t.subject}</span>
                       <span
                         className={cn(
-                          "text-[9px] font-mono font-medium uppercase px-1.5 py-0.2 rounded border",
+                          "text-[9px] font-mono font-medium uppercase px-1.5 py-0.5 rounded border",
                           t.status === "open"
                             ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
                             : t.status === "resolved"

@@ -95,7 +95,7 @@ export function OTPVerification() {
         await api.registerRequest(pendingUser.email, pendingUser.phone);
       }
       setSeconds(60);
-      setDigits(Array(6).fill(""));
+      setCode("");
       toast.success("New verification code sent!");
     } catch (err) {
       const error = err as { message?: string };
@@ -138,7 +138,7 @@ export function OTPVerification() {
             setCode(completedCode);
             verify(completedCode);
           }}
-          error={error}
+          error={error ?? undefined}
           disabled={loading}
           autoFocus
         />

@@ -218,7 +218,7 @@ export function PayerntHome({
             </div>
             <div className="mt-2">
               {isLoading ? (
-                <div className="h-7 w-20 bg-neutral-200 dark:bg-white/10 rounded animate-pulse" />
+                <div className="h-7 w-20 bg-neutral-200 dark:bg-white/10 rounded" />
               ) : (
                 <p className="text-xl sm:text-2xl font-extrabold text-neutral-900 dark:text-white tracking-tight font-display">
                   ₹{availableBalance.toLocaleString("en-IN")}
@@ -247,7 +247,7 @@ export function PayerntHome({
             </div>
             <div className="mt-2">
               {isLoading ? (
-                <div className="h-7 w-20 bg-neutral-200 dark:bg-white/10 rounded animate-pulse" />
+                <div className="h-7 w-20 bg-neutral-200 dark:bg-white/10 rounded" />
               ) : (
                 <p className="text-xl sm:text-2xl font-extrabold text-neutral-900 dark:text-white tracking-tight font-display">
                   ₹{totalEarnings.toLocaleString("en-IN")}
@@ -276,7 +276,7 @@ export function PayerntHome({
             </div>
             <div className="mt-2">
               {isLoading ? (
-                <div className="h-7 w-12 bg-neutral-200 dark:bg-white/10 rounded animate-pulse" />
+                <div className="h-7 w-12 bg-neutral-200 dark:bg-white/10 rounded" />
               ) : (
                 <p className="text-xl sm:text-2xl font-extrabold text-neutral-900 dark:text-white tracking-tight font-display">
                   {String(activeProducts).padStart(2, "0")}
@@ -305,7 +305,7 @@ export function PayerntHome({
             </div>
             <div className="mt-2">
               {isLoading ? (
-                <div className="h-7 w-12 bg-neutral-200 dark:bg-white/10 rounded animate-pulse" />
+                <div className="h-7 w-12 bg-neutral-200 dark:bg-white/10 rounded" />
               ) : (
                 <p className="text-xl sm:text-2xl font-extrabold text-neutral-900 dark:text-white tracking-tight font-display">
                   {String(activeRentals).padStart(2, "0")}
@@ -340,7 +340,7 @@ export function PayerntHome({
 
           {isLoading ? (
             <div className="space-y-2 py-2">
-              <div className="p-3 rounded-xl bg-neutral-100/60 dark:bg-white/[0.04] animate-pulse space-y-1.5">
+              <div className="p-3 rounded-xl bg-neutral-100/60 dark:bg-white/[0.04] space-y-1.5">
                 <div className="h-3.5 w-32 bg-neutral-200 dark:bg-white/10 rounded" />
                 <div className="h-3 w-20 bg-neutral-200 dark:bg-white/10 rounded" />
               </div>
@@ -400,7 +400,7 @@ export function PayerntHome({
 
           {isLoading ? (
             <div className="space-y-2 py-2">
-              <div className="p-3 rounded-xl bg-neutral-100/60 dark:bg-white/[0.04] animate-pulse space-y-1.5">
+              <div className="p-3 rounded-xl bg-neutral-100/60 dark:bg-white/[0.04] space-y-1.5">
                 <div className="h-3.5 w-32 bg-neutral-200 dark:bg-white/10 rounded" />
                 <div className="h-3 w-16 bg-neutral-200 dark:bg-white/10 rounded" />
               </div>
@@ -689,7 +689,7 @@ export function PayerntHome({
 
                 <div className="mt-4">
                   {isLoading ? (
-                    <div className="h-8 w-24 bg-neutral-200 dark:bg-white/10 rounded animate-pulse" />
+                    <div className="h-8 w-24 bg-neutral-200 dark:bg-white/10 rounded" />
                   ) : (
                     <span className="text-2xl lg:text-3xl font-extrabold text-neutral-900 dark:text-white tracking-tight font-display">
                       ₹{availableBalance.toLocaleString("en-IN")}
@@ -729,7 +729,7 @@ export function PayerntHome({
 
                 <div className="mt-4">
                   {isLoading ? (
-                    <div className="h-8 w-24 bg-neutral-200 dark:bg-white/10 rounded animate-pulse" />
+                    <div className="h-8 w-24 bg-neutral-200 dark:bg-white/10 rounded" />
                   ) : (
                     <span className="text-2xl lg:text-3xl font-extrabold text-neutral-900 dark:text-white tracking-tight font-display">
                       ₹{totalEarnings.toLocaleString("en-IN")}
@@ -769,7 +769,7 @@ export function PayerntHome({
 
                 <div className="mt-4">
                   {isLoading ? (
-                    <div className="h-8 w-14 bg-neutral-200 dark:bg-white/10 rounded animate-pulse" />
+                    <div className="h-8 w-14 bg-neutral-200 dark:bg-white/10 rounded" />
                   ) : (
                     <span className="text-2xl lg:text-3xl font-extrabold text-neutral-900 dark:text-white tracking-tight font-display">
                       {String(activeProducts).padStart(2, "0")}
@@ -809,7 +809,7 @@ export function PayerntHome({
 
                 <div className="mt-4">
                   {isLoading ? (
-                    <div className="h-8 w-14 bg-neutral-200 dark:bg-white/10 rounded animate-pulse" />
+                    <div className="h-8 w-14 bg-neutral-200 dark:bg-white/10 rounded" />
                   ) : (
                     <span className="text-2xl lg:text-3xl font-extrabold text-neutral-900 dark:text-white tracking-tight font-display">
                       {String(activeRentals).padStart(2, "0")}
@@ -848,11 +848,11 @@ export function PayerntHome({
 
               {isLoading ? (
                 <div className="space-y-2.5 my-auto py-3">
-                  <div className="p-3 rounded-xl bg-white dark:bg-white/[0.03] animate-pulse space-y-2 border border-neutral-200/80 dark:border-white/5">
+                  <div className="p-3 rounded-xl bg-white dark:bg-white/[0.03] space-y-2 border border-neutral-200/80 dark:border-white/5">
                     <div className="h-3.5 w-48 bg-neutral-200 dark:bg-white/10 rounded" />
                     <div className="h-2.5 w-28 bg-neutral-200 dark:bg-white/10 rounded" />
                   </div>
-                  <div className="p-3 rounded-xl bg-white dark:bg-white/[0.03] animate-pulse space-y-2 border border-neutral-200/80 dark:border-white/5">
+                  <div className="p-3 rounded-xl bg-white dark:bg-white/[0.03] space-y-2 border border-neutral-200/80 dark:border-white/5">
                     <div className="h-3.5 w-40 bg-neutral-200 dark:bg-white/10 rounded" />
                     <div className="h-2.5 w-24 bg-neutral-200 dark:bg-white/10 rounded" />
                   </div>
@@ -910,10 +910,10 @@ export function PayerntHome({
 
               {isLoading ? (
                 <div className="flex flex-col justify-between flex-1 pt-3 space-y-2">
-                  <div className="p-2.5 rounded-xl bg-white dark:bg-white/[0.03] animate-pulse space-y-2 border border-neutral-200/80 dark:border-white/5">
+                  <div className="p-2.5 rounded-xl bg-white dark:bg-white/[0.03] space-y-2 border border-neutral-200/80 dark:border-white/5">
                     <div className="h-3.5 w-32 bg-neutral-200 dark:bg-white/10 rounded" />
                   </div>
-                  <div className="p-2.5 rounded-xl bg-white dark:bg-white/[0.03] animate-pulse space-y-2 border border-neutral-200/80 dark:border-white/5">
+                  <div className="p-2.5 rounded-xl bg-white dark:bg-white/[0.03] space-y-2 border border-neutral-200/80 dark:border-white/5">
                     <div className="h-3.5 w-36 bg-neutral-200 dark:bg-white/10 rounded" />
                   </div>
                 </div>

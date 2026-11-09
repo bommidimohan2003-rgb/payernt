@@ -81,7 +81,7 @@ export function Testimonials() {
             {[1, 2, 3].map((i) => (
               <div
                 key={i}
-                className="rounded-2xl bg-neutral-50 dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 p-5 sm:p-6 space-y-4 animate-pulse"
+                className="rounded-2xl bg-neutral-50 dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 p-5 sm:p-6 space-y-4"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">

@@ -1,23 +1,17 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import {
   motion,
   useReducedMotion,
   AnimatePresence,
 } from "framer-motion";
-import { useNavigate, Link } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import { useTheme } from "@/hooks/useTheme";
-import { useAuth } from "@/hooks/useAuth";
 import {
   Coins,
   ShoppingBag,
   ArrowUpRight,
   ArrowDownRight,
   PackagePlus,
-  Package,
-  ShieldCheck,
-  Zap,
-  Sparkles,
-  ArrowRight,
   Sun,
   Moon,
 } from "lucide-react";
@@ -47,12 +41,12 @@ function GatewayTopNav() {
           onClick={toggle}
           aria-label="Toggle Color Theme"
           title={`Switch to ${theme === "dark" ? "Light" : "Dark"} Mode`}
-          className="w-9 h-9 sm:w-10 sm:h-10 rounded-full border border-neutral-300 dark:border-neutral-700/80 hover:border-neutral-400 dark:hover:border-neutral-500 bg-background/80 hover:bg-neutral-100 dark:hover:bg-white/5 text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white flex items-center justify-center transition-all cursor-pointer shrink-0 active:scale-95 backdrop-blur-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="w-9 h-9 sm:w-10 sm:h-10 rounded-full border border-neutral-300 dark:border-neutral-700/80 hover:border-neutral-400 dark:hover:border-neutral-500 bg-background/80 hover:bg-neutral-100 dark:hover:bg-white/5 text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0 backdrop-blur-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           {theme === "dark" ? (
-            <Sun className="h-4 w-4 sm:h-[18px] sm:w-[18px] stroke-[1.6]" />
+            <Sun className="h-4 w-4 sm:h-[18px] sm:w-[18px] stroke-[1.75]" />
           ) : (
-            <Moon className="h-4 w-4 sm:h-[18px] sm:w-[18px] stroke-[1.6]" />
+            <Moon className="h-4 w-4 sm:h-[18px] sm:w-[18px] stroke-[1.75]" />
           )}
         </button>
       )}
@@ -112,32 +106,14 @@ function BrandTitle({
 }
 
 /**
- * Clean Minimal Ambient Background (No Grids)
+ * Clean Minimal Canvas Backdrop (Zero Noise Filters)
  */
-function CinematicBackground({
-  shouldReduceMotion,
-}: {
-  shouldReduceMotion: boolean | null;
-}) {
+function GatewayBackdrop() {
   return (
-    <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden select-none">
-      {/* 1. Subtle Analog Texture (Uniform Across Canvas) */}
-      <svg
-        className="absolute inset-0 w-full h-full opacity-[0.015] dark:opacity-[0.025] mix-blend-overlay pointer-events-none"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <filter id="cinematicNoise">
-          <feTurbulence
-            type="fractalNoise"
-            baseFrequency="0.75"
-            numOctaves="3"
-            stitchTiles="stitch"
-          />
-          <feColorMatrix type="saturate" values="0" />
-        </filter>
-        <rect width="100%" height="100%" filter="url(#cinematicNoise)" />
-      </svg>
-    </div>
+    <div
+      aria-hidden="true"
+      className="absolute inset-0 pointer-events-none z-0 overflow-hidden select-none"
+    />
   );
 }
 
@@ -171,7 +147,7 @@ export function ProductSelection() {
 
   return (
     <div className="relative min-h-[100dvh] h-[100dvh] w-full bg-background text-foreground flex flex-col justify-between overflow-hidden selection:bg-foreground/15 select-none transition-colors duration-200">
-      <CinematicBackground shouldReduceMotion={shouldReduceMotion} />
+      <GatewayBackdrop />
       <GatewayTopNav />
 
       {/* TOP-LEFT CORNER BRAND MARK (MOBILE ONLY) */}
@@ -182,37 +158,9 @@ export function ProductSelection() {
       {/* ================================================================== */}
       {/* DESKTOP / LARGE-SCREEN FULL-VIEWPORT GATEWAY (>= 768px)            */}
       {/* ================================================================== */}
-      <div className="hidden md:flex flex-col h-full w-full relative z-10 justify-between py-8 px-10 lg:px-16 2xl:px-24">
-        {/* EDITORIAL TOP CORNER METADATA */}
-        <div className="flex items-center justify-between w-full text-[10px] font-mono tracking-[0.28em] text-muted-foreground/50 uppercase shrink-0 pr-12 sm:pr-14">
-          <motion.span
-            initial={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, x: -10 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.6, delay: 0.1, ease: smoothEase }}
-          >
-            ORIGIN
-          </motion.span>
-
-          <motion.span
-            initial={shouldReduceMotion ? { opacity: 1 } : { opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.6, delay: 0.15, ease: smoothEase }}
-            className="tracking-[0.32em] text-muted-foreground/40"
-          >
-            paYent / GATEWAY
-          </motion.span>
-
-          <motion.span
-            initial={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, x: 10 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.6, delay: 0.1, ease: smoothEase }}
-          >
-            2026
-          </motion.span>
-        </div>
-
+      <div className="hidden md:flex flex-col h-full w-full relative z-10 justify-center py-10 px-10 lg:px-16 2xl:px-24">
         {/* UPPER BRANDING & CENTRAL ORIGIN */}
-        <header className="flex flex-col items-center text-center shrink-0 pt-1">
+        <header className="flex flex-col items-center text-center shrink-0 pt-2">
           {/* Main Brand Title */}
           <motion.div
             initial={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, y: -12 }}
@@ -227,9 +175,9 @@ export function ProductSelection() {
             initial={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.25, ease: smoothEase }}
-            className="text-xs lg:text-sm font-semibold tracking-[0.36em] uppercase text-muted-foreground mt-2.5"
+            className="text-sm lg:text-base font-medium tracking-wide text-muted-foreground mt-2.5"
           >
-            RENT. LEND.
+            Rent &amp; Lend
           </motion.p>
 
           {/* Tagline 2 */}
@@ -237,7 +185,7 @@ export function ProductSelection() {
             initial={shouldReduceMotion ? { opacity: 1 } : { opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5, delay: 0.35, ease: smoothEase }}
-            className="text-[11px] lg:text-xs font-normal text-muted-foreground/60 tracking-wider mt-1"
+            className="text-xs lg:text-sm font-normal text-muted-foreground/80 mt-1"
           >
             One Platform. More Possibilities.
           </motion.p>
@@ -278,8 +226,8 @@ export function ProductSelection() {
               transition={{ duration: 0.45, delay: 0.55 }}
               className="flex flex-col items-center mt-2.5"
             >
-              <span className="text-[9px] font-mono tracking-[0.32em] text-muted-foreground/60 uppercase">
-                CHOOSE YOUR PATH
+              <span className="text-xs font-medium text-muted-foreground/80">
+                Choose your experience
               </span>
               <motion.div
                 animate={{
@@ -287,7 +235,7 @@ export function ProductSelection() {
                   opacity: [0.3, 0.7, 0.3],
                 }}
                 transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-                className="h-px bg-foreground/40 mt-1"
+                className="h-px bg-foreground/40 mt-1.5"
               />
             </motion.div>
 
@@ -395,7 +343,7 @@ export function ProductSelection() {
               y: 0,
             }}
             transition={{ duration: 0.5, delay: 0.65, ease: smoothEase }}
-            className="group relative flex-1 flex flex-col items-center justify-center p-8 lg:p-16 text-center cursor-pointer outline-none transition-all focus-visible:ring-1 focus-visible:ring-foreground/40"
+            className="group relative flex-1 flex flex-col items-center justify-center p-8 lg:p-16 text-center cursor-pointer outline-none transition-opacity focus-visible:ring-2 focus-visible:ring-foreground/50"
           >
             <motion.div
               animate={{
@@ -408,15 +356,15 @@ export function ProductSelection() {
               transition={{ duration: 0.3, ease: smoothEase }}
               className="relative z-10 flex flex-col items-center max-w-md"
             >
-              {/* Category Label with Dynamic Lead Line (LENDING ─────────────) */}
+              {/* Category Label with Dynamic Lead Line */}
               <div className="flex items-center gap-2.5">
                 <span
-                  className={`text-xs lg:text-sm font-mono tracking-[0.28em] uppercase transition-colors duration-200 ${hoveredSide === "payernt"
-                    ? "text-foreground font-bold"
-                    : "text-muted-foreground/70"
+                  className={`text-xs lg:text-sm font-medium tracking-wide transition-colors duration-200 ${hoveredSide === "payernt"
+                    ? "text-foreground font-semibold"
+                    : "text-muted-foreground/80"
                     }`}
                 >
-                  LENDING
+                  Lending
                 </span>
                 <motion.div
                   animate={{
@@ -438,20 +386,20 @@ export function ProductSelection() {
 
               {/* Exact Role Label */}
               <p
-                className={`text-base lg:text-xl font-bold tracking-[0.24em] uppercase transition-colors duration-200 ${hoveredSide === "payernt"
+                className={`text-base lg:text-xl font-semibold tracking-wide transition-colors duration-200 ${hoveredSide === "payernt"
                   ? "text-foreground"
-                  : "text-foreground/80"
+                  : "text-foreground/85"
                   }`}
               >
-                LENDER
+                Lender
               </p>
 
               {/* Plain Typography Tagline with Animated Underline */}
-              <div className="relative mt-6">
+              <div className="relative mt-5">
                 <p
-                  className={`text-xs lg:text-sm font-mono tracking-[0.22em] uppercase transition-colors duration-200 ${hoveredSide === "payernt"
+                  className={`text-xs lg:text-sm font-normal transition-colors duration-200 ${hoveredSide === "payernt"
                     ? "text-foreground font-medium"
-                    : "text-muted-foreground/70"
+                    : "text-muted-foreground/80"
                     }`}
                 >
                   Lendmore, Earnmore
@@ -498,7 +446,7 @@ export function ProductSelection() {
               y: 0,
             }}
             transition={{ duration: 0.5, delay: 0.65, ease: smoothEase }}
-            className="group relative flex-1 flex flex-col items-center justify-center p-8 lg:p-16 text-center cursor-pointer outline-none transition-all focus-visible:ring-1 focus-visible:ring-foreground/40"
+            className="group relative flex-1 flex flex-col items-center justify-center p-8 lg:p-16 text-center cursor-pointer outline-none transition-opacity focus-visible:ring-2 focus-visible:ring-foreground/50"
           >
             <motion.div
               animate={{
@@ -511,15 +459,15 @@ export function ProductSelection() {
               transition={{ duration: 0.3, ease: smoothEase }}
               className="relative z-10 flex flex-col items-center max-w-md"
             >
-              {/* Category Label with Dynamic Lead Line (RENTING ─────────────) */}
+              {/* Category Label with Dynamic Lead Line */}
               <div className="flex items-center gap-2.5">
                 <span
-                  className={`text-xs lg:text-sm font-mono tracking-[0.28em] uppercase transition-colors duration-200 ${hoveredSide === "payrent"
-                    ? "text-foreground font-bold"
-                    : "text-muted-foreground/70"
+                  className={`text-xs lg:text-sm font-medium tracking-wide transition-colors duration-200 ${hoveredSide === "payrent"
+                    ? "text-foreground font-semibold"
+                    : "text-muted-foreground/80"
                     }`}
                 >
-                  RENTING
+                  Renting
                 </span>
                 <motion.div
                   animate={{
@@ -541,20 +489,20 @@ export function ProductSelection() {
 
               {/* Exact Role Label */}
               <p
-                className={`text-base lg:text-xl font-bold tracking-[0.24em] uppercase transition-colors duration-200 ${hoveredSide === "payrent"
+                className={`text-base lg:text-xl font-semibold tracking-wide transition-colors duration-200 ${hoveredSide === "payrent"
                   ? "text-foreground"
-                  : "text-foreground/80"
+                  : "text-foreground/85"
                   }`}
               >
-                RENTER
+                Renter
               </p>
 
               {/* Plain Typography Tagline with Animated Underline */}
-              <div className="relative mt-6">
+              <div className="relative mt-5">
                 <p
-                  className={`text-xs lg:text-sm font-mono tracking-[0.22em] uppercase transition-colors duration-200 ${hoveredSide === "payrent"
+                  className={`text-xs lg:text-sm font-normal transition-colors duration-200 ${hoveredSide === "payrent"
                     ? "text-foreground font-medium"
-                    : "text-muted-foreground/70"
+                    : "text-muted-foreground/80"
                     }`}
                 >
                   Rentmore, Savemore
@@ -573,32 +521,6 @@ export function ProductSelection() {
             </motion.div>
           </motion.button>
         </main>
-
-        {/* BOTTOM STATUS & CORNER METADATA */}
-        <footer className="flex items-center justify-between w-full text-[10px] font-mono tracking-[0.28em] text-muted-foreground/50 uppercase shrink-0 pt-1">
-          <motion.span
-            initial={shouldReduceMotion ? { opacity: 1 } : { opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.5, delay: 0.75 }}
-          >
-            RENT • LEND
-          </motion.span>
-          <motion.span
-            initial={shouldReduceMotion ? { opacity: 1 } : { opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.5, delay: 0.8 }}
-            className="font-semibold text-muted-foreground/70 tracking-[0.32em]"
-          >
-            CHOOSE YOUR PATH
-          </motion.span>
-          <motion.span
-            initial={shouldReduceMotion ? { opacity: 1 } : { opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.5, delay: 0.75 }}
-          >
-            ONE PLATFORM / TWO PATHS
-          </motion.span>
-        </footer>
       </div>
 
       {/* ================================================================== */}
@@ -633,13 +555,13 @@ export function ProductSelection() {
                 onClick={() => setIsMobileOpen(true)}
                 aria-expanded={false}
                 aria-label="paYent — Tap to choose between Lender and Renter pathways"
-                className="cursor-pointer outline-none select-none py-4 px-8 border border-border/80 hover:border-foreground/60 rounded-2xl bg-card/60 active:scale-95 transition-all focus-visible:ring-1 focus-visible:ring-foreground/40 backdrop-blur-md shadow-sm"
+                className="cursor-pointer outline-none select-none py-4 px-8 border border-border/80 hover:border-foreground/60 rounded-2xl bg-card/60 transition-colors focus-visible:ring-2 focus-visible:ring-foreground/50 backdrop-blur-md shadow-sm"
               >
                 <BrandTitle className="text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground" />
               </button>
 
-              <span className="text-[9px] font-mono tracking-[0.25em] text-muted-foreground/60 uppercase mt-3">
-                Tap to choose path →
+              <span className="text-xs font-medium text-muted-foreground/80 mt-3">
+                Tap to choose path
               </span>
             </motion.div>
           ) : (
@@ -667,11 +589,11 @@ export function ProductSelection() {
                   }
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.35, ease: smoothEase }}
-                  className="shrink-0 flex-none self-center my-auto z-20 cursor-pointer outline-none select-none text-left p-2 sm:p-2.5 border border-border/80 hover:border-foreground/60 rounded-2xl bg-card/80 active:scale-95 transition-all backdrop-blur-md focus-visible:ring-1 focus-visible:ring-foreground/40 shadow-xs group -mr-[1px]"
+                  className="shrink-0 flex-none self-center my-auto z-20 cursor-pointer outline-none select-none text-left p-2 sm:p-2.5 border border-border/80 hover:border-foreground/60 rounded-2xl bg-card/80 transition-colors backdrop-blur-md focus-visible:ring-2 focus-visible:ring-foreground/50 shadow-xs group -mr-[1px]"
                 >
                   <BrandTitle className="text-base xs:text-lg font-extrabold tracking-tight text-foreground" />
-                  <div className="text-[7px] font-mono tracking-widest text-muted-foreground/70 group-hover:text-foreground/90 transition-colors uppercase mt-0.5">
-                    TAP TO CLOSE
+                  <div className="text-[10px] font-medium text-muted-foreground/80 group-hover:text-foreground/90 transition-colors mt-0.5">
+                    Tap to close
                   </div>
                 </motion.button>
 
@@ -731,15 +653,15 @@ export function ProductSelection() {
                     }
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.35, delay: 0.18, ease: smoothEase }}
-                    className="group cursor-pointer outline-none select-none text-left p-2 xs:p-2.5 border border-border/80 hover:border-foreground/60 rounded-2xl bg-card/80 active:scale-95 transition-all focus-visible:ring-1 focus-visible:ring-foreground/40 flex flex-col justify-between backdrop-blur-md shadow-xs h-[100px] min-h-[100px] max-h-[100px] flex-none"
+                    className="group cursor-pointer outline-none select-none text-left p-2 xs:p-2.5 border border-border/80 hover:border-foreground/60 rounded-2xl bg-card/80 transition-colors focus-visible:ring-2 focus-visible:ring-foreground/50 flex flex-col justify-between backdrop-blur-md shadow-xs h-[100px] min-h-[100px] max-h-[100px] flex-none"
                   >
                     <div>
                       <div className="flex items-center justify-between w-full">
-                        <span className="text-[8px] xs:text-[8.5px] font-mono tracking-wider text-muted-foreground/90 uppercase flex items-center gap-1">
-                          <Coins className="w-2.5 h-2.5 text-foreground/80" />
-                          LENDING
+                        <span className="text-[10px] font-medium text-muted-foreground flex items-center gap-1">
+                          <Coins className="w-2.5 h-2.5 text-foreground/80 stroke-[1.75]" />
+                          Lending
                         </span>
-                        <ArrowUpRight className="w-3 h-3 text-muted-foreground/60 group-hover:text-foreground transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                        <ArrowUpRight className="w-3 h-3 text-muted-foreground/60 group-hover:text-foreground transition-colors stroke-[1.75]" />
                       </div>
                       <div className="mt-0.5">
                         <ChoiceTitle
@@ -750,8 +672,8 @@ export function ProductSelection() {
                     </div>
 
                     <div className="flex items-center justify-between w-full mt-0.5">
-                      <p className="text-[11px] xs:text-xs font-bold text-foreground uppercase tracking-wider">
-                        LENDER
+                      <p className="text-[11px] xs:text-xs font-semibold text-foreground">
+                        Lender
                       </p>
                       <div
                         className="relative w-6 h-6 rounded-full bg-foreground/5 border border-border flex items-center justify-center text-foreground/90 shrink-0"
@@ -761,8 +683,8 @@ export function ProductSelection() {
                       </div>
                     </div>
 
-                    <div className="text-[7px] xs:text-[7.5px] font-mono uppercase tracking-widest text-muted-foreground/75">
-                      LENDMORE, EARNMORE
+                    <div className="text-[10px] text-muted-foreground/80">
+                      Lendmore, Earnmore
                     </div>
                   </motion.button>
 
@@ -779,15 +701,15 @@ export function ProductSelection() {
                     }
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.35, delay: 0.24, ease: smoothEase }}
-                    className="group cursor-pointer outline-none select-none text-left p-2 xs:p-2.5 border border-border/80 hover:border-foreground/60 rounded-2xl bg-card/80 active:scale-95 transition-all focus-visible:ring-1 focus-visible:ring-foreground/40 flex flex-col justify-between backdrop-blur-md shadow-xs h-[100px] min-h-[100px] max-h-[100px] flex-none"
+                    className="group cursor-pointer outline-none select-none text-left p-2 xs:p-2.5 border border-border/80 hover:border-foreground/60 rounded-2xl bg-card/80 transition-colors focus-visible:ring-2 focus-visible:ring-foreground/50 flex flex-col justify-between backdrop-blur-md shadow-xs h-[100px] min-h-[100px] max-h-[100px] flex-none"
                   >
                     <div>
                       <div className="flex items-center justify-between w-full">
-                        <span className="text-[8px] xs:text-[8.5px] font-mono tracking-wider text-muted-foreground/90 uppercase flex items-center gap-1">
-                          <ShoppingBag className="w-2.5 h-2.5 text-foreground/80" />
-                          RENTING
+                        <span className="text-[10px] font-medium text-muted-foreground flex items-center gap-1">
+                          <ShoppingBag className="w-2.5 h-2.5 text-foreground/80 stroke-[1.75]" />
+                          Renting
                         </span>
-                        <ArrowDownRight className="w-3 h-3 text-muted-foreground/60 group-hover:text-foreground transition-transform group-hover:translate-x-0.5 group-hover:translate-y-0.5" />
+                        <ArrowDownRight className="w-3 h-3 text-muted-foreground/60 group-hover:text-foreground transition-colors stroke-[1.75]" />
                       </div>
                       <div className="mt-0.5">
                         <ChoiceTitle
@@ -798,8 +720,8 @@ export function ProductSelection() {
                     </div>
 
                     <div className="flex items-center justify-between w-full mt-0.5">
-                      <p className="text-[11px] xs:text-xs font-bold text-foreground uppercase tracking-wider">
-                        RENTER
+                      <p className="text-[11px] xs:text-xs font-semibold text-foreground">
+                        Renter
                       </p>
                       {/* Bag with product being added indicator */}
                       <div
@@ -813,8 +735,8 @@ export function ProductSelection() {
                       </div>
                     </div>
 
-                    <div className="text-[7px] xs:text-[7.5px] font-mono uppercase tracking-widest text-muted-foreground/75">
-                      RENTMORE, SAVEMORE
+                    <div className="text-[10px] text-muted-foreground/80">
+                      Rentmore, Savemore
                     </div>
                   </motion.button>
                 </div>

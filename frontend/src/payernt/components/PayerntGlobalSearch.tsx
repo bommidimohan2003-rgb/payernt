@@ -305,7 +305,7 @@ export function PayerntGlobalSearch({
                           </span>
                           {page.badge && (
                             <span
-                              className={`px-1.5 py-0.2 rounded text-[9px] font-medium uppercase tracking-wider ${
+                              className={`px-1.5 py-0.5 rounded text-[9px] font-medium uppercase tracking-wider ${
                                 isSelected
                                   ? "bg-primary-foreground/20 text-primary-foreground"
                                   : "bg-primary/10 text-primary"

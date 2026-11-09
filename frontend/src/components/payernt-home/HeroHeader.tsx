@@ -50,7 +50,7 @@ export function HeroHeader({ className = "" }: HeroHeaderProps) {
             <button
               type="button"
               onClick={handleSignInClick}
-              aria-label={`Dashboard for ${user.name || user.email || "Account"}`}
+              aria-label={`Dashboard for ${user.fullName || user.email || "Account"}`}
               className="inline-flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 rounded-full bg-[#ddf0e4] hover:bg-[#cde7d6] text-neutral-900 font-semibold text-xs sm:text-sm border border-emerald-900/15 shadow-2xs transition-all duration-200 active:scale-95 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a3828] focus-visible:ring-offset-2"
             >
               <User
@@ -58,7 +58,7 @@ export function HeroHeader({ className = "" }: HeroHeaderProps) {
                 aria-hidden="true"
               />
               <span className="truncate max-w-[120px] sm:max-w-[160px]">
-                {user.name ? user.name.split(" ")[0] : "Dashboard"}
+                {user.fullName ? user.fullName.split(" ")[0] : "Dashboard"}
               </span>
             </button>
             <button

@@ -717,7 +717,7 @@ export default function Messages() {
                   {[1, 2, 3, 4].map((n) => (
                     <div
                       key={n}
-                      className="p-3.5 rounded-2xl bg-secondary/30 animate-pulse space-y-2.5"
+                      className="p-3.5 rounded-2xl bg-secondary/30 space-y-2.5"
                     >
                       <div className="flex items-center gap-3">
                         <div className="h-11 w-11 rounded-xl bg-secondary shrink-0" />
@@ -819,7 +819,7 @@ export default function Messages() {
                             {c.productTitle || "Gear Rental"}
                           </span>
                           {c.counterparty?.role && (
-                            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-md bg-secondary text-muted-foreground uppercase tracking-wider shrink-0">
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-secondary text-muted-foreground uppercase tracking-wider shrink-0">
                               {c.counterparty.role === "lender" ? "Lender" : "Renter"}
                             </span>
                           )}

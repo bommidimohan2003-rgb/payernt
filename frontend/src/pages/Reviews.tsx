@@ -390,7 +390,7 @@ export default function Reviews() {
             {[1, 2, 3, 4, 5, 6].map((i) => (
               <div
                 key={i}
-                className="rounded-2xl bg-neutral-50 dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 p-6 space-y-4 animate-pulse"
+                className="rounded-2xl bg-neutral-50 dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 p-6 space-y-4"
               >
                 <div className="flex items-center gap-3">
                   <div className="h-10 w-10 rounded-xl bg-neutral-200 dark:bg-neutral-800" />

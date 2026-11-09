@@ -1,21 +1,26 @@
+import React from "react";
 import { Hero } from "@/components/home/Hero";
 import { Categories } from "@/components/home/Categories";
-import { TrustStrip } from "@/components/home/TrustStrip";
+import { ExploreRentals } from "@/components/home/ExploreRentals";
+import { NewArrivals } from "@/components/home/NewArrivals";
+import { RecentlyViewed } from "@/components/home/RecentlyViewed";
+import { RecommendedForYou } from "@/components/home/RecommendedForYou";
+import { CustomerReviews } from "@/components/home/CustomerReviews";
 import { HowItWorks } from "@/components/home/HowItWorks";
-import { CreatorCommunity } from "@/components/home/CreatorCommunity";
-import { Testimonials } from "@/components/home/Testimonials";
+import { WhyChoose } from "@/components/home/WhyChoose";
 import { MainLayout } from "@/layouts/MainLayout";
 import { JsonLd } from "@/components/common/JsonLd";
 
 const orgSchema = {
   "@type": "Organization",
-  name: "Payent",
+  name: "paYent Rentals",
   url: "https://payent.com",
   logo: "https://payent.com/brand/payent-logo-512.png",
   sameAs: [
     "https://twitter.com/payent",
     "https://instagram.com/payent",
-    "https://github.com/payent",
+    "https://linkedin.com/company/payent",
+    "https://youtube.com/@payent",
   ],
   contactPoint: {
     "@type": "ContactPoint",
@@ -26,11 +31,11 @@ const orgSchema = {
 
 const websiteSchema = {
   "@type": "WebSite",
-  name: "Payent",
+  name: "paYent Rentals",
   url: "https://payent.com",
   potentialAction: {
     "@type": "SearchAction",
-    target: "https://payent.com/categories?q={search_term_string}",
+    target: "https://payent.com/browse?q={search_term_string}",
     "query-input": "required name=search_term_string",
   },
 };
@@ -41,23 +46,32 @@ export default function Home() {
       <JsonLd schema={orgSchema} />
       <JsonLd schema={websiteSchema} />
 
-      {/* 1. Cinematic Hero with Creator Imagery, Why PAYENT Card & Search */}
+      {/* 1. Text-Focused Editorial Hero Section */}
       <Hero />
 
-      {/* 2. Explore Gear By Category */}
+      {/* 2. 6 Canonical Categories with Circular Line Icons & Subcategories */}
       <Categories />
 
-      {/* 3. Trust / Benefit Strip */}
-      <TrustStrip />
+      {/* 3. Explore Rentals Section (#explore-rentals with Filters & Sort) */}
+      <ExploreRentals />
 
-      {/* 5. How It Works (3 Steps) */}
+      {/* 4. New Arrivals (Sorted Newest First with Pagination) */}
+      <NewArrivals />
+
+      {/* 5. Recently Viewed (Logged-in only; hidden if empty) */}
+      <RecentlyViewed />
+
+      {/* 6. Recommended For You (Personalized with Popular Fallback) */}
+      <RecommendedForYou />
+
+      {/* 7. Customer Reviews ("Real Stories, Real Experiences" Carousel) */}
+      <CustomerReviews />
+
+      {/* 8. How paYent Works (3-Step Connected Flow) */}
       <HowItWorks />
 
-      {/* 6. Creator Community Section */}
-      <CreatorCommunity />
-
-      {/* 7. What Creators Say (Testimonials) */}
-      <Testimonials />
+      {/* 9. Why Choose paYent (10 Verified Platform Benefits) */}
+      <WhyChoose />
     </MainLayout>
   );
 }

@@ -716,7 +716,7 @@ export default function Knowledge() {
         <div className="space-y-0.5">
           <span className="font-mono text-xs font-bold text-[#F5F5F5]">{row.id}</span>
           <div className="flex items-center gap-1.5">
-            <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-[#171C23] text-[#A1A1AA] border border-[rgba(161,161,170,0.18)]">
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#171C23] text-[#A1A1AA] border border-[rgba(161,161,170,0.18)]">
               {row.category}
             </span>
             <span className="text-[10px] font-mono text-muted-foreground">v{row.version}</span>
@@ -1137,7 +1137,7 @@ export default function Knowledge() {
                         {d.category || "GENERAL"}
                       </span>
                       {d.source_ticket_id && (
-                        <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-blue-500/10 text-blue-400 border border-blue-500/30">
+                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/30">
                           From Ticket #{d.source_ticket_id}
                         </span>
                       )}
@@ -1456,7 +1456,7 @@ export default function Knowledge() {
                       <div className="flex items-center gap-2">
                         <span className="font-mono text-xs font-bold text-[#F5F5F5]">Version {v.version}</span>
                         {isCurrent && (
-                          <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
                             Current Active
                           </span>
                         )}

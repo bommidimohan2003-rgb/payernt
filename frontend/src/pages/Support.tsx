@@ -29,6 +29,7 @@ import {
   Wrench,
   ThumbsUp,
   ThumbsDown,
+  LifeBuoy,
 } from "lucide-react";
 import { MainLayout } from "@/layouts/MainLayout";
 import { BackButton } from "@/components/common/BackButton";
@@ -322,7 +323,7 @@ export const FAQ_DATA: FAQItem[] = [
     category: "Billing & Payments",
     question: "My payment succeeded, but the status has not updated.",
     answer:
-      "If your bank confirms debit but Payent displays 'Payment Pending', the webhook confirmation may be delayed by bank gateway servers. Provide the Razorpay Payment ID (`pay_...`) or bank reference number so our billing team can link and activate your booking manually.",
+      "If your bank confirms debit but paYent displays 'Payment Pending', the webhook confirmation may be delayed by bank gateway servers. Provide the Razorpay Payment ID (`pay_...`) or bank reference number so our billing team can link and activate your booking manually.",
   },
   {
     id: "bp-7",
@@ -359,7 +360,7 @@ export const FAQ_DATA: FAQItem[] = [
     category: "Previous Orders",
     question: "I have a dispute about the product condition at return.",
     answer:
-      "Disputes regarding gear condition require inspection photos from both delivery handover and return handover. Payent reviews the pre-rental verification photos against return documentation to objectively resolve security deposit claims.",
+      "Disputes regarding gear condition require inspection photos from both delivery handover and return handover. paYent reviews the pre-rental verification photos against return documentation to objectively resolve security deposit claims.",
   },
   {
     id: "po-5",
@@ -375,7 +376,7 @@ export const FAQ_DATA: FAQItem[] = [
     category: "App & Technical Support",
     question: "I cannot log in.",
     answer:
-      "Ensure you are entering the registered email address. If you forgot your password, use the 'Forgot Password' link on the login page to receive a secure reset link. Note: never share your password with anyone, including Payent staff.",
+      "Ensure you are entering the registered email address. If you forgot your password, use the 'Forgot Password' link on the login page to receive a secure reset link. Note: never share your password with anyone, including paYent staff.",
   },
   {
     id: "at-2",
@@ -417,7 +418,7 @@ export const FAQ_DATA: FAQItem[] = [
     category: "App & Technical Support",
     question: "I need help with Secret PIN verification.",
     answer:
-      "Payent uses an 8-Digit Handover Security Protocol: the vendor possesses a 4-digit Secret PIN, and the renter possesses a 4-digit Secret PIN. Both pins must be verified upon delivery. Never disclose your PIN before physically inspecting the gear.",
+      "paYent uses an 8-Digit Handover Security Protocol: the vendor possesses a 4-digit Secret PIN, and the renter possesses a 4-digit Secret PIN. Both pins must be verified upon delivery. Never disclose your PIN before physically inspecting the gear.",
   },
 
   // --- 5. General Help ---
@@ -426,7 +427,7 @@ export const FAQ_DATA: FAQItem[] = [
     category: "General Help",
     question: "What are the rental insurance details?",
     answer:
-      "All rentals on Payent include standard hardware protection against verified equipment breakdown under normal usage. Intentional damage, negligence, water immersion, or loss without police report are not covered. Detailed terms are in our rental policy.",
+      "All rentals on paYent include standard hardware protection against verified equipment breakdown under normal usage. Intentional damage, negligence, water immersion, or loss without police report are not covered. Detailed terms are in our rental policy.",
   },
   {
     id: "gh-2",
@@ -438,9 +439,9 @@ export const FAQ_DATA: FAQItem[] = [
   {
     id: "gh-3",
     category: "General Help",
-    question: "How does Payent work?",
+    question: "How does paYent work?",
     answer:
-      "Payent connects creative professionals and tech enthusiasts. Renters browse certified equipment, complete KYC verification, and pay through secure escrow. Lenders earn passive income on idle high-end gear with full security deposit protection.",
+      "paYent connects creative professionals and tech enthusiasts. Renters browse certified equipment, complete KYC verification, and pay through secure escrow. Lenders earn passive income on idle high-end gear with full security deposit protection.",
   },
   {
     id: "gh-4",
@@ -566,6 +567,25 @@ export default function Support() {
       setSearchQuery(search.q);
     }
   }, [search?.tab, search?.q]);
+
+  // Smoothly scroll to anchored legal/security sections (#cancellation-refunds, #security-protocol)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const scrollToHash = () => {
+      const hashId = window.location.hash.replace(/^#/, "");
+      if (!hashId) return;
+      const el = document.getElementById(hashId);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    };
+    const timer = window.setTimeout(scrollToHash, 60);
+    window.addEventListener("hashchange", scrollToHash);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("hashchange", scrollToHash);
+    };
+  }, [currentCategory, pathname]);
 
   // Load user bookings if authenticated
   useEffect(() => {
@@ -746,14 +766,14 @@ export default function Support() {
             <div className="flex flex-col items-center mb-8 sm:mb-12 lg:mb-16">
               <BackButton fallback="/" className="mb-4" />
               <h1
-                className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-foreground"
+                className="text-3xl sm:text-4xl md:text-5xl font-semibold tracking-tight text-foreground"
                 data-testid="support-heading"
               >
                 FAQ + Support
               </h1>
             </div>
 
-            {/* Exactly Five Category Options in Responsive Layout */}
+            {/* Five Category Options in Responsive Layout */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 sm:gap-4 lg:gap-4 xl:gap-5 w-full">
               {FAQ_CATEGORIES.map((cat, index) => {
                 const Icon = cat.icon;
@@ -765,8 +785,8 @@ export default function Support() {
                     search={{ category: cat.id }}
                     data-testid={`category-card-${cat.id}`}
                     className={cn(
-                      "group relative rounded-2xl sm:rounded-3xl border border-border/80 bg-card p-4.5 sm:p-5 lg:p-6 text-left transition-all duration-200 cursor-pointer",
-                      "hover:border-foreground/30 hover:shadow-lg dark:hover:shadow-black/60 hover:-translate-y-1 active:scale-[0.98]",
+                      "group relative rounded-2xl sm:rounded-3xl border border-border/80 bg-card p-4.5 sm:p-5 lg:p-6 text-left transition-[border-color,box-shadow] duration-200 cursor-pointer",
+                      "hover:border-foreground/30 hover:shadow-md dark:hover:shadow-black/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white",
                       "flex flex-col justify-between",
                       // Tablet: 5th card positioned neatly across 2 columns
                       isFifth
@@ -780,12 +800,12 @@ export default function Support() {
                       <div className="flex items-center gap-3.5 sm:flex-col sm:items-start sm:gap-0 sm:w-full">
                         {/* Icon Container */}
                         <div className="p-2.5 sm:p-3 rounded-2xl bg-foreground/5 dark:bg-white/5 border border-border/60 flex items-center justify-center text-foreground shrink-0 group-hover:bg-foreground group-hover:text-background transition-colors duration-200 shadow-sm">
-                          <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
+                          <Icon className="w-5 h-5 sm:w-6 sm:h-6 stroke-[1.75]" aria-hidden="true" />
                         </div>
 
                         {/* Title & Description */}
                         <div className="min-w-0 sm:mt-4 sm:w-full">
-                          <h2 className="text-sm sm:text-base font-bold text-foreground group-hover:text-foreground transition-colors line-clamp-2">
+                          <h2 className="text-sm sm:text-base font-semibold text-foreground group-hover:text-foreground transition-colors line-clamp-2">
                             {cat.name}
                           </h2>
                           <p className="text-xs text-muted-foreground mt-1 sm:mt-1.5 leading-relaxed line-clamp-2 sm:line-clamp-3">
@@ -796,13 +816,69 @@ export default function Support() {
 
                       {/* Mobile Chevron / Desktop Action Footer */}
                       <div className="shrink-0 sm:w-full sm:pt-3 sm:mt-3 sm:border-t sm:border-border/40 flex items-center justify-end sm:justify-between text-xs font-semibold text-muted-foreground group-hover:text-foreground">
-                        <span className="hidden sm:inline-block text-[11px] font-medium">Explore Topics</span>
-                        <ArrowRight className="w-4 h-4 sm:w-3.5 sm:h-3.5 shrink-0 group-hover:translate-x-1 transition-transform duration-200" />
+                        <span className="hidden sm:inline-block text-xs font-medium">Explore Topics</span>
+                        <ArrowRight className="w-4 h-4 stroke-[1.75] shrink-0 transition-transform duration-200 group-hover:translate-x-1" aria-hidden="true" />
                       </div>
                     </div>
                   </Link>
                 );
               })}
+            </div>
+
+            {/* Anchored Legal & Security Summaries (for Footer deep links) */}
+            <div
+              id="support-policies"
+              className="mt-12 pt-8 border-t border-border/60 grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5"
+            >
+              <section
+                id="cancellation-refunds"
+                className="scroll-mt-24 rounded-2xl border border-border/80 bg-card p-5 sm:p-6 space-y-3"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-foreground/5 border border-border/60 text-foreground">
+                    <CreditCard className="w-4 h-4 stroke-[1.75]" aria-hidden="true" />
+                  </div>
+                  <h2 className="text-base font-semibold text-foreground">
+                    Cancellation & Refund Rules
+                  </h2>
+                </div>
+                <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+                  Orders cancelled prior to handover dispatch receive a full escrow refund. If delivered equipment is defective or missing listed accessories, your rental billing clock pauses while paYent arranges replacement gear or a pro-rata refund. Refundable deposits are released via Razorpay within 3 to 5 business days of verified return inspection.
+                </p>
+                <Link
+                  to="/support"
+                  search={{ category: "billing-payments" }}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white rounded-md py-1"
+                >
+                  <span>View Billing & Refund FAQ</span>
+                  <ArrowRight className="w-3.5 h-3.5 stroke-[1.75]" aria-hidden="true" />
+                </Link>
+              </section>
+
+              <section
+                id="security-protocol"
+                className="scroll-mt-24 rounded-2xl border border-border/80 bg-card p-5 sm:p-6 space-y-3"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-foreground/5 border border-border/60 text-foreground">
+                    <Shield className="w-4 h-4 stroke-[1.75]" aria-hidden="true" />
+                  </div>
+                  <h2 className="text-base font-semibold text-foreground">
+                    Security & Handover Protocol
+                  </h2>
+                </div>
+                <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+                  Every paYent rental enforces verified KYC screening, escrow deposit protection, and the 8-digit two-way Secret PIN handover check. Renters and lenders inspect equipment condition together before releasing handover codes, and payment processing runs exclusively over TLS-encrypted gateways.
+                </p>
+                <Link
+                  to="/support"
+                  search={{ category: "app-technical" }}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white rounded-md py-1"
+                >
+                  <span>Read Secret PIN & Safety FAQ</span>
+                  <ArrowRight className="w-3.5 h-3.5 stroke-[1.75]" aria-hidden="true" />
+                </Link>
+              </section>
             </div>
           </div>
         </div>
@@ -828,14 +904,14 @@ export default function Support() {
               <Link
                 to="/support"
                 search={{}}
-                className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl border border-border bg-card hover:bg-muted text-xs font-semibold text-foreground transition-all duration-150 cursor-pointer shadow-sm group"
+                className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl border border-border bg-card hover:bg-muted text-xs font-semibold text-foreground transition-colors duration-150 cursor-pointer shadow-sm group focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
               >
-                <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform" />
+                <ArrowLeft className="w-3.5 h-3.5 stroke-[1.75] group-hover:-translate-x-0.5 transition-transform" />
                 <span>Back to FAQ + Support</span>
               </Link>
 
               <div className="text-xs text-muted-foreground font-medium hidden sm:flex items-center gap-1.5">
-                <Link to="/support" search={{}} className="hover:underline">
+                <Link to="/support" search={{}} className="hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white rounded-sm">
                   FAQ + Support
                 </Link>
                 <span>/</span>
@@ -847,13 +923,13 @@ export default function Support() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
               <div className="flex items-start gap-4">
                 <div className="p-3.5 sm:p-4 rounded-2xl bg-foreground/5 dark:bg-white/5 border border-border flex items-center justify-center text-foreground shrink-0 shadow-sm">
-                  <CategoryIcon className="w-6 h-6 sm:w-7 sm:h-7" />
+                  <CategoryIcon className="w-6 h-6 sm:w-7 sm:h-7 stroke-[1.75]" aria-hidden="true" />
                 </div>
                 <div className="space-y-1">
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-foreground/5 dark:bg-white/5 border border-border/50 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-foreground/5 dark:bg-white/5 border border-border/50 text-xs font-medium text-muted-foreground">
                     <span>Category Support</span>
                   </div>
-                  <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight text-foreground">
+                  <h1 className="text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight text-foreground">
                     {currentCategory.name}
                   </h1>
                   <p className="text-xs sm:text-sm text-muted-foreground max-w-xl leading-relaxed">
@@ -866,16 +942,16 @@ export default function Support() {
               <div className="flex items-center gap-2 shrink-0 flex-wrap">
                 <button
                   onClick={() => setActiveTab("ticket")}
-                  className="px-3.5 py-2 rounded-xl bg-foreground text-background text-xs font-bold hover:opacity-90 transition-opacity cursor-pointer flex items-center gap-1.5 shadow-sm"
+                  className="px-3.5 py-2 rounded-xl bg-foreground text-background text-xs font-semibold hover:opacity-90 transition-opacity cursor-pointer flex items-center gap-1.5 shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
                 >
-                  <PlusCircle className="w-3.5 h-3.5" />
+                  <PlusCircle className="w-3.5 h-3.5 stroke-[1.75]" aria-hidden="true" />
                   <span>Raise Ticket</span>
                 </button>
                 <Link
                   to="/contact"
-                  className="px-3.5 py-2 rounded-xl bg-card border border-border text-foreground hover:bg-muted text-xs font-semibold transition-colors flex items-center gap-1.5"
+                  className="px-3.5 py-2 rounded-xl bg-card border border-border text-foreground hover:bg-muted text-xs font-semibold transition-colors flex items-center gap-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
                 >
-                  <ExternalLink className="w-3.5 h-3.5" />
+                  <ExternalLink className="w-3.5 h-3.5 stroke-[1.75]" aria-hidden="true" />
                   <span>Contact Team</span>
                 </Link>
               </div>
@@ -886,55 +962,55 @@ export default function Support() {
               <button
                 onClick={() => setActiveTab("faq")}
                 className={cn(
-                  "px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 shrink-0",
+                  "px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white",
                   activeTab === "faq"
                     ? "bg-foreground text-background shadow-sm"
                     : "bg-card border border-border text-muted-foreground hover:text-foreground hover:border-foreground/30"
                 )}
               >
-                <HelpCircle className="w-3.5 h-3.5" />
-                <span>Questions & Answers ({categoryFaqs.length})</span>
+                <HelpCircle className="w-3.5 h-3.5 stroke-[1.75]" aria-hidden="true" />
+                <span className="tabular-nums">Questions & Answers ({categoryFaqs.length})</span>
               </button>
 
               <button
                 onClick={() => setActiveTab("troubleshoot")}
                 className={cn(
-                  "px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 shrink-0",
+                  "px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white",
                   activeTab === "troubleshoot"
                     ? "bg-foreground text-background shadow-sm"
                     : "bg-card border border-border text-muted-foreground hover:text-foreground hover:border-foreground/30"
                 )}
               >
-                <Wrench className="w-3.5 h-3.5" />
+                <Wrench className="w-3.5 h-3.5 stroke-[1.75]" aria-hidden="true" />
                 <span>Diagnostic Steps</span>
               </button>
 
               <button
                 onClick={() => setActiveTab("ticket")}
                 className={cn(
-                  "px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 shrink-0",
+                  "px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white",
                   activeTab === "ticket"
                     ? "bg-foreground text-background shadow-sm"
                     : "bg-card border border-border text-muted-foreground hover:text-foreground hover:border-foreground/30"
                 )}
               >
-                <PlusCircle className="w-3.5 h-3.5" />
+                <PlusCircle className="w-3.5 h-3.5 stroke-[1.75]" aria-hidden="true" />
                 <span>Raise a Ticket</span>
               </button>
 
               <button
                 onClick={() => setActiveTab("requests")}
                 className={cn(
-                  "px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 shrink-0",
+                  "px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white",
                   activeTab === "requests"
                     ? "bg-foreground text-background shadow-sm"
                     : "bg-card border border-border text-muted-foreground hover:text-foreground hover:border-foreground/30"
                 )}
               >
-                <MessageSquare className="w-3.5 h-3.5" />
+                <MessageSquare className="w-3.5 h-3.5 stroke-[1.75]" aria-hidden="true" />
                 <span>My Support Requests</span>
                 {myTickets.length > 0 && (
-                  <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-500/10 text-emerald-500 font-bold">
+                  <span className="px-1.5 py-0.5 rounded-full text-xs bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold tabular-nums">
                     {myTickets.length}
                   </span>
                 )}
@@ -950,13 +1026,13 @@ export default function Support() {
             <div className="space-y-6">
               {/* Category Search Input */}
               <div className="relative flex items-center max-w-xl">
-                <Search className="absolute left-3.5 w-4 h-4 text-muted-foreground pointer-events-none" />
+                <Search className="absolute left-3.5 w-4 h-4 text-muted-foreground stroke-[1.75] pointer-events-none" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder={`Search questions in ${currentCategory.name}...`}
-                  className="w-full pl-10 pr-9 py-2.5 rounded-xl bg-card border border-border text-xs sm:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20 transition-all shadow-sm"
+                  placeholder={`Search questions in ${currentCategory.name}`}
+                  className="w-full pl-10 pr-9 py-2.5 rounded-xl bg-card border border-border text-xs sm:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20 transition-colors shadow-sm"
                 />
                 {searchQuery && (
                   <button
@@ -1041,7 +1117,7 @@ export default function Support() {
                       <div
                         key={faq.id}
                         className={cn(
-                          "rounded-2xl border transition-all duration-200 overflow-hidden",
+                          "rounded-2xl border transition-colors duration-200 overflow-hidden",
                           isExpanded
                             ? "bg-card border-foreground/30 shadow-sm"
                             : "bg-card/70 border-border hover:border-foreground/20"
@@ -1049,24 +1125,24 @@ export default function Support() {
                       >
                         <button
                           onClick={() => setExpandedFaqId(isExpanded ? null : faq.id)}
-                          className="w-full p-4 sm:p-5 text-left flex items-center justify-between gap-4 cursor-pointer focus:outline-none"
+                          className="w-full p-4 sm:p-5 text-left flex items-center justify-between gap-4 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
                           aria-expanded={isExpanded}
                         >
                           <div className="flex items-center gap-3">
                             {faq.subCategory === "camera" ? (
-                              <Camera className="w-4 h-4 text-muted-foreground shrink-0" />
+                              <Camera className="w-4 h-4 text-muted-foreground shrink-0 stroke-[1.75]" />
                             ) : faq.subCategory === "laptop" ? (
-                              <Laptop className="w-4 h-4 text-muted-foreground shrink-0" />
+                              <Laptop className="w-4 h-4 text-muted-foreground shrink-0 stroke-[1.75]" />
                             ) : (
-                              <HelpCircle className="w-4 h-4 text-muted-foreground shrink-0" />
+                              <HelpCircle className="w-4 h-4 text-muted-foreground shrink-0 stroke-[1.75]" />
                             )}
-                            <span className="text-sm sm:text-base font-bold text-foreground">
+                            <span className="text-sm sm:text-base font-semibold text-foreground">
                               {faq.question}
                             </span>
                           </div>
                           <ChevronDown
                             className={cn(
-                              "w-4 h-4 text-muted-foreground transition-transform duration-200 shrink-0",
+                              "w-4 h-4 text-muted-foreground transition-transform duration-200 shrink-0 stroke-[1.75]",
                               isExpanded && "rotate-180 text-foreground"
                             )}
                           />
@@ -1078,8 +1154,8 @@ export default function Support() {
 
                             {faq.troubleshootingSteps && faq.troubleshootingSteps.length > 0 && (
                               <div className="p-4 rounded-xl bg-muted/60 border border-border space-y-2">
-                                <div className="font-bold text-foreground text-xs flex items-center gap-1.5">
-                                  <Wrench className="w-3.5 h-3.5 text-foreground" />
+                                <div className="font-semibold text-foreground text-xs flex items-center gap-1.5">
+                                  <Wrench className="w-3.5 h-3.5 text-foreground stroke-[1.75]" />
                                   <span>Recommended Safe Troubleshooting Steps:</span>
                                 </div>
                                 <ul className="space-y-1.5 list-disc list-inside text-xs text-foreground/80">
@@ -1097,17 +1173,17 @@ export default function Support() {
                               <span className="text-muted-foreground">Was this answer helpful?</span>
                               <div className="flex items-center gap-2">
                                 <button
-                                  onClick={() => toast.success("Glad this resolved your question!")}
-                                  className="px-3 py-1 rounded-lg bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-foreground flex items-center gap-1 cursor-pointer font-medium"
+                                  onClick={() => toast.success("Marked as resolved")}
+                                  className="px-3 py-1 rounded-lg bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-foreground flex items-center gap-1 cursor-pointer font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
                                 >
-                                  <ThumbsUp className="w-3 h-3 text-emerald-500" />
+                                  <ThumbsUp className="w-3 h-3 text-emerald-500 stroke-[1.75]" />
                                   <span>Yes, resolved</span>
                                 </button>
                                 <button
                                   onClick={() => handlePrefillTicket(faq.category, faq.question)}
-                                  className="px-3 py-1 rounded-lg bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-foreground flex items-center gap-1 cursor-pointer font-medium"
+                                  className="px-3 py-1 rounded-lg bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-foreground flex items-center gap-1 cursor-pointer font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
                                 >
-                                  <ThumbsDown className="w-3 h-3 text-rose-500" />
+                                  <ThumbsDown className="w-3 h-3 text-rose-500 stroke-[1.75]" />
                                   <span>Still need help</span>
                                 </button>
                               </div>
@@ -1145,8 +1221,8 @@ export default function Support() {
             <div className="max-w-3xl mx-auto space-y-6">
               <div className="relative rounded-2xl sm:rounded-3xl bg-card dark:bg-[#1E1E1E] border border-neutral-300/80 dark:border-neutral-700/80 pt-5 sm:pt-6 p-6 sm:p-8 space-y-6 text-left">
                 <div className="absolute -top-3 left-4 px-2 bg-card dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
-                  <Wrench className="h-3.5 w-3.5 text-primary" />
-                  <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
+                  <Wrench className="h-3.5 w-3.5 text-foreground stroke-[1.75]" />
+                  <span className="text-xs sm:text-[13px] font-semibold text-foreground">
                     Diagnostic Flow for {currentCategory.name}
                   </span>
                 </div>
@@ -1158,7 +1234,7 @@ export default function Support() {
 
                 {/* Step 1: Sub-category selection */}
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-foreground">
+                  <label className="text-xs font-semibold text-foreground">
                     Step 1: Select issue area
                   </label>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -1177,10 +1253,10 @@ export default function Support() {
                           else if (c === "Account & Login") setTroubleIssue("OTP SMS code not received");
                           else if (c === "App Performance") setTroubleIssue("App crashes on launch");
                           else if (c === "Platform Rules") setTroubleIssue("How does gear deposit work?");
-                          else setTroubleIssue("What does Payent Shield insurance cover?");
+                          else setTroubleIssue("What does paYent Shield insurance cover?");
                         }}
                         className={cn(
-                          "p-3 rounded-xl border text-xs font-bold transition-all cursor-pointer text-center",
+                          "p-3 rounded-xl border text-xs font-semibold transition-colors cursor-pointer text-center focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white",
                           troubleCategory === c
                             ? "bg-foreground text-background border-foreground shadow-sm"
                             : "bg-muted/50 border-border text-muted-foreground hover:text-foreground"
@@ -1275,7 +1351,7 @@ export default function Support() {
                     )}
                     {troubleCategory === "Security & Coverage" && (
                       <>
-                        <option value="What does Payent Shield insurance cover?">What does Payent Shield insurance cover?</option>
+                        <option value="What does paYent Shield insurance cover?">What does paYent Shield insurance cover?</option>
                         <option value="Accidental damage vs normal wear & tear">Accidental damage vs normal wear & tear</option>
                         <option value="Reporting lost or stolen rental equipment">Reporting lost or stolen rental equipment</option>
                       </>
@@ -1348,13 +1424,13 @@ export default function Support() {
                     <button
                       onClick={() => setTroubleResolved(true)}
                       className={cn(
-                        "px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer",
+                        "px-4 py-2 rounded-xl text-xs font-semibold transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white",
                         troubleResolved === true
                           ? "bg-emerald-500 text-white"
                           : "bg-muted hover:bg-muted/80 text-foreground"
                       )}
                     >
-                      Yes, resolved!
+                      Yes, resolved
                     </button>
                     <button
                       onClick={() => {
@@ -1362,7 +1438,7 @@ export default function Support() {
                         handlePrefillTicket(currentCategory.name, troubleIssue);
                       }}
                       className={cn(
-                        "px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer",
+                        "px-4 py-2 rounded-xl text-xs font-semibold transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white",
                         troubleResolved === false
                           ? "bg-rose-500 text-white"
                           : "bg-muted hover:bg-muted/80 text-foreground"
@@ -1374,9 +1450,9 @@ export default function Support() {
                 </div>
 
                 {troubleResolved === true && (
-                  <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-xs font-semibold flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Great! You&rsquo;re all set. Return to Questions &amp; Answers if you need anything else.</span>
+                  <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-semibold flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 stroke-[1.75]" aria-hidden="true" />
+                    <span>Issue marked resolved. Return to Questions &amp; Answers if you need anything else.</span>
                   </div>
                 )}
               </div>
@@ -1388,8 +1464,8 @@ export default function Support() {
             <div className="max-w-2xl mx-auto space-y-6">
               <div className="relative rounded-2xl sm:rounded-3xl bg-card dark:bg-[#1E1E1E] border border-neutral-300/80 dark:border-neutral-700/80 pt-5 sm:pt-6 p-6 sm:p-8 space-y-6 text-left">
                 <div className="absolute -top-3 left-4 px-2 bg-card dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
-                  <LifeBuoy className="h-3.5 w-3.5 text-primary" />
-                  <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground">
+                  <LifeBuoy className="h-3.5 w-3.5 text-foreground stroke-[1.75]" aria-hidden="true" />
+                  <span className="text-xs sm:text-[13px] font-semibold text-foreground">
                     Raise a Ticket for {currentCategory.name}
                   </span>
                 </div>
@@ -1401,13 +1477,13 @@ export default function Support() {
 
                 {ticketSuccessId ? (
                   <div className="p-6 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-center space-y-4">
-                    <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto" />
+                    <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto stroke-[1.75]" aria-hidden="true" />
                     <div className="space-y-1">
-                      <h3 className="text-base font-bold text-foreground">
-                        Support Ticket Created Successfully!
+                      <h3 className="text-base font-semibold text-foreground">
+                        Support Ticket Submitted
                       </h3>
                       <p className="text-xs text-muted-foreground">Your reference ID is:</p>
-                      <div className="font-mono text-sm font-black text-emerald-500 bg-emerald-500/10 py-1.5 px-3 rounded-lg inline-block">
+                      <div className="font-mono text-sm font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 py-1.5 px-3 rounded-lg inline-block">
                         #{ticketSuccessId}
                       </div>
                     </div>
@@ -1612,7 +1688,7 @@ export default function Support() {
             <div className="max-w-6xl mx-auto space-y-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-xl sm:text-2xl font-black text-foreground">
+                  <h2 className="text-xl sm:text-2xl font-semibold text-foreground">
                     My Support Requests
                   </h2>
                   <p className="text-xs sm:text-sm text-muted-foreground">
@@ -1623,30 +1699,30 @@ export default function Support() {
                   <button
                     onClick={loadMyTickets}
                     disabled={loadingTickets}
-                    className="p-2 rounded-xl bg-card border border-border text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                    className="p-2 rounded-xl bg-card border border-border text-muted-foreground hover:text-foreground transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
                     title="Refresh tickets"
                   >
-                    <RefreshCw className={cn("w-4 h-4", loadingTickets && "animate-spin")} />
+                    <RefreshCw className={cn("w-4 h-4 stroke-[1.75]", loadingTickets && "animate-spin")} />
                   </button>
                 )}
               </div>
 
               {!user ? (
                 <div className="p-8 sm:p-12 rounded-3xl bg-card border border-border text-center space-y-4">
-                  <Shield className="w-10 h-10 text-muted-foreground mx-auto" />
+                  <Shield className="w-10 h-10 text-muted-foreground mx-auto stroke-[1.75]" aria-hidden="true" />
                   <div className="space-y-1">
-                    <h3 className="text-base font-bold text-foreground">
+                    <h3 className="text-base font-semibold text-foreground">
                       Log In to View Your Requests
                     </h3>
                     <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                      For your privacy and data security, support ticket history is only accessible when logged into your verified Payent account.
+                      For your privacy and data security, support ticket history is only accessible when logged into your verified paYent account.
                     </p>
                   </div>
                   <Link
                     to="/login"
-                    className="px-5 py-2.5 rounded-xl bg-foreground text-background text-xs font-bold inline-block hover:opacity-90 shadow-sm"
+                    className="px-5 py-2.5 rounded-xl bg-foreground text-background text-xs font-semibold inline-block hover:opacity-90 shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
                   >
-                    Log In to Payent
+                    Log In to paYent
                   </Link>
                 </div>
               ) : loadingTickets ? (
@@ -1660,16 +1736,16 @@ export default function Support() {
                   <p className="text-xs text-rose-500">{ticketListError}</p>
                   <button
                     onClick={loadMyTickets}
-                    className="px-4 py-2 rounded-xl bg-card border border-border text-xs font-bold hover:bg-muted"
+                    className="px-4 py-2 rounded-xl bg-card border border-border text-xs font-semibold hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
                   >
                     Retry
                   </button>
                 </div>
               ) : myTickets.length === 0 ? (
                 <div className="p-8 sm:p-12 rounded-3xl bg-card border border-border text-center space-y-4">
-                  <MessageSquare className="w-10 h-10 text-muted-foreground mx-auto" />
+                  <MessageSquare className="w-10 h-10 text-muted-foreground mx-auto stroke-[1.75]" aria-hidden="true" />
                   <div className="space-y-1">
-                    <h3 className="text-base font-bold text-foreground">
+                    <h3 className="text-base font-semibold text-foreground">
                       No Support Tickets Found
                     </h3>
                     <p className="text-xs text-muted-foreground max-w-sm mx-auto">
@@ -1678,7 +1754,7 @@ export default function Support() {
                   </div>
                   <button
                     onClick={() => setActiveTab("ticket")}
-                    className="px-5 py-2.5 rounded-xl bg-foreground text-background text-xs font-bold hover:opacity-90 cursor-pointer shadow-sm"
+                    className="px-5 py-2.5 rounded-xl bg-foreground text-background text-xs font-semibold hover:opacity-90 cursor-pointer shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
                   >
                     Raise Support Ticket
                   </button>
@@ -1693,7 +1769,7 @@ export default function Support() {
                       <div
                         key={t.id}
                         className={cn(
-                          "rounded-2xl border transition-all overflow-hidden",
+                          "rounded-2xl border transition-colors overflow-hidden",
                           isSelected
                             ? "bg-card border-foreground/30 shadow-md"
                             : "bg-card/70 border-border hover:border-foreground/20"
@@ -1705,45 +1781,45 @@ export default function Support() {
                         >
                           <div className="space-y-1 min-w-0">
                             <div className="flex items-center gap-2">
-                              <span className="font-mono text-xs font-bold text-foreground">
+                              <span className="font-mono text-xs font-semibold text-foreground">
                                 #{t.id}
                               </span>
                               <span
                                 className={cn(
-                                  "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase",
+                                  "px-2 py-0.5 rounded-full text-xs font-semibold capitalize",
                                   status === "open"
-                                    ? "bg-amber-500/10 text-amber-500 border border-amber-500/20"
+                                    ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
                                     : status === "pending"
-                                    ? "bg-blue-500/10 text-blue-500 border border-blue-500/20"
+                                    ? "bg-neutral-500/10 text-neutral-700 dark:text-neutral-300 border border-neutral-500/20"
                                     : status === "resolved" || status === "closed"
-                                    ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
+                                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
                                     : "bg-muted text-muted-foreground"
                                 )}
                               >
                                 {status}
                               </span>
-                              <span className="text-[11px] text-muted-foreground px-2 py-0.5 rounded-full bg-muted">
+                              <span className="text-xs text-muted-foreground px-2 py-0.5 rounded-full bg-muted">
                                 {t.category || "General"}
                               </span>
                             </div>
-                            <h4 className="text-sm font-bold text-foreground truncate">
+                            <h4 className="text-sm font-semibold text-foreground truncate">
                               {t.subject}
                             </h4>
                             {t.bookingId && (
-                              <div className="text-[11px] text-muted-foreground font-mono">
+                              <div className="text-xs text-muted-foreground font-mono">
                                 Related Booking: #{t.bookingId}
                               </div>
                             )}
                           </div>
 
                           <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
-                            <div className="text-right text-[11px] text-muted-foreground">
+                            <div className="text-right text-xs text-muted-foreground tabular-nums">
                               <div>{t.createdAt ? t.createdAt.slice(0, 10) : "Recent"}</div>
-                              <div className="text-[10px]">{msgs.length} messages</div>
+                              <div className="text-xs">{msgs.length} messages</div>
                             </div>
                             <ChevronDown
                               className={cn(
-                                "w-4 h-4 text-muted-foreground transition-transform",
+                                "w-4 h-4 text-muted-foreground transition-transform stroke-[1.75]",
                                 isSelected && "rotate-180 text-foreground"
                               )}
                             />
@@ -1765,8 +1841,8 @@ export default function Support() {
                                         : "mr-auto bg-muted border border-border text-foreground"
                                     )}
                                   >
-                                    <div className="flex items-center justify-between gap-4 font-bold text-[10px] opacity-75">
-                                      <span>{isAdmin ? "Payent Support" : m.sender || "You"}</span>
+                                    <div className="flex items-center justify-between gap-4 font-semibold text-xs opacity-75">
+                                      <span>{isAdmin ? "paYent Support" : m.sender || "You"}</span>
                                       <span>
                                         {m.timestamp
                                           ? new Date(m.timestamp).toLocaleTimeString([], {

@@ -301,7 +301,7 @@ export default function Agents() {
             <span>{tab.label}</span>
             <span
               className={cn(
-                "px-1.5 py-0.2 rounded-full text-[10px] font-mono",
+                "px-1.5 py-0.5 rounded-full text-[10px] font-mono",
                 statusFilter === tab.id
                   ? "bg-black/15 text-black"
                   : "bg-white/10 text-zinc-300"

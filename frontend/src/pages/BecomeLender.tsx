@@ -395,7 +395,7 @@ export default function BecomeLender() {
                       setTitle("");
                       setPrice("");
                       setDescription("");
-                      setPhotos([]);
+                      setPrimaryImage("");
                       setCurrentStep(1);
                     }}
                     variant="outline"

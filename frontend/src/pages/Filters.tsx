@@ -13,6 +13,7 @@ import {
   Navigation,
   SlidersHorizontal,
   RotateCcw,
+  Package,
 } from "lucide-react";
 import { Button } from "@/components/common/Button";
 import { Input } from "@/components/common/Input";
@@ -24,7 +25,13 @@ import { useTheme } from "@/hooks/useTheme";
 import { storage } from "@/utils/storage";
 import { api } from "@/utils/api";
 import { isFakeOrDeletedProduct, isUserOwnProduct } from "@/utils/productFilters";
+import { formatProductLocation, isProductAvailable } from "@/utils/formatters";
 import { INITIAL_FALLBACK_PRODUCTS } from "@/utils/fallbackProducts";
+import {
+  matchesProductCategory,
+  getCategoryDisplayLabel,
+  normalizeCategoryParam,
+} from "@/utils/categoryFilter";
 import { cn } from "@/lib/utils";
 import type { Product } from "@/types";
 
@@ -54,6 +61,7 @@ export default function FiltersPage() {
   const search = useSearch({ strict: false }) as {
     q?: string;
     cat?: string;
+    category?: string;
     min_p?: string;
     max_p?: string;
     city?: string;
@@ -64,19 +72,25 @@ export default function FiltersPage() {
     sort?: string;
   };
 
-  // Mobile Filter Sidebar Toggle State (drawer on mobile with "<" symbol)
+  // Mobile Filter Sidebar Toggle State
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  const urlCat = useMemo(
+    () => normalizeCategoryParam(search as Record<string, unknown>),
+    [search]
+  );
 
   // 1. Search Query State
   const [searchQuery, setSearchQuery] = useState<string>(search.q || "");
 
   // 2. Categories State (Multi-selection)
   const [selectedCats, setSelectedCats] = useState<string[]>(() => {
-    if (!search.cat || search.cat === "all") return [];
-    return search.cat
+    if (!urlCat || urlCat === "all") return [];
+    return urlCat
       .split(",")
       .map((s) => s.trim().toLowerCase())
-      .filter(Boolean);
+      .filter((s) => Boolean(s) && s !== "all");
   });
 
   // 3. Price Range (Dual Slider & Inputs)
@@ -89,8 +103,8 @@ export default function FiltersPage() {
     return !isNaN(val) && val > 0 && val <= 10000 ? val : 10000;
   });
 
-  // 4. Availability Dates
-  const todayStr = new Date().toISOString().split("T")[0];
+  // 4. Availability Dates (Deferred date floor post-mount for SSR/CSR hydration parity)
+  const [todayStr, setTodayStr] = useState<string>("");
   const [startDate, setStartDate] = useState<string>(search.start || "");
   const [endDate, setEndDate] = useState<string>(search.end || "");
 
@@ -109,16 +123,32 @@ export default function FiltersPage() {
     return search.cond.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
   });
 
-  // 7. Products Catalog State
-  const [products, setProducts] = useState<Product[]>(() => {
-    const cached = storage.get<Product[]>("payent_server_products", []);
-    const clean = cached.filter((p) => !isFakeOrDeletedProduct(p));
-    return clean.length > 0 ? clean : INITIAL_FALLBACK_PRODUCTS;
-  });
+  // 7. Products Catalog State (SSR-deterministic initial state; client storage hydrated in useEffect)
+  const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
+  const [products, setProducts] = useState<Product[]>(() =>
+    INITIAL_FALLBACK_PRODUCTS.filter((p) => !isFakeOrDeletedProduct(p))
+  );
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  // Fetch real products on mount
+  // Hydrate mounted state, client storage cache, and fetch live products post-mount (Obs B)
   useEffect(() => {
+    setMounted(true);
+    setTodayStr(new Date().toISOString().split("T")[0]);
+
+    const cached = storage.get<Product[]>("payent_server_products", []);
+    if (Array.isArray(cached) && cached.length > 0) {
+      const cleanCached = cached.filter((p) => !isFakeOrDeletedProduct(p));
+      if (cleanCached.length > 0) {
+        const merged = [...cleanCached];
+        for (const fb of INITIAL_FALLBACK_PRODUCTS) {
+          if (!merged.some((p) => String(p.id) === String(fb.id))) {
+            merged.push(fb);
+          }
+        }
+        setProducts(merged);
+      }
+    }
+
     setIsLoading(true);
     api
       .getPublicCustomProducts()
@@ -142,6 +172,18 @@ export default function FiltersPage() {
         setIsLoading(false);
       });
   }, []);
+
+  // Close mobile drawer on Escape
+  useEffect(() => {
+    if (!isMobileFilterOpen) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsMobileFilterOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [isMobileFilterOpen]);
 
   // Update URL Search Parameters whenever filters change
   const syncUrlParams = useCallback(
@@ -216,9 +258,55 @@ export default function FiltersPage() {
     setSearchQuery(val);
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     searchTimeoutRef.current = setTimeout(() => {
+      searchTimeoutRef.current = null;
       syncUrlParams({ qVal: val });
     }, 300);
   };
+
+  // Sync local filter state when URL search params change via Back/Forward or external links
+  useEffect(() => {
+    if (!searchTimeoutRef.current) {
+      setSearchQuery(search.q || "");
+    }
+    const nextCats =
+      urlCat && urlCat !== "all"
+        ? urlCat
+            .split(",")
+            .map((s) => s.trim().toLowerCase())
+            .filter((s) => Boolean(s) && s !== "all")
+        : [];
+    setSelectedCats(nextCats);
+
+    const minVal = Number(search.min_p);
+    setMinPrice(!isNaN(minVal) && minVal >= 0 ? minVal : 0);
+
+    const maxVal = Number(search.max_p);
+    setMaxPrice(!isNaN(maxVal) && maxVal > 0 && maxVal <= 10000 ? maxVal : 10000);
+
+    setStartDate(search.start || "");
+    setEndDate(search.end || "");
+    setCityInput(search.city || "");
+    setPincodeInput(search.pincode || "");
+
+    setSelectedConditions(
+      search.cond
+        ? search.cond
+            .split(",")
+            .map((s) => s.trim().toLowerCase())
+            .filter(Boolean)
+        : ["new", "used"]
+    );
+  }, [
+    search.q,
+    urlCat,
+    search.min_p,
+    search.max_p,
+    search.start,
+    search.end,
+    search.city,
+    search.pincode,
+    search.cond,
+  ]);
 
   // Category Toggle
   const handleToggleCat = (catId: string) => {
@@ -282,12 +370,8 @@ export default function FiltersPage() {
     });
 
     activeList.forEach((p) => {
-      const pCat = String(p.category || "").toLowerCase();
       PRIMARY_CATEGORIES.forEach((c) => {
-        if (
-          pCat.includes(c.id) ||
-          (c.id === "laptops" && (pCat.includes("pc") || pCat.includes("mac")))
-        ) {
+        if (matchesProductCategory(p.category, c.id)) {
           counts[c.id] = (counts[c.id] || 0) + 1;
         }
       });
@@ -342,12 +426,7 @@ export default function FiltersPage() {
 
       // 2. Category Filter (OR logic across selected)
       if (selectedCats.length > 0) {
-        const pCat = String(p.category || "").toLowerCase();
-        const matchesAny = selectedCats.some((c) => {
-          if (pCat.includes(c)) return true;
-          if (c === "laptops" && (pCat.includes("pc") || pCat.includes("mac"))) return true;
-          return false;
-        });
+        const matchesAny = selectedCats.some((c) => matchesProductCategory(p.category, c));
         if (!matchesAny) return false;
       }
 
@@ -360,7 +439,7 @@ export default function FiltersPage() {
       if (cityInput && cityInput.trim() && cityInput.toLowerCase() !== "all cities") {
         const term = cityInput.trim().toLowerCase();
         const pCity = String(
-          p.city || p.owner_city || p.location || p.owner_address || ""
+          p.city || p.area || p.owner_city || p.location || p.owner?.city || p.owner_address || ""
         ).toLowerCase();
         if (!pCity.includes(term)) return false;
       }
@@ -413,7 +492,7 @@ export default function FiltersPage() {
       const match = PRIMARY_CATEGORIES.find((c) => c.id === catId);
       chips.push({
         id: `cat-${catId}`,
-        label: match ? match.name : catId,
+        label: match ? match.name : getCategoryDisplayLabel(catId),
         onRemove: () => handleToggleCat(catId),
       });
     });
@@ -497,21 +576,22 @@ export default function FiltersPage() {
     syncUrlParams,
   ]);
 
-  // Sidebar Filter Section Component (reusable for desktop & mobile)
+  // Sidebar Filter Section Component (reusable for desktop & mobile with unique DOM prefixes)
   const renderSidebarFilters = (isMobileView = false) => {
-    // Exact background matching so top-border notch interruptions are 100% invisible and seamless
+    const idPrefix = isMobileView ? "mobile" : "desktop";
+    // Exact background matching so top-border notch interruptions stay seamless across surfaces
     const notchBgClass = isMobileView
       ? "bg-white dark:bg-[#1E1E1E]"
       : "bg-neutral-50 dark:bg-[#1E1E1E]";
 
     return (
-      <div className="space-y-3.5 sm:space-y-6">
+      <div className="space-y-4 sm:space-y-6">
         {/* 1. CATEGORY SECTION BOX */}
         <SectionBox
           title="Category"
-          titleClassName="text-xs sm:text-[13px] font-bold px-1"
+          titleClassName="text-xs sm:text-[13px] font-semibold px-1"
           cutoutBgClass={notchBgClass}
-          className="p-2.5 xs:p-3 sm:p-4 pt-3 sm:pt-5.5 rounded-xl sm:rounded-2xl border-neutral-300/80 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] shadow-xs"
+          className="p-3 sm:p-4 pt-4 sm:pt-5.5 rounded-xl sm:rounded-2xl border-neutral-300/80 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] shadow-xs"
           action={
             selectedCats.length > 0 ? (
               <button
@@ -520,51 +600,59 @@ export default function FiltersPage() {
                   setSelectedCats([]);
                   syncUrlParams({ cat: [] });
                 }}
-                className="text-[10px] sm:text-[11px] font-medium text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white cursor-pointer px-1 transition-colors"
+                className="text-xs font-medium text-neutral-600 hover:text-neutral-950 dark:text-neutral-400 dark:hover:text-white cursor-pointer px-1 transition-colors"
               >
-                Reset
+                Clear all
               </button>
             ) : null
           }
         >
-          {/* On mobile: compact vertical list with clear touch targets */}
-          <div className="space-y-0.5 sm:space-y-1.5 mt-0.5">
+          <div className="space-y-1 sm:space-y-1.5 mt-0.5">
             {PRIMARY_CATEGORIES.map((cat) => {
               const isChecked = selectedCats.includes(cat.id);
               const count = categoryCounts[cat.id] ?? 0;
+              const inputId = `${isMobileView ? "mobile" : "desktop"}-filter-cat-${cat.id}`;
 
               return (
                 <label
                   key={cat.id}
-                  onClick={() => handleToggleCat(cat.id)}
-                  className="group flex items-center justify-between py-0.5 sm:py-1 px-1 sm:px-2 rounded-md cursor-pointer select-none transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800/60"
+                  htmlFor={inputId}
+                  className="group flex items-center justify-between py-1.5 sm:py-1 px-1.5 sm:px-2 rounded-md cursor-pointer select-none transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800/60"
                 >
-                  <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0">
-                    {/* Checkbox */}
+                  <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+                    <input
+                      id={inputId}
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={() => handleToggleCat(cat.id)}
+                      className="sr-only peer"
+                    />
+                    {/* Decorative Checkbox Indicator */}
                     <div
+                      aria-hidden="true"
                       className={cn(
-                        "w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-[4px] flex items-center justify-center transition-all duration-150 shrink-0",
+                        "w-4 h-4 rounded-[4px] flex items-center justify-center transition-colors duration-150 shrink-0 peer-focus-visible:ring-2 peer-focus-visible:ring-neutral-950 dark:peer-focus-visible:ring-white peer-focus-visible:ring-offset-1",
                         isChecked
-                          ? "bg-neutral-900 text-white dark:bg-white dark:text-black shadow-xs"
-                          : "bg-transparent border border-neutral-400 dark:border-neutral-700 group-hover:border-neutral-600 dark:group-hover:border-neutral-500"
+                          ? "bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 shadow-xs"
+                          : "bg-transparent border border-neutral-400 dark:border-neutral-600 group-hover:border-neutral-700 dark:group-hover:border-neutral-400"
                       )}
                     >
-                      {isChecked && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                      {isChecked && <Check className="w-2.5 h-2.5 stroke-[2]" />}
                     </div>
 
                     <span
                       className={cn(
-                        "text-[11px] sm:text-xs tracking-tight transition-colors truncate",
+                        "text-xs transition-colors truncate",
                         isChecked
-                          ? "text-neutral-900 dark:text-white font-medium"
-                          : "text-neutral-700 dark:text-neutral-300 group-hover:text-neutral-900 dark:group-hover:text-white"
+                          ? "text-neutral-950 dark:text-white font-semibold"
+                          : "text-neutral-700 dark:text-neutral-300 group-hover:text-neutral-950 dark:group-hover:text-white"
                       )}
                     >
                       {cat.name}
                     </span>
                   </div>
 
-                  <span className="text-[8.5px] sm:text-[11px] text-neutral-400 dark:text-neutral-500 font-mono ml-1 shrink-0">
+                  <span className="text-xs text-neutral-600 dark:text-neutral-400 font-medium tabular-nums ml-1.5 shrink-0">
                     {count}
                   </span>
                 </label>
@@ -573,14 +661,14 @@ export default function FiltersPage() {
           </div>
         </SectionBox>
 
-        {/* 2. PRICE RANGE SECTION BOX (WAKESLIDER + NOTCH NUMERIC INPUTS) */}
+        {/* 2. PRICE RANGE SECTION BOX */}
         <SectionBox
           title="Price"
-          titleClassName="text-xs sm:text-[13px] font-bold px-1"
+          titleClassName="text-xs sm:text-[13px] font-semibold px-1"
           cutoutBgClass={notchBgClass}
-          className="p-2.5 xs:p-3 sm:p-4 pt-3 sm:pt-5.5 rounded-xl sm:rounded-2xl border-neutral-300/80 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] shadow-xs space-y-2 sm:space-y-4"
+          className="p-3 sm:p-4 pt-4 sm:pt-5.5 rounded-xl sm:rounded-2xl border-neutral-300/80 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] shadow-xs space-y-3 sm:space-y-4"
           badge={
-            <span className="text-[10px] sm:text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 font-mono">
+            <span className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 tabular-nums">
               {minPrice > 0
                 ? `₹${minPrice}–${maxPrice >= 10000 ? "10k+" : maxPrice}`
                 : maxPrice >= 10000
@@ -597,14 +685,13 @@ export default function FiltersPage() {
                   setMaxPrice(10000);
                   syncUrlParams({ minP: 0, maxP: 10000 });
                 }}
-                className="text-[10px] sm:text-[11px] font-medium text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white cursor-pointer px-1 transition-colors"
+                className="text-xs font-medium text-neutral-600 hover:text-neutral-950 dark:text-neutral-400 dark:hover:text-white cursor-pointer px-1 transition-colors"
               >
-                Reset
+                Clear all
               </button>
             ) : null
           }
         >
-          {/* React Bits WakeSlider: Price Wave Slider */}
           <div className="pt-0.5 sm:pt-1">
             <WakeSlider
               min={200}
@@ -623,9 +710,9 @@ export default function FiltersPage() {
             />
           </div>
 
-          {/* Direct Min / Max Input Fields with Notch Styling in 2 columns */}
-          <div className="grid grid-cols-2 gap-1.5 sm:gap-3 pt-0.5 sm:pt-1">
+          <div className="grid grid-cols-2 gap-2 sm:gap-3 pt-0.5 sm:pt-1">
             <Input
+              id={`${idPrefix}-filter-price-min`}
               label="Min"
               type="number"
               min={0}
@@ -639,10 +726,11 @@ export default function FiltersPage() {
                 syncUrlParams({ minP: val });
               }}
               cutoutBgClass={notchBgClass}
-              className="text-[11px] sm:text-xs font-mono"
-              inputWrapperClassName="h-7.5 sm:h-11 px-2 sm:px-4 rounded-lg sm:rounded-[16px] border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E]"
+              className="text-xs font-mono tabular-nums"
+              inputWrapperClassName="h-9 sm:h-11 px-2.5 sm:px-4 rounded-xl border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E]"
             />
             <Input
+              id={`${idPrefix}-filter-price-max`}
               label="Max"
               type="number"
               min={minPrice + 100}
@@ -657,13 +745,12 @@ export default function FiltersPage() {
                 syncUrlParams({ maxP: clamped });
               }}
               cutoutBgClass={notchBgClass}
-              className="text-[11px] sm:text-xs font-mono"
-              inputWrapperClassName="h-7.5 sm:h-11 px-2 sm:px-4 rounded-lg sm:rounded-[16px] border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E]"
+              className="text-xs font-mono tabular-nums"
+              inputWrapperClassName="h-9 sm:h-11 px-2.5 sm:px-4 rounded-xl border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E]"
             />
           </div>
 
-          {/* Quick Min / Max bound hints */}
-          <div className="flex items-center justify-between text-[9px] sm:text-[11px] text-neutral-500 font-mono">
+          <div className="flex items-center justify-between text-xs text-neutral-600 dark:text-neutral-400 font-medium tabular-nums">
             <span>₹0</span>
             <span>₹10k</span>
           </div>
@@ -672,10 +759,10 @@ export default function FiltersPage() {
         {/* 3. AVAILABILITY DATES SECTION BOX */}
         <SectionBox
           title="Dates"
-          titleClassName="text-xs sm:text-[13px] font-bold px-1"
-          icon={<Calendar className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-neutral-500 dark:text-neutral-400" />}
+          titleClassName="text-xs sm:text-[13px] font-semibold px-1"
+          icon={<Calendar className="h-3.5 w-3.5 text-neutral-600 dark:text-neutral-400" aria-hidden="true" />}
           cutoutBgClass={notchBgClass}
-          className="p-2.5 xs:p-3 sm:p-4 pt-3 sm:pt-5.5 rounded-xl sm:rounded-2xl border-neutral-300/80 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] shadow-xs space-y-2 sm:space-y-3.5"
+          className="p-3 sm:p-4 pt-4 sm:pt-5.5 rounded-xl sm:rounded-2xl border-neutral-300/80 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] shadow-xs space-y-3"
           action={
             startDate || endDate ? (
               <button
@@ -685,43 +772,44 @@ export default function FiltersPage() {
                   setEndDate("");
                   syncUrlParams({ startD: "", endD: "" });
                 }}
-                className="text-[10px] sm:text-[11px] font-medium text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white cursor-pointer px-1 transition-colors"
+                className="text-xs font-medium text-neutral-600 hover:text-neutral-950 dark:text-neutral-400 dark:hover:text-white cursor-pointer px-1 transition-colors"
               >
                 Clear
               </button>
             ) : null
           }
         >
-          {/* Start and End dates in 1 column on mobile to give ample room for date-picker UI */}
-          <div className="space-y-1.5 sm:space-y-3">
+          <div className="space-y-2.5 sm:space-y-3">
             <Input
+              id={`${idPrefix}-filter-date-start`}
               label="Start"
               type="date"
-              min={todayStr}
+              min={todayStr || undefined}
               value={startDate}
               onChange={(e) => {
                 setStartDate(e.target.value);
                 syncUrlParams({ startD: e.target.value });
               }}
-              icon={<Calendar className="h-3 w-3 sm:h-3.5 sm:w-3.5 stroke-[1.6]" />}
+              icon={<Calendar className="h-3.5 w-3.5 stroke-[1.75]" />}
               cutoutBgClass={notchBgClass}
-              className="text-[10px] sm:text-xs [&::-webkit-calendar-picker-indicator]:dark:filter [&::-webkit-calendar-picker-indicator]:dark:invert cursor-pointer"
-              inputWrapperClassName="h-7.5 sm:h-11 px-2 sm:px-4 rounded-lg sm:rounded-[16px] border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E]"
+              className="text-xs [&::-webkit-calendar-picker-indicator]:dark:filter [&::-webkit-calendar-picker-indicator]:dark:invert cursor-pointer"
+              inputWrapperClassName="h-9 sm:h-11 px-2.5 sm:px-4 rounded-xl border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E]"
             />
 
             <Input
+              id={`${idPrefix}-filter-date-end`}
               label="End"
               type="date"
-              min={startDate || todayStr}
+              min={startDate || todayStr || undefined}
               value={endDate}
               onChange={(e) => {
                 setEndDate(e.target.value);
                 syncUrlParams({ endD: e.target.value });
               }}
-              icon={<Calendar className="h-3 w-3 sm:h-3.5 sm:w-3.5 stroke-[1.6]" />}
+              icon={<Calendar className="h-3.5 w-3.5 stroke-[1.75]" />}
               cutoutBgClass={notchBgClass}
-              className="text-[10px] sm:text-xs [&::-webkit-calendar-picker-indicator]:dark:filter [&::-webkit-calendar-picker-indicator]:dark:invert cursor-pointer"
-              inputWrapperClassName="h-7.5 sm:h-11 px-2 sm:px-4 rounded-lg sm:rounded-[16px] border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E]"
+              className="text-xs [&::-webkit-calendar-picker-indicator]:dark:filter [&::-webkit-calendar-picker-indicator]:dark:invert cursor-pointer"
+              inputWrapperClassName="h-9 sm:h-11 px-2.5 sm:px-4 rounded-xl border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E]"
             />
           </div>
         </SectionBox>
@@ -729,10 +817,10 @@ export default function FiltersPage() {
         {/* 4. LOCATION SECTION BOX */}
         <SectionBox
           title="Location"
-          titleClassName="text-xs sm:text-[13px] font-bold px-1"
-          icon={<MapPin className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-[#8FAF7E]" />}
+          titleClassName="text-xs sm:text-[13px] font-semibold px-1"
+          icon={<MapPin className="h-3.5 w-3.5 text-neutral-700 dark:text-neutral-300" aria-hidden="true" />}
           cutoutBgClass={notchBgClass}
-          className="p-2.5 xs:p-3 sm:p-4 pt-3 sm:pt-5.5 rounded-xl sm:rounded-2xl border-neutral-300/80 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] shadow-xs space-y-2 sm:space-y-3.5"
+          className="p-3 sm:p-4 pt-4 sm:pt-5.5 rounded-xl sm:rounded-2xl border-neutral-300/80 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] shadow-xs space-y-3"
           action={
             cityInput || pincodeInput ? (
               <button
@@ -742,14 +830,14 @@ export default function FiltersPage() {
                   setPincodeInput("");
                   syncUrlParams({ cityVal: "", pinVal: "" });
                 }}
-                className="text-[10px] sm:text-[11px] font-medium text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white cursor-pointer px-1 transition-colors"
+                className="text-xs font-medium text-neutral-600 hover:text-neutral-950 dark:text-neutral-400 dark:hover:text-white cursor-pointer px-1 transition-colors"
               >
                 Clear
               </button>
             ) : null
           }
         >
-          {/* GPS Quick Detect Pill Button */}
+          {/* GPS Quick Detect Pill Button (Monochrome) */}
           <button
             type="button"
             onClick={() => {
@@ -759,22 +847,22 @@ export default function FiltersPage() {
                 syncUrlParams({ cityVal: detectedCity });
               }
             }}
-            className="w-full flex items-center justify-between p-1.5 sm:p-2.5 rounded-lg sm:rounded-[16px] bg-white hover:bg-neutral-50 dark:bg-[#1E1E1E] dark:hover:bg-neutral-800/60 border border-neutral-300 dark:border-neutral-700/80 text-[11px] sm:text-xs text-left cursor-pointer transition-colors"
+            className="w-full min-h-[40px] flex items-center justify-between px-3 py-2 rounded-xl bg-neutral-50 hover:bg-neutral-100 dark:bg-[#1E1E1E] dark:hover:bg-neutral-800 border border-neutral-300 dark:border-neutral-700/80 text-xs text-left cursor-pointer transition-colors"
           >
-            <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
-              <MapPin className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-[#8FAF7E] shrink-0" />
-              <span className="text-neutral-800 dark:text-neutral-200 font-medium truncate text-xs">
+            <div className="flex items-center gap-2 min-w-0">
+              <MapPin className="h-3.5 w-3.5 text-neutral-700 dark:text-neutral-300 shrink-0" aria-hidden="true" />
+              <span className="text-neutral-900 dark:text-neutral-100 font-medium truncate text-xs">
                 {isDetecting ? "GPS..." : detectedCity || "Auto GPS"}
               </span>
             </div>
-            <span className="text-[8px] sm:text-[9px] font-mono font-bold text-[#8FAF7E] uppercase bg-[#8FAF7E]/10 px-1.5 py-0.5 rounded-md shrink-0">
+            <span className="text-[11px] font-mono font-semibold text-neutral-700 dark:text-neutral-300 bg-neutral-200/80 dark:bg-neutral-800 px-2 py-0.5 rounded-md shrink-0">
               Auto
             </span>
           </button>
 
-          {/* City & PIN Code inputs in 2 columns side-by-side */}
-          <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-1 sm:space-y-3">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-1 sm:space-y-3">
             <Input
+              id={`${idPrefix}-filter-city`}
               label="City"
               type="text"
               value={cityInput}
@@ -783,27 +871,29 @@ export default function FiltersPage() {
                 syncUrlParams({ cityVal: e.target.value });
               }}
               placeholder="City"
-              icon={<MapPin className="h-3 w-3 sm:h-3.5 sm:w-3.5 stroke-[1.6]" />}
+              icon={<MapPin className="h-3.5 w-3.5 stroke-[1.75]" />}
               cutoutBgClass={notchBgClass}
-              className="text-[11px] sm:text-xs"
-              inputWrapperClassName="h-7.5 sm:h-11 px-2 sm:px-4 rounded-lg sm:rounded-[16px] border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E]"
+              className="text-xs"
+              inputWrapperClassName="h-9 sm:h-11 px-2.5 sm:px-4 rounded-xl border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E]"
               rightAdornment={
                 cityInput ? (
                   <button
                     type="button"
+                    aria-label="Clear city filter"
                     onClick={() => {
                       setCityInput("");
                       syncUrlParams({ cityVal: "" });
                     }}
-                    className="p-0.5 text-neutral-400 hover:text-neutral-800 dark:hover:text-white cursor-pointer"
+                    className="p-1 text-neutral-600 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white cursor-pointer"
                   >
-                    <X className="h-3 w-3" />
+                    <X className="h-3.5 w-3.5" aria-hidden="true" />
                   </button>
                 ) : null
               }
             />
 
             <Input
+              id={`${idPrefix}-filter-pin`}
               label="PIN"
               type="text"
               value={pincodeInput}
@@ -812,21 +902,22 @@ export default function FiltersPage() {
                 syncUrlParams({ pinVal: e.target.value });
               }}
               placeholder="PIN"
-              icon={<Navigation className="h-3 w-3 sm:h-3.5 sm:w-3.5 stroke-[1.6]" />}
+              icon={<Navigation className="h-3.5 w-3.5 stroke-[1.75]" />}
               cutoutBgClass={notchBgClass}
-              className="text-[11px] sm:text-xs font-mono"
-              inputWrapperClassName="h-7.5 sm:h-11 px-2 sm:px-4 rounded-lg sm:rounded-[16px] border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E]"
+              className="text-xs font-mono tabular-nums"
+              inputWrapperClassName="h-9 sm:h-11 px-2.5 sm:px-4 rounded-xl border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E]"
               rightAdornment={
                 pincodeInput ? (
                   <button
                     type="button"
+                    aria-label="Clear PIN filter"
                     onClick={() => {
                       setPincodeInput("");
                       syncUrlParams({ pinVal: "" });
                     }}
-                    className="p-0.5 text-neutral-400 hover:text-neutral-800 dark:hover:text-white cursor-pointer"
+                    className="p-1 text-neutral-600 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white cursor-pointer"
                   >
-                    <X className="h-3 w-3" />
+                    <X className="h-3.5 w-3.5" aria-hidden="true" />
                   </button>
                 ) : null
               }
@@ -837,49 +928,67 @@ export default function FiltersPage() {
         {/* 5. PRODUCT CONDITION SECTION BOX */}
         <SectionBox
           title="Condition"
-          titleClassName="text-xs sm:text-[13px] font-bold px-1"
-          icon={<ShieldCheck className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-neutral-500 dark:text-neutral-400" />}
+          titleClassName="text-xs sm:text-[13px] font-semibold px-1"
+          icon={<ShieldCheck className="h-3.5 w-3.5 text-neutral-600 dark:text-neutral-400" aria-hidden="true" />}
           cutoutBgClass={notchBgClass}
-          className="p-2.5 xs:p-3 sm:p-4 pt-3 sm:pt-5.5 rounded-xl sm:rounded-2xl border-neutral-300/80 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] shadow-xs"
+          className="p-3 sm:p-4 pt-4 sm:pt-5.5 rounded-xl sm:rounded-2xl border-neutral-300/80 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] shadow-xs"
         >
-          <div className="grid grid-cols-2 gap-1.5 sm:block sm:space-y-2 mt-0.5">
+          <div className="grid grid-cols-2 gap-2 sm:block sm:space-y-2 mt-0.5">
             {[
               { id: "new" as const, label: "Brand New", count: conditionCounts.new },
               { id: "used" as const, label: "Verified Used", count: conditionCounts.used },
             ].map((cond) => {
               const isChecked = selectedConditions.includes(cond.id);
+              const isOnlySelected = isChecked && selectedConditions.length === 1;
+              const inputId = `${isMobileView ? "mobile" : "desktop"}-filter-cond-${cond.id}`;
 
               return (
                 <label
                   key={cond.id}
-                  onClick={() => handleToggleCondition(cond.id)}
-                  className="group flex items-center justify-between py-1 sm:py-1.5 px-1.5 sm:px-2 rounded-md cursor-pointer select-none transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800/60"
+                  htmlFor={inputId}
+                  className={cn(
+                    "group flex items-center justify-between py-1.5 px-2 rounded-md select-none transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800/60",
+                    isOnlySelected ? "cursor-not-allowed" : "cursor-pointer"
+                  )}
                 >
-                  <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0">
+                  <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+                    <input
+                      id={inputId}
+                      type="checkbox"
+                      checked={isChecked}
+                      aria-disabled={isOnlySelected}
+                      onChange={() => {
+                        if (!isOnlySelected) {
+                          handleToggleCondition(cond.id);
+                        }
+                      }}
+                      className="sr-only peer"
+                    />
                     <div
+                      aria-hidden="true"
                       className={cn(
-                        "w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-[4px] flex items-center justify-center transition-all duration-150 shrink-0",
+                        "w-4 h-4 rounded-[4px] flex items-center justify-center transition-colors duration-150 shrink-0 peer-focus-visible:ring-2 peer-focus-visible:ring-neutral-950 dark:peer-focus-visible:ring-white peer-focus-visible:ring-offset-1",
                         isChecked
-                          ? "bg-neutral-900 text-white dark:bg-white dark:text-black shadow-xs"
-                          : "bg-transparent border border-neutral-400 dark:border-neutral-700 group-hover:border-neutral-600 dark:group-hover:border-neutral-500"
+                          ? "bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 shadow-xs"
+                          : "bg-transparent border border-neutral-400 dark:border-neutral-600 group-hover:border-neutral-700 dark:group-hover:border-neutral-400"
                       )}
                     >
-                      {isChecked && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                      {isChecked && <Check className="w-2.5 h-2.5 stroke-[2]" />}
                     </div>
 
                     <span
                       className={cn(
-                        "text-[10.5px] sm:text-sm tracking-tight transition-colors truncate",
+                        "text-xs sm:text-sm transition-colors truncate",
                         isChecked
-                          ? "text-neutral-900 dark:text-white font-medium"
-                          : "text-neutral-700 dark:text-neutral-300 group-hover:text-neutral-900 dark:group-hover:text-white"
+                          ? "text-neutral-950 dark:text-white font-semibold"
+                          : "text-neutral-700 dark:text-neutral-300 group-hover:text-neutral-950 dark:group-hover:text-white"
                       )}
                     >
                       {cond.label}
                     </span>
                   </div>
 
-                  <span className="text-[8.5px] sm:text-xs text-neutral-400 dark:text-neutral-500 font-mono ml-1 shrink-0">
+                  <span className="text-xs text-neutral-600 dark:text-neutral-400 font-medium tabular-nums ml-1 shrink-0">
                     {cond.count}
                   </span>
                 </label>
@@ -892,9 +1001,9 @@ export default function FiltersPage() {
         <button
           type="button"
           onClick={handleClearAll}
-          className="w-full py-2 px-3 rounded-xl border border-neutral-300 dark:border-neutral-700 text-xs font-semibold text-neutral-700 dark:text-neutral-200 hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors text-center cursor-pointer inline-flex items-center justify-center gap-1.5 shadow-xs"
+          className="w-full min-h-[44px] py-2 px-3 rounded-xl border border-neutral-300 dark:border-neutral-700 text-xs font-semibold text-neutral-800 dark:text-neutral-200 hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors text-center cursor-pointer inline-flex items-center justify-center gap-1.5 shadow-xs"
         >
-          <RotateCcw className="h-3.5 w-3.5 shrink-0" />
+          <RotateCcw className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
           <span>Clear all</span>
         </button>
       </div>
@@ -904,35 +1013,50 @@ export default function FiltersPage() {
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-[#1E1E1E] text-neutral-900 dark:text-neutral-100 font-sans antialiased transition-colors flex flex-col selection:bg-neutral-800 selection:text-white">
       {/* =================================================================== */}
-      {/* TOP HEADER: BACK TO EXPLORE + BRAND + TITLE + DONE BUTTON           */}
+      {/* TOP HEADER: BACK TO EXPLORE + TITLE + THEME TOGGLE + DONE BUTTON    */}
       {/* =================================================================== */}
-      <header className="sticky top-0 z-30 h-14 sm:h-16 shrink-0 bg-white/95 dark:bg-[#1E1E1E]/95 backdrop-blur-md border-b border-neutral-200 dark:border-neutral-800 px-3 sm:px-8 flex items-center justify-between gap-2 sm:gap-4">
+      <header className="sticky top-0 z-30 h-16 shrink-0 bg-white/95 dark:bg-[#1E1E1E]/95 backdrop-blur-md border-b border-neutral-200 dark:border-neutral-800 px-3 sm:px-8 flex items-center justify-between gap-2 sm:gap-4">
         {/* Left: Back Link & Title */}
         <div className="flex items-center gap-2 sm:gap-4 min-w-0">
           <Link
             to="/categories"
             search={search as any}
-            className="inline-flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-semibold text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white transition-colors p-1 -ml-1 sm:p-1.5 sm:-ml-1.5 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800/50 shrink-0"
+            className="inline-flex items-center gap-1.5 sm:gap-2 min-h-[44px] px-2 -ml-1 text-xs sm:text-sm font-semibold text-neutral-600 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white transition-colors rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800/50 shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
             title="Return to standard Explore view"
           >
-            <ArrowLeft className="h-4 w-4 stroke-[2]" />
+            <ArrowLeft className="h-4 w-4 stroke-[1.75]" aria-hidden="true" />
             <span className="hidden sm:inline">Back to Explore</span>
           </Link>
           <div className="h-4 w-[1px] bg-neutral-300 dark:bg-neutral-800 hidden sm:block" />
-          <h1 className="text-xs sm:text-base font-bold text-neutral-900 dark:text-white tracking-tight flex items-center gap-1.5 truncate">
+          <h1 className="text-sm sm:text-base font-semibold text-neutral-900 dark:text-white flex items-center gap-1.5 truncate">
             <span>Filter Marketplace</span>
-            <span className="text-[11px] sm:text-xs font-normal text-neutral-500 dark:text-neutral-400">
+            <span className="text-xs font-normal text-neutral-600 dark:text-neutral-400 tabular-nums">
               ({filteredProducts.length})
             </span>
           </h1>
         </div>
 
-        {/* Right: Done Button */}
+        {/* Right: Monochrome Header Theme Toggle + Done Button */}
         <div className="flex items-center gap-2 shrink-0">
+          {mounted && (
+            <button
+              type="button"
+              onClick={toggleTheme}
+              aria-label={isDark ? "Switch to Light Theme" : "Switch to Dark Theme"}
+              title={isDark ? "Switch to Light Theme" : "Switch to Dark Theme"}
+              className="h-11 w-11 sm:h-10 sm:w-10 rounded-full border border-neutral-300 dark:border-neutral-700 hover:border-neutral-950 dark:hover:border-white bg-transparent hover:bg-neutral-100 dark:hover:bg-neutral-900 text-neutral-800 dark:text-neutral-200 flex items-center justify-center transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
+            >
+              {isDark ? (
+                <Sun className="h-4 w-4 stroke-[1.75]" aria-hidden="true" />
+              ) : (
+                <Moon className="h-4 w-4 stroke-[1.75]" aria-hidden="true" />
+              )}
+            </button>
+          )}
           <Link
             to="/categories"
             search={search as any}
-            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-neutral-900 text-white dark:bg-white dark:text-black hover:bg-neutral-800 dark:hover:bg-neutral-200 text-xs font-bold transition-colors cursor-pointer shadow-xs"
+            className="inline-flex items-center justify-center min-h-[44px] sm:min-h-[40px] px-4 py-2 rounded-full bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 hover:bg-neutral-800 dark:hover:bg-neutral-200 text-xs font-semibold transition-colors cursor-pointer shadow-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
           >
             Done
           </Link>
@@ -940,87 +1064,86 @@ export default function FiltersPage() {
       </header>
 
       {/* =================================================================== */}
-      {/* MAIN TWO-COLUMN BODY LAYOUT                                         */}
-      {/* Same 2-column design on laptop AND mobile screen:                   */}
-      {/* Left side: Filter settings | Right side: Products                   */}
-      {/* Both columns move naturally together while scrolling                */}
+      {/* MAIN TWO-COLUMN BODY LAYOUT (Distinct Desktop & Mobile Sidebars)    */}
       {/* =================================================================== */}
       <div className="flex-1 max-w-[1600px] w-full mx-auto flex relative min-h-[calc(100vh-4rem)]">
-        {/* Backdrop for mobile drawer */}
-        {isMobileFilterOpen && (
-          <div
-            onClick={() => setIsMobileFilterOpen(false)}
-            className="sm:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-xs transition-opacity duration-300"
-            aria-hidden="true"
-          />
-        )}
-
-        {/* ----------------------------------------------------------------- */}
-        {/* LEFT COLUMN: FILTER SIDEBAR                                       */}
-        {/* Desktop: Static in-flow sidebar                                   */}
-        {/* Mobile: Compact reduced-width slide-out drawer with "<" to close */}
-        {/* ----------------------------------------------------------------- */}
+        {/* Desktop Static In-Flow Sidebar (uses #desktop-filter-* IDs) */}
         <aside
-          className={cn(
-            // Desktop layout (unaltered in-flow sidebar)
-            "sm:shrink-0 sm:static sm:z-auto sm:bg-neutral-50 sm:dark:bg-[#1E1E1E] sm:border-r sm:border-neutral-200 sm:dark:border-neutral-800 sm:w-[200px] md:w-[240px] lg:w-[280px] xl:w-[26%] sm:translate-x-0 sm:shadow-none sm:flex sm:flex-col",
-            // Mobile layout (compact reduced width slide-over drawer)
-            "fixed inset-y-0 left-0 z-50 w-[68vw] max-w-[250px] xs:w-[65vw] xs:max-w-[260px] bg-white dark:bg-[#1E1E1E] shadow-2xl transition-transform duration-300 ease-in-out border-r border-neutral-200 dark:border-neutral-800 flex flex-col",
-            isMobileFilterOpen ? "translate-x-0" : "-translate-x-full sm:translate-x-0"
-          )}
+          aria-label="Desktop filters"
+          className="hidden sm:flex sm:flex-col sm:shrink-0 sm:bg-neutral-50 sm:dark:bg-[#1E1E1E] sm:border-r sm:border-neutral-200 sm:dark:border-neutral-800 sm:w-[220px] md:w-[250px] lg:w-[280px] xl:w-[26%]"
         >
-          {/* Mobile Drawer Header with "<" Close Button */}
-          <div className="sm:hidden flex items-center justify-between px-3 py-2.5 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50/90 dark:bg-neutral-900/90 shrink-0">
-            <button
-              type="button"
-              onClick={() => setIsMobileFilterOpen(false)}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-neutral-200/80 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs font-bold hover:bg-neutral-300 dark:hover:bg-neutral-700 transition-colors cursor-pointer"
-              aria-label="Close filters"
-            >
-              <span className="font-mono font-black text-sm leading-none">&lt;</span>
-              <span>Close</span>
-            </button>
-
-            <span className="font-extrabold text-xs xs:text-sm text-neutral-900 dark:text-white">
-              Filters
-              {activeChips.length > 0 && (
-                <span className="ml-1 px-1.5 py-0.2 rounded-full text-[9px] bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold">
-                  {activeChips.length}
-                </span>
-              )}
-            </span>
-
-            <button
-              type="button"
-              onClick={handleClearAll}
-              className="text-xs font-semibold text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white transition-colors cursor-pointer"
-            >
-              Reset
-            </button>
-          </div>
-
-          {/* Scrollable Filter List */}
-          <div className="flex-1 overflow-y-auto px-2.5 xs:px-3 sm:px-3.5 lg:px-5 xl:px-6 py-2.5 sm:py-6">
-            {renderSidebarFilters(true)}
-          </div>
-
-          {/* Mobile Drawer Bottom Action */}
-          <div className="sm:hidden p-2.5 border-t border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] shrink-0">
-            <button
-              type="button"
-              onClick={() => setIsMobileFilterOpen(false)}
-              className="w-full py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white dark:bg-white dark:text-black dark:hover:bg-neutral-100 font-bold text-xs shadow-md transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              <span>Show {filteredProducts.length} Results</span>
-            </button>
+          <div className="flex-1 overflow-y-auto px-3.5 lg:px-5 xl:px-6 py-6 pb-28">
+            {renderSidebarFilters(false)}
           </div>
         </aside>
 
+        {/* Mobile Filter Drawer Backdrop + Panel (only mounted when open; uses #mobile-filter-* IDs) */}
+        {isMobileFilterOpen && (
+          <>
+            <div
+              onClick={() => setIsMobileFilterOpen(false)}
+              className="sm:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-xs transition-opacity duration-200"
+              aria-hidden="true"
+            />
+            <aside
+              role="dialog"
+              aria-modal="true"
+              aria-label="Mobile filters"
+              className="sm:hidden fixed inset-y-0 left-0 z-50 w-[78vw] max-w-[300px] bg-white dark:bg-[#1E1E1E] shadow-2xl border-r border-neutral-200 dark:border-neutral-800 flex flex-col"
+            >
+              {/* Mobile Drawer Header */}
+              <div className="flex items-center justify-between px-3 py-2.5 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-[#1E1E1E] shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsMobileFilterOpen(false)}
+                  className="inline-flex items-center gap-1.5 min-h-[40px] px-3 py-1 rounded-lg bg-neutral-200/80 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-xs font-semibold hover:bg-neutral-300 dark:hover:bg-neutral-700 transition-colors cursor-pointer"
+                  aria-label="Close filters"
+                >
+                  <X className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span>Close</span>
+                </button>
+
+                <span className="font-bold text-xs text-neutral-900 dark:text-white inline-flex items-center gap-1.5">
+                  <span>Filters</span>
+                  {activeChips.length > 0 && (
+                    <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 font-semibold tabular-nums">
+                      {activeChips.length}
+                    </span>
+                  )}
+                </span>
+
+                <button
+                  type="button"
+                  onClick={handleClearAll}
+                  className="text-xs font-semibold text-neutral-600 hover:text-neutral-950 dark:text-neutral-400 dark:hover:text-white transition-colors cursor-pointer px-2 py-1"
+                >
+                  Clear all
+                </button>
+              </div>
+
+              {/* Mobile Scrollable Filter List */}
+              <div className="flex-1 overflow-y-auto px-3 py-3">
+                {renderSidebarFilters(true)}
+              </div>
+
+              {/* Mobile Drawer Bottom Action */}
+              <div className="p-3 border-t border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsMobileFilterOpen(false)}
+                  className="w-full min-h-[44px] py-2.5 rounded-xl bg-neutral-950 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-200 font-semibold text-xs shadow-sm transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <span>Show {filteredProducts.length} Results</span>
+                </button>
+              </div>
+            </aside>
+          </>
+        )}
+
         {/* ----------------------------------------------------------------- */}
-        {/* RIGHT COLUMN: PRODUCT RESULTS GRID (LAPTOP & MOBILE)              */}
-        {/* 3 cards per row on mobile (grid-cols-3) with full width           */}
+        {/* RIGHT COLUMN: PRODUCT RESULTS GRID (2 COLS MOBILE, 2-3 DESKTOP)   */}
         {/* ----------------------------------------------------------------- */}
-        <main className="flex-1 min-w-0 px-2 sm:px-5 lg:px-8 py-2.5 sm:py-6 flex flex-col space-y-2.5 sm:space-y-6">
+        <main className="flex-1 min-w-0 px-3 sm:px-5 lg:px-8 py-3 sm:py-6 pb-28 md:pb-32 flex flex-col space-y-3 sm:space-y-6">
           {/* SEARCH INPUT BAR WITH NOTCH DESIGN */}
           <div className="w-full shrink-0">
             <Input
@@ -1028,43 +1151,44 @@ export default function FiltersPage() {
               type="text"
               value={searchQuery}
               onChange={(e) => handleSearchChange(e.target.value)}
-              placeholder="Search cameras, laptops, drones..."
+              placeholder="Search cameras, laptops, drones"
               icon={<Search className="h-4 w-4 sm:h-5 sm:w-5 stroke-[1.6]" />}
               cutoutBgClass="bg-neutral-50 dark:bg-[#1E1E1E]"
-              className="text-xs sm:text-base"
-              inputWrapperClassName="h-9 sm:h-12 lg:h-13 px-3 sm:px-5 rounded-xl sm:rounded-[20px] border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E] shadow-xs"
+              className="text-xs sm:text-sm"
+              inputWrapperClassName="h-11 sm:h-12 px-3 sm:px-5 rounded-xl border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E] shadow-xs"
               rightAdornment={
                 searchQuery ? (
                   <button
                     type="button"
+                    aria-label="Clear search"
                     onClick={() => {
                       setSearchQuery("");
                       syncUrlParams({ qVal: "" });
                     }}
-                    className="p-1 text-neutral-400 hover:text-black dark:hover:text-white cursor-pointer"
+                    className="p-1.5 text-neutral-600 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white cursor-pointer"
                   >
-                    <X className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                    <X className="h-4 w-4" aria-hidden="true" />
                   </button>
                 ) : null
               }
             />
           </div>
 
-          {/* STICKY TOP ROW: REMOVABLE FILTER CHIPS + CLEAR ALL (EXACT REFERENCE) */}
-          <div className="sticky top-14 sm:top-16 z-20 bg-neutral-50/95 dark:bg-[#1E1E1E]/95 backdrop-blur-md pt-1 pb-2 sm:pb-3 border-b border-neutral-200 dark:border-neutral-800/80 flex items-center justify-between gap-1.5 sm:gap-3 flex-wrap min-h-[30px] sm:min-h-[38px]">
+          {/* STICKY TOP ROW: REMOVABLE FILTER CHIPS + CLEAR ALL */}
+          <div className="sticky top-16 z-20 bg-neutral-50/95 dark:bg-[#1E1E1E]/95 backdrop-blur-md pt-1 pb-2.5 sm:pb-3 border-b border-neutral-200 dark:border-neutral-800/80 flex items-center justify-between gap-2 sm:gap-3 flex-wrap min-h-[44px]">
             <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-              {/* Mobile Filter Toggle Button with "<" */}
+              {/* Mobile Filter Toggle Button */}
               <button
                 type="button"
                 onClick={() => setIsMobileFilterOpen(true)}
-                className="sm:hidden inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-neutral-900 text-white dark:bg-white dark:text-black text-xs font-bold shadow-xs cursor-pointer hover:opacity-90 active:scale-95 transition-all shrink-0"
-                title="Open filters (<)"
-                aria-label="Open filters (<)"
+                className="sm:hidden inline-flex items-center gap-1.5 min-h-[40px] px-3 py-1.5 rounded-lg bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 text-xs font-semibold shadow-xs cursor-pointer hover:opacity-90 transition-colors shrink-0"
+                title="Open filters"
+                aria-label="Open filters"
               >
-                <span className="font-mono font-black text-xs leading-none">&lt;</span>
+                <SlidersHorizontal className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 <span>Filters</span>
                 {activeChips.length > 0 && (
-                  <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-white/20 dark:bg-black/20 font-black">
+                  <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-white/20 dark:bg-black/20 font-bold tabular-nums">
                     {activeChips.length}
                   </span>
                 )}
@@ -1072,16 +1196,16 @@ export default function FiltersPage() {
               {activeChips.map((chip) => (
                 <div
                   key={chip.id}
-                  className="inline-flex items-center gap-1 px-1.5 xs:px-2 sm:px-3 py-0.5 sm:py-1.5 rounded-md sm:rounded-lg bg-white dark:bg-[#1E1E1E] border border-neutral-300/80 dark:border-neutral-700 text-[9.5px] xs:text-[10.5px] sm:text-sm text-neutral-800 dark:text-neutral-200 transition-colors shadow-xs"
+                  className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-white dark:bg-[#1E1E1E] border border-neutral-300/80 dark:border-neutral-700 text-xs text-neutral-800 dark:text-neutral-200 transition-colors shadow-xs"
                 >
-                  <span className="truncate max-w-[80px] xs:max-w-[120px] sm:max-w-none">{chip.label}</span>
+                  <span className="truncate max-w-[120px] sm:max-w-none">{chip.label}</span>
                   <button
                     type="button"
                     onClick={chip.onRemove}
-                    className="text-neutral-400 hover:text-black dark:hover:text-white p-0.5 rounded cursor-pointer transition-colors"
+                    className="text-neutral-600 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white p-0.5 rounded cursor-pointer transition-colors"
                     aria-label={`Remove filter ${chip.label}`}
                   >
-                    <X className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                    <X className="h-3.5 w-3.5" aria-hidden="true" />
                   </button>
                 </div>
               ))}
@@ -1090,60 +1214,87 @@ export default function FiltersPage() {
                 <button
                   type="button"
                   onClick={handleClearAll}
-                  className="text-[9.5px] xs:text-[10.5px] sm:text-sm font-medium text-neutral-500 hover:text-black dark:text-neutral-400 dark:hover:text-white transition-colors cursor-pointer px-1 sm:px-2 py-0.5 flex items-center gap-1"
+                  className="text-xs font-medium text-neutral-600 hover:text-neutral-950 dark:text-neutral-400 dark:hover:text-white transition-colors cursor-pointer px-2 py-1 flex items-center gap-1"
                 >
-                  <RotateCcw className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                  <RotateCcw className="h-3 w-3" aria-hidden="true" />
                   <span>Clear all</span>
                 </button>
               )}
 
               {activeChips.length === 0 && (
-                <span className="text-[10px] xs:text-xs sm:text-sm text-neutral-500 dark:text-neutral-400">
-                  Showing all equipment. Use filters on the left to narrow down.
+                <span className="text-xs sm:text-sm text-neutral-600 dark:text-neutral-400">
+                  Showing all equipment. Use filters to narrow down.
                 </span>
               )}
             </div>
 
-            <div className="text-[9px] xs:text-[10px] sm:text-xs text-neutral-500 dark:text-neutral-400 font-mono shrink-0">
+            <div className="text-xs text-neutral-600 dark:text-neutral-400 font-medium tabular-nums shrink-0">
               {filteredProducts.length} {filteredProducts.length === 1 ? "gear" : "gears"}
             </div>
           </div>
 
-          {/* PRODUCT CARDS GRID (3 CARDS PER ROW ON MOBILE, 2 ON SM, 3 ON LG) */}
+          {/* PRODUCT CARDS GRID (2 COLS MOBILE, 2 COLS SM, 3 COLS LG) */}
           {filteredProducts.length > 0 ? (
-            <div className="grid grid-cols-3 sm:grid-cols-2 lg:grid-cols-3 gap-1.5 xs:gap-2 sm:gap-4 lg:gap-5 pb-24">
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-5">
               {filteredProducts.map((p: any) => {
                 const rate = p.price || p.daily_rate || p.dailyRate || 0;
-                const img =
+                const rawImg =
                   p.image ||
                   p.primary_image ||
                   (Array.isArray(p.images) && p.images[0]) ||
-                  "/placeholder.png";
-                const vendorName =
-                  p.owner_name || p.ownerName || p.brand || "Verified Vendor";
+                  "";
+                const itemKey = String(p.id);
+                const hasFailedImage = Boolean(failedImages[itemKey]) || !rawImg;
+                const productLocation = formatProductLocation(p);
+                const isAvailable = isProductAvailable(p);
 
                 return (
                   <Link
                     key={p.id}
                     to="/product/$id"
-                    params={{ id: String(p.id) }}
+                    params={{ id: itemKey }}
                     search={{ from: "filters" } as any}
-                    className="group bg-white dark:bg-[#1E1E1E] border border-neutral-200 dark:border-neutral-800 hover:border-neutral-400 dark:hover:border-neutral-600 rounded-lg sm:rounded-2xl p-1 xs:p-1.5 sm:p-3.5 flex flex-col h-full justify-between transition-all duration-200 cursor-pointer shadow-xs hover:shadow-md hover:-translate-y-0.5"
+                    className="group bg-white dark:bg-[#1E1E1E] border border-neutral-200 dark:border-neutral-800 hover:border-neutral-400 dark:hover:border-neutral-600 rounded-xl sm:rounded-2xl p-2.5 sm:p-3.5 flex flex-col h-full justify-between transition-colors duration-200 cursor-pointer shadow-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
                   >
-                    {/* Top Image Container with Fixed Consistent Aspect Ratio */}
-                    <div className="relative w-full aspect-square sm:aspect-[4/3] rounded-md sm:rounded-xl overflow-hidden bg-neutral-100 dark:bg-neutral-900 mb-1 sm:mb-2.5 shrink-0">
-                      <img
-                        src={img}
-                        alt={p.title || p.name || "Equipment"}
-                        loading="lazy"
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src =
-                            "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=600&auto=format&fit=crop&q=80";
-                        }}
-                      />
+                    {/* Top Image Container */}
+                    <div className="relative w-full aspect-[4/3] rounded-lg sm:rounded-xl overflow-hidden bg-neutral-100 dark:bg-neutral-900 mb-2 sm:mb-2.5 shrink-0 flex items-center justify-center">
+                      {!hasFailedImage ? (
+                        <img
+                          src={rawImg}
+                          alt={p.title || p.name || "Equipment"}
+                          loading="lazy"
+                          className="w-full h-full object-cover"
+                          onError={() =>
+                            setFailedImages((prev) =>
+                              prev[itemKey] ? prev : { ...prev, [itemKey]: true }
+                            )
+                          }
+                        />
+                      ) : (
+                        <Package
+                          className="h-8 w-8 text-neutral-400 dark:text-neutral-600 stroke-[1.75]"
+                          aria-hidden="true"
+                        />
+                      )}
+                      <span
+                        className={cn(
+                          "absolute top-1.5 right-1.5 sm:top-2 sm:right-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-medium border leading-tight backdrop-blur-md",
+                          isAvailable
+                            ? "bg-neutral-950/80 text-white border-white/15"
+                            : "bg-neutral-950/85 text-neutral-300 border-white/15"
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "h-1.5 w-1.5 rounded-full shrink-0",
+                            isAvailable ? "bg-emerald-400" : "bg-rose-400"
+                          )}
+                          aria-hidden="true"
+                        />
+                        <span>{isAvailable ? "Available" : "Unavailable"}</span>
+                      </span>
                       {p.condition && (
-                        <span className="absolute top-1 left-1 sm:top-2 sm:left-2 px-1 py-0.2 sm:px-1.5 sm:py-0.5 rounded sm:rounded-full text-[7px] xs:text-[8px] sm:text-[10px] font-semibold tracking-wide uppercase bg-black/75 text-white backdrop-blur-xs border border-white/10 leading-none">
+                        <span className="absolute top-1.5 left-1.5 sm:top-2 sm:left-2 px-2 py-0.5 rounded-full text-[11px] font-medium bg-neutral-950/85 text-white border border-white/15 leading-tight">
                           {p.condition}
                         </span>
                       )}
@@ -1152,20 +1303,21 @@ export default function FiltersPage() {
                     {/* Card Body & Pricing */}
                     <div className="flex-1 flex flex-col justify-between min-w-0">
                       <div className="min-w-0">
-                        <h4 className="text-[9.5px] xs:text-[11px] sm:text-sm font-semibold text-neutral-900 dark:text-white tracking-tight truncate line-clamp-1 group-hover:text-neutral-700 dark:group-hover:text-neutral-200 transition-colors leading-tight">
+                        <h2 className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white truncate line-clamp-1 group-hover:text-neutral-700 dark:group-hover:text-neutral-200 transition-colors leading-snug">
                           {p.title || p.name}
-                        </h4>
-                        <p className="hidden xs:block text-[8px] xs:text-[9.5px] sm:text-xs text-neutral-500 dark:text-neutral-400 truncate mt-0.5 leading-none">
-                          {vendorName}
+                        </h2>
+                        <p className="mt-0.5 flex items-center gap-1 text-xs text-neutral-600 dark:text-neutral-400 min-w-0 leading-snug">
+                          <MapPin className="h-3 w-3 shrink-0 stroke-[1.75]" aria-hidden="true" />
+                          <span className="truncate">{productLocation}</span>
                         </p>
                       </div>
 
-                      <div className="mt-1 sm:mt-2 pt-0.5 border-t border-neutral-100 dark:border-neutral-800/60 flex items-baseline justify-between sm:justify-end sm:gap-1 flex-wrap">
-                        <span className="text-[9.5px] xs:text-[11.5px] sm:text-base font-bold text-neutral-900 dark:text-white font-mono leading-none">
+                      <div className="mt-2 pt-1.5 border-t border-neutral-100 dark:border-neutral-800/80 flex items-baseline justify-between gap-1">
+                        <span className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white tabular-nums leading-none">
                           ₹{Number(rate).toLocaleString("en-IN")}
                         </span>
-                        <span className="text-[7px] xs:text-[8px] sm:text-[10px] text-neutral-500 dark:text-neutral-400 leading-none">
-                          /day
+                        <span className="text-xs text-neutral-600 dark:text-neutral-400 leading-none">
+                          / day
                         </span>
                       </div>
                     </div>
@@ -1176,14 +1328,14 @@ export default function FiltersPage() {
           ) : (
             /* EMPTY STATE */
             <div className="flex flex-col items-center justify-center py-20 px-4 text-center space-y-4">
-              <div className="h-14 w-14 rounded-full bg-neutral-100 dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 flex items-center justify-center text-neutral-500 dark:text-neutral-400">
-                <Search className="h-6 w-6" />
+              <div className="h-14 w-14 rounded-full bg-neutral-100 dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 flex items-center justify-center text-neutral-600 dark:text-neutral-400">
+                <Search className="h-6 w-6" aria-hidden="true" />
               </div>
               <div className="space-y-1 max-w-md">
-                <h3 className="text-base font-bold text-neutral-900 dark:text-white">
+                <h2 className="text-base font-bold text-neutral-900 dark:text-white">
                   No products match your filters
-                </h3>
-                <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                </h2>
+                <p className="text-xs text-neutral-600 dark:text-neutral-400">
                   Try unchecking some categories, expanding the daily price range, or clearing location criteria.
                 </p>
               </div>
@@ -1194,36 +1346,12 @@ export default function FiltersPage() {
                 onClick={handleClearAll}
                 className="cursor-pointer font-semibold inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs"
               >
-                <RotateCcw className="h-3.5 w-3.5 shrink-0" />
+                <RotateCcw className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 <span>Clear all filters</span>
               </Button>
             </div>
           )}
         </main>
-      </div>
-
-      {/* =================================================================== */}
-      {/* FLOATING THEME TOGGLE (EXACT REFERENCE SCREENSHOT BOTTOM RIGHT)     */}
-      {/* =================================================================== */}
-      <div className="fixed bottom-5 right-5 z-40">
-        <button
-          type="button"
-          onClick={toggleTheme}
-          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full bg-white dark:bg-[#1E1E1E] border border-neutral-300 dark:border-neutral-700/80 hover:border-neutral-400 dark:hover:border-neutral-500 text-neutral-900 dark:text-white text-xs font-semibold shadow-xl cursor-pointer transition-all hover:scale-105 active:scale-95"
-          title="Toggle Dark / Light Theme"
-        >
-          {isDark ? (
-            <>
-              <Sun className="h-3.5 w-3.5 text-amber-400" />
-              <span>Theme</span>
-            </>
-          ) : (
-            <>
-              <Moon className="h-3.5 w-3.5 text-blue-400" />
-              <span>Theme</span>
-            </>
-          )}
-        </button>
       </div>
     </div>
   );

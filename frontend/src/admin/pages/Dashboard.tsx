@@ -1149,7 +1149,7 @@ export function Dashboard() {
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] font-mono uppercase px-1.5 py-0.2 rounded bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 font-bold">
+                          <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 font-bold">
                             Gear Listing
                           </span>
                           <span className="text-xs font-bold text-[#242424] dark:text-[#F8FAFC] truncate">
@@ -1189,7 +1189,7 @@ export function Dashboard() {
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] font-mono uppercase px-1.5 py-0.2 rounded bg-blue-100 dark:bg-blue-500/20 text-blue-800 dark:text-blue-300 font-bold">
+                          <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-500/20 text-blue-800 dark:text-blue-300 font-bold">
                             KYC User
                           </span>
                           <span className="text-xs font-bold text-[#242424] dark:text-[#F8FAFC] truncate">
@@ -1247,7 +1247,7 @@ export function Dashboard() {
                       <div className="flex items-center gap-2">
                         <span
                           className={cn(
-                            "text-[9px] font-mono uppercase px-1.5 py-0.2 rounded font-bold",
+                            "text-[9px] font-mono uppercase px-1.5 py-0.5 rounded font-bold",
                             issue.severity === "CRITICAL"
                               ? "bg-red-100 dark:bg-red-500/20 text-red-800 dark:text-red-300"
                               : "bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300"

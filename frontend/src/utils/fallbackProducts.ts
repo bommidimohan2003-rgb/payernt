@@ -265,15 +265,10 @@ export const INITIAL_FALLBACK_PRODUCTS: Product[] = [
 
 export function findFallbackProduct(id: string | number): Product | undefined {
   const targetKey = String(id).toLowerCase().trim();
-  return (
-    INITIAL_FALLBACK_PRODUCTS.find(
-      (p) =>
-        String(p.id).toLowerCase() === targetKey ||
-        String(p.id) === String(id)
-    ) ||
-    (targetKey === "1" || targetKey.includes("sony")
-      ? INITIAL_FALLBACK_PRODUCTS[0]
-      : undefined)
+  return INITIAL_FALLBACK_PRODUCTS.find(
+    (p) =>
+      String(p.id).toLowerCase() === targetKey ||
+      String(p.id) === String(id)
   );
 }
 

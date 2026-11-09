@@ -62,7 +62,7 @@ const sizes: Record<ButtonSize, string> = {
  * Fast, responsive, accessible button with instant interaction feedback:
  * - Immediate click handling without artificial delays or sliding overlays
  * - Preserved brand monochrome palette with crisp hover, active, and focus-visible states
- * - Symbol on the left, button label on the right
+ * - Supports leading (leftIcon/icon) and trailing (rightIcon) slots as well as natural inline children order
  */
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   function Button(
@@ -104,6 +104,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         ? errorText
         : children;
 
+    const leadingIcon = icon || leftIcon || null;
+
     return (
       <button
         ref={ref}
@@ -111,7 +113,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         onClick={handleClick}
         aria-busy={loading}
         className={cn(
-          "relative inline-flex items-center justify-center gap-1.5 font-medium transition-colors duration-150 select-none [&_svg]:order-first",
+          "relative inline-flex items-center justify-center gap-1.5 font-medium transition-colors duration-150 select-none",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
           "disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer",
           variants[variant],
@@ -120,15 +122,18 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         )}
         {...rest}
       >
-        <span className="relative flex items-center justify-center gap-1.5 text-inherit transition-colors duration-150 [&_svg]:order-first">
+        <span className="relative inline-flex items-center justify-center gap-1.5 text-inherit transition-colors duration-150">
           {loading ? (
             <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
           ) : (
-            icon || leftIcon || rightIcon || null
+            leadingIcon
           )}
-          <span className="inline-flex items-center gap-1.5 [&_svg]:order-first">
-            {displayText}
-          </span>
+          {displayText !== undefined && displayText !== null && displayText !== false && (
+            <span className="inline-flex items-center gap-1.5">
+              {displayText}
+            </span>
+          )}
+          {!loading && rightIcon ? rightIcon : null}
         </span>
       </button>
     );

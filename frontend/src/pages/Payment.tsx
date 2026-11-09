@@ -996,7 +996,7 @@ export default function Payment() {
                     className="h-16 w-16 rounded-xl object-cover border border-neutral-200 dark:border-neutral-700 shrink-0"
                   />
                   <div className="min-w-0 flex-1 space-y-1">
-                    <span className="inline-block px-1.5 py-0.2 rounded text-[9px] font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 uppercase">
+                    <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 uppercase">
                       {effectiveCategory}
                     </span>
                     <h4 className="text-sm font-bold text-neutral-900 dark:text-white truncate">

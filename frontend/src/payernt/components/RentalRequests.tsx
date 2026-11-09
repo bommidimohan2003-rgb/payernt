@@ -1131,7 +1131,7 @@ export function RentalRequests({
           {[1, 2, 3].map((i) => (
             <div
               key={i}
-              className="rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#1E1E1E] p-5 shadow-xs animate-pulse space-y-3"
+              className="rounded-3xl border border-black/10 dark:border-[#A1A1AA]/20 bg-white dark:bg-[#1E1E1E] p-5 shadow-xs space-y-3"
             >
               <div className="flex items-center gap-4">
                 <div className="h-14 w-14 rounded-2xl bg-neutral-200 dark:bg-white/10 shrink-0" />

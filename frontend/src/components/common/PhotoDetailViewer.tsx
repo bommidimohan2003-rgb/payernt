@@ -105,7 +105,7 @@ export function PhotoDetailViewer({
             <video
               key={videoUrl || "/videos/inspection-sample.mp4"}
               src={videoUrl || "/videos/inspection-sample.mp4"}
-              poster={activeSrc || (photos && photos[0]) || ""}
+              poster={activeSrc || imagesList[0] || ""}
               controls
               autoPlay
               muted

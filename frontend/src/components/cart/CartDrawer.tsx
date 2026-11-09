@@ -31,7 +31,7 @@ export function CartDrawer() {
         search: { id: cartItems[0].product_id },
       });
     } else {
-      navigate({ to: "/checkout", search: { id: "" } as any });
+      navigate({ to: "/checkout", search: { id: "" } });
     }
   };
 

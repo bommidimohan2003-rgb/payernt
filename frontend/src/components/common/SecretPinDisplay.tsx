@@ -89,7 +89,7 @@ export function SecretPinDisplay({
               <span className="text-xs font-bold text-[#F5F5F5] tracking-tight">
                 {title || defaultTitle}
               </span>
-              <span className="text-[10px] uppercase font-mono px-1.5 py-0.2 rounded bg-white/5 border border-white/10 text-[#A1A1AA]">
+              <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-[#A1A1AA]">
                 {isVendor ? "Lender" : "Borrower"}
               </span>
             </div>

@@ -1452,7 +1452,7 @@ def get_user(email: str):
 
     # 1. Search admin_accounts
     try:
-        admin = fetch_one("SELECT * FROM admin_accounts WHERE email = %s", (clean_email,))
+        admin = fetch_one("SELECT * FROM admin_accounts WHERE LOWER(email) = %s", (clean_email,))
         if admin:
             _user_cache[clean_email] = (now, admin)
             return admin
@@ -1461,7 +1461,7 @@ def get_user(email: str):
 
     # 2. Search payrent_accounts
     try:
-        payrent = fetch_one("SELECT * FROM payrent_accounts WHERE email = %s", (clean_email,))
+        payrent = fetch_one("SELECT * FROM payrent_accounts WHERE LOWER(email) = %s", (clean_email,))
         if payrent:
             _user_cache[clean_email] = (now, payrent)
             return payrent
@@ -1470,7 +1470,7 @@ def get_user(email: str):
 
     # 3. Fallback to users table
     try:
-        user = fetch_one("SELECT * FROM users WHERE email = %s", (clean_email,))
+        user = fetch_one("SELECT * FROM users WHERE LOWER(email) = %s", (clean_email,))
         if user:
             _user_cache[clean_email] = (now, user)
             return user
@@ -3755,6 +3755,9 @@ def get_all_approved_custom_products(limit: Optional[int] = None, offset: int = 
                                    cp.images, cp.video_url,
                                    cp.category, cp.rating, cp.reviews, cp.available, cp.status,
                                    cp.owner_name, cp.owner_avatar, cp.owner_rating, cp.featured, cp.created_at,
+                                   pp.city AS product_city,
+                                   pp.area AS product_area,
+                                   pp.pincode AS product_pincode,
                                    COALESCE(u.address, pa.address, '') AS owner_address, 
                                    COALESCE(u.city, pa.address, '') AS owner_city, 
                                    u.state AS owner_state, 
@@ -3763,6 +3766,7 @@ def get_all_approved_custom_products(limit: Optional[int] = None, offset: int = 
                                    COALESCE(u.verified, 1) AS owner_verified,
                                    a.status AS agent_status
                             FROM custom_products cp
+                            LEFT JOIN payernt_products pp ON cp.id = pp.id
                             LEFT JOIN users u ON cp.user_email = u.email
                             LEFT JOIN payernt_accounts pa ON cp.user_email = pa.email
                             LEFT JOIN agents a ON cp.user_email = a.user_email
@@ -3777,6 +3781,9 @@ def get_all_approved_custom_products(limit: Optional[int] = None, offset: int = 
                                    cp.images, cp.video_url,
                                    cp.category, cp.rating, cp.reviews, cp.available, cp.status,
                                    cp.owner_name, cp.owner_avatar, cp.owner_rating, cp.featured, cp.created_at,
+                                   pp.city AS product_city,
+                                   pp.area AS product_area,
+                                   pp.pincode AS product_pincode,
                                    COALESCE(u.address, pa.address, '') AS owner_address, 
                                    COALESCE(u.city, pa.address, '') AS owner_city, 
                                    u.state AS owner_state, 
@@ -3785,6 +3792,7 @@ def get_all_approved_custom_products(limit: Optional[int] = None, offset: int = 
                                    COALESCE(u.verified, 1) AS owner_verified,
                                    a.status AS agent_status
                             FROM custom_products cp
+                            LEFT JOIN payernt_products pp ON cp.id = pp.id
                             LEFT JOIN users u ON cp.user_email = u.email
                             LEFT JOIN payernt_accounts pa ON cp.user_email = pa.email
                             LEFT JOIN agents a ON cp.user_email = a.user_email
@@ -5457,6 +5465,8 @@ def get_user_category_affinities(user_email: str = None, session_id: str = None)
             GROUP BY category
         """
         conn = get_db_connection()
+        if not conn:
+            raise ConnectionError("Database connection unavailable")
         try:
             with conn.cursor() as cursor:
                 cursor.execute(query, (user_email or "", session_id or ""))
@@ -5465,7 +5475,8 @@ def get_user_category_affinities(user_email: str = None, session_id: str = None)
                     if r.get("category"):
                         affinities[r["category"]] = float(r.get("interaction_count", 0))
         finally:
-            conn.close()
+            if conn:
+                conn.close()
     except Exception as e:
         print(f"Notice: Database query fallback in get_user_category_affinities: {e}")
         # Fallback to in-memory event tracking
@@ -5490,13 +5501,16 @@ def get_popular_search_queries(limit: int = 5) -> list:
             LIMIT %s
         """
         conn = get_db_connection()
+        if not conn:
+            raise ConnectionError("Database connection unavailable")
         try:
             with conn.cursor() as cursor:
                 cursor.execute(query, (limit,))
                 rows = cursor.fetchall()
                 return [r["search_query"] for r in rows if r.get("search_query")]
         finally:
-            conn.close()
+            if conn:
+                conn.close()
     except Exception as e:
         print(f"Notice: Database fallback in get_popular_search_queries: {e}")
         counts = {}
@@ -7451,6 +7465,9 @@ def get_products_batch(product_ids: List[str]) -> Dict[str, dict]:
                 placeholders = ", ".join(["%s"] * len(product_ids))
                 query = f"""
                     SELECT cp.*, 
+                           pp.city AS product_city,
+                           pp.area AS product_area,
+                           pp.pincode AS product_pincode,
                            u.address AS owner_address, 
                            u.city AS owner_city, 
                            u.state AS owner_state, 
@@ -7459,6 +7476,7 @@ def get_products_batch(product_ids: List[str]) -> Dict[str, dict]:
                            u.verified AS owner_verified,
                            a.status AS agent_status
                     FROM custom_products cp
+                    LEFT JOIN payernt_products pp ON cp.id = pp.id
                     LEFT JOIN users u ON cp.user_email = u.email
                     LEFT JOIN agents a ON cp.user_email = a.user_email
                     WHERE cp.id IN ({placeholders})
