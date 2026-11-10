@@ -152,7 +152,7 @@ export function Hero() {
               ======================================================== */}
           <div className="relative w-full h-[140px] sm:h-[180px] md:h-[220px] lg:h-[300px] select-none">
             {/* 1. SILVER LAPTOP */}
-            <div className="absolute top-[1%] right-[5%] sm:top-[2%] sm:right-[8%] md:top-[2%] md:right-[9%] lg:top-[2%] lg:right-[10%] w-[58%] sm:w-[53%] md:w-[51%] lg:w-[50%] max-w-[320px] z-10">
+            <div className="absolute top-[1%] right-[5%] sm:top-[2%] sm:right-[8%] md:top-[2%] md:right-[9%] lg:-top-[5%] xl:-top-[7%] lg:right-[10%] w-[58%] sm:w-[53%] md:w-[51%] lg:w-[50%] max-w-[320px] z-10">
               <div
                 aria-hidden="true"
                 className="pointer-events-none absolute -bottom-[3%] left-[10%] right-[8%] h-[20%] rounded-full bg-black/18 dark:bg-black/75 blur-md rotate-[26deg]"
