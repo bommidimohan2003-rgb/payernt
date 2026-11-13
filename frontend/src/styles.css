@@ -85,6 +85,94 @@
   }
 }
 
+/* ============================================================
+   paYent Custom Cursor System (Desktop Pointer Fine Only)
+   Derived strictly from user-uploaded cursor asset (512x512)
+   Calculated apex hotspot: X=5, Y=2 on 32x32 canvas
+   ============================================================ */
+@media (hover: hover) and (pointer: fine) {
+  :root {
+    --payent-cursor-default: url("/payent-cursor.png") 5 2, auto;
+    --payent-cursor-pointer: url("/payent-cursor.png") 5 2, pointer;
+  }
+
+  .dark {
+    --payent-cursor-default: url("/payent-cursor-dark.png") 5 2, auto;
+    --payent-cursor-pointer: url("/payent-cursor-dark.png") 5 2, pointer;
+  }
+
+  html,
+  body {
+    cursor: var(--payent-cursor-default);
+  }
+
+  /* Interactive pointer controls: Buttons, Links, Clickable primitives, Cards */
+  a,
+  button,
+  [role="button"],
+  [role="link"],
+  [role="tab"],
+  [role="menuitem"],
+  [role="option"],
+  [role="switch"],
+  [role="checkbox"],
+  [role="radio"],
+  summary,
+  select,
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"],
+  input[type="checkbox"],
+  input[type="radio"],
+  .cursor-pointer {
+    cursor: var(--payent-cursor-pointer);
+  }
+
+  /* Default surfaces and cards */
+  .cursor-default {
+    cursor: var(--payent-cursor-default);
+  }
+
+  /* Text editing inputs: preserve native text I-beam cursor */
+  input[type="text"],
+  input[type="password"],
+  input[type="email"],
+  input[type="number"],
+  input[type="search"],
+  input[type="tel"],
+  input[type="url"],
+  textarea,
+  [contenteditable="true"],
+  .cursor-text {
+    cursor: text;
+  }
+
+  /* Disabled controls: preserve native not-allowed cursor */
+  :disabled,
+  [aria-disabled="true"],
+  .disabled,
+  .cursor-not-allowed {
+    cursor: not-allowed !important;
+  }
+
+  /* Draggable states: preserve native grab/grabbing cursor */
+  .cursor-grab {
+    cursor: grab;
+  }
+
+  .cursor-grabbing {
+    cursor: grabbing;
+  }
+
+  .cursor-wait {
+    cursor: wait;
+  }
+
+  .cursor-move {
+    cursor: move;
+  }
+}
+
 :root {
   --radius: 0.9rem;
   /* ============================================================
