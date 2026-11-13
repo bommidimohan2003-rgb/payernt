@@ -19,17 +19,18 @@ function readPublic(relPath: string): Buffer {
 describe("paYent Custom Cursor System (Desktop Pointer Fine Only)", () => {
   it("public directory contains all optimized cursor assets with valid PNG headers", () => {
     const assets = [
-      { name: "payent-cursor.png", expectedWidth: 32, expectedHeight: 32 },
-      { name: "payent-cursor-dark.png", expectedWidth: 32, expectedHeight: 32 },
-      { name: "payent-cursor-pure.png", expectedWidth: 32, expectedHeight: 32 },
-      { name: "payent-cursor@2x.png", expectedWidth: 64, expectedHeight: 64 },
+      { name: "payent-cursor.png", expectedWidth: 16, expectedHeight: 16 },
+      { name: "payent-cursor-dark.png", expectedWidth: 16, expectedHeight: 16 },
+      { name: "payent-cursor-pure.png", expectedWidth: 16, expectedHeight: 16 },
+      { name: "payent-cursor@2x.png", expectedWidth: 32, expectedHeight: 32 },
+      { name: "payent-cursor-dark@2x.png", expectedWidth: 32, expectedHeight: 32 },
     ];
 
     for (const { name, expectedWidth, expectedHeight } of assets) {
       const filePath = path.join(rootDir, "public", name);
       assert.ok(fs.existsSync(filePath), `Asset ${name} must exist in public/`);
       const buf = readPublic(name);
-      assert.ok(buf.length > 300, `Asset ${name} must have non-trivial file size`);
+      assert.ok(buf.length > 200, `Asset ${name} must have non-trivial file size`);
 
       // Verify PNG magic bytes
       const isPng =
@@ -61,23 +62,23 @@ describe("paYent Custom Cursor System (Desktop Pointer Fine Only)", () => {
       "Cursor rules must be scoped under @media (hover: hover) and (pointer: fine)"
     );
 
-    // 2. CSS variables for default and pointer states with exact hotspot (5 2)
+    // 2. CSS variables for default and pointer states with exact 50% hotspot (3 1)
     assert.match(
       css,
-      /--payent-cursor-default:\s*url\(["']?\/payent-cursor\.png["']?\)\s+5\s+2,\s*auto/,
-      "Root must define --payent-cursor-default with hotspot 5 2"
+      /--payent-cursor-default:\s*url\(["']?\/payent-cursor\.png["']?\)\s+3\s+1,\s*auto/,
+      "Root must define --payent-cursor-default with hotspot 3 1"
     );
     assert.match(
       css,
-      /--payent-cursor-pointer:\s*url\(["']?\/payent-cursor\.png["']?\)\s+5\s+2,\s*pointer/,
-      "Root must define --payent-cursor-pointer with hotspot 5 2"
+      /--payent-cursor-pointer:\s*url\(["']?\/payent-cursor\.png["']?\)\s+3\s+1,\s*pointer/,
+      "Root must define --payent-cursor-pointer with hotspot 3 1"
     );
 
-    // 3. Dark theme surface support
+    // 3. Dark theme surface support with white cursor
     assert.match(
       css,
-      /\.dark\s*\{[\s\S]*--payent-cursor-default:\s*url\(["']?\/payent-cursor-dark\.png["']?\)\s+5\s+2/,
-      "Dark theme must define high-contrast cursor variant with hotspot 5 2"
+      /\.dark\s*\{[\s\S]*--payent-cursor-default:\s*url\(["']?\/payent-cursor-dark\.png["']?\)\s+3\s+1/,
+      "Dark theme must define white cursor variant with hotspot 3 1"
     );
 
     // 4. Global application to html and body

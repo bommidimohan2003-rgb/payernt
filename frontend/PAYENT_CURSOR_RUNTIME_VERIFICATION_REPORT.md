@@ -9,9 +9,10 @@ Runtime verification was conducted across desktop and mobile viewports, Chromium
   - `1440 × 900` (Standard Desktop Display)
   - `1280 × 800` (Compact Laptop Display)
   - `375 × 812` (Mobile Touchscreen Emulation)
+- **Scale Tested**: 50% scale reduction (16×16 px standard canvas, 32×32 px `@2x` retina canvas).
 - **Themes Tested**:
-  - Light Theme (`#FFFFFF` background, `#0A0A0A` text)
-  - Dark Theme (`#1E1E1E` 4DP surface, `#FAFAFA` text)
+  - Light Theme (`#FFFFFF` background, `#0A0A0A` text) → Solid Black Cursor
+  - Dark Theme (`#1E1E1E` 4DP surface, `#FAFAFA` text) → **Pure White Cursor**
 
 ---
 
@@ -21,71 +22,55 @@ Using headless Chromium with DOM extraction and computed style introspection on 
 
 ```json
 {
-  "bodyCursor": "url(\"file:///C:/payent-cursor.png\") 5 2, auto",
-  "btnLightCursor": "url(\"file:///C:/payent-cursor.png\") 5 2, pointer",
-  "linkLightCursor": "url(\"file:///C:/payent-cursor.png\") 5 2, pointer",
-  "cardLightCursor": "url(\"file:///C:/payent-cursor.png\") 5 2, pointer",
+  "bodyCursor": "url(\"file:///C:/payent-cursor.png\") 3 1, auto",
+  "btnLightCursor": "url(\"file:///C:/payent-cursor.png\") 3 1, pointer",
+  "linkLightCursor": "url(\"file:///C:/payent-cursor.png\") 3 1, pointer",
+  "cardLightCursor": "url(\"file:///C:/payent-cursor.png\") 3 1, pointer",
   "inputLightCursor": "text",
   "disabledLightCursor": "not-allowed",
-  "btnDarkCursor": "url(\"file:///C:/payent-cursor-dark.png\") 5 2, pointer",
-  "cardDarkCursor": "url(\"file:///C:/payent-cursor-dark.png\") 5 2, pointer",
+  "btnDarkCursor": "url(\"file:///C:/payent-cursor-dark.png\") 3 1, pointer",
+  "cardDarkCursor": "url(\"file:///C:/payent-cursor-dark.png\") 3 1, pointer",
   "inputDarkCursor": "text",
   "disabledDarkCursor": "not-allowed"
 }
 ```
 
 ### Observations
-1. **Normal Page Backgrounds (`body`)**: Evaluates to `url("/payent-cursor.png") 5 2, auto`.
-2. **Buttons & Links**: Buttons (`<button>`, `a`, `[role="button"]`, `.cursor-pointer`) evaluate to `url("/payent-cursor.png") 5 2, pointer` instead of standard OS glove hand icon.
-3. **Product Cards**: Clickable rental cards with `.cursor-pointer` evaluate to `url("/payent-cursor.png") 5 2, pointer`.
-4. **Text Inputs**: Text inputs (`<input type="text">`, `<textarea>`) cleanly preserve native `cursor: text`.
-5. **Disabled Controls**: Buttons with `:disabled` or `.cursor-not-allowed` strictly evaluate to `cursor: not-allowed` due to `!important` priority.
-6. **Dark Theme Elements**: Inside `.dark` containers, computed cursor updates cleanly to `url("/payent-cursor-dark.png") 5 2, pointer`.
+1. **Light Mode**:
+   - `body`: Uses `url("/payent-cursor.png") 3 1, auto`.
+   - `button, a, [role="button"], .cursor-pointer`: Uses `url("/payent-cursor.png") 3 1, pointer`.
+   - High contrast against white surfaces, with subtle outline protecting visibility over black buttons and dark photos.
+2. **Dark Mode (`.dark`)**:
+   - `button, card, a`: Uses `url("/payent-cursor-dark.png") 3 1, pointer` — **Pure White Cursor**.
+   - Brilliant visibility against `#1E1E1E` and `#000000`, with subtle dark outline preventing loss over light elements in dark mode.
+3. **Form Inputs**:
+   - All text inputs (`input[type="text"]`, `textarea`) preserve native `cursor: text`.
+4. **Disabled Controls**:
+   - All disabled buttons and `.cursor-not-allowed` elements preserve `cursor: not-allowed !important`.
+5. **Mobile Viewports**:
+   - In `375 × 812`, media query `@media (hover: hover) and (pointer: fine)` evaluates to `false`, preserving native touch interactions.
 
 ---
 
-## 3. Visual Verification Across Backgrounds & Themes
+## 3. Visual Verification Montage
 
-A 5-column composite visibility evaluation was generated across real background tokens:
-
-| Surface / Token | Background Hex | Pure Black Visibility | Outlined Variant Visibility | Status |
-| :--- | :---: | :---: | :---: | :---: |
-| **White** | `#FFFFFF` | 21:1 Contrast | 21:1 (Outline blends invisibly into white) | **PASS** |
-| **Light Grey** | `#E5E5E5` | High Contrast | High Contrast with clean silhouette | **PASS** |
-| **Mid Grey** | `#737373` | Moderate | High Contrast | **PASS** |
-| **Dark Theme** | `#1E1E1E` | 1.2:1 (Nearly invisible) | Crisp 1px white border renders silhouette cleanly | **PASS** |
-| **Pure Black** | `#000000` | 0% (Invisible) | 100% visible with crisp boundary | **PASS** |
-
-Visual proof artifacts saved to artifact directory:
-- `cursor_verification_1280x800.png`
-- `cursor_verification_1440x900.png`
-- `cursor_verification_375x812.png`
-- `cursor_comparison.png`
+Screenshots and comparison montages saved to artifact directory:
+- `cursor_50pct_comparison.png`: 5-column side-by-side comparison across White, Light Grey, Mid Grey, Dark Surface (#1E1E1E), and Pure Black (#000000).
+- `cursor_50pct_1280x800.png`
+- `cursor_50pct_1440x900.png`
+- `cursor_50pct_375x812.png`
 
 ---
 
-## 4. Mobile & Touch Device Verification
+## 4. Automated Regression Test Suite Results
 
-On touchscreen devices (iPhone, iPad, Android phones) where no mouse or trackpad is attached:
-- Media query `@media (hover: hover) and (pointer: fine)` evaluates to `false`.
-- The custom cursor CSS block is bypassed by the browser.
-- Native tap, scroll, pinch-to-zoom, and swipe gestures operate with standard zero-pointer touch interactions.
-
----
-
-## 5. Automated Regression Test Suite Results
-
-The comprehensive test suite was executed via `tsx --test`:
-
+Executed via `tsx --test`:
 ```
 ▶ paYent Custom Cursor System (Desktop Pointer Fine Only)
-  ✔ public directory contains all optimized cursor assets with valid PNG headers (4.3032ms)
-  ✔ styles.css enforces global cursor rules, responsive media query, and accurate hotspot (1.3774ms)
-✔ paYent Custom Cursor System (Desktop Pointer Fine Only) (6.9805ms)
-▶ F-01: Wishlist product ID passing, rollback, and synchronization
-  ...
-✔ Phase 4 Part B — Overlay Product Card, Explore Cards, Location & Availability (68.0641ms)
-
+  ✔ public directory contains all optimized cursor assets with valid PNG headers (3.6011ms)
+  ✔ styles.css enforces global cursor rules, responsive media query, and accurate hotspot (2.4384ms)
+✔ paYent Custom Cursor System (Desktop Pointer Fine Only) (7.3506ms)
+...
 ℹ tests 54
 ℹ suites 18
 ℹ pass 54
@@ -93,20 +78,19 @@ The comprehensive test suite was executed via `tsx --test`:
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 1304.3794
+ℹ duration_ms 1152.4548
 ```
 
 - **Total Test Cases**: 54
 - **Passed**: 54
 - **Failed**: 0
-- **Regression Invariants**: Zero test regressions across Wishlist (F-01), Category Canonicalization (F-02), Monochrome Design System (F-09/11/13), Secondary A11y (F-10/12/14), and P3/P4 fixes.
 
 ---
 
-## 6. Production Bundle Build Verification
+## 5. Production Build Verification
 
-Executed `npm run build` (`vite build`):
+Executed `npm run build`:
 - `✓ 3436 modules transformed`
-- Output bundle: `dist/client/assets/styles-Db24b_yQ.css` (362.23 kB)
-- Built in `2.34s`
-- Zero TypeScript diagnostics, zero Rollup/Vite compilation warnings, and zero broken asset paths.
+- Output bundle: `dist/client/assets/styles-PxQ9WTXx.css` (362.23 kB)
+- Built in `1.98s`
+- Zero errors, zero hydration mismatches, zero broken asset links.
