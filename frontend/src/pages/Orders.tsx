@@ -1265,7 +1265,7 @@ export default function Orders() {
                     {/* Left + Middle: Thumbnail + Info */}
                     <div className="flex items-center gap-3 sm:gap-3.5 min-w-0 flex-1">
                       {/* Compact Thumbnail */}
-                      <div className="w-18 h-16 sm:w-20 sm:h-18 rounded-xl overflow-hidden bg-neutral-100 dark:bg-neutral-900 border border-neutral-200/70 dark:border-white/10 shrink-0 flex items-center justify-center p-0.5">
+                      <div className="w-18 h-16 sm:w-20 sm:h-18 rounded-xl overflow-hidden bg-neutral-100 dark:bg-[#262626] border border-neutral-200/70 dark:border-[#383838] shrink-0 flex items-center justify-center p-0.5">
                         {o.productImage || (o as any).product_image ? (
                           <img
                             src={getOptimizedImageUrl(o.productImage || (o as any).product_image, "thumb")}

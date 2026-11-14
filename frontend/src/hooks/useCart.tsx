@@ -34,7 +34,7 @@ interface CartContextType {
   refreshCart: () => void;
 }
 
-const CartContext = createContext<CartContextType | null>(null);
+export const CartContext = createContext<CartContextType | null>(null);
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -51,17 +51,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
     const token = storage.get<string | null>(STORAGE_KEYS.token, null);
     if (!token) return false;
     const pathname = window.location.pathname;
-    const isGatewayOrAuth =
-      pathname === "/" ||
-      pathname === "/select" ||
-      pathname === "/login" ||
-      pathname === "/register" ||
-      pathname === "/otp" ||
-      pathname.startsWith("/account-pending") ||
+    const isLenderOrAdmin =
       pathname.startsWith("/payernt") ||
       pathname.startsWith("/paye₹nt") ||
       pathname.startsWith("/admin");
-    return !isGatewayOrAuth || isCartOpen;
+    return !isLenderOrAdmin || isCartOpen;
   }, [user, isCartOpen]);
 
   const {
@@ -105,8 +99,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["cart"] });
-      toast.success(data?.message || "Added to cart!");
-      setIsCartOpen(true);
     },
     onError: (err: unknown) => {
       const e = err as { message?: string };

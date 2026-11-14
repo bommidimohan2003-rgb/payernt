@@ -144,7 +144,7 @@ export function Footer() {
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Twitter / X"
-              className="h-10 w-10 sm:h-8 sm:w-8 rounded-full border border-neutral-300 dark:border-neutral-700 bg-neutral-100 dark:bg-neutral-900 flex items-center justify-center text-neutral-800 dark:text-neutral-200 hover:border-neutral-950 dark:hover:border-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
+              className="h-10 w-10 sm:h-8 sm:w-8 rounded-full border border-neutral-300 dark:border-neutral-700/80 bg-neutral-100 dark:bg-[#262626] flex items-center justify-center text-neutral-800 dark:text-neutral-200 hover:border-neutral-950 dark:hover:border-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
             >
               <Twitter className="h-3.5 w-3.5 stroke-[1.75]" aria-hidden="true" />
             </a>
@@ -153,7 +153,7 @@ export function Footer() {
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Instagram"
-              className="h-10 w-10 sm:h-8 sm:w-8 rounded-full border border-neutral-300 dark:border-neutral-700 bg-neutral-100 dark:bg-neutral-900 flex items-center justify-center text-neutral-800 dark:text-neutral-200 hover:border-neutral-950 dark:hover:border-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
+              className="h-10 w-10 sm:h-8 sm:w-8 rounded-full border border-neutral-300 dark:border-neutral-700/80 bg-neutral-100 dark:bg-[#262626] flex items-center justify-center text-neutral-800 dark:text-neutral-200 hover:border-neutral-950 dark:hover:border-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
             >
               <Instagram className="h-3.5 w-3.5 stroke-[1.75]" aria-hidden="true" />
             </a>
@@ -162,7 +162,7 @@ export function Footer() {
               target="_blank"
               rel="noopener noreferrer"
               aria-label="LinkedIn"
-              className="h-10 w-10 sm:h-8 sm:w-8 rounded-full border border-neutral-300 dark:border-neutral-700 bg-neutral-100 dark:bg-neutral-900 flex items-center justify-center text-neutral-800 dark:text-neutral-200 hover:border-neutral-950 dark:hover:border-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
+              className="h-10 w-10 sm:h-8 sm:w-8 rounded-full border border-neutral-300 dark:border-neutral-700/80 bg-neutral-100 dark:bg-[#262626] flex items-center justify-center text-neutral-800 dark:text-neutral-200 hover:border-neutral-950 dark:hover:border-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
             >
               <Linkedin className="h-3.5 w-3.5 stroke-[1.75]" aria-hidden="true" />
             </a>
@@ -171,7 +171,7 @@ export function Footer() {
               target="_blank"
               rel="noopener noreferrer"
               aria-label="YouTube"
-              className="h-10 w-10 sm:h-8 sm:w-8 rounded-full border border-neutral-300 dark:border-neutral-700 bg-neutral-100 dark:bg-neutral-900 flex items-center justify-center text-neutral-800 dark:text-neutral-200 hover:border-neutral-950 dark:hover:border-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
+              className="h-10 w-10 sm:h-8 sm:w-8 rounded-full border border-neutral-300 dark:border-neutral-700/80 bg-neutral-100 dark:bg-[#262626] flex items-center justify-center text-neutral-800 dark:text-neutral-200 hover:border-neutral-950 dark:hover:border-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
             >
               <Youtube className="h-3.5 w-3.5 stroke-[1.75]" aria-hidden="true" />
             </a>

@@ -10,7 +10,7 @@ export interface SectionBoxProps extends Omit<HTMLAttributes<HTMLDivElement>, "t
   badge?: ReactNode;
   /** Optional action button or link positioned on the top-right border */
   action?: ReactNode;
-  /** Background color class for the cutout masking behind the title/action. Defaults to 'bg-card dark:bg-[#141414]' */
+  /** Background color class for the cutout masking behind the title/action. Defaults to 'bg-card dark:bg-[#1E1E1E]' */
   cutoutBgClass?: string;
   /** Additional styling for the title text element */
   titleClassName?: string;
@@ -33,7 +33,7 @@ export const SectionBox = forwardRef<HTMLDivElement, SectionBoxProps>(
       icon,
       badge,
       action,
-      cutoutBgClass = "bg-card dark:bg-[#141414]",
+      cutoutBgClass = "bg-card dark:bg-[#1E1E1E]",
       titleClassName,
       variant = "default",
       className,

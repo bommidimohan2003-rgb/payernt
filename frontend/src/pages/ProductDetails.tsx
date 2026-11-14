@@ -1754,10 +1754,10 @@ const productSchema = product ? {
                   <button
                     type="button"
                     onClick={() => setShowFullCalendar((prev) => !prev)}
-                    className="w-full p-2.5 sm:p-3 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 hover:bg-neutral-100 dark:hover:bg-neutral-800/80 transition-colors flex items-center justify-between cursor-pointer group"
+                    className="w-full p-2.5 sm:p-3 rounded-xl border border-neutral-200 dark:border-neutral-700/80 bg-neutral-50 dark:bg-[#262626] hover:bg-neutral-100 dark:hover:bg-[#2E2E2E] transition-colors flex items-center justify-between cursor-pointer group"
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="h-8 w-8 rounded-lg bg-neutral-200/80 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 flex items-center justify-center shrink-0">
+                      <div className="h-8 w-8 rounded-lg bg-neutral-200/80 dark:bg-[#1E1E1E] text-neutral-900 dark:text-neutral-100 flex items-center justify-center shrink-0">
                         <Calendar className="h-4 w-4" aria-hidden="true" />
                       </div>
                       <div className="text-left truncate">
@@ -1820,8 +1820,8 @@ const productSchema = product ? {
                     className={cn(
                       "w-full p-2.5 sm:p-3 rounded-xl border transition-colors flex items-center justify-between cursor-pointer group text-left",
                       isSlotDropdownOpen
-                        ? "border-neutral-950 dark:border-white bg-neutral-100 dark:bg-neutral-900"
-                        : "border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 hover:bg-neutral-100 dark:hover:bg-neutral-800/80"
+                        ? "border-neutral-950 dark:border-white bg-neutral-100 dark:bg-[#262626]"
+                        : "border-neutral-200 dark:border-neutral-700/80 bg-neutral-50 dark:bg-[#262626] hover:bg-neutral-100 dark:hover:bg-[#2E2E2E]"
                     )}
                     aria-haspopup="listbox"
                     aria-expanded={isSlotDropdownOpen}
@@ -1936,7 +1936,7 @@ const productSchema = product ? {
                 {/* Multi-Day Days Marker / Stepper */}
                 {durationMode === "custom" && (
                     <div className="pt-2">
-                      <div className="flex items-center justify-between p-2.5 sm:p-3 rounded-xl bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800">
+                      <div className="flex items-center justify-between p-2.5 sm:p-3 rounded-xl bg-neutral-50 dark:bg-[#262626] border border-neutral-200 dark:border-neutral-700/80">
                         <div>
                           <span className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400 block">
                             Rental Duration
@@ -1952,13 +1952,13 @@ const productSchema = product ? {
                             onClick={() => handleDaysChange(rentalDays - 1)}
                             disabled={rentalDays <= 2}
                             aria-label="Decrease rental days"
-                            className="w-8 h-8 rounded-lg border border-neutral-300 dark:border-neutral-700 flex items-center justify-center font-bold text-base hover:bg-neutral-200/70 dark:hover:bg-neutral-800 disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer text-neutral-950 dark:text-white"
+                            className="w-8 h-8 rounded-lg border border-neutral-300 dark:border-neutral-700/80 flex items-center justify-center font-bold text-base hover:bg-neutral-200/70 dark:hover:bg-[#1E1E1E] disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer text-neutral-950 dark:text-white"
                             title="Decrease days"
                           >
                             -
                           </button>
 
-                          <div className="flex items-center justify-center px-2 py-1 bg-white dark:bg-[#1E1E1E] border border-neutral-300 dark:border-neutral-700 rounded-lg">
+                          <div className="flex items-center justify-center px-2 py-1 bg-white dark:bg-[#1E1E1E] border border-neutral-300 dark:border-neutral-700/80 rounded-lg">
                             <input
                               type="number"
                               min={2}
@@ -1979,7 +1979,7 @@ const productSchema = product ? {
                             onClick={() => handleDaysChange(rentalDays + 1)}
                             disabled={rentalDays >= 90}
                             aria-label="Increase rental days"
-                            className="w-8 h-8 rounded-lg border border-neutral-300 dark:border-neutral-700 flex items-center justify-center font-bold text-base hover:bg-neutral-200/70 dark:hover:bg-neutral-800 disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer text-neutral-950 dark:text-white"
+                            className="w-8 h-8 rounded-lg border border-neutral-300 dark:border-neutral-700/80 flex items-center justify-center font-bold text-base hover:bg-neutral-200/70 dark:hover:bg-[#1E1E1E] disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer text-neutral-950 dark:text-white"
                             title="Increase days"
                           >
                             +
@@ -1990,7 +1990,7 @@ const productSchema = product ? {
                   )}
 
                 {/* Booking Summary */}
-                <div className="relative rounded-2xl bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 pt-4.5 pb-3 px-3.5 sm:px-4 flex items-center justify-between gap-3">
+                <div className="relative rounded-2xl bg-neutral-50 dark:bg-[#262626] border border-neutral-200 dark:border-neutral-700/80 pt-4.5 pb-3 px-3.5 sm:px-4 flex items-center justify-between gap-3">
                   <div className="absolute -top-2.5 left-3 px-1.5 bg-neutral-50 dark:bg-[#1E1E1E] text-xs font-semibold text-neutral-700 dark:text-neutral-300 pointer-events-none select-none z-10">
                     Booking Summary
                   </div>

@@ -86,7 +86,7 @@ function Nav4DockItem({
         className={`relative flex flex-col items-center justify-center gap-0.5 min-w-[46px] min-h-[46px] px-1 rounded-2xl transition-colors duration-200 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white shrink-0 ${
           item.isActive
             ? "bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 shadow-xs font-semibold"
-            : "hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white"
+            : "hover:bg-neutral-100 dark:hover:bg-[#262626] text-neutral-600 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white"
         }`}
         aria-label={item.label}
         aria-current={item.isActive ? "page" : undefined}

@@ -1,8 +1,9 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useContext } from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { Search, Sun, Moon, User as UserIcon } from "lucide-react";
+import { Search, Sun, Moon, User as UserIcon, ShoppingCart } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
+import { CartContext } from "@/hooks/useCart";
 import { cn } from "@/lib/utils";
 import { LogoIcon } from "@/components/common/LogoIcon";
 import { ProfilePhoto } from "@/components/common/ProfilePhoto";
@@ -30,6 +31,9 @@ export function Navbar() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  const cartCtx = useContext(CartContext);
+  const cartCount = cartCtx?.cartCount || 0;
 
   // Typewriter animation effect
   useEffect(() => {
@@ -113,16 +117,18 @@ export function Navbar() {
         )}
       >
         <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-3 sm:px-6 lg:px-8 gap-2 sm:gap-4">
-          {/* 1. paYent Logo */}
+          {/* 1. paYent Logo -> Navigates to the Gateway ("/") of the two sides (paye₹nt Lender / pay₹ent Renter) */}
           <div className="flex items-center shrink-0">
             <Link
-              to="/payent"
-              className="flex items-center gap-2.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white rounded-lg select-none py-1 transition-colors"
+              to="/"
+              className="flex items-center gap-2.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white rounded-lg select-none py-1 transition-colors cursor-pointer"
               id="nav-logo"
-              aria-label="paYent Rentals Home"
+              title="Return to Gateway (Choose Experience)"
+              aria-label="paYent Gateway"
             >
               <LogoIcon showTagline={false} />
             </Link>
+            {/* Renter storefront route reference: to="/payent" */}
           </div>
 
           {/* 2. Unified Search Bar with Typing Animation (active on BOTH Mobile & Desktop, min-h-[44px] for touch target compliance) */}
@@ -133,7 +139,7 @@ export function Navbar() {
                 onClick={() => setSearchOverlayOpen(true)}
                 id="nav-desktop-search-btn"
                 aria-label="Search rentals"
-                className="w-full flex items-center gap-1.5 xs:gap-2 sm:gap-2.5 min-h-[44px] sm:min-h-[40px] px-2.5 xs:px-3 sm:px-3.5 py-2 rounded-full border border-neutral-300 dark:border-neutral-700/90 bg-neutral-50 dark:bg-neutral-900 text-neutral-600 dark:text-neutral-400 hover:border-neutral-950 dark:hover:border-white hover:text-neutral-950 dark:hover:text-white transition-colors cursor-pointer text-xs sm:text-sm shadow-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
+                className="w-full flex items-center gap-1.5 xs:gap-2 sm:gap-2.5 min-h-[44px] sm:min-h-[40px] px-2.5 xs:px-3 sm:px-3.5 py-2 rounded-full border border-neutral-300 dark:border-neutral-700/80 bg-neutral-50 dark:bg-[#262626] text-neutral-600 dark:text-neutral-400 hover:border-neutral-950 dark:hover:border-white hover:text-neutral-950 dark:hover:text-white transition-colors cursor-pointer text-xs sm:text-sm shadow-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
               >
                 <Search className="h-3.5 w-3.5 sm:h-4 sm:w-4 stroke-[1.75] shrink-0 text-neutral-500 dark:text-neutral-400" aria-hidden="true" />
                 <span className="truncate text-left text-[11px] xs:text-xs sm:text-sm text-neutral-600 dark:text-neutral-300">
@@ -151,8 +157,29 @@ export function Navbar() {
             </div>
           )}
 
-          {/* 3. Controls: Theme Toggle, Profile / Login */}
+          {/* 3. Controls: Cart Button, Theme Toggle, Profile / Login */}
           <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+
+            {/* Rental Cart Button with real-time numeric badge (>= 44x44px touch target on mobile) */}
+            {!isAuthPage && (
+              <Link
+                to="/cart"
+                id="nav-cart-btn"
+                aria-label={`Rental Cart${cartCount > 0 ? `, ${cartCount} item${cartCount > 1 ? "s" : ""}` : ""}`}
+                title="View Rental Cart"
+                className="relative h-11 w-11 sm:h-10 sm:w-10 rounded-full border border-neutral-300 dark:border-neutral-700 hover:border-neutral-950 dark:hover:border-white bg-transparent hover:bg-neutral-100 dark:hover:bg-[#262626] text-neutral-800 dark:text-neutral-200 flex items-center justify-center transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white shrink-0"
+              >
+                <ShoppingCart className="h-4 w-4 stroke-[1.75]" aria-hidden="true" />
+                {mounted && cartCount > 0 && (
+                  <span
+                    data-testid="nav-cart-badge"
+                    className="absolute -top-1 -right-1 flex h-4.5 min-w-[18px] px-1 items-center justify-center rounded-full bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 text-[10px] font-bold leading-none shadow-xs border border-white dark:border-[#1E1E1E]"
+                  >
+                    {cartCount > 99 ? "99+" : cartCount}
+                  </span>
+                )}
+              </Link>
+            )}
 
             {/* Quick Monochrome Theme Toggle (>= 44x44px touch target on mobile) */}
             {mounted && (
@@ -161,7 +188,7 @@ export function Navbar() {
                 onClick={toggle}
                 aria-label={theme === "dark" ? "Switch to Light Theme" : "Switch to Dark Theme"}
                 title={theme === "dark" ? "Switch to Light Theme" : "Switch to Dark Theme"}
-                className="h-11 w-11 sm:h-10 sm:w-10 rounded-full border border-neutral-300 dark:border-neutral-700 hover:border-neutral-950 dark:hover:border-white bg-transparent hover:bg-neutral-100 dark:hover:bg-neutral-900 text-neutral-800 dark:text-neutral-200 flex items-center justify-center transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
+                className="h-11 w-11 sm:h-10 sm:w-10 rounded-full border border-neutral-300 dark:border-neutral-700 hover:border-neutral-950 dark:hover:border-white bg-transparent hover:bg-neutral-100 dark:hover:bg-[#262626] text-neutral-800 dark:text-neutral-200 flex items-center justify-center transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
               >
                 {theme === "dark" ? (
                   <Sun className="h-4 w-4 stroke-[1.75]" aria-hidden="true" />
@@ -177,7 +204,7 @@ export function Navbar() {
                 to="/profile"
                 id="nav-profile-btn"
                 aria-label="My Profile"
-                className="flex items-center gap-2 min-h-[44px] sm:min-h-[40px] p-1.5 pl-2 pr-3 sm:pr-4 rounded-full border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900 hover:border-neutral-950 dark:hover:border-white text-neutral-900 dark:text-white transition-colors cursor-pointer shadow-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
+                className="flex items-center gap-2 min-h-[44px] sm:min-h-[40px] p-1.5 pl-2 pr-3 sm:pr-4 rounded-full border border-neutral-300 dark:border-neutral-700/80 bg-neutral-50 dark:bg-[#262626] hover:border-neutral-950 dark:hover:border-white text-neutral-900 dark:text-white transition-colors cursor-pointer shadow-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
               >
                 <ProfilePhoto
                   src={user.profilePhotoUrl || user.profile_photo_url || user.avatar}

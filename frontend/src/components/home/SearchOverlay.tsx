@@ -248,10 +248,10 @@ export function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
       {/* Popup Modal Dialog */}
       <div
         ref={dialogRef}
-        className="relative w-full max-w-2xl sm:max-w-3xl flex flex-col max-h-[84vh] rounded-3xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150"
+        className="relative w-full max-w-2xl sm:max-w-3xl flex flex-col max-h-[84vh] rounded-3xl bg-white dark:bg-[#1E1E1E] border border-neutral-200 dark:border-neutral-700/80 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150"
       >
         {/* Top Search Bar */}
-        <div className="border-b border-neutral-200 dark:border-neutral-800 px-4 sm:px-5 py-3.5 bg-neutral-50/50 dark:bg-neutral-900/50">
+        <div className="border-b border-neutral-200 dark:border-neutral-700/80 px-4 sm:px-5 py-3.5 bg-neutral-50/50 dark:bg-[#1E1E1E]">
           <div className="flex items-center gap-2.5">
             <div className="relative flex-1 flex items-center">
               <Search className="absolute left-3.5 h-4 w-4 text-neutral-500 dark:text-neutral-400 stroke-[1.75] pointer-events-none" />
@@ -266,7 +266,7 @@ export function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
                 }}
                 placeholder="Search rentals"
                 aria-label="Search rentals"
-                className="w-full pl-10 pr-10 py-2.5 min-h-[44px] rounded-full border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800/90 text-xs sm:text-sm text-neutral-900 dark:text-white placeholder:text-neutral-500 dark:placeholder:text-neutral-400 focus:outline-none focus:border-neutral-950 dark:focus:border-white transition-colors"
+                className="w-full pl-10 pr-10 py-2.5 min-h-[44px] rounded-full border border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#262626] text-xs sm:text-sm text-neutral-900 dark:text-white placeholder:text-neutral-500 dark:placeholder:text-neutral-400 focus:outline-none focus:border-neutral-950 dark:focus:border-white transition-colors"
               />
               {query && (
                 <button
@@ -289,7 +289,7 @@ export function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
                 "hidden sm:inline-flex items-center gap-1.5 min-h-[44px] px-3.5 py-2.5 rounded-full border text-xs font-semibold transition-colors cursor-pointer shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white",
                 selectedCity || pincode
                   ? "border-neutral-950 dark:border-white bg-neutral-950 text-white dark:bg-white dark:text-neutral-950"
-                  : "border-neutral-300 dark:border-neutral-700 hover:border-neutral-950 dark:hover:border-white text-neutral-800 dark:text-neutral-200 bg-white dark:bg-neutral-800/90"
+                  : "border-neutral-300 dark:border-neutral-700/80 hover:border-neutral-950 dark:hover:border-white text-neutral-800 dark:text-neutral-200 bg-white dark:bg-[#262626]"
               )}
             >
               <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
@@ -301,7 +301,7 @@ export function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
               type="button"
               onClick={onClose}
               aria-label="Close search"
-              className="h-11 w-11 rounded-full border border-neutral-200 dark:border-neutral-700/80 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-800 dark:text-neutral-200 flex items-center justify-center transition-colors cursor-pointer shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
+              className="h-11 w-11 rounded-full border border-neutral-200 dark:border-neutral-700/80 hover:bg-neutral-100 dark:hover:bg-[#262626] text-neutral-800 dark:text-neutral-200 flex items-center justify-center transition-colors cursor-pointer shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
             >
               <X className="h-4 w-4" aria-hidden="true" />
             </button>
@@ -309,13 +309,13 @@ export function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
 
           {/* Location Picker Drawer */}
           {showLocationPicker && (
-            <div className="mt-2.5 p-3 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 space-y-2">
+            <div className="mt-2.5 p-3 rounded-2xl border border-neutral-200 dark:border-neutral-700/80 bg-white dark:bg-[#262626] space-y-2">
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   onClick={handleGpsDetect}
                   disabled={gpsLoading}
-                  className="inline-flex items-center gap-1.5 min-h-[36px] px-3 py-1 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-xs font-medium hover:border-neutral-950 dark:hover:border-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white cursor-pointer"
+                  className="inline-flex items-center gap-1.5 min-h-[36px] px-3 py-1 rounded-lg border border-neutral-300 dark:border-neutral-700/80 bg-neutral-50 dark:bg-[#1E1E1E] text-xs font-medium hover:border-neutral-950 dark:hover:border-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white cursor-pointer"
                 >
                   <Navigation className="h-3 w-3 stroke-[1.75]" aria-hidden="true" />
                   <span>{gpsLoading ? "Detecting..." : gpsLocation ? "GPS Selected" : "Use GPS"}</span>
@@ -331,7 +331,7 @@ export function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
                         "min-h-[36px] px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white cursor-pointer",
                         selectedCity === city
                           ? "border-neutral-950 bg-neutral-950 text-white dark:border-white dark:bg-white dark:text-neutral-950"
-                          : "border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300"
+                          : "border-neutral-200 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E] text-neutral-700 dark:text-neutral-300"
                       )}
                     >
                       {city}
@@ -345,7 +345,7 @@ export function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
                   value={pincode}
                   onChange={(e) => setPincode(e.target.value.replace(/\D/g, "").slice(0, 6))}
                   placeholder="6-digit Pincode"
-                  className="min-h-[36px] px-2.5 py-1 text-xs rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white w-32"
+                  className="min-h-[36px] px-2.5 py-1 text-xs rounded-lg border border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E] text-neutral-900 dark:text-white w-32"
                 />
               </div>
               {locationError && (
@@ -384,7 +384,7 @@ export function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
                             },
                           });
                         }}
-                        className="px-3.5 py-2 rounded-full border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-xs font-medium hover:border-neutral-950 dark:hover:border-white transition-colors cursor-pointer"
+                        className="px-3.5 py-2 rounded-full border border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#262626] text-xs font-medium hover:border-neutral-950 dark:hover:border-white transition-colors cursor-pointer"
                       >
                         {c.name}
                       </button>
@@ -416,7 +416,7 @@ export function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
                     {Array.from({ length: 4 }).map((_, i) => (
                       <div
                         key={i}
-                        className="aspect-[3/4] rounded-xl bg-neutral-100 dark:bg-neutral-800 border border-neutral-200/70 dark:border-neutral-800"
+                        className="aspect-[3/4] rounded-xl bg-neutral-100 dark:bg-[#1E1E1E] border border-neutral-200/70 dark:border-neutral-700/80"
                       />
                     ))}
                   </div>
@@ -434,9 +434,9 @@ export function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
                           to="/product/$id"
                           params={{ id: pid }}
                           onClick={() => onClose()}
-                          className="group rounded-xl border border-neutral-200 dark:border-neutral-800 p-2.5 bg-white dark:bg-neutral-900 hover:border-neutral-400 dark:hover:border-neutral-600 transition-colors cursor-pointer flex flex-col justify-between focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
+                          className="group rounded-xl border border-neutral-200 dark:border-neutral-700/80 p-2.5 bg-white dark:bg-[#1E1E1E] hover:border-neutral-400 dark:hover:border-neutral-500 transition-colors cursor-pointer flex flex-col justify-between focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
                         >
-                          <div className="aspect-[3/4] w-full rounded-lg bg-neutral-100 dark:bg-neutral-800 overflow-hidden mb-2 flex items-center justify-center">
+                          <div className="aspect-[3/4] w-full rounded-lg bg-neutral-100 dark:bg-[#262626] overflow-hidden mb-2 flex items-center justify-center">
                             {hasFailed ? (
                               <Package className="h-6 w-6 stroke-[1.75] text-neutral-500 dark:text-neutral-400" aria-hidden="true" />
                             ) : (
@@ -461,7 +461,7 @@ export function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
                     })}
                   </div>
                 ) : (
-                  <div className="text-center py-12 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900">
+                  <div className="text-center py-12 rounded-2xl border border-neutral-200 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E]">
                     <p className="text-sm font-semibold text-neutral-900 dark:text-white">
                       No matching gear found for "{query}"
                     </p>
@@ -471,7 +471,7 @@ export function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
                     <button
                       type="button"
                       onClick={() => setQuery("")}
-                      className="mt-3 px-4 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 text-xs font-medium hover:bg-neutral-100 dark:hover:bg-neutral-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white cursor-pointer"
+                      className="mt-3 px-4 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700/80 text-xs font-medium hover:bg-neutral-100 dark:hover:bg-[#262626] focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white cursor-pointer"
                     >
                       Clear Search
                     </button>
@@ -509,7 +509,7 @@ export function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
                           setQuery(term);
                           handleExecuteSearch(term);
                         }}
-                        className="px-3.5 py-2 rounded-full border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 text-xs font-medium text-neutral-800 dark:text-neutral-200 hover:border-neutral-950 dark:hover:border-white transition-colors cursor-pointer"
+                        className="px-3.5 py-2 rounded-full border border-neutral-200 dark:border-neutral-700/80 bg-white dark:bg-[#262626] text-xs font-medium text-neutral-800 dark:text-neutral-200 hover:border-neutral-950 dark:hover:border-white transition-colors cursor-pointer"
                       >
                         {term}
                       </button>
@@ -534,7 +534,7 @@ export function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
                           setQuery(term);
                           handleExecuteSearch(term);
                         }}
-                        className="px-3.5 py-2 rounded-full border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 text-xs font-medium text-neutral-800 dark:text-neutral-200 hover:border-neutral-950 dark:hover:border-white transition-colors cursor-pointer"
+                        className="px-3.5 py-2 rounded-full border border-neutral-200 dark:border-neutral-700/80 bg-white dark:bg-[#262626] text-xs font-medium text-neutral-800 dark:text-neutral-200 hover:border-neutral-950 dark:hover:border-white transition-colors cursor-pointer"
                       >
                         {term}
                       </button>
@@ -566,9 +566,9 @@ export function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
                             },
                           });
                         }}
-                        className="flex items-center gap-3 p-3 min-h-[48px] rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 text-left hover:border-neutral-950 dark:hover:border-white transition-colors cursor-pointer"
+                        className="flex items-center gap-3 p-3 min-h-[48px] rounded-xl border border-neutral-200 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E] text-left hover:border-neutral-950 dark:hover:border-white transition-colors cursor-pointer"
                       >
-                        <div className="h-8 w-8 rounded-full border border-neutral-200 dark:border-neutral-700 flex items-center justify-center shrink-0">
+                        <div className="h-8 w-8 rounded-full border border-neutral-200 dark:border-neutral-700/80 flex items-center justify-center shrink-0">
                           <Icon className="h-4 w-4" aria-hidden="true" />
                         </div>
                         <span className="text-xs font-semibold text-neutral-900 dark:text-white">

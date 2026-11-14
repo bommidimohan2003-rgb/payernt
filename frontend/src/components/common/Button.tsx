@@ -38,13 +38,13 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variants: Record<ButtonVariant, string> = {
   primary:
-    "bg-[#161616] text-[#FFFFFF] hover:bg-[#292929] active:bg-[#0B0B0B] dark:bg-[#F2F0EA] dark:text-[#0A0A0A] dark:hover:bg-[#FFFDF7] dark:active:bg-[#DDD9D0] border border-transparent shadow-sm",
+    "bg-[#161616] text-[#FFFFFF] hover:bg-[#292929] active:bg-[#0B0B0B] dark:bg-[#FFFFFF] dark:text-[#121212] dark:hover:bg-[#E5E5E5] dark:active:bg-[#D4D4D4] border border-transparent shadow-sm",
   secondary:
-    "bg-[#FFFFFF] text-[#171717] border border-[#D6D6D6] hover:bg-[#F3F3F3] active:bg-[#EAEAEA] dark:bg-transparent dark:text-[#E8E4DA] dark:border-[rgba(242,240,234,0.35)] dark:hover:bg-[rgba(242,240,234,0.10)] dark:active:bg-[rgba(242,240,234,0.16)]",
+    "bg-[#FFFFFF] text-[#171717] border border-[#D6D6D6] hover:bg-[#F3F3F3] active:bg-[#EAEAEA] dark:bg-[#262626] dark:text-[#FFFFFF] dark:border-[#383838] dark:hover:bg-[#2E2E2E] dark:active:bg-[#1E1E1E]",
   ghost:
-    "bg-transparent text-[#333333] hover:bg-[#F4F4F4] active:bg-[#EAEAEA] dark:bg-transparent dark:text-[#CFC9BD] dark:hover:bg-[rgba(242,240,234,0.07)] dark:hover:text-[#F2F0EA] dark:active:bg-[rgba(242,240,234,0.12)]",
+    "bg-transparent text-[#333333] hover:bg-[#F4F4F4] active:bg-[#EAEAEA] dark:bg-transparent dark:text-[#B3B3B3] dark:hover:bg-[#262626] dark:hover:text-[#FFFFFF] dark:active:bg-[#2E2E2E]",
   outline:
-    "bg-transparent text-[#171717] border border-[#D6D6D6] hover:bg-[#F3F3F3] active:bg-[#EAEAEA] dark:bg-transparent dark:text-[#DDD8CD] dark:border-[#6F6A60] dark:hover:bg-[#F0ECE3] dark:hover:text-[#111111] dark:active:bg-[#DDD9D0]",
+    "bg-transparent text-[#171717] border border-[#D6D6D6] hover:bg-[#F3F3F3] active:bg-[#EAEAEA] dark:bg-transparent dark:text-[#FFFFFF] dark:border-[#383838] dark:hover:bg-[#262626] dark:hover:text-[#FFFFFF] dark:active:bg-[#2E2E2E]",
   destructive:
     "bg-[#FF1744] text-[#FFFFFF] hover:bg-[#D50000] active:bg-[#B71C1C] border border-transparent shadow-sm",
 };

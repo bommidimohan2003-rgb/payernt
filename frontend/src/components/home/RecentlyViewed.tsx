@@ -106,7 +106,7 @@ export function RecentlyViewed() {
   }
 
   return (
-    <section className="w-full py-5 sm:py-7 bg-neutral-50/50 dark:bg-neutral-900/30 border-b border-neutral-200/80 dark:border-neutral-800/80">
+    <section className="w-full py-5 sm:py-7 bg-neutral-50/50 dark:bg-[#1E1E1E] border-b border-neutral-200/80 dark:border-neutral-800/80">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mb-3.5">
           <h2 className="text-xl sm:text-2xl font-semibold tracking-tight text-neutral-950 dark:text-white">

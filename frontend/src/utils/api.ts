@@ -1,5 +1,7 @@
 import { storage, STORAGE_KEYS, resetPayentCache } from "./storage";
 import { isFakeOrDeletedProduct } from "./productFilters";
+import { INITIAL_FALLBACK_PRODUCTS } from "./fallbackProducts";
+import { matchesProductCategory } from "./categoryFilter";
 import type {
   Order,
   Product,
@@ -1810,7 +1812,7 @@ export const api = {
     if (token) headers["Authorization"] = `Bearer ${token}`;
 
     try {
-      const res = await fetchWithTimeout(url, { method: "GET", headers, signal }, 8000);
+      const res = await fetchWithTimeout(url, { method: "GET", headers, signal }, 25000);
       if (res.ok) {
         const json = await res.json();
         const raw = Array.isArray(json) ? json : json?.data || json?.products || [];
@@ -1864,32 +1866,69 @@ export const api = {
     const headers: Record<string, string> = {};
     if (token) headers["Authorization"] = `Bearer ${token}`;
 
-    const res = await fetchWithTimeout(url, { method: "GET", headers, signal }, 8000);
-    if (!res.ok) {
-      throw new Error(`Failed to load products (HTTP ${res.status})`);
+    try {
+      const res = await fetchWithTimeout(url, { method: "GET", headers, signal }, 25000);
+      if (!res.ok) {
+        throw new Error(`Failed to load products (HTTP ${res.status})`);
+      }
+      const json = await res.json();
+      const raw = Array.isArray(json) ? json : json?.data || json?.products || [];
+      const normalized = Array.isArray(raw)
+        ? raw.filter((p) => !isFakeOrDeletedProduct(p)).map((p) => normalizeProductData(p))
+        : [];
+
+      const totalHeader = res.headers?.get("X-Total-Count");
+      const parsedHeader = totalHeader !== null && totalHeader !== "" ? Number(totalHeader) : NaN;
+      const hasHeaderTotal = Number.isFinite(parsedHeader) && parsedHeader >= 0;
+
+      // Cache live products in local storage for instant offline / timeout fallback
+      if (normalized.length > 0 && typeof window !== "undefined") {
+        try {
+          const existing = storage.get<Product[]>("payent_server_products", []);
+          const mergedMap = new Map(existing.map((p) => [String(p.id), p]));
+          normalized.forEach((p) => mergedMap.set(String(p.id), p));
+          storage.set("payent_server_products", Array.from(mergedMap.values()));
+        } catch {}
+      }
+
+      // Client slice fallback only if an intermediary mock/proxy returns an unpaginated full list without X-Total-Count
+      const isUnpaginatedFallback = !hasHeaderTotal && normalized.length > limit;
+      const items = isUnpaginatedFallback
+        ? normalized.slice((page - 1) * limit, page * limit)
+        : normalized;
+      const total = hasHeaderTotal
+        ? parsedHeader
+        : isUnpaginatedFallback
+        ? normalized.length
+        : (page - 1) * limit + items.length;
+
+      return { items, total, page, limit };
+    } catch (err: unknown) {
+      if (signal?.aborted) throw err;
+      console.warn("[API] getFilteredProductsPage notice:", err);
+
+      // Graceful degraded recovery: If backend timed out or network dropped, serve cached or verified fallback catalog
+      const cached = typeof window !== "undefined" ? storage.get<Product[]>("payent_server_products", []) : [];
+      let fallbackPool = (cached && cached.length > 0 ? cached : INITIAL_FALLBACK_PRODUCTS)
+        .filter((p) => !isFakeOrDeletedProduct(p));
+
+      if (filters.categories) {
+        fallbackPool = fallbackPool.filter((p) => matchesProductCategory(p.category || "", filters.categories!));
+      }
+      if (filters.sort === "newest") {
+        fallbackPool = [...fallbackPool].sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")));
+      } else if (filters.sort === "price_asc") {
+        fallbackPool = [...fallbackPool].sort((a, b) => Number(a.daily_rate || a.price || 0) - Number(b.daily_rate || b.price || 0));
+      } else if (filters.sort === "price_desc") {
+        fallbackPool = [...fallbackPool].sort((a, b) => Number(b.daily_rate || b.price || 0) - Number(a.daily_rate || a.price || 0));
+      }
+
+      if (fallbackPool.length > 0) {
+        const items = fallbackPool.slice((page - 1) * limit, page * limit);
+        return { items, total: fallbackPool.length, page, limit };
+      }
+      throw err;
     }
-    const json = await res.json();
-    const raw = Array.isArray(json) ? json : json?.data || json?.products || [];
-    const normalized = Array.isArray(raw)
-      ? raw.filter((p) => !isFakeOrDeletedProduct(p)).map((p) => normalizeProductData(p))
-      : [];
-
-    const totalHeader = res.headers?.get("X-Total-Count");
-    const parsedHeader = totalHeader !== null && totalHeader !== "" ? Number(totalHeader) : NaN;
-    const hasHeaderTotal = Number.isFinite(parsedHeader) && parsedHeader >= 0;
-
-    // Client slice fallback only if an intermediary mock/proxy returns an unpaginated full list without X-Total-Count
-    const isUnpaginatedFallback = !hasHeaderTotal && normalized.length > limit;
-    const items = isUnpaginatedFallback
-      ? normalized.slice((page - 1) * limit, page * limit)
-      : normalized;
-    const total = hasHeaderTotal
-      ? parsedHeader
-      : isUnpaginatedFallback
-      ? normalized.length
-      : (page - 1) * limit + items.length;
-
-    return { items, total, page, limit };
   },
 
   async getPublicCategories() {

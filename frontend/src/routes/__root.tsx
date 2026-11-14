@@ -5,7 +5,6 @@ import {
   createRootRouteWithContext,
   useRouter,
   useRouterState,
-  useNavigate,
   HeadContent,
   Scripts,
   type ErrorComponentProps,
@@ -234,13 +233,6 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootContent() {
   const [showChatbot, setShowChatbot] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const navigate = useNavigate();
-
-  const handlePreloaderComplete = () => {
-    if (pathname === "/") {
-      navigate({ to: "/select" });
-    }
-  };
 
   useEffect(() => {
     const timer = setTimeout(() => setShowChatbot(true), 1000);
@@ -258,7 +250,7 @@ function RootContent() {
 
   return (
     <>
-      <AppPreloader onComplete={handlePreloaderComplete} />
+      <AppPreloader />
       {!hideMainNavigation && <Navigation4 />}
       <Outlet />
 

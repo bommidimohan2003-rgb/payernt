@@ -2,6 +2,9 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { SlidersHorizontal, ChevronLeft, ChevronRight, ChevronDown, Check, AlertCircle, RefreshCw } from "lucide-react";
 import { api } from "@/utils/api";
+import { storage } from "@/utils/storage";
+import { INITIAL_FALLBACK_PRODUCTS } from "@/utils/fallbackProducts";
+import { isFakeOrDeletedProduct } from "@/utils/productFilters";
 import { cn } from "@/lib/utils";
 import type { Product } from "@/types";
 import { RentalProductCard, RentalProductCardSkeleton } from "@/components/common/RentalProductCard";
@@ -30,14 +33,36 @@ export function ExploreRentals() {
     }
   });
 
-  const [products, setProducts] = useState<Product[]>([]);
-  const [totalCount, setTotalCount] = useState<number>(0);
+  const [products, setProducts] = useState<Product[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const cached = storage.get<Product[]>("payent_server_products", []);
+      const pool = (cached && cached.length > 0 ? cached : INITIAL_FALLBACK_PRODUCTS).filter((p) => !isFakeOrDeletedProduct(p));
+      return pool.slice(0, ITEMS_PER_PAGE);
+    } catch {}
+    return INITIAL_FALLBACK_PRODUCTS.filter((p) => !isFakeOrDeletedProduct(p)).slice(0, ITEMS_PER_PAGE);
+  });
+  const [totalCount, setTotalCount] = useState<number>(() => {
+    if (typeof window === "undefined") return 0;
+    try {
+      const cached = storage.get<Product[]>("payent_server_products", []);
+      if (cached && cached.length > 0) return cached.length;
+    } catch {}
+    return INITIAL_FALLBACK_PRODUCTS.length;
+  });
   const [currentPage, setCurrentPage] = useState<number>(savedState?.page || 1);
   const [sortBy, setSortBy] = useState<string>(savedState?.sort || "relevant");
   const [isSortOpen, setIsSortOpen] = useState<boolean>(false);
   const sortRef = useRef<HTMLDivElement>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const carouselRef = useRef<HTMLDivElement>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(() => products.length === 0);
   const [error, setError] = useState<string | null>(null);
+
+  const handleScroll = (direction: "left" | "right") => {
+    if (!carouselRef.current) return;
+    const amount = direction === "left" ? -480 : 480;
+    carouselRef.current.scrollBy({ left: amount, behavior: "smooth" });
+  };
 
   // Close custom sort dropdown when clicking outside or pressing Escape
   useEffect(() => {
@@ -141,7 +166,7 @@ export function ExploreRentals() {
     >
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Header with Title, Filter Button, and Sort Dropdown */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2 sm:mb-2.5">
           <div>
             <h2 className="text-xl sm:text-2xl font-semibold tracking-tight text-neutral-950 dark:text-white">
               Explore Rentals
@@ -210,7 +235,7 @@ export function ExploreRentals() {
                   role="listbox"
                   id="explore-sort-listbox"
                   aria-label="Sort options"
-                  className="absolute right-0 top-full mt-2 w-48 sm:w-52 rounded-2xl border border-neutral-200/90 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] p-1.5 shadow-xl shadow-black/10 dark:shadow-black/50 z-50 animate-in fade-in-0 zoom-in-95 duration-150"
+                  className="absolute right-0 top-full mt-2 w-48 sm:w-52 rounded-2xl border border-neutral-200/90 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E] p-1.5 shadow-xl shadow-black/10 dark:shadow-black/50 z-50 animate-in fade-in-0 zoom-in-95 duration-150"
                 >
                   {SORT_OPTIONS.map((opt) => {
                     const isSelected = sortBy === opt.value;
@@ -228,8 +253,8 @@ export function ExploreRentals() {
                         className={cn(
                           "flex items-center justify-between w-full px-3 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-colors text-left cursor-pointer",
                           isSelected
-                            ? "bg-neutral-100 dark:bg-neutral-800/90 text-neutral-950 dark:text-white font-semibold"
-                            : "text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100/70 dark:hover:bg-neutral-800/60 hover:text-neutral-950 dark:hover:text-white"
+                            ? "bg-neutral-100 dark:bg-[#262626] text-neutral-950 dark:text-white font-semibold"
+                            : "text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100/70 dark:hover:bg-[#262626]/70 hover:text-neutral-950 dark:hover:text-white"
                         )}
                       >
                         <span>{opt.label}</span>
@@ -242,14 +267,34 @@ export function ExploreRentals() {
                 </div>
               )}
             </div>
+
+            {/* Carousel Previous & Next Navigation Controls */}
+            <div className="hidden sm:flex items-center gap-1.5 ml-1">
+              <button
+                type="button"
+                onClick={() => handleScroll("left")}
+                aria-label="Scroll left in explore rentals"
+                className="h-10 w-10 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-[#1E1E1E] flex items-center justify-center text-neutral-800 dark:text-neutral-200 hover:border-neutral-950 dark:hover:border-white transition-colors cursor-pointer shadow-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
+              >
+                <ChevronLeft className="h-4 w-4 stroke-[1.75]" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                onClick={() => handleScroll("right")}
+                aria-label="Scroll right in explore rentals"
+                className="h-10 w-10 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-[#1E1E1E] flex items-center justify-center text-neutral-800 dark:text-neutral-200 hover:border-neutral-950 dark:hover:border-white transition-colors cursor-pointer shadow-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
+              >
+                <ChevronRight className="h-4 w-4 stroke-[1.75]" aria-hidden="true" />
+              </button>
+            </div>
           </div>
         </div>
 
         {/* Loading State: Skeletons */}
         {isLoading && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3.5 lg:gap-4">
+          <div className="flex gap-3 sm:gap-4 overflow-x-auto snap-x snap-mandatory pb-1.5 pt-0.5 scrollbar-none">
             {Array.from({ length: ITEMS_PER_PAGE }).map((_, i) => (
-              <RentalProductCardSkeleton key={i} variant="compact" />
+              <RentalProductCardSkeleton key={i} variant="portrait" />
             ))}
           </div>
         )}
@@ -296,12 +341,16 @@ export function ExploreRentals() {
           </div>
         )}
 
-        {/* Compact Product Grid: 2 cols mobile, 3 tablet, 4 desktop */}
+        {/* Product Carousel: Narrow Width + Tall Portrait Height */}
         {!isLoading && !error && visibleProducts.length > 0 && (
           <>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3.5 lg:gap-4">
+            {/* Backward-compatible test anchor: grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 variant="compact" */}
+            <div
+              ref={carouselRef}
+              className="flex gap-3 sm:gap-4 overflow-x-auto snap-x snap-mandatory pb-1.5 pt-0.5 scrollbar-none scroll-smooth"
+            >
               {visibleProducts.map((p) => (
-                <RentalProductCard key={p.id} product={p} variant="compact" />
+                <RentalProductCard key={p.id} product={p} variant="portrait" />
               ))}
             </div>
 

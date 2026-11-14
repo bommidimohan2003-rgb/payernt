@@ -57,19 +57,50 @@ interface CategoryDefinition {
   icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
 }
 
-// Category symbols and metadata preserved from the brand catalog cards
+// Category symbols and metadata preserved from the brand catalog cards (strictly unique symbols)
 const PRIMARY_CATEGORIES: CategoryDefinition[] = [
   { id: "all", name: "All Categories", icon: Layers },
   { id: "laptops", name: "Laptops / PCs", icon: Laptop },
   { id: "cameras", name: "Cameras", icon: Camera },
   { id: "drones", name: "Drones", icon: Drone },
-  { id: "audio", name: "Audio", icon: Headphones },
-  { id: "sound", name: "Sound Equipment", icon: Speaker },
+  { id: "audio", name: "Audio & Sound", icon: Headphones },
   { id: "tools", name: "Drills & Tools", icon: Drill },
   { id: "powerbanks", name: "Power Stations", icon: BatteryCharging },
   { id: "lighting", name: "Studio Lighting", icon: Lightbulb },
   { id: "bikes", name: "Bikes & Rides", icon: Bike },
+  { id: "gaming", name: "Gaming", icon: Gamepad2 },
+  { id: "music", name: "Instruments", icon: Music },
 ];
+
+const CATEGORY_ALIAS_MAP: Record<string, string> = {
+  electronics: "laptops",
+  electronic: "laptops",
+  laptops: "laptops",
+  laptop: "laptops",
+  vehicles: "bikes",
+  vehicle: "bikes",
+  bikes: "bikes",
+  bike: "bikes",
+  sound: "audio",
+  audio: "audio",
+  drills: "tools",
+  drill: "tools",
+  tools: "tools",
+  tool: "tools",
+  cameras: "cameras",
+  camera: "cameras",
+  drones: "drones",
+  drone: "drones",
+  powerbanks: "powerbanks",
+  power: "powerbanks",
+  lighting: "lighting",
+  light: "lighting",
+  studio: "lighting",
+  gaming: "gaming",
+  game: "gaming",
+  music: "music",
+  musical: "music",
+};
 
 const categoryIconMap: Record<
   string,
@@ -478,7 +509,7 @@ export default function Categories() {
     return map;
   }, [allProductsList, user]);
 
-  // Category filter chips with symbols from original category cards
+  // Category filter chips with symbols from original category cards (strictly unique symbols)
   const categoryChips = useMemo(() => {
     const list = PRIMARY_CATEGORIES.map((c) => ({
       id: c.id,
@@ -489,25 +520,40 @@ export default function Categories() {
 
     if (liveCategories && liveCategories.length > 0) {
       liveCategories.forEach((lc) => {
+        const canonicalId = CATEGORY_ALIAS_MAP[lc.id.toLowerCase()] || lc.id.toLowerCase();
         const exists = list.some(
           (item) =>
+            item.id.toLowerCase() === canonicalId ||
             item.id.toLowerCase() === lc.id.toLowerCase() ||
+            (CATEGORY_ALIAS_MAP[item.id.toLowerCase()] || item.id.toLowerCase()) === canonicalId ||
             item.name.toLowerCase() === lc.name.toLowerCase()
         );
         if (!exists) {
           const Icon = categoryIconMap[lc.id.toLowerCase()] || LayoutGrid;
-          const count = allProductsList.filter((p) => matchesProductCategory(p.category, lc.id)).length;
-          list.push({
-            id: lc.id,
-            name: lc.name,
-            icon: Icon,
-            count,
-          });
+          // Prevent duplicate symbols if another chip already uses this exact icon
+          const iconAlreadyUsed = list.some((item) => item.icon === Icon);
+          if (!iconAlreadyUsed) {
+            const count = allProductsList.filter((p) => matchesProductCategory(p.category, lc.id)).length;
+            list.push({
+              id: lc.id,
+              name: lc.name,
+              icon: Icon,
+              count,
+            });
+          }
         }
       });
     }
 
-    return list;
+    // Final deduplication pass to guarantee every displayed category symbol is strictly unique
+    const seenIcons = new Set();
+    return list.filter((item) => {
+      if (seenIcons.has(item.icon)) {
+        return false;
+      }
+      seenIcons.add(item.icon);
+      return true;
+    });
   }, [categoryCounts, liveCategories, allProductsList]);
 
   // Title for selected category
@@ -537,8 +583,8 @@ export default function Categories() {
               <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0 max-w-2xl">
                 <BackButton fallback="/payent" />
 
-                {/* Search Bar */}
-                <form onSubmit={handleSearchSubmit} className="relative flex-1 min-w-0 max-w-md">
+                {/* Search Bar (hidden on mobile screen as search is globally available in the navbar) */}
+                <form onSubmit={handleSearchSubmit} className="hidden sm:block relative flex-1 min-w-0 max-w-md">
                   <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-500 dark:text-neutral-400 pointer-events-none" aria-hidden="true" />
                   <input
                     type="text"

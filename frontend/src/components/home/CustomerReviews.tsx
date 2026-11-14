@@ -82,7 +82,7 @@ export function CustomerReviews() {
   }
 
   return (
-    <section className="w-full py-5 sm:py-7 bg-neutral-50/50 dark:bg-neutral-900/30 border-b border-neutral-200/80 dark:border-neutral-800/80">
+    <section className="w-full py-5 sm:py-7 bg-neutral-50/50 dark:bg-[#1E1E1E] border-b border-neutral-200/80 dark:border-neutral-800/80">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <div className="flex items-center justify-between mb-3.5">
@@ -101,7 +101,7 @@ export function CustomerReviews() {
                 type="button"
                 onClick={() => handleScroll("left")}
                 aria-label="Previous reviews"
-                className="h-11 w-11 rounded-full border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 flex items-center justify-center text-neutral-800 dark:text-neutral-200 hover:border-neutral-950 dark:hover:border-white transition-colors cursor-pointer shadow-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
+                className="h-11 w-11 rounded-full border border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E] flex items-center justify-center text-neutral-800 dark:text-neutral-200 hover:border-neutral-950 dark:hover:border-white transition-colors cursor-pointer shadow-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
               >
                 <ChevronLeft className="h-4 w-4 stroke-[1.75]" aria-hidden="true" />
               </button>
@@ -109,7 +109,7 @@ export function CustomerReviews() {
                 type="button"
                 onClick={() => handleScroll("right")}
                 aria-label="Next reviews"
-                className="h-11 w-11 rounded-full border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 flex items-center justify-center text-neutral-800 dark:text-neutral-200 hover:border-neutral-950 dark:hover:border-white transition-colors cursor-pointer shadow-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
+                className="h-11 w-11 rounded-full border border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E] flex items-center justify-center text-neutral-800 dark:text-neutral-200 hover:border-neutral-950 dark:hover:border-white transition-colors cursor-pointer shadow-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
               >
                 <ChevronRight className="h-4 w-4 stroke-[1.75]" aria-hidden="true" />
               </button>
@@ -123,7 +123,7 @@ export function CustomerReviews() {
             {Array.from({ length: 3 }).map((_, i) => (
               <div
                 key={i}
-                className="h-48 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-100/70 dark:bg-neutral-900 p-6"
+                className="h-48 rounded-2xl border border-neutral-200 dark:border-neutral-700/80 bg-neutral-100/70 dark:bg-[#1E1E1E] p-6"
               />
             ))}
           </div>
@@ -146,7 +146,7 @@ export function CustomerReviews() {
                 return (
                   <div
                     key={r.id || idx}
-                    className="snap-start shrink-0 w-[88vw] sm:w-[calc(33.333%-1rem)] flex flex-col justify-between rounded-2xl border border-neutral-200/90 dark:border-neutral-800 bg-white dark:bg-neutral-900/90 p-4 sm:p-5 shadow-xs"
+                    className="snap-start shrink-0 w-[88vw] sm:w-[calc(33.333%-1rem)] flex flex-col justify-between rounded-2xl border border-neutral-200/90 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E] p-4 sm:p-5 shadow-xs"
                   >
                     <div>
                       {/* Monochrome 5-Star Rating */}

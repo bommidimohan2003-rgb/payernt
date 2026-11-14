@@ -123,48 +123,58 @@ export function Categories() {
           </Link>
         </div>
 
-        {/* 6 Circular Monochrome Line Icon Cards (2 cols on mobile for full non-truncated names) */}
+        {/* 6 Category Cards Matching Explore Page Design (Circular Icon Frame + Text Label) */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 lg:gap-4">
           {CANONICAL_CATEGORIES.map((cat) => {
             const Icon = cat.icon;
             const isSelected = selectedCatId === cat.id;
-            const count = counts[cat.id] ?? counts[cat.name.toLowerCase()];
+            const count = counts[cat.id.toLowerCase()] ?? counts[cat.name.toLowerCase()];
 
             return (
               <button
                 key={cat.id}
                 type="button"
                 onClick={() => setSelectedCatId(cat.id)}
+                title={count !== undefined ? `${cat.name} (${count})` : cat.name}
+                aria-label={count !== undefined ? `${cat.name} (${count})` : cat.name}
                 className={cn(
-                  "group flex flex-col items-center text-center p-1.5 sm:p-2 min-h-[44px] rounded-2xl transition-colors duration-200 cursor-pointer select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white",
+                  "group flex flex-col items-center justify-center gap-1.5 p-2.5 sm:p-3 min-h-[88px] sm:min-h-[96px] rounded-2xl transition-colors duration-200 cursor-pointer select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white",
                   isSelected
-                    ? "bg-neutral-100 dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 shadow-xs"
-                    : "hover:bg-neutral-50 dark:hover:bg-neutral-900/50 border border-transparent"
+                    ? "bg-neutral-100 dark:bg-[#262626] border border-neutral-300 dark:border-neutral-700/80 shadow-xs"
+                    : "hover:bg-neutral-50 dark:hover:bg-[#262626]/50 border border-transparent"
                 )}
                 aria-pressed={isSelected}
               >
-                {/* Circular monochrome icon frame */}
+                {/* Circular monochrome icon frame matching Explore page */}
                 <div
                   className={cn(
-                    "flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-full border transition-colors duration-200",
+                    "inline-flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-full border shadow-xs transition-colors duration-200",
                     isSelected
-                      ? "border-neutral-950 bg-neutral-950 text-white dark:border-white dark:bg-white dark:text-neutral-950 shadow-xs"
-                      : "border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 group-hover:border-neutral-400 dark:group-hover:border-neutral-600 group-hover:text-neutral-950 dark:group-hover:text-white"
+                      ? "border-neutral-950 bg-neutral-950 text-white dark:border-white dark:bg-white dark:text-neutral-950"
+                      : "border-neutral-200 dark:border-neutral-800 bg-neutral-100 dark:bg-[#1E1E1E] text-neutral-700 dark:text-neutral-300 group-hover:border-neutral-300 dark:group-hover:border-neutral-700 group-hover:bg-neutral-200 dark:group-hover:bg-neutral-800 group-hover:text-neutral-950 dark:group-hover:text-white"
                   )}
                 >
-                  <Icon className="h-4.5 w-4.5 sm:h-5 sm:w-5 stroke-[1.75]" />
+                  <Icon
+                    className={cn(
+                      "h-5 w-5 sm:h-6 sm:w-6 shrink-0 transition-colors duration-200 stroke-[1.6]",
+                      isSelected
+                        ? "text-white dark:text-neutral-950"
+                        : "text-neutral-700 dark:text-neutral-300 group-hover:text-neutral-950 dark:group-hover:text-white"
+                    )}
+                  />
                 </div>
 
-                {/* Category Name (untruncated across mobile and desktop) */}
-                <span className="mt-1 text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white leading-snug">
+                {/* Category label beneath matching Explore page */}
+                <span
+                  className={cn(
+                    "text-[11px] sm:text-xs text-center leading-tight truncate max-w-[110px] transition-colors duration-200",
+                    isSelected
+                      ? "font-semibold text-neutral-950 dark:text-white"
+                      : "font-medium text-neutral-600 dark:text-neutral-400 group-hover:text-neutral-950 dark:group-hover:text-white"
+                  )}
+                >
                   {cat.name}
                 </span>
-
-                {count !== undefined && count > 0 && (
-                  <span className="mt-0.5 text-xs text-neutral-600 dark:text-neutral-400 tabular-nums">
-                    {count} items
-                  </span>
-                )}
               </button>
             );
           })}
@@ -193,7 +203,7 @@ export function Categories() {
                   key={sub}
                   type="button"
                   onClick={() => handleSubcategoryClick(sub)}
-                  className="shrink-0 min-h-[34px] px-3 py-1 rounded-full border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900 text-xs font-medium text-neutral-800 dark:text-neutral-200 hover:border-neutral-950 dark:hover:border-white hover:text-neutral-950 dark:hover:text-white transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
+                  className="shrink-0 min-h-[34px] px-3 py-1 rounded-full border border-neutral-300 dark:border-neutral-700/80 bg-neutral-50 dark:bg-[#262626] text-xs font-medium text-neutral-800 dark:text-neutral-200 hover:border-neutral-950 dark:hover:border-white hover:text-neutral-950 dark:hover:text-white transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
                 >
                   {sub}
                 </button>

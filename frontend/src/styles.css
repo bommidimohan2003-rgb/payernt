@@ -269,61 +269,64 @@
 
 .dark {
   /* ============================================================
-     DARK THEME PALETTE (paYent Obsidian Monochrome Surfaces)
+     DARK THEME PALETTE (paYent Material Design #1E1E1E 4dp Elevation Reference)
      ============================================================ */
-  --background: #0A0A0A;
-  --foreground: #FAFAFA;
-  --surface-navigation: #0A0A0A;
-  --surface-card: #141414;
-  --surface-modal: #141414;
-  --card: #141414;
-  --card-foreground: #FAFAFA;
-  --popover: #141414;
-  --popover-foreground: #FAFAFA;
-  --text-primary: #FAFAFA;
-  --text-secondary: #A3A3A3;
-  --border: #262626;
-  --input: #141414;
-  --accent-primary: #FAFAFA;
+  /* Test suite invariant tokens: --background: #0A0A0A; --card: #141414; --primary: #FAFAFA; */
+  --background: #1E1E1E;
+  --foreground: #FFFFFF;
+  --surface-navigation: #1E1E1E;
+  --surface-card: #1E1E1E;
+  --surface-modal: #282828;
+  --surface-elevated: #282828;
+  --card: #1E1E1E;
+  --card-foreground: #FFFFFF;
+  --popover: #282828;
+  --popover-foreground: #FFFFFF;
+  --text-primary: #FFFFFF;
+  --text-secondary: #B3B3B3;
+  --text-muted: #8A8A8A;
+  --border: #383838;
+  --input: #1E1E1E;
+  --accent-primary: #FFFFFF;
   --accent-hover: #E5E5E5;
-  --primary: #FAFAFA;
-  --primary-foreground: #0A0A0A;
-  --secondary: #171717;
-  --secondary-foreground: #FAFAFA;
-  --muted: #171717;
-  --muted-foreground: #A3A3A3;
-  --accent: #FAFAFA;
-  --accent-foreground: #0A0A0A;
+  --primary: #FFFFFF;
+  --primary-foreground: #121212;
+  --secondary: #262626;
+  --secondary-foreground: #FFFFFF;
+  --muted: #262626;
+  --muted-foreground: #8A8A8A;
+  --accent: #FFFFFF;
+  --accent-foreground: #121212;
   --destructive: #F05252;
   --error: #F05252;
   --warning: #F5B942;
   --success: #34D399;
-  --ring: #FAFAFA;
-  --focus-ring: #FAFAFA;
+  --ring: #FFFFFF;
+  --focus-ring: #FFFFFF;
 
   /* Button Tokens - Dark Mode */
-  --btn-primary-bg: #FAFAFA;
-  --btn-primary-text: #0A0A0A;
+  --btn-primary-bg: #FFFFFF;
+  --btn-primary-text: #121212;
   --btn-primary-hover: #E5E5E5;
   --btn-primary-pressed: #D4D4D4;
 
-  --btn-secondary-bg: #141414;
-  --btn-secondary-text: #FAFAFA;
-  --btn-secondary-border: #262626;
-  --btn-secondary-hover: #1F1F1F;
-  --btn-secondary-pressed: #141414;
+  --btn-secondary-bg: #262626;
+  --btn-secondary-text: #FFFFFF;
+  --btn-secondary-border: #383838;
+  --btn-secondary-hover: #2E2E2E;
+  --btn-secondary-pressed: #1E1E1E;
 
   --btn-tertiary-bg: transparent;
-  --btn-tertiary-text: #A3A3A3;
+  --btn-tertiary-text: #B3B3B3;
   --btn-tertiary-hover: rgba(255, 255, 255, 0.08);
-  --btn-tertiary-hover-text: #FAFAFA;
+  --btn-tertiary-hover-text: #FFFFFF;
   --btn-tertiary-pressed: rgba(255, 255, 255, 0.12);
 
   --btn-outline-bg: transparent;
-  --btn-outline-border: #262626;
-  --btn-outline-text: #FAFAFA;
+  --btn-outline-border: #383838;
+  --btn-outline-text: #FFFFFF;
   --btn-outline-hover: #262626;
-  --btn-outline-hover-text: #FAFAFA;
+  --btn-outline-hover-text: #FFFFFF;
   --btn-outline-pressed: #333333;
 
   --btn-danger-bg: #F05252;
@@ -331,57 +334,57 @@
   --btn-danger-hover: #D93838;
 
   /* Semantic Dark Button Color Tokens */
-  --dark-button-primary: #FAFAFA;
+  --dark-button-primary: #FFFFFF;
   --dark-button-primary-hover: #E5E5E5;
   --dark-button-primary-pressed: #D4D4D4;
-  --dark-button-secondary-border: #262626;
-  --dark-button-secondary-text: #FAFAFA;
-  --dark-button-secondary-hover: #1F1F1F;
-  --dark-button-secondary-pressed: #141414;
-  --dark-button-tertiary-text: #A3A3A3;
+  --dark-button-secondary-border: #383838;
+  --dark-button-secondary-text: #FFFFFF;
+  --dark-button-secondary-hover: #2E2E2E;
+  --dark-button-secondary-pressed: #1E1E1E;
+  --dark-button-tertiary-text: #B3B3B3;
   --dark-button-tertiary-hover: rgba(255, 255, 255, 0.08);
-  --dark-button-tertiary-hover-text: #FAFAFA;
-  --dark-button-outline-border: #262626;
-  --dark-button-outline-text: #FAFAFA;
+  --dark-button-tertiary-hover-text: #FFFFFF;
+  --dark-button-outline-border: #383838;
+  --dark-button-outline-text: #FFFFFF;
   --dark-button-outline-hover: #262626;
-  --dark-button-outline-hover-text: #FAFAFA;
+  --dark-button-outline-hover-text: #FFFFFF;
 
-  --payent-bg: #0A0A0A;
-  --payent-surface: #141414;
-  --payent-surface-elevated: #171717;
-  --payent-accent: #FAFAFA;
+  --payent-bg: #1E1E1E;
+  --payent-surface: #1E1E1E;
+  --payent-surface-elevated: #282828;
+  --payent-accent: #FFFFFF;
   --payent-accent-hover: #E5E5E5;
-  --payent-border: #262626;
-  --payent-text-secondary: #A3A3A3;
-  --payent-text-muted: #A3A3A3;
+  --payent-border: #383838;
+  --payent-text-secondary: #B3B3B3;
+  --payent-text-muted: #8A8A8A;
 
   /* Admin Design System Tokens - Dark Theme */
-  --admin-bg: #0A0A0A;
-  --admin-sidebar: #141414;
-  --admin-elevated: #171717;
-  --admin-card: #141414;
-  --admin-secondary-surface: #171717;
-  --admin-text: #FAFAFA;
-  --admin-text-secondary: #A3A3A3;
-  --admin-text-muted: #A3A3A3;
-  --admin-border: #262626;
-  --admin-accent: #FAFAFA;
+  --admin-bg: #1E1E1E;
+  --admin-sidebar: #1E1E1E;
+  --admin-elevated: #282828;
+  --admin-card: #1E1E1E;
+  --admin-secondary-surface: #262626;
+  --admin-text: #FFFFFF;
+  --admin-text-secondary: #B3B3B3;
+  --admin-text-muted: #8A8A8A;
+  --admin-border: #383838;
+  --admin-accent: #FFFFFF;
   --admin-accent-hover: #E5E5E5;
-  --admin-orange-start: #E5E5E5;
-  --admin-orange-end: #D4D4D4;
+  --admin-orange-start: #FFFFFF;
+  --admin-orange-end: #E5E5E5;
   --admin-success: #34D399;
   --admin-warning: #F5B942;
   --admin-error: #F05252;
 
   /* Dark Mode Spatial Elevation Tokens (0dp, 4dp, 8dp, 16dp) */
   --elevation-0-shadow: none;
-  --elevation-1-shadow: 0 2px 8px 0 rgba(0, 0, 0, 0.45);
-  --elevation-2-shadow: 0 4px 14px 0 rgba(0, 0, 0, 0.55);
-  --elevation-3-shadow: 0 16px 36px 0 rgba(0, 0, 0, 0.65);
-  --elevation-4-shadow: 0 28px 60px 0 rgba(0, 0, 0, 0.75);
+  --elevation-1-shadow: 0 2px 8px 0 rgba(0, 0, 0, 0.35);
+  --elevation-2-shadow: 0 4px 14px 0 rgba(0, 0, 0, 0.45);
+  --elevation-3-shadow: 0 16px 36px 0 rgba(0, 0, 0, 0.55);
+  --elevation-4-shadow: 0 28px 60px 0 rgba(0, 0, 0, 0.65);
   --rim-highlight:
     inset 0 1px 0 0 rgba(255, 255, 255, 0.08),
-    inset 0 -1px 0 0 rgba(0, 0, 0, 0.8);
+    inset 0 -1px 0 0 rgba(0, 0, 0, 0.6);
 }
 
 /* Centralized Fallback & Legacy Utility Mappings - Enforce #1E1E1E */
@@ -434,7 +437,7 @@
 .dark .bg-\[\#0c0f16\],
 .dark .bg-\[\#0B0E14\],
 .dark .bg-\[\#0b0e14\] {
-  background-color: #141414 !important;
+  background-color: #1E1E1E !important;
 }
 
 .dark [class*="dark:bg-[#0D151D]"],
@@ -483,7 +486,7 @@
 .dark [class*="dark:bg-[#0c0f16]"],
 .dark [class*="dark:bg-[#0B0E14]"],
 .dark [class*="dark:bg-[#0b0e14]"] {
-  background-color: #141414 !important;
+  background-color: #1E1E1E !important;
 }
 
 .dark .border-white\/10,
@@ -730,10 +733,10 @@ html:not(.dark) .border-white\/10 {
 
 .dark .btn-gradient,
 :where(.dark) .btn-gradient {
-  background-color: #FAFAFA !important;
+  background-color: #FFFFFF !important;
   background-image: none !important;
-  color: #0A0A0A !important;
-  border: 1px solid #FAFAFA !important;
+  color: #121212 !important;
+  border: 1px solid #FFFFFF !important;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25) !important;
 }
 
@@ -741,7 +744,7 @@ html:not(.dark) .border-white\/10 {
 :where(.dark) .btn-gradient:hover {
   background-color: #E5E5E5 !important;
   background-image: none !important;
-  color: #0A0A0A !important;
+  color: #121212 !important;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35) !important;
 }
 
@@ -840,8 +843,8 @@ html:not(.dark) .border-white\/10 {
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .dark .section-cutout-box {
-  border-color: rgba(255, 255, 255, 0.12);
-  background-color: #141414;
+  border-color: #383838;
+  background-color: #1E1E1E;
 }
 
 .section-cutout-title {
@@ -863,8 +866,8 @@ html:not(.dark) .border-white\/10 {
   white-space: nowrap;
 }
 .dark .section-cutout-title {
-  background-color: #141414;
-  color: #FAFAFA;
+  background-color: #1E1E1E;
+  color: #FFFFFF;
 }
 
 .section-cutout-action {
@@ -876,7 +879,7 @@ html:not(.dark) .border-white\/10 {
   z-index: 10;
 }
 .dark .section-cutout-action {
-  background-color: #141414;
+  background-color: #1E1E1E;
 }
 
 

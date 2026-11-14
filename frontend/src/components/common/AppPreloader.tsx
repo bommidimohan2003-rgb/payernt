@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 
 interface AppPreloaderProps {
@@ -26,6 +26,11 @@ export function AppPreloader({
   const [typedCount, setTypedCount] = useState(0);
   const shouldReduceMotion = useReducedMotion();
 
+  const onCompleteRef = useRef(onComplete);
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
+
   // Target coordinates for permanent navbar brand logo
   const [navTarget, setNavTarget] = useState({
     top: 34,
@@ -51,7 +56,7 @@ export function AppPreloader({
         pathname.startsWith("/forgot-password") ||
         pathname.startsWith("/reset-password");
       if (isAuthRoute) {
-        if (onComplete) onComplete();
+        onCompleteRef.current?.();
         return;
       }
 
@@ -59,7 +64,7 @@ export function AppPreloader({
       const urlParams = new URLSearchParams(window.location.search);
       const replay = urlParams.get("preload") === "true";
       if (urlParams.get("nopreloader") === "true") {
-        if (onComplete) onComplete();
+        onCompleteRef.current?.();
         return;
       }
 
@@ -70,7 +75,7 @@ export function AppPreloader({
         try {
           sessionStorage.setItem("payent:preloaded", "true");
         } catch {}
-        if (onComplete) onComplete();
+        onCompleteRef.current?.();
         return;
       }
 
@@ -83,12 +88,12 @@ export function AppPreloader({
     }
 
     if (hasSeen) {
-      if (onComplete) onComplete();
+      onCompleteRef.current?.();
       return;
     }
 
     setIsVisible(true);
-  }, [forceShow, onComplete]);
+  }, [forceShow]);
 
   // Measure navbar logo coordinates and compute center-to-left translation delta
   useEffect(() => {
@@ -149,7 +154,7 @@ export function AppPreloader({
         try {
           sessionStorage.setItem("payent:preloaded", "true");
         } catch {}
-        if (onComplete) onComplete();
+        onCompleteRef.current?.();
       }, 700);
       return () => clearTimeout(tReduce);
     }
@@ -187,14 +192,14 @@ export function AppPreloader({
         try {
           sessionStorage.setItem("payent:preloaded", "true");
         } catch {}
-        if (onComplete) onComplete();
+        onCompleteRef.current?.();
       }, 1150)
     );
 
     return () => {
       timers.forEach(clearTimeout);
     };
-  }, [isVisible, shouldReduceMotion, onComplete]);
+  }, [isVisible, shouldReduceMotion]);
 
   if (!mounted || !isVisible) return null;
 

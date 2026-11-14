@@ -5779,6 +5779,97 @@ def fetch_user_listings(email: str = Depends(get_current_user_email)):
     booked_set = set(check_products_booking_conflicts(pids, today_str, today_str)) if pids else set()
     return [format_product_dict(p, is_summary=False, booked_pids_set=booked_set, is_public=False) for p in listings]
 
+_BASE_PUBLIC_LISTINGS_CACHE = {"time": 0, "listings": []}
+_TODAY_BOOKED_CACHE = {"date": "", "time": 0, "booked": set()}
+
+def get_base_public_listings() -> list:
+    now = time.time()
+    if now - _BASE_PUBLIC_LISTINGS_CACHE["time"] < 120 and _BASE_PUBLIC_LISTINGS_CACHE["listings"]:
+        return [dict(p) for p in _BASE_PUBLIC_LISTINGS_CACHE["listings"]]
+
+    listings = get_all_approved_custom_products(limit=None, offset=0) or []
+    try:
+        from payernt_database import get_all_active_payernt_products
+        payernt_items = get_all_active_payernt_products()
+        for p in payernt_items:
+            if not any(str(l.get("id")) == str(p.get("id")) for l in listings):
+                raw_imgs = p.get("images")
+                if isinstance(raw_imgs, str) and raw_imgs.startswith("["):
+                    try:
+                        parsed_imgs = json.loads(raw_imgs)
+                    except Exception:
+                        parsed_imgs = [p.get("primary_image")] if p.get("primary_image") else []
+                elif isinstance(raw_imgs, list):
+                    parsed_imgs = raw_imgs
+                else:
+                    parsed_imgs = [p.get("primary_image")] if p.get("primary_image") else []
+                
+                v_url = p.get("video_url") or ""
+
+                listings.append({
+                    "id": p.get("id"),
+                    "title": p.get("title") or p.get("name"),
+                    "name": p.get("name"),
+                    "brand": p.get("brand", ""),
+                    "model": p.get("model", ""),
+                    "description": p.get("description"),
+                    "price": p.get("daily_rate", 999),
+                    "daily_rate": p.get("daily_rate", 999),
+                    "dailyRate": p.get("daily_rate", 999),
+                    "pricePerDay": p.get("daily_rate", 999),
+                    "pricing": p.get("pricing") if isinstance(p.get("pricing"), dict) else {
+                        "daily": p.get("daily_rate", 999),
+                        "dailyRate": p.get("daily_rate", 999),
+                        "weekly": round(float(p.get("daily_rate", 999)) * 7 * 0.85),
+                        "monthly": round(float(p.get("daily_rate", 999)) * 30 * 0.7),
+                    },
+                    "image": p.get("primary_image") or (parsed_imgs[0] if parsed_imgs else ""),
+                    "primary_image": p.get("primary_image"),
+                    "images": parsed_imgs,
+                    "video_url": v_url or None,
+                    "videoUrl": v_url or None,
+                    "category": p.get("category", "tech"),
+                    "condition": p.get("condition_grade", "Like New"),
+                    "rating": 4.9,
+                    "reviews": 12,
+                    "available": p.get("available", True),
+                    "owner_id": p.get("owner_id"),
+                    "ownerId": p.get("owner_id"),
+                    "owner_email": p.get("owner_email"),
+                    "ownerEmail": p.get("owner_email"),
+                    "user_email": p.get("owner_email"),
+                    "userEmail": p.get("owner_email"),
+                    "owner_name": p.get("owner_name", "Payent Verified Vendor"),
+                    "owner_avatar": p.get("owner_avatar") or "",
+                    "owner_rating": 4.9,
+                    "city": p.get("city"),
+                    "area": p.get("area"),
+                    "pincode": p.get("pincode"),
+                    "state": p.get("state"),
+                    "owner_city": p.get("owner_city") or p.get("city"),
+                    "owner_state": p.get("owner_state") or p.get("state"),
+                    "created_at": p.get("created_at"),
+                    "status": "approved",
+                    "featured": True,
+                    "is_vendor_product": True,
+                    "is_payernt_product": True,
+                })
+    except Exception:
+        pass
+
+    if listings:
+        listings = [
+            p for p in listings
+            if not any(
+                k in str(p.get("title", "") or p.get("name", "") or p.get("model", "") or p.get("id", "") or "").lower()
+                for k in ["fx3", "cinema line", "prod-1790474939846-841", "prod-1790474367552-646", "p-custom-1791012883229", "sony-fx3"]
+            )
+        ]
+
+    _BASE_PUBLIC_LISTINGS_CACHE["time"] = now
+    _BASE_PUBLIC_LISTINGS_CACHE["listings"] = listings
+    return [dict(p) for p in listings]
+
 @app.get("/api/products")
 @app.get("/api/products/custom/public")
 def fetch_public_listings(
@@ -5797,9 +5888,28 @@ def fetch_public_listings(
     sort: Optional[str] = Query(None),
     authorization: Optional[str] = Header(None)
 ):
-    response.headers["Cache-Control"] = "public, max-age=30, stale-while-revalidate=120"
-    page_num = page or 1
-    offset = (page_num - 1) * limit if limit is not None else 0
+    if response is not None and hasattr(response, "headers"):
+        response.headers["Cache-Control"] = "public, max-age=60, stale-while-revalidate=300"
+
+    def _val(x, default=None):
+        if x is None:
+            return default
+        if hasattr(x, "default"):
+            return x.default if x.default is not ... else default
+        return x
+
+    limit_val = _val(limit, None)
+    page_val = _val(page, 1)
+    try:
+        page_num = int(page_val) if page_val is not None else 1
+    except Exception:
+        page_num = 1
+    try:
+        limit_num = int(limit_val) if limit_val is not None else None
+    except Exception:
+        limit_num = None
+
+    offset = (page_num - 1) * limit_num if limit_num is not None else 0
     cache_key = (
         f"public_custom_products:q{q}:cat{categories}:min{min_price}:"
         f"max{max_price}:c{city}:pin{pincode}:cond{condition}:s{start_date}:e{end_date}:sort{sort}"
@@ -5826,88 +5936,7 @@ def fetch_public_listings(
                     pass
 
     def _load():
-        listings = get_all_approved_custom_products(limit=None, offset=0) or []
-        try:
-            from payernt_database import get_all_active_payernt_products
-            payernt_items = get_all_active_payernt_products()
-            for p in payernt_items:
-                if not any(str(l.get("id")) == str(p.get("id")) for l in listings):
-                    raw_imgs = p.get("images")
-                    if isinstance(raw_imgs, str) and raw_imgs.startswith("["):
-                        try:
-                            parsed_imgs = json.loads(raw_imgs)
-                        except Exception:
-                            parsed_imgs = [p.get("primary_image")] if p.get("primary_image") else []
-                    elif isinstance(raw_imgs, list):
-                        parsed_imgs = raw_imgs
-                    else:
-                        parsed_imgs = [p.get("primary_image")] if p.get("primary_image") else []
-                    
-                    v_url = p.get("video_url") or ""
-
-                    listings.append({
-                        "id": p.get("id"),
-                        "title": p.get("title") or p.get("name"),
-                        "name": p.get("name"),
-                        "brand": p.get("brand", ""),
-                        "model": p.get("model", ""),
-                        "description": p.get("description"),
-                        "price": p.get("daily_rate", 999),
-                        "daily_rate": p.get("daily_rate", 999),
-                        "dailyRate": p.get("daily_rate", 999),
-                        "pricePerDay": p.get("daily_rate", 999),
-                        "pricing": p.get("pricing") if isinstance(p.get("pricing"), dict) else {
-                            "daily": p.get("daily_rate", 999),
-                            "dailyRate": p.get("daily_rate", 999),
-                            "weekly": round(float(p.get("daily_rate", 999)) * 7 * 0.85),
-                            "monthly": round(float(p.get("daily_rate", 999)) * 30 * 0.7),
-                        },
-                        "image": p.get("primary_image") or (parsed_imgs[0] if parsed_imgs else ""),
-                        "primary_image": p.get("primary_image"),
-                        "images": parsed_imgs,
-                        "video_url": v_url or None,
-                        "videoUrl": v_url or None,
-                        "category": p.get("category", "tech"),
-                        "condition": p.get("condition_grade", "Like New"),
-                        "rating": 4.9,
-                        "reviews": 12,
-                        "available": p.get("available", True),
-                        "owner_id": p.get("owner_id"),
-                        "ownerId": p.get("owner_id"),
-                        "owner_email": p.get("owner_email"),
-                        "ownerEmail": p.get("owner_email"),
-                        "user_email": p.get("owner_email"),
-                        "userEmail": p.get("owner_email"),
-                        "owner_name": p.get("owner_name", "Payent Verified Vendor"),
-                        "owner_avatar": p.get("owner_avatar") or "",
-                        "owner_rating": 4.9,
-                        "city": p.get("city"),
-                        "area": p.get("area"),
-                        "pincode": p.get("pincode"),
-                        "state": p.get("state"),
-                        "owner_city": p.get("owner_city") or p.get("city"),
-                        "owner_state": p.get("owner_state") or p.get("state"),
-                        "created_at": p.get("created_at"),
-                        "status": "approved",
-                        "featured": True,
-                        "is_vendor_product": True,
-                        "is_payernt_product": True,
-                    })
-        except Exception:
-            pass
-
-        if not listings:
-            return []
-
-        # Strictly exclude fake or deleted products (specifically Sony FX3)
-        listings = [
-            p for p in listings
-            if not any(
-                k in str(p.get("title", "") or p.get("name", "") or p.get("model", "") or p.get("id", "") or "").lower()
-                for k in ["fx3", "cinema line", "prod-1790474939846-841", "prod-1790474367552-646", "p-custom-1791012883229", "sony-fx3"]
-            )
-        ]
-
+        listings = get_base_public_listings()
         if not listings:
             return []
 
@@ -6021,7 +6050,14 @@ def fetch_public_listings(
             booked_set = set()
         else:
             today_str = dt.now(timezone.utc).strftime("%Y-%m-%d")
-            booked_set = set(check_products_booking_conflicts(pids, today_str, today_str)) if pids else set()
+            now_ts = time.time()
+            if _TODAY_BOOKED_CACHE.get("date") == today_str and now_ts - _TODAY_BOOKED_CACHE.get("time", 0) < 60:
+                booked_set = _TODAY_BOOKED_CACHE.get("booked", set())
+            else:
+                booked_set = set(check_products_booking_conflicts(pids, today_str, today_str)) if pids else set()
+                _TODAY_BOOKED_CACHE["date"] = today_str
+                _TODAY_BOOKED_CACHE["time"] = now_ts
+                _TODAY_BOOKED_CACHE["booked"] = booked_set
 
         # 6. Sorting
         if sort == "price_asc":
@@ -6035,7 +6071,7 @@ def fetch_public_listings(
 
         return [format_product_dict(p, is_summary=True, booked_pids_set=booked_set, is_public=True) for p in listings]
 
-    all_listings = get_cached(cache_key, 30, _load) or []
+    all_listings = get_cached(cache_key, 120, _load) or []
     if caller_email and all_listings:
         visible_listings = [
             p for p in all_listings
@@ -6044,10 +6080,11 @@ def fetch_public_listings(
     else:
         visible_listings = list(all_listings)
 
-    response.headers["X-Total-Count"] = str(len(visible_listings))
+    if response is not None and hasattr(response, "headers"):
+        response.headers["X-Total-Count"] = str(len(visible_listings))
 
-    if limit is not None and limit > 0:
-        return visible_listings[offset : offset + limit]
+    if limit_num is not None and limit_num > 0:
+        return visible_listings[offset : offset + limit_num]
     return visible_listings
 
 @app.get("/api/products/custom/{id}")
@@ -6055,7 +6092,7 @@ def fetch_public_listings(
 def fetch_product_by_id(id: str, response: Response):
     if any(k in id.lower() for k in ["fx3", "cinema line", "prod-1790474939846-841", "prod-1790474367552-646", "p-custom-1791012883229", "sony-fx3"]):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found.")
-    response.headers["Cache-Control"] = "public, max-age=30, stale-while-revalidate=120"
+    response.headers["Cache-Control"] = "public, max-age=60, stale-while-revalidate=300"
     def _load_prod():
         product = fetch_one_product(id)
         if not product:
@@ -13288,7 +13325,7 @@ def list_public_reviews(
 ):
     """Retrieve verified production customer reviews with server-side pagination, sorting, and filtering."""
     target_pid = product_id or productId
-    response.headers["Cache-Control"] = "public, max-age=30, stale-while-revalidate=120"
+    response.headers["Cache-Control"] = "public, max-age=60, stale-while-revalidate=300"
     cache_key = f"public_reviews:{page}:{limit}:{sort}:{rating}:{target_pid}:{verified_only}"
     return get_cached(
         cache_key,

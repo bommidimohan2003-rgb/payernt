@@ -73,10 +73,10 @@ export function WhyChoose() {
             return (
               <div
                 key={idx}
-                className="flex flex-col p-2 sm:p-2.5 rounded-xl border border-neutral-200/90 dark:border-neutral-800 bg-white dark:bg-neutral-900/90 shadow-xs"
+                className="flex flex-col p-2 sm:p-2.5 rounded-xl border border-neutral-200/90 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E] shadow-xs"
               >
                 <div className="flex items-center gap-1.5 mb-0.5 min-w-0">
-                  <div className="h-6 w-6 shrink-0 rounded-full border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800 flex items-center justify-center text-neutral-900 dark:text-white">
+                  <div className="h-6 w-6 shrink-0 rounded-full border border-neutral-200 dark:border-neutral-700/80 bg-neutral-50 dark:bg-[#262626] flex items-center justify-center text-neutral-900 dark:text-white">
                     <Icon className="h-3 w-3 stroke-[1.75]" aria-hidden="true" />
                   </div>
                   <h3 className="text-[11px] sm:text-xs font-semibold text-neutral-950 dark:text-white leading-tight">

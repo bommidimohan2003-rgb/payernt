@@ -189,12 +189,12 @@ export function Sidebar() {
       {/* Icon-Only Compact Navigation Rail (Symbols Only, No Names) */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 flex flex-col w-[72px] bg-white dark:bg-[#1E1E1E] border-r border-[#E6E4E9] dark:border-[#273244] transition-transform duration-200 ease-out lg:sticky lg:top-0 lg:h-screen shrink-0 select-none shadow-[2px_0_12px_rgba(0,0,0,0.02)]",
+          "fixed inset-y-0 left-0 z-40 flex flex-col w-[72px] bg-white dark:bg-[#1E1E1E] border-r border-[#E6E4E9] dark:border-[#383838] transition-transform duration-200 ease-out lg:sticky lg:top-0 lg:h-screen shrink-0 select-none shadow-[2px_0_12px_rgba(0,0,0,0.02)]",
           mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
         )}
       >
         {/* Workspace Brand Header (Icon Only) */}
-        <div className="flex items-center justify-center h-16 border-b border-[#E6E4E9] dark:border-[#273244] shrink-0">
+        <div className="flex items-center justify-center h-16 border-b border-[#E6E4E9] dark:border-[#383838] shrink-0">
           <Tooltip>
             <TooltipTrigger asChild>
               <Link
@@ -213,7 +213,7 @@ export function Sidebar() {
             <TooltipContent
               side="right"
               sideOffset={12}
-              className="bg-[#242424] text-white dark:bg-[#1E1E1E] dark:text-[#F8FAFC] text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-black/10 dark:border-[#273244] shadow-xl"
+              className="bg-[#242424] text-white dark:bg-[#1E1E1E] dark:text-[#FFFFFF] text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-black/10 dark:border-[#383838] shadow-xl"
             >
               Payent Admin Portal
             </TooltipContent>
@@ -229,7 +229,7 @@ export function Sidebar() {
             >
               {/* Subtle hairline between groups */}
               {gIdx > 0 && (
-                <div className="w-7 h-[1px] bg-[#E6E4E9] dark:bg-[#1E1E1E] my-1 opacity-70" />
+                <div className="w-7 h-[1px] bg-[#E6E4E9] dark:bg-[#383838] my-1 opacity-70" />
               )}
 
               {group.items.map((it) => {
@@ -257,29 +257,29 @@ export function Sidebar() {
                         className={cn(
                           "group relative flex items-center justify-center h-10 w-10 rounded-xl transition-all duration-150 cursor-pointer",
                           active
-                            ? "bg-[#242424] text-white dark:bg-[#1E1E1E] dark:text-[#F8FAFC] dark:border dark:border-[#3B82F6]/40 shadow-xs"
-                            : "text-[#77757D] hover:text-[#242424] hover:bg-[#F8F7F9] dark:text-[#9AAAC2] dark:hover:text-[#F8FAFC] dark:hover:bg-[#162238]/60",
+                            ? "bg-[#242424] text-white dark:bg-[#1E1E1E] dark:text-[#FFFFFF] dark:border dark:border-[#383838] shadow-xs"
+                            : "text-[#77757D] hover:text-[#242424] hover:bg-[#F8F7F9] dark:text-[#B3B3B3] dark:hover:text-[#FFFFFF] dark:hover:bg-[#262626]",
                         )}
                       >
                         <it.icon
                           className={cn(
                             "h-5 w-5 shrink-0 transition-transform group-hover:scale-105",
                             active
-                              ? "text-white dark:text-[#F8FAFC]"
-                              : "text-[#77757D] group-hover:text-[#242424] dark:text-[#9AAAC2] dark:group-hover:text-[#F8FAFC]",
+                              ? "text-white dark:text-[#FFFFFF]"
+                              : "text-[#77757D] group-hover:text-[#242424] dark:text-[#B3B3B3] dark:group-hover:text-[#FFFFFF]",
                           )}
                         />
 
                         {/* Pending notification dot */}
                         {badgeVal > 0 && (
-                          <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-[#FF7655] ring-2 ring-white dark:ring-[#0D1524]" />
+                          <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-[#FF7655] ring-2 ring-white dark:ring-[#1E1E1E]" />
                         )}
                       </Link>
                     </TooltipTrigger>
                     <TooltipContent
                       side="right"
                       sideOffset={12}
-                      className="bg-[#242424] text-white dark:bg-[#1E1E1E] dark:text-[#F8FAFC] text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-black/10 dark:border-[#273244] shadow-xl flex items-center gap-2"
+                      className="bg-[#242424] text-white dark:bg-[#1E1E1E] dark:text-[#FFFFFF] text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-black/10 dark:border-[#383838] shadow-xl flex items-center gap-2"
                     >
                       <span>{it.label}</span>
                       {badgeVal > 0 && (
@@ -296,14 +296,14 @@ export function Sidebar() {
         </nav>
 
         {/* User Identity & Logout Rail Footer (Symbols Only) */}
-        <div className="p-2 border-t border-[#E6E4E9] dark:border-[#273244] shrink-0 flex flex-col items-center gap-2">
+        <div className="p-2 border-t border-[#E6E4E9] dark:border-[#383838] shrink-0 flex flex-col items-center gap-2">
           {/* User Profile Avatar with Tooltip */}
           <Tooltip>
             <TooltipTrigger asChild>
               <Link
                 to="/admin/profile"
                 aria-label="Admin Profile"
-                className="group relative h-9 w-9 rounded-xl overflow-hidden border border-[#E6E4E9] dark:border-[#273244] flex items-center justify-center hover:border-[#3B82F6]/50 transition-colors"
+                className="group relative h-9 w-9 rounded-xl overflow-hidden border border-[#E6E4E9] dark:border-[#383838] flex items-center justify-center hover:border-neutral-400 dark:hover:border-white/50 transition-colors"
               >
                 <ProfilePhoto
                   src={
@@ -320,10 +320,10 @@ export function Sidebar() {
             <TooltipContent
               side="right"
               sideOffset={12}
-              className="bg-[#242424] text-white dark:bg-[#1E1E1E] dark:text-[#F8FAFC] text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-black/10 dark:border-[#273244] shadow-xl flex flex-col"
+              className="bg-[#242424] text-white dark:bg-[#1E1E1E] dark:text-[#FFFFFF] text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-black/10 dark:border-[#383838] shadow-xl flex flex-col"
             >
               <span>{currentUser?.fullName || "Administrator"}</span>
-              <span className="text-[10px] text-[#9AAAC2] font-mono font-normal">
+              <span className="text-[10px] text-[#B3B3B3] font-mono font-normal">
                 {currentUser?.email || "admin@payent.in"}
               </span>
             </TooltipContent>
@@ -343,7 +343,7 @@ export function Sidebar() {
             <TooltipContent
               side="right"
               sideOffset={12}
-              className="bg-[#242424] text-white dark:bg-[#1E1E1E] dark:text-rose-400 text-xs font-semibold px-2.5 py-1 rounded-lg border border-black/10 dark:border-[#273244] shadow-xl"
+              className="bg-[#242424] text-white dark:bg-[#1E1E1E] dark:text-rose-400 text-xs font-semibold px-2.5 py-1 rounded-lg border border-black/10 dark:border-[#383838] shadow-xl"
             >
               Sign Out
             </TooltipContent>

@@ -58,13 +58,13 @@ export function Topbar() {
   }, []);
 
   return (
-    <header className="sticky top-0 z-30 flex items-center justify-between px-6 md:px-8 h-16 bg-white/95 dark:bg-[#1E1E1E]/95 border-b border-[#E6E4E9] dark:border-[#273244] backdrop-blur-md transition-colors duration-200">
+    <header className="sticky top-0 z-30 flex items-center justify-between px-6 md:px-8 h-16 bg-white/95 dark:bg-[#1E1E1E]/95 border-b border-[#E6E4E9] dark:border-[#383838] backdrop-blur-md transition-colors duration-200">
       {/* Left side: Current page title & contextual subtitle */}
       <div className="flex flex-col justify-center min-w-0 pr-4">
-        <h1 className="text-base font-bold tracking-tight text-[#242424] dark:text-[#F8FAFC] truncate">
+        <h1 className="text-base font-bold tracking-tight text-[#242424] dark:text-[#FFFFFF] truncate">
           {currentMeta.title}
         </h1>
-        <p className="text-[11px] text-[#77757D] dark:text-[#9AAAC2] truncate hidden sm:block">
+        <p className="text-[11px] text-[#77757D] dark:text-[#B3B3B3] truncate hidden sm:block">
           {currentMeta.subtitle}
         </p>
       </div>
@@ -100,7 +100,7 @@ export function Topbar() {
         {/* Theme Toggle */}
         <button
           onClick={toggle}
-          className="p-2 rounded-lg text-[#77757D] dark:text-[#9AAAC2] hover:text-[#242424] dark:hover:text-[#F8FAFC] hover:bg-[#F8F7F9] dark:hover:bg-[#162238] border border-transparent hover:border-[#E6E4E9] dark:hover:border-[#273244] transition-all cursor-pointer"
+          className="p-2 rounded-lg text-[#77757D] dark:text-[#B3B3B3] hover:text-[#242424] dark:hover:text-[#FFFFFF] hover:bg-[#F8F7F9] dark:hover:bg-[#262626] border border-transparent hover:border-[#E6E4E9] dark:hover:border-[#383838] transition-all cursor-pointer"
           title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
           aria-label="Toggle theme"
         >
@@ -115,7 +115,7 @@ export function Topbar() {
         <NotificationDropdown />
 
         {/* Subtle Divider */}
-        <div className="h-5 w-[1px] bg-[#E6E4E9] dark:bg-[#1E1E1E] shrink-0" />
+        <div className="h-5 w-[1px] bg-[#E6E4E9] dark:bg-[#383838] shrink-0" />
 
         {/* Admin Profile */}
         <ProfileDropdown />

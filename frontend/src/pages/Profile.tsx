@@ -593,7 +593,7 @@ export default function Profile() {
 
                 {/* Identity Summary Badges */}
                 <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-1">
-                  <div className="px-3 py-1.5 rounded-xl bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-xs font-medium text-neutral-900 dark:text-neutral-100 flex items-center gap-1.5">
+                  <div className="px-3 py-1.5 rounded-xl bg-neutral-100 dark:bg-[#262626] border border-neutral-200 dark:border-neutral-700/80 text-xs font-medium text-neutral-900 dark:text-neutral-100 flex items-center gap-1.5">
                     <ShieldCheck className="h-3.5 w-3.5 text-neutral-700 dark:text-neutral-300" aria-hidden="true" />
                     <span>
                       PAN:{" "}
@@ -608,11 +608,11 @@ export default function Profile() {
                       </strong>
                     </span>
                   </div>
-                  <div className="px-3 py-1.5 rounded-xl bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-xs font-medium text-neutral-900 dark:text-neutral-100 flex items-center gap-1.5">
+                  <div className="px-3 py-1.5 rounded-xl bg-neutral-100 dark:bg-[#262626] border border-neutral-200 dark:border-neutral-700/80 text-xs font-medium text-neutral-900 dark:text-neutral-100 flex items-center gap-1.5">
                     <Mail className="h-3.5 w-3.5 text-neutral-700 dark:text-neutral-300" aria-hidden="true" />
                     <span className="font-semibold">{user?.email || "—"}</span>
                   </div>
-                  <div className="px-3 py-1.5 rounded-xl bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-xs font-medium text-neutral-900 dark:text-neutral-100 flex items-center gap-1.5">
+                  <div className="px-3 py-1.5 rounded-xl bg-neutral-100 dark:bg-[#262626] border border-neutral-200 dark:border-neutral-700/80 text-xs font-medium text-neutral-900 dark:text-neutral-100 flex items-center gap-1.5">
                     <Phone className="h-3.5 w-3.5 text-neutral-700 dark:text-neutral-300" aria-hidden="true" />
                     <span className="font-semibold">{user?.phone || "Not provided"}</span>
                   </div>
@@ -643,7 +643,7 @@ export default function Profile() {
               </Button>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 p-3 sm:p-4 mx-3 sm:mx-6 mb-4 sm:mb-6 rounded-2xl bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-center">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 p-3 sm:p-4 mx-3 sm:mx-6 mb-4 sm:mb-6 rounded-2xl bg-neutral-50 dark:bg-[#262626] border border-neutral-200 dark:border-neutral-700/80 text-center">
               {/* Metric 1: Completed Rentals */}
               <div className="p-2 space-y-0.5">
                 {loadingStats ? (
@@ -731,7 +731,7 @@ export default function Profile() {
               "min-h-[44px] px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-colors cursor-pointer whitespace-nowrap",
               activeTab === "details"
                 ? "bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 shadow-xs"
-                : "bg-neutral-100 dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white hover:bg-neutral-200/70 dark:hover:bg-neutral-800"
+                : "bg-neutral-100 dark:bg-[#262626] text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white hover:bg-neutral-200/70 dark:hover:bg-[#2E2E2E]"
             )}
           >
             <UserIcon className="h-4 w-4" aria-hidden="true" />
@@ -747,7 +747,7 @@ export default function Profile() {
               "min-h-[44px] px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-colors cursor-pointer whitespace-nowrap",
               activeTab === "location"
                 ? "bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 shadow-xs"
-                : "bg-neutral-100 dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white hover:bg-neutral-200/70 dark:hover:bg-neutral-800"
+                : "bg-neutral-100 dark:bg-[#262626] text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white hover:bg-neutral-200/70 dark:hover:bg-[#2E2E2E]"
             )}
           >
             <MapPin className="h-4 w-4" aria-hidden="true" />
@@ -763,7 +763,7 @@ export default function Profile() {
               "min-h-[44px] px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-colors cursor-pointer whitespace-nowrap",
               activeTab === "payout"
                 ? "bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 shadow-xs"
-                : "bg-neutral-100 dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white hover:bg-neutral-200/70 dark:hover:bg-neutral-800"
+                : "bg-neutral-100 dark:bg-[#262626] text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white hover:bg-neutral-200/70 dark:hover:bg-[#2E2E2E]"
             )}
           >
             <CreditCard className="h-4 w-4" aria-hidden="true" />
@@ -779,7 +779,7 @@ export default function Profile() {
               "min-h-[44px] px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-colors cursor-pointer whitespace-nowrap",
               activeTab === "security"
                 ? "bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 shadow-xs"
-                : "bg-neutral-100 dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white hover:bg-neutral-200/70 dark:hover:bg-neutral-800"
+                : "bg-neutral-100 dark:bg-[#262626] text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white hover:bg-neutral-200/70 dark:hover:bg-[#2E2E2E]"
             )}
           >
             <Lock className="h-4 w-4" aria-hidden="true" />
@@ -843,7 +843,7 @@ export default function Profile() {
                     value={form.bio || ""}
                     onChange={(e) => setForm({ ...form, bio: e.target.value })}
                     placeholder="Tell renters about your filmmaking background and equipment care guidelines..."
-                    className="w-full bg-neutral-50 dark:bg-neutral-900 text-neutral-950 dark:text-white placeholder:text-neutral-500 text-xs rounded-2xl p-4 border border-neutral-200 dark:border-neutral-800 focus:outline-none focus:border-neutral-950 dark:focus:border-white transition-colors font-medium resize-none"
+                    className="w-full bg-neutral-50 dark:bg-[#262626] text-neutral-950 dark:text-white placeholder:text-neutral-500 text-xs rounded-2xl p-4 border border-neutral-200 dark:border-neutral-700/80 focus:outline-none focus:border-neutral-950 dark:focus:border-white transition-colors font-medium resize-none"
                   />
                 </div>
 
@@ -869,21 +869,21 @@ export default function Profile() {
             )}
 
             {activeTab === "location" && (
-              <div className="relative rounded-2xl sm:rounded-3xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] pt-5 sm:pt-6 p-6 sm:p-8 space-y-6 text-left">
+              <div className="relative rounded-2xl sm:rounded-3xl border border-neutral-200 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E] pt-5 sm:pt-6 p-6 sm:p-8 space-y-6 text-left">
                 <div className="absolute -top-3 left-4 px-2 bg-white dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
                   <MapPin className="h-3.5 w-3.5 text-neutral-700 dark:text-neutral-300 stroke-[1.75]" aria-hidden="true" />
                   <span className="text-xs sm:text-[13px] font-semibold text-neutral-950 dark:text-white">
                     Realtime Location &amp; Address
                   </span>
                 </div>
-                <div className="flex items-center justify-end pb-4 border-b border-neutral-200 dark:border-neutral-800 flex-wrap gap-2">
+                <div className="flex items-center justify-end pb-4 border-b border-neutral-200 dark:border-neutral-700/80 flex-wrap gap-2">
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
                     disabled={detectingLocation}
                     onClick={detectCurrentLocation}
-                    className="min-h-[40px] gap-2 font-semibold text-xs border-neutral-300 dark:border-neutral-700 text-neutral-900 dark:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer py-2 px-4"
+                    className="min-h-[40px] gap-2 font-semibold text-xs border-neutral-300 dark:border-neutral-700 text-neutral-900 dark:text-white hover:bg-neutral-100 dark:hover:bg-[#262626] cursor-pointer py-2 px-4"
                   >
                     {detectingLocation ? (
                       <>
@@ -900,7 +900,7 @@ export default function Profile() {
                 </div>
 
                 {locationStatus && (
-                  <div className="p-4 rounded-2xl bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center justify-between gap-3">
+                  <div className="p-4 rounded-2xl bg-neutral-100 dark:bg-[#262626] border border-neutral-200 dark:border-neutral-700/80 text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
                       <Navigation className="h-4 w-4 shrink-0" aria-hidden="true" />
                       <span>{locationStatus}</span>
@@ -1152,7 +1152,7 @@ export default function Profile() {
                       sessions.map((s) => (
                         <div
                           key={s.id}
-                          className="flex items-center justify-between p-4 rounded-2xl bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 flex-wrap gap-4"
+                          className="flex items-center justify-between p-4 rounded-2xl bg-neutral-50 dark:bg-[#262626] border border-neutral-200 dark:border-neutral-700/80 flex-wrap gap-4"
                         >
                           <div className="flex items-center gap-3.5">
                             {s.deviceName?.includes("Mobile") ? (
@@ -1193,7 +1193,7 @@ export default function Profile() {
                         </div>
                       ))
                     ) : (
-                      <div className="p-4 rounded-2xl bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-center text-xs text-neutral-600 dark:text-neutral-400 font-medium">
+                      <div className="p-4 rounded-2xl bg-neutral-50 dark:bg-[#262626] border border-neutral-200 dark:border-neutral-700/80 text-center text-xs text-neutral-600 dark:text-neutral-400 font-medium">
                         Active device session securely stored (30-min access / 7-day refresh).
                       </div>
                     )}
@@ -1206,8 +1206,8 @@ export default function Profile() {
           {/* Right Column: Verification & Trust Badges */}
           <div className="space-y-6">
             {/* Verification Status Card */}
-            <div className="rounded-3xl bg-white dark:bg-[#1E1E1E] p-6 border border-neutral-200 dark:border-neutral-800 space-y-5 shadow-xs">
-              <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-800 pb-3">
+            <div className="rounded-3xl bg-white dark:bg-[#1E1E1E] p-6 border border-neutral-200 dark:border-neutral-700/80 space-y-5 shadow-xs">
+              <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-700/80 pb-3">
                 <h3 className="font-semibold text-base text-neutral-950 dark:text-white flex items-center gap-2">
                   <ShieldCheck className="h-5 w-5 text-neutral-700 dark:text-neutral-300 stroke-[1.75]" aria-hidden="true" />
                   <span>Verification &amp; Trust Status</span>
@@ -1216,7 +1216,7 @@ export default function Profile() {
                   variant="outline"
                   size="sm"
                   onClick={() => navigate({ to: "/payent/kyc" })}
-                  className="gap-1.5 text-xs font-semibold py-1.5 px-3 border-neutral-300 dark:border-neutral-700 text-neutral-900 dark:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                  className="gap-1.5 text-xs font-semibold py-1.5 px-3 border-neutral-300 dark:border-neutral-700 text-neutral-900 dark:text-white hover:bg-neutral-100 dark:hover:bg-[#262626]"
                 >
                   <span>{kycData?.status === "APPROVED" ? "View PAN KYC" : "Manage PAN KYC"}</span>
                   <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
@@ -1224,7 +1224,7 @@ export default function Profile() {
               </div>
 
               <div className="space-y-3">
-                <div className="p-3.5 rounded-2xl bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 space-y-2.5">
+                <div className="p-3.5 rounded-2xl bg-neutral-50 dark:bg-[#262626] border border-neutral-200 dark:border-neutral-700/80 space-y-2.5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       {kycLoading ? (
@@ -1313,7 +1313,7 @@ export default function Profile() {
                   )}
                 </div>
 
-                <div className="flex items-center justify-between p-3.5 rounded-2xl bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800">
+                <div className="flex items-center justify-between p-3.5 rounded-2xl bg-neutral-50 dark:bg-[#262626] border border-neutral-200 dark:border-neutral-700/80">
                   <div className="flex items-center gap-3">
                     <CheckCircle2 className="h-5 w-5 text-emerald-700 dark:text-emerald-400 shrink-0" aria-hidden="true" />
                     <div>
@@ -1330,7 +1330,7 @@ export default function Profile() {
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between p-3.5 rounded-2xl bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800">
+                <div className="flex items-center justify-between p-3.5 rounded-2xl bg-neutral-50 dark:bg-[#262626] border border-neutral-200 dark:border-neutral-700/80">
                   <div className="flex items-center gap-3">
                     <ShieldCheck className="h-5 w-5 text-emerald-700 dark:text-emerald-400 shrink-0 stroke-[1.75]" aria-hidden="true" />
                     <div>
