@@ -167,8 +167,47 @@ export default function Categories() {
     [search]
   );
   const activeCategory = normalizedCat || "all";
-  const [sort, setSort] = useState<SortOption>(() => (search.sort as SortOption) || "featured");
+  const sort: SortOption = (search.sort as SortOption) || "featured";
   const [isSortOpen, setIsSortOpen] = useState(false);
+
+  // Save scroll position when navigating to filters or product details
+  useEffect(() => {
+    const handleScroll = () => {
+      try {
+        sessionStorage.setItem("payent_browse_scroll", String(window.scrollY || 0));
+      } catch {}
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  // Restore scroll position when returning via browser back
+  useEffect(() => {
+    try {
+      const savedScroll = sessionStorage.getItem("payent_browse_scroll");
+      if (savedScroll && Number(savedScroll) > 0) {
+        requestAnimationFrame(() => {
+          window.scrollTo({ top: Number(savedScroll), behavior: "auto" });
+        });
+      }
+    } catch {}
+  }, []);
+
+  const handleSortSelect = (sortId: string) => {
+    setIsSortOpen(false);
+    navigate({
+      to: targetRoute,
+      search: (prev: any) => {
+        const next = { ...prev };
+        if (sortId === "featured") {
+          delete next.sort;
+        } else {
+          next.sort = sortId;
+        }
+        return next;
+      },
+    });
+  };
 
   // Active filter count for badge
   const activeFilterCount = useMemo(() => {
@@ -612,7 +651,7 @@ export default function Categories() {
                 {/* Dedicated Filter Button (label visible across all viewports) */}
                 <Link
                   to="/filters"
-                  search={search as any}
+                  search={{ ...search, from: targetRoute } as any}
                   className={cn(
                     "inline-flex items-center gap-1.5 min-h-[44px] px-3 sm:px-3.5 py-2 rounded-full border text-xs font-semibold transition-colors cursor-pointer shrink-0 shadow-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white",
                     activeFilterCount > 0
@@ -798,7 +837,7 @@ export default function Categories() {
 
                 <Link
                   to="/filters"
-                  search={search as any}
+                  search={{ ...search, from: targetRoute } as any}
                   className="text-xs font-semibold text-neutral-900 dark:text-white hover:underline cursor-pointer ml-1"
                 >
                   Edit in Filters
@@ -924,10 +963,7 @@ export default function Categories() {
                     <button
                       key={opt.id}
                       type="button"
-                      onClick={() => {
-                        setSort(opt.id as SortOption);
-                        setIsSortOpen(false);
-                      }}
+                      onClick={() => handleSortSelect(opt.id)}
                       className={cn(
                         "w-full text-left px-3 py-2 text-xs rounded-xl transition-colors flex items-center justify-between cursor-pointer",
                         sort === opt.id

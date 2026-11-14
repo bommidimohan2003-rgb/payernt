@@ -1,9 +1,13 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/utils/api";
 import { storage, STORAGE_KEYS } from "@/utils/storage";
 import type { Product } from "@/types";
-import { RentalProductCard, RentalProductCardSkeleton } from "@/components/common/RentalProductCard";
+import {
+  RentalProductCard,
+  RentalProductCardSkeleton,
+} from "@/components/common/RentalProductCard";
 
 interface RecentlyViewedCacheEntry {
   empty: boolean;
@@ -14,7 +18,9 @@ function getRecentlyViewedCacheKey(email?: string | null) {
   return `payent_recently_viewed_v1:${(email || "anon").toLowerCase().trim()}`;
 }
 
-function readRecentlyViewedCache(cacheKey: string): RecentlyViewedCacheEntry | null {
+function readRecentlyViewedCache(
+  cacheKey: string,
+): RecentlyViewedCacheEntry | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = window.localStorage.getItem(cacheKey);
@@ -32,7 +38,10 @@ function readRecentlyViewedCache(cacheKey: string): RecentlyViewedCacheEntry | n
   }
 }
 
-function writeRecentlyViewedCache(cacheKey: string, entry: RecentlyViewedCacheEntry) {
+function writeRecentlyViewedCache(
+  cacheKey: string,
+  entry: RecentlyViewedCacheEntry,
+) {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(cacheKey, JSON.stringify(entry));
@@ -47,6 +56,13 @@ export function RecentlyViewed() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loaded, setLoaded] = useState<boolean>(false);
   const [knownEmpty, setKnownEmpty] = useState<boolean>(false);
+  const carouselRef = useRef<HTMLDivElement>(null);
+
+  const handleScroll = (direction: "left" | "right") => {
+    if (!carouselRef.current) return;
+    const amount = direction === "left" ? -480 : 480;
+    carouselRef.current.scrollBy({ left: amount, behavior: "smooth" });
+  };
 
   useEffect(() => {
     // Strictly for logged-in users only (user starts null in both SSR and initial CSR)
@@ -75,7 +91,8 @@ export function RecentlyViewed() {
       setLoaded(false);
     }
 
-    api.getRecentlyViewed(token, userEmail)
+    api
+      .getRecentlyViewed(token, userEmail)
       .then((items) => {
         if (!active) return;
         const normalized = Array.isArray(items) ? items.slice(0, 8) : [];
@@ -106,28 +123,51 @@ export function RecentlyViewed() {
   }
 
   return (
-    <section className="w-full py-5 sm:py-7 bg-neutral-50/50 dark:bg-[#1E1E1E] border-b border-neutral-200/80 dark:border-neutral-800/80">
+    <section className="w-full py-5 sm:py-7 bg-white dark:bg-[#1E1E1E] border-b border-neutral-200/80 dark:border-neutral-800/80">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="mb-3.5">
-          <h2 className="text-xl sm:text-2xl font-semibold tracking-tight text-neutral-950 dark:text-white">
-            Recently Viewed
-          </h2>
-          <p className="mt-0.5 text-xs sm:text-sm text-neutral-600 dark:text-neutral-400">
-            Gear you recently inspected during your rental exploration
-          </p>
+        <div className="flex items-center justify-between gap-3 mb-2 sm:mb-2.5">
+          <div className="min-w-0">
+            <h2 className="text-xl sm:text-2xl font-semibold tracking-tight text-neutral-950 dark:text-white">
+              Recently Viewed
+            </h2>
+            <p className="mt-0.5 text-xs sm:text-sm text-neutral-600 dark:text-neutral-400">
+              Gear you recently inspected during your rental exploration
+            </p>
+          </div>
+          <div className="hidden sm:flex items-center gap-1 shrink-0">
+            <button
+              type="button"
+              onClick={() => handleScroll("left")}
+              aria-label="Scroll recently viewed left"
+              className="inline-flex items-center justify-center h-8 w-8 rounded-full border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-[#1E1E1E] text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white cursor-pointer"
+            >
+              <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              onClick={() => handleScroll("right")}
+              aria-label="Scroll recently viewed right"
+              className="inline-flex items-center justify-center h-8 w-8 rounded-full border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-[#1E1E1E] text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white cursor-pointer"
+            >
+              <ChevronRight className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
         </div>
 
-        {/* Reserve steady 4-col section height while logged-in history loads for the first time */}
+        {/* Loading State or Product Carousel: Matching ExploreRentals, NewArrivals, and RecommendedForYou */}
         {!loaded ? (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-5">
+          <div className="flex gap-3 sm:gap-4 overflow-x-auto snap-x snap-mandatory pb-1.5 pt-0.5 scrollbar-none">
             {Array.from({ length: 4 }).map((_, i) => (
-              <RentalProductCardSkeleton key={i} />
+              <RentalProductCardSkeleton key={i} variant="portrait" />
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-5">
+          <div
+            ref={carouselRef}
+            className="flex gap-3 sm:gap-4 overflow-x-auto snap-x snap-mandatory pb-1.5 pt-0.5 scrollbar-none scroll-smooth"
+          >
             {products.map((p) => (
-              <RentalProductCard key={p.id} product={p} />
+              <RentalProductCard key={p.id} product={p} variant="portrait" />
             ))}
           </div>
         )}

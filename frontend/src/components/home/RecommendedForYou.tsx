@@ -2,12 +2,17 @@ import React, { useState, useEffect, useRef } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/utils/api";
-import { storage } from "@/utils/storage";
 import { INITIAL_FALLBACK_PRODUCTS } from "@/utils/fallbackProducts";
-import { isFakeOrDeletedProduct } from "@/utils/productFilters";
+import {
+  isFakeOrDeletedProduct,
+  isUserOwnProduct,
+} from "@/utils/productFilters";
 import { matchesProductCategory } from "@/utils/categoryFilter";
 import type { Product } from "@/types";
-import { RentalProductCard, RentalProductCardSkeleton } from "@/components/common/RentalProductCard";
+import {
+  RentalProductCard,
+  RentalProductCardSkeleton,
+} from "@/components/common/RentalProductCard";
 
 const isComputerProduct = (p: Product) => {
   if (!p) return false;
@@ -21,24 +26,28 @@ const isComputerProduct = (p: Product) => {
     cat.includes("laptop") ||
     cat.includes("pc") ||
     cat.includes("mac") ||
-    /macbook|laptop|thinkpad|dell|hp|asus|acer|lenovo|surface|desktop|pc|computer|imac/i.test(title) ||
+    /macbook|laptop|thinkpad|dell|hp|asus|acer|lenovo|surface|desktop|pc|computer|imac/i.test(
+      title,
+    ) ||
     /laptop|macbook|processor|intel|ryzen|ram|workstation/i.test(desc)
   );
 };
 
+const INITIAL_RECOMMENDED_PRODUCTS: Product[] =
+  INITIAL_FALLBACK_PRODUCTS.filter(
+    (p: Product) => isComputerProduct(p) && !isFakeOrDeletedProduct(p),
+  ).slice(0, 8);
+
 export function RecommendedForYou() {
   const { user } = useAuth();
-  const [products, setProducts] = useState<Product[]>(() => {
-    if (typeof window === "undefined") return [];
-    try {
-      const cached = storage.get<Product[]>("payent_server_products", []);
-      const pool = (cached && cached.length > 0 ? cached : INITIAL_FALLBACK_PRODUCTS).filter((p) => !isFakeOrDeletedProduct(p));
-      const comps = pool.filter(isComputerProduct);
-      if (comps.length > 0) return comps.slice(0, 8);
-    } catch {}
-    return INITIAL_FALLBACK_PRODUCTS.filter(isComputerProduct).slice(0, 8);
-  });
-  const [isLoading, setIsLoading] = useState<boolean>(() => products.length === 0);
+  const userEmail = user?.email || "";
+  const userId = user?.id || "";
+
+  // Synchronous initial state is deterministic between SSR and initial CSR hydration
+  const [products, setProducts] = useState<Product[]>(
+    INITIAL_RECOMMENDED_PRODUCTS,
+  );
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const carouselRef = useRef<HTMLDivElement>(null);
 
   const handleScroll = (direction: "left" | "right") => {
@@ -50,25 +59,40 @@ export function RecommendedForYou() {
   useEffect(() => {
     let active = true;
 
+    // Immediately filter out any products belonging to current user on account switch
+    setProducts((prev) =>
+      Array.isArray(prev)
+        ? prev.filter((p: Product) => p && !isUserOwnProduct(p, user))
+        : [],
+    );
+
     const loadComputers = async () => {
       try {
         let computerItems: Product[] = [];
 
         // Parallel fetch recommendations & category query
         const [persRes, lapRes] = await Promise.all([
-          user?.email ? api.getPersonalizedRecommendations(user.email).catch(() => null) : Promise.resolve(null),
-          api.getFilteredProductsPage({ categories: "laptops", limit: 12 }).catch(() => null),
+          userEmail
+            ? api.getPersonalizedRecommendations(userEmail).catch(() => null)
+            : Promise.resolve(null),
+          api
+            .getFilteredProductsPage({ categories: "laptops", limit: 12 })
+            .catch(() => null),
         ]);
 
         if (!active) return;
 
         if (Array.isArray(persRes?.items)) {
-          computerItems = persRes.items.filter(isComputerProduct);
+          computerItems = persRes.items.filter(
+            (p: Product) => isComputerProduct(p) && !isUserOwnProduct(p, user),
+          );
         }
 
         if (Array.isArray(lapRes?.items)) {
-          const matched = lapRes.items.filter(isComputerProduct);
-          const seen = new Set(computerItems.map((p) => p.id));
+          const matched = lapRes.items.filter(
+            (p: Product) => isComputerProduct(p) && !isUserOwnProduct(p, user),
+          );
+          const seen = new Set(computerItems.map((p: Product) => p.id));
           for (const item of matched) {
             if (!seen.has(item.id)) {
               computerItems.push(item);
@@ -80,10 +104,15 @@ export function RecommendedForYou() {
         // Fallback: search all catalog products for computers if still under target
         if (active && computerItems.length < 4) {
           try {
-            const allResult = await api.getFilteredProductsPage({ limit: 40 }).catch(() => null);
+            const allResult = await api
+              .getFilteredProductsPage({ limit: 40 })
+              .catch(() => null);
             if (active && Array.isArray(allResult?.items)) {
-              const matched = allResult.items.filter(isComputerProduct);
-              const seen = new Set(computerItems.map((p) => p.id));
+              const matched = allResult.items.filter(
+                (p: Product) =>
+                  isComputerProduct(p) && !isUserOwnProduct(p, user),
+              );
+              const seen = new Set(computerItems.map((p: Product) => p.id));
               for (const item of matched) {
                 if (!seen.has(item.id)) {
                   computerItems.push(item);
@@ -91,17 +120,26 @@ export function RecommendedForYou() {
                 }
               }
             }
-          } catch {}
+          } catch {
+            // Non-critical search fallback catch
+          }
         }
 
         // Fallback to trending computers if catalog search had none
         if (active && computerItems.length === 0) {
           try {
-            const trending = await api.getTrendingRecommendations().catch(() => null);
+            const trending = await api
+              .getTrendingRecommendations()
+              .catch(() => null);
             if (active && Array.isArray(trending)) {
-              computerItems = trending.filter(isComputerProduct);
+              computerItems = trending.filter(
+                (p: Product) =>
+                  isComputerProduct(p) && !isUserOwnProduct(p, user),
+              );
             }
-          } catch {}
+          } catch {
+            // Non-critical trending fallback catch
+          }
         }
 
         if (active && computerItems.length > 0) {
@@ -121,7 +159,9 @@ export function RecommendedForYou() {
     return () => {
       active = false;
     };
-  }, [user]);
+    // Re-run recommendation search only when the authenticated user identity primitives change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userEmail, userId]);
 
   if (!isLoading && products.length === 0) {
     return null;
@@ -136,7 +176,8 @@ export function RecommendedForYou() {
               Recommended For You — Computers
             </h2>
             <p className="mt-0.5 text-xs sm:text-sm text-neutral-600 dark:text-neutral-400">
-              Curated laptops, workstations, and high-performance computing hardware
+              Curated laptops, workstations, and high-performance computing
+              hardware
             </p>
           </div>
           <div className="hidden sm:flex items-center gap-1 shrink-0">
@@ -170,7 +211,7 @@ export function RecommendedForYou() {
             ref={carouselRef}
             className="flex gap-3 sm:gap-4 overflow-x-auto snap-x snap-mandatory pb-1.5 pt-0.5 scrollbar-none scroll-smooth"
           >
-            {products.map((p) => (
+            {products.map((p: Product) => (
               <RentalProductCard key={p.id} product={p} variant="portrait" />
             ))}
           </div>

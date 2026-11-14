@@ -117,7 +117,20 @@ export function useAuth() {
 
     initAuth();
 
-    const onStorage = () => {
+    const onStorage = (event?: Event) => {
+      // Ignore storage changes that have nothing to do with auth tokens or current user
+      const customDetail = (event as CustomEvent)?.detail;
+      const key = customDetail?.originalKey || customDetail?.key || (event as StorageEvent)?.key;
+      if (
+        key &&
+        key !== STORAGE_KEYS.token &&
+        key !== STORAGE_KEYS.refreshToken &&
+        key !== STORAGE_KEYS.currentUser &&
+        key !== "payent:signed_out"
+      ) {
+        return;
+      }
+
       const isSignedOut =
         typeof window !== "undefined" &&
         localStorage.getItem("payent:signed_out") === "true";
@@ -125,7 +138,21 @@ export function useAuth() {
       if (isSignedOut || !token) {
         setUser(null);
       } else {
-        setUser(storage.get<User | null>(STORAGE_KEYS.currentUser, null));
+        const nextUser = storage.get<User | null>(STORAGE_KEYS.currentUser, null);
+        setUser((prev) => {
+          if (!prev && !nextUser) return null;
+          if (
+            prev &&
+            nextUser &&
+            prev.id === nextUser.id &&
+            prev.email === nextUser.email &&
+            prev.fullName === nextUser.fullName &&
+            prev.avatar === nextUser.avatar
+          ) {
+            return prev; // Preserve reference identity to avoid unnecessary re-renders
+          }
+          return nextUser;
+        });
       }
     };
 

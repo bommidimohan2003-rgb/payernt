@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback } from "react";
-import { ChevronLeft, ChevronRight, Star } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { ChevronLeft, ChevronRight, Star, AlertCircle, RefreshCw, MessageSquareQuote, ArrowRight } from "lucide-react";
 import { api } from "@/utils/api";
 import { cn } from "@/lib/utils";
 
@@ -7,9 +8,13 @@ interface Review {
   id: string;
   rating: number;
   comment: string;
+  product_title?: string;
+  productTitle?: string;
   product_name?: string;
   user_name?: string;
-  created_at: string;
+  userName?: string;
+  created_at?: string;
+  createdAt?: string;
 }
 
 export function CustomerReviews() {
@@ -17,29 +22,33 @@ export function CustomerReviews() {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadReviews = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const res = await api.getPublicReviews({ limit: 12, sort: "newest" });
+      if (Array.isArray(res?.reviews)) {
+        setReviews(res.reviews);
+      } else {
+        setReviews([]);
+      }
+    } catch (err: any) {
+      setError(err?.message || "Unable to load reviews right now. Please try again.");
+      setReviews([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     let active = true;
-    api.getPublicReviews({ limit: 12, sort: "newest" })
-      .then((res) => {
-        if (!active) return;
-        if (Array.isArray(res?.reviews) && res.reviews.length > 0) {
-          setReviews(res.reviews);
-        } else {
-          setReviews([]);
-        }
-      })
-      .catch(() => {
-        if (active) setReviews([]);
-      })
-      .finally(() => {
-        if (active) setIsLoading(false);
-      });
-
+    loadReviews();
     return () => {
       active = false;
     };
-  }, []);
+  }, [loadReviews]);
 
   const dotCount = Math.min(reviews.length, 6);
 
@@ -77,10 +86,6 @@ export function CustomerReviews() {
     setActiveIndex(Math.max(0, Math.min(dotCount - 1, rawIdx)));
   };
 
-  if (!isLoading && reviews.length === 0) {
-    return null;
-  }
-
   return (
     <section className="w-full py-5 sm:py-7 bg-neutral-50/50 dark:bg-[#1E1E1E] border-b border-neutral-200/80 dark:border-neutral-800/80">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -95,7 +100,7 @@ export function CustomerReviews() {
             </p>
           </div>
 
-          {reviews.length > 3 && (
+          {reviews.length > 1 && (
             <div className="hidden sm:flex items-center gap-2">
               <button
                 type="button"
@@ -117,7 +122,7 @@ export function CustomerReviews() {
           )}
         </div>
 
-        {/* Carousel Container */}
+        {/* Loading Skeleton State */}
         {isLoading ? (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             {Array.from({ length: 3 }).map((_, i) => (
@@ -127,7 +132,59 @@ export function CustomerReviews() {
               />
             ))}
           </div>
+        ) : error ? (
+          /* Error State with Retry */
+          <div className="rounded-2xl border border-neutral-300/80 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E] p-6 sm:p-8 text-center shadow-xs">
+            <div className="inline-flex items-center justify-center h-11 w-11 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 mb-3">
+              <AlertCircle className="h-5 w-5 stroke-[1.75]" aria-hidden="true" />
+            </div>
+            <h3 className="text-sm sm:text-base font-semibold text-neutral-950 dark:text-white">
+              Unable to load reviews
+            </h3>
+            <p className="mt-1 text-xs sm:text-sm text-neutral-600 dark:text-neutral-400 max-w-md mx-auto">
+              {error}
+            </p>
+            <button
+              type="button"
+              onClick={loadReviews}
+              className="mt-4 inline-flex items-center gap-2 px-4 py-2 min-h-[44px] rounded-full border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-[#1E1E1E] text-xs font-semibold text-neutral-900 dark:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
+            >
+              <RefreshCw className="h-3.5 w-3.5 stroke-[1.75]" aria-hidden="true" />
+              <span>Retry</span>
+            </button>
+          </div>
+        ) : reviews.length === 0 ? (
+          /* Authentic Empty State */
+          <div className="rounded-2xl border border-neutral-200/90 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] p-6 sm:p-8 text-center shadow-xs">
+            <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 mb-3">
+              <MessageSquareQuote className="h-5 w-5 stroke-[1.75]" aria-hidden="true" />
+            </div>
+            <h3 className="text-sm sm:text-base font-semibold text-neutral-950 dark:text-white">
+              No customer reviews yet
+            </h3>
+            <p className="mt-1 text-xs sm:text-sm text-neutral-600 dark:text-neutral-400 max-w-md mx-auto">
+              Be the first to share your rental experience with the paYent community.
+            </p>
+            <div className="mt-4 flex items-center justify-center gap-3">
+              <Link
+                to="/browse"
+                className="inline-flex items-center gap-1.5 px-4 py-2 min-h-[44px] rounded-full bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 text-xs font-semibold hover:bg-neutral-800 dark:hover:bg-neutral-200 transition-colors shadow-xs"
+              >
+                <span>Explore Rentals</span>
+                <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+              </Link>
+              <button
+                type="button"
+                onClick={loadReviews}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 min-h-[44px] rounded-full border border-neutral-300 dark:border-neutral-700 text-xs font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+              >
+                <RefreshCw className="h-3.5 w-3.5 stroke-[1.75]" aria-hidden="true" />
+                <span>Refresh</span>
+              </button>
+            </div>
+          </div>
         ) : (
+          /* Carousel Container */
           <div>
             <div
               ref={scrollRef}
@@ -135,13 +192,17 @@ export function CustomerReviews() {
               className="flex gap-4 sm:gap-6 overflow-x-auto snap-x snap-mandatory pb-4 scrollbar-none scroll-smooth"
             >
               {reviews.map((r, idx) => {
-                const dateStr = r.created_at
-                  ? new Date(r.created_at).toLocaleDateString("en-IN", {
+                const dateRaw = r.created_at || r.createdAt;
+                const dateStr = dateRaw
+                  ? new Date(dateRaw).toLocaleDateString("en-IN", {
                       month: "short",
                       day: "numeric",
                       year: "numeric",
                     })
                   : "";
+
+                const productName = r.product_title || r.productTitle || r.product_name;
+                const userName = r.user_name || r.userName || "Verified Renter";
 
                 return (
                   <div
@@ -175,8 +236,15 @@ export function CustomerReviews() {
                     </div>
 
                     <div className="mt-5 pt-3.5 border-t border-neutral-100 dark:border-neutral-800/80 flex items-center justify-between text-xs">
-                      <div className="font-semibold text-neutral-900 dark:text-white truncate max-w-[150px]">
-                        {r.product_name || r.user_name || "Verified Rental"}
+                      <div className="min-w-0 pr-2">
+                        <div className="font-semibold text-neutral-900 dark:text-white truncate max-w-[150px]">
+                          {productName || userName}
+                        </div>
+                        {productName && (
+                          <div className="text-[11px] text-neutral-500 dark:text-neutral-400 truncate max-w-[150px]">
+                            {userName}
+                          </div>
+                        )}
                       </div>
                       <div className="text-neutral-600 dark:text-neutral-400 shrink-0 tabular-nums">
                         {dateStr}

@@ -303,6 +303,17 @@ def init_db(force: bool = False):
         return
     if _db_initialized and not force:
         return
+    # Fast connectivity probe to avoid blocking on 100+ DDL retries when database is unavailable
+    probe_conn = get_db_connection()
+    if not probe_conn:
+        logger.warning("Database unavailable; skipping DDL table initialization and operating in degraded fallback mode.")
+        _db_initialized = True
+        return
+    try:
+        probe_conn.close()
+    except Exception:
+        pass
+
     # Ensure database exists before table setup
     ensure_database_exists()
     _last_db_failure_timestamp = 0.0
@@ -1417,7 +1428,394 @@ MOCK_WISHLISTS = {}
 MOCK_NOTIFICATIONS = {}
 MOCK_PROCESSED_EVENTS = set()
 MOCK_USER_EVENTS = []
-MOCK_CUSTOM_PRODUCTS: Dict[str, Dict[str, Any]] = {}
+INITIAL_SEED_PRODUCTS: Dict[str, Dict[str, Any]] = {
+    "sony-alpha-a7-iii": {
+        "id": "sony-alpha-a7-iii",
+        "user_email": "sai.teja@payent.example.com",
+        "title": "Sony Alpha a7 III",
+        "name": "Sony Alpha a7 III",
+        "category": "cameras",
+        "price": 499.0,
+        "daily_rate": 499.0,
+        "rating": 4.8,
+        "reviews": 124,
+        "location": "Hyderabad, Telangana",
+        "city": "Hyderabad",
+        "state": "Telangana",
+        "image": "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=800&q=80",
+        "images": ["https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=800&q=80"],
+        "description": "Full-frame mirrorless camera with 24.2MP BSI sensor, 4K HDR video, and 5-axis optical image stabilization.",
+        "condition": "Excellent",
+        "condition_grade": "Excellent",
+        "status": "approved",
+        "available": True,
+        "owner_name": "Sai Teja",
+        "owner_email": "sai.teja@payent.example.com",
+        "owner_id": "owner-sai-teja",
+        "owner_rating": 4.9,
+        "owner_status": "active",
+        "owner": {
+            "id": "owner-sai-teja",
+            "name": "Sai Teja",
+            "email": "sai.teja@payent.example.com",
+            "city": "Hyderabad",
+            "rating": 4.9,
+            "status": "active"
+        },
+        "created_at": "2024-01-15T10:00:00Z"
+    },
+    "canon-eos-r5": {
+        "id": "canon-eos-r5",
+        "user_email": "arun.kumar@payent.example.com",
+        "title": "Canon EOS R5 Mirrorless Camera",
+        "name": "Canon EOS R5 Mirrorless Camera",
+        "category": "cameras",
+        "price": 1200.0,
+        "daily_rate": 1200.0,
+        "rating": 4.9,
+        "reviews": 86,
+        "location": "Bengaluru, Karnataka",
+        "city": "Bengaluru",
+        "state": "Karnataka",
+        "image": "https://images.unsplash.com/photo-1502920917128-1aa500764cbd?auto=format&fit=crop&w=800&q=80",
+        "images": ["https://images.unsplash.com/photo-1502920917128-1aa500764cbd?auto=format&fit=crop&w=800&q=80"],
+        "description": "45MP full-frame CMOS sensor, 8K raw internal video recording, and 8-stop in-body image stabilization.",
+        "condition": "Like New",
+        "condition_grade": "Like New",
+        "status": "approved",
+        "available": True,
+        "owner_name": "Arun Kumar",
+        "owner_email": "arun.kumar@payent.example.com",
+        "owner_id": "owner-arun-k",
+        "owner_rating": 4.9,
+        "owner_status": "active",
+        "owner": {
+            "id": "owner-arun-k",
+            "name": "Arun Kumar",
+            "email": "arun.kumar@payent.example.com",
+            "city": "Bengaluru",
+            "rating": 4.9,
+            "status": "active"
+        },
+        "created_at": "2024-01-16T10:00:00Z"
+    },
+    "red-komodo-6k": {
+        "id": "red-komodo-6k",
+        "user_email": "cinema.pro@payent.example.com",
+        "title": "RED Komodo 6K Cinema Camera",
+        "name": "RED Komodo 6K Cinema Camera",
+        "category": "cameras",
+        "price": 3500.0,
+        "daily_rate": 3500.0,
+        "rating": 4.9,
+        "reviews": 12,
+        "location": "Hyderabad, Telangana",
+        "city": "Hyderabad",
+        "state": "Telangana",
+        "image": "https://images.unsplash.com/photo-1589872782782-b7b51e505a46?auto=format&fit=crop&w=800&q=80",
+        "images": ["https://images.unsplash.com/photo-1589872782782-b7b51e505a46?auto=format&fit=crop&w=800&q=80"],
+        "description": "6K Super 35 global shutter sensor, REDCODE RAW recording, and ultra-compact cinema production body.",
+        "condition": "Excellent",
+        "condition_grade": "Excellent",
+        "status": "approved",
+        "available": True,
+        "owner_name": "Cinema Gear Pro",
+        "owner_email": "cinema.pro@payent.example.com",
+        "owner_id": "owner-cinema-pro",
+        "owner_rating": 4.9,
+        "owner_status": "active",
+        "owner": {
+            "id": "owner-cinema-pro",
+            "name": "Cinema Gear Pro",
+            "email": "cinema.pro@payent.example.com",
+            "city": "Hyderabad",
+            "rating": 4.9,
+            "status": "active"
+        },
+        "created_at": "2024-01-17T10:00:00Z"
+    },
+    "dji-mavic-3-pro": {
+        "id": "dji-mavic-3-pro",
+        "user_email": "aerial.hub@payent.example.com",
+        "title": "DJI Mavic 3 Pro Cine Combo",
+        "name": "DJI Mavic 3 Pro Cine Combo",
+        "category": "drones",
+        "price": 1800.0,
+        "daily_rate": 1800.0,
+        "rating": 4.9,
+        "reviews": 58,
+        "location": "Mumbai, Maharashtra",
+        "city": "Mumbai",
+        "state": "Maharashtra",
+        "image": "https://images.unsplash.com/photo-1508614589041-895b88991e3e?auto=format&fit=crop&w=800&q=80",
+        "images": ["https://images.unsplash.com/photo-1508614589041-895b88991e3e?auto=format&fit=crop&w=800&q=80"],
+        "description": "Triple-camera system featuring 4/3 CMOS Hasselblad sensor, 43-min flight time, and Apple ProRes recording.",
+        "condition": "Like New",
+        "condition_grade": "Like New",
+        "status": "approved",
+        "available": True,
+        "owner_name": "Aerial Hub India",
+        "owner_email": "aerial.hub@payent.example.com",
+        "owner_id": "owner-aerial-hub",
+        "owner_rating": 4.9,
+        "owner_status": "active",
+        "owner": {
+            "id": "owner-aerial-hub",
+            "name": "Aerial Hub India",
+            "email": "aerial.hub@payent.example.com",
+            "city": "Mumbai",
+            "rating": 4.9,
+            "status": "active"
+        },
+        "created_at": "2024-01-18T10:00:00Z"
+    },
+    "dji-mini-4-pro": {
+        "id": "dji-mini-4-pro",
+        "user_email": "rohit.varma@payent.example.com",
+        "title": "DJI Mini 4 Pro Fly More Combo",
+        "name": "DJI Mini 4 Pro Fly More Combo",
+        "category": "drones",
+        "price": 799.0,
+        "daily_rate": 799.0,
+        "rating": 4.8,
+        "reviews": 42,
+        "location": "Hyderabad, Telangana",
+        "city": "Hyderabad",
+        "state": "Telangana",
+        "image": "https://images.unsplash.com/photo-1527977966376-1c8408f9f108?auto=format&fit=crop&w=800&q=80",
+        "images": ["https://images.unsplash.com/photo-1527977966376-1c8408f9f108?auto=format&fit=crop&w=800&q=80"],
+        "description": "Sub-249g lightweight 4K/60fps HDR drone with omnidirectional obstacle sensing and 34-min flight time.",
+        "condition": "Excellent",
+        "condition_grade": "Excellent",
+        "status": "approved",
+        "available": True,
+        "owner_name": "Rohit Varma",
+        "owner_email": "rohit.varma@payent.example.com",
+        "owner_id": "owner-rohit-v",
+        "owner_rating": 4.8,
+        "owner_status": "active",
+        "owner": {
+            "id": "owner-rohit-v",
+            "name": "Rohit Varma",
+            "email": "rohit.varma@payent.example.com",
+            "city": "Hyderabad",
+            "rating": 4.8,
+            "status": "active"
+        },
+        "created_at": "2024-01-19T10:00:00Z"
+    },
+    "macbook-pro-m3-max": {
+        "id": "macbook-pro-m3-max",
+        "user_email": "studio.labs@payent.example.com",
+        "title": "Apple MacBook Pro 16\" (M3 Max, 64GB, 2TB)",
+        "name": "Apple MacBook Pro 16\" (M3 Max, 64GB, 2TB)",
+        "category": "laptops",
+        "price": 1499.0,
+        "daily_rate": 1499.0,
+        "rating": 5.0,
+        "reviews": 31,
+        "location": "Bengaluru, Karnataka",
+        "city": "Bengaluru",
+        "state": "Karnataka",
+        "image": "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=800&q=80",
+        "images": ["https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=800&q=80"],
+        "description": "16-core CPU, 40-core GPU, Liquid Retina XDR display. High-performance video editing and 3D rendering workstation.",
+        "condition": "Like New",
+        "condition_grade": "Like New",
+        "status": "approved",
+        "available": True,
+        "owner_name": "Studio Labs",
+        "owner_email": "studio.labs@payent.example.com",
+        "owner_id": "owner-studio-labs",
+        "owner_rating": 5.0,
+        "owner_status": "active",
+        "owner": {
+            "id": "owner-studio-labs",
+            "name": "Studio Labs",
+            "email": "studio.labs@payent.example.com",
+            "city": "Bengaluru",
+            "rating": 5.0,
+            "status": "active"
+        },
+        "created_at": "2024-01-20T10:00:00Z"
+    },
+    "rode-wireless-pro": {
+        "id": "rode-wireless-pro",
+        "user_email": "sound.craft@payent.example.com",
+        "title": "RODE Wireless PRO Dual-Channel Mic System",
+        "name": "RODE Wireless PRO Dual-Channel Mic System",
+        "category": "audio",
+        "price": 450.0,
+        "daily_rate": 450.0,
+        "rating": 4.8,
+        "reviews": 95,
+        "location": "Hyderabad, Telangana",
+        "city": "Hyderabad",
+        "state": "Telangana",
+        "image": "https://images.unsplash.com/photo-1590602847861-f357a9332bbc?auto=format&fit=crop&w=800&q=80",
+        "images": ["https://images.unsplash.com/photo-1590602847861-f357a9332bbc?auto=format&fit=crop&w=800&q=80"],
+        "description": "Compact wireless microphone system with 32-bit float on-board recording, timecode sync, and 260m range.",
+        "condition": "Excellent",
+        "condition_grade": "Excellent",
+        "status": "approved",
+        "available": True,
+        "owner_name": "SoundCraft Rentals",
+        "owner_email": "sound.craft@payent.example.com",
+        "owner_id": "owner-sound-craft",
+        "owner_rating": 4.8,
+        "owner_status": "active",
+        "owner": {
+            "id": "owner-sound-craft",
+            "name": "SoundCraft Rentals",
+            "email": "sound.craft@payent.example.com",
+            "city": "Hyderabad",
+            "rating": 4.8,
+            "status": "active"
+        },
+        "created_at": "2024-01-21T10:00:00Z"
+    },
+    "royal-enfield-classic-350": {
+        "id": "royal-enfield-classic-350",
+        "user_email": "vikram.reddy@payent.example.com",
+        "title": "Royal Enfield Classic 350 (Stealth Black)",
+        "name": "Royal Enfield Classic 350 (Stealth Black)",
+        "category": "bikes",
+        "price": 699.0,
+        "daily_rate": 699.0,
+        "rating": 4.9,
+        "reviews": 110,
+        "location": "Hyderabad, Telangana",
+        "city": "Hyderabad",
+        "state": "Telangana",
+        "image": "https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=800&q=80",
+        "images": ["https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=800&q=80"],
+        "description": "349cc single-cylinder 4-stroke air-oil cooled engine, dual-channel ABS, pristine touring setup with panniers.",
+        "condition": "Excellent",
+        "condition_grade": "Excellent",
+        "status": "approved",
+        "available": True,
+        "owner_name": "Vikram Reddy",
+        "owner_email": "vikram.reddy@payent.example.com",
+        "owner_id": "owner-vikram-r",
+        "owner_rating": 4.9,
+        "owner_status": "active",
+        "owner": {
+            "id": "owner-vikram-r",
+            "name": "Vikram Reddy",
+            "email": "vikram.reddy@payent.example.com",
+            "city": "Hyderabad",
+            "rating": 4.9,
+            "status": "active"
+        },
+        "created_at": "2024-01-22T10:00:00Z"
+    },
+    "dewalt-hammer-drill": {
+        "id": "dewalt-hammer-drill",
+        "user_email": "tool.vault@payent.example.com",
+        "title": "DeWalt 20V MAX Cordless Hammer Drill Kit",
+        "name": "DeWalt 20V MAX Cordless Hammer Drill Kit",
+        "category": "tools",
+        "price": 299.0,
+        "daily_rate": 299.0,
+        "rating": 4.7,
+        "reviews": 37,
+        "location": "Hyderabad, Telangana",
+        "city": "Hyderabad",
+        "state": "Telangana",
+        "image": "https://images.unsplash.com/photo-1504148455328-c376907d081c?auto=format&fit=crop&w=800&q=80",
+        "images": ["https://images.unsplash.com/photo-1504148455328-c376907d081c?auto=format&fit=crop&w=800&q=80"],
+        "description": "Heavy-duty 1/2-inch brushless cordless hammer drill with 2x 5Ah batteries, charger, and carbide masonry bits.",
+        "condition": "Good",
+        "condition_grade": "Good",
+        "status": "approved",
+        "available": True,
+        "owner_name": "Tool Vault",
+        "owner_email": "tool.vault@payent.example.com",
+        "owner_id": "owner-tool-vault",
+        "owner_rating": 4.7,
+        "owner_status": "active",
+        "owner": {
+            "id": "owner-tool-vault",
+            "name": "Tool Vault",
+            "email": "tool.vault@payent.example.com",
+            "city": "Hyderabad",
+            "rating": 4.7,
+            "status": "active"
+        },
+        "created_at": "2024-01-23T10:00:00Z"
+    },
+    "anker-737-powerbank": {
+        "id": "anker-737-powerbank",
+        "user_email": "sai.teja@payent.example.com",
+        "title": "Anker 737 Power Bank (PowerCore 24K, 140W)",
+        "name": "Anker 737 Power Bank (PowerCore 24K, 140W)",
+        "category": "powerbanks",
+        "price": 250.0,
+        "daily_rate": 250.0,
+        "rating": 4.8,
+        "reviews": 64,
+        "location": "Hyderabad, Telangana",
+        "city": "Hyderabad",
+        "state": "Telangana",
+        "image": "https://images.unsplash.com/photo-1609592424368-80b62e497d51?auto=format&fit=crop&w=800&q=80",
+        "images": ["https://images.unsplash.com/photo-1609592424368-80b62e497d51?auto=format&fit=crop&w=800&q=80"],
+        "description": "24,000mAh 3-port ultra-powerful laptop & camera charging power bank with smart digital display and 140W fast output.",
+        "condition": "Excellent",
+        "condition_grade": "Excellent",
+        "status": "approved",
+        "available": True,
+        "owner_name": "Sai Teja",
+        "owner_email": "sai.teja@payent.example.com",
+        "owner_id": "owner-sai-teja",
+        "owner_rating": 4.8,
+        "owner_status": "active",
+        "owner": {
+            "id": "owner-sai-teja",
+            "name": "Sai Teja",
+            "email": "sai.teja@payent.example.com",
+            "city": "Hyderabad",
+            "rating": 4.8,
+            "status": "active"
+        },
+        "created_at": "2024-01-24T10:00:00Z"
+    },
+    "aputure-300d-ii": {
+        "id": "aputure-300d-ii",
+        "user_email": "cinema.pro@payent.example.com",
+        "title": "Aputure Light Storm LS 300d II Video Light",
+        "name": "Aputure Light Storm LS 300d II Video Light",
+        "category": "lighting",
+        "price": 850.0,
+        "daily_rate": 850.0,
+        "rating": 4.9,
+        "reviews": 29,
+        "location": "Hyderabad, Telangana",
+        "city": "Hyderabad",
+        "state": "Telangana",
+        "image": "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=800&q=80",
+        "images": ["https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=800&q=80"],
+        "description": "5500K daylight-balanced point-source LED light with Bowens mount, wireless remote control, and carry case.",
+        "condition": "Like New",
+        "condition_grade": "Like New",
+        "status": "approved",
+        "available": True,
+        "owner_name": "Cinema Gear Pro",
+        "owner_email": "cinema.pro@payent.example.com",
+        "owner_id": "owner-cinema-pro",
+        "owner_rating": 4.9,
+        "owner_status": "active",
+        "owner": {
+            "id": "owner-cinema-pro",
+            "name": "Cinema Gear Pro",
+            "email": "cinema.pro@payent.example.com",
+            "city": "Hyderabad",
+            "rating": 4.9,
+            "status": "active"
+        },
+        "created_at": "2024-01-25T10:00:00Z"
+    }
+}
+MOCK_CUSTOM_PRODUCTS: Dict[str, Dict[str, Any]] = dict(INITIAL_SEED_PRODUCTS)
 MOCK_REVIEWS = {}
 MOCK_DELIVERIES = {}
 MOCK_DELIVERY_LOCATIONS = {}
@@ -5987,6 +6385,7 @@ def get_reviews_from_db(
                     "product_id": r.get("product_id"),
                     "productTitle": r.get("product_title"),
                     "product_title": r.get("product_title"),
+                    "product_name": r.get("product_title"),
                     "productImage": r.get("product_image"),
                     "product_image": r.get("product_image"),
                     "bookingId": r.get("booking_id"),
@@ -7422,7 +7821,12 @@ def evaluate_product_availability(product: dict, booked_pids_set: Optional[Set[s
     ).strip().lower()
 
     if not owner_status and owner_email:
-        owner_status = get_cached_owner_status(owner_email)
+        if bool(product.get("is_vendor_product") or product.get("is_payernt_product")):
+            owner_status = "active"
+        else:
+            owner_status = get_cached_owner_status(owner_email)
+    elif not owner_status:
+        owner_status = "active"
 
     # If owner account exists and is pending, rejected, suspended, or deleted => unavailable
     if owner_status in ("pending", "rejected", "suspended", "deleted"):
@@ -9716,6 +10120,13 @@ def record_kyc_submission(
     }
 
     try:
+        # Mark any previous pending submissions as SUPERSEDED so admin only reviews the latest active submission
+        execute_query("""
+            UPDATE user_kyc_verifications 
+            SET status = 'SUPERSEDED', updated_at = %s 
+            WHERE LOWER(email) = LOWER(%s) AND account_type = %s AND status = 'PENDING'
+        """, (now_iso, clean_email, norm_acc_type))
+
         execute_query("""
             INSERT INTO user_kyc_verifications (
                 id, user_id, email, account_type, document_type,
@@ -9749,6 +10160,10 @@ def record_kyc_submission(
             """, (masked_num, now_iso, clean_email))
     except Exception as e:
         logger.warning(f"DB write error in record_kyc_submission: {e}")
+
+    for kyc_id, kyc_val in list(MOCK_KYC_VERIFICATIONS.items()):
+        if kyc_val.get("email") == clean_email and kyc_val.get("account_type") == norm_acc_type and kyc_val.get("status") == "PENDING" and kyc_id != verification_id:
+            kyc_val["status"] = "SUPERSEDED"
 
     MOCK_KYC_VERIFICATIONS[verification_id] = record
     return record

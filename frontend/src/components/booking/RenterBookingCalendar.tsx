@@ -487,14 +487,27 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
       return;
     }
 
+    // Helper to find the nearest valid non-blocked return date starting from minEnd
+    const findNextAvailableEndDate = (fromStartKey: string): string => {
+      const [y, m, d] = fromStartKey.split("-").map(Number);
+      const testDate = new Date(y, m - 1, d + 1);
+      for (let offset = 0; offset < 30; offset++) {
+        const testKey = formatDateKey(testDate.getFullYear(), testDate.getMonth(), testDate.getDate());
+        const chk = checkRangeUnavailable(fromStartKey, testKey);
+        if (!chk.hasConflict) {
+          return testKey;
+        }
+        testDate.setDate(testDate.getDate() + 1);
+      }
+      const fallbackDate = new Date(y, m - 1, d + 1);
+      return formatDateKey(fallbackDate.getFullYear(), fallbackDate.getMonth(), fallbackDate.getDate());
+    };
+
     // Multi-day custom mode: Picking / Changing Start Date
     if (activeTarget === "start" || !selectedStartDate) {
       let newEnd = selectedEndDate;
-      if (!newEnd || dateKey >= newEnd) {
-        // Automatically default return date to start date + 1 day
-        const [y, m, d] = dateKey.split("-").map(Number);
-        const nextDay = new Date(y, m - 1, d + 1);
-        newEnd = formatDateKey(nextDay.getFullYear(), nextDay.getMonth(), nextDay.getDate());
+      if (!newEnd || dateKey >= newEnd || checkRangeUnavailable(dateKey, newEnd).hasConflict) {
+        newEnd = findNextAvailableEndDate(dateKey);
       }
       handleDatesUpdate(dateKey, newEnd);
       setActiveTarget("end");
@@ -504,9 +517,7 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
     // Multi-day custom mode: Picking / Changing Return Date (activeTarget === "end")
     if (dateKey < selectedStartDate) {
       // User clicked an earlier date, seamlessly restart range with start as this date
-      const [y, m, d] = dateKey.split("-").map(Number);
-      const nextDay = new Date(y, m - 1, d + 1);
-      const defaultEnd = formatDateKey(nextDay.getFullYear(), nextDay.getMonth(), nextDay.getDate());
+      const defaultEnd = findNextAvailableEndDate(dateKey);
       handleDatesUpdate(dateKey, defaultEnd);
       setActiveTarget("end");
       return;
@@ -514,9 +525,7 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
 
     if (dateKey === selectedStartDate) {
       // Clicking same date: enforce at least 2 days for multi-day rental
-      const [y, m, d] = dateKey.split("-").map(Number);
-      const nextDay = new Date(y, m - 1, d + 1);
-      const defaultEnd = formatDateKey(nextDay.getFullYear(), nextDay.getMonth(), nextDay.getDate());
+      const defaultEnd = findNextAvailableEndDate(dateKey);
       handleDatesUpdate(selectedStartDate, defaultEnd);
       setActiveTarget("end");
       return;

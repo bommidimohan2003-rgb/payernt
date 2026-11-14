@@ -19,44 +19,36 @@ const SORT_OPTIONS = [
   { value: "price_desc", label: "Price: High to Low" },
 ] as const;
 
+const INITIAL_EXPLORE_PRODUCTS: Product[] = INITIAL_FALLBACK_PRODUCTS
+  .filter((p) => !isFakeOrDeletedProduct(p))
+  .slice(0, ITEMS_PER_PAGE);
+
 export function ExploreRentals() {
   const navigate = useNavigate();
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Read saved state if returning from product details
-  const [savedState] = useState(() => {
-    try {
-      const raw = sessionStorage.getItem(EXPLORE_PAGE_STATE_KEY);
-      return raw ? JSON.parse(raw) : null;
-    } catch {
-      return null;
-    }
-  });
-
-  const [products, setProducts] = useState<Product[]>(() => {
-    if (typeof window === "undefined") return [];
-    try {
-      const cached = storage.get<Product[]>("payent_server_products", []);
-      const pool = (cached && cached.length > 0 ? cached : INITIAL_FALLBACK_PRODUCTS).filter((p) => !isFakeOrDeletedProduct(p));
-      return pool.slice(0, ITEMS_PER_PAGE);
-    } catch {}
-    return INITIAL_FALLBACK_PRODUCTS.filter((p) => !isFakeOrDeletedProduct(p)).slice(0, ITEMS_PER_PAGE);
-  });
-  const [totalCount, setTotalCount] = useState<number>(() => {
-    if (typeof window === "undefined") return 0;
-    try {
-      const cached = storage.get<Product[]>("payent_server_products", []);
-      if (cached && cached.length > 0) return cached.length;
-    } catch {}
-    return INITIAL_FALLBACK_PRODUCTS.length;
-  });
-  const [currentPage, setCurrentPage] = useState<number>(savedState?.page || 1);
-  const [sortBy, setSortBy] = useState<string>(savedState?.sort || "relevant");
+  // Synchronous initial state is deterministic between SSR and initial CSR hydration
+  const [products, setProducts] = useState<Product[]>(INITIAL_EXPLORE_PRODUCTS);
+  const [totalCount, setTotalCount] = useState<number>(INITIAL_FALLBACK_PRODUCTS.length);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [sortBy, setSortBy] = useState<string>("relevant");
   const [isSortOpen, setIsSortOpen] = useState<boolean>(false);
   const sortRef = useRef<HTMLDivElement>(null);
   const carouselRef = useRef<HTMLDivElement>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(() => products.length === 0);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Restore saved state from sessionStorage post-mount to avoid SSR/CSR hydration mismatch
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(EXPLORE_PAGE_STATE_KEY);
+      if (raw) {
+        const saved = JSON.parse(raw);
+        if (saved?.page && saved.page > 1) setCurrentPage(saved.page);
+        if (saved?.sort && saved.sort !== "relevant") setSortBy(saved.sort);
+      }
+    } catch {}
+  }, []);
 
   const handleScroll = (direction: "left" | "right") => {
     if (!carouselRef.current) return;
@@ -126,11 +118,39 @@ export function ExploreRentals() {
         return;
       }
 
-      setProducts(result.items);
-      setTotalCount(safeTotal);
+      if (result.items && result.items.length > 0) {
+        setProducts(result.items);
+        setTotalCount(safeTotal);
+      } else {
+        const cached = storage.get<Product[]>("payent_server_products", []);
+        let fallbackPool = (cached && cached.length > 0 ? cached : []).filter((p) => !isFakeOrDeletedProduct(p));
+        if (fallbackPool.length === 0) {
+          fallbackPool = INITIAL_FALLBACK_PRODUCTS.filter((p) => !isFakeOrDeletedProduct(p));
+        }
+        const sliced = fallbackPool.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+        setProducts(sliced.length > 0 ? sliced : fallbackPool.slice(0, ITEMS_PER_PAGE));
+        setTotalCount(fallbackPool.length);
+      }
     } catch (err: any) {
       if (err?.name === "AbortError" || controller.signal.aborted) return;
-      setError(err?.message || "Unable to load rental equipment. Please try again.");
+      const cached = storage.get<Product[]>("payent_server_products", []);
+      let fallbackPool = (cached && cached.length > 0 ? cached : []).filter((p) => !isFakeOrDeletedProduct(p));
+      if (fallbackPool.length === 0) {
+        fallbackPool = INITIAL_FALLBACK_PRODUCTS.filter((p) => !isFakeOrDeletedProduct(p));
+      }
+      if (fallbackPool.length > 0) {
+        const sliced = fallbackPool.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+        setProducts(sliced.length > 0 ? sliced : fallbackPool.slice(0, ITEMS_PER_PAGE));
+        setTotalCount(fallbackPool.length);
+        setError(null);
+      } else {
+        setProducts((current) => {
+          if (current.length === 0) {
+            setError(err?.message || "Unable to load rental equipment. Please try again.");
+          }
+          return current;
+        });
+      }
     } finally {
       if (!controller.signal.aborted) {
         setIsLoading(false);

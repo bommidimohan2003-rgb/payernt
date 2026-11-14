@@ -1673,10 +1673,11 @@ export const payerntApi = {
   async submitKyc(payload: {
     documentType: "AADHAAR";
     documentNumber: string;
-    fileName: string;
-    fileType: string;
-    fileData: string;
-    fileSize: number;
+    fileName?: string;
+    fileType?: string;
+    fileData?: string;
+    fileSize?: number;
+    isEdit?: boolean;
   }): Promise<{
     success: boolean;
     status: "PENDING" | "APPROVED" | "REJECTED";

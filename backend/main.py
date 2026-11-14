@@ -915,9 +915,80 @@ def get_current_user_email(authorization: Optional[str] = Header(None)) -> str:
             detail="Missing or invalid Authorization header. Must start with 'Bearer '"
         )
     
-    token = authorization.split(" ")[1]
+    token = authorization.split(" ", 1)[1].strip()
+    if (token.startswith('"') and token.endswith('"')) or (token.startswith("'") and token.endswith("'")):
+        token = token[1:-1].strip()
+    if not token or token.lower() in ("null", "undefined", "[object object]", "none"):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing or invalid Authorization header. Must start with 'Bearer '"
+        )
 
-    # 1. Try Firebase Admin SDK cryptographic verification if initialized
+    # 1. Fast local cryptographic JWT verification first (0.01ms memory HMAC check, prevents WAN latency)
+    try:
+        payload = decode_access_token(token, expected_type="access")
+        if payload and payload.get("sub"):
+            jti = payload.get("jti")
+            if jti and is_token_revoked(jti):
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Token has been revoked or logged out."
+                )
+
+            sid = payload.get("sid")
+            if sid and is_session_revoked(sid):
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Session has been revoked or expired."
+                )
+
+            # Account type & role validation
+            account_type = (payload.get("account_type") or payload.get("accountType") or "").strip().lower()
+            role = str(payload.get("role") or "").strip().lower()
+            if account_type in ("paye₹nt", "payernt") and role not in ("admin", "superadmin"):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Forbidden: This endpoint requires a pay₹ent customer account."
+                )
+
+            valid_roles = (
+                "admin", "superadmin", "customer", "renter", "user", "lender",
+                "vendor", "owner", "partner", "host", "merchant", "payernt", "paye₹nt", ""
+            )
+            if role and role not in valid_roles:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Forbidden: Invalid or unauthorized account role."
+                )
+
+            user_email = str(payload.get("email") or payload.get("sub") or "").strip().lower()
+            user = get_user(user_email)
+            if not user:
+                return user_email
+            user_status = str(user.get("status") or "").lower().strip()
+            if user_status == "suspended":
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Account suspended. Please contact support."
+                )
+            if user_status == "deleted":
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Account has been deleted or deactivated."
+                )
+            if user_status == "rejected":
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Account application has been rejected. Please contact support."
+                )
+
+            return user_email
+    except HTTPException:
+        raise
+    except Exception:
+        pass
+
+    # 2. Try Firebase Admin SDK cryptographic verification as fallback for Google Sign-In
     if HAS_FIREBASE and firebase_admin and firebase_admin._apps:
         try:
             decoded_token = firebase_auth.verify_id_token(token)
@@ -931,70 +1002,10 @@ def get_current_user_email(authorization: Optional[str] = Header(None)) -> str:
         except Exception:
             pass
 
-    # 2. Cryptographic JWT access token verification with pinned algorithm and strict signature check
-    payload = decode_access_token(token, expected_type="access")
-    if not payload or "sub" not in payload:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials or Token expired"
-        )
-
-    # Check server-side token & session revocation
-    jti = payload.get("jti")
-    if jti and is_token_revoked(jti):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token has been revoked or logged out."
-        )
-
-    sid = payload.get("sid")
-    if sid and is_session_revoked(sid):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Session has been revoked or expired."
-        )
-
-    # Account type & role validation
-    account_type = (payload.get("account_type") or payload.get("accountType") or "").strip().lower()
-    role = str(payload.get("role") or "").strip().lower()
-    if account_type in ("paye₹nt", "payernt") and role not in ("admin", "superadmin"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Forbidden: This endpoint requires a pay₹ent customer account.",
-        )
-    # Allow all valid platform roles (customers, lenders, vendors, owners, admins, etc.)
-    valid_roles = (
-        "admin", "superadmin", "customer", "renter", "user", "lender",
-        "vendor", "owner", "partner", "host", "merchant", "payernt", "paye₹nt", ""
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials or Token expired"
     )
-    if role and role not in valid_roles:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Forbidden: Invalid or unauthorized account role.",
-        )
-
-    user_email = payload["sub"].strip().lower()
-    user = get_user(user_email)
-    if not user:
-        return user_email
-    user_status = str(user.get("status") or "").lower().strip()
-    if user_status == "suspended":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account suspended. Please contact support."
-        )
-    if user_status == "deleted":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account has been deleted or deactivated."
-        )
-    if user_status == "rejected":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account application has been rejected. Please contact support."
-        )
-
-    return user_email
 
 def get_current_any_user_email(authorization: Optional[str] = Header(None)) -> str:
     """
@@ -1007,9 +1018,61 @@ def get_current_any_user_email(authorization: Optional[str] = Header(None)) -> s
             detail="Missing or invalid Authorization header. Must start with 'Bearer '"
         )
     
-    token = authorization.split(" ")[1]
+    token = authorization.split(" ", 1)[1].strip()
+    if (token.startswith('"') and token.endswith('"')) or (token.startswith("'") and token.endswith("'")):
+        token = token[1:-1].strip()
+    if not token or token.lower() in ("null", "undefined", "[object object]", "none"):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing or invalid Authorization header. Must start with 'Bearer '"
+        )
 
-    # 1. Try Firebase Admin SDK cryptographic verification if initialized
+    # 1. Fast local cryptographic JWT verification first (0.01ms memory HMAC check, prevents WAN latency)
+    try:
+        payload = decode_access_token(token, expected_type="access")
+        if payload and payload.get("sub"):
+            jti = payload.get("jti")
+            if jti and is_token_revoked(jti):
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Token has been revoked or logged out."
+                )
+
+            sid = payload.get("sid")
+            if sid and is_session_revoked(sid):
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Session has been revoked or expired."
+                )
+
+            user_email = str(payload.get("email") or payload.get("sub") or "").strip().lower()
+            user = get_user(user_email)
+            if not user:
+                return user_email
+            user_status = str(user.get("status") or "").lower().strip()
+            if user_status == "suspended":
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Account suspended. Please contact support."
+                )
+            if user_status == "deleted":
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Account has been deleted or deactivated."
+                )
+            if user_status == "rejected":
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Account application has been rejected. Please contact support."
+                )
+
+            return user_email
+    except HTTPException:
+        raise
+    except Exception:
+        pass
+
+    # 2. Try Firebase Admin SDK cryptographic verification as fallback for Google Sign-In
     if HAS_FIREBASE and firebase_admin and firebase_admin._apps:
         try:
             decoded_token = firebase_auth.verify_id_token(token)
@@ -1023,51 +1086,10 @@ def get_current_any_user_email(authorization: Optional[str] = Header(None)) -> s
         except Exception:
             pass
 
-    # 2. Cryptographic JWT access token verification
-    payload = decode_access_token(token, expected_type="access")
-    if not payload or "sub" not in payload:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials or Token expired"
-        )
-
-    # Check server-side token & session revocation
-    jti = payload.get("jti")
-    if jti and is_token_revoked(jti):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token has been revoked or logged out."
-        )
-
-    sid = payload.get("sid")
-    if sid and is_session_revoked(sid):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Session has been revoked or expired."
-        )
-
-    user_email = payload["sub"].strip().lower()
-    user = get_user(user_email)
-    if not user:
-        return user_email
-    user_status = str(user.get("status") or "").lower().strip()
-    if user_status == "suspended":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account suspended. Please contact support."
-        )
-    if user_status == "deleted":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account has been deleted or deactivated."
-        )
-    if user_status == "rejected":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account application has been rejected. Please contact support."
-        )
-
-    return user_email
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials or Token expired"
+    )
 
 def get_optional_current_user_email(authorization: Optional[str] = Header(None)) -> Optional[str]:
     if not authorization or not authorization.startswith("Bearer "):
@@ -2722,8 +2744,9 @@ class KycSubmitSchema(BaseModel):
     document_number: str = Field(..., alias="documentNumber")
     file_name: Optional[str] = Field("document.jpg", alias="fileName")
     file_type: Optional[str] = Field("image/jpeg", alias="fileType")
-    file_data: str = Field(..., alias="fileData")
+    file_data: Optional[str] = Field(None, alias="fileData")
     file_size: Optional[int] = Field(0, alias="fileSize")
+    is_edit: Optional[bool] = Field(False, alias="isEdit")
 
     model_config = {"populate_by_name": True}
 
@@ -2875,50 +2898,60 @@ def submit_kyc_route(data: KycSubmitSchema, authorization: Optional[str] = Heade
 
     # 2. Check current status to prevent duplicate submissions or resubmission of approved accounts
     current_kyc = get_user_kyc_status(email, account_type)
-    if current_kyc.get("status") == "PENDING":
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="A KYC verification request is already pending administrative review."
-        )
+    is_edit_mode = bool(getattr(data, "is_edit", False))
     if current_kyc.get("status") == "APPROVED":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="KYC verification has already been approved for this account."
+            detail="KYC verification has already been approved for this account and cannot be modified."
+        )
+    if current_kyc.get("status") == "PENDING" and not is_edit_mode:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A KYC verification request is already pending administrative review. Use Edit to modify details before approval."
         )
 
     # 3. Validate file upload (size, MIME type, payload presence)
     file_data = (data.file_data or "").strip()
-    if not file_data:
+    if not file_data and not is_edit_mode:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Document photo is required."
         )
 
-    # 5MB file size limit (base64 string is ~7MB maximum)
-    if (data.file_size and data.file_size > 5 * 1024 * 1024) or len(file_data) > 7 * 1024 * 1024:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail="Document file exceeds maximum size limit (5MB)."
-        )
-
-    # Allowed MIME types
-    raw_mime = (data.file_type or "").strip().lower()
-    if file_data.startswith("data:"):
-        header_mime = file_data.split(";")[0].replace("data:", "").lower()
-        if header_mime:
-            raw_mime = header_mime
-
-    allowed_mimes = {"image/jpeg", "image/jpg", "image/png", "application/pdf"}
-    if raw_mime not in allowed_mimes:
-        raise HTTPException(
-            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-            detail=f"Unsupported document format '{raw_mime}'. Supported formats are JPG, JPEG, PNG, and PDF."
-        )
-
-    # Sanitize file name
     safe_name = re.sub(r"[^a-zA-Z0-9._-]", "_", os.path.basename(data.file_name or "document.jpg"))
     if not safe_name:
         safe_name = "document.jpg"
+    raw_mime = (data.file_type or "").strip().lower()
+
+    if file_data:
+        # 5MB file size limit (base64 string is ~7MB maximum)
+        if (data.file_size and data.file_size > 5 * 1024 * 1024) or len(file_data) > 7 * 1024 * 1024:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail="Document file exceeds maximum size limit (5MB)."
+            )
+
+        # Allowed MIME types
+        if file_data.startswith("data:"):
+            header_mime = file_data.split(";")[0].replace("data:", "").lower()
+            if header_mime:
+                raw_mime = header_mime
+
+        allowed_mimes = {"image/jpeg", "image/jpg", "image/png", "application/pdf"}
+        if raw_mime not in allowed_mimes:
+            raise HTTPException(
+                status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                detail=f"Unsupported document format '{raw_mime}'. Supported formats are JPG, JPEG, PNG, and PDF."
+            )
+    else:
+        # Edit mode without new file upload: retain previous document file details
+        safe_name = current_kyc.get("documentFileName") or "document.jpg"
+        raw_mime = current_kyc.get("documentMimeType") or "image/jpeg"
+        from database import get_kyc_verification_by_id
+        prev_id = current_kyc.get("id")
+        prev_rec = get_kyc_verification_by_id(prev_id) if prev_id else None
+        if prev_rec:
+            file_data = prev_rec.get("document_data_encrypted") or ""
 
     # 4. Save to secure private directory (never public)
     storage_path = None
@@ -2945,10 +2978,11 @@ def submit_kyc_route(data: KycSubmitSchema, authorization: Optional[str] = Heade
         storage_path=storage_path
     )
 
+    action_msg = "updated" if is_edit_mode else "uploaded"
     return {
         "success": True,
         "status": "PENDING",
-        "message": f"{doc_type} document uploaded successfully and submitted for verification review.",
+        "message": f"{doc_type} document {action_msg} successfully and submitted for verification review.",
         "verificationId": rec["id"],
         "maskedNumber": rec["document_number_masked"],
         "documentType": rec["document_type"],
@@ -3679,6 +3713,24 @@ def add_order(data: OrderSchema, current_user: dict = Depends(get_approved_user)
     is_avail, _, reason = evaluate_product_availability(prod)
     if not is_avail:
         raise HTTPException(status_code=400, detail=f"Product is currently unavailable: {reason}")
+
+    # Authoritative date-range availability and blocked-date validation
+    from database import check_product_interval_conflicts
+    req_start = datetime.datetime(s_date.year, s_date.month, s_date.day, 0, 0, 0, tzinfo=datetime.timezone.utc)
+    e_date = e_dt.date() if isinstance(e_dt, datetime.datetime) else e_dt
+    req_end = datetime.datetime(e_date.year, e_date.month, e_date.day, 23, 59, 59, tzinfo=datetime.timezone.utc)
+
+    conflicted, conflict_reason = check_product_interval_conflicts(
+        product_id=pid,
+        req_start_dt=req_start,
+        req_end_dt=req_end,
+        product=prod
+    )
+    if conflicted:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Selected rental dates ({start} to {end}) are unavailable: {conflict_reason or 'blocked by owner or already reserved'}."
+        )
 
     # Requirement 2: Enforce Admin-Approved KYC for Product Owner (Vendor)
     owner_email = (prod.get("user_email") or prod.get("owner_email") or prod.get("ownerId") or prod.get("owner_id") or "").strip().lower()
@@ -5853,9 +5905,16 @@ def get_base_public_listings() -> list:
                     "featured": True,
                     "is_vendor_product": True,
                     "is_payernt_product": True,
+                    "owner_status": "active",
+                    "owner_verified": 1,
+                    "agent_status": "approved",
                 })
     except Exception:
         pass
+
+    if not listings:
+        from database import INITIAL_SEED_PRODUCTS
+        listings = [dict(p) for p in INITIAL_SEED_PRODUCTS.values()]
 
     if listings:
         listings = [
@@ -5900,6 +5959,35 @@ def fetch_public_listings(
 
     limit_val = _val(limit, None)
     page_val = _val(page, 1)
+    q_val = _val(q, None)
+    q = str(q_val).strip() if q_val is not None else None
+    cat_val = _val(categories, None)
+    categories = str(cat_val).strip() if cat_val is not None else None
+    min_price_val = _val(min_price, None)
+    try:
+        min_price = float(min_price_val) if min_price_val is not None else None
+    except Exception:
+        min_price = None
+    max_price_val = _val(max_price, None)
+    try:
+        max_price = float(max_price_val) if max_price_val is not None else None
+    except Exception:
+        max_price = None
+    city_val = _val(city, None)
+    city = str(city_val).strip() if city_val is not None else None
+    pin_val = _val(pincode, None)
+    pincode = str(pin_val).strip() if pin_val is not None else None
+    cond_val = _val(condition, None)
+    condition = str(cond_val).strip() if cond_val is not None else None
+    start_date_val = _val(start_date, None)
+    start_date = str(start_date_val).strip() if start_date_val is not None else None
+    end_date_val = _val(end_date, None)
+    end_date = str(end_date_val).strip() if end_date_val is not None else None
+    sort_val = _val(sort, None)
+    sort = str(sort_val).strip() if sort_val is not None else None
+    auth_val = _val(authorization, None)
+    authorization = str(auth_val).strip() if auth_val is not None else None
+
     try:
         page_num = int(page_val) if page_val is not None else 1
     except Exception:
@@ -5915,25 +6003,8 @@ def fetch_public_listings(
         f"max{max_price}:c{city}:pin{pincode}:cond{condition}:s{start_date}:e{end_date}:sort{sort}"
     )
 
-    # Identify caller if authorization header is provided
-    caller_email = None
-    if authorization and authorization.startswith("Bearer "):
-        token = authorization.split(" ")[1].strip()
-        if token:
-            if HAS_FIREBASE and firebase_admin and firebase_admin._apps:
-                try:
-                    decoded = firebase_auth.verify_id_token(token)
-                    if decoded and decoded.get("email"):
-                        caller_email = str(decoded["email"]).strip().lower()
-                except Exception:
-                    pass
-            if not caller_email:
-                try:
-                    payload = decode_access_token(token, expected_type="access")
-                    if payload and payload.get("sub"):
-                        caller_email = str(payload["sub"]).strip().lower()
-                except Exception:
-                    pass
+    # Identify caller if authorization header is provided (safe extraction without WAN latency)
+    caller_email, _ = extract_caller_identity_from_auth(authorization)
 
     def _load():
         listings = get_base_public_listings()
@@ -6087,6 +6158,65 @@ def fetch_public_listings(
         return visible_listings[offset : offset + limit_num]
     return visible_listings
 
+@app.get("/api/products/recently-viewed")
+def get_recently_viewed_products(
+    authorization: Optional[str] = Header(None),
+    user_email: Optional[str] = Query(None),
+    limit: int = Query(8, ge=1, le=20)
+):
+    caller_email = _extract_caller_email_optional(authorization, user_email)
+    if not caller_email:
+        return []
+    
+    conn = get_db_connection()
+    recent_pids = []
+    if conn:
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT product_id, MAX(created_at) as last_viewed
+                    FROM user_events
+                    WHERE event_type = 'view_product' AND LOWER(user_email) = LOWER(%s) AND product_id IS NOT NULL AND TRIM(product_id) != ''
+                    GROUP BY product_id
+                    ORDER BY last_viewed DESC
+                    LIMIT %s
+                """, (caller_email, limit))
+                rows = cursor.fetchall()
+                recent_pids = [r["product_id"] for r in rows if r.get("product_id")]
+        except Exception as e:
+            print(f"Notice: recently_viewed query fallback: {e}")
+        finally:
+            conn.close()
+    
+    if not recent_pids:
+        seen = set()
+        from database import MOCK_USER_EVENTS
+        for ev in reversed(MOCK_USER_EVENTS):
+            if ev.get("event_type") == "view_product" and str(ev.get("user_email") or "").strip().lower() == caller_email:
+                pid = ev.get("product_id")
+                if pid and pid not in seen:
+                    seen.add(pid)
+                    recent_pids.append(pid)
+                    if len(recent_pids) >= limit:
+                        break
+
+    if not recent_pids:
+        return []
+
+    if "get_recommendation_catalog" in globals():
+        catalog = get_recommendation_catalog()
+    else:
+        from database import INITIAL_SEED_PRODUCTS
+        catalog = list(INITIAL_SEED_PRODUCTS.values())
+    catalog_by_id = {str(item.get("id")): item for item in catalog}
+    
+    products = []
+    for pid in recent_pids:
+        if pid in catalog_by_id:
+            products.append(catalog_by_id[pid])
+    
+    return products
+
 @app.get("/api/products/custom/{id}")
 @app.get("/api/products/{id}")
 def fetch_product_by_id(id: str, response: Response):
@@ -6174,6 +6304,11 @@ def fetch_product_by_id(id: str, response: Response):
                     }
             except Exception:
                 pass
+        if not product:
+            from database import INITIAL_SEED_PRODUCTS
+            target_seed = INITIAL_SEED_PRODUCTS.get(id) or INITIAL_SEED_PRODUCTS.get(str(id).lower())
+            if target_seed:
+                return format_product_dict(dict(target_seed), is_public=True)
             return None
         return format_product_dict(product, is_public=True)
     
@@ -14545,6 +14680,9 @@ def get_recommendation_catalog() -> List[dict]:
             owner_name = db_p.get("owner_name") or owner_info.get("name") or "Verified Lender"
             owner_avatar = db_p.get("owner_avatar") or owner_info.get("avatar") or ""
             owner_rating = float(db_p.get("owner_rating") or owner_info.get("rating") or 5.0)
+            owner_email = (db_p.get("owner_email") or db_p.get("user_email") or owner_info.get("email") or "").strip().lower()
+            user_email = (db_p.get("user_email") or db_p.get("owner_email") or "").strip().lower()
+            owner_id = str(db_p.get("owner_id") or db_p.get("ownerId") or owner_info.get("id") or "").strip()
             
             catalog_map[str(db_p["id"])] = {
                 "id": str(db_p["id"]),
@@ -14556,10 +14694,15 @@ def get_recommendation_catalog() -> List[dict]:
                 "reviews": int(db_p.get("reviews", 0)),
                 "available": bool(db_p.get("available", True)),
                 "image": str(db_p.get("image", "")),
+                "owner_email": owner_email,
+                "user_email": user_email,
+                "owner_id": owner_id,
                 "owner": {
                     "name": owner_name,
                     "avatar": owner_avatar,
-                    "rating": owner_rating
+                    "rating": owner_rating,
+                    "email": owner_email,
+                    "id": owner_id
                 }
             }
     result = list(catalog_map.values())
@@ -14567,6 +14710,62 @@ def get_recommendation_catalog() -> List[dict]:
         _RECOMMENDATION_CATALOG_CACHE = result
         _RECOMMENDATION_CATALOG_CACHED_AT = now
     return result or _RECOMMENDATION_CATALOG_CACHE
+
+
+def extract_caller_identity_from_auth(authorization: Optional[str] = None) -> Tuple[Optional[str], Optional[str]]:
+    """Extract authenticated caller email and id from verified JWT access token."""
+    if not authorization or not isinstance(authorization, str) or not authorization.startswith("Bearer "):
+        return None, None
+    token = authorization.split(" ")[1].strip()
+    if not token:
+        return None, None
+    caller_email = None
+    caller_id = None
+    # 1. Fast local JWT decoding first (0.01ms, prevents WAN latency)
+    try:
+        payload = decode_access_token(token, expected_type="access")
+        if payload and payload.get("sub"):
+            sub_val = str(payload["sub"]).strip()
+            if "@" in sub_val:
+                caller_email = sub_val.lower()
+            else:
+                caller_id = sub_val
+            if payload.get("email"):
+                caller_email = str(payload["email"]).strip().lower()
+            if payload.get("user_id") or payload.get("id"):
+                caller_id = str(payload.get("user_id") or payload.get("id"))
+            return caller_email, caller_id
+    except Exception:
+        pass
+    # 2. Firebase verification fallback
+    if HAS_FIREBASE and firebase_admin and firebase_admin._apps:
+        try:
+            decoded = firebase_auth.verify_id_token(token)
+            if decoded and decoded.get("email"):
+                caller_email = str(decoded["email"]).strip().lower()
+                caller_id = str(decoded.get("uid") or "")
+                return caller_email, caller_id
+        except Exception:
+            pass
+    return None, None
+
+
+def filter_recommendations_for_user(items: List[dict], caller_email: Optional[str], caller_id: Optional[str]) -> List[dict]:
+    """Strictly exclude products owned/listed by the authenticated user from recommendations."""
+    if not caller_email and not caller_id:
+        return items
+    c_email = caller_email.strip().lower() if caller_email else None
+    c_id = str(caller_id).strip() if caller_id else None
+    filtered = []
+    for p in items:
+        p_owner_email = str(p.get("owner_email") or p.get("user_email") or (p.get("owner") or {}).get("email") or "").strip().lower()
+        p_owner_id = str(p.get("owner_id") or p.get("ownerId") or (p.get("owner") or {}).get("id") or "").strip()
+        if c_email and p_owner_email and p_owner_email == c_email:
+            continue
+        if c_id and p_owner_id and p_owner_id == c_id:
+            continue
+        filtered.append(p)
+    return filtered
 
 
 # Phase 1 — Event Tracking API Endpoint
@@ -14587,13 +14786,16 @@ def post_events(payload: dict):
 
 # Phase 2 — Immediate Non-ML Recommendations: Similar Items
 @app.get("/api/recommendations/similar/{product_id}")
-def get_similar_recommendations(product_id: str):
+def get_similar_recommendations(product_id: str, authorization: Optional[str] = Header(None)):
     """
     GET /api/recommendations/similar/{product_id}
     Returns items in same category with similar price and precomputed similarity boost.
+    Excludes products owned by the authenticated caller.
     """
-    catalog = get_recommendation_catalog()
-    target = next((p for p in catalog if p["id"] == product_id), None)
+    caller_email, caller_id = extract_caller_identity_from_auth(authorization)
+    raw_catalog = get_recommendation_catalog()
+    catalog = filter_recommendations_for_user(raw_catalog, caller_email, caller_id)
+    target = next((p for p in raw_catalog if p["id"] == product_id), None)
     
     if not target:
         # Fallback to general high-rated products if product_id not found
@@ -14635,13 +14837,22 @@ def get_similar_recommendations(product_id: str):
 
 # Phase 2 — Immediate Non-ML Recommendations: Trending Now
 @app.get("/api/recommendations/trending")
-def get_trending_recommendations():
+def get_trending_recommendations(
+    authorization: Optional[str] = Header(None),
+    caller_email: Optional[str] = None,
+    caller_id: Optional[str] = None
+):
     """
     GET /api/recommendations/trending
     Returns products ranked by recent weighted event interactions (booking_completed, add_to_cart, view_product)
     with time-decay, falling back to top catalog items.
+    Excludes products owned by the authenticated caller.
     """
-    catalog = get_recommendation_catalog()
+    if not caller_email and not caller_id and authorization:
+        caller_email, caller_id = extract_caller_identity_from_auth(authorization)
+
+    raw_catalog = get_recommendation_catalog()
+    catalog = filter_recommendations_for_user(raw_catalog, caller_email, caller_id)
     catalog_map = {p["id"]: p for p in catalog}
     
     event_counts = get_trending_event_counts(days=30)
@@ -14669,14 +14880,17 @@ def get_trending_recommendations():
 
 # Phase 2 — Immediate Non-ML Recommendations: Frequently Booked Together
 @app.get("/api/recommendations/frequently-together/{product_id}")
-def get_frequently_together_recommendations(product_id: str):
+def get_frequently_together_recommendations(product_id: str, authorization: Optional[str] = Header(None)):
     """
     GET /api/recommendations/frequently-together/{product_id}
     Returns co-occurring items in order history or complementary category products.
+    Excludes products owned by the authenticated caller.
     """
-    catalog = get_recommendation_catalog()
+    caller_email, caller_id = extract_caller_identity_from_auth(authorization)
+    raw_catalog = get_recommendation_catalog()
+    catalog = filter_recommendations_for_user(raw_catalog, caller_email, caller_id)
     catalog_map = {p["id"]: p for p in catalog}
-    target = catalog_map.get(product_id)
+    target = next((p for p in raw_catalog if p["id"] == product_id), None)
 
     co_occurrences = get_order_co_occurrences(product_id, limit=4)
     results = []
@@ -14715,18 +14929,27 @@ def get_frequently_together_recommendations(product_id: str):
 
 # Phase 3 — Cold-Start-Aware Personalization
 @app.get("/api/recommendations/personalized")
-def get_personalized_recommendations(user_email: Optional[str] = None, session_id: Optional[str] = None):
+def get_personalized_recommendations(
+    user_email: Optional[str] = None,
+    session_id: Optional[str] = None,
+    authorization: Optional[str] = Header(None)
+):
     """
     GET /api/recommendations/personalized
     Returns personalized items based on logged-in user's or current session's recent view/browse history.
     Falls back cleanly to Phase 2 trending products if no prior user history exists (cold-start).
+    Excludes products owned by the authenticated caller.
     """
-    catalog = get_recommendation_catalog()
-    recent_events = get_recent_user_events(user_email=user_email, session_id=session_id, limit=25)
+    caller_email, caller_id = extract_caller_identity_from_auth(authorization)
+    effective_user_email = caller_email or user_email
+
+    raw_catalog = get_recommendation_catalog()
+    catalog = filter_recommendations_for_user(raw_catalog, caller_email, caller_id)
+    recent_events = get_recent_user_events(user_email=effective_user_email, session_id=session_id, limit=25)
 
     if not recent_events:
-        # COLD-START FALLBACK: Return trending items cleanly
-        trending = get_trending_recommendations()
+        # COLD-START FALLBACK: Return trending items cleanly (already filtered by caller)
+        trending = get_trending_recommendations(caller_email=caller_email, caller_id=caller_id)
         return {
             "source": "trending_fallback",
             "title": "Trending Tech Gear",
@@ -14749,7 +14972,7 @@ def get_personalized_recommendations(user_email: Optional[str] = None, session_i
             cat_weights[cat] = cat_weights.get(cat, 0.0) + weight
 
     if not cat_weights:
-        trending = get_trending_recommendations()
+        trending = get_trending_recommendations(caller_email=caller_email, caller_id=caller_id)
         return {
             "source": "trending_fallback",
             "title": "Trending Tech Gear",
@@ -14865,6 +15088,14 @@ def _extract_caller_email_optional(authorization: Optional[str] = None, user_ema
     if authorization and authorization.startswith("Bearer "):
         token = authorization.split(" ")[1].strip()
         if token:
+            try:
+                payload = decode_access_token(token, expected_type="access")
+                if payload and payload.get("sub"):
+                    sub_val = str(payload.get("email") or payload.get("sub") or "").strip().lower()
+                    if sub_val:
+                        return sub_val
+            except Exception:
+                pass
             if HAS_FIREBASE and firebase_admin and firebase_admin._apps:
                 try:
                     decoded = firebase_auth.verify_id_token(token)
@@ -14872,12 +15103,6 @@ def _extract_caller_email_optional(authorization: Optional[str] = None, user_ema
                         return str(decoded["email"]).strip().lower()
                 except Exception:
                     pass
-            try:
-                payload = decode_access_token(token, expected_type="access")
-                if payload and payload.get("sub"):
-                    return str(payload["sub"]).strip().lower()
-            except Exception:
-                pass
     return None
 
 class SearchRecordSchema(BaseModel):
@@ -14977,61 +15202,6 @@ def clear_user_search_history_api(
             MOCK_USER_EVENTS.pop(i)
             
     return {"success": True}
-
-@app.get("/api/products/recently-viewed")
-def get_recently_viewed_products(
-    authorization: Optional[str] = Header(None),
-    user_email: Optional[str] = Query(None),
-    limit: int = Query(8, ge=1, le=20)
-):
-    caller_email = _extract_caller_email_optional(authorization, user_email)
-    if not caller_email:
-        return []
-    
-    conn = get_db_connection()
-    recent_pids = []
-    if conn:
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute("""
-                    SELECT product_id, MAX(created_at) as last_viewed
-                    FROM user_events
-                    WHERE event_type = 'view_product' AND LOWER(user_email) = LOWER(%s) AND product_id IS NOT NULL AND TRIM(product_id) != ''
-                    GROUP BY product_id
-                    ORDER BY last_viewed DESC
-                    LIMIT %s
-                """, (caller_email, limit))
-                rows = cursor.fetchall()
-                recent_pids = [r["product_id"] for r in rows if r.get("product_id")]
-        except Exception as e:
-            print(f"Notice: recently_viewed query fallback: {e}")
-        finally:
-            conn.close()
-    
-    if not recent_pids:
-        seen = set()
-        from database import MOCK_USER_EVENTS
-        for ev in reversed(MOCK_USER_EVENTS):
-            if ev.get("event_type") == "view_product" and str(ev.get("user_email") or "").strip().lower() == caller_email:
-                pid = ev.get("product_id")
-                if pid and pid not in seen:
-                    seen.add(pid)
-                    recent_pids.append(pid)
-                    if len(recent_pids) >= limit:
-                        break
-
-    if not recent_pids:
-        return []
-
-    catalog = get_recommendation_catalog()
-    catalog_by_id = {str(item.get("id")): item for item in catalog}
-    
-    products = []
-    for pid in recent_pids:
-        if pid in catalog_by_id:
-            products.append(catalog_by_id[pid])
-    
-    return products
 
 # ===========================================================================
 # SECURE DEVICE IDENTITY & MY SECURITY QR ENDPOINTS

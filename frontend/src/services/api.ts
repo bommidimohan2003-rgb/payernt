@@ -1,4 +1,5 @@
 import axios from "axios";
+import { storage, STORAGE_KEYS } from "@/utils/storage";
 
 const getApiBase = () => {
   if (typeof window !== "undefined") {
@@ -12,7 +13,10 @@ const getApiBase = () => {
   }
   if (import.meta.env.VITE_API_URL) {
     const apiUrl = import.meta.env.VITE_API_URL;
-    if (typeof window !== "undefined" && window.location.hostname === "10.0.2.2") {
+    if (
+      typeof window !== "undefined" &&
+      window.location.hostname === "10.0.2.2"
+    ) {
       return apiUrl.replace(/localhost|127\.0\.0\.1/, "10.0.2.2");
     }
     return apiUrl;
@@ -24,6 +28,57 @@ const getApiBase = () => {
 };
 const API_BASE = getApiBase();
 
+export function getValidAccessToken(): string | null {
+  if (typeof window === "undefined") return null;
+  // 1. First retrieve using storage utility (auto JSON-parses properly)
+  let token = storage.get<string | null>(STORAGE_KEYS.token, null);
+
+  // 2. Fallbacks if storage.get returned null or raw string in alternate keys
+  if (!token) {
+    const rawCandidates = [
+      window.localStorage.getItem("payent:token"),
+      window.localStorage.getItem("token"),
+      window.localStorage.getItem("payent_token"),
+      window.localStorage.getItem("payernt_token"),
+      window.localStorage.getItem("paye₹nt_token"),
+    ];
+    for (const raw of rawCandidates) {
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === "string") {
+            token = parsed;
+            break;
+          }
+        } catch {
+          token = raw;
+          break;
+        }
+      }
+    }
+  }
+
+  if (typeof token !== "string") return null;
+  token = token.trim();
+  // Strip any accidental wrapping quotes
+  if (
+    (token.startsWith('"') && token.endsWith('"')) ||
+    (token.startsWith("'") && token.endsWith("'"))
+  ) {
+    token = token.slice(1, -1).trim();
+  }
+  // Validate token is not an invalid literal or empty
+  if (
+    !token ||
+    token.toLowerCase() === "null" ||
+    token.toLowerCase() === "undefined" ||
+    token === "[object Object]"
+  ) {
+    return null;
+  }
+  return token;
+}
+
 export const api = axios.create({
   baseURL: `${API_BASE}/api`,
   timeout: 10000,
@@ -31,28 +86,20 @@ export const api = axios.create({
 
 api.interceptors.request.use((config) => {
   if (typeof window !== "undefined") {
-    const token =
-      window.localStorage.getItem("payent:token") ||
-      window.localStorage.getItem("token") ||
-      window.localStorage.getItem("payent_token") ||
-      window.localStorage.getItem("payernt_token") ||
-      window.localStorage.getItem("paye₹nt_token");
+    const token = getValidAccessToken();
     if (token) {
+      config.headers = config.headers || {};
       config.headers.set("Authorization", `Bearer ${token}`);
     }
-    const user =
-      window.localStorage.getItem("payent:currentUser") ||
-      window.localStorage.getItem("currentUser") ||
-      window.localStorage.getItem("payent_user") ||
-      window.localStorage.getItem("payernt_user");
-    if (user) {
-      try {
-        const parsed = JSON.parse(user);
-        if (parsed?.id) config.headers.set("X-User-Id", parsed.id);
-        if (parsed?.email) config.headers.set("X-User-Email", parsed.email);
-      } catch {
-        /* ignore */
-      }
+    const user = storage.get<{ id?: string | number; email?: string } | null>(
+      STORAGE_KEYS.currentUser,
+      null,
+    );
+    if (user?.id) {
+      config.headers.set("X-User-Id", String(user.id));
+    }
+    if (user?.email) {
+      config.headers.set("X-User-Email", String(user.email));
     }
   }
   return config;
@@ -64,7 +111,9 @@ async function refreshAxiosToken(): Promise<string | null> {
   if (_axiosRefreshPromise) return _axiosRefreshPromise;
   if (typeof window === "undefined") return null;
 
-  const currentRefreshToken = window.localStorage.getItem("payent:refreshToken");
+  const currentRefreshToken =
+    storage.get<string | null>(STORAGE_KEYS.refreshToken, null) ||
+    window.localStorage.getItem("payent:refreshToken");
   if (!currentRefreshToken) return null;
 
   _axiosRefreshPromise = (async () => {
@@ -73,9 +122,9 @@ async function refreshAxiosToken(): Promise<string | null> {
         refresh_token: currentRefreshToken,
       });
       if (res.data?.token) {
-        window.localStorage.setItem("payent:token", res.data.token);
+        storage.set(STORAGE_KEYS.token, res.data.token);
         if (res.data.refreshToken) {
-          window.localStorage.setItem("payent:refreshToken", res.data.refreshToken);
+          storage.set(STORAGE_KEYS.refreshToken, res.data.refreshToken);
         }
         return res.data.token as string;
       }
@@ -108,21 +157,22 @@ api.interceptors.response.use(
         return api(originalRequest);
       } else {
         if (typeof window !== "undefined") {
-          window.localStorage.removeItem("payent:token");
-          window.localStorage.removeItem("payent:refreshToken");
-          window.localStorage.removeItem("payent:currentUser");
+          storage.remove(STORAGE_KEYS.token);
+          storage.remove(STORAGE_KEYS.refreshToken);
+          storage.remove(STORAGE_KEYS.currentUser);
           window.localStorage.removeItem("payent:admin:token");
           window.localStorage.removeItem("payent:admin:current_user");
-          const lastExp = (window as any).__lastSessionExpired || 0;
+          const win = window as unknown as { __lastSessionExpired?: number };
+          const lastExp = win.__lastSessionExpired || 0;
           if (Date.now() - lastExp > 3000) {
-            (window as any).__lastSessionExpired = Date.now();
+            win.__lastSessionExpired = Date.now();
             window.dispatchEvent(new CustomEvent("payent-session-expired"));
           }
         }
       }
     }
     return Promise.reject(error);
-  }
+  },
 );
 
 export interface ReviewItem {
@@ -214,15 +264,18 @@ export const reviewsApi = {
 
   updateReview: async (
     id: string,
-    data: { rating?: number; comment?: string }
+    data: { rating?: number; comment?: string },
   ): Promise<ReviewItem> => {
     const res = await api.put<ReviewItem>(`/reviews/${id}`, data);
     return res.data;
   },
 
-  deleteReview: async (id: string): Promise<{ success: boolean; message: string }> => {
-    const res = await api.delete<{ success: boolean; message: string }>(`/reviews/${id}`);
+  deleteReview: async (
+    id: string,
+  ): Promise<{ success: boolean; message: string }> => {
+    const res = await api.delete<{ success: boolean; message: string }>(
+      `/reviews/${id}`,
+    );
     return res.data;
   },
 };
-

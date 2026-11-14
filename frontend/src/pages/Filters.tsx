@@ -252,6 +252,39 @@ export default function FiltersPage() {
     ]
   );
 
+  const fromRoute = (search as any).from || "/categories";
+
+  const handleBack = () => {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      window.history.back();
+    } else {
+      navigate({ to: fromRoute, search: search as any, replace: true });
+    }
+  };
+
+  const handleApplyAndReturn = () => {
+    const qParams: Record<string, any> = {};
+
+    if (searchQuery && searchQuery.trim()) qParams.q = searchQuery.trim();
+    if (selectedCats.length > 0) qParams.cat = selectedCats.join(",");
+    if (minPrice > 0) qParams.min_p = String(minPrice);
+    if (maxPrice < 10000) qParams.max_p = String(maxPrice);
+    if (startDate) qParams.start = startDate;
+    if (endDate) qParams.end = endDate;
+    if (cityInput && cityInput.trim() && cityInput.toLowerCase() !== "all cities") {
+      qParams.city = cityInput.trim();
+    }
+    if (pincodeInput && pincodeInput.trim()) qParams.pincode = pincodeInput.trim();
+    if (selectedConditions.length === 1) qParams.cond = selectedConditions[0];
+    if (search.sort) qParams.sort = search.sort;
+
+    navigate({
+      to: fromRoute,
+      search: qParams as any,
+      replace: true,
+    });
+  };
+
   // Search input handler with debounce
   const searchTimeoutRef = useRef<any>(null);
   const handleSearchChange = (val: string) => {
@@ -1018,15 +1051,15 @@ export default function FiltersPage() {
       <header className="sticky top-0 z-30 h-16 shrink-0 bg-white/95 dark:bg-[#1E1E1E]/95 backdrop-blur-md border-b border-neutral-200 dark:border-neutral-800 px-3 sm:px-8 flex items-center justify-between gap-2 sm:gap-4">
         {/* Left: Back Link & Title */}
         <div className="flex items-center gap-2 sm:gap-4 min-w-0">
-          <Link
-            to="/categories"
-            search={search as any}
-            className="inline-flex items-center gap-1.5 sm:gap-2 min-h-[44px] px-2 -ml-1 text-xs sm:text-sm font-semibold text-neutral-600 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white transition-colors rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800/50 shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
+          <button
+            type="button"
+            onClick={handleBack}
+            className="inline-flex items-center gap-1.5 sm:gap-2 min-h-[44px] px-2 -ml-1 text-xs sm:text-sm font-semibold text-neutral-600 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white transition-colors rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800/50 shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white cursor-pointer"
             title="Return to standard Explore view"
           >
             <ArrowLeft className="h-4 w-4 stroke-[1.75]" aria-hidden="true" />
             <span className="hidden sm:inline">Back to Explore</span>
-          </Link>
+          </button>
           <div className="h-4 w-[1px] bg-neutral-300 dark:bg-neutral-800 hidden sm:block" />
           <h1 className="text-sm sm:text-base font-semibold text-neutral-900 dark:text-white flex items-center gap-1.5 truncate">
             <span>Filter Marketplace</span>
@@ -1053,13 +1086,13 @@ export default function FiltersPage() {
               )}
             </button>
           )}
-          <Link
-            to="/categories"
-            search={search as any}
+          <button
+            type="button"
+            onClick={handleApplyAndReturn}
             className="inline-flex items-center justify-center min-h-[44px] sm:min-h-[40px] px-4 py-2 rounded-full bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 hover:bg-neutral-800 dark:hover:bg-neutral-200 text-xs font-semibold transition-colors cursor-pointer shadow-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
           >
             Done
-          </Link>
+          </button>
         </div>
       </header>
 

@@ -35,7 +35,7 @@ import { SlideCommit } from "@/components/reactbits/SlideCommit";
 import { Input } from "@/components/common/Input";
 import { Modal } from "@/components/common/Modal";
 import { storage, STORAGE_KEYS } from "@/utils/storage";
-import { api } from "@/utils/api";
+import { api, getApiBase } from "@/utils/api";
 import { tracker } from "@/utils/eventTracker";
 import { RecommendationSection } from "@/components/recommendations/RecommendationSection";
 import type { Order, Product, UserAddress } from "@/types";
@@ -127,6 +127,70 @@ export default function Checkout() {
   const [start, setStart] = useState(initialStart);
   const [end, setEnd] = useState(initialEnd);
   const [withInsurance, setWithInsurance] = useState<boolean>(true);
+  const [dateConflictError, setDateConflictError] = useState<string | null>(null);
+  const [isValidatingDates, setIsValidatingDates] = useState(false);
+
+  useEffect(() => {
+    if (!product?.id || !start || !end) return;
+    let active = true;
+    setIsValidatingDates(true);
+    setDateConflictError(null);
+
+    const apiBase = getApiBase();
+    fetch(`${apiBase}/api/products/${encodeURIComponent(product.id)}/availability?start_date=${start}&end_date=${end}&session=full_day`)
+      .then(async (res) => {
+        if (!res.ok) {
+          if (res.status === 400) {
+            const err = await res.json().catch(() => ({}));
+            if (active) setDateConflictError(err.detail || "Selected dates are unavailable.");
+          }
+          return;
+        }
+        const data = await res.json();
+        if (!active) return;
+
+        const blockedSet = new Set<string>([
+          ...(Array.isArray(data.blockedDates) ? data.blockedDates : (data.blocked_dates || [])),
+          ...(Array.isArray(data.preparationBlockedDates) ? data.preparationBlockedDates : (data.preparation_blocked_dates || [])),
+        ]);
+        const bookedSet = new Set<string>(
+          Array.isArray(data.bookedDates) ? data.bookedDates : (data.booked_dates || [])
+        );
+
+        const [sY, sM, sD] = start.split("-").map(Number);
+        const [eY, eM, eD] = end.split("-").map(Number);
+        const cur = new Date(sY, sM - 1, sD);
+        const last = new Date(eY, eM - 1, eD);
+
+        let conflictMsg: string | null = null;
+        while (cur <= last) {
+          const key = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}-${String(cur.getDate()).padStart(2, "0")}`;
+          if (blockedSet.has(key)) {
+            conflictMsg = `Date ${key} is blocked by the owner for maintenance or personal use.`;
+            break;
+          }
+          if (bookedSet.has(key)) {
+            conflictMsg = `Date ${key} is already booked by another confirmed rental.`;
+            break;
+          }
+          cur.setDate(cur.getDate() + 1);
+        }
+
+        if (active) {
+          setDateConflictError(conflictMsg);
+        }
+      })
+      .catch(() => {
+        if (active) setDateConflictError(null);
+      })
+      .finally(() => {
+        if (active) setIsValidatingDates(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [product?.id, start, end]);
 
   // Address State & Form
   const [savedAddresses, setSavedAddresses] = useState<UserAddress[]>([]);
@@ -506,6 +570,12 @@ export default function Checkout() {
       );
       setActiveStep("address");
       setShowAddressForm(true);
+      return;
+    }
+
+    if (dateConflictError) {
+      toast.error(dateConflictError);
+      setPaymentError(dateConflictError);
       return;
     }
 
@@ -1426,6 +1496,13 @@ export default function Checkout() {
                       min={start}
                     />
                   </div>
+
+                  {dateConflictError && (
+                    <div className="flex items-start gap-2.5 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 text-xs text-rose-700 dark:text-rose-300">
+                      <AlertCircle className="h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400 mt-0.5" />
+                      <span>{dateConflictError}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* 3. Payment Method Card */}

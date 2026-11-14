@@ -106,7 +106,7 @@ export async function fetchWithTimeout(
     return await fetch(url, { ...cleanOptions, signal: controller.signal });
   } catch (err: unknown) {
     const e = err as { name?: string; message?: string };
-    if (isTimeout || e?.name === "AbortError") {
+    if (isTimeout) {
       const timeoutErr = new Error(`Request to ${url} timed out after ${timeoutMs}ms`);
       (timeoutErr as any).name = "TimeoutError";
       (timeoutErr as any).isTimeout = true;
@@ -1904,7 +1904,11 @@ export const api = {
 
       return { items, total, page, limit };
     } catch (err: unknown) {
-      if (signal?.aborted) throw err;
+      const isAbort = (err as any)?.name === "AbortError" || signal?.aborted;
+      const isTimeout = (err as any)?.isTimeout || (err as any)?.name === "TimeoutError";
+      if (isAbort && !isTimeout) {
+        throw err;
+      }
       console.warn("[API] getFilteredProductsPage notice:", err);
 
       // Graceful degraded recovery: If backend timed out or network dropped, serve cached or verified fallback catalog
@@ -2407,12 +2411,17 @@ export const api = {
   // Recommendation Engine API Methods
   async getSimilarRecommendations(productId: string): Promise<Product[]> {
     if (!API_BASE || !productId) return [];
+    const token = typeof window !== "undefined" ? storage.get<string | null>(STORAGE_KEYS.token, null) : null;
+    const cacheSuffix = token ? `auth_${token.slice(-10)}` : "guest";
     return getCachedOrFetch<Product[]>(
-      `rec_similar_${productId}`,
+      `rec_similar_${productId}_${cacheSuffix}`,
       async () => {
         try {
+          const headers: Record<string, string> = {};
+          if (token) headers["Authorization"] = `Bearer ${token}`;
           const res = await fetch(
             `${API_BASE}/api/recommendations/similar/${encodeURIComponent(productId)}`,
+            { headers }
           );
           if (!res.ok) return [];
           return await res.json();
@@ -2426,11 +2435,15 @@ export const api = {
 
   async getTrendingRecommendations(): Promise<Product[]> {
     if (!API_BASE) return [];
+    const token = typeof window !== "undefined" ? storage.get<string | null>(STORAGE_KEYS.token, null) : null;
+    const cacheSuffix = token ? `auth_${token.slice(-10)}` : "guest";
     return getCachedOrFetch<Product[]>(
-      "rec_trending",
+      `rec_trending_${cacheSuffix}`,
       async () => {
         try {
-          const res = await fetch(`${API_BASE}/api/recommendations/trending`);
+          const headers: Record<string, string> = {};
+          if (token) headers["Authorization"] = `Bearer ${token}`;
+          const res = await fetch(`${API_BASE}/api/recommendations/trending`, { headers });
           if (!res.ok) return [];
           return await res.json();
         } catch {
@@ -2441,7 +2454,7 @@ export const api = {
     );
   },
 
-    async getRecommendations(productId: string, type: "similar" | "frequently_together" = "similar"): Promise<Product[]> {
+  async getRecommendations(productId: string, type: "similar" | "frequently_together" = "similar"): Promise<Product[]> {
     if (type === "frequently_together") {
       return this.getFrequentlyTogetherRecommendations(productId);
     }
@@ -2452,12 +2465,17 @@ export const api = {
     productId: string,
   ): Promise<Product[]> {
     if (!API_BASE || !productId) return [];
+    const token = typeof window !== "undefined" ? storage.get<string | null>(STORAGE_KEYS.token, null) : null;
+    const cacheSuffix = token ? `auth_${token.slice(-10)}` : "guest";
     return getCachedOrFetch<Product[]>(
-      `rec_freq_together_${productId}`,
+      `rec_freq_together_${productId}_${cacheSuffix}`,
       async () => {
         try {
+          const headers: Record<string, string> = {};
+          if (token) headers["Authorization"] = `Bearer ${token}`;
           const res = await fetch(
             `${API_BASE}/api/recommendations/frequently-together/${encodeURIComponent(productId)}`,
+            { headers }
           );
           if (!res.ok) return [];
           return await res.json();
@@ -2471,18 +2489,30 @@ export const api = {
 
   async getPersonalizedRecommendations(userEmail?: string, sessionId?: string) {
     if (!API_BASE) return null;
-    try {
-      const params = new URLSearchParams();
-      if (userEmail) params.append("user_email", userEmail);
-      if (sessionId) params.append("session_id", sessionId);
+    const cleanEmail = userEmail ? userEmail.toLowerCase().trim() : "anon";
+    const cacheKey = `rec_personalized_${cleanEmail}_${sessionId || "default"}`;
+    return getCachedOrFetch(
+      cacheKey,
+      async () => {
+        try {
+          const token = typeof window !== "undefined" ? storage.get<string | null>(STORAGE_KEYS.token, null) : null;
+          const headers: Record<string, string> = {};
+          if (token) headers["Authorization"] = `Bearer ${token}`;
 
-      const url = `${API_BASE}/api/recommendations/personalized${params.toString() ? "?" + params.toString() : ""}`;
-      const res = await fetch(url);
-      if (!res.ok) return null;
-      return await res.json();
-    } catch {
-      return null;
-    }
+          const params = new URLSearchParams();
+          if (userEmail) params.append("user_email", userEmail);
+          if (sessionId) params.append("session_id", sessionId);
+
+          const url = `${API_BASE}/api/recommendations/personalized${params.toString() ? "?" + params.toString() : ""}`;
+          const res = await fetch(url, { headers });
+          if (!res.ok) return null;
+          return await res.json();
+        } catch {
+          return null;
+        }
+      },
+      { ttlMs: 60000, userIsolated: true, staleWhileRevalidate: true }
+    );
   },
 
   async getMLStatus() {
@@ -2624,16 +2654,18 @@ export const api = {
 
       const qs = params.toString();
       const url = `${API_BASE}/api/reviews${qs ? `?${qs}` : ""}`;
-      const res = await fetchWithTimeout(url, {}, 5000);
-      if (!res.ok) return { reviews: [], total: 0, total_pages: 1 };
+      const res = await fetchWithTimeout(url, {}, 10000);
+      if (!res.ok) {
+        throw new Error(`Failed to load customer reviews (HTTP ${res.status})`);
+      }
       const data = await res.json();
       return {
         reviews: Array.isArray(data?.reviews) ? data.reviews : [],
-        total: Number(data?.total) || 0,
-        total_pages: Number(data?.total_pages) || 1,
+        total: Number(data?.pagination?.total ?? data?.total ?? (Array.isArray(data?.reviews) ? data.reviews.length : 0)),
+        total_pages: Number(data?.pagination?.totalPages ?? data?.total_pages ?? 1),
       };
-    } catch {
-      return { reviews: [], total: 0, total_pages: 1 };
+    } catch (err: unknown) {
+      throw err;
     }
   },
 
@@ -3415,10 +3447,11 @@ export const api = {
     payload: {
       documentType: "AADHAAR" | "PAN";
       documentNumber: string;
-      fileName: string;
-      fileType: string;
-      fileData: string;
-      fileSize: number;
+      fileName?: string;
+      fileType?: string;
+      fileData?: string;
+      fileSize?: number;
+      isEdit?: boolean;
     },
     token?: string,
   ): Promise<{

@@ -20,6 +20,7 @@ import { Route as CategoriesRouteImport } from './routes/categories'
 import { Route as CheckoutRouteImport } from './routes/checkout'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as ExploreRouteImport } from './routes/explore'
 import { Route as FaqRouteImport } from './routes/faq'
 import { Route as FiltersRouteImport } from './routes/filters'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
@@ -164,6 +165,11 @@ const ContactRoute = ContactRouteImport.update({
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ExploreRoute = ExploreRouteImport.update({
+  id: '/explore',
+  path: '/explore',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FaqRoute = FaqRouteImport.update({
@@ -629,6 +635,7 @@ export interface FileRoutesByFullPath {
   '/checkout': typeof CheckoutRoute
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRoute
+  '/explore': typeof ExploreRoute
   '/faq': typeof FaqRoute
   '/filters': typeof FiltersRoute
   '/forgot-password': typeof ForgotPasswordRoute
@@ -731,6 +738,7 @@ export interface FileRoutesByTo {
   '/checkout': typeof CheckoutRoute
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRoute
+  '/explore': typeof ExploreRoute
   '/faq': typeof FaqRoute
   '/filters': typeof FiltersRoute
   '/forgot-password': typeof ForgotPasswordRoute
@@ -833,6 +841,7 @@ export interface FileRoutesById {
   '/checkout': typeof CheckoutRoute
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRoute
+  '/explore': typeof ExploreRoute
   '/faq': typeof FaqRoute
   '/filters': typeof FiltersRoute
   '/forgot-password': typeof ForgotPasswordRoute
@@ -938,6 +947,7 @@ export interface FileRouteTypes {
     | '/checkout'
     | '/contact'
     | '/dashboard'
+    | '/explore'
     | '/faq'
     | '/filters'
     | '/forgot-password'
@@ -1040,6 +1050,7 @@ export interface FileRouteTypes {
     | '/checkout'
     | '/contact'
     | '/dashboard'
+    | '/explore'
     | '/faq'
     | '/filters'
     | '/forgot-password'
@@ -1141,6 +1152,7 @@ export interface FileRouteTypes {
     | '/checkout'
     | '/contact'
     | '/dashboard'
+    | '/explore'
     | '/faq'
     | '/filters'
     | '/forgot-password'
@@ -1245,6 +1257,7 @@ export interface RootRouteChildren {
   CheckoutRoute: typeof CheckoutRoute
   ContactRoute: typeof ContactRoute
   DashboardRoute: typeof DashboardRoute
+  ExploreRoute: typeof ExploreRoute
   FaqRoute: typeof FaqRoute
   FiltersRoute: typeof FiltersRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
@@ -1353,6 +1366,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/explore': {
+      id: '/explore'
+      path: '/explore'
+      fullPath: '/explore'
+      preLoaderRoute: typeof ExploreRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/faq': {
@@ -2216,6 +2236,7 @@ const rootRouteChildren: RootRouteChildren = {
   CheckoutRoute: CheckoutRoute,
   ContactRoute: ContactRoute,
   DashboardRoute: DashboardRoute,
+  ExploreRoute: ExploreRoute,
   FaqRoute: FaqRoute,
   FiltersRoute: FiltersRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,

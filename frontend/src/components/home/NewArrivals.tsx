@@ -10,29 +10,19 @@ import { RentalProductCard, RentalProductCardSkeleton } from "@/components/commo
 
 const ITEMS_PER_PAGE = 8;
 
+const INITIAL_NEW_ARRIVALS: Product[] = INITIAL_FALLBACK_PRODUCTS
+  .filter((p) => !isFakeOrDeletedProduct(p))
+  .slice(0, ITEMS_PER_PAGE);
+
 export function NewArrivals() {
   const abortControllerRef = useRef<AbortController | null>(null);
   const carouselRef = useRef<HTMLDivElement>(null);
-  const [products, setProducts] = useState<Product[]>(() => {
-    if (typeof window === "undefined") return [];
-    try {
-      const cached = storage.get<Product[]>("payent_server_products", []);
-      const pool = (cached && cached.length > 0 ? cached : INITIAL_FALLBACK_PRODUCTS).filter((p) => !isFakeOrDeletedProduct(p));
-      const sorted = [...pool].sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")));
-      return sorted.slice(0, ITEMS_PER_PAGE);
-    } catch {}
-    return INITIAL_FALLBACK_PRODUCTS.filter((p) => !isFakeOrDeletedProduct(p)).slice(0, ITEMS_PER_PAGE);
-  });
-  const [totalCount, setTotalCount] = useState<number>(() => {
-    if (typeof window === "undefined") return 0;
-    try {
-      const cached = storage.get<Product[]>("payent_server_products", []);
-      if (cached && cached.length > 0) return cached.length;
-    } catch {}
-    return INITIAL_FALLBACK_PRODUCTS.length;
-  });
+
+  // Synchronous initial state is deterministic between SSR and initial CSR hydration
+  const [products, setProducts] = useState<Product[]>(INITIAL_NEW_ARRIVALS);
+  const [totalCount, setTotalCount] = useState<number>(INITIAL_FALLBACK_PRODUCTS.length);
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const [isLoading, setIsLoading] = useState<boolean>(() => products.length === 0);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleScroll = (direction: "left" | "right") => {
@@ -63,11 +53,41 @@ export function NewArrivals() {
         return;
       }
 
-      setProducts(result.items);
-      setTotalCount(safeTotal);
+      if (result.items && result.items.length > 0) {
+        setProducts(result.items);
+        setTotalCount(safeTotal);
+      } else {
+        const cached = storage.get<Product[]>("payent_server_products", []);
+        let fallbackPool = (cached && cached.length > 0 ? cached : []).filter((p) => !isFakeOrDeletedProduct(p));
+        if (fallbackPool.length === 0) {
+          fallbackPool = INITIAL_FALLBACK_PRODUCTS.filter((p) => !isFakeOrDeletedProduct(p));
+        }
+        const sorted = [...fallbackPool].sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")));
+        const sliced = sorted.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+        setProducts(sliced.length > 0 ? sliced : sorted.slice(0, ITEMS_PER_PAGE));
+        setTotalCount(fallbackPool.length);
+      }
     } catch (err: any) {
       if (err?.name === "AbortError" || controller.signal.aborted) return;
-      setError(err?.message || "Failed to load newly listed equipment.");
+      const cached = storage.get<Product[]>("payent_server_products", []);
+      let fallbackPool = (cached && cached.length > 0 ? cached : []).filter((p) => !isFakeOrDeletedProduct(p));
+      if (fallbackPool.length === 0) {
+        fallbackPool = INITIAL_FALLBACK_PRODUCTS.filter((p) => !isFakeOrDeletedProduct(p));
+      }
+      if (fallbackPool.length > 0) {
+        const sorted = [...fallbackPool].sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")));
+        const sliced = sorted.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+        setProducts(sliced.length > 0 ? sliced : sorted.slice(0, ITEMS_PER_PAGE));
+        setTotalCount(fallbackPool.length);
+        setError(null);
+      } else {
+        setProducts((current) => {
+          if (current.length === 0) {
+            setError(err?.message || "Failed to load newly listed equipment.");
+          }
+          return current;
+        });
+      }
     } finally {
       if (!controller.signal.aborted) {
         setIsLoading(false);

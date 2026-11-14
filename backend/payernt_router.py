@@ -128,7 +128,9 @@ def get_current_payernt_account(authorization: Optional[str] = Header(None)) -> 
             detail="Missing or invalid Authorization header for paye₹nt.",
         )
 
-    token = authorization.split(" ")[1]
+    token = authorization.split(" ", 1)[1].strip()
+    if (token.startswith('"') and token.endswith('"')) or (token.startswith("'") and token.endswith("'")):
+        token = token[1:-1].strip()
     payload = decode_access_token(token, expected_type="access")
     if not payload or "sub" not in payload:
         raise HTTPException(
@@ -2572,7 +2574,9 @@ def create_booking_with_security(
             detail="Authentication required to book gear.",
         )
 
-    token = authorization.split(" ")[1]
+    token = authorization.split(" ", 1)[1].strip()
+    if (token.startswith('"') and token.endswith('"')) or (token.startswith("'") and token.endswith("'")):
+        token = token[1:-1].strip()
     payload = decode_access_token(token, expected_type="access")
     if not payload or "sub" not in payload:
         raise HTTPException(
@@ -2790,7 +2794,9 @@ def rental_cancel_booking_endpoint(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication required to cancel booking."
         )
-    token = authorization.split(" ")[1]
+    token = authorization.split(" ", 1)[1].strip()
+    if (token.startswith('"') and token.endswith('"')) or (token.startswith("'") and token.endswith("'")):
+        token = token[1:-1].strip()
     payload = decode_access_token(token, expected_type="access")
     if not payload or "sub" not in payload:
         raise HTTPException(
@@ -2818,7 +2824,9 @@ def get_renter_pin_endpoint(
             detail="Authentication required to view Secret PIN.",
         )
 
-    token = authorization.split(" ")[1]
+    token = authorization.split(" ", 1)[1].strip()
+    if (token.startswith('"') and token.endswith('"')) or (token.startswith("'") and token.endswith("'")):
+        token = token[1:-1].strip()
     payload = decode_access_token(token, expected_type="access")
     if not payload or "sub" not in payload:
         raise HTTPException(
@@ -3039,7 +3047,9 @@ def vendor_advance_queue_endpoint(
             detail="Authentication required to advance rental queue. Missing Bearer token."
         )
 
-    token = authorization.split(" ")[1].strip()
+    token = authorization.split(" ", 1)[1].strip()
+    if (token.startswith('"') and token.endswith('"')) or (token.startswith("'") and token.endswith("'")):
+        token = token[1:-1].strip().strip()
     payload = decode_access_token(token, expected_type="access")
     if not payload or "sub" not in payload:
         raise HTTPException(
@@ -3077,7 +3087,9 @@ def get_payernt_queue_actions_endpoint(
     """Returns the persistent audit log of all milestone completions for a booking."""
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Authentication required.")
-    token = authorization.split(" ")[1].strip()
+    token = authorization.split(" ", 1)[1].strip()
+    if (token.startswith('"') and token.endswith('"')) or (token.startswith("'") and token.endswith("'")):
+        token = token[1:-1].strip().strip()
     payload = decode_access_token(token, expected_type="access")
     if not payload or "sub" not in payload:
         raise HTTPException(status_code=401, detail="Invalid token.")
@@ -3273,7 +3285,9 @@ def check_courier_authorization_for_delivery(booking_id: str, authorization: Opt
     if not authorization or not authorization.startswith("Bearer "):
         return False, status.HTTP_401_UNAUTHORIZED, "Authentication required. Bearer token missing.", {}
 
-    token = authorization.split(" ")[1]
+    token = authorization.split(" ", 1)[1].strip()
+    if (token.startswith('"') and token.endswith('"')) or (token.startswith("'") and token.endswith("'")):
+        token = token[1:-1].strip()
     payload = decode_access_token(token, expected_type="access")
     if not payload or ("sub" not in payload and "user_id" not in payload):
         return False, status.HTTP_401_UNAUTHORIZED, "Session invalid or expired.", {}

@@ -16,6 +16,7 @@ import {
   Lock,
   FileCheck,
   Info,
+  Edit3,
 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/utils/api";
@@ -23,7 +24,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
 import { BackButton } from "@/components/common/BackButton";
 import { useKycScreenshotProtection } from "@/hooks/useKycScreenshotProtection";
-import { KycScreenShield, KycProtectionBadge } from "@/components/security/KycScreenShield";
+import {
+  KycScreenShield,
+  KycProtectionBadge,
+} from "@/components/security/KycScreenShield";
 
 export function PayrentKycPage() {
   const navigate = useNavigate();
@@ -33,18 +37,25 @@ export function PayrentKycPage() {
   const [submitting, setSubmitting] = useState(false);
 
   // Status from backend
-  const [kycStatus, setKycStatus] = useState<"NOT_STARTED" | "PENDING" | "APPROVED" | "REJECTED">("NOT_STARTED");
+  const [kycStatus, setKycStatus] = useState<
+    "NOT_STARTED" | "PENDING" | "APPROVED" | "REJECTED"
+  >("NOT_STARTED");
   const [maskedNumber, setMaskedNumber] = useState<string | null>(null);
   const [documentFileName, setDocumentFileName] = useState<string | null>(null);
   const [submittedAt, setSubmittedAt] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState<string | null>(null);
   const [allowResubmission, setAllowResubmission] = useState(true);
 
+  // Edit mode state: permitted strictly before admin approval
+  const [isEditing, setIsEditing] = useState(false);
+  const canEdit = kycStatus !== "APPROVED";
+
   // Anti-Screenshot & Screen Capture Protection (Page-Specific: applies across entry, submission, and verification)
-  const { isObscured, unobscure, setFileDialogOpen, protectProps } = useKycScreenshotProtection({
-    documentType: "PAN Card",
-    enabled: true,
-  });
+  const { isObscured, unobscure, setFileDialogOpen, protectProps } =
+    useKycScreenshotProtection({
+      documentType: "PAN Card",
+      enabled: true,
+    });
 
   // PAN Input state
   const [panRaw, setPanRaw] = useState("");
@@ -73,7 +84,7 @@ export function PayrentKycPage() {
         setRejectionReason(res.rejectionReason || null);
         setAllowResubmission(res.allowResubmission ?? true);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.warn("Could not fetch Payrent KYC status:", err);
     } finally {
       setLoading(false);
@@ -94,7 +105,10 @@ export function PayrentKycPage() {
 
   // PAN Input change: normalize to uppercase, strip non-alphanumeric and spaces
   const handlePanChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const clean = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10);
+    const clean = e.target.value
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "")
+      .slice(0, 10);
     setPanRaw(clean);
     if (panError) setPanError(null);
   };
@@ -121,13 +135,22 @@ export function PayrentKycPage() {
     // 5MB limit
     const maxBytes = 5 * 1024 * 1024;
     if (file.size > maxBytes) {
-      setFileError("Document size exceeds 5MB limit. Please upload a smaller image.");
+      setFileError(
+        "Document size exceeds 5MB limit. Please upload a smaller image.",
+      );
       return;
     }
 
-    const validTypes = ["image/jpeg", "image/jpg", "image/png", "application/pdf"];
+    const validTypes = [
+      "image/jpeg",
+      "image/jpg",
+      "image/png",
+      "application/pdf",
+    ];
     if (!validTypes.includes(file.type.toLowerCase())) {
-      setFileError("Unsupported document format. Allowed formats: JPG, JPEG, PNG, PDF.");
+      setFileError(
+        "Unsupported document format. Allowed formats: JPG, JPEG, PNG, PDF.",
+      );
       return;
     }
 
@@ -157,6 +180,13 @@ export function PayrentKycPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!canEdit) {
+      toast.error(
+        "KYC documents have already been approved by an administrator and cannot be modified.",
+      );
+      return;
+    }
+
     let hasError = false;
     const cleanPan = panRaw.trim().toUpperCase();
 
@@ -165,11 +195,13 @@ export function PayrentKycPage() {
       setPanError("PAN Number is required.");
       hasError = true;
     } else if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(cleanPan)) {
-      setPanError("Enter a valid 10-character PAN number format (e.g. ABCDE1234F).");
+      setPanError(
+        "Enter a valid 10-character PAN number format (e.g. ABCDE1234F).",
+      );
       hasError = true;
     }
 
-    if (!selectedFile) {
+    if (!selectedFile && !isEditing) {
       setFileError("Please upload a clear photo or document of your PAN card.");
       hasError = true;
     }
@@ -181,27 +213,57 @@ export function PayrentKycPage() {
 
     try {
       setSubmitting(true);
-      const res = await api.submitKyc({
+      const payload: {
+        documentType: "PAN";
+        documentNumber: string;
+        fileName?: string;
+        fileType?: string;
+        fileData?: string;
+        fileSize?: number;
+        isEdit?: boolean;
+      } = {
         documentType: "PAN",
         documentNumber: cleanPan,
-        fileName: selectedFile!.name,
-        fileType: selectedFile!.type,
-        fileData: selectedFile!.data,
-        fileSize: selectedFile!.size,
-      });
+        isEdit: isEditing || kycStatus === "PENDING",
+      };
+
+      if (selectedFile) {
+        payload.fileName = selectedFile.name;
+        payload.fileType = selectedFile.type;
+        payload.fileData = selectedFile.data;
+        payload.fileSize = selectedFile.size;
+      }
+
+      const res = await api.submitKyc(payload);
 
       if (res && res.success) {
-        toast.success("PAN document submitted successfully! Placed under review.");
+        toast.success(
+          isEditing
+            ? "PAN verification details updated successfully! Placed under review."
+            : "PAN document submitted successfully! Placed under review.",
+        );
         setKycStatus(res.status || "PENDING");
         setMaskedNumber(res.maskedNumber || `XXXXX${cleanPan.slice(5)}`);
-        setDocumentFileName(selectedFile!.name);
+        if (selectedFile) {
+          setDocumentFileName(selectedFile.name);
+        }
         setSubmittedAt(new Date().toISOString());
+        setIsEditing(false);
         setAllowResubmission(false);
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new Event("payent_kyc_updated"));
+        }
       } else {
-        toast.error(res?.message || "PAN verification submission failed. Please try again.");
+        toast.error(
+          res?.message ||
+            "PAN verification submission failed. Please try again.",
+        );
       }
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to submit PAN verification. Please try again.");
+    } catch (err: unknown) {
+      toast.error(
+        (err as Error)?.message ||
+          "Failed to submit PAN verification. Please try again.",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -213,11 +275,32 @@ export function PayrentKycPage() {
     setPanError(null);
     setFileError(null);
     setKycStatus("NOT_STARTED");
+    setIsEditing(false);
+  };
+
+  const handleStartEdit = () => {
+    if (!canEdit) {
+      toast.error("Approved KYC documents cannot be modified.");
+      return;
+    }
+    setIsEditing(true);
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setPanError(null);
+    setFileError(null);
+    setSelectedFile(null);
+    setPanRaw("");
   };
 
   return (
     <DashboardLayout>
-      <KycScreenShield isObscured={isObscured} documentType="PAN Card" onDismiss={unobscure} />
+      <KycScreenShield
+        isObscured={isObscured}
+        documentType="PAN Card"
+        onDismiss={unobscure}
+      />
       <div className="w-full max-w-5xl mx-auto space-y-6 text-left py-6 px-4 sm:px-6">
         {/* Navigation & Breadcrumb */}
         <div className="flex items-center justify-between pb-2">
@@ -235,8 +318,9 @@ export function PayrentKycPage() {
             PAN Card Verification
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground mt-1.5 leading-relaxed">
-            Verify your renter identity on pay₹ent using your 10-character PAN Card.
-            Approved KYC enables zero-security-deposit rentals, instant checkout confirmation, and verified customer status.
+            Verify your renter identity on pay₹ent using your 10-character PAN
+            Card. Approved KYC enables zero-security-deposit rentals, instant
+            checkout confirmation, and verified customer status.
           </p>
         </div>
 
@@ -244,19 +328,29 @@ export function PayrentKycPage() {
         {loading ? (
           <div className="p-12 rounded-3xl border border-border/80 bg-card flex flex-col items-center justify-center gap-3">
             <Loader2 className="h-6 w-6 animate-spin text-primary" />
-            <p className="text-xs font-semibold text-muted-foreground">Checking PAN KYC verification status...</p>
+            <p className="text-xs font-semibold text-muted-foreground">
+              Checking PAN KYC verification status...
+            </p>
           </div>
         ) : (
           <>
             {/* Status: APPROVED */}
             {kycStatus === "APPROVED" && (
               <div className="p-6 rounded-3xl border border-emerald-500/30 bg-emerald-500/10 space-y-3">
-                <div className="flex items-center gap-3 text-emerald-600 dark:text-emerald-400 font-bold text-base">
-                  <CheckCircle2 className="h-6 w-6 shrink-0" />
-                  <span>PAN Identity Verified</span>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 text-emerald-600 dark:text-emerald-400 font-bold text-base">
+                    <CheckCircle2 className="h-6 w-6 shrink-0" />
+                    <span>PAN Identity Verified</span>
+                  </div>
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 text-[11px] font-bold">
+                    <Lock className="h-3 w-3" />
+                    <span>Approved & Locked</span>
+                  </span>
                 </div>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Your PAN Card identity verification is fully approved. You have unlocked zero-deposit rental privileges across the pay₹ent marketplace.
+                  Your PAN Card identity verification is fully approved. You
+                  have unlocked zero-deposit rental privileges across the
+                  pay₹ent marketplace.
                 </p>
                 <div className="pt-2 border-t border-emerald-500/20 flex flex-wrap items-center gap-4 text-xs font-mono">
                   <div>
@@ -266,15 +360,23 @@ export function PayrentKycPage() {
                   {maskedNumber && (
                     <div>
                       <span className="text-muted-foreground">Number: </span>
-                      <span className="font-bold text-foreground">{maskedNumber}</span>
+                      <span className="font-bold text-foreground">
+                        {maskedNumber}
+                      </span>
                     </div>
                   )}
                   {submittedAt && (
                     <div>
                       <span className="text-muted-foreground">Verified: </span>
-                      <span className="text-foreground">{new Date(submittedAt).toLocaleDateString()}</span>
+                      <span className="text-foreground">
+                        {new Date(submittedAt).toLocaleDateString()}
+                      </span>
                     </div>
                   )}
+                </div>
+                <div className="pt-1 text-[11px] text-muted-foreground italic">
+                  Note: Verified KYC documents are officially approved by
+                  compliance and cannot be modified.
                 </div>
               </div>
             )}
@@ -282,35 +384,91 @@ export function PayrentKycPage() {
             {/* Status: PENDING */}
             {kycStatus === "PENDING" && (
               <div className="p-6 rounded-3xl border border-amber-500/30 bg-amber-500/10 space-y-3">
-                <div className="flex items-center gap-3 text-amber-600 dark:text-amber-400 font-bold text-base">
-                  <Clock className="h-6 w-6 shrink-0 animate-pulse" />
-                  <span>Verification Under Administrative Review</span>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 text-amber-600 dark:text-amber-400 font-bold text-base">
+                    <Clock className="h-6 w-6 shrink-0 animate-pulse" />
+                    <span>Verification Under Administrative Review</span>
+                  </div>
+                  {!isEditing && canEdit && (
+                    <button
+                      type="button"
+                      onClick={handleStartEdit}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-amber-500/20 text-amber-950 dark:text-amber-200 border border-amber-500/30 hover:bg-amber-500/30 font-bold text-xs transition-colors cursor-pointer shrink-0 self-start sm:self-auto shadow-xs"
+                      aria-label="Edit pending PAN Card details"
+                    >
+                      <Edit3 className="h-3.5 w-3.5" />
+                      <span>Edit KYC Details</span>
+                    </button>
+                  )}
                 </div>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Your PAN Card number and document photo have been securely uploaded. Our compliance team is reviewing the submission. Verification typically completes within 24 hours.
+                  Your PAN Card number and document photo have been securely
+                  uploaded. Our compliance team is reviewing the submission.
+                  Verification typically completes within 24 hours.
                 </p>
                 <div className="pt-2 border-t border-amber-500/20 flex flex-wrap items-center gap-4 text-xs font-mono">
                   <div>
                     <span className="text-muted-foreground">Status: </span>
-                    <span className="font-bold text-amber-600 dark:text-amber-400 uppercase">PENDING REVIEW</span>
+                    <span className="font-bold text-amber-600 dark:text-amber-400 uppercase">
+                      PENDING REVIEW
+                    </span>
                   </div>
                   {maskedNumber && (
                     <div>
                       <span className="text-muted-foreground">PAN: </span>
-                      <span className="font-bold text-foreground">{maskedNumber}</span>
+                      <span className="font-bold text-foreground">
+                        {maskedNumber}
+                      </span>
                     </div>
                   )}
                   {documentFileName && (
                     <div>
                       <span className="text-muted-foreground">File: </span>
-                      <span className="font-bold text-foreground">{documentFileName}</span>
+                      <span className="font-bold text-foreground">
+                        {documentFileName}
+                      </span>
                     </div>
                   )}
                 </div>
-                <div className="p-3 rounded-xl bg-amber-500/5 border border-amber-500/15 text-[11px] text-amber-700 dark:text-amber-300 flex items-center gap-2">
-                  <Info className="h-4 w-4 shrink-0" />
-                  <span>Notice: Instant government database verification is pending real verification provider API credentials.</span>
+                <div className="p-3 rounded-xl bg-amber-500/5 border border-amber-500/15 text-[11px] text-amber-700 dark:text-amber-300 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Info className="h-4 w-4 shrink-0" />
+                    <span>
+                      Notice: You can update your details or photo anytime
+                      before compliance approval.
+                    </span>
+                  </div>
+                  {!isEditing && canEdit && (
+                    <button
+                      type="button"
+                      onClick={handleStartEdit}
+                      className="font-bold text-amber-900 dark:text-amber-200 underline hover:opacity-80 cursor-pointer shrink-0"
+                    >
+                      Edit now
+                    </button>
+                  )}
                 </div>
+              </div>
+            )}
+
+            {isEditing && (
+              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5 text-xs text-amber-950 dark:text-amber-200">
+                  <Edit3 className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                  <span>
+                    <strong>Editing Pending KYC Submission:</strong> You can
+                    update your 10-character PAN number and replace your
+                    uploaded document before our team approves it.
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCancelEdit}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-amber-500/30 bg-card hover:bg-secondary text-xs font-semibold text-foreground cursor-pointer shrink-0 transition-colors"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  <span>Cancel</span>
+                </button>
               </div>
             )}
 
@@ -322,11 +480,15 @@ export function PayrentKycPage() {
                   <span>PAN Card Verification Rejected</span>
                 </div>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Your submitted PAN Card could not be verified. You may review the safe feedback below and submit a clear, valid PAN document.
+                  Your submitted PAN Card could not be verified. You may review
+                  the safe feedback below and submit a clear, valid PAN
+                  document.
                 </p>
                 {rejectionReason && (
                   <div className="p-3.5 rounded-2xl bg-card border border-rose-500/20 text-xs">
-                    <span className="font-bold text-rose-600 dark:text-rose-400 block mb-1">Reason:</span>
+                    <span className="font-bold text-rose-600 dark:text-rose-400 block mb-1">
+                      Reason:
+                    </span>
                     <span className="text-foreground">{rejectionReason}</span>
                   </div>
                 )}
@@ -346,7 +508,9 @@ export function PayrentKycPage() {
             )}
 
             {/* Verification Form */}
-            {(kycStatus === "NOT_STARTED" || (kycStatus === "REJECTED" && !rejectionReason)) && (
+            {(kycStatus === "NOT_STARTED" ||
+              isEditing ||
+              (kycStatus === "REJECTED" && !rejectionReason)) && (
               <form
                 onSubmit={handleSubmit}
                 className="relative rounded-3xl border border-border/80 bg-card p-6 sm:p-8 space-y-6 shadow-sm overflow-hidden kyc-secure-container select-none"
@@ -355,9 +519,15 @@ export function PayrentKycPage() {
               >
                 <div className="flex items-center justify-between border-b border-border/60 pb-4">
                   <div>
-                    <h3 className="text-lg font-bold text-foreground">Submit PAN Card Details</h3>
+                    <h3 className="text-lg font-bold text-foreground">
+                      {isEditing
+                        ? "Edit PAN Card Details"
+                        : "Submit PAN Card Details"}
+                    </h3>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      Enter your 10-character PAN number and attach a clear photo of your PAN Card.
+                      {isEditing
+                        ? "Update your 10-character PAN number or upload a replacement document."
+                        : "Enter your 10-character PAN number and attach a clear photo of your PAN Card."}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -372,8 +542,12 @@ export function PayrentKycPage() {
                 {/* Field 1 — PAN Number */}
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <label htmlFor="pan-number-input" className="block text-xs font-bold text-foreground">
-                      Field 1 — PAN Number <span className="text-destructive">*</span>
+                    <label
+                      htmlFor="pan-number-input"
+                      className="block text-xs font-bold text-foreground"
+                    >
+                      Field 1 — PAN Number{" "}
+                      <span className="text-destructive">*</span>
                     </label>
                     <span className="text-[11px] text-muted-foreground">
                       10 Characters (e.g. ABCDE1234F)
@@ -382,7 +556,9 @@ export function PayrentKycPage() {
 
                   <div
                     className={`flex items-center gap-2 rounded-2xl border bg-secondary/30 px-4 h-12 transition-colors border-border focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 ${
-                      panError ? "border-destructive focus-within:ring-destructive/20" : ""
+                      panError
+                        ? "border-destructive focus-within:ring-destructive/20"
+                        : ""
                     }`}
                   >
                     <CreditCard className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -403,17 +579,26 @@ export function PayrentKycPage() {
                       onClick={() => setShowPan(!showPan)}
                       className="p-1 text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
                       title={showPan ? "Mask PAN" : "Reveal PAN"}
-                      aria-label={showPan ? "Mask PAN Number" : "Show PAN Number"}
+                      aria-label={
+                        showPan ? "Mask PAN Number" : "Show PAN Number"
+                      }
                     >
-                      {showPan ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      {showPan ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
                     </button>
                   </div>
 
                   {panError && (
-                    <p className="text-xs text-destructive font-medium">{panError}</p>
+                    <p className="text-xs text-destructive font-medium">
+                      {panError}
+                    </p>
                   )}
                   <p className="text-[11px] text-muted-foreground">
-                    Format: 5 letters, 4 digits, 1 letter. Normalized automatically to uppercase.
+                    Format: 5 letters, 4 digits, 1 letter. Normalized
+                    automatically to uppercase.
                   </p>
                 </div>
 
@@ -421,18 +606,41 @@ export function PayrentKycPage() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <label className="block text-xs font-bold text-foreground">
-                      Field 2 — PAN Card Photo <span className="text-destructive">*</span>
+                      Field 2 — PAN Card Photo{" "}
+                      <span className="text-destructive">*</span>
                     </label>
                     <span className="text-[11px] text-muted-foreground">
                       JPG, JPEG, PNG, or PDF (Max 5MB)
                     </span>
                   </div>
 
+                  {isEditing && documentFileName && !selectedFile && (
+                    <div className="p-3 rounded-2xl bg-secondary/40 border border-border/80 flex items-center justify-between gap-3 text-xs">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <FileCheck className="h-4 w-4 text-emerald-500 shrink-0" />
+                        <span className="truncate">
+                          Current document:{" "}
+                          <strong className="font-semibold text-foreground">
+                            {documentFileName}
+                          </strong>
+                        </span>
+                      </div>
+                      <span className="text-[11px] text-muted-foreground shrink-0">
+                        Upload below to replace
+                      </span>
+                    </div>
+                  )}
+
                   {!selectedFile ? (
                     <div
-                      onClick={() => { setFileDialogOpen(true); fileInputRef.current?.click(); }}
+                      onClick={() => {
+                        setFileDialogOpen(true);
+                        fileInputRef.current?.click();
+                      }}
                       className={`border-2 border-dashed rounded-3xl p-8 flex flex-col items-center justify-center gap-3 cursor-pointer transition-all hover:bg-secondary/40 text-center ${
-                        fileError ? "border-destructive/80 bg-destructive/5" : "border-border bg-secondary/15"
+                        fileError
+                          ? "border-destructive/80 bg-destructive/5"
+                          : "border-border bg-secondary/15"
                       }`}
                     >
                       <div className="h-12 w-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shadow-xs">
@@ -443,7 +651,8 @@ export function PayrentKycPage() {
                           Click to upload or drag & drop your PAN card photo
                         </p>
                         <p className="text-[11px] text-muted-foreground">
-                          Ensure your PAN number, full name, and birth date are clear and uncropped.
+                          Ensure your PAN number, full name, and birth date are
+                          clear and uncropped.
                         </p>
                       </div>
                       <button
@@ -466,9 +675,12 @@ export function PayrentKycPage() {
                             <FileCheck className="h-5 w-5" />
                           </div>
                           <div className="min-w-0">
-                            <p className="text-xs font-bold text-foreground truncate">{selectedFile.name}</p>
+                            <p className="text-xs font-bold text-foreground truncate">
+                              {selectedFile.name}
+                            </p>
                             <p className="text-[11px] text-muted-foreground font-mono">
-                              {(selectedFile.size / 1024).toFixed(1)} KB · {selectedFile.type}
+                              {(selectedFile.size / 1024).toFixed(1)} KB ·{" "}
+                              {selectedFile.type}
                             </p>
                           </div>
                         </div>
@@ -476,7 +688,10 @@ export function PayrentKycPage() {
                         <div className="flex items-center gap-2 shrink-0">
                           <button
                             type="button"
-                            onClick={() => { setFileDialogOpen(true); fileInputRef.current?.click(); }}
+                            onClick={() => {
+                              setFileDialogOpen(true);
+                              fileInputRef.current?.click();
+                            }}
                             className="px-3 py-1.5 rounded-xl border border-border bg-card text-foreground hover:bg-secondary text-xs font-semibold cursor-pointer"
                           >
                             Replace Photo
@@ -517,7 +732,9 @@ export function PayrentKycPage() {
                   />
 
                   {fileError && (
-                    <p className="text-xs text-destructive font-medium">{fileError}</p>
+                    <p className="text-xs text-destructive font-medium">
+                      {fileError}
+                    </p>
                   )}
                 </div>
 
@@ -528,12 +745,23 @@ export function PayrentKycPage() {
                     <span>Identity Document Storage Security</span>
                   </div>
                   <p>
-                    Documents are stored in private, access-restricted storage. They are never published to public CDNs or shared with third parties without authorized review.
+                    Documents are stored in private, access-restricted storage.
+                    They are never published to public CDNs or shared with third
+                    parties without authorized review.
                   </p>
                 </div>
 
-                {/* Submit Button */}
-                <div className="pt-2 flex justify-end">
+                {/* Submit & Cancel Buttons */}
+                <div className="pt-2 flex items-center justify-end gap-3">
+                  {isEditing && (
+                    <button
+                      type="button"
+                      onClick={handleCancelEdit}
+                      className="px-5 py-3 rounded-2xl border border-border bg-card hover:bg-secondary font-bold text-xs uppercase tracking-wider text-foreground cursor-pointer transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  )}
                   <button
                     type="submit"
                     disabled={submitting}
@@ -542,12 +770,16 @@ export function PayrentKycPage() {
                     {submitting ? (
                       <>
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        <span>Verifying PAN...</span>
+                        <span>
+                          {isEditing ? "Updating PAN..." : "Verifying PAN..."}
+                        </span>
                       </>
                     ) : (
                       <>
                         <ShieldCheck className="h-4 w-4" />
-                        <span>Verify PAN</span>
+                        <span>
+                          {isEditing ? "Save & Update KYC" : "Verify PAN"}
+                        </span>
                       </>
                     )}
                   </button>

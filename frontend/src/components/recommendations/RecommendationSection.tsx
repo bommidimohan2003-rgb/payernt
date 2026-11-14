@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
   Star,
@@ -13,6 +13,7 @@ import type { Product } from "@/types";
 import { tracker } from "@/utils/eventTracker";
 import { useWishlist } from "@/hooks/useWishlist";
 import { useAuth } from "@/hooks/useAuth";
+import { isUserOwnProduct } from "@/utils/productFilters";
 import { Button } from "@/components/common/Button";
 import { Rating } from "@/components/common/Rating";
 import { toast } from "sonner";
@@ -41,16 +42,19 @@ export function RecommendationSection({
   const { has, toggle } = useWishlist();
   const { user } = useAuth();
 
+  const visibleProducts = useMemo(() => {
+    return (products || []).filter((p) => !isUserOwnProduct(p, user));
+  }, [products, user]);
 
   useEffect(() => {
-    if (products && products.length > 0) {
-      products.forEach((p) => {
+    if (visibleProducts && visibleProducts.length > 0) {
+      visibleProducts.forEach((p) => {
         tracker.recommendationImpression(p.id, type);
       });
     }
-  }, [products, type]);
+  }, [visibleProducts, type]);
 
-  if (!products || products.length === 0) return null;
+  if (!visibleProducts || visibleProducts.length === 0) return null;
 
   const getIcon = () => {
     switch (type) {
@@ -111,7 +115,7 @@ export function RecommendationSection({
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-          {products.slice(0, 4).map((product) => (
+          {visibleProducts.slice(0, 4).map((product) => (
             <div
               key={product.id}
               onClick={() => handleProductClick(product.id)}
@@ -168,9 +172,8 @@ export function RecommendationSection({
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        {products.map((product) => {
+        {visibleProducts.map((product) => {
           const isWishlisted = has(product.id);
-
           return (
             <div
               key={product.id}
