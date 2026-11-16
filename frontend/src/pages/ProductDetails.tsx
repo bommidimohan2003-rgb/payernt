@@ -1567,6 +1567,7 @@ const productSchema = product ? {
                   <div className="w-full h-full min-h-[340px] sm:min-h-[440px] rounded-3xl overflow-hidden bg-black flex flex-col items-center justify-center relative">
                     <video
                       key={activeVideoUrl}
+                      src={activeVideoUrl}
                       poster={activeDisplayImage || product?.image}
                       controls
                       autoPlay
@@ -1574,6 +1575,9 @@ const productSchema = product ? {
                       playsInline
                       preload="auto"
                       className="w-full h-full max-h-[460px] object-contain rounded-3xl"
+                      onLoadedMetadata={(e) => {
+                        e.currentTarget.play().catch(() => {});
+                      }}
                       onError={(e) => {
                         const target = e.currentTarget;
                         if (!target.currentSrc?.includes("l2vmxn9hwk6p0cs4ajoz")) {
