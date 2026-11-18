@@ -68,6 +68,7 @@ class AgentChatRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=2000, description="Customer message or inquiry")
     session_id: Optional[str] = Field(None, max_length=128, description="Client session identifier")
     conversation_id: Optional[str] = Field(None, max_length=128, description="Existing conversation thread ID")
+    action: Optional[str] = Field(None, max_length=64, description="Structured client action (e.g. confirm_escalation, cancel_escalation)")
 
 
 class AgentChatResponse(BaseModel):
@@ -148,7 +149,8 @@ def agent_chat_endpoint(
         result = _tool_router.process_message(
             message=clean_message,
             context=context,
-            conversation_id=payload.conversation_id
+            conversation_id=payload.conversation_id,
+            action=payload.action,
         )
     except PersistenceUnavailableError:
         logger.error("Production persistence failure during agent turn: returning controlled error")
@@ -179,6 +181,8 @@ def agent_chat_endpoint(
         )
 
     requires_confirmation = False
+    if result.get("requires_confirmation"):
+        requires_confirmation = True
     tool_res = result.get("tool_result")
     if isinstance(tool_res, dict) and tool_res.get("requires_confirmation"):
         requires_confirmation = True

@@ -51,7 +51,9 @@ export function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
   useEffect(() => {
     if (isOpen) {
       previousFocusRef.current =
-        typeof document !== "undefined" ? (document.activeElement as HTMLElement | null) : null;
+        typeof document !== "undefined"
+          ? (document.activeElement as HTMLElement | null)
+          : null;
       document.body.style.overflow = "hidden";
       const focusTimer = setTimeout(() => inputRef.current?.focus(), 50);
       loadHistoryAndPopular();
@@ -64,17 +66,23 @@ export function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
         }
         if (e.key === "Tab" && dialogRef.current) {
           const focusables = dialogRef.current.querySelectorAll<HTMLElement>(
-            'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+            'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
           );
           if (focusables.length === 0) return;
           const first = focusables[0];
           const last = focusables[focusables.length - 1];
           if (e.shiftKey) {
-            if (document.activeElement === first || !dialogRef.current.contains(document.activeElement)) {
+            if (
+              document.activeElement === first ||
+              !dialogRef.current.contains(document.activeElement)
+            ) {
               e.preventDefault();
               last.focus();
             }
-          } else if (document.activeElement === last || !dialogRef.current.contains(document.activeElement)) {
+          } else if (
+            document.activeElement === last ||
+            !dialogRef.current.contains(document.activeElement)
+          ) {
             e.preventDefault();
             first.focus();
           }
@@ -103,12 +111,18 @@ export function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
       try {
         const history = await api.getSearchHistory(token, user.email);
         setRecentSearches(Array.isArray(history) ? history : []);
-      } catch {}
+      } catch {
+        /* ignore search history errors */
+      }
     }
     try {
       const popular = await api.getPopularSearches();
       if (Array.isArray(popular)) {
-        setPopularSearches(popular.filter((q): q is string => typeof q === "string" && q.trim().length > 0));
+        setPopularSearches(
+          popular.filter(
+            (q): q is string => typeof q === "string" && q.trim().length > 0,
+          ),
+        );
       } else {
         setPopularSearches([]);
       }
@@ -147,7 +161,7 @@ export function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
             city: selectedCity || undefined,
             pincode: pincode || undefined,
           },
-          controller.signal
+          controller.signal,
         );
 
         if (seq !== searchSeqRef.current || controller.signal.aborted) return;
@@ -158,7 +172,11 @@ export function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
             const title = (p.title || p.name || "").toLowerCase();
             const desc = (p.description || "").toLowerCase();
             const cat = (p.category || "").toLowerCase();
-            return title.includes(qLower) || desc.includes(qLower) || cat.includes(qLower);
+            return (
+              title.includes(qLower) ||
+              desc.includes(qLower) ||
+              cat.includes(qLower)
+            );
           });
           setResults(filtered.slice(0, 8));
         }
@@ -195,7 +213,7 @@ export function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
         q: trimmed,
         city: selectedCity || undefined,
         pincode: pincode || undefined,
-      } as any,
+      } as Record<string, string | undefined>,
     });
   };
 
@@ -218,18 +236,22 @@ export function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
       },
       () => {
         setGpsLoading(false);
-        const msg = "Location access was denied. Please select your city or enter a pincode.";
+        const msg =
+          "Location access was denied. Please select your city or enter a pincode.";
         setLocationError(msg);
         toast.error(msg);
-      }
+      },
     );
   };
 
   // Find matching categories for query
   const matchingCategories = query.trim()
-    ? CANONICAL_CATEGORIES.filter((c) =>
-        c.name.toLowerCase().includes(query.toLowerCase()) ||
-        c.subcategories.some((sub) => sub.toLowerCase().includes(query.toLowerCase()))
+    ? CANONICAL_CATEGORIES.filter(
+        (c) =>
+          c.name.toLowerCase().includes(query.toLowerCase()) ||
+          c.subcategories.some((sub) =>
+            sub.toLowerCase().includes(query.toLowerCase()),
+          ),
       )
     : [];
 
@@ -289,7 +311,7 @@ export function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
                 "hidden sm:inline-flex items-center gap-1.5 min-h-[44px] px-3.5 py-2.5 rounded-full border text-xs font-semibold transition-colors cursor-pointer shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white",
                 selectedCity || pincode
                   ? "border-neutral-950 dark:border-white bg-neutral-950 text-white dark:bg-white dark:text-neutral-950"
-                  : "border-neutral-300 dark:border-neutral-700/80 hover:border-neutral-950 dark:hover:border-white text-neutral-800 dark:text-neutral-200 bg-white dark:bg-[#262626]"
+                  : "border-neutral-300 dark:border-neutral-700/80 hover:border-neutral-950 dark:hover:border-white text-neutral-800 dark:text-neutral-200 bg-white dark:bg-[#262626]",
               )}
             >
               <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
@@ -317,39 +339,57 @@ export function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
                   disabled={gpsLoading}
                   className="inline-flex items-center gap-1.5 min-h-[36px] px-3 py-1 rounded-lg border border-neutral-300 dark:border-neutral-700/80 bg-neutral-50 dark:bg-[#1E1E1E] text-xs font-medium hover:border-neutral-950 dark:hover:border-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white cursor-pointer"
                 >
-                  <Navigation className="h-3 w-3 stroke-[1.75]" aria-hidden="true" />
-                  <span>{gpsLoading ? "Detecting..." : gpsLocation ? "GPS Selected" : "Use GPS"}</span>
+                  <Navigation
+                    className="h-3 w-3 stroke-[1.75]"
+                    aria-hidden="true"
+                  />
+                  <span>
+                    {gpsLoading
+                      ? "Detecting..."
+                      : gpsLocation
+                        ? "GPS Selected"
+                        : "Use GPS"}
+                  </span>
                 </button>
 
                 <div className="flex flex-wrap items-center gap-1">
-                  {["Mumbai", "Delhi", "Bengaluru", "Hyderabad", "Chennai"].map((city) => (
-                    <button
-                      key={city}
-                      type="button"
-                      onClick={() => setSelectedCity((c) => (c === city ? "" : city))}
-                      className={cn(
-                        "min-h-[36px] px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white cursor-pointer",
-                        selectedCity === city
-                          ? "border-neutral-950 bg-neutral-950 text-white dark:border-white dark:bg-white dark:text-neutral-950"
-                          : "border-neutral-200 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E] text-neutral-700 dark:text-neutral-300"
-                      )}
-                    >
-                      {city}
-                    </button>
-                  ))}
+                  {["Mumbai", "Delhi", "Bengaluru", "Hyderabad", "Chennai"].map(
+                    (city) => (
+                      <button
+                        key={city}
+                        type="button"
+                        onClick={() =>
+                          setSelectedCity((c) => (c === city ? "" : city))
+                        }
+                        className={cn(
+                          "min-h-[36px] px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white cursor-pointer",
+                          selectedCity === city
+                            ? "border-neutral-950 bg-neutral-950 text-white dark:border-white dark:bg-white dark:text-neutral-950"
+                            : "border-neutral-200 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E] text-neutral-700 dark:text-neutral-300",
+                        )}
+                      >
+                        {city}
+                      </button>
+                    ),
+                  )}
                 </div>
 
                 <input
                   type="text"
                   aria-label="6-digit Pincode"
                   value={pincode}
-                  onChange={(e) => setPincode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  onChange={(e) =>
+                    setPincode(e.target.value.replace(/\D/g, "").slice(0, 6))
+                  }
                   placeholder="6-digit Pincode"
                   className="min-h-[36px] px-2.5 py-1 text-xs rounded-lg border border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E] text-neutral-900 dark:text-white w-32"
                 />
               </div>
               {locationError && (
-                <p role="status" className="text-xs font-medium text-red-600 dark:text-red-400">
+                <p
+                  role="status"
+                  className="text-xs font-medium text-red-600 dark:text-red-400"
+                >
                   {locationError}
                 </p>
               )}
@@ -375,6 +415,10 @@ export function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
                         type="button"
                         onClick={() => {
                           onClose();
+                          if (c.id === "more") {
+                            navigate({ to: "/categories" });
+                            return;
+                          }
                           navigate({
                             to: "/browse",
                             search: {
@@ -424,8 +468,12 @@ export function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                     {results.map((p) => {
                       const price = Number(p.daily_rate || p.price || 0);
-                      const rawImg = p.image || (Array.isArray(p.images) && p.images[0]) || "";
-                      const img = typeof rawImg === "string" ? rawImg.trim() : "";
+                      const rawImg =
+                        p.image ||
+                        (Array.isArray(p.images) && p.images[0]) ||
+                        "";
+                      const img =
+                        typeof rawImg === "string" ? rawImg.trim() : "";
                       const pid = String(p.id);
                       const hasFailed = !img || failedImages[pid];
                       return (
@@ -438,12 +486,20 @@ export function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
                         >
                           <div className="aspect-[3/4] w-full rounded-lg bg-neutral-100 dark:bg-[#262626] overflow-hidden mb-2 flex items-center justify-center">
                             {hasFailed ? (
-                              <Package className="h-6 w-6 stroke-[1.75] text-neutral-500 dark:text-neutral-400" aria-hidden="true" />
+                              <Package
+                                className="h-6 w-6 stroke-[1.75] text-neutral-500 dark:text-neutral-400"
+                                aria-hidden="true"
+                              />
                             ) : (
                               <img
                                 src={img}
                                 alt={p.title || p.name || "Rental item"}
-                                onError={() => setFailedImages((prev) => ({ ...prev, [pid]: true }))}
+                                onError={() =>
+                                  setFailedImages((prev) => ({
+                                    ...prev,
+                                    [pid]: true,
+                                  }))
+                                }
                                 className="h-full w-full object-cover"
                               />
                             )}
@@ -453,7 +509,10 @@ export function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
                               {p.title || p.name}
                             </div>
                             <div className="text-xs font-semibold text-neutral-900 dark:text-white mt-1 tabular-nums">
-                              ₹{price} <span className="font-normal text-neutral-600 dark:text-neutral-400 text-xs">/ day</span>
+                              ₹{price}{" "}
+                              <span className="font-normal text-neutral-600 dark:text-neutral-400 text-xs">
+                                / day
+                              </span>
                             </div>
                           </div>
                         </Link>
@@ -466,7 +525,8 @@ export function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
                       No matching gear found for "{query}"
                     </p>
                     <p className="mt-1 text-xs text-neutral-600 dark:text-neutral-400">
-                      Try searching for broader keywords like "camera", "laptop", "bike", or "drill".
+                      Try searching for broader keywords like "camera",
+                      "laptop", "bike", or "drill".
                     </p>
                     <button
                       type="button"
@@ -557,6 +617,10 @@ export function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
                         type="button"
                         onClick={() => {
                           onClose();
+                          if (c.id === "more") {
+                            navigate({ to: "/categories" });
+                            return;
+                          }
                           navigate({
                             to: "/browse",
                             search: {

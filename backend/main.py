@@ -6168,6 +6168,10 @@ def get_recently_viewed_products(
     if not caller_email:
         return []
     
+    caller_id = None
+    if "extract_caller_identity_from_auth" in globals() and authorization:
+        _, caller_id = extract_caller_identity_from_auth(authorization)
+    
     conn = get_db_connection()
     recent_pids = []
     if conn:
@@ -6180,7 +6184,7 @@ def get_recently_viewed_products(
                     GROUP BY product_id
                     ORDER BY last_viewed DESC
                     LIMIT %s
-                """, (caller_email, limit))
+                """, (caller_email, limit * 2))
                 rows = cursor.fetchall()
                 recent_pids = [r["product_id"] for r in rows if r.get("product_id")]
         except Exception as e:
@@ -6197,7 +6201,7 @@ def get_recently_viewed_products(
                 if pid and pid not in seen:
                     seen.add(pid)
                     recent_pids.append(pid)
-                    if len(recent_pids) >= limit:
+                    if len(recent_pids) >= limit * 2:
                         break
 
     if not recent_pids:
@@ -6215,7 +6219,23 @@ def get_recently_viewed_products(
         if pid in catalog_by_id:
             products.append(catalog_by_id[pid])
     
-    return products
+    if "filter_recommendations_for_user" in globals():
+        products = filter_recommendations_for_user(products, caller_email, caller_id)
+    else:
+        c_email = caller_email.strip().lower() if caller_email else None
+        c_id = str(caller_id).strip() if caller_id else None
+        filtered = []
+        for p in products:
+            p_owner_email = str(p.get("owner_email") or p.get("user_email") or (p.get("owner") or {}).get("email") or "").strip().lower()
+            p_owner_id = str(p.get("owner_id") or p.get("ownerId") or (p.get("owner") or {}).get("id") or "").strip()
+            if c_email and p_owner_email and p_owner_email == c_email:
+                continue
+            if c_id and p_owner_id and p_owner_id == c_id:
+                continue
+            filtered.append(p)
+        products = filtered
+    
+    return products[:limit]
 
 @app.get("/api/products/custom/{id}")
 @app.get("/api/products/{id}")

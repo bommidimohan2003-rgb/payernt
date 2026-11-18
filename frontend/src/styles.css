@@ -824,6 +824,53 @@ html:not(.dark) .border-white\/10 {
   }
 }
 
+/* ============================================================
+   Cool Smooth Skeleton Shimmer (Continuous GPU-Accelerated Wave)
+   ============================================================ */
+@keyframes cool-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.animate-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.45) 50%,
+    transparent 100%
+  );
+  animation: cool-shimmer 1.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  pointer-events: none;
+}
+
+.dark .animate-shimmer::after {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.08) 50%,
+    transparent 100%
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-shimmer::after {
+    animation: none;
+  }
+}
+
 @utility no-scrollbar {
   &::-webkit-scrollbar {
     display: none;

@@ -149,10 +149,14 @@ class TeluguNormalizer:
     TELUGU_INDICATOR_WORDS: Set[str] = {
         "na", "naa", "maa", "enti", "yenti", "emiti", "ekkada", "ekada", "eppudu", "epudu",
         "kavali", "cheyali", "cheyyandi", "cheyyi", "chesanu", "ayyinda",
-        "ayyindi", "aindi", "raledu", "undi", "undhi", "unnaru", "unnadu",
-        "vachinda", "vastundi",
+        "ayyindi", "aindi", "raledu", "undi", "undhi", "unnaru", "unnadu", "unnav",
+        "vachinda", "vastundi", "ela", "yela", "avunu", "ha", "haa", "ledu", "vaddu",
         "dabulu", "dabbulu", "paisalu", "matladali", "vadhu", "oddu", "inka",
-        "namaste", "namaskaram", "bagunnara", "tho", "lo", "kosam", "gurinchi", "ante"
+        "namaste", "namaskaram", "bagunnara", "tho", "lo", "kosam", "gurinchi", "ante",
+        "ee", "aa", "meeru", "meeku", "cheppandi", "adi", "idi", "cinema", "enduku", "evaru",
+        "dhanyavadalu", "chala", "bagundi", "swagatham", "peru", "cheyyagalru", "chestaru",
+        "cheyyagalara", "kaluddam", "velthanu", "selavu", "vuntanu", "vachanu", "manam", "cheddam",
+        "evaritho", "matladutunnanu"
     }
 
     # Direct translation of semantic core terms for hybrid parsing

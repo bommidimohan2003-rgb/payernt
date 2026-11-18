@@ -1,6 +1,14 @@
 import React, { useRef, useState, useEffect, useCallback } from "react";
 import { Link } from "@tanstack/react-router";
-import { ChevronLeft, ChevronRight, Star, AlertCircle, RefreshCw, MessageSquareQuote, ArrowRight } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Star,
+  AlertCircle,
+  RefreshCw,
+  MessageSquareQuote,
+  ArrowRight,
+} from "lucide-react";
 import { api } from "@/utils/api";
 import { cn } from "@/lib/utils";
 
@@ -34,8 +42,11 @@ export function CustomerReviews() {
       } else {
         setReviews([]);
       }
-    } catch (err: any) {
-      setError(err?.message || "Unable to load reviews right now. Please try again.");
+    } catch (err: unknown) {
+      setError(
+        (err as Error)?.message ||
+          "Unable to load reviews right now. Please try again.",
+      );
       setReviews([]);
     } finally {
       setIsLoading(false);
@@ -96,7 +107,8 @@ export function CustomerReviews() {
               Real Stories, Real Experiences
             </h2>
             <p className="mt-0.5 text-xs sm:text-sm text-neutral-600 dark:text-neutral-400">
-              Verified reviews from lenders and renters across the paYent community
+              Verified reviews from lenders and renters across the paYent
+              community
             </p>
           </div>
 
@@ -108,7 +120,10 @@ export function CustomerReviews() {
                 aria-label="Previous reviews"
                 className="h-11 w-11 rounded-full border border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E] flex items-center justify-center text-neutral-800 dark:text-neutral-200 hover:border-neutral-950 dark:hover:border-white transition-colors cursor-pointer shadow-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
               >
-                <ChevronLeft className="h-4 w-4 stroke-[1.75]" aria-hidden="true" />
+                <ChevronLeft
+                  className="h-4 w-4 stroke-[1.75]"
+                  aria-hidden="true"
+                />
               </button>
               <button
                 type="button"
@@ -116,7 +131,10 @@ export function CustomerReviews() {
                 aria-label="Next reviews"
                 className="h-11 w-11 rounded-full border border-neutral-300 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E] flex items-center justify-center text-neutral-800 dark:text-neutral-200 hover:border-neutral-950 dark:hover:border-white transition-colors cursor-pointer shadow-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
               >
-                <ChevronRight className="h-4 w-4 stroke-[1.75]" aria-hidden="true" />
+                <ChevronRight
+                  className="h-4 w-4 stroke-[1.75]"
+                  aria-hidden="true"
+                />
               </button>
             </div>
           )}
@@ -128,7 +146,7 @@ export function CustomerReviews() {
             {Array.from({ length: 3 }).map((_, i) => (
               <div
                 key={i}
-                className="h-48 rounded-2xl border border-neutral-200 dark:border-neutral-700/80 bg-neutral-100/70 dark:bg-[#1E1E1E] p-6"
+                className="h-48 rounded-2xl border border-neutral-200 dark:border-neutral-700/80 bg-neutral-100/70 dark:bg-[#1E1E1E] p-6 animate-shimmer"
               />
             ))}
           </div>
@@ -136,7 +154,10 @@ export function CustomerReviews() {
           /* Error State with Retry */
           <div className="rounded-2xl border border-neutral-300/80 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E] p-6 sm:p-8 text-center shadow-xs">
             <div className="inline-flex items-center justify-center h-11 w-11 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 mb-3">
-              <AlertCircle className="h-5 w-5 stroke-[1.75]" aria-hidden="true" />
+              <AlertCircle
+                className="h-5 w-5 stroke-[1.75]"
+                aria-hidden="true"
+              />
             </div>
             <h3 className="text-sm sm:text-base font-semibold text-neutral-950 dark:text-white">
               Unable to load reviews
@@ -149,7 +170,10 @@ export function CustomerReviews() {
               onClick={loadReviews}
               className="mt-4 inline-flex items-center gap-2 px-4 py-2 min-h-[44px] rounded-full border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-[#1E1E1E] text-xs font-semibold text-neutral-900 dark:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
             >
-              <RefreshCw className="h-3.5 w-3.5 stroke-[1.75]" aria-hidden="true" />
+              <RefreshCw
+                className="h-3.5 w-3.5 stroke-[1.75]"
+                aria-hidden="true"
+              />
               <span>Retry</span>
             </button>
           </div>
@@ -157,13 +181,17 @@ export function CustomerReviews() {
           /* Authentic Empty State */
           <div className="rounded-2xl border border-neutral-200/90 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] p-6 sm:p-8 text-center shadow-xs">
             <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 mb-3">
-              <MessageSquareQuote className="h-5 w-5 stroke-[1.75]" aria-hidden="true" />
+              <MessageSquareQuote
+                className="h-5 w-5 stroke-[1.75]"
+                aria-hidden="true"
+              />
             </div>
             <h3 className="text-sm sm:text-base font-semibold text-neutral-950 dark:text-white">
               No customer reviews yet
             </h3>
             <p className="mt-1 text-xs sm:text-sm text-neutral-600 dark:text-neutral-400 max-w-md mx-auto">
-              Be the first to share your rental experience with the paYent community.
+              Be the first to share your rental experience with the paYent
+              community.
             </p>
             <div className="mt-4 flex items-center justify-center gap-3">
               <Link
@@ -178,7 +206,10 @@ export function CustomerReviews() {
                 onClick={loadReviews}
                 className="inline-flex items-center gap-1.5 px-3.5 py-2 min-h-[44px] rounded-full border border-neutral-300 dark:border-neutral-700 text-xs font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
               >
-                <RefreshCw className="h-3.5 w-3.5 stroke-[1.75]" aria-hidden="true" />
+                <RefreshCw
+                  className="h-3.5 w-3.5 stroke-[1.75]"
+                  aria-hidden="true"
+                />
                 <span>Refresh</span>
               </button>
             </div>
@@ -201,7 +232,8 @@ export function CustomerReviews() {
                     })
                   : "";
 
-                const productName = r.product_title || r.productTitle || r.product_name;
+                const productName =
+                  r.product_title || r.productTitle || r.product_name;
                 const userName = r.user_name || r.userName || "Verified Renter";
 
                 return (
@@ -221,7 +253,7 @@ export function CustomerReviews() {
                                 "h-4 w-4 stroke-[1.75]",
                                 isFilled
                                   ? "fill-neutral-950 dark:fill-white text-neutral-950 dark:text-white"
-                                  : "text-neutral-300 dark:text-neutral-700"
+                                  : "text-neutral-300 dark:text-neutral-700",
                               )}
                               aria-hidden="true"
                             />
@@ -257,7 +289,11 @@ export function CustomerReviews() {
 
             {/* Mobile Interactive Swipe Indicators (dots with >= 44px touch height) */}
             {dotCount > 1 && (
-              <div className="flex sm:hidden items-center justify-center gap-1 mt-1" role="tablist" aria-label="Review slides">
+              <div
+                className="flex sm:hidden items-center justify-center gap-1 mt-1"
+                role="tablist"
+                aria-label="Review slides"
+              >
                 {Array.from({ length: dotCount }).map((_, i) => {
                   const isActive = i === activeIndex;
                   return (
@@ -274,7 +310,7 @@ export function CustomerReviews() {
                           "block h-1.5 rounded-full transition-[width,background-color] duration-200",
                           isActive
                             ? "w-5 bg-neutral-950 dark:bg-white"
-                            : "w-1.5 bg-neutral-300 dark:bg-neutral-700"
+                            : "w-1.5 bg-neutral-300 dark:bg-neutral-700",
                         )}
                       />
                     </button>

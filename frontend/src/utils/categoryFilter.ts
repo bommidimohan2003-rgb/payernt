@@ -13,6 +13,8 @@ export const CANONICAL_CATEGORY_LABELS: Record<string, string> = {
   powerbanks: "Power Stations",
   lighting: "Studio Lighting",
   bikes: "Bikes & Rides",
+  cars: "Cars & Drives",
+  outdoor: "Outdoor Gear",
 };
 
 /**
@@ -95,6 +97,25 @@ export function matchesProductCategory(
       pCat.includes("ride") ||
       pCat.includes("cycle") ||
       pCat.includes("scooter")
+    );
+  }
+
+  if (tId === "cars" || tId === "car") {
+    return (
+      pCat.includes("car") ||
+      pCat.includes("vehicle") ||
+      pCat.includes("auto") ||
+      pCat.includes("sedan") ||
+      pCat.includes("suv")
+    );
+  }
+
+  if (tId === "outdoor" || tId === "outdoors") {
+    return (
+      pCat.includes("outdoor") ||
+      pCat.includes("camp") ||
+      pCat.includes("tent") ||
+      pCat.includes("hike")
     );
   }
 

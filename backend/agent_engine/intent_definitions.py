@@ -308,6 +308,8 @@ DEFAULT_INTENT_DEFINITIONS: List[IntentDefinition] = [
         exact_phrases=(
             "where is my delivery",
             "track my delivery",
+            "check my delivery",
+            "checking my delivery",
             "when will my product arrive",
             "delivery ekkada undi",
             "delivery boy ekkada unnadu",
@@ -315,7 +317,7 @@ DEFAULT_INTENT_DEFINITIONS: List[IntentDefinition] = [
             "order delivered ayyinda",
         ),
         regex_patterns=(
-            r"\b(track|where\s+is|status\s+of)\s+(my\s+)?(delivery|courier|shipment|order)\b",
+            r"\b(check|checking|track|where\s+is|status\s+of)\s+(my\s+)?(delivery|courier|shipment|order)\b",
             r"\bdelivery\s+(status|tracking|location|eta)\b",
             r"\bdelivery\s+(ek+ada\s+undi|boy\s+ek+ada\s+unnadu)\b",
             r"\b(order|delivery)\s+deliver(ed)?\s+ayyinda\b",
@@ -608,23 +610,39 @@ DEFAULT_INTENT_DEFINITIONS: List[IntentDefinition] = [
     # 19. Greeting
     IntentDefinition(
         canonical_name="GREETING",
-        description="User saying hello, namaste, or opening conversational remarks.",
-        english_keywords=("hi", "hello", "hey", "good morning", "good evening", "namaste", "namaskaram"),
-        telugu_keywords=("namaste", "namaskaram", "ela unnaru", "bagunnara"),
-        synonyms=("greetings", "howdy", "sup"),
+        description="User saying hello, namaste, or opening conversational remarks in English or Telugu/Tenglish.",
+        english_keywords=(
+            "hi", "hello", "hey", "good morning", "good afternoon", "good evening",
+            "how are you", "namaste", "namaskaram", "hi payent", "hello payent agent"
+        ),
+        telugu_keywords=(
+            "namaste", "namaskaram", "ela unnaru", "bagunnara", "ela unnav",
+            "hi payent", "hello payent agent"
+        ),
+        synonyms=("greetings", "howdy", "sup", "hello there"),
         exact_phrases=(
             "hi",
             "hello",
             "hey",
+            "good morning",
+            "good afternoon",
+            "good evening",
+            "how are you",
+            "how are you?",
             "namaste",
             "namaskaram",
-            "good morning",
-            "good evening",
+            "hi payent",
+            "hello payent agent",
             "ela unnaru",
+            "ela unnaru?",
             "bagunnara",
+            "bagunnara?",
+            "ela unnav",
+            "ela unnav?",
         ),
         regex_patterns=(
-            r"^(hi|hello|hey|namaste|namaskaram|good\s+morning|good\s+afternoon|good\s+evening)\b",
+            r"^(hi|hello|hey|namaste|namaskaram|good\s+morning|good\s+afternoon|good\s+evening|how\s+are\s+you|ela\s+unnaru|bagunnara|ela\s+unnav)\b",
+            r"^(hi|hello|hey)\s+payent(\s+agent)?\b",
         ),
         priority=75,
         confidence_threshold=0.70,
@@ -632,26 +650,218 @@ DEFAULT_INTENT_DEFINITIONS: List[IntentDefinition] = [
         response_template_key="greeting_response",
     ),
 
-    # 20. Goodbye
+    # 20. Goodbye / Farewell
     IntentDefinition(
         canonical_name="GOODBYE",
         description="User ending conversation or bidding farewell.",
-        english_keywords=("bye", "goodbye", "see you", "cya", "thanks bye", "have a good day"),
-        telugu_keywords=("vuntanu", "selavu", "bye"),
-        synonyms=("farewell", "take care"),
+        english_keywords=(
+            "bye", "goodbye", "see you", "cya", "thanks bye", "have a good day",
+            "see you later", "talk to you later", "that's all", "i'm done", "have a nice day",
+            "farewell", "take care"
+        ),
+        telugu_keywords=(
+            "vuntanu", "selavu", "bye", "malli kaluddam", "velthanu", "sare bye",
+            "inka avasaram ledu", "thank you bye"
+        ),
+        synonyms=("farewell", "take care", "leaving", "parting"),
         exact_phrases=(
             "bye",
             "goodbye",
             "bye bye",
             "thank you bye",
+            "see you later",
+            "talk to you later",
+            "that's all",
+            "i'm done",
+            "have a nice day",
+            "malli kaluddam",
+            "velthanu",
+            "sare bye",
+            "inka avasaram ledu",
         ),
         regex_patterns=(
-            r"^(bye|goodbye|see\s+you|cya)\b",
+            r"^(bye(\s+bye)?|goodbye|see\s+you(\s+later)?|talk\s+to\s+you\s+later|that\'?s\s+all|i\'?m\s+done|have\s+a\s+nice\s+day|cya)\b",
+            r"^(malli\s+kaluddam|velthanu|sare[,\s]+bye|inka\s+avasaram\s+ledu|thank\s+you[,\s]+bye|selavu|vuntanu)\b",
         ),
         priority=75,
-        confidence_threshold=0.75,
+        confidence_threshold=0.72,
         clarification_message="",
         response_template_key="goodbye_response",
+    ),
+
+
+    # 20c. Identity
+    IntentDefinition(
+        canonical_name="IDENTITY",
+        description="User asking about the identity, name, or nature of Payent AI Agent.",
+        english_keywords=(
+            "who are you", "what is your name", "are you human", "are you an ai",
+            "what is payent agent", "who am i talking to", "identity", "ai bot"
+        ),
+        telugu_keywords=(
+            "meeru evaru", "nee peru enti", "meeru human aa", "meeru ai aa",
+            "nenu evaritho matladutunnanu", "peru enti"
+        ),
+        synonyms=("agent identity", "bot identity", "who is this"),
+        exact_phrases=(
+            "who are you",
+            "who are you?",
+            "what is your name",
+            "what is your name?",
+            "what's your name",
+            "what's your name?",
+            "are you a human",
+            "are you a human?",
+            "are you human",
+            "are you human?",
+            "are you an ai",
+            "are you an ai?",
+            "are you ai",
+            "are you ai?",
+            "what is payent agent",
+            "what is payent agent?",
+            "who am i talking to",
+            "who am i talking to?",
+            "meeru evaru",
+            "meeru evaru?",
+            "nee peru enti",
+            "nee peru enti?",
+            "meeru human aa",
+            "meeru human aa?",
+            "meeru ai aa",
+            "meeru ai aa?",
+            "nenu evaritho matladutunnanu",
+            "nenu evaritho matladutunnanu?",
+        ),
+        regex_patterns=(
+            r"\b(who\s+are\s+you|what\s+is\s+your\s+name|are\s+you\s+(a\s+)?(human|ai|bot)|who\s+am\s+i\s+talking\s+to|what\s+is\s+payent\s+agent)\b",
+            r"\b(meeru\s+evaru|nee\s+peru\s+enti|meeru\s+(human|ai)\s*(aa|a)?|nenu\s+evaritho\s+matladutunnanu)\b",
+        ),
+        priority=75,
+        confidence_threshold=0.70,
+        clarification_message="Are you asking about who I am and my role as the Payent AI Agent?",
+        response_template_key="identity_response",
+    ),
+
+    # 20d. Capabilities
+    IntentDefinition(
+        canonical_name="CAPABILITIES",
+        description="User asking what the Payent AI Agent can do or what services it supports.",
+        english_keywords=(
+            "what can you do", "how can you help me", "what services do you support",
+            "can you help with bookings", "can you check my payment", "can you track my delivery",
+            "can you connect me to support", "capabilities", "features"
+        ),
+        telugu_keywords=(
+            "meeru em cheyyagalru", "naaku ela help chestaru", "em services support chestaru",
+            "booking check cheyyagalara", "payment status cheppagalara", "delivery track cheyyagalara"
+        ),
+        synonyms=("what can agent do", "how can agent help", "bot capabilities"),
+        exact_phrases=(
+            "what can you do",
+            "what can you do?",
+            "how can you help me",
+            "how can you help me?",
+            "what services do you support",
+            "what services do you support?",
+            "can you help with bookings",
+            "can you check my payment",
+            "can you track my delivery",
+            "can you connect me to support",
+            "meeru em cheyyagalru",
+            "meeru em cheyyagalru?",
+            "naaku ela help chestaru",
+            "naaku ela help chestaru?",
+            "em services support chestaru",
+            "em services support chestaru?",
+            "booking check cheyyagalara",
+            "payment status cheppagalara",
+            "delivery track cheyyagalara",
+        ),
+        regex_patterns=(
+            r"\b(what\s+can\s+you\s+do|how\s+can\s+you\s+help\s+me|what\s+services\s+do\s+you\s+support|can\s+you\s+help\s+with\s+bookings|can\s+you\s+check\s+my\s+payment|can\s+you\s+track\s+my\s+delivery|can\s+you\s+connect\s+me\s+to\s+support)\b",
+            r"\b(meeru\s+em\s+cheyyagalru|naaku\s+ela\s+help\s+chestaru|em\s+services\s+support\s+chestaru|booking\s+check\s+cheyyagalara|payment\s+status\s+cheppagalara|delivery\s+track\s+cheyyagalara)\b",
+        ),
+        priority=70,
+        confidence_threshold=0.68,
+        clarification_message="Would you like to know what Payent Agent can help you with?",
+        response_template_key="capabilities_response",
+    ),
+
+    # 20e. Gratitude
+    IntentDefinition(
+        canonical_name="GRATITUDE",
+        description="User expressing gratitude, appreciation, or polite thanks.",
+        english_keywords=(
+            "thank you", "thanks", "thanks a lot", "thank you so much",
+            "appreciate it", "that's helpful", "great thanks", "much appreciated"
+        ),
+        telugu_keywords=(
+            "dhanyavadalu", "thank you anna", "thanks ra", "chala thanks",
+            "helpful ga undi", "bagundi thanks"
+        ),
+        synonyms=("thankful", "appreciation", "gratitude"),
+        exact_phrases=(
+            "thank you",
+            "thank you.",
+            "thanks",
+            "thanks.",
+            "thanks a lot",
+            "thank you so much",
+            "appreciate it",
+            "that's helpful",
+            "great, thanks",
+            "great thanks",
+            "dhanyavadalu",
+            "thank you anna",
+            "thanks ra",
+            "chala thanks",
+            "helpful ga undi",
+            "bagundi, thanks",
+            "bagundi thanks",
+        ),
+        regex_patterns=(
+            r"^(thank\s+you(\s+so\s+much|\s+very\s+much|\s+a\s+lot)?|thanks(\s+a\s+lot|\s+so\s+much)?|appreciate\s+it|that\'?s\s+helpful|great[,\s]+thanks)\b",
+            r"^(dhanyavadalu|chala\s+thanks|thank\s+you\s+anna|thanks\s+ra|helpful\s+ga\s+undi|bagundi[,\s]+thanks)\b",
+        ),
+        priority=75,
+        confidence_threshold=0.72,
+        clarification_message="",
+        response_template_key="gratitude_response",
+    ),
+
+    # 20f. Welcome Back
+    IntentDefinition(
+        canonical_name="WELCOME_BACK",
+        description="User returning or resuming an active conversation.",
+        english_keywords=(
+            "i'm back", "let's continue", "i am back", "we can continue",
+            "continue our conversation", "back again", "welcome back"
+        ),
+        telugu_keywords=(
+            "malli vachanu", "manam continue cheddam", "nenu malli vachanu",
+            "malli start cheddam"
+        ),
+        synonyms=("resume conversation", "return", "continue"),
+        exact_phrases=(
+            "i'm back",
+            "let's continue",
+            "i am back",
+            "we can continue",
+            "continue our conversation",
+            "malli vachanu",
+            "manam continue cheddam",
+            "nenu malli vachanu",
+            "malli start cheddam",
+        ),
+        regex_patterns=(
+            r"^(i\'?m\s+back|i\s+am\s+back|let\'?s\s+continue|we\s+can\s+continue|continue(\s+our)?\s+conversation|back\s+again|welcome\s+back)\b",
+            r"^(malli\s+vachanu|manam\s+continue\s+cheddam|nenu\s+malli\s+vachanu|malli\s+start\s+cheddam)\b",
+        ),
+        priority=75,
+        confidence_threshold=0.70,
+        clarification_message="Welcome back! How can I continue assisting you?",
+        response_template_key="welcome_back_response",
     ),
 
     # 21. General Help
@@ -843,7 +1053,13 @@ class IntentRegistry:
 
     def get(self, canonical_name: str) -> Optional[IntentDefinition]:
         """Retrieves an intent definition by canonical name."""
-        return self._definitions.get(canonical_name)
+        res = self._definitions.get(canonical_name)
+        if res is None:
+            if canonical_name == "FAREWELL":
+                return self._definitions.get("GOODBYE")
+            if canonical_name == "GOODBYE":
+                return self._definitions.get("FAREWELL")
+        return res
 
     def get_all(self) -> List[IntentDefinition]:
         """Returns all registered intent definitions sorted by priority (descending)."""

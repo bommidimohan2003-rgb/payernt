@@ -584,7 +584,11 @@ def test_25_low_confidence_fallback_does_not_invent_policy(router: AgentToolRout
     res = router.process_message("How to cook Hyderabadi chicken biryani?", guest)
     assert res["requires_auth"] is False
     assert "biryani" not in res["response_text"].lower()
-    assert "Payent Agent" in res["response_text"] or "assist" in res["response_text"].lower()
+    assert (
+        "Payent Agent" in res["response_text"]
+        or "assist" in res["response_text"].lower()
+        or "human support" in res["response_text"].lower()
+    )
 
 
 def test_26_follow_up_conversation_context_booking_status(router: AgentToolRouter, mock_users_and_orders):

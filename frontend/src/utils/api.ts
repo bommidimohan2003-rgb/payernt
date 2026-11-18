@@ -3496,6 +3496,7 @@ export const api = {
     message: string;
     session_id?: string;
     conversation_id?: string;
+    action?: string;
   }): Promise<{
     success: boolean;
     response: string;

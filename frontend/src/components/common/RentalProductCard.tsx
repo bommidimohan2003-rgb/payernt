@@ -1,6 +1,13 @@
 import React, { useEffect, useRef, useState, useContext } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Heart, MapPin, Package, ShoppingBag, ShoppingCart, Loader2 } from "lucide-react";
+import {
+  Heart,
+  MapPin,
+  Package,
+  ShoppingBag,
+  ShoppingCart,
+  Loader2,
+} from "lucide-react";
 import { useWishlist } from "@/hooks/useWishlist";
 import { useAuth } from "@/hooks/useAuth";
 import { CartContext } from "@/hooks/useCart";
@@ -21,11 +28,29 @@ function getProductBrand(product: Product): string {
   const title = product.title || product.name || "";
   const firstWord = title.trim().split(/\s+/)[0];
   const knownBrands = [
-    "Sony", "Apple", "Canon", "DJI", "RED", "Fujifilm", "Nikon",
-    "Blackmagic", "Rode", "GoPro", "Panasonic", "Sennheiser",
-    "MacBook", "Dell", "HP", "Lenovo", "Asus", "Bose", "Shure"
+    "Sony",
+    "Apple",
+    "Canon",
+    "DJI",
+    "RED",
+    "Fujifilm",
+    "Nikon",
+    "Blackmagic",
+    "Rode",
+    "GoPro",
+    "Panasonic",
+    "Sennheiser",
+    "MacBook",
+    "Dell",
+    "HP",
+    "Lenovo",
+    "Asus",
+    "Bose",
+    "Shure",
   ];
-  const matched = knownBrands.find((b) => b.toLowerCase() === firstWord.toLowerCase());
+  const matched = knownBrands.find(
+    (b) => b.toLowerCase() === firstWord.toLowerCase(),
+  );
   if (matched) return matched;
   if (product.category) {
     return product.category.charAt(0).toUpperCase() + product.category.slice(1);
@@ -58,7 +83,7 @@ export function RentalProductCard({
   const [isAddingToCart, setIsAddingToCart] = useState(false);
 
   const isInCart = cartItems.some(
-    (it) => it.product_id === productId || String(it.id) === productId
+    (it) => it.product_id === productId || String(it.id) === productId,
   );
 
   const price = Number(product.daily_rate || product.price || 0);
@@ -66,9 +91,7 @@ export function RentalProductCard({
   const location = formatProductLocation(product);
   const isAvailable = isProductAvailable(product);
   const rawImageUrl =
-    product.image ||
-    (Array.isArray(product.images) && product.images[0]) ||
-    "";
+    product.image || (Array.isArray(product.images) && product.images[0]) || "";
   const imageUrl = typeof rawImageUrl === "string" ? rawImageUrl.trim() : "";
   const showFallbackPlaceholder = !imageUrl || imageError;
 
@@ -88,7 +111,7 @@ export function RentalProductCard({
                 : "/explore";
             navigate({
               to: "/login",
-              search: { redirect: currentPath } as any,
+              search: { redirect: currentPath } as Record<string, string>,
             });
           },
         },
@@ -194,7 +217,7 @@ export function RentalProductCard({
         data-testid={`portrait-product-card-${productId}`}
         className={cn(
           "group relative flex flex-col justify-between w-[206px] sm:w-[226px] md:w-[240px] h-[270px] sm:h-[285px] md:h-[295px] rounded-[24px] sm:rounded-[26px] border border-neutral-800/60 dark:border-neutral-700/60 bg-[#1E1E1E] text-white overflow-hidden select-none shrink-0 snap-start shadow-xs hover:border-neutral-600 dark:hover:border-neutral-500 transition-all duration-200 cursor-pointer",
-          className
+          className,
         )}
       >
         <Link
@@ -209,7 +232,9 @@ export function RentalProductCard({
             {showFallbackPlaceholder ? (
               <div className="flex flex-col items-center justify-center gap-1 text-neutral-400">
                 <Package className="h-7 w-7 stroke-[1.75]" aria-hidden="true" />
-                <span className="text-[10px] font-medium leading-none">No photo</span>
+                <span className="text-[10px] font-medium leading-none">
+                  No photo
+                </span>
               </div>
             ) : (
               <img
@@ -225,7 +250,7 @@ export function RentalProductCard({
                 }}
                 className={cn(
                   "w-full h-full object-cover object-center transition-all duration-300 group-hover:scale-105",
-                  imageLoaded ? "opacity-100" : "opacity-0"
+                  imageLoaded ? "opacity-100" : "opacity-0",
                 )}
               />
             )}
@@ -258,11 +283,18 @@ export function RentalProductCard({
                 type="button"
                 onClick={handleCartClick}
                 disabled={isAddingToCart}
-                aria-label={isInCart ? `${title} is in your cart - View Cart` : `Add ${title} to rental cart`}
+                aria-label={
+                  isInCart
+                    ? `${title} is in your cart - View Cart`
+                    : `Add ${title} to rental cart`
+                }
                 className="h-8 w-8 sm:h-8.5 sm:w-8.5 rounded-[12px] sm:rounded-[14px] bg-white hover:bg-neutral-100 active:scale-95 text-neutral-950 flex items-center justify-center transition-all cursor-pointer shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-white shrink-0 disabled:opacity-75"
               >
                 {isAddingToCart ? (
-                  <Loader2 className="h-4 w-4 animate-spin text-neutral-950" aria-hidden="true" />
+                  <Loader2
+                    className="h-4 w-4 animate-spin text-neutral-950"
+                    aria-hidden="true"
+                  />
                 ) : (
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -291,7 +323,11 @@ export function RentalProductCard({
           type="button"
           onClick={handleWishlistToggle}
           aria-pressed={isWishlisted}
-          aria-label={isWishlisted ? `Remove ${title} from wishlist` : `Add ${title} to wishlist`}
+          aria-label={
+            isWishlisted
+              ? `Remove ${title} from wishlist`
+              : `Add ${title} to wishlist`
+          }
           className="group/wish absolute top-2 right-2 sm:top-2.5 sm:right-2.5 z-20 flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 cursor-pointer"
         >
           <span
@@ -300,15 +336,13 @@ export function RentalProductCard({
               "flex h-7 w-7 sm:h-7.5 sm:w-7.5 items-center justify-center rounded-full transition-colors shadow-sm",
               isWishlisted
                 ? "bg-[#1E1E1E] text-white"
-                : "bg-[#1E1E1E]/90 hover:bg-[#1E1E1E] text-white"
+                : "bg-[#1E1E1E]/90 hover:bg-[#1E1E1E] text-white",
             )}
           >
             <Heart
               className={cn(
                 "h-3.5 w-3.5 sm:h-4 sm:w-4 transition-colors stroke-[2]",
-                isWishlisted
-                  ? "fill-white text-white"
-                  : "text-white"
+                isWishlisted ? "fill-white text-white" : "text-white",
               )}
               aria-hidden="true"
             />
@@ -327,7 +361,7 @@ export function RentalProductCard({
       className={cn(
         "group relative bg-neutral-100 dark:bg-[#1E1E1E] border border-neutral-200/90 dark:border-neutral-700/80 hover:border-neutral-400 dark:hover:border-neutral-500 transition-colors duration-200 shadow-xs overflow-hidden select-none",
         isCompact ? "rounded-xl" : "rounded-2xl",
-        className
+        className,
       )}
     >
       <Link
@@ -338,8 +372,8 @@ export function RentalProductCard({
           isExplore
             ? "aspect-[4/5] rounded-2xl"
             : isCompact
-            ? "aspect-[5/4] sm:aspect-[3/2] rounded-xl"
-            : "aspect-[4/3] rounded-2xl"
+              ? "aspect-[5/4] sm:aspect-[3/2] rounded-xl"
+              : "aspect-[4/3] rounded-2xl",
         )}
         aria-label={`View details for ${title}`}
       >
@@ -354,14 +388,19 @@ export function RentalProductCard({
               "absolute inset-x-0 flex flex-col items-center justify-center gap-0.5 text-neutral-600 dark:text-neutral-400",
               isExplore
                 ? "top-10 bottom-[42%]"
-                : "top-8 bottom-[58%] sm:bottom-[50%]"
+                : "top-8 bottom-[58%] sm:bottom-[50%]",
             )}
           >
             <Package
-              className={cn("stroke-[1.75]", isCompact ? "h-5 w-5 sm:h-6 sm:w-6" : "h-6 w-6")}
+              className={cn(
+                "stroke-[1.75]",
+                isCompact ? "h-5 w-5 sm:h-6 sm:w-6" : "h-6 w-6",
+              )}
               aria-hidden="true"
             />
-            <span className="text-[10px] sm:text-xs font-medium leading-none">No photo</span>
+            <span className="text-[10px] sm:text-xs font-medium leading-none">
+              No photo
+            </span>
           </div>
         ) : (
           <img
@@ -377,7 +416,7 @@ export function RentalProductCard({
             }}
             className={cn(
               "absolute inset-0 h-full w-full object-cover object-center transition-opacity duration-200",
-              imageLoaded ? "opacity-100" : "opacity-0"
+              imageLoaded ? "opacity-100" : "opacity-0",
             )}
           />
         )}
@@ -392,13 +431,13 @@ export function RentalProductCard({
               : "top-2 left-2 px-2 py-0.5 sm:px-2.5 sm:py-1 text-[10px] sm:text-[11px]",
             isAvailable
               ? "bg-neutral-950/75 text-white border-white/15"
-              : "bg-neutral-950/85 text-neutral-300 border-white/15"
+              : "bg-neutral-950/85 text-neutral-300 border-white/15",
           )}
         >
           <span
             className={cn(
               "h-1.5 w-1.5 rounded-full shrink-0",
-              isAvailable ? "bg-emerald-400" : "bg-rose-400"
+              isAvailable ? "bg-emerald-400" : "bg-rose-400",
             )}
             aria-hidden="true"
           />
@@ -413,7 +452,10 @@ export function RentalProductCard({
             </h3>
 
             <div className="flex items-center gap-1 text-[11px] sm:text-xs text-white/90 min-w-0">
-              <MapPin className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0 stroke-[1.75]" aria-hidden="true" />
+              <MapPin
+                className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0 stroke-[1.75]"
+                aria-hidden="true"
+              />
               <span className="truncate">{location}</span>
             </div>
 
@@ -432,13 +474,23 @@ export function RentalProductCard({
                 type="button"
                 onClick={handleCartClick}
                 disabled={isAddingToCart}
-                aria-label={isInCart ? `${title} is in your cart - View Cart` : `Add ${title} to rental cart`}
+                aria-label={
+                  isInCart
+                    ? `${title} is in your cart - View Cart`
+                    : `Add ${title} to rental cart`
+                }
                 className="h-8 w-8 sm:h-8.5 sm:w-8.5 rounded-full sm:rounded-[12px] bg-white hover:bg-neutral-100 active:scale-95 text-neutral-950 flex items-center justify-center transition-all cursor-pointer shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-white shrink-0 disabled:opacity-75"
               >
                 {isAddingToCart ? (
-                  <Loader2 className="h-4 w-4 animate-spin text-neutral-950" aria-hidden="true" />
+                  <Loader2
+                    className="h-4 w-4 animate-spin text-neutral-950"
+                    aria-hidden="true"
+                  />
                 ) : (
-                  <ShoppingCart className="h-4 w-4 sm:h-4.5 sm:w-4.5 stroke-[2] text-neutral-950" aria-hidden="true" />
+                  <ShoppingCart
+                    className="h-4 w-4 sm:h-4.5 sm:w-4.5 stroke-[2] text-neutral-950"
+                    aria-hidden="true"
+                  />
                 )}
               </button>
             </div>
@@ -450,7 +502,10 @@ export function RentalProductCard({
             </h3>
 
             <div className="flex items-center gap-1 text-[10px] sm:text-[11px] text-white/85 min-w-0">
-              <MapPin className="h-3 w-3 shrink-0 stroke-[1.75]" aria-hidden="true" />
+              <MapPin
+                className="h-3 w-3 shrink-0 stroke-[1.75]"
+                aria-hidden="true"
+              />
               <span className="truncate">{location}</span>
             </div>
 
@@ -471,7 +526,10 @@ export function RentalProductCard({
 
             <div className="flex items-center justify-between gap-2 min-w-0 pt-0.5">
               <div className="flex items-center gap-1 text-[11px] sm:text-xs text-white/85 min-w-0">
-                <MapPin className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0 stroke-[1.75]" aria-hidden="true" />
+                <MapPin
+                  className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0 stroke-[1.75]"
+                  aria-hidden="true"
+                />
                 <span className="truncate">{location}</span>
               </div>
 
@@ -497,7 +555,11 @@ export function RentalProductCard({
           type="button"
           onClick={handleWishlistToggle}
           aria-pressed={isWishlisted}
-          aria-label={isWishlisted ? `Remove ${title} from wishlist` : `Add ${title} to wishlist`}
+          aria-label={
+            isWishlisted
+              ? `Remove ${title} from wishlist`
+              : `Add ${title} to wishlist`
+          }
           className="group/wish absolute top-0.5 right-0.5 sm:top-1 sm:right-1 z-20 flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white cursor-pointer"
         >
           <span
@@ -509,7 +571,7 @@ export function RentalProductCard({
                 "h-3.5 w-3.5 sm:h-4 sm:w-4 transition-colors stroke-[1.75]",
                 isWishlisted
                   ? "fill-neutral-950 dark:fill-white text-neutral-950 dark:text-white"
-                  : "text-neutral-700 dark:text-neutral-300"
+                  : "text-neutral-700 dark:text-neutral-300",
               )}
               aria-hidden="true"
             />
@@ -520,7 +582,11 @@ export function RentalProductCard({
           type="button"
           onClick={handleWishlistToggle}
           aria-pressed={isWishlisted}
-          aria-label={isWishlisted ? `Remove ${title} from wishlist` : `Add ${title} to wishlist`}
+          aria-label={
+            isWishlisted
+              ? `Remove ${title} from wishlist`
+              : `Add ${title} to wishlist`
+          }
           className="group/wish absolute top-1 right-1 sm:top-1.5 sm:right-1.5 z-20 flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white cursor-pointer"
         >
           <span
@@ -532,7 +598,7 @@ export function RentalProductCard({
                 "h-4 w-4 transition-colors stroke-[1.75]",
                 isWishlisted
                   ? "fill-neutral-950 dark:fill-white text-neutral-950 dark:text-white"
-                  : "text-neutral-700 dark:text-neutral-300"
+                  : "text-neutral-700 dark:text-neutral-300",
               )}
               aria-hidden="true"
             />
@@ -550,16 +616,16 @@ export function RentalProductCardSkeleton({
 }) {
   if (variant === "portrait") {
     return (
-      <div className="w-[206px] sm:w-[226px] md:w-[240px] h-[270px] sm:h-[285px] md:h-[295px] rounded-[24px] sm:rounded-[26px] border border-neutral-800/60 dark:border-neutral-700/60 bg-[#1E1E1E] overflow-hidden shadow-xs flex flex-col justify-between shrink-0 snap-start">
-        <div className="w-full h-[172px] sm:h-[184px] md:h-[192px] bg-neutral-200 dark:bg-neutral-800 rounded-b-[20px] sm:rounded-b-[22px] shrink-0" />
+      <div className="w-[206px] sm:w-[226px] md:w-[240px] h-[270px] sm:h-[285px] md:h-[295px] rounded-[24px] sm:rounded-[26px] border border-neutral-200/90 dark:border-neutral-700/60 bg-neutral-100/80 dark:bg-[#1E1E1E] overflow-hidden shadow-xs flex flex-col justify-between shrink-0 snap-start animate-shimmer select-none">
+        <div className="w-full h-[172px] sm:h-[184px] md:h-[192px] bg-neutral-200/80 dark:bg-neutral-800/80 rounded-b-[20px] sm:rounded-b-[22px] shrink-0" />
         <div className="w-full flex-1 flex flex-col justify-between pt-2 pb-2.5 px-3 sm:px-3.5 shrink-0">
-          <div className="space-y-1">
-            <div className="h-3 w-3/4 rounded bg-neutral-700/80" />
-            <div className="h-2 w-1/3 rounded bg-neutral-700/60" />
+          <div className="space-y-1.5">
+            <div className="h-3.5 w-3/4 rounded-md bg-neutral-300/80 dark:bg-neutral-700/70" />
+            <div className="h-2.5 w-1/3 rounded-md bg-neutral-300/60 dark:bg-neutral-700/50" />
           </div>
           <div className="flex items-end justify-between gap-1.5 mt-auto pt-1">
-            <div className="h-5 w-14 rounded bg-neutral-700/80" />
-            <div className="h-8 w-8 sm:h-8.5 sm:w-8.5 rounded-[12px] sm:rounded-[14px] bg-white/20" />
+            <div className="h-5 w-16 rounded-md bg-neutral-300/80 dark:bg-neutral-700/70" />
+            <div className="h-8 w-8 sm:h-8.5 sm:w-8.5 rounded-[12px] sm:rounded-[14px] bg-neutral-300/80 dark:bg-neutral-700/70" />
           </div>
         </div>
       </div>
@@ -568,12 +634,12 @@ export function RentalProductCardSkeleton({
 
   if (variant === "explore") {
     return (
-      <div className="relative w-full aspect-[4/5] rounded-2xl bg-neutral-200 dark:bg-[#1E1E1E] border border-neutral-200 dark:border-neutral-700/80 overflow-hidden shadow-xs flex flex-col justify-end px-3 pb-3 sm:px-3.5 sm:pb-3.5 gap-1.5">
-        <div className="h-4 w-3/4 rounded bg-neutral-300/90 dark:bg-[#282828]" />
-        <div className="h-3 w-1/2 rounded bg-neutral-300/90 dark:bg-[#282828]" />
+      <div className="relative w-full aspect-[4/5] rounded-2xl bg-neutral-100/90 dark:bg-[#1E1E1E] border border-neutral-200/90 dark:border-neutral-700/80 overflow-hidden shadow-xs flex flex-col justify-end px-3 pb-3 sm:px-3.5 sm:pb-3.5 gap-1.5 animate-shimmer select-none">
+        <div className="h-4 w-3/4 rounded-md bg-neutral-200/90 dark:bg-[#282828]" />
+        <div className="h-3 w-1/2 rounded-md bg-neutral-200/90 dark:bg-[#282828]" />
         <div className="flex items-center justify-between gap-2 pt-0.5">
-          <div className="h-4 w-20 rounded bg-neutral-300/90 dark:bg-[#282828]" />
-          <div className="h-8 w-8 sm:h-8.5 sm:w-8.5 rounded-full sm:rounded-[12px] bg-neutral-300/90 dark:bg-[#282828]" />
+          <div className="h-4 w-20 rounded-md bg-neutral-200/90 dark:bg-[#282828]" />
+          <div className="h-8 w-8 sm:h-8.5 sm:w-8.5 rounded-full sm:rounded-[12px] bg-neutral-200/90 dark:bg-[#282828]" />
         </div>
       </div>
     );
@@ -581,22 +647,22 @@ export function RentalProductCardSkeleton({
 
   if (variant === "compact") {
     return (
-      <div className="relative w-full aspect-[5/4] sm:aspect-[3/2] rounded-xl bg-neutral-200 dark:bg-[#1E1E1E] border border-neutral-200 dark:border-neutral-700/80 overflow-hidden shadow-xs flex flex-col justify-end px-2.5 pb-2 sm:px-3 sm:pb-2.5 gap-1.5">
-        <div className="h-3.5 w-3/4 rounded bg-neutral-300/90 dark:bg-[#282828]" />
+      <div className="relative w-full aspect-[5/4] sm:aspect-[3/2] rounded-xl bg-neutral-100/90 dark:bg-[#1E1E1E] border border-neutral-200/90 dark:border-neutral-700/80 overflow-hidden shadow-xs flex flex-col justify-end px-2.5 pb-2 sm:px-3 sm:pb-2.5 gap-1.5 animate-shimmer select-none">
+        <div className="h-3.5 w-3/4 rounded-md bg-neutral-200/90 dark:bg-[#282828]" />
         <div className="flex items-center justify-between gap-2">
-          <div className="h-3 w-1/2 rounded bg-neutral-300/90 dark:bg-[#282828]" />
-          <div className="h-3.5 w-16 rounded bg-neutral-300/90 dark:bg-[#282828]" />
+          <div className="h-3 w-1/2 rounded-md bg-neutral-200/90 dark:bg-[#282828]" />
+          <div className="h-3.5 w-16 rounded-md bg-neutral-200/90 dark:bg-[#282828]" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="relative w-full aspect-[4/3] rounded-2xl bg-neutral-200 dark:bg-[#1E1E1E] border border-neutral-200 dark:border-neutral-700/80 overflow-hidden shadow-xs flex flex-col justify-end px-3 pb-2.5 gap-1.5">
-      <div className="h-4 w-3/4 rounded bg-neutral-300/90 dark:bg-[#282828]" />
+    <div className="relative w-full aspect-[4/3] rounded-2xl bg-neutral-100/90 dark:bg-[#1E1E1E] border border-neutral-200/90 dark:border-neutral-700/80 overflow-hidden shadow-xs flex flex-col justify-end px-3 pb-2.5 gap-1.5 animate-shimmer select-none">
+      <div className="h-4 w-3/4 rounded-md bg-neutral-200/90 dark:bg-[#282828]" />
       <div className="flex items-center justify-between gap-2">
-        <div className="h-3 w-1/3 rounded bg-neutral-300/90 dark:bg-[#282828]" />
-        <div className="h-3.5 w-20 rounded bg-neutral-300/90 dark:bg-[#282828]" />
+        <div className="h-3 w-1/3 rounded-md bg-neutral-200/90 dark:bg-[#282828]" />
+        <div className="h-3.5 w-20 rounded-md bg-neutral-200/90 dark:bg-[#282828]" />
       </div>
     </div>
   );

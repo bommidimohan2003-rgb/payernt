@@ -21,8 +21,8 @@ export function UserMessage({ text, timestamp }: UserMessageProps) {
       transition={{ duration: 0.18, ease: "easeOut" }}
       className="flex flex-col items-end w-full"
     >
-      <div className="flex items-start justify-end max-w-[85%] sm:max-w-[80%]">
-        <div className="rounded-2xl rounded-tr-sm px-4 py-2.5 text-[13.5px] bg-[#17191C] text-white font-normal break-words leading-relaxed border border-[#252930] shadow-[0_1px_3px_rgba(23,25,28,0.12)]">
+      <div className="flex items-start justify-end max-w-[88%] sm:max-w-[82%]">
+        <div className="rounded-2xl rounded-tr-xs px-4 py-2.5 text-[13.5px] bg-[#17191C] text-white font-normal break-words leading-relaxed border border-[#252930] shadow-[0_1px_3px_rgba(23,25,28,0.12)] selection:bg-white/20">
           {text}
         </div>
       </div>

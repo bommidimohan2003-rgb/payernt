@@ -50,23 +50,27 @@ describe("paYent Phase 5 Critical Bug Fixes & Resilience", () => {
     assert.match(reviewsSrc, /min-h-\[44px\]/);
   });
 
-  it("Fix 2: Exclude Authenticated User's Listings from Recommendations", () => {
+  it("Fix 2: Exclude Authenticated User's Listings from Recommendations and Recently Viewed", () => {
     const recSectionSrc = readSrc("components/recommendations/RecommendationSection.tsx");
     const recHomeSrc = readSrc("components/home/RecommendedForYou.tsx");
+    const recRecentlyViewedSrc = readSrc("components/home/RecentlyViewed.tsx");
     const apiSrc = readSrc("utils/api.ts");
 
-    // Both components import isUserOwnProduct correctly
+    // All components import isUserOwnProduct correctly
     assert.match(recSectionSrc, /import\s*\{[^}]*isUserOwnProduct[^}]*\}\s*from\s*["']@\/utils\/productFilters["']/);
     assert.match(recHomeSrc, /import\s*\{[^}]*isUserOwnProduct[^}]*\}\s*from\s*["']@\/utils\/productFilters["']/);
+    assert.match(recRecentlyViewedSrc, /import\s*\{[^}]*isUserOwnProduct[^}]*\}\s*from\s*["']@\/utils\/productFilters["']/);
 
     // Frontend passes Authorization token
     assert.match(apiSrc, /getPersonalizedRecommendations[\s\S]*?headers\["Authorization"\]\s*=\s*`Bearer \$\{token\}`/);
     assert.match(apiSrc, /getTrendingRecommendations[\s\S]*?headers\["Authorization"\]\s*=\s*`Bearer \$\{token\}`/);
     assert.match(apiSrc, /getSimilarRecommendations[\s\S]*?headers\["Authorization"\]\s*=\s*`Bearer \$\{token\}`/);
+    assert.match(apiSrc, /getRecentlyViewed[\s\S]*?headers\["Authorization"\]\s*=\s*`Bearer \$\{token\}`/);
 
     // Frontend filters user's own products
     assert.match(recSectionSrc, /isUserOwnProduct\(p,\s*user\)/);
     assert.match(recHomeSrc, /isUserOwnProduct\(p,\s*user\)/);
+    assert.match(recRecentlyViewedSrc, /isUserOwnProduct\(p,\s*user\)/);
 
     // Runtime execution and null-safety of isUserOwnProduct
     const { isUserOwnProduct } = loadBundledSrc<{ isUserOwnProduct: (p: any, u: any) => boolean }>("utils/productFilters.ts");

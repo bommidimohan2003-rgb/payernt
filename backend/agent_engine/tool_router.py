@@ -38,7 +38,8 @@ class AgentToolRouter:
         self,
         message: str,
         context: AgentSessionContext,
-        conversation_id: Optional[str] = None
+        conversation_id: Optional[str] = None,
+        action: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Executes a single conversational turn:
@@ -46,18 +47,28 @@ class AgentToolRouter:
         2. Persists the exchange if a conversation thread is active.
         3. Enforces production persistence failure fail-closed safety.
         """
+        cid = conversation_id
+        if not cid and (context.session_id or context.is_authenticated):
+            try:
+                conv = create_or_get_conversation(context.session_id, context)
+                if conv and conv.get("id"):
+                    cid = conv.get("id")
+            except Exception as e:
+                logger.debug(f"Could not pre-resolve conversation: {e}")
+
         result = self.coordinator.coordinate_query(
             message=message,
             context=context,
-            conversation_id=conversation_id,
+            conversation_id=cid,
+            action=action,
         )
 
         # --- CONVERSATION PERSISTENCE ---
-        cid = conversation_id
-        if conversation_id or context.session_id:
+        if cid or context.session_id:
             try:
-                conv = create_or_get_conversation(context.session_id, context)
-                cid = conv.get("id")
+                if not cid:
+                    conv = create_or_get_conversation(context.session_id, context)
+                    cid = conv.get("id")
                 # Save user message
                 save_agent_message(
                     conversation_id=cid,

@@ -12,10 +12,9 @@ export interface TypingIndicatorProps {
  * Left-aligned assistant message bubble matching the AgentMessage surface:
  * - Background: Light grey (#F5F6F8)
  * - Border: Subtle border (#E1E4E8)
- * - Corner geometry: rounded-2xl rounded-tl-sm
+ * - Corner geometry: rounded-2xl rounded-tl-xs
  * - Avatar: Custom paYent P brand symbol (PayentAgentIcon size 26)
- * - Three sequential typing dots in brand green (#16A36A)
- * - Smooth vertical translation and opacity breathing loop
+ * - Three smoothly animated dots in brand green (#16A36A)
  */
 export function TypingIndicator({ className = "" }: TypingIndicatorProps) {
   return (
@@ -31,16 +30,16 @@ export function TypingIndicator({ className = "" }: TypingIndicatorProps) {
     >
       <div className="flex items-center gap-2.5">
         {/* Assistant Avatar */}
-        <div className="shrink-0 mt-0.5">
+        <div className="shrink-0">
           <PayentAgentIcon size={26} />
         </div>
 
         {/* Message Bubble with 3 Sequential Animated Dots */}
-        <div className="rounded-2xl rounded-tl-sm px-4 py-3 bg-[#F5F6F8] border border-[#E1E4E8] shadow-[0_1px_2px_rgba(23,25,28,0.03)] flex items-center gap-1.5 h-10 select-none">
+        <div className="rounded-2xl rounded-tl-xs px-4 py-2.5 bg-[#F5F6F8] border border-[#E1E4E8] shadow-[0_1px_2px_rgba(23,25,28,0.02)] flex items-center gap-1.5 h-9 select-none">
           <motion.span
-            className="inline-block h-2 w-2 rounded-full bg-[#16A36A]"
+            className="inline-block h-1.5 w-1.5 rounded-full bg-[#16A36A]"
             animate={{
-              y: [0, -3.5, 0],
+              y: [0, -3, 0],
               opacity: [0.35, 1, 0.35],
             }}
             transition={{
@@ -51,9 +50,9 @@ export function TypingIndicator({ className = "" }: TypingIndicatorProps) {
             }}
           />
           <motion.span
-            className="inline-block h-2 w-2 rounded-full bg-[#16A36A]"
+            className="inline-block h-1.5 w-1.5 rounded-full bg-[#16A36A]"
             animate={{
-              y: [0, -3.5, 0],
+              y: [0, -3, 0],
               opacity: [0.35, 1, 0.35],
             }}
             transition={{
@@ -64,9 +63,9 @@ export function TypingIndicator({ className = "" }: TypingIndicatorProps) {
             }}
           />
           <motion.span
-            className="inline-block h-2 w-2 rounded-full bg-[#16A36A]"
+            className="inline-block h-1.5 w-1.5 rounded-full bg-[#16A36A]"
             animate={{
-              y: [0, -3.5, 0],
+              y: [0, -3, 0],
               opacity: [0.35, 1, 0.35],
             }}
             transition={{

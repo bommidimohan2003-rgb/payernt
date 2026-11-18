@@ -32,12 +32,51 @@ from agent_engine.concise_formatter import (
 )
 from agent_engine.escalation import (
     create_support_ticket,
+    find_active_support_ticket,
     get_support_ticket_detail,
     get_user_support_tickets,
     propose_human_escalation,
 )
+from agent_engine.fallback_responses import (
+    build_decline_response,
+    build_unknown_fallback_response,
+    clear_pending_escalation,
+    get_pending_escalation,
+    is_affirmative_response,
+    is_negative_response,
+)
+from agent_engine.conversational_responses import (
+    strip_conversational_prefixes,
+)
+from agent_engine.identity_responses import (
+    get_identity_response,
+    is_identity_query,
+)
+from agent_engine.capabilities_responses import (
+    get_capabilities_response,
+    is_capabilities_query,
+)
+from agent_engine.gratitude_responses import (
+    get_gratitude_response,
+    is_pure_gratitude,
+)
+from agent_engine.farewell_responses import (
+    get_farewell_response,
+    is_pure_farewell,
+)
+from agent_engine.welcome_back_responses import (
+    get_welcome_back_response,
+    is_pure_welcome_back,
+)
+from agent_engine.greeting_responses import (
+    extract_greeting_prefix,
+    get_greeting_response,
+    is_pure_greeting,
+)
 from agent_engine.intent_classifier import ClassificationResult, IntentClassifier
+from agent_engine.persistence import PersistenceUnavailableError
 from agent_engine.response_templates import TEMPLATES, get_response_template
+from agent_engine.telugu_normalizer import TeluguNormalizer
 from agent_engine.retrieval.knowledge_manager import (
     KnowledgeIndexManager,
     KnowledgeManager,
@@ -86,6 +125,7 @@ class HybridQueryCoordinator:
         self.classifier = classifier or IntentClassifier()
         self.index_manager = index_manager or KnowledgeIndexManager.get_instance()
         self.knowledge_manager = knowledge_manager or KnowledgeManager()
+        self.telugu_normalizer = TeluguNormalizer()
 
     # =========================================================================
     # QUERY CLASSIFICATION & INTENT DECOMPOSITION
@@ -93,6 +133,10 @@ class HybridQueryCoordinator:
 
     def _has_personal_intent(self, text: str, intent: str) -> bool:
         """Determines if the query seeks personal account or order-specific data."""
+        # Conversational intents are not personal queries
+        if intent in ("GREETING", "GOODBYE", "FAREWELL", "IDENTITY", "CAPABILITIES", "GRATITUDE", "WELCOME_BACK"):
+            return False
+
         text_lower = text.lower()
 
         # If it is explicitly a general policy or FAQ query without personal possessives, it's not personal
@@ -249,35 +293,281 @@ class HybridQueryCoordinator:
     # COORDINATION PIPELINE
     # =========================================================================
 
+    def _check_pending_support_confirmation(
+        self,
+        clean_msg: str,
+        last_agent_msg: Optional[Dict[str, Any]],
+        context: AgentSessionContext,
+        conversation_id: Optional[str],
+        action: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Evaluates whether a turn completes or cancels an active support escalation confirmation.
+        Returns a response dict if handled, or None if not an active support confirmation turn.
+        Checks both fast in-memory pending escalation registry and persistent message history.
+        """
+        # Fast path: check in-memory pending escalation state
+        pending_rec = get_pending_escalation(
+            session_id=context.session_id,
+            conversation_id=conversation_id,
+        )
+
+        prev_tool = {}
+        prev_text = ""
+        if last_agent_msg:
+            prev_tool = last_agent_msg.get("tool_result") or last_agent_msg.get("tool_calls_json") or {}
+            if isinstance(prev_tool, str):
+                try:
+                    import json
+                    prev_tool = json.loads(prev_tool)
+                except Exception:
+                    prev_tool = {}
+            prev_text = (last_agent_msg.get("content") or "").lower()
+
+        prev_state = prev_tool.get("state") if isinstance(prev_tool, dict) else None
+        prev_action = prev_tool.get("action") if isinstance(prev_tool, dict) else None
+
+        is_pending = (
+            pending_rec is not None
+            or prev_state == "AWAITING_SUPPORT_CONFIRMATION"
+            or prev_action == "propose_escalation"
+            or "connect you with our human support team" in prev_text
+            or "human support team tho connect" in prev_text
+            or "support ticket" in prev_text
+            or "support specialist" in prev_text
+        )
+
+        if not is_pending:
+            if (action == "confirm_escalation" or is_affirmative_response(clean_msg)) and context.is_authenticated and context.clean_email:
+                existing = find_active_support_ticket(context.clean_email, conversation_id=conversation_id)
+                if existing:
+                    t_id = existing["id"]
+                    resp_text = (
+                        f"You already have an active support ticket **#{t_id}** (Status: **{existing.get('status', 'open').upper()}**).\n\n"
+                        f"Our team has already been notified and is reviewing your request. You can check for updates in your Support Messages."
+                    )
+                    return {
+                        "intent": "HUMAN_SUPPORT",
+                        "confidence": 1.0,
+                        "is_ambiguous": False,
+                        "requires_auth": False,
+                        "requires_confirmation": False,
+                        "tool_called": "create_support_ticket",
+                        "tool_result": {
+                            "success": True,
+                            "is_duplicate": True,
+                            "ticket_id": t_id,
+                            "status": existing.get("status", "open"),
+                            "category": existing.get("category", "General Help"),
+                            "state": "SUPPORT_ACCEPTED",
+                        },
+                        "response_text": resp_text,
+                        "suggestions": ["Check Ticket Status", "Return to Assistant"],
+                        "entities": {},
+                        "session_id": context.session_id,
+                        "conversation_id": conversation_id,
+                        "authenticated": True,
+                        "query_type": QueryType.ESCALATION.value,
+                    }
+            return None
+
+        # 1. User accepts (via structured action or affirmative phrase)
+        is_affirmative = (action == "confirm_escalation") or is_affirmative_response(clean_msg)
+        is_negative = (action == "cancel_escalation") or is_negative_response(clean_msg)
+
+        if is_affirmative:
+            if not context.is_authenticated:
+                return {
+                    "intent": "HUMAN_SUPPORT",
+                    "confidence": 1.0,
+                    "is_ambiguous": False,
+                    "requires_auth": True,
+                    "requires_confirmation": False,
+                    "tool_called": "create_support_ticket",
+                    "tool_result": {
+                        "requires_auth": True,
+                        "error": "Authentication required to create a support ticket."
+                    },
+                    "response_text": (
+                        "To connect you with our human support team and create a formal support ticket, "
+                        "please sign in to your Payent account."
+                    ),
+                    "suggestions": ["Sign In", "Browse Equipment", "Help Center"],
+                    "entities": {},
+                    "session_id": context.session_id,
+                    "conversation_id": conversation_id,
+                    "authenticated": False,
+                    "query_type": QueryType.ESCALATION.value,
+                }
+
+            # Retrieve unanswered question from pending record or previous tool payload
+            unanswered_query = None
+            if pending_rec:
+                unanswered_query = pending_rec.get("unanswered_query")
+            if not unanswered_query and isinstance(prev_tool, dict):
+                unanswered_query = prev_tool.get("unanswered_query") or prev_tool.get("summary")
+
+            ticket_subject = "Support Request: Unanswered Inquiry"
+            ticket_message = (
+                unanswered_query
+                or "Customer requested human support assistance following an unassisted inquiry."
+            )
+
+            try:
+                ticket_res = create_support_ticket(
+                    context=context,
+                    subject=ticket_subject,
+                    message=ticket_message,
+                    category="General Help",
+                    conversation_id=conversation_id,
+                )
+            except PersistenceUnavailableError:
+                return {
+                    "intent": "HUMAN_SUPPORT",
+                    "confidence": 1.0,
+                    "is_ambiguous": False,
+                    "requires_auth": False,
+                    "requires_confirmation": True,
+                    "tool_called": "create_support_ticket",
+                    "tool_result": {
+                        "success": False,
+                        "error": "Database persistence is unavailable in production"
+                    },
+                    "response_text": (
+                        "I am unable to submit your support ticket right now due to a temporary connection delay. "
+                        "Please try again in a few moments, or reach out to support@payent.com directly."
+                    ),
+                    "suggestions": ["Retry Support Ticket", "Help Center"],
+                    "entities": {},
+                    "session_id": context.session_id,
+                    "conversation_id": conversation_id,
+                    "authenticated": True,
+                    "status": "service_unavailable",
+                    "persistence_error": True,
+                    "query_type": QueryType.ESCALATION.value,
+                }
+            except Exception as e:
+                logger.error(f"Error creating support ticket: {e}")
+                return {
+                    "intent": "HUMAN_SUPPORT",
+                    "confidence": 1.0,
+                    "is_ambiguous": False,
+                    "requires_auth": False,
+                    "requires_confirmation": True,
+                    "tool_called": "create_support_ticket",
+                    "tool_result": {
+                        "success": False,
+                        "error": str(e)
+                    },
+                    "response_text": (
+                        "I encountered an issue submitting your support ticket. Please try again or contact customer care."
+                    ),
+                    "suggestions": ["Retry Support Ticket", "Help Center", "Contact Support"],
+                    "entities": {},
+                    "session_id": context.session_id,
+                    "conversation_id": conversation_id,
+                    "authenticated": True,
+                    "status": "error",
+                    "query_type": QueryType.ESCALATION.value,
+                }
+
+            if ticket_res.get("success"):
+                # Deterministically clear pending escalation upon successful creation
+                clear_pending_escalation(context.session_id, conversation_id)
+                t_id = ticket_res.get("ticket_id")
+                ticket_res["state"] = "SUPPORT_ACCEPTED"
+                is_telugu = (pending_rec and pending_rec.get("is_telugu")) or self.telugu_normalizer.is_tenglish(clean_msg)
+
+                if ticket_res.get("is_duplicate"):
+                    if is_telugu:
+                        resp_text = (
+                            f"Meeku already active support ticket undi **#{t_id}** (Status: **{ticket_res.get('status', 'open').upper()}**).\n\n"
+                            f"Maa support team deenini review chestunnaru. Support Messages lo updates check chesukovachu."
+                        )
+                    else:
+                        resp_text = (
+                            f"You already have an active support ticket **#{t_id}** (Status: **{ticket_res.get('status', 'open').upper()}**).\n\n"
+                            f"Our team has already been notified and is reviewing your request. You can check for updates in your Support Messages."
+                        )
+                else:
+                    if is_telugu:
+                        resp_text = (
+                            f"Mee support request successfully create ayyindi.\n\n"
+                            f"• **Ticket Reference**: `#{t_id}`\n"
+                            f"• **Category**: {ticket_res.get('category', 'General Help')}\n"
+                            f"• **Status**: OPEN\n\n"
+                            f"Maa support team mee request ni review chesi twaralo follow up chestaru."
+                        )
+                    else:
+                        resp_text = (
+                            f"Your support request has been created successfully. I have connected you with our human support team and created support ticket **#{t_id}**.\n\n"
+                            f"• **Ticket Reference**: `#{t_id}`\n"
+                            f"• **Category**: {ticket_res.get('category', 'General Help')}\n"
+                            f"• **Status**: OPEN\n\n"
+                            f"Our support team can review your request and follow up with you shortly."
+                        )
+
+                return {
+                    "intent": "HUMAN_SUPPORT",
+                    "confidence": 1.0,
+                    "is_ambiguous": False,
+                    "requires_auth": False,
+                    "requires_confirmation": False,
+                    "tool_called": "create_support_ticket",
+                    "tool_result": ticket_res,
+                    "response_text": resp_text,
+                    "suggestions": ["Check Ticket Status", "Return to Assistant"],
+                    "entities": {},
+                    "session_id": context.session_id,
+                    "conversation_id": conversation_id,
+                    "authenticated": True,
+                    "query_type": QueryType.ESCALATION.value,
+                }
+            else:
+                return {
+                    "intent": "HUMAN_SUPPORT",
+                    "confidence": 1.0,
+                    "is_ambiguous": False,
+                    "requires_auth": ticket_res.get("requires_auth", False),
+                    "requires_confirmation": True,
+                    "tool_called": "create_support_ticket",
+                    "tool_result": ticket_res,
+                    "response_text": ticket_res.get("message") or ticket_res.get("error") or "Failed to create support ticket. Would you like to try again?",
+                    "suggestions": ["Retry Support Ticket", "Help Center", "Contact Support"],
+                    "entities": {},
+                    "session_id": context.session_id,
+                    "conversation_id": conversation_id,
+                    "authenticated": context.is_authenticated,
+                    "status": "error",
+                    "query_type": QueryType.ESCALATION.value,
+                }
+
+        # 2. User declines
+        if is_negative:
+            clear_pending_escalation(context.session_id, conversation_id)
+            is_telugu = (pending_rec and pending_rec.get("is_telugu")) or self.telugu_normalizer.is_tenglish(clean_msg)
+            return build_decline_response(
+                is_telugu=is_telugu,
+                session_id=context.session_id,
+                conversation_id=conversation_id,
+                authenticated=context.is_authenticated,
+            )
+
+        # 3. User rephrases with a new substantive question -> clear pending escalation and return None to process normally
+        clear_pending_escalation(context.session_id, conversation_id)
+        return None
+
     def coordinate_query(
         self,
         message: str,
         context: AgentSessionContext,
         conversation_id: Optional[str] = None,
+        action: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Main entry point for processing a conversational turn through the hybrid pipeline.
         """
         clean_msg = message.strip()
-
-        # 1. Frontline Classification & Entity Extraction
-        classification: ClassificationResult = self.classifier.classify(clean_msg)
-        intent = classification.intent
-        entities = classification.entities
-
-        if isinstance(entities, dict):
-            booking_id = entities.get("booking_id") or (entities.get("booking_ids", [None])[0] if entities.get("booking_ids") else None)
-            product_id = entities.get("product_id") or (entities.get("product_ids", [None])[0] if entities.get("product_ids") else None)
-            ticket_id = entities.get("ticket_id") or (entities.get("ticket_ids", [None])[0] if entities.get("ticket_ids") else None)
-            entities_dict = entities
-        else:
-            b_ids = getattr(entities, "booking_ids", [])
-            p_ids = getattr(entities, "product_ids", [])
-            t_ids = getattr(entities, "ticket_ids", [])
-            booking_id = b_ids[0] if b_ids else None
-            product_id = p_ids[0] if p_ids else None
-            ticket_id = t_ids[0] if t_ids else None
-            entities_dict = entities.to_dict() if hasattr(entities, "to_dict") else {}
 
         # Multi-turn conversation context resolution
         history_messages: List[Dict[str, Any]] = []
@@ -295,8 +585,119 @@ class HybridQueryCoordinator:
                 last_agent_msg = m
                 break
 
+        # Priority 1: Check active multi-turn support confirmation (Yes/No response or action)
+        support_conf_res = self._check_pending_support_confirmation(
+            clean_msg=clean_msg,
+            last_agent_msg=last_agent_msg,
+            context=context,
+            conversation_id=conversation_id,
+            action=action,
+        )
+        if support_conf_res is not None:
+            return support_conf_res
+
+        # Priority 2: Pure greeting detection (Immediate 0ms return, no DB/retrieval calls)
+        is_pure, g_type = is_pure_greeting(clean_msg)
+        if is_pure and g_type:
+            user_name = None
+            if context.is_authenticated and context.full_name and context.full_name != "Guest Visitor":
+                user_name = context.full_name
+            elif context.is_authenticated and context.clean_email:
+                user_name = context.clean_email.split("@")[0]
+            is_telugu = g_type == "ela_unnaru" or (self.telugu_normalizer.is_tenglish(clean_msg) and g_type != "namaste")
+            greeting_res = get_greeting_response(g_type, user_name=user_name, is_telugu=is_telugu)
+            greeting_res["session_id"] = context.session_id
+            greeting_res["conversation_id"] = conversation_id
+            greeting_res["authenticated"] = context.is_authenticated
+            return greeting_res
+
+        # Priority 3: Pure Identity detection
+        is_ident, ident_subtype = is_identity_query(clean_msg)
+        if is_ident and ident_subtype:
+            is_telugu = self.telugu_normalizer.is_tenglish(clean_msg)
+            ident_res = get_identity_response(
+                subtype=ident_subtype,
+                is_telugu=is_telugu,
+                session_id=context.session_id,
+                conversation_id=conversation_id,
+                authenticated=context.is_authenticated,
+            )
+            return ident_res
+
+        # Priority 4: Pure Capabilities detection
+        is_cap, cap_subtype = is_capabilities_query(clean_msg)
+        if is_cap and cap_subtype:
+            is_telugu = self.telugu_normalizer.is_tenglish(clean_msg)
+            cap_res = get_capabilities_response(
+                subtype=cap_subtype,
+                is_telugu=is_telugu,
+                session_id=context.session_id,
+                conversation_id=conversation_id,
+                authenticated=context.is_authenticated,
+            )
+            return cap_res
+
+        # Priority 5: Pure Gratitude detection
+        if is_pure_gratitude(clean_msg):
+            is_telugu = self.telugu_normalizer.is_tenglish(clean_msg)
+            grat_res = get_gratitude_response(
+                is_telugu=is_telugu,
+                session_id=context.session_id,
+                conversation_id=conversation_id,
+                authenticated=context.is_authenticated,
+            )
+            return grat_res
+
+        # Priority 6: Pure Farewell detection
+        if is_pure_farewell(clean_msg):
+            is_telugu = self.telugu_normalizer.is_tenglish(clean_msg)
+            farewell_res = get_farewell_response(
+                is_telugu=is_telugu,
+                session_id=context.session_id,
+                conversation_id=conversation_id,
+                authenticated=context.is_authenticated,
+            )
+            return farewell_res
+
+        # Priority 7: Pure Welcome Back detection
+        is_wb, wb_subtype = is_pure_welcome_back(clean_msg)
+        if is_wb and wb_subtype:
+            is_telugu = self.telugu_normalizer.is_tenglish(clean_msg)
+            wb_res = get_welcome_back_response(
+                subtype=wb_subtype,
+                is_telugu=is_telugu,
+                session_id=context.session_id,
+                conversation_id=conversation_id,
+                authenticated=context.is_authenticated,
+            )
+            return wb_res
+
+        # Priority 8: Conversational prefix stripping for mixed queries (greetings, gratitude, welcome back)
+        # (e.g. "Thanks, check my payment", "Hi, what is my booking status?", "Okay, let's continue checking my delivery")
+        _, substantive_query = strip_conversational_prefixes(clean_msg)
+        query_to_process = substantive_query if substantive_query else clean_msg
+
+        # 1. Frontline Classification & Entity Extraction
+        classification: ClassificationResult = self.classifier.classify(query_to_process)
+        intent = classification.intent
+        entities = classification.entities
+
+        if isinstance(entities, dict):
+            booking_id = entities.get("booking_id") or (entities.get("booking_ids", [None])[0] if entities.get("booking_ids") else None)
+            product_id = entities.get("product_id") or (entities.get("product_ids", [None])[0] if entities.get("product_ids") else None)
+            ticket_id = entities.get("ticket_id") or (entities.get("ticket_ids", [None])[0] if entities.get("ticket_ids") else None)
+            entities_dict = entities
+        else:
+            b_ids = getattr(entities, "booking_ids", [])
+            p_ids = getattr(entities, "product_ids", [])
+            t_ids = getattr(entities, "ticket_ids", [])
+            booking_id = b_ids[0] if b_ids else None
+            product_id = p_ids[0] if p_ids else None
+            ticket_id = t_ids[0] if t_ids else None
+            entities_dict = entities.to_dict() if hasattr(entities, "to_dict") else {}
+
         # A. Resolve ordinal reference ("second one", "first one", "3rd booking", etc.)
-        ordinal_match = re.search(r"\b(first|second|third|fourth|1st|2nd|3rd|4th|last)\s*(one|booking|order|rental)?\b", clean_msg.lower())
+        ordinal_match = re.search(r"\b(first|second|third|fourth|1st|2nd|3rd|4th|last)\s*(one|booking|order|rental)?\b", query_to_process.lower())
         if ordinal_match and not booking_id and last_agent_msg:
             prev_tool_res = last_agent_msg.get("tool_result") or {}
             if isinstance(prev_tool_res, str):
@@ -347,34 +748,11 @@ class HybridQueryCoordinator:
                 if intent in ("UNKNOWN_INTENT", "GENERAL_HELP"):
                     intent = "BOOKING_DETAILS"
 
-        # C. Resolve pending escalation confirmation follow-up
-        is_simple_affirmation = (
-            clean_msg.lower().strip(" .!?,") in (
-                "yes", "yes please", "sure", "proceed", "confirm", "ok", "please connect me", "yep", "ha", "avunu",
-                "yes please connect me", "confirm support ticket", "proceed with ticket", "please proceed", "please connect"
-            )
-            or any(clean_msg.lower().strip(" .!?,").startswith(p) for p in ("yes", "proceed", "confirm", "please connect"))
-        )
-        if last_agent_msg and is_simple_affirmation:
-            prev_tool = (last_agent_msg.get("tool_result") or {})
-            if isinstance(prev_tool, str):
-                try:
-                    import json
-                    prev_tool = json.loads(prev_tool)
-                except Exception:
-                    prev_tool = {}
-            prev_action = prev_tool.get("action") if isinstance(prev_tool, dict) else None
-            prev_text = (last_agent_msg.get("content") or "").lower()
-            if prev_action == "propose_escalation" or "support ticket" in prev_text or "support specialist" in prev_text:
-                intent = "HUMAN_SUPPORT"
-                classification.intent = "HUMAN_SUPPORT"
-                classification.confidence = 0.99
-
         # 2. Knowledge Retrieval (Phase 8.2 / 8.3)
         retriever: AgentKnowledgeRetriever = self.index_manager.get_retriever()
         kb_results: List[RetrievalResult] = []
         try:
-            kb_results = retriever.retrieve(clean_msg, top_k=3)
+            kb_results = retriever.retrieve(query_to_process, top_k=3)
         except Exception as e:
             logger.warning(f"Notice during knowledge retrieval: {e}")
 
@@ -483,7 +861,89 @@ class HybridQueryCoordinator:
                     "query_type": QueryType.GUIDE.value,
                 }
 
-        # Fallback to existing deterministic response templates (e.g. Greetings, Help)
+        # Pure or fallback greeting response
+        if intent == "GREETING":
+            is_pure, g_type = is_pure_greeting(message)
+            user_name = None
+            if context.is_authenticated and context.full_name and context.full_name != "Guest Visitor":
+                user_name = context.full_name
+            elif context.is_authenticated and context.clean_email:
+                user_name = context.clean_email.split("@")[0]
+            is_telugu = g_type == "ela_unnaru" or (self.telugu_normalizer.is_tenglish(message) and g_type != "namaste")
+            res = get_greeting_response(g_type or "general", user_name=user_name, is_telugu=is_telugu)
+            res["session_id"] = context.session_id
+            res["conversation_id"] = conversation_id
+            res["authenticated"] = context.is_authenticated
+            return res
+
+        # Identity response
+        if intent == "IDENTITY":
+            is_match, subtype = is_identity_query(message)
+            is_telugu = self.telugu_normalizer.is_tenglish(message)
+            return get_identity_response(
+                subtype=subtype or "general",
+                is_telugu=is_telugu,
+                session_id=context.session_id,
+                conversation_id=conversation_id,
+                authenticated=context.is_authenticated,
+            )
+
+        # Capabilities response
+        if intent == "CAPABILITIES":
+            is_match, subtype = is_capabilities_query(message)
+            is_telugu = self.telugu_normalizer.is_tenglish(message)
+            return get_capabilities_response(
+                subtype=subtype or "general",
+                is_telugu=is_telugu,
+                session_id=context.session_id,
+                conversation_id=conversation_id,
+                authenticated=context.is_authenticated,
+            )
+
+        # Gratitude response
+        if intent == "GRATITUDE":
+            is_telugu = self.telugu_normalizer.is_tenglish(message)
+            return get_gratitude_response(
+                is_telugu=is_telugu,
+                session_id=context.session_id,
+                conversation_id=conversation_id,
+                authenticated=context.is_authenticated,
+            )
+
+        # Farewell / Goodbye response
+        if intent in ("FAREWELL", "GOODBYE"):
+            is_telugu = self.telugu_normalizer.is_tenglish(message)
+            return get_farewell_response(
+                is_telugu=is_telugu,
+                session_id=context.session_id,
+                conversation_id=conversation_id,
+                authenticated=context.is_authenticated,
+            )
+
+        # Welcome Back response
+        if intent == "WELCOME_BACK":
+            is_match, subtype = is_pure_welcome_back(message)
+            is_telugu = self.telugu_normalizer.is_tenglish(message)
+            return get_welcome_back_response(
+                subtype=subtype or "general",
+                is_telugu=is_telugu,
+                session_id=context.session_id,
+                conversation_id=conversation_id,
+                authenticated=context.is_authenticated,
+            )
+
+        # Unknown / unsupported question fallback offering human support
+        if intent == "UNKNOWN_INTENT":
+            is_telugu = self.telugu_normalizer.is_tenglish(message)
+            return build_unknown_fallback_response(
+                unanswered_query=message,
+                is_telugu=is_telugu,
+                session_id=context.session_id,
+                conversation_id=conversation_id,
+                authenticated=context.is_authenticated,
+            )
+
+        # Fallback to existing deterministic response templates (e.g. Help)
         tpl_key = classification.response_template_key
         tpl = TEMPLATES.get(tpl_key) or TEMPLATES.get(intent.lower()) or get_response_template(tpl_key)
         if tpl:
@@ -1211,6 +1671,7 @@ class HybridQueryCoordinator:
             "confidence": confidence,
             "is_ambiguous": False,
             "requires_auth": requires_auth,
+            "requires_confirmation": bool(tool_result and isinstance(tool_result, dict) and tool_result.get("requires_confirmation")),
             "tool_called": tool_called,
             "tool_result": tool_result,
             "response_text": response_text,

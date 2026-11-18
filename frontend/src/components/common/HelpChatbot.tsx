@@ -5,10 +5,18 @@ import { api } from "@/utils/api";
 import { storage, STORAGE_KEYS } from "@/utils/storage";
 import { PayentAgentIcon } from "@/components/common/PayentAgentIcon";
 import { TypingIndicator } from "@/components/common/TypingIndicator";
-import { AgentMessage } from "@/components/common/AgentMessage";
+import {
+  AgentMessage,
+  AgentToolResult,
+} from "@/components/common/AgentMessage";
 import { UserMessage } from "@/components/common/UserMessage";
 import { SuggestedPrompts } from "@/components/common/SuggestedPrompts";
 import { ChatInput } from "@/components/common/ChatInput";
+
+interface StoredUser {
+  email?: string;
+  name?: string;
+}
 
 interface ChatMessage {
   id: string;
@@ -17,7 +25,7 @@ interface ChatMessage {
   timestamp: Date;
   intent?: string;
   toolCalled?: string;
-  toolResult?: any;
+  toolResult?: AgentToolResult | null;
   suggestions?: string[];
   requiresAuth?: boolean;
   requiresConfirmation?: boolean;
@@ -37,7 +45,8 @@ export function HelpChatbot() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
-  const [activeSuggestions, setActiveSuggestions] = useState<string[]>(DEFAULT_SUGGESTIONS);
+  const [activeSuggestions, setActiveSuggestions] =
+    useState<string[]>(DEFAULT_SUGGESTIONS);
   const [conversationId, setConversationId] = useState<string>("");
   const [sessionId, setSessionId] = useState<string>("");
   const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
@@ -59,7 +68,7 @@ export function HelpChatbot() {
     }
 
     const token = storage.get<string | null>(STORAGE_KEYS.token, null);
-    const user = storage.get<any>(STORAGE_KEYS.currentUser, null);
+    const user = storage.get<StoredUser | null>(STORAGE_KEYS.currentUser, null);
     const email = user?.email || null;
     setCurrentUserEmail(email);
 
@@ -83,13 +92,17 @@ export function HelpChatbot() {
   useEffect(() => {
     const handleOpen = () => setIsOpen(true);
     window.addEventListener("open-payent-help-chat", handleOpen);
-    return () => window.removeEventListener("open-payent-help-chat", handleOpen);
+    return () =>
+      window.removeEventListener("open-payent-help-chat", handleOpen);
   }, []);
 
   // Account switching / logout safety: clear conversation when authentication state changes
   useEffect(() => {
     const checkAuthChange = () => {
-      const user = storage.get<any>(STORAGE_KEYS.currentUser, null);
+      const user = storage.get<StoredUser | null>(
+        STORAGE_KEYS.currentUser,
+        null,
+      );
       const email = user?.email || null;
       if (email !== currentUserEmail) {
         setCurrentUserEmail(email);
@@ -127,7 +140,7 @@ export function HelpChatbot() {
   }, [messages, isTyping, isOpen]);
 
   const handleSend = useCallback(
-    async (textToSend: string) => {
+    async (textToSend: string, action?: string) => {
       const cleanText = textToSend.trim();
       if (!cleanText || isTyping) return;
 
@@ -148,11 +161,15 @@ export function HelpChatbot() {
           message: cleanText,
           session_id: sessionId,
           conversation_id: conversationId || undefined,
+          action,
         });
 
         if (response.conversation_id) {
           setConversationId(response.conversation_id);
-          sessionStorage.setItem("payent_agent_conv_id", response.conversation_id);
+          sessionStorage.setItem(
+            "payent_agent_conv_id",
+            response.conversation_id,
+          );
         }
 
         const botMsg: ChatMessage = {
@@ -173,7 +190,7 @@ export function HelpChatbot() {
         if (response.suggestions && response.suggestions.length > 0) {
           setActiveSuggestions(response.suggestions);
         }
-      } catch (err: any) {
+      } catch {
         const errMsg: ChatMessage = {
           id: `err_${Date.now()}`,
           sender: "bot",
@@ -184,12 +201,16 @@ export function HelpChatbot() {
           suggestions: ["Try Again", "Help Center", "Talk to Human Support"],
         };
         setMessages((prev) => [...prev, errMsg]);
-        setActiveSuggestions(["Try Again", "Help Center", "Talk to Human Support"]);
+        setActiveSuggestions([
+          "Try Again",
+          "Help Center",
+          "Talk to Human Support",
+        ]);
       } finally {
         setIsTyping(false);
       }
     },
-    [conversationId, isTyping, sessionId]
+    [conversationId, isTyping, sessionId],
   );
 
   return (
@@ -221,9 +242,9 @@ export function HelpChatbot() {
               exit={{ rotate: 90, opacity: 0 }}
               className="relative flex items-center justify-center"
             >
-              <PayentAgentIcon size={30} />
+              <PayentAgentIcon size={28} />
               <span
-                className="absolute -top-1 -right-1 flex h-2.5 w-2.5 rounded-full bg-white border-2 border-[#17191C]"
+                className="absolute -top-0.5 -right-0.5 flex h-2 w-2 rounded-full bg-white border-[1.5px] border-[#17191C]"
                 aria-hidden="true"
               />
             </motion.div>
@@ -231,34 +252,28 @@ export function HelpChatbot() {
         </AnimatePresence>
       </motion.button>
 
-      {/* Floating Chat Window */}
+      {/* Floating Chat Window (Desktop Floating, Mobile Viewport-Fitted) */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.97 }}
+            initial={{ opacity: 0, y: 16, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.97 }}
+            exit={{ opacity: 0, y: 16, scale: 0.98 }}
             transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-            className="fixed inset-x-3 bottom-3 sm:inset-auto sm:bottom-24 sm:right-6 z-50 w-auto sm:w-[420px] max-w-[calc(100vw-1.5rem)] h-[calc(100dvh-1.5rem)] sm:h-[620px] max-h-[calc(100vh-6.5rem)] rounded-2xl bg-white border border-[#E1E4E8] shadow-[0_24px_64px_-12px_rgba(23,25,28,0.28)] flex flex-col overflow-hidden"
+            className="fixed inset-0 sm:inset-auto sm:bottom-24 sm:right-6 z-50 w-full sm:w-[410px] max-w-full sm:max-w-[calc(100vw-2rem)] h-full sm:h-[600px] max-h-full sm:max-h-[calc(100vh-7rem)] rounded-none sm:rounded-2xl bg-white border-0 sm:border sm:border-[#E1E4E8] shadow-none sm:shadow-[0_20px_50px_rgba(23,25,28,0.22),0_1px_3px_rgba(23,25,28,0.06)] flex flex-col overflow-hidden pt-[env(safe-area-inset-top,0px)] pb-[env(safe-area-inset-bottom,0px)]"
           >
-            {/* Header: Monochrome Dark Charcoal (#17191C) with Custom P Symbol & Payent Agent */}
-            <div className="px-4 py-3.5 bg-[#17191C] text-white flex items-center justify-between border-b border-white/10 shrink-0">
+            {/* Header: Pure Minimal Editorial Header */}
+            <div className="px-4 py-3 bg-[#17191C] text-white flex items-center justify-between border-b border-[#252930] shrink-0 h-[52px]">
               <div className="flex items-center gap-2.5 min-w-0">
-                <PayentAgentIcon size={26} />
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <span className="font-semibold text-sm text-white tracking-tight truncate">
-                    Payent Agent
-                  </span>
-                  <span
-                    className="inline-block h-1.5 w-1.5 rounded-full bg-neutral-300"
-                    aria-hidden="true"
-                  />
-                </div>
+                <PayentAgentIcon size={24} />
+                <span className="font-semibold text-sm text-white tracking-tight truncate">
+                  Payent Agent
+                </span>
               </div>
               <button
                 onClick={() => setIsOpen(false)}
-                className="hover:bg-white/10 p-2 rounded-lg transition-colors text-white/80 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white cursor-pointer"
-                aria-label="Close Chat"
+                className="hover:bg-white/10 p-1.5 rounded-lg transition-colors text-white/70 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white cursor-pointer"
+                aria-label="Close Payent Agent"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -289,9 +304,13 @@ export function HelpChatbot() {
                     requiresAuth={m.requiresAuth}
                     requiresConfirmation={m.requiresConfirmation}
                     isError={m.isError}
+                    isSubmitting={isTyping}
                     lastUserQuery={m.lastUserQuery}
                     onRetry={(query) => handleSend(query)}
                     onCloseChat={() => setIsOpen(false)}
+                    onConfirmEscalation={() => handleSend("Yes, connect me", "confirm_escalation")}
+                    onCancelEscalation={() => handleSend("No, I'll rephrase", "cancel_escalation")}
+                    onSelectAction={(action, act) => handleSend(action, act)}
                   />
                 );
               })}
@@ -304,7 +323,7 @@ export function HelpChatbot() {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Suggested Prompt Buttons (Refined Geometric Micro-Actions) */}
+            {/* Suggested Prompt Buttons */}
             <SuggestedPrompts
               suggestions={activeSuggestions}
               onSelect={(prompt) => handleSend(prompt)}

@@ -15,7 +15,7 @@ export function SuggestedPrompts({
   if (!suggestions || suggestions.length === 0) return null;
 
   return (
-    <div className="px-3.5 py-2 bg-gradient-to-t from-white via-white to-[#F5F6F8]/50 border-t border-[#E1E4E8]/80 flex items-center gap-1.5 overflow-x-auto no-scrollbar scroll-smooth shrink-0">
+    <div className="px-3.5 py-2.5 bg-[#FAFAFB] border-t border-[#E1E4E8] flex items-center gap-1.5 overflow-x-auto no-scrollbar scroll-smooth shrink-0">
       {suggestions.map((suggestion, sIdx) => {
         const isConfirm =
           suggestion.toLowerCase().includes("confirm") ||
@@ -30,8 +30,8 @@ export function SuggestedPrompts({
             onClick={() => onSelect(suggestion)}
             className={`group inline-flex items-center gap-1 text-[11.5px] px-3 py-1.5 rounded-lg border transition-all text-left font-medium select-none cursor-pointer whitespace-nowrap shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${
               isConfirm
-                ? "bg-[#16A36A]/10 border-[#16A36A]/35 text-[#16A36A] hover:bg-[#16A36A]/20 active:scale-[0.97] font-semibold"
-                : "bg-white border-[#E1E4E8] text-[#252930] hover:text-[#17191C] hover:border-[#17191C]/40 hover:bg-[#F5F6F8] active:scale-[0.97] shadow-[0_1px_2px_rgba(0,0,0,0.02)]"
+                ? "bg-[#16A36A]/8 border-[#16A36A]/30 text-[#16A36A] hover:bg-[#16A36A]/16 active:scale-[0.98] font-semibold"
+                : "bg-white border-[#E1E4E8] text-[#252930] hover:text-[#17191C] hover:border-[#17191C]/35 hover:bg-[#F5F6F8] active:scale-[0.98] shadow-2xs"
             }`}
           >
             <span>{suggestion}</span>

@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/utils/api";
 import { storage, STORAGE_KEYS } from "@/utils/storage";
+import { isUserOwnProduct } from "@/utils/productFilters";
 import type { Product } from "@/types";
 import {
   RentalProductCard,
@@ -53,6 +54,7 @@ function writeRecentlyViewedCache(
 export function RecentlyViewed() {
   const { user } = useAuth();
   const userEmail = user?.email ? user.email.toLowerCase().trim() : null;
+  const userId = user?.id ? String(user.id).trim() : null;
   const [products, setProducts] = useState<Product[]>([]);
   const [loaded, setLoaded] = useState<boolean>(false);
   const [knownEmpty, setKnownEmpty] = useState<boolean>(false);
@@ -74,13 +76,24 @@ export function RecentlyViewed() {
     }
 
     let active = true;
+
+    // Immediately filter out any products belonging to current user on account switch
+    setProducts((prev) =>
+      Array.isArray(prev)
+        ? prev.filter((p: Product) => p && !isUserOwnProduct(p, user))
+        : [],
+    );
+
     const token = storage.get<string | null>(STORAGE_KEYS.token, null);
     const cacheKey = getRecentlyViewedCacheKey(userEmail);
     const cached = readRecentlyViewedCache(cacheKey);
 
     if (cached && cached.items.length > 0) {
-      setProducts(cached.items.slice(0, 8));
-      setKnownEmpty(false);
+      const filtered = cached.items.filter(
+        (p: Product) => p && !isUserOwnProduct(p, user),
+      );
+      setProducts(filtered.slice(0, 8));
+      setKnownEmpty(filtered.length === 0);
       setLoaded(true);
     } else if (cached?.empty) {
       setProducts([]);
@@ -95,7 +108,11 @@ export function RecentlyViewed() {
       .getRecentlyViewed(token, userEmail)
       .then((items) => {
         if (!active) return;
-        const normalized = Array.isArray(items) ? items.slice(0, 8) : [];
+        const normalized = Array.isArray(items)
+          ? items
+              .filter((p: Product) => p && !isUserOwnProduct(p, user))
+              .slice(0, 8)
+          : [];
         setProducts(normalized);
         setKnownEmpty(normalized.length === 0);
         setLoaded(true);
@@ -115,7 +132,8 @@ export function RecentlyViewed() {
     return () => {
       active = false;
     };
-  }, [userEmail]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userEmail, userId]);
 
   // Hide completely for logged-out users or confirmed empty history
   if (!user || knownEmpty || (loaded && products.length === 0)) {

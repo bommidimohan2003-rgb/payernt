@@ -46,7 +46,7 @@ export function ChatInput({
       onSubmit={handleSubmit}
       className="p-3 sm:p-3.5 bg-white border-t border-[#E1E4E8] shrink-0"
     >
-      <div className="relative flex items-center rounded-xl bg-[#F5F6F8] border border-[#E1E4E8] focus-within:border-[#17191C] focus-within:bg-white focus-within:ring-2 focus-within:ring-[#17191C]/8 transition-all p-1">
+      <div className="relative flex items-center rounded-xl bg-[#F5F6F8] border border-[#E1E4E8] focus-within:border-[#17191C] focus-within:bg-white focus-within:ring-2 focus-within:ring-[#17191C]/6 transition-all p-1">
         <input
           ref={inputRef}
           type="text"
@@ -56,8 +56,8 @@ export function ChatInput({
           placeholder="Ask in English or Telugu (T-English)..."
           disabled={disabled}
           maxLength={2000}
-          className="flex-1 bg-transparent px-3 py-1 text-[13.5px] text-[#252930] placeholder:text-[#707780] focus:outline-none transition-colors"
-          aria-label="Ask Payent Agent"
+          className="flex-1 bg-transparent px-3 py-1.5 text-[13.5px] text-[#252930] placeholder:text-[#707780] focus:outline-none transition-colors"
+          aria-label="Ask in English or Telugu (T-English)..."
         />
 
         <button
@@ -66,7 +66,7 @@ export function ChatInput({
           className={`shrink-0 h-8 w-8 rounded-lg flex items-center justify-center transition-all ${
             canSend
               ? "bg-[#17191C] text-white hover:bg-[#252930] active:scale-95 cursor-pointer shadow-2xs"
-              : "bg-[#17191C]/25 text-white/60 cursor-not-allowed"
+              : "bg-[#17191C]/15 text-white/40 cursor-not-allowed"
           }`}
           aria-label="Send message"
         >
