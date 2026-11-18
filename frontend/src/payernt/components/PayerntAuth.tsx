@@ -382,7 +382,7 @@ export function PayerntAuth({
               </div>
 
               {/* Form Content Switched by Mode */}
-              <AnimatePresence mode="wait">
+              <AnimatePresence mode="wait" initial={false}>
                 {mode === "login" ? (
                   <motion.div
                     key="payernt-login"
