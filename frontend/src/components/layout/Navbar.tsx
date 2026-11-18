@@ -160,14 +160,14 @@ export function Navbar() {
           {/* 3. Controls: Cart Button, Theme Toggle, Profile / Login */}
           <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
 
-            {/* Rental Cart Button with real-time numeric badge (>= 44x44px touch target on mobile) */}
+            {/* Rental Cart Button with real-time numeric badge (hidden on mobile, visible on desktop md+) */}
             {!isAuthPage && (
               <Link
                 to="/cart"
                 id="nav-cart-btn"
                 aria-label={`Rental Cart${cartCount > 0 ? `, ${cartCount} item${cartCount > 1 ? "s" : ""}` : ""}`}
                 title="View Rental Cart"
-                className="relative h-11 w-11 sm:h-10 sm:w-10 rounded-full border border-neutral-300 dark:border-neutral-700 hover:border-neutral-950 dark:hover:border-white bg-transparent hover:bg-neutral-100 dark:hover:bg-[#262626] text-neutral-800 dark:text-neutral-200 flex items-center justify-center transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white shrink-0"
+                className="relative h-11 w-11 sm:h-10 sm:w-10 rounded-full border border-neutral-300 dark:border-neutral-700 hover:border-neutral-950 dark:hover:border-white bg-transparent hover:bg-neutral-100 dark:hover:bg-[#262626] text-neutral-800 dark:text-neutral-200 hidden md:flex items-center justify-center transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white shrink-0"
               >
                 <ShoppingCart className="h-4 w-4 stroke-[1.75]" aria-hidden="true" />
                 {mounted && cartCount > 0 && (
@@ -181,14 +181,14 @@ export function Navbar() {
               </Link>
             )}
 
-            {/* Quick Monochrome Theme Toggle (>= 44x44px touch target on mobile) */}
+            {/* Quick Monochrome Theme Toggle (hidden on mobile, visible on desktop md+) */}
             {mounted && (
               <button
                 type="button"
                 onClick={toggle}
                 aria-label={theme === "dark" ? "Switch to Light Theme" : "Switch to Dark Theme"}
                 title={theme === "dark" ? "Switch to Light Theme" : "Switch to Dark Theme"}
-                className="h-11 w-11 sm:h-10 sm:w-10 rounded-full border border-neutral-300 dark:border-neutral-700 hover:border-neutral-950 dark:hover:border-white bg-transparent hover:bg-neutral-100 dark:hover:bg-[#262626] text-neutral-800 dark:text-neutral-200 flex items-center justify-center transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
+                className="h-11 w-11 sm:h-10 sm:w-10 rounded-full border border-neutral-300 dark:border-neutral-700 hover:border-neutral-950 dark:hover:border-white bg-transparent hover:bg-neutral-100 dark:hover:bg-[#262626] text-neutral-800 dark:text-neutral-200 hidden md:flex items-center justify-center transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
               >
                 {theme === "dark" ? (
                   <Sun className="h-4 w-4 stroke-[1.75]" aria-hidden="true" />

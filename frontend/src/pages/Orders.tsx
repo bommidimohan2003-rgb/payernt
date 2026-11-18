@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef, useContext } from "react";
 import { toast } from "sonner";
 import {
   Package,
@@ -35,6 +35,7 @@ import {
   RefreshCw,
   FileText,
   Loader2,
+  ShoppingCart,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/common/Button";
@@ -43,7 +44,8 @@ import { STORAGE_KEYS, storage } from "@/utils/storage";
 import { api } from "@/utils/api";
 import type { Order } from "@/types";
 import { LoadingState, ErrorState, EmptyState } from "@/components/states";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, Link } from "@tanstack/react-router";
+import { CartContext } from "@/hooks/useCart";
 import { getOptimizedImageUrl } from "@/utils/images";
 import { SecretPinDisplay } from "@/components/common/SecretPinDisplay";
 import { LiveRentalQueue } from "@/components/rental/LiveRentalQueue";
@@ -384,6 +386,8 @@ function BookingProgressTracker({ status, isCancelled }: { status: string; isCan
 }
 
 export default function Orders() {
+  const cartCtx = useContext(CartContext);
+  const cartCount = cartCtx?.cartCount || 0;
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setErrorState] = useState<string | null>(null);
@@ -918,9 +922,28 @@ export default function Orders() {
             <span>Back</span>
           </button>
 
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 text-xs font-medium">
-            <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
-            <span>100% Escrow Protected • Zero-Risk Guarantee</span>
+          <div className="flex items-center gap-2">
+            {/* Quick Cart button on mobile header row */}
+            <Link
+              to="/cart"
+              id="orders-top-cart-btn"
+              aria-label={`Rental Cart${cartCount > 0 ? `, ${cartCount} items` : ""}`}
+              className="sm:hidden inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-neutral-200/90 dark:border-white/10 bg-white dark:bg-[#1E1E1E] hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-800 dark:text-neutral-200 text-xs font-medium transition-colors cursor-pointer shadow-xs"
+            >
+              <ShoppingCart className="h-3.5 w-3.5" />
+              <span>Cart</span>
+              {cartCount > 0 && (
+                <span className="flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 text-[9px] font-bold leading-none">
+                  {cartCount > 99 ? "99+" : cartCount}
+                </span>
+              )}
+            </Link>
+
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 text-xs font-medium">
+              <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+              <span className="hidden xs:inline">100% Escrow Protected • Zero-Risk Guarantee</span>
+              <span className="xs:hidden">Escrow Protected</span>
+            </div>
           </div>
         </div>
 
@@ -941,14 +964,32 @@ export default function Orders() {
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => navigate({ to: "/categories" })}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-neutral-200/90 dark:border-white/10 bg-white dark:bg-white/5 hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-800 dark:text-white text-xs font-medium transition-colors shrink-0 w-fit cursor-pointer shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
-          >
-            <Store className="h-3.5 w-3.5 stroke-[1.75]" />
-            <span>Browse Marketplace</span>
-          </button>
+          <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+            {/* Rental Cart Button with live count */}
+            <Link
+              to="/cart"
+              id="orders-cart-btn"
+              aria-label={`Rental Cart${cartCount > 0 ? `, ${cartCount} items` : ""}`}
+              className="relative inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl border border-neutral-300 dark:border-white/15 bg-white dark:bg-[#1E1E1E] hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-900 dark:text-white text-xs font-semibold transition-colors shrink-0 cursor-pointer shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
+            >
+              <ShoppingCart className="h-3.5 w-3.5 stroke-[1.75]" />
+              <span>Rental Cart</span>
+              {cartCount > 0 && (
+                <span className="flex h-4.5 min-w-[18px] px-1 items-center justify-center rounded-full bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 text-[10px] font-bold leading-none shadow-xs border border-white dark:border-[#1E1E1E]">
+                  {cartCount > 99 ? "99+" : cartCount}
+                </span>
+              )}
+            </Link>
+
+            <button
+              type="button"
+              onClick={() => navigate({ to: "/categories" })}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-neutral-200/90 dark:border-white/10 bg-white dark:bg-white/5 hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-800 dark:text-white text-xs font-medium transition-colors shrink-0 w-fit cursor-pointer shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
+            >
+              <Store className="h-3.5 w-3.5 stroke-[1.75]" />
+              <span>Browse Marketplace</span>
+            </button>
+          </div>
         </div>
 
         {/* Four Summary KPI Metric Cards (Compact Monochrome Surface + Crisp Active Ring) */}

@@ -33,6 +33,8 @@ import {
   EyeOff,
   ExternalLink,
   RefreshCw,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { useCallback, useEffect, useState, useRef } from "react";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
@@ -40,6 +42,7 @@ import { BackButton } from "@/components/common/BackButton";
 import { Button } from "@/components/common/Button";
 import { Input } from "@/components/common/Input";
 import { useAuth } from "@/hooks/useAuth";
+import { useTheme } from "@/hooks/useTheme";
 import { toast } from "sonner";
 import { api } from "@/utils/api";
 import { storage, STORAGE_KEYS } from "@/utils/storage";
@@ -51,6 +54,7 @@ import { cn } from "@/lib/utils";
 
 export default function Profile() {
   const { user, ready, updateUser, logout, logoutAll, getSessions, revokeSession } = useAuth();
+  const { theme, themeMode, setThemeMode, toggle: toggleTheme } = useTheme();
   const navigate = useNavigate();
 
   const [isPhotoModalOpen, setIsPhotoModalOpen] = useState(false);
@@ -497,13 +501,37 @@ export default function Profile() {
             </div>
           </div>
 
-          <Button
-            onClick={saveProfile}
-            className="min-h-[42px] bg-neutral-950 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-200 font-semibold text-xs px-5 py-2.5 rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 self-start md:self-auto cursor-pointer"
-          >
-            <Save className="h-4 w-4" aria-hidden="true" />
-            <span>Save Profile Changes</span>
-          </Button>
+          <div className="flex items-center gap-2.5 self-start md:self-auto flex-wrap">
+            {/* Quick Monochrome / Color Theme Switcher */}
+            <button
+              type="button"
+              onClick={toggleTheme}
+              id="profile-theme-toggle-btn"
+              aria-label={theme === "dark" ? "Switch to Light Theme" : "Switch to Dark Theme"}
+              title={theme === "dark" ? "Switch to Light Theme" : "Switch to Dark Theme"}
+              className="min-h-[42px] px-3.5 py-2 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-[#1E1E1E] hover:bg-neutral-100 dark:hover:bg-[#262626] text-neutral-900 dark:text-neutral-100 text-xs font-semibold flex items-center gap-2 shadow-xs transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
+            >
+              {theme === "dark" ? (
+                <>
+                  <Sun className="h-4 w-4 text-amber-500" aria-hidden="true" />
+                  <span>Light Mode</span>
+                </>
+              ) : (
+                <>
+                  <Moon className="h-4 w-4 text-indigo-400" aria-hidden="true" />
+                  <span>Dark Mode</span>
+                </>
+              )}
+            </button>
+
+            <Button
+              onClick={saveProfile}
+              className="min-h-[42px] bg-neutral-950 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-200 font-semibold text-xs px-5 py-2.5 rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Save className="h-4 w-4" aria-hidden="true" />
+              <span>Save Profile Changes</span>
+            </Button>
+          </div>
         </div>
 
         {/* Profile Overview Surface (Monochrome — zero overlapping -mt-16 occlusion) */}
@@ -718,6 +746,71 @@ export default function Profile() {
               </div>
             </div>
           )}
+        </div>
+
+        {/* Theme & Display Appearance Preferences Card */}
+        <div className="rounded-2xl sm:rounded-3xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#1E1E1E] p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700/80 flex items-center justify-center text-neutral-800 dark:text-neutral-200 shrink-0">
+              {theme === "dark" ? (
+                <Moon className="h-5 w-5 text-indigo-400" aria-hidden="true" />
+              ) : (
+                <Sun className="h-5 w-5 text-amber-500" aria-hidden="true" />
+              )}
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold text-neutral-950 dark:text-white">
+                Display &amp; Theme Appearance
+              </h2>
+              <p className="text-xs text-neutral-600 dark:text-neutral-400">
+                Active theme: <strong className="font-semibold text-neutral-950 dark:text-white capitalize">{theme} Mode</strong> ({themeMode} preference).
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+            <button
+              type="button"
+              onClick={() => setThemeMode("light")}
+              className={cn(
+                "min-h-[38px] px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer border",
+                themeMode === "light"
+                  ? "bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 border-neutral-950 dark:border-white shadow-xs"
+                  : "bg-neutral-100 dark:bg-[#262626] text-neutral-700 dark:text-neutral-300 border-transparent hover:bg-neutral-200 dark:hover:bg-[#2E2E2E]"
+              )}
+            >
+              <Sun className="h-3.5 w-3.5 text-amber-500" aria-hidden="true" />
+              <span>Light</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setThemeMode("dark")}
+              className={cn(
+                "min-h-[38px] px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer border",
+                themeMode === "dark"
+                  ? "bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 border-neutral-950 dark:border-white shadow-xs"
+                  : "bg-neutral-100 dark:bg-[#262626] text-neutral-700 dark:text-neutral-300 border-transparent hover:bg-neutral-200 dark:hover:bg-[#2E2E2E]"
+              )}
+            >
+              <Moon className="h-3.5 w-3.5 text-indigo-400" aria-hidden="true" />
+              <span>Dark</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setThemeMode("system")}
+              className={cn(
+                "min-h-[38px] px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer border",
+                themeMode === "system"
+                  ? "bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 border-neutral-950 dark:border-white shadow-xs"
+                  : "bg-neutral-100 dark:bg-[#262626] text-neutral-700 dark:text-neutral-300 border-transparent hover:bg-neutral-200 dark:hover:bg-[#2E2E2E]"
+              )}
+            >
+              <Laptop className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>System</span>
+            </button>
+          </div>
         </div>
 
         {/* Section Navigation Tabs */}
