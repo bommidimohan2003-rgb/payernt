@@ -42,8 +42,16 @@ export default function Support() {
       const data = await notificationsService.getSupportTickets();
       setTickets(data);
 
-      if (data.length > 0 && !selectedTicket) {
-        setSelectedTicket(data[0]);
+      const urlParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+      const targetId = urlParams?.get("id") || urlParams?.get("ticket");
+
+      if (data.length > 0) {
+        if (targetId) {
+          const match = data.find((t) => t.id === targetId);
+          setSelectedTicket(match || data[0]);
+        } else if (!selectedTicket) {
+          setSelectedTicket(data[0]);
+        }
       }
     } catch (err) {
       console.error(err);
@@ -101,6 +109,8 @@ export default function Support() {
     }
   };
 
+  const [priorityFilter, setPriorityFilter] = useState("all");
+
   const filteredTickets = useMemo(() => {
     let result = [...tickets];
 
@@ -108,10 +118,13 @@ export default function Support() {
       const q = search.toLowerCase();
       result = result.filter(
         (t) =>
+          (t.id && t.id.toLowerCase().includes(q)) ||
           (t.subject && t.subject.toLowerCase().includes(q)) ||
           (t.userName && t.userName.toLowerCase().includes(q)) ||
           (t.userEmail && t.userEmail.toLowerCase().includes(q)) ||
-          (t.category && t.category.toLowerCase().includes(q))
+          (t.category && t.category.toLowerCase().includes(q)) ||
+          (t.originalInquiry && t.originalInquiry.toLowerCase().includes(q)) ||
+          (t.description && t.description.toLowerCase().includes(q))
       );
     }
 
@@ -119,10 +132,12 @@ export default function Support() {
       result = result.filter((t) => t.status === statusFilter);
     }
 
-    return result;
-  }, [tickets, search, statusFilter]);
+    if (priorityFilter !== "all") {
+      result = result.filter((t) => (t.priority || "").toLowerCase() === priorityFilter.toLowerCase());
+    }
 
-  const [priorityFilter, setPriorityFilter] = useState("all");
+    return result;
+  }, [tickets, search, statusFilter, priorityFilter]);
 
   const tabCounts = useMemo(() => {
     return {
@@ -274,13 +289,23 @@ export default function Support() {
             ) : (
               filteredTickets.map((t) => {
                 const isSelected = selectedTicket?.id === t.id;
+                const firstMsg = t.messages && t.messages.length > 0 ? t.messages[0] : null;
+                const preview =
+                  t.originalInquiry ||
+                  firstMsg?.originalInquiry ||
+                  (firstMsg?.message || firstMsg?.content || t.description || "")
+                    .split("\n")[0]
+                    .replace(/^Original user inquiry:\s*/i, "")
+                    .trim();
                 return (
                   <div
                     key={t.id}
                     onClick={() => setSelectedTicket(t)}
                     className={cn(
-                      "p-3.5 cursor-pointer transition-colors text-xs space-y-1 relative",
-                      isSelected ? "bg-white/[0.04] before:absolute before:left-0 before:top-2 before:bottom-2 before:w-0.5 before:bg-white" : "hover:bg-white/[0.02]"
+                      "p-3.5 cursor-pointer transition-colors text-xs space-y-1.5 relative",
+                      isSelected
+                        ? "bg-white/[0.04] before:absolute before:left-0 before:top-2 before:bottom-2 before:w-0.5 before:bg-white"
+                        : "hover:bg-white/[0.02]"
                     )}
                   >
                     <div className="flex items-center justify-between">
@@ -299,7 +324,16 @@ export default function Support() {
                       </span>
                     </div>
 
-                    <p className="text-[11px] text-[#A1A1AA] truncate">{t.userName} ({t.userEmail})</p>
+                    <p className="text-[11px] text-[#A1A1AA] truncate">
+                      {t.userName} ({t.userEmail})
+                    </p>
+
+                    {preview && (
+                      <p className="text-[11px] text-[#D4D4D8] truncate font-medium">
+                        <span className="text-[#71717A]">Preview: </span>
+                        "{preview}"
+                      </p>
+                    )}
 
                     <div className="flex items-center justify-between text-[10px] text-[#A1A1AA] font-mono">
                       <span>{t.category || "General"}</span>
@@ -315,88 +349,185 @@ export default function Support() {
         {/* TICKET CONVERSATION THREAD */}
         <div className="lg:col-span-2 bg-[#10151B] rounded-xl border border-[rgba(161,161,170,0.18)] flex flex-col h-[650px] overflow-hidden">
           {selectedTicket ? (
-            <>
-              {/* Thread Header */}
-              <div className="p-4 border-b border-[rgba(161,161,170,0.18)] bg-[#0B1015] flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-bold text-[#F5F5F5]">{selectedTicket.subject}</h3>
-                  <p className="text-xs text-[#A1A1AA] mt-0.5">
-                    From: <span className="font-medium text-[#F5F5F5]">{selectedTicket.userName}</span> ({selectedTicket.userEmail})
-                  </p>
-                </div>
+            (() => {
+              const firstMsg =
+                selectedTicket.messages && selectedTicket.messages.length > 0
+                  ? selectedTicket.messages[0]
+                  : null;
 
-                <div className="flex items-center gap-1.5">
-                  {selectedTicket.status === "resolved" && (
-                    <button
-                      type="button"
-                      onClick={handleSuggestKnowledge}
-                      disabled={suggestingKnowledge}
-                      title="Suggest this resolved support thread as a draft knowledge article"
-                      className="px-2.5 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-semibold flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-colors"
-                    >
-                      <Sparkles className="h-3.5 w-3.5" />
-                      <span>{suggestingKnowledge ? "Suggesting..." : "Suggest as Knowledge"}</span>
-                    </button>
-                  )}
-                  <select
-                    value={selectedTicket.status}
-                    onChange={(e) => handleUpdateStatus(e.target.value as AdminSupportTicket["status"])}
-                    className="bg-[#050709] text-[#F5F5F5] text-xs rounded-lg px-2.5 py-1.5 border border-[rgba(161,161,170,0.18)] font-medium uppercase cursor-pointer"
-                  >
-                    <option value="open">Open</option>
-                    <option value="pending">In Progress</option>
-                    <option value="resolved">Resolved</option>
-                    <option value="closed">Closed</option>
-                  </select>
-                </div>
-              </div>
+              const originalInquiryText =
+                selectedTicket.originalInquiry ||
+                firstMsg?.originalInquiry ||
+                (selectedTicket.description && selectedTicket.description.includes("Original user inquiry:")
+                  ? selectedTicket.description
+                      .split("Original user inquiry:")[1]
+                      .split("Escalation reason:")[0]
+                      .trim()
+                  : selectedTicket.description) ||
+                (firstMsg && (firstMsg.message || firstMsg.content || "").includes("Original user inquiry:")
+                  ? (firstMsg.message || firstMsg.content || "")
+                      .split("Original user inquiry:")[1]
+                      .split("Escalation reason:")[0]
+                      .trim()
+                  : firstMsg?.message || firstMsg?.content || "");
 
-              {/* Message History */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-3 text-xs">
-                {selectedTicket.messages && selectedTicket.messages.length > 0 ? (
-                  selectedTicket.messages.map((m) => (
-                    <div
-                      key={m.id}
-                      className={cn(
-                        "p-3 rounded-lg max-w-lg space-y-1 leading-relaxed",
-                        m.sender === "admin"
-                          ? "ml-auto bg-secondary text-foreground font-medium border border-border/70"
-                          : "bg-secondary/40 border border-border/50 text-foreground"
-                      )}
-                    >
-                      <div className="flex items-center justify-between text-[10px] font-medium opacity-75">
-                        <span>{m.sender === "admin" ? "Support Admin" : selectedTicket.userName}</span>
-                        <span>{m.createdAt ? new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}</span>
+              const contextItems =
+                selectedTicket.conversationContext && selectedTicket.conversationContext.length > 0
+                  ? selectedTicket.conversationContext
+                  : firstMsg?.conversationContext && firstMsg.conversationContext.length > 0
+                  ? firstMsg.conversationContext
+                  : [];
+
+              return (
+                <>
+                  {/* Thread Header */}
+                  <div className="p-4 border-b border-[rgba(161,161,170,0.18)] bg-[#0B1015] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="text-sm font-bold text-[#F5F5F5]">{selectedTicket.subject}</h3>
+                        <span className="font-mono text-[10px] text-[#A1A1AA] bg-white/5 px-2 py-0.5 rounded border border-[rgba(161,161,170,0.18)]">
+                          #{selectedTicket.id}
+                        </span>
                       </div>
-                      <p>{m.message}</p>
+                      <div className="flex items-center gap-2 text-xs text-[#A1A1AA] mt-1 flex-wrap">
+                        <span>
+                          Requester: <strong className="font-medium text-[#F5F5F5]">{selectedTicket.userName}</strong>
+                        </span>
+                        <span>•</span>
+                        <span>{selectedTicket.userEmail}</span>
+                        <span>•</span>
+                        <span>{selectedTicket.category || "General Help"}</span>
+                        <span>•</span>
+                        <span>Priority: <strong className="uppercase text-amber-400">{selectedTicket.priority || "medium"}</strong></span>
+                        <span>•</span>
+                        <span>{selectedTicket.createdAt ? new Date(selectedTicket.createdAt).toLocaleString() : "Recent"}</span>
+                      </div>
                     </div>
-                  ))
-                ) : (
-                  <div className="py-12 text-center text-xs text-muted-foreground">
-                    No replies sent yet in this ticket thread.
-                  </div>
-                )}
-              </div>
 
-              {/* Reply Form */}
-              <form onSubmit={handleSendReply} className="p-3 border-t border-[rgba(161,161,170,0.18)] bg-[#0B1015] flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Type an official admin response..."
-                  value={reply}
-                  onChange={(e) => setReply(e.target.value)}
-                  className="flex-1 px-3 py-2 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] text-[#F5F5F5] text-xs font-medium focus:outline-none focus:border-white/40 placeholder:text-[#A1A1AA]"
-                />
-                <button
-                  type="submit"
-                  disabled={submittingReply || !reply.trim()}
-                  className="px-3.5 py-2 rounded-lg bg-white hover:bg-neutral-200 text-black font-semibold text-xs transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
-                >
-                  <Send className="h-3.5 w-3.5" />
-                  <span>Send</span>
-                </button>
-              </form>
-            </>
+                    <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto">
+                      {selectedTicket.status === "resolved" && (
+                        <button
+                          type="button"
+                          onClick={handleSuggestKnowledge}
+                          disabled={suggestingKnowledge}
+                          title="Suggest this resolved support thread as a draft knowledge article"
+                          className="px-2.5 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-semibold flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-colors"
+                        >
+                          <Sparkles className="h-3.5 w-3.5" />
+                          <span>{suggestingKnowledge ? "Suggesting..." : "Suggest as Knowledge"}</span>
+                        </button>
+                      )}
+                      <select
+                        value={selectedTicket.status}
+                        onChange={(e) => handleUpdateStatus(e.target.value as AdminSupportTicket["status"])}
+                        className="bg-[#050709] text-[#F5F5F5] text-xs rounded-lg px-2.5 py-1.5 border border-[rgba(161,161,170,0.18)] font-medium uppercase cursor-pointer"
+                      >
+                        <option value="open">Open</option>
+                        <option value="pending">In Progress</option>
+                        <option value="resolved">Resolved</option>
+                        <option value="closed">Closed</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Dedicated Original Inquiry & Conversation Context Panel */}
+                  <div className="p-3 border-b border-[rgba(161,161,170,0.1)] bg-[#0E1318] space-y-2.5">
+                    {originalInquiryText ? (
+                      <div className="p-3 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] space-y-1">
+                        <div className="text-[10px] font-mono uppercase tracking-wider text-emerald-400 font-bold flex items-center gap-1.5">
+                          <LifeBuoy className="h-3.5 w-3.5" />
+                          <span>Original User Inquiry</span>
+                        </div>
+                        <p className="text-xs text-[#F5F5F5] font-medium leading-relaxed whitespace-pre-wrap">
+                          "{originalInquiryText}"
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="p-2.5 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] text-xs text-[#71717A] italic">
+                        Original inquiry description is unavailable for this ticket.
+                      </div>
+                    )}
+
+                    {contextItems.length > 0 && (
+                      <div className="p-3 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] space-y-1.5">
+                        <div className="text-[10px] font-mono uppercase tracking-wider text-[#A1A1AA] font-bold">
+                          Conversation Context
+                        </div>
+                        <div className="space-y-1.5 border-l-2 border-[rgba(161,161,170,0.2)] pl-2.5">
+                          {contextItems.map((c, idx) => (
+                            <div key={idx} className="text-xs space-y-0.5">
+                              <span className="font-semibold text-[#A1A1AA] text-[10px] uppercase font-mono">
+                                {c.sender}:
+                              </span>
+                              <p className="text-[#E4E4E7] whitespace-pre-wrap">{c.text}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Message History */}
+                  <div className="flex-1 overflow-y-auto p-4 space-y-3 text-xs">
+                    {selectedTicket.messages && selectedTicket.messages.length > 0 ? (
+                      selectedTicket.messages.map((m) => {
+                        const msgContent = m.message || m.content || "";
+                        const msgTime = m.createdAt || m.timestamp;
+                        const isUserSender = m.sender !== "admin" && m.senderType !== "admin";
+                        return (
+                          <div
+                            key={m.id}
+                            className={cn(
+                              "p-3 rounded-lg max-w-lg space-y-1 leading-relaxed",
+                              !isUserSender
+                                ? "ml-auto bg-secondary text-foreground font-medium border border-border/70"
+                                : "bg-secondary/40 border border-border/50 text-foreground"
+                            )}
+                          >
+                            <div className="flex items-center justify-between text-[10px] font-medium opacity-75">
+                              <span>{!isUserSender ? "Support Admin" : selectedTicket.userName}</span>
+                              <span>
+                                {msgTime
+                                  ? new Date(msgTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                                  : ""}
+                              </span>
+                            </div>
+                            <p className="whitespace-pre-wrap">
+                              {msgContent || (
+                                <span className="italic text-[#71717A]">No description content recorded.</span>
+                              )}
+                            </p>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="py-12 text-center text-xs text-muted-foreground">
+                        No replies sent yet in this ticket thread.
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Reply Form */}
+                  <form onSubmit={handleSendReply} className="p-3 border-t border-[rgba(161,161,170,0.18)] bg-[#0B1015] flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Type an official admin response..."
+                      value={reply}
+                      onChange={(e) => setReply(e.target.value)}
+                      className="flex-1 px-3 py-2 rounded-lg bg-[#050709] border border-[rgba(161,161,170,0.18)] text-[#F5F5F5] text-xs font-medium focus:outline-none focus:border-white/40 placeholder:text-[#A1A1AA]"
+                    />
+                    <button
+                      type="submit"
+                      disabled={submittingReply || !reply.trim()}
+                      className="px-3.5 py-2 rounded-lg bg-white hover:bg-neutral-200 text-black font-semibold text-xs transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                    >
+                      <Send className="h-3.5 w-3.5" />
+                      <span>Send</span>
+                    </button>
+                  </form>
+                </>
+              );
+            })()
           ) : (
             <div className="h-full flex items-center justify-center text-xs text-muted-foreground">
               Select a ticket to view thread history.

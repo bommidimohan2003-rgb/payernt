@@ -81,6 +81,10 @@ export function PayerntMobileBottomNav({
     { id: "profile", label: tCommon.profile, icon: User, path: "/payernt/profile" },
   ];
 
+  const isMoreActive =
+    isMoreOpen ||
+    moreItems.some((item) => pathname.startsWith(item.path));
+
   return (
     <>
       {/* Floating Transparent Bottom Navigation Bar - Hovering on Screen */}
@@ -134,7 +138,7 @@ export function PayerntMobileBottomNav({
               type="button"
               onClick={() => setIsMoreOpen(true)}
               className={`relative flex flex-col items-center justify-center min-h-[48px] py-1 px-1 rounded-xl transition-all cursor-pointer ${
-                isMoreOpen
+                isMoreActive
                   ? "text-neutral-950 dark:text-white"
                   : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
               }`}
@@ -142,14 +146,14 @@ export function PayerntMobileBottomNav({
             >
               <div
                 className={`flex items-center justify-center h-7 w-7 rounded-lg transition-colors ${
-                  isMoreOpen ? "bg-neutral-100 dark:bg-white/[0.12]" : ""
+                  isMoreActive ? "bg-neutral-100 dark:bg-white/[0.12]" : ""
                 }`}
               >
                 <MoreHorizontal className="h-4.5 w-4.5 stroke-[1.9]" />
               </div>
               <span
                 className={`text-[10px] tracking-tight mt-0.5 leading-none ${
-                  isMoreOpen ? "font-bold text-neutral-950 dark:text-white" : "font-medium"
+                  isMoreActive ? "font-bold text-neutral-950 dark:text-white" : "font-medium"
                 }`}
               >
                 {tCommon.more}

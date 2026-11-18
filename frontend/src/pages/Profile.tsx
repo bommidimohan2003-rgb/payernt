@@ -471,6 +471,10 @@ export default function Profile() {
   return (
     <DashboardLayout>
       <div className="space-y-8 max-w-7xl mx-auto pb-12">
+        {/* Top-left Back Navigation */}
+        <div className="flex items-center justify-start">
+          <BackButton fallback="/payent" />
+        </div>
 
         {/* Pending Approval Notice Banner */}
         {isPendingApproval && (
@@ -490,7 +494,6 @@ export default function Profile() {
         {/* Top Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <BackButton fallback="/categories" />
             <div>
               <h1 className="text-2xl sm:text-3xl font-semibold text-neutral-950 dark:text-white font-display tracking-tight">
                 Profile &amp; Identity

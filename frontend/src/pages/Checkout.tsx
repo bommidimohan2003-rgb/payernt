@@ -278,6 +278,8 @@ export default function Checkout() {
     message: string;
   } | null>(null);
   const [kycStatus, setKycStatus] = useState<string | null>(null);
+  const [checkoutConsent, setCheckoutConsent] = useState(false);
+  const [consentError, setConsentError] = useState<string | null>(null);
 
   useEffect(() => {
     const token = storage.get<string | null>(STORAGE_KEYS.token, null);
@@ -538,6 +540,15 @@ export default function Checkout() {
   const handleConfirmOrder = async (overrideWithInsurance?: boolean) => {
     if (!product) return;
     setPaymentError(null);
+    setConsentError(null);
+
+    if (!checkoutConsent) {
+      const msg = "Please review and agree to the Terms of Service, Refund Policy, and Privacy Policy before placing your order.";
+      setConsentError(msg);
+      toast.error(msg);
+      return;
+    }
+
     const token = storage.get<string | null>(STORAGE_KEYS.token, null);
 
     if (!token) {
@@ -630,6 +641,22 @@ export default function Checkout() {
       setBookingId(actualBookingId);
       setConfirmedOrder({ ...orderPayload, id: actualBookingId });
       tracker.bookingCompleted(product.id, product.category);
+
+      // Audit checkout consent in database under DPDP Act 2023
+      api.submitConsent({
+        userIdOrSession: user?.id || user?.email || "checkout_user",
+        consentType: "CHECKOUT_TERMS",
+        preferences: {
+          terms_version: "2026.1",
+          refund_policy_version: "2026.1",
+          privacy_policy_version: "2026.1",
+          with_insurance: effectiveInsurance,
+          booking_id: actualBookingId,
+          accepted_at: new Date().toISOString(),
+        },
+        userEmail: user?.email,
+      }).catch(() => {});
+
       setIsProcessing(false);
       setOpen(true);
     } catch (err: unknown) {
@@ -645,6 +672,15 @@ export default function Checkout() {
   // Razorpay Gateway Handler
   const handlePayWithRazorpay = async () => {
     setPaymentError(null);
+    setConsentError(null);
+
+    if (!checkoutConsent) {
+      const msg = "Please review and agree to the Terms of Service, Refund Policy, and Privacy Policy before proceeding to payment.";
+      setConsentError(msg);
+      toast.error(msg);
+      return;
+    }
+
     const token = storage.get<string | null>(STORAGE_KEYS.token, null);
 
     if (!token) {
@@ -966,7 +1002,9 @@ export default function Checkout() {
   return (
     <MainLayout>
       <section className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-        <BackButton fallback="/cart" className="mb-4" />
+        <div className="flex items-center justify-start mb-4">
+          <BackButton fallback="/cart" />
+        </div>
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
@@ -1826,6 +1864,61 @@ export default function Checkout() {
               </div>
             )}
 
+            {/* Explicit Statutory Consent Checkbox (Requirement 5C & CPA Dark Pattern Guidelines) */}
+            <div className="p-3.5 rounded-2xl bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-300/80 dark:border-neutral-700/80 space-y-2">
+              <label
+                htmlFor="checkout-consent-check"
+                className="flex items-start gap-2.5 text-xs cursor-pointer select-none"
+              >
+                <input
+                  id="checkout-consent-check"
+                  type="checkbox"
+                  checked={checkoutConsent}
+                  onChange={(e) => {
+                    setCheckoutConsent(e.target.checked);
+                    if (consentError) setConsentError(null);
+                  }}
+                  className="mt-0.5 h-4 w-4 rounded border-neutral-300 dark:border-neutral-700 text-primary focus:ring-primary cursor-pointer accent-neutral-950 dark:accent-white"
+                />
+                <span className="text-muted-foreground text-[11px] leading-relaxed">
+                  I agree to the{" "}
+                  <a
+                    href="/terms"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-bold text-foreground underline hover:text-primary"
+                  >
+                    Terms of Service
+                  </a>
+                  ,{" "}
+                  <a
+                    href="/refund-policy"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-bold text-foreground underline hover:text-primary"
+                  >
+                    Refund &amp; Cancellation Policy
+                  </a>
+                  , and{" "}
+                  <a
+                    href="/privacy"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-bold text-foreground underline hover:text-primary"
+                  >
+                    Privacy Policy
+                  </a>
+                  , and authorise security deposit pre-authorisation per the Cancellation Policy.{" "}
+                  <span className="text-primary font-bold">*</span>
+                </span>
+              </label>
+              {consentError && (
+                <p className="text-[11px] text-destructive font-medium pl-6.5">
+                  {consentError}
+                </p>
+              )}
+            </div>
+
             {/* PRIMARY ACTION: React Bits SlideCommit Slide-to-Confirm */}
             <div className="space-y-3">
               <SlideCommit
@@ -1833,6 +1926,7 @@ export default function Checkout() {
                 successLabel={`Order Confirmed • ₹${total.toFixed(0)} (${withInsurance ? "Insured" : "No Insurance"})`}
                 onConfirm={() => handleConfirmOrder()}
                 disabled={
+                  !checkoutConsent ||
                   isProcessing ||
                   isVerifying ||
                   categoryRestriction?.restricted ||

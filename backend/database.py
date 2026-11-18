@@ -295,6 +295,44 @@ def check_db_health() -> Tuple[bool, str]:
     except Exception as e:
         return False, str(e)
 
+# Helper to safely add column if not exists
+def add_column_safely(table: str, column_def: str):
+    try:
+        conn = get_db_connection()
+        if not conn:
+            return
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(f"ALTER TABLE {table} ADD COLUMN {column_def}")
+            conn.commit()
+        except Exception as e:
+            if hasattr(e, 'args') and len(e.args) > 0 and e.args[0] == 1060:
+                pass  # Column already exists
+            else:
+                logger.debug(f"Altering {table} for {column_def} notice: {e}")
+        finally:
+            conn.close()
+    except Exception:
+        pass
+
+# Helper to safely add index if not exists
+def add_index_safely(table: str, index_name: str, column_def: str, unique: bool = False):
+    try:
+        conn = get_db_connection()
+        if not conn:
+            return
+        try:
+            uniq_kw = "UNIQUE " if unique else ""
+            with conn.cursor() as cursor:
+                cursor.execute(f"CREATE {uniq_kw}INDEX {index_name} ON {table} ({column_def})")
+            conn.commit()
+        except Exception:
+            pass  # Index already exists or duplicate
+        finally:
+            conn.close()
+    except Exception:
+        pass
+
 _db_initialized = False
 
 def init_db(force: bool = False):
@@ -318,44 +356,6 @@ def init_db(force: bool = False):
     ensure_database_exists()
     _last_db_failure_timestamp = 0.0
     _last_pool_failure_timestamp = 0.0
-
-    # Helper to safely add column if not exists
-    def add_column_safely(table: str, column_def: str):
-        try:
-            conn = get_db_connection()
-            if not conn:
-                return
-            try:
-                with conn.cursor() as cursor:
-                    cursor.execute(f"ALTER TABLE {table} ADD COLUMN {column_def}")
-                conn.commit()
-            except Exception as e:
-                if hasattr(e, 'args') and len(e.args) > 0 and e.args[0] == 1060:
-                    pass  # Column already exists
-                else:
-                    logger.debug(f"Altering {table} for {column_def} notice: {e}")
-            finally:
-                conn.close()
-        except Exception:
-            pass
-
-    # Helper to safely add index if not exists
-    def add_index_safely(table: str, index_name: str, column_def: str, unique: bool = False):
-        try:
-            conn = get_db_connection()
-            if not conn:
-                return
-            try:
-                uniq_kw = "UNIQUE " if unique else ""
-                with conn.cursor() as cursor:
-                    cursor.execute(f"CREATE {uniq_kw}INDEX {index_name} ON {table} ({column_def})")
-                conn.commit()
-            except Exception:
-                pass  # Index already exists or duplicate
-            finally:
-                conn.close()
-        except Exception:
-            pass
 
     # Create users table
     execute_query("""
@@ -836,10 +836,12 @@ def init_db(force: bool = False):
     add_column_safely("notifications", "booking_id VARCHAR(255) NULL")
     add_column_safely("notifications", "link VARCHAR(500) NULL")
     add_column_safely("notifications", "event_key VARCHAR(255) NULL")
+    add_column_safely("notifications", "audience_role VARCHAR(20) DEFAULT 'PAYRENT'")
     add_index_safely("notifications", "idx_notif_user_read", "user_email, is_read")
     add_index_safely("notifications", "idx_notif_user_created", "user_email, created_at")
     add_index_safely("notifications", "idx_notif_event_key", "user_email, event_key")
     add_index_safely("notifications", "idx_notif_booking", "booking_id")
+    add_index_safely("notifications", "idx_notif_audience_role", "user_email, audience_role, is_read")
 
     # Create categories table
     execute_query("""
@@ -932,6 +934,23 @@ def init_db(force: bool = False):
     add_column_safely("support_tickets", "last_read_user_at VARCHAR(100)")
     add_index_safely("support_tickets", "idx_support_tickets_user_email", "user_email")
     add_index_safely("support_tickets", "idx_support_tickets_status", "status")
+
+    # Create support_ticket_messages table
+    execute_query("""
+        CREATE TABLE IF NOT EXISTS support_ticket_messages (
+            id VARCHAR(255) PRIMARY KEY,
+            ticket_id VARCHAR(255) NOT NULL,
+            sender_id VARCHAR(255) NOT NULL,
+            sender_type VARCHAR(50) NOT NULL,
+            sender_name VARCHAR(255),
+            message TEXT NOT NULL,
+            created_at VARCHAR(100) NOT NULL,
+            is_read BOOLEAN DEFAULT FALSE
+        )
+    """)
+    add_index_safely("support_ticket_messages", "idx_stm_ticket", "ticket_id")
+    add_index_safely("support_ticket_messages", "idx_stm_created", "ticket_id, created_at")
+    add_index_safely("support_ticket_messages", "idx_stm_unread", "ticket_id, is_read")
 
     # Create admin_settings table
     execute_query("""
@@ -1257,6 +1276,44 @@ def init_db(force: bool = False):
     add_index_safely("device_transfers", "idx_dt_current_owner", "current_owner_email")
     add_index_safely("device_transfers", "idx_dt_target_owner", "target_owner_email")
     add_index_safely("device_transfers", "idx_dt_status", "status")
+
+    # Consent Audit Records Table (DPDP Act 2023 / E-Commerce Rules)
+    execute_query("""
+        CREATE TABLE IF NOT EXISTS consent_records (
+            id VARCHAR(255) PRIMARY KEY,
+            user_id_or_session VARCHAR(255) NOT NULL,
+            user_email VARCHAR(255) NULL,
+            consent_type VARCHAR(100) NOT NULL,
+            preferences_json TEXT NOT NULL,
+            policy_version VARCHAR(50) NOT NULL,
+            ip_address VARCHAR(100) NULL,
+            user_agent VARCHAR(500) NULL,
+            created_at VARCHAR(100) NOT NULL,
+            updated_at VARCHAR(100) NOT NULL
+        )
+    """)
+    add_index_safely("consent_records", "idx_cr_user_session", "user_id_or_session")
+    add_index_safely("consent_records", "idx_cr_user_email", "user_email")
+    add_index_safely("consent_records", "idx_cr_consent_type", "consent_type")
+
+    # Privacy & Grievance Requests Table (DPDP Act 2023 / Consumer Protection E-Commerce 2020)
+    execute_query("""
+        CREATE TABLE IF NOT EXISTS privacy_requests (
+            id VARCHAR(255) PRIMARY KEY,
+            user_email VARCHAR(255) NOT NULL,
+            request_type VARCHAR(100) NOT NULL,
+            details TEXT NULL,
+            status VARCHAR(50) DEFAULT 'PENDING',
+            resolution_notes TEXT NULL,
+            resolved_by VARCHAR(255) NULL,
+            resolved_at VARCHAR(100) NULL,
+            created_at VARCHAR(100) NOT NULL,
+            updated_at VARCHAR(100) NOT NULL
+        )
+    """)
+    add_index_safely("privacy_requests", "idx_pr_user_email", "user_email")
+    add_index_safely("privacy_requests", "idx_pr_request_type", "request_type")
+    add_index_safely("privacy_requests", "idx_pr_status", "status")
 
     # Seed initial data if tables are empty
     conn = get_db_connection()
@@ -1827,6 +1884,8 @@ MOCK_PASSWORD_RESET_TOKENS = {}
 MOCK_DEVICES = {}
 MOCK_DEVICE_SECURITY_HISTORY = []
 MOCK_DEVICE_TRANSFERS = []
+MOCK_CONSENT_RECORDS = {}
+MOCK_PRIVACY_REQUESTS = {}
 MOCK_USER_ADDRESSES: Dict[str, Dict[str, Any]] = {}
 
 
@@ -3209,7 +3268,8 @@ def update_order_booking_location(order_id: str, caller_email: str, location_dat
                 email=lender_email,
                 title="Booking Location Updated 📍",
                 message=f"Renter updated the booking location for #{order_id} before acceptance.",
-                notif_type="booking"
+                notif_type="booking",
+                audience_role="PAYERNT"
             )
 
         broadcast_admin_event_safe("booking.location_updated", {
@@ -4049,6 +4109,7 @@ def get_all_custom_products():
     return list(MOCK_CUSTOM_PRODUCTS.values())
 
 MOCK_AGENTS = {}
+MOCK_SUPPORT_TICKET_MESSAGES: Dict[str, List[Dict[str, Any]]] = {}
 MOCK_SUPPORT_TICKETS: Dict[str, dict] = {
     "TCK-2026-001": {
         "id": "TCK-2026-001",
@@ -4075,6 +4136,321 @@ MOCK_SUPPORT_TICKETS: Dict[str, dict] = {
         ],
     }
 }
+
+def save_support_ticket_message(
+    ticket_id: str,
+    sender_id: str,
+    sender_type: str,
+    message: str,
+    sender_name: Optional[str] = None,
+    message_id: Optional[str] = None,
+    is_read: bool = False,
+    created_at: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Persists a support ticket reply to support_ticket_messages and updates support_tickets.messages.
+    Guarantees persistence in TiDB and synchronizes in-memory fallback.
+    """
+    clean_tid = (ticket_id or "").strip()
+    clean_msg = (message or "").strip()
+    clean_stype = (sender_type or "user").strip().lower()
+    clean_sid = (sender_id or "").strip().lower()
+    now_str = created_at or datetime.datetime.now(datetime.timezone.utc).isoformat()
+    msg_id = message_id or f"stm-{int(time.time() * 1000)}-{random.randint(1000, 9999)}"
+    s_name = sender_name or ("paYent Support" if clean_stype == "admin" else clean_sid.split("@")[0])
+
+    record = {
+        "id": msg_id,
+        "ticket_id": clean_tid,
+        "ticketId": clean_tid,
+        "sender_id": clean_sid,
+        "senderId": clean_sid,
+        "sender_type": clean_stype,
+        "senderType": clean_stype,
+        "sender_name": s_name,
+        "sender": s_name,
+        "message": clean_msg,
+        "content": clean_msg,
+        "created_at": now_str,
+        "createdAt": now_str,
+        "timestamp": now_str,
+        "is_read": is_read,
+        "isRead": is_read,
+        "read": is_read,
+    }
+
+    if clean_tid not in MOCK_SUPPORT_TICKET_MESSAGES:
+        MOCK_SUPPORT_TICKET_MESSAGES[clean_tid] = []
+    if not any(m["id"] == msg_id for m in MOCK_SUPPORT_TICKET_MESSAGES[clean_tid]):
+        MOCK_SUPPORT_TICKET_MESSAGES[clean_tid].append(record)
+
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    INSERT INTO support_ticket_messages 
+                    (id, ticket_id, sender_id, sender_type, sender_name, message, created_at, is_read)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """, (msg_id, clean_tid, clean_sid, clean_stype, s_name, clean_msg, now_str, is_read))
+
+                cursor.execute("SELECT messages, unread_user_count FROM support_tickets WHERE id = %s", (clean_tid,))
+                t_row = cursor.fetchone()
+                if t_row:
+                    try:
+                        raw_msgs = t_row.get("messages")
+                        msg_list = json.loads(raw_msgs) if isinstance(raw_msgs, str) else (raw_msgs or [])
+                    except Exception:
+                        msg_list = []
+                    msg_list.append({
+                        "id": msg_id,
+                        "sender": s_name,
+                        "senderType": clean_stype,
+                        "message": clean_msg,
+                        "content": clean_msg,
+                        "createdAt": now_str,
+                        "timestamp": now_str,
+                        "read": is_read,
+                    })
+                    if clean_stype == "admin":
+                        cursor.execute("""
+                            UPDATE support_tickets 
+                            SET messages = %s, updated_at = %s, unread_user_count = COALESCE(unread_user_count, 0) + 1 
+                            WHERE id = %s
+                        """, (json.dumps(msg_list), now_str, clean_tid))
+                    else:
+                        cursor.execute("""
+                            UPDATE support_tickets 
+                            SET messages = %s, updated_at = %s 
+                            WHERE id = %s
+                        """, (json.dumps(msg_list), now_str, clean_tid))
+                conn.commit()
+        except Exception as e:
+            logger.warning(f"[save_support_ticket_message] DB note: {e}")
+            raise
+        finally:
+            conn.close()
+
+    if clean_tid in MOCK_SUPPORT_TICKETS:
+        mt = MOCK_SUPPORT_TICKETS[clean_tid]
+        curr_m = mt.get("messages", [])
+        if not any(m.get("id") == msg_id for m in curr_m):
+            curr_m.append({
+                "id": msg_id,
+                "sender": s_name,
+                "senderType": clean_stype,
+                "message": clean_msg,
+                "content": clean_msg,
+                "createdAt": now_str,
+                "timestamp": now_str,
+                "read": is_read,
+            })
+            mt["messages"] = curr_m
+            mt["updated_at"] = now_str
+
+    return record
+
+
+def get_support_ticket_messages(ticket_id: str, include_internal: bool = False) -> List[Dict[str, Any]]:
+    """
+    Retrieves messages for a support ticket ordered chronologically.
+    Reads from support_ticket_messages table, with fallback to support_tickets.messages JSON.
+    Hides internal notes unless include_internal=True.
+    """
+    clean_tid = (ticket_id or "").strip()
+    if not clean_tid:
+        return []
+
+    messages = []
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT id, ticket_id, sender_id, sender_type, sender_name, message, created_at, is_read
+                    FROM support_ticket_messages
+                    WHERE ticket_id = %s
+                    ORDER BY created_at ASC
+                """, (clean_tid,))
+                rows = cursor.fetchall()
+                if rows:
+                    for r in rows:
+                        stype = (r.get("sender_type") or "user").lower()
+                        msg_text = r.get("message") or ""
+                        if not include_internal and msg_text.startswith("CONFIDENTIAL INTERNAL NOTE:"):
+                            continue
+                        messages.append({
+                            "id": r["id"],
+                            "ticketId": r["ticket_id"],
+                            "senderId": r["sender_id"],
+                            "senderType": stype,
+                            "sender": r.get("sender_name") or ("paYent Support" if stype == "admin" else "User"),
+                            "message": msg_text,
+                            "content": msg_text,
+                            "createdAt": r["created_at"],
+                            "timestamp": r["created_at"],
+                            "isRead": bool(r.get("is_read")),
+                            "read": bool(r.get("is_read")),
+                        })
+                else:
+                    cursor.execute("SELECT messages, user_name, user_email FROM support_tickets WHERE id = %s", (clean_tid,))
+                    t_row = cursor.fetchone()
+                    if t_row and t_row.get("messages"):
+                        try:
+                            raw_msgs = t_row["messages"]
+                            msg_list = json.loads(raw_msgs) if isinstance(raw_msgs, str) else (raw_msgs or [])
+                            for m in msg_list:
+                                msg_text = m.get("content") or m.get("message") or ""
+                                if not include_internal and msg_text.startswith("CONFIDENTIAL INTERNAL NOTE:"):
+                                    continue
+                                stype = (m.get("senderType") or m.get("sender_type") or ("admin" if m.get("sender") == "admin" else "user")).lower()
+                                messages.append({
+                                    "id": m.get("id") or f"msg-{clean_tid}",
+                                    "ticketId": clean_tid,
+                                    "senderId": t_row.get("user_email") if stype == "user" else "admin",
+                                    "senderType": stype,
+                                    "sender": m.get("sender") or (t_row.get("user_name") if stype == "user" else "paYent Support"),
+                                    "message": msg_text,
+                                    "content": msg_text,
+                                    "createdAt": m.get("createdAt") or m.get("timestamp") or "",
+                                    "timestamp": m.get("timestamp") or m.get("createdAt") or "",
+                                    "isRead": bool(m.get("read") or m.get("is_read")),
+                                    "read": bool(m.get("read") or m.get("is_read")),
+                                })
+                        except Exception:
+                            pass
+        except Exception as e:
+            logger.warning(f"[get_support_ticket_messages] DB note: {e}")
+        finally:
+            conn.close()
+
+    if not messages:
+        if clean_tid in MOCK_SUPPORT_TICKET_MESSAGES:
+            for r in MOCK_SUPPORT_TICKET_MESSAGES[clean_tid]:
+                msg_text = r.get("message") or r.get("content") or ""
+                if not include_internal and msg_text.startswith("CONFIDENTIAL INTERNAL NOTE:"):
+                    continue
+                messages.append(r)
+        elif clean_tid in MOCK_SUPPORT_TICKETS:
+            for m in MOCK_SUPPORT_TICKETS[clean_tid].get("messages", []):
+                msg_text = m.get("content") or m.get("message") or ""
+                if not include_internal and msg_text.startswith("CONFIDENTIAL INTERNAL NOTE:"):
+                    continue
+                stype = (m.get("senderType") or m.get("sender_type") or ("admin" if m.get("sender") == "admin" else "user")).lower()
+                messages.append({
+                    "id": m.get("id") or f"msg-{clean_tid}",
+                    "ticketId": clean_tid,
+                    "senderId": "admin" if stype == "admin" else "user",
+                    "senderType": stype,
+                    "sender": m.get("sender") or ("paYent Support" if stype == "admin" else "User"),
+                    "message": msg_text,
+                    "content": msg_text,
+                    "createdAt": m.get("createdAt") or m.get("timestamp") or "",
+                    "timestamp": m.get("timestamp") or m.get("createdAt") or "",
+                    "isRead": bool(m.get("read") or m.get("is_read")),
+                    "read": bool(m.get("read") or m.get("is_read")),
+                })
+
+    return messages
+
+
+def mark_support_ticket_messages_read(ticket_id: str, reader_type: str = "user") -> bool:
+    """
+    Marks messages as read in support_ticket_messages and updates support_tickets.
+    """
+    clean_tid = (ticket_id or "").strip()
+    now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cursor:
+                if reader_type == "user":
+                    cursor.execute("""
+                        UPDATE support_ticket_messages 
+                        SET is_read = TRUE 
+                        WHERE ticket_id = %s AND LOWER(sender_type) = 'admin'
+                    """, (clean_tid,))
+                    cursor.execute("""
+                        UPDATE support_tickets 
+                        SET unread_user_count = 0, last_read_user_at = %s 
+                        WHERE id = %s
+                    """, (now_str, clean_tid))
+                else:
+                    cursor.execute("""
+                        UPDATE support_ticket_messages 
+                        SET is_read = TRUE 
+                        WHERE ticket_id = %s AND LOWER(sender_type) = 'user'
+                    """, (clean_tid,))
+                conn.commit()
+        except Exception as e:
+            logger.warning(f"[mark_support_ticket_messages_read] DB note: {e}")
+        finally:
+            conn.close()
+
+    if clean_tid in MOCK_SUPPORT_TICKET_MESSAGES:
+        for m in MOCK_SUPPORT_TICKET_MESSAGES[clean_tid]:
+            if reader_type == "user" and m.get("sender_type") == "admin":
+                m["is_read"] = True
+                m["read"] = True
+            elif reader_type == "admin" and m.get("sender_type") == "user":
+                m["is_read"] = True
+                m["read"] = True
+
+    if clean_tid in MOCK_SUPPORT_TICKETS:
+        mt = MOCK_SUPPORT_TICKETS[clean_tid]
+        mt["unread_user_count"] = 0
+        mt["last_read_user_at"] = now_str
+        for m in mt.get("messages", []):
+            if reader_type == "user" and (m.get("senderType") == "admin" or m.get("sender") == "admin"):
+                m["read"] = True
+                m["is_read"] = True
+
+    return True
+
+
+def get_user_unread_support_count(user_email: str) -> int:
+    """
+    Returns total unread admin support messages for a user.
+    """
+    clean_email = (user_email or "").strip().lower()
+    if not clean_email:
+        return 0
+
+    count = 0
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT COALESCE(SUM(t.unread_user_count), 0) as total_unread
+                    FROM support_tickets t
+                    WHERE LOWER(t.user_email) = %s
+                """, (clean_email,))
+                row = cursor.fetchone()
+                if row and row.get("total_unread") is not None and int(row["total_unread"]) > 0:
+                    count = int(row["total_unread"])
+                else:
+                    cursor.execute("""
+                        SELECT COUNT(*) as unread_msgs
+                        FROM support_ticket_messages m
+                        JOIN support_tickets t ON m.ticket_id = t.id
+                        WHERE LOWER(t.user_email) = %s AND LOWER(m.sender_type) = 'admin' AND m.is_read = FALSE
+                    """, (clean_email,))
+                    row2 = cursor.fetchone()
+                    if row2 and row2.get("unread_msgs") is not None:
+                        count = int(row2["unread_msgs"])
+        except Exception as e:
+            logger.warning(f"[get_user_unread_support_count] DB note: {e}")
+        finally:
+            conn.close()
+
+    if count == 0:
+        for tid, t in MOCK_SUPPORT_TICKETS.items():
+            if (t.get("user_email") or "").strip().lower() == clean_email:
+                msgs = t.get("messages", [])
+                count += sum(1 for m in msgs if (m.get("senderType") == "admin" or m.get("sender") == "admin") and not m.get("read"))
+
+    return count
 
 REAL_ACCOUNTS = {
     "bommidimohan2003@gmail.com",
@@ -4393,31 +4769,54 @@ def get_payernt_account_id(email: str) -> Optional[str]:
     except Exception:
         return None
 
-def get_notifications(email: str):
+def get_notifications(email: str, role: Optional[str] = None):
     clean_email = (email or "").strip().lower()
     if not clean_email:
         return []
+    target_role = role.strip().upper() if role else "ALL"
     try:
         conn = get_db_connection()
         if conn:
             try:
                 with conn.cursor() as cursor:
-                    vendor_id = get_payernt_account_id(clean_email)
-                    if vendor_id and vendor_id != clean_email:
+                    if target_role == "PAYERNT":
+                        vendor_id = get_payernt_account_id(clean_email)
+                        if vendor_id and vendor_id != clean_email:
+                            cursor.execute("""
+                                SELECT id, user_email, title, message, type, is_read, created_at,
+                                       product_name, booking_id, link, event_key, audience_role
+                                FROM notifications
+                                WHERE user_email IN (%s, %s)
+                                  AND (audience_role = 'PAYERNT' OR audience_role = 'COMMON')
+                                ORDER BY created_at DESC
+                                LIMIT 50
+                            """, (clean_email, vendor_id))
+                        else:
+                            cursor.execute("""
+                                SELECT id, user_email, title, message, type, is_read, created_at,
+                                       product_name, booking_id, link, event_key, audience_role
+                                FROM notifications
+                                WHERE user_email = %s
+                                  AND (audience_role = 'PAYERNT' OR audience_role = 'COMMON')
+                                ORDER BY created_at DESC
+                                LIMIT 50
+                            """, (clean_email,))
+                    elif target_role == "ALL":
                         cursor.execute("""
                             SELECT id, user_email, title, message, type, is_read, created_at,
-                                   product_name, booking_id, link, event_key
-                            FROM notifications
-                            WHERE user_email IN (%s, %s)
-                            ORDER BY created_at DESC
-                            LIMIT 50
-                        """, (clean_email, vendor_id))
-                    else:
-                        cursor.execute("""
-                            SELECT id, user_email, title, message, type, is_read, created_at,
-                                   product_name, booking_id, link, event_key
+                                   product_name, booking_id, link, event_key, audience_role
                             FROM notifications
                             WHERE user_email = %s
+                            ORDER BY created_at DESC
+                            LIMIT 50
+                        """, (clean_email,))
+                    else:  # PAYRENT (Default)
+                        cursor.execute("""
+                            SELECT id, user_email, title, message, type, is_read, created_at,
+                                   product_name, booking_id, link, event_key, audience_role
+                            FROM notifications
+                            WHERE user_email = %s
+                              AND (audience_role = 'PAYRENT' OR audience_role = 'COMMON' OR audience_role IS NULL)
                             ORDER BY created_at DESC
                             LIMIT 50
                         """, (clean_email,))
@@ -4428,10 +4827,68 @@ def get_notifications(email: str):
                 conn.close()
     except Exception as e:
         print(f"Notice: Database read error in get_notifications: {e}")
-    return [
-        n for n in MOCK_NOTIFICATIONS.values()
-        if (n.get("user_email") or n.get("userEmail") or "").strip().lower() == clean_email
-    ]
+    results = []
+    for n in MOCK_NOTIFICATIONS.values():
+        if (n.get("user_email") or n.get("userEmail") or "").strip().lower() == clean_email:
+            n_role = (n.get("audience_role") or n.get("audienceRole") or "PAYRENT").upper()
+            if target_role == "ALL" or n_role == "COMMON" or n_role == target_role:
+                results.append(n)
+    return results
+
+def get_unread_notifications_count(email: str, role: Optional[str] = None) -> int:
+    clean_email = (email or "").strip().lower()
+    if not clean_email:
+        return 0
+    target_role = role.strip().upper() if role else "ALL"
+    try:
+        conn = get_db_connection()
+        if conn:
+            try:
+                with conn.cursor() as cursor:
+                    if target_role == "PAYERNT":
+                        vendor_id = get_payernt_account_id(clean_email)
+                        if vendor_id and vendor_id != clean_email:
+                            cursor.execute("""
+                                SELECT COUNT(*) as cnt FROM notifications
+                                WHERE user_email IN (%s, %s)
+                                  AND is_read = FALSE
+                                  AND (audience_role = 'PAYERNT' OR audience_role = 'COMMON')
+                            """, (clean_email, vendor_id))
+                        else:
+                            cursor.execute("""
+                                SELECT COUNT(*) as cnt FROM notifications
+                                WHERE user_email = %s
+                                  AND is_read = FALSE
+                                  AND (audience_role = 'PAYERNT' OR audience_role = 'COMMON')
+                            """, (clean_email,))
+                    elif target_role == "ALL":
+                        cursor.execute("""
+                            SELECT COUNT(*) as cnt FROM notifications
+                            WHERE user_email = %s AND is_read = FALSE
+                        """, (clean_email,))
+                    else:  # PAYRENT
+                        cursor.execute("""
+                            SELECT COUNT(*) as cnt FROM notifications
+                            WHERE user_email = %s
+                              AND is_read = FALSE
+                              AND (audience_role = 'PAYRENT' OR audience_role = 'COMMON' OR audience_role IS NULL)
+                        """, (clean_email,))
+                    row = cursor.fetchone()
+                    if row:
+                        return int(row.get("cnt") or 0)
+            finally:
+                conn.close()
+    except Exception as e:
+        print(f"Notice: Database count error in get_unread_notifications_count: {e}")
+
+    cnt = 0
+    for n in MOCK_NOTIFICATIONS.values():
+        if (n.get("user_email") or n.get("userEmail") or "").strip().lower() == clean_email:
+            if not (n.get("is_read") or n.get("read")):
+                n_role = (n.get("audience_role") or n.get("audienceRole") or "PAYRENT").upper()
+                if target_role == "ALL" or n_role == "COMMON" or n_role == target_role:
+                    cnt += 1
+    return cnt
 
 def create_notification(email: str = None, title_or_dict: Any = None, message: str = None, **kwargs):
     clean_email = (email or kwargs.get("user_email") or "").strip().lower()
@@ -4446,6 +4903,12 @@ def create_notification(email: str = None, title_or_dict: Any = None, message: s
     notif_booking_id = kwargs.get("booking_id") or kwargs.get("bookingId")
     notif_link = kwargs.get("link") or kwargs.get("action_route") or kwargs.get("actionRoute")
     notif_event_key = kwargs.get("event_key") or kwargs.get("eventKey")
+
+    notif_audience_role = (
+        kwargs.get("audience_role")
+        or kwargs.get("audienceRole")
+        or (title_or_dict.get("audience_role") or title_or_dict.get("audienceRole") if isinstance(title_or_dict, dict) else None)
+    )
 
     if isinstance(title_or_dict, dict):
         notif_id = title_or_dict.get("id") or notif_id
@@ -4475,9 +4938,23 @@ def create_notification(email: str = None, title_or_dict: Any = None, message: s
             notif_booking_id = n_data.get("booking_id") or n_data.get("bookingId") or notif_booking_id
             notif_link = n_data.get("link") or n_data.get("action_route") or notif_link
             notif_event_key = n_data.get("event_key") or n_data.get("eventKey") or notif_event_key
+            if not notif_audience_role:
+                notif_audience_role = n_data.get("audience_role") or n_data.get("audienceRole")
         else:
             notif_title = kwargs.get("title") or "Notification"
             notif_message = message or kwargs.get("message") or ""
+
+    # Infer audience_role if still unset
+    if not notif_audience_role:
+        if notif_link and (notif_link.startswith("/payernt") or "/lender" in notif_link):
+            notif_audience_role = "PAYERNT"
+        elif notif_type == "security":
+            notif_audience_role = "COMMON"
+        else:
+            notif_audience_role = "PAYRENT"
+    notif_audience_role = str(notif_audience_role).strip().upper()
+    if notif_audience_role not in ("PAYRENT", "PAYERNT", "COMMON"):
+        notif_audience_role = "PAYRENT"
 
     # Check for existing notification if event_key is specified (Prevent duplicate notifications)
     if notif_event_key:
@@ -4488,7 +4965,7 @@ def create_notification(email: str = None, title_or_dict: Any = None, message: s
                     with conn.cursor() as cursor:
                         cursor.execute("""
                             SELECT id, user_email, title, message, type, is_read, created_at,
-                                   product_name, booking_id, link, event_key
+                                   product_name, booking_id, link, event_key, audience_role
                             FROM notifications
                             WHERE user_email = %s AND event_key = %s
                             LIMIT 1
@@ -4522,13 +4999,15 @@ def create_notification(email: str = None, title_or_dict: Any = None, message: s
         "link": notif_link,
         "event_key": notif_event_key,
         "eventKey": notif_event_key,
+        "audience_role": notif_audience_role,
+        "audienceRole": notif_audience_role,
     }
     MOCK_NOTIFICATIONS[notif_id] = notif_data
 
     try:
         execute_query("""
-            INSERT INTO notifications (id, user_email, title, message, type, is_read, created_at, product_name, booking_id, link, event_key)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO notifications (id, user_email, title, message, type, is_read, created_at, product_name, booking_id, link, event_key, audience_role)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
             notif_id,
             clean_email,
@@ -4540,24 +5019,34 @@ def create_notification(email: str = None, title_or_dict: Any = None, message: s
             notif_product_name,
             notif_booking_id,
             notif_link,
-            notif_event_key
+            notif_event_key,
+            notif_audience_role
         ))
     except Exception as e:
         print(f"Notice: Database write error in create_notification: {e}")
 
-    # Cross-sync to payernt_notifications if user is a vendor or owner
+    # Cross-sync to payernt_notifications ONLY if notification is for PAYERNT or COMMON
+    if notif_audience_role in ("PAYERNT", "COMMON"):
+        try:
+            from payernt_database import add_payernt_notification
+            add_payernt_notification(
+                owner_id=clean_email,
+                title=notif_title,
+                message=notif_message,
+                type_=notif_type,
+                action_route=notif_link or "orders",
+                booking_id=notif_booking_id,
+                product_name=notif_product_name,
+                event_key=notif_event_key,
+                audience_role=notif_audience_role
+            )
+        except Exception:
+            pass
+
+    # Real-time WebSocket delivery
     try:
-        from payernt_database import add_payernt_notification
-        add_payernt_notification(
-            owner_id=clean_email,
-            title=notif_title,
-            message=notif_message,
-            type_=notif_type,
-            action_route=notif_link or "orders",
-            booking_id=notif_booking_id,
-            product_name=notif_product_name,
-            event_key=notif_event_key
-        )
+        from main import broadcast_user_notification
+        broadcast_user_notification(clean_email, notif_data, notif_audience_role)
     except Exception:
         pass
 
@@ -4575,18 +5064,68 @@ def mark_notification_read(notification_id: str, email: str = None):
     else:
         execute_query("UPDATE notifications SET is_read = TRUE WHERE id = %s", (notification_id,))
 
-def mark_notifications_read(email: str):
+def mark_notifications_read(email: str, role: Optional[str] = None):
     clean_email = (email or "").strip().lower()
+    target_role = role.strip().upper() if role else "ALL"
     for n in MOCK_NOTIFICATIONS.values():
         if (n.get("user_email") or n.get("userEmail") or "").strip().lower() == clean_email:
-            n["is_read"] = True
-            n["read"] = True
-    execute_query("UPDATE notifications SET is_read = TRUE WHERE user_email = %s OR user_email IN (SELECT id FROM payernt_accounts WHERE LOWER(email) = %s)", (clean_email, clean_email))
+            n_role = (n.get("audience_role") or n.get("audienceRole") or "PAYRENT").upper()
+            if target_role == "ALL" or n_role == "COMMON" or n_role == target_role:
+                n["is_read"] = True
+                n["read"] = True
+
+    if target_role == "PAYERNT":
+        execute_query("""
+            UPDATE notifications 
+            SET is_read = TRUE 
+            WHERE (user_email = %s OR user_email IN (SELECT id FROM payernt_accounts WHERE LOWER(email) = %s))
+              AND (audience_role = 'PAYERNT' OR audience_role = 'COMMON')
+        """, (clean_email, clean_email))
+        try:
+            from payernt_database import mark_all_payernt_notifications_read
+            mark_all_payernt_notifications_read(clean_email)
+        except Exception:
+            pass
+    elif target_role == "ALL":
+        execute_query("UPDATE notifications SET is_read = TRUE WHERE user_email = %s", (clean_email,))
+    else:  # PAYRENT
+        execute_query("""
+            UPDATE notifications 
+            SET is_read = TRUE 
+            WHERE user_email = %s 
+              AND (audience_role = 'PAYRENT' OR audience_role = 'COMMON' OR audience_role IS NULL)
+        """, (clean_email,))
+
+def delete_notification(notification_id: str, email: str = None) -> bool:
+    """Deletes a single notification belonging to the authenticated user."""
+    clean_email = (email or "").strip().lower()
+    deleted = False
+    if clean_email:
+        res = execute_query(
+            "DELETE FROM notifications WHERE id = %s AND (user_email = %s OR user_email IN (SELECT id FROM payernt_accounts WHERE LOWER(email) = %s))",
+            (notification_id, clean_email, clean_email)
+        )
+        if res is not None:
+            deleted = True
+    else:
+        res = execute_query("DELETE FROM notifications WHERE id = %s", (notification_id,))
+        if res is not None:
+            deleted = True
+
+    # Also remove from payernt_notifications if matching
     try:
-        from payernt_database import mark_all_payernt_notifications_read
-        mark_all_payernt_notifications_read(clean_email)
+        from payernt_database import delete_payernt_notification
+        delete_payernt_notification(clean_email or "", notification_id)
     except Exception:
         pass
+
+    if notification_id in MOCK_NOTIFICATIONS:
+        n = MOCK_NOTIFICATIONS[notification_id]
+        notif_owner = (n.get("user_email") or n.get("userEmail") or "").strip().lower()
+        if not clean_email or notif_owner == clean_email:
+            del MOCK_NOTIFICATIONS[notification_id]
+            deleted = True
+    return deleted
 
 def notify_booking_event(
     booking_id: str,
@@ -4951,7 +5490,8 @@ def notify_booking_event(
             product_name=prod_title,
             booking_id=order_id,
             link=renter_notif["link"],
-            event_key=renter_notif["event_key"]
+            event_key=renter_notif["event_key"],
+            audience_role="PAYRENT"
         )
 
     # Dispatch to lender
@@ -4965,7 +5505,8 @@ def notify_booking_event(
             product_name=prod_title,
             booking_id=order_id,
             link=lender_notif["link"],
-            event_key=lender_notif["event_key"]
+            event_key=lender_notif["event_key"],
+            audience_role="PAYERNT"
         )
         if lender_account_id and lender_account_id != target_lender_id:
             try:
@@ -4978,7 +5519,8 @@ def notify_booking_event(
                     action_route="requests",
                     booking_id=order_id,
                     product_name=prod_title,
-                    event_key=lender_notif["event_key"]
+                    event_key=lender_notif["event_key"],
+                    audience_role="PAYERNT"
                 )
             except Exception:
                 pass
@@ -6329,7 +6871,7 @@ def get_reviews_from_db(
             if not r.get("hidden")
             and (rating_filter is None or r.get("rating") == rating_filter)
             and (not product_id or r.get("product_id") == product_id)
-            and (not verified_only or r.get("is_verified", True))
+            and (not verified_only or r.get("is_verified") is True)
         ]
         if sort == "highest":
             filtered.sort(key=lambda x: (x.get("rating", 0), x.get("created_at", "")), reverse=True)
@@ -6377,8 +6919,12 @@ def get_reviews_from_db(
             
             reviews = []
             for r in rows:
-                user_display = r.get("db_user_name") or r.get("user_name") or "Creator"
+                user_display = r.get("db_user_name") or r.get("user_name") or "Community Member"
                 avatar_url = r.get("db_user_photo") or r.get("db_user_avatar") or r.get("user_avatar") or ""
+                # Authentic review rating and verification resolution (never substitute missing rating or verification)
+                raw_rating = r.get("rating")
+                clean_rating = int(raw_rating) if raw_rating is not None and int(raw_rating) > 0 else 0
+                is_verified_flag = bool(r.get("is_verified") is True)
                 reviews.append({
                     "id": r["id"],
                     "productId": r.get("product_id"),
@@ -6401,10 +6947,10 @@ def get_reviews_from_db(
                     "profilePhotoUrl": avatar_url,
                     "userLocation": r.get("db_user_city") or r.get("user_location") or "",
                     "userRole": r.get("db_user_role") or r.get("user_role") or "",
-                    "rating": int(r.get("rating", 5)),
+                    "rating": clean_rating,
                     "comment": r.get("comment", ""),
-                    "isVerified": bool(r.get("is_verified", True)),
-                    "is_verified": bool(r.get("is_verified", True)),
+                    "isVerified": is_verified_flag,
+                    "is_verified": is_verified_flag,
                     "createdAt": r.get("created_at"),
                     "created_at": r.get("created_at"),
                     "updatedAt": r.get("updated_at"),
@@ -10375,5 +10921,318 @@ def get_kyc_stats_admin() -> Dict[str, int]:
         "rejected": rejected,
         "needs_information": needs_info
     }
+
+
+# =============================================================================
+# STATUTORY CONSENT & PRIVACY MANAGEMENT (DPDP Act 2023 / E-Commerce Rules 2020)
+# =============================================================================
+
+def record_user_consent(
+    user_id_or_session: str,
+    consent_type: str,
+    preferences: Dict[str, Any],
+    policy_version: str = "v2026.11",
+    user_email: Optional[str] = None,
+    ip_address: Optional[str] = None,
+    user_agent: Optional[str] = None
+) -> Dict[str, Any]:
+    """Records an explicit user consent preference with audit trail."""
+    import json
+    import uuid
+    from datetime import datetime, timezone
+
+    rec_id = f"cns_{uuid.uuid4().hex[:12]}"
+    now_iso = datetime.now(timezone.utc).isoformat()
+    clean_session = (user_id_or_session or "").strip()
+    clean_email = (user_email or "").strip().lower() if user_email else None
+    pref_str = json.dumps(preferences)
+
+    record = {
+        "id": rec_id,
+        "user_id_or_session": clean_session,
+        "user_email": clean_email,
+        "consent_type": consent_type,
+        "preferences": preferences,
+        "preferences_json": pref_str,
+        "policy_version": policy_version,
+        "ip_address": ip_address or "127.0.0.1",
+        "user_agent": (user_agent or "")[:490],
+        "created_at": now_iso,
+        "updated_at": now_iso
+    }
+
+    try:
+        execute_query("""
+            INSERT INTO consent_records (
+                id, user_id_or_session, user_email, consent_type, preferences_json,
+                policy_version, ip_address, user_agent, created_at, updated_at
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (
+            rec_id, clean_session, clean_email, consent_type, pref_str,
+            policy_version, ip_address or "127.0.0.1", (user_agent or "")[:490], now_iso, now_iso
+        ))
+    except Exception as e:
+        logger.warning(f"Notice: Failed to insert consent_record into database: {e}")
+
+    MOCK_CONSENT_RECORDS[rec_id] = record
+    return record
+
+
+def get_user_consents(user_id_or_session: str, user_email: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Retrieves consent history for session ID or authenticated email."""
+    import json
+    clean_session = (user_id_or_session or "").strip()
+    clean_email = (user_email or "").strip().lower() if user_email else None
+
+    try:
+        rows = fetch_all("""
+            SELECT id, user_id_or_session, user_email, consent_type, preferences_json,
+                   policy_version, created_at, updated_at
+            FROM consent_records
+            WHERE user_id_or_session = %s OR (user_email IS NOT NULL AND user_email = %s)
+            ORDER BY created_at DESC
+        """, (clean_session, clean_email or "__none__"))
+        if rows:
+            for r in rows:
+                try:
+                    r["preferences"] = json.loads(r.get("preferences_json") or "{}")
+                except Exception:
+                    r["preferences"] = {}
+            return rows
+    except Exception as e:
+        logger.warning(f"Notice: DB read error in get_user_consents: {e}")
+
+    results = []
+    for r in sorted(MOCK_CONSENT_RECORDS.values(), key=lambda x: x.get("created_at", ""), reverse=True):
+        if r.get("user_id_or_session") == clean_session or (clean_email and r.get("user_email") == clean_email):
+            results.append(r)
+    return results
+
+
+def create_privacy_request(user_email: str, request_type: str, details: Optional[str] = None) -> Dict[str, Any]:
+    """Submits a statutory data protection request (export, correction, erasure, grievance)."""
+    import uuid
+    from datetime import datetime, timezone
+
+    clean_email = (user_email or "").strip().lower()
+    req_id = f"DPR-{uuid.uuid4().hex[:10].upper()}"
+    now_iso = datetime.now(timezone.utc).isoformat()
+    norm_type = (request_type or "DATA_EXPORT").strip().upper()
+
+    record = {
+        "id": req_id,
+        "user_email": clean_email,
+        "request_type": norm_type,
+        "details": details or "",
+        "status": "PENDING",
+        "resolution_notes": None,
+        "resolved_by": None,
+        "resolved_at": None,
+        "created_at": now_iso,
+        "updated_at": now_iso
+    }
+
+    try:
+        execute_query("""
+            INSERT INTO privacy_requests (
+                id, user_email, request_type, details, status,
+                resolution_notes, resolved_by, resolved_at, created_at, updated_at
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (
+            req_id, clean_email, norm_type, details or "", "PENDING",
+            None, None, None, now_iso, now_iso
+        ))
+    except Exception as e:
+        logger.warning(f"Notice: Failed to insert privacy_request into DB: {e}")
+
+    MOCK_PRIVACY_REQUESTS[req_id] = record
+    return record
+
+
+def get_user_privacy_requests(user_email: str) -> List[Dict[str, Any]]:
+    """Retrieves all statutory data privacy requests filed by a user."""
+    clean_email = (user_email or "").strip().lower()
+    try:
+        rows = fetch_all("""
+            SELECT id, user_email, request_type, details, status, resolution_notes,
+                   resolved_by, resolved_at, created_at, updated_at
+            FROM privacy_requests
+            WHERE LOWER(user_email) = %s
+            ORDER BY created_at DESC
+        """, (clean_email,))
+        if rows:
+            return rows
+    except Exception as e:
+        logger.warning(f"Notice: DB read error in get_user_privacy_requests: {e}")
+
+    return [r for r in MOCK_PRIVACY_REQUESTS.values() if r.get("user_email") == clean_email]
+
+
+def get_all_privacy_requests_admin() -> List[Dict[str, Any]]:
+    """Admin listing of all privacy and grievance requests."""
+    try:
+        rows = fetch_all("""
+            SELECT id, user_email, request_type, details, status, resolution_notes,
+                   resolved_by, resolved_at, created_at, updated_at
+            FROM privacy_requests
+            ORDER BY created_at DESC
+        """)
+        if rows:
+            return rows
+    except Exception as e:
+        logger.warning(f"Notice: DB read error in get_all_privacy_requests_admin: {e}")
+
+    return sorted(list(MOCK_PRIVACY_REQUESTS.values()), key=lambda x: x.get("created_at", ""), reverse=True)
+
+
+def resolve_privacy_request(
+    request_id: str,
+    status: str,
+    resolution_notes: str,
+    resolved_by: str
+) -> bool:
+    """Marks a privacy request as completed, in-review, or rejected with resolution audit note."""
+    from datetime import datetime, timezone
+    now_iso = datetime.now(timezone.utc).isoformat()
+    clean_status = (status or "COMPLETED").strip().upper()
+
+    try:
+        execute_query("""
+            UPDATE privacy_requests
+            SET status = %s, resolution_notes = %s, resolved_by = %s, resolved_at = %s, updated_at = %s
+            WHERE id = %s
+        """, (clean_status, resolution_notes, resolved_by, now_iso, now_iso, request_id))
+    except Exception as e:
+        logger.warning(f"Notice: DB update error in resolve_privacy_request: {e}")
+
+    if request_id in MOCK_PRIVACY_REQUESTS:
+        MOCK_PRIVACY_REQUESTS[request_id]["status"] = clean_status
+        MOCK_PRIVACY_REQUESTS[request_id]["resolution_notes"] = resolution_notes
+        MOCK_PRIVACY_REQUESTS[request_id]["resolved_by"] = resolved_by
+        MOCK_PRIVACY_REQUESTS[request_id]["resolved_at"] = now_iso
+        MOCK_PRIVACY_REQUESTS[request_id]["updated_at"] = now_iso
+    return True
+
+
+def get_user_personal_data_summary(user_email: str) -> Dict[str, Any]:
+    """Generates a transparent personal data overview for the authenticated user under DPDP Section 11."""
+    clean_email = (user_email or "").strip().lower()
+    user = get_user(clean_email) or {}
+    kyc = None
+    try:
+        kyc = get_user_kyc_status(clean_email, "payrent")
+    except Exception:
+        pass
+    
+    # Count orders
+    orders = get_user_orders(clean_email) if "get_user_orders" in globals() else []
+    
+    # Count reviews
+    user_reviews = [r for r in MOCK_REVIEWS.values() if (r.get("user_email") or "").lower() == clean_email]
+    
+    # Count devices
+    devices = [d for d in MOCK_DEVICES.values() if (d.get("owner_email") or d.get("user_email") or "").lower() == clean_email]
+
+    return {
+        "profile": {
+            "fullName": user.get("full_name") or user.get("fullName") or "",
+            "email": clean_email,
+            "phone": user.get("phone") or "",
+            "city": user.get("city") or "",
+            "accountRole": user.get("role") or "customer",
+            "accountStatus": user.get("status") or "active",
+            "registeredAt": user.get("created_at") or user.get("createdAt") or "",
+            "isEmailVerified": bool(user.get("verified", False))
+        },
+        "kyc": {
+            "hasRecord": kyc is not None,
+            "status": kyc.get("status") if kyc else "NOT_SUBMITTED",
+            "accountType": kyc.get("account_type") if kyc else None,
+            "documentType": kyc.get("document_type") if kyc else None,
+            "documentNumberMasked": kyc.get("document_number_masked") if kyc else None,
+            "submittedAt": kyc.get("submitted_at") if kyc else None,
+            "reviewedAt": kyc.get("reviewed_at") if kyc else None
+        },
+        "statistics": {
+            "ordersCount": len(orders),
+            "reviewsCount": len(user_reviews),
+            "registeredDevicesCount": len(devices),
+            "consentRecordsCount": len(get_user_consents("", user_email=clean_email)),
+            "privacyRequestsCount": len(get_user_privacy_requests(clean_email))
+        },
+        "activityCounts": {
+            "orders": len(orders),
+            "reviews": len(user_reviews),
+            "registeredDevices": len(devices),
+            "consents": len(get_user_consents("", user_email=clean_email)),
+            "privacyRequests": len(get_user_privacy_requests(clean_email))
+        },
+        "retentionNotice": (
+            "Under Indian regulatory requirements (Companies Act 2013 and Income Tax Act 1961), "
+            "financial transaction and billing records must be retained for 8 financial years. "
+            "Personal data is processed in accordance with the paYent Privacy Policy and DPDP Act 2023."
+        )
+    }
+
+
+def export_user_personal_data(user_email: str) -> Dict[str, Any]:
+    """Compiles a complete, portable JSON archive of the user's personal data."""
+    from datetime import datetime, timezone
+    clean_email = (user_email or "").strip().lower()
+    summary = get_user_personal_data_summary(clean_email)
+    
+    orders = get_user_orders(clean_email) if "get_user_orders" in globals() else []
+    clean_orders = []
+    for o in orders:
+        clean_orders.append({
+            "orderId": o.get("id"),
+            "productTitle": o.get("product_title") or o.get("productTitle"),
+            "startDate": o.get("start_date") or o.get("startDate"),
+            "endDate": o.get("end_date") or o.get("endDate"),
+            "totalAmount": o.get("total"),
+            "status": o.get("status"),
+            "createdAt": o.get("created_at") or o.get("createdAt")
+        })
+
+    user_reviews = [
+        {
+            "id": r.get("id"),
+            "productId": r.get("product_id"),
+            "productTitle": r.get("product_title"),
+            "rating": r.get("rating"),
+            "comment": r.get("comment"),
+            "createdAt": r.get("created_at")
+        }
+        for r in MOCK_REVIEWS.values() if (r.get("user_email") or "").lower() == clean_email
+    ]
+
+    devices = [
+        {
+            "id": d.get("id"),
+            "serialNumber": d.get("serial_number"),
+            "model": d.get("model"),
+            "deviceStatus": d.get("device_status"),
+            "registeredAt": d.get("registered_at")
+        }
+        for d in MOCK_DEVICES.values() if (d.get("owner_email") or d.get("user_email") or "").lower() == clean_email
+    ]
+
+    return {
+        "exportMetadata": {
+            "platform": "paYent Marketplace",
+            "exportTimestamp": datetime.now(timezone.utc).isoformat(),
+            "dataSubject": clean_email,
+            "formatVersion": "DPDP-1.0",
+            "statutoryBasis": "Digital Personal Data Protection Act, 2023 Section 11 (Right to Access)"
+        },
+        "userProfile": summary["profile"],
+        "identityAndKYC": summary["kyc"],
+        "rentalTransactions": clean_orders,
+        "customerReviews": user_reviews,
+        "registeredHardware": devices,
+        "consentHistory": get_user_consents("", user_email=clean_email),
+        "privacyAndGrievanceRequests": get_user_privacy_requests(clean_email)
+    }
+
 
 

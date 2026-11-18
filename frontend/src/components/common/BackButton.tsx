@@ -11,7 +11,7 @@ export interface BackButtonProps {
 }
 
 export function BackButton({
-  fallback = "/",
+  fallback = "/payent",
   label = "Back",
   className,
   onClick,
@@ -24,7 +24,13 @@ export function BackButton({
       onClick();
       return;
     }
-    if (typeof window !== "undefined" && window.history.length > 1) {
+    const hasInternalHistory =
+      typeof window !== "undefined" &&
+      window.history.length > 1 &&
+      (window.history.state?.idx > 0 ||
+        (Boolean(document.referrer) && document.referrer.includes(window.location.host)));
+
+    if (hasInternalHistory) {
       window.history.back();
     } else {
       navigate({ to: fallback as any });
@@ -35,8 +41,10 @@ export function BackButton({
     <button
       type="button"
       onClick={handleClick}
+      id="page-back-button"
+      data-testid="back-button"
       className={cn(
-        "group inline-flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-semibold text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-full bg-white dark:bg-[#1E1E1E] border border-black/10 dark:border-white/10 shadow-xs hover:border-black/20 dark:hover:border-white/20 transition-all cursor-pointer active:scale-95 shrink-0 select-none",
+        "group inline-flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-semibold text-neutral-800 dark:text-neutral-200 hover:text-neutral-950 dark:hover:text-white px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-full bg-white dark:bg-[#1E1E1E] border border-neutral-200/90 dark:border-white/10 shadow-xs hover:border-neutral-400 dark:hover:border-white/20 transition-all cursor-pointer active:scale-95 shrink-0 select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white",
         className
       )}
       aria-label="Go back to previous page"

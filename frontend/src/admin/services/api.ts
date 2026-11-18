@@ -319,11 +319,29 @@ export interface AdminSupportTicket {
   priority: "low" | "medium" | "high" | "urgent" | string;
   userName: string;
   userEmail: string;
+  description?: string;
+  originalInquiry?: string;
+  conversationContext?: {
+    sender: string;
+    senderType?: string;
+    text: string;
+    timestamp?: string;
+  }[];
   messages: {
     id: string;
-    sender: "user" | "admin";
-    message: string;
-    createdAt: string;
+    sender: "user" | "admin" | string;
+    senderType?: string;
+    message?: string;
+    content?: string;
+    createdAt?: string;
+    timestamp?: string;
+    originalInquiry?: string;
+    conversationContext?: {
+      sender: string;
+      senderType?: string;
+      text: string;
+      timestamp?: string;
+    }[];
   }[];
   createdAt: string;
 }

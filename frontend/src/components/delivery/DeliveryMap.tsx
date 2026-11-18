@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Maximize2, Navigation } from "lucide-react";
@@ -97,6 +97,12 @@ export function DeliveryMap({
   const historyPolylineRef = useRef<L.Polyline | null>(null);
   const { theme } = useTheme();
 
+  // Click-to-load consent state for third-party map embed (Requirement 7)
+  const [hasMapConsent, setHasMapConsent] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("payent:map_embed_consent") === "true";
+  });
+
   const isDarkMode =
     theme === "dark" ||
     ((theme as string) === "system" &&
@@ -105,6 +111,7 @@ export function DeliveryMap({
 
   // Initialize Leaflet map
   useEffect(() => {
+    if (!hasMapConsent) return;
     if (!mapContainerRef.current) return;
     if (mapInstanceRef.current) return;
 
@@ -138,7 +145,7 @@ export function DeliveryMap({
       map.remove();
       mapInstanceRef.current = null;
     };
-  }, [isDarkMode]);
+  }, [hasMapConsent, isDarkMode]);
 
   // Update Markers, Route, and Fitting
   useEffect(() => {
@@ -267,6 +274,33 @@ export function DeliveryMap({
 
   return (
     <div className={`relative overflow-hidden rounded-2xl border border-border bg-card shadow-lg ${className}`}>
+      {/* Click-to-Load Privacy Gate for Third-Party Basemap (Requirement 7) */}
+      {!hasMapConsent ? (
+        <div className="absolute inset-0 z-[500] bg-neutral-100 dark:bg-neutral-900 flex flex-col items-center justify-center p-6 text-center">
+          <div className="h-12 w-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-3">
+            <Navigation className="h-6 w-6" />
+          </div>
+          <h4 className="text-sm sm:text-base font-bold text-foreground">
+            Interactive Live Delivery Map
+          </h4>
+          <p className="text-xs text-muted-foreground max-w-sm mt-1 mb-4 leading-relaxed">
+            Viewing this live transit route connects your browser to external tile servers from CARTO and OpenStreetMap contributors, subject to their respective privacy policies.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setHasMapConsent(true);
+              if (typeof window !== "undefined") {
+                localStorage.setItem("payent:map_embed_consent", "true");
+              }
+            }}
+            className="px-5 py-2.5 rounded-full bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 text-xs font-bold hover:opacity-90 transition-opacity shadow-md cursor-pointer"
+          >
+            Load Live Map
+          </button>
+        </div>
+      ) : null}
+
       <div ref={mapContainerRef} className="w-full h-full min-h-[350px] z-0" />
 
       <div className="absolute bottom-4 right-4 z-[400] flex flex-col gap-2">

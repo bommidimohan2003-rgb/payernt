@@ -232,6 +232,16 @@ export default function Dashboard() {
   return (
     <DashboardLayout>
       <div className="space-y-6 sm:space-y-8 w-full max-w-7xl">
+        {/* Navigation Breadcrumb Bar */}
+        <div className="flex items-center justify-between gap-4">
+          <BackButton fallback="/payent" className="!mb-0 !py-1.5 !px-3.5 text-xs font-semibold" />
+          <div className="flex items-center gap-2 text-xs text-neutral-500 dark:text-neutral-400">
+            <Link to="/payent" className="hover:text-neutral-900 dark:hover:text-white transition-colors">Home</Link>
+            <span>/</span>
+            <span className="font-semibold text-neutral-900 dark:text-white">Creator Dashboard</span>
+          </div>
+        </div>
+
         {/* ADMIN OPERATIONS CALLOUT */}
         {(user?.role === "admin" || (user as any)?.role === "superadmin" || (typeof window !== "undefined" && Boolean(localStorage.getItem("payent:admin:current_user")))) && (
           <div className="rounded-2xl border border-blue-500/30 bg-blue-950/20 dark:bg-blue-950/40 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -261,16 +271,6 @@ export default function Dashboard() {
 
         {/* Authoritative Dual-Side KYC Status Banner */}
         <KycStatusBanner role="renter" />
-
-        {/* Navigation Breadcrumb Bar */}
-        <div className="flex items-center justify-between gap-4">
-          <BackButton fallback="/categories" className="!mb-0 !py-1.5 !px-3.5 text-xs font-semibold" />
-          <div className="flex items-center gap-2 text-xs text-neutral-500 dark:text-neutral-400">
-            <Link to="/" className="hover:text-neutral-900 dark:hover:text-white transition-colors">Home</Link>
-            <span>/</span>
-            <span className="font-semibold text-neutral-900 dark:text-white">Creator Dashboard</span>
-          </div>
-        </div>
 
         {/* 1. WELCOME & COMMAND HERO */}
         <div className="rounded-3xl border border-neutral-200/90 dark:border-white/10 bg-white dark:bg-[#1E1E1E] p-6 sm:p-7 shadow-sm">

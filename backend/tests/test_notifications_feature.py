@@ -3,6 +3,9 @@ import os
 import unittest
 from datetime import datetime, timezone
 
+os.environ["TESTING"] = "1"
+os.environ["PYTEST_CURRENT_TEST"] = "1"
+
 # Ensure backend directory is in path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 

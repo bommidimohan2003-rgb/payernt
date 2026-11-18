@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
+import { BackButton } from "@/components/common/BackButton";
 import {
   Package,
   ArrowLeft,
@@ -239,13 +240,7 @@ export function LenderProductDetails({ productId: propId }: { productId?: string
       {/* Top Breadcrumb & Action Bar */}
       <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-border/80">
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => navigate({ to: "/payernt/products" })}
-            className="inline-flex items-center gap-2 text-xs font-bold text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to My Products
-          </button>
+          <BackButton fallback="/payernt/products" label="Back to My Products" />
           <div className="h-4 w-px bg-border" />
           <span className="text-xs font-mono text-muted-foreground">
             Listing ID: #{product.id}

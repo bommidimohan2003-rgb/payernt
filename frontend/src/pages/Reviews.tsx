@@ -246,7 +246,9 @@ export default function Reviews() {
       <div className="min-h-screen bg-white dark:bg-[#1E1E1E] text-neutral-900 dark:text-white transition-colors duration-300 pt-6 sm:pt-8 pb-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           {/* Header Breadcrumb & Title */}
-          <BackButton fallback="/categories" className="mb-4" />
+          <div className="flex items-center justify-start mb-4 sm:mb-6">
+            <BackButton fallback="/payent" />
+          </div>
           <div className="mb-8">
             <div className="flex items-center gap-2 text-xs font-semibold text-neutral-500 dark:text-[#A8B1BA] mb-2">
               <Link

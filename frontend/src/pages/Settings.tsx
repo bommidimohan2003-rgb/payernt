@@ -28,6 +28,7 @@ import { OwnershipTransferTab } from "@/components/security/OwnershipTransferTab
 import { RegisterDeviceModal } from "@/components/security/RegisterDeviceModal";
 import { RegisteredDevice, deviceService } from "@/services/deviceService";
 import { BellToggle } from "@/components/reactbits/BellToggle";
+import { DataPrivacyHub } from "@/components/privacy/DataPrivacyHub";
 import { storage } from "@/utils/storage";
 
 function Toggle({ on, onChange }: { on: boolean; onChange: () => void }) {
@@ -97,16 +98,16 @@ export default function Settings() {
   return (
     <DashboardLayout>
       <div className="space-y-6 w-full max-w-7xl pb-16">
-        <div className="flex items-center gap-3">
-          <BackButton fallback="/categories" />
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-neutral-900 dark:text-white font-display tracking-tight">
-              {tCommon.settings}
-            </h1>
-            <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 mt-1">
-              {tCommon.settings} &bull; paYent Security & Account Preferences
-            </p>
-          </div>
+        <div className="flex items-center justify-start mb-2">
+          <BackButton fallback="/profile" />
+        </div>
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-neutral-900 dark:text-white font-display tracking-tight">
+            {tCommon.settings}
+          </h1>
+          <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 mt-1">
+            {tCommon.settings} &bull; paYent Security & Account Preferences
+          </p>
         </div>
 
         {/* ========================================================================= */}
@@ -382,7 +383,12 @@ export default function Settings() {
         </div>
 
         {/* ========================================================================= */}
-        {/* SECTION 6: DANGER ZONE */}
+        {/* SECTION 6: YOUR DATA & PRIVACY (DPDP ACT 2023) */}
+        {/* ========================================================================= */}
+        <DataPrivacyHub />
+
+        {/* ========================================================================= */}
+        {/* SECTION 7: DANGER ZONE */}
         {/* ========================================================================= */}
         <div className="relative rounded-2xl sm:rounded-3xl bg-neutral-50 dark:bg-[#1E1E1E]/40 border border-destructive/40 pt-5 sm:pt-6 p-5 sm:p-6 shadow-sm text-left">
           <div className="absolute -top-3 left-4 px-2 bg-neutral-50 dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">

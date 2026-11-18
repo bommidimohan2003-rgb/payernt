@@ -56,8 +56,8 @@ export const DeviceVerificationPage: React.FC = () => {
       <div className="min-h-[75vh] flex items-center justify-center px-4 py-12">
         <div className="w-full max-w-xl space-y-6">
           {/* Back link */}
-          <div>
-            <BackButton fallback="/" label="Return to paYent" />
+          <div className="flex items-center justify-start">
+            <BackButton fallback="/payent" label="Return to paYent" />
           </div>
 
           {loading ? (

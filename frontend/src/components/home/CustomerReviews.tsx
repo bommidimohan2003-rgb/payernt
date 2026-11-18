@@ -21,6 +21,8 @@ interface Review {
   product_name?: string;
   user_name?: string;
   userName?: string;
+  is_verified?: boolean;
+  isVerified?: boolean;
   created_at?: string;
   createdAt?: string;
 }
@@ -234,7 +236,9 @@ export function CustomerReviews() {
 
                 const productName =
                   r.product_title || r.productTitle || r.product_name;
-                const userName = r.user_name || r.userName || "Verified Renter";
+                const userName = r.user_name || r.userName || "Community Member";
+                const isVerified = Boolean(r.is_verified || r.isVerified);
+                const actualRating = typeof r.rating === "number" && r.rating > 0 ? Math.min(5, Math.max(0, Math.round(r.rating))) : 0;
 
                 return (
                   <div
@@ -242,10 +246,14 @@ export function CustomerReviews() {
                     className="snap-start shrink-0 w-[88vw] sm:w-[calc(33.333%-1rem)] flex flex-col justify-between rounded-2xl border border-neutral-200/90 dark:border-neutral-700/80 bg-white dark:bg-[#1E1E1E] p-4 sm:p-5 shadow-xs"
                   >
                     <div>
-                      {/* Monochrome 5-Star Rating */}
-                      <div className="flex items-center gap-1 mb-3">
+                      {/* Monochrome Rating (Accurate - No Fake 5-Star Defaults) */}
+                      <div
+                        className="flex items-center gap-1 mb-3"
+                        role="img"
+                        aria-label={actualRating > 0 ? `${actualRating} out of 5 stars` : "No rating provided"}
+                      >
                         {Array.from({ length: 5 }).map((_, starIdx) => {
-                          const isFilled = starIdx < (r.rating || 5);
+                          const isFilled = starIdx < actualRating;
                           return (
                             <Star
                               key={starIdx}
@@ -259,6 +267,11 @@ export function CustomerReviews() {
                             />
                           );
                         })}
+                        {actualRating === 0 && (
+                          <span className="text-[10px] text-neutral-400 ml-1 font-medium">
+                            (Unrated)
+                          </span>
+                        )}
                       </div>
 
                       {/* Review Comment */}
@@ -272,11 +285,18 @@ export function CustomerReviews() {
                         <div className="font-semibold text-neutral-900 dark:text-white truncate max-w-[150px]">
                           {productName || userName}
                         </div>
-                        {productName && (
-                          <div className="text-[11px] text-neutral-500 dark:text-neutral-400 truncate max-w-[150px]">
-                            {userName}
-                          </div>
-                        )}
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          {productName && (
+                            <span className="text-[11px] text-neutral-500 dark:text-neutral-400 truncate max-w-[120px]">
+                              {userName}
+                            </span>
+                          )}
+                          {isVerified && (
+                            <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                              ✓ Verified Renter
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <div className="text-neutral-600 dark:text-neutral-400 shrink-0 tabular-nums">
                         {dateStr}

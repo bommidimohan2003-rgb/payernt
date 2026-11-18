@@ -24,6 +24,7 @@ import {
   BadgeCheck,
 } from "lucide-react";
 import { MainLayout } from "@/layouts/MainLayout";
+import { BackButton } from "@/components/common/BackButton";
 import { STORAGE_KEYS, storage } from "@/utils/storage";
 import { api } from "@/utils/api";
 import type { UserPaymentTransaction } from "@/types";
@@ -193,14 +194,7 @@ export default function PaymentHistory() {
         <div className="border-b border-neutral-200 dark:border-neutral-800 bg-white/80 dark:bg-[#1E1E1E]/80 backdrop-blur-md sticky top-0 z-20">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => navigate({ to: "/orders" })}
-                className="p-1.5 rounded-lg border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-300 transition-colors cursor-pointer"
-                title="Back to Orders"
-              >
-                <ArrowLeft className="h-4 w-4" />
-              </button>
+              <BackButton fallback="/orders" />
               <div>
                 <h1 className="text-xl sm:text-2xl font-extrabold text-neutral-900 dark:text-white tracking-tight">
                   Payment History & Transactions

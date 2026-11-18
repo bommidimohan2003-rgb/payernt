@@ -39,6 +39,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/common/Button";
+import { BackButton } from "@/components/common/BackButton";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
 import { STORAGE_KEYS, storage } from "@/utils/storage";
 import { api } from "@/utils/api";
@@ -913,14 +914,7 @@ export default function Orders() {
       <div className="w-full space-y-4 sm:space-y-5 text-neutral-900 dark:text-white">
         {/* Top Breadcrumb / Navigation & Escrow Guarantee Row */}
         <div className="flex flex-row items-center justify-between gap-3">
-          <button
-            type="button"
-            onClick={() => navigate({ to: "/categories" })}
-            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-neutral-200/90 dark:border-white/10 bg-white dark:bg-[#1E1E1E] hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-800 dark:text-neutral-200 text-xs font-medium transition-colors cursor-pointer shadow-xs"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            <span>Back</span>
-          </button>
+          <BackButton fallback="/payent" />
 
           <div className="flex items-center gap-2">
             {/* Quick Cart button on mobile header row */}
@@ -928,7 +922,7 @@ export default function Orders() {
               to="/cart"
               id="orders-top-cart-btn"
               aria-label={`Rental Cart${cartCount > 0 ? `, ${cartCount} items` : ""}`}
-              className="sm:hidden inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-neutral-200/90 dark:border-white/10 bg-white dark:bg-[#1E1E1E] hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-800 dark:text-neutral-200 text-xs font-medium transition-colors cursor-pointer shadow-xs"
+              className="md:hidden inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-neutral-200/90 dark:border-white/10 bg-white dark:bg-[#1E1E1E] hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-800 dark:text-neutral-200 text-xs font-medium transition-colors cursor-pointer shadow-xs"
             >
               <ShoppingCart className="h-3.5 w-3.5" />
               <span>Cart</span>

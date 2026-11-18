@@ -30,6 +30,9 @@ import {
   ThumbsUp,
   ThumbsDown,
   LifeBuoy,
+  ShieldCheck,
+  Lock,
+  Ticket,
 } from "lucide-react";
 import { MainLayout } from "@/layouts/MainLayout";
 import { BackButton } from "@/components/common/BackButton";
@@ -529,6 +532,7 @@ export default function Support() {
   const [selectedRequest, setSelectedRequest] = useState<any | null>(null);
   const [replyText, setReplyText] = useState("");
   const [replying, setReplying] = useState(false);
+  const [unreadSupportCount, setUnreadSupportCount] = useState<number>(0);
 
   // Synchronize state when active category changes
   useEffect(() => {
@@ -558,15 +562,139 @@ export default function Support() {
     }
   }, [currentCategory]);
 
-  // Read search & tab params from URL if specified
-  useEffect(() => {
-    if (search?.tab && ["faq", "troubleshoot", "ticket", "requests"].includes(search.tab)) {
-      setActiveTab(search.tab);
+  // Fetch live unread support count from backend API
+  const refreshUnreadCount = useCallback(async () => {
+    if (!user) {
+      setUnreadSupportCount(0);
+      return;
     }
+    const token = localStorage.getItem("payent:auth:token") || "";
+    try {
+      const count = await api.getSupportUnreadCount(token);
+      setUnreadSupportCount(typeof count === "number" ? count : 0);
+    } catch {
+      // ignore network errors
+    }
+  }, [user]);
+
+  // Load user support tickets
+  const loadMyTickets = useCallback(async () => {
+    if (!user) return;
+    setLoadingTickets(true);
+    setTicketListError(null);
+    try {
+      const token = localStorage.getItem("payent:auth:token") || "";
+      const tickets = await api.getSupportTickets(token);
+      const list = Array.isArray(tickets) ? tickets : [];
+      setMyTickets(list);
+      const unreadTotal = list.reduce((acc: number, t: any) => {
+        if (t.unread) return acc + 1;
+        if (typeof t.unreadCount === "number") return acc + t.unreadCount;
+        return acc;
+      }, 0);
+      setUnreadSupportCount(unreadTotal);
+    } catch {
+      setTicketListError("Could not retrieve your support requests. Please try again.");
+    } finally {
+      setLoadingTickets(false);
+    }
+  }, [user]);
+
+  // Initial load and auto-refresh for tickets and unread count
+  useEffect(() => {
+    if (user) {
+      loadMyTickets();
+      refreshUnreadCount();
+      const interval = setInterval(refreshUnreadCount, 8000);
+      return () => clearInterval(interval);
+    }
+  }, [user, loadMyTickets, refreshUnreadCount]);
+
+  useEffect(() => {
+    if (user && activeTab === "requests") {
+      loadMyTickets();
+    }
+  }, [user, activeTab, loadMyTickets]);
+
+  // Select and mark ticket as read, fetching freshest thread details
+  const handleSelectTicket = useCallback(async (ticket: any | null) => {
+    if (!ticket) {
+      setSelectedRequest(null);
+      return;
+    }
+    setSelectedRequest(ticket);
+    const token = localStorage.getItem("payent:auth:token") || "";
+    // Mark as read immediately on client and backend
+    if (ticket.unread || ticket.unreadCount > 0) {
+      api.markSupportTicketRead(ticket.id, token).catch(() => {});
+      setMyTickets((prev) =>
+        prev.map((t) => (t.id === ticket.id ? { ...t, unread: false, unreadCount: 0 } : t))
+      );
+      setUnreadSupportCount((prev) => Math.max(0, prev - (ticket.unreadCount || (ticket.unread ? 1 : 0))));
+      refreshUnreadCount();
+    }
+    // Fetch latest fresh conversation messages
+    try {
+      const detail = await api.getSupportTicketDetail(ticket.id, token);
+      if (detail && detail.messages) {
+        setSelectedRequest((prev: any) => (prev?.id === ticket.id ? { ...prev, ...detail, unread: false, unreadCount: 0 } : prev));
+        setMyTickets((prev) =>
+          prev.map((t) => (t.id === ticket.id ? { ...t, ...detail, unread: false, unreadCount: 0 } : t))
+        );
+      }
+    } catch {}
+  }, [refreshUnreadCount]);
+
+  // Poll active ticket conversation so incoming admin replies sync in real time
+  useEffect(() => {
+    if (activeTab !== "requests" || !selectedRequest?.id) return;
+    const ticketId = selectedRequest.id;
+    const interval = setInterval(async () => {
+      const token = localStorage.getItem("payent:auth:token") || "";
+      const detail = await api.getSupportTicketDetail(ticketId, token);
+      if (detail && detail.messages) {
+        setSelectedRequest((prev: any) => {
+          if (prev?.id !== ticketId) return prev;
+          if (detail.messages.length !== (prev.messages || []).length || detail.status !== prev.status) {
+            return { ...prev, ...detail, unread: false, unreadCount: 0 };
+          }
+          return prev;
+        });
+        setMyTickets((prev) =>
+          prev.map((t) => (t.id === ticketId ? { ...t, ...detail, unread: false, unreadCount: 0 } : t))
+        );
+      }
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [activeTab, selectedRequest?.id]);
+
+  // Read search & tab params from URL if specified, including direct ticket navigation (?id=TICK-...)
+  useEffect(() => {
+    const urlParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+    const targetTicketId =
+      (search as any)?.id ||
+      (search as any)?.ticket ||
+      urlParams?.get("id") ||
+      urlParams?.get("ticket");
+
+    const targetTab = (search as any)?.tab || urlParams?.get("tab");
+
+    if (targetTicketId) {
+      setActiveTab("requests");
+      if (myTickets.length > 0) {
+        const found = myTickets.find((t) => t.id === targetTicketId);
+        if (found) {
+          handleSelectTicket(found);
+        }
+      }
+    } else if (targetTab && ["faq", "troubleshoot", "ticket", "requests"].includes(targetTab)) {
+      setActiveTab(targetTab as any);
+    }
+
     if (search?.q) {
       setSearchQuery(search.q);
     }
-  }, [search?.tab, search?.q]);
+  }, [search, myTickets, handleSelectTicket]);
 
   // Smoothly scroll to anchored legal/security sections (#cancellation-refunds, #security-protocol)
   useEffect(() => {
@@ -608,28 +736,6 @@ export default function Support() {
         .finally(() => setLoadingBookings(false));
     }
   }, [user]);
-
-  // Load user support tickets
-  const loadMyTickets = useCallback(async () => {
-    if (!user) return;
-    setLoadingTickets(true);
-    setTicketListError(null);
-    try {
-      const token = localStorage.getItem("payent:auth:token") || "";
-      const tickets = await api.getSupportTickets(token);
-      setMyTickets(Array.isArray(tickets) ? tickets : []);
-    } catch {
-      setTicketListError("Could not retrieve your support requests. Please try again.");
-    } finally {
-      setLoadingTickets(false);
-    }
-  }, [user]);
-
-  useEffect(() => {
-    if (activeTab === "requests") {
-      loadMyTickets();
-    }
-  }, [activeTab, loadMyTickets]);
 
   // Filtered FAQ Items for current dedicated category
   const categoryFaqs = useMemo(() => {
@@ -715,17 +821,17 @@ export default function Support() {
     setReplying(true);
     try {
       const token = localStorage.getItem("payent:auth:token") || "";
-      const res = await api.replyToConversation(ticketId, replyText.trim(), token);
+      const res = await api.replySupportTicket(ticketId, replyText.trim(), token);
       if (res && res.messages) {
-        setSelectedRequest((prev: any) => ({ ...prev, messages: res.messages }));
+        setSelectedRequest((prev: any) => ({ ...prev, messages: res.messages, status: res.status || prev.status }));
         setMyTickets((prev) =>
-          prev.map((t) => (t.id === ticketId ? { ...t, messages: res.messages } : t))
+          prev.map((t) => (t.id === ticketId ? { ...t, messages: res.messages, status: res.status || t.status } : t))
         );
       }
       setReplyText("");
       toast.success("Reply submitted to support.");
-    } catch {
-      toast.error("Failed to send reply. Please try again.");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to send reply. Please try again.");
     } finally {
       setReplying(false);
     }
@@ -748,81 +854,512 @@ export default function Support() {
     }
   }, [currentCategory]);
 
+  // Helper to format dates cleanly
+  const formatTicketDate = (dateStr?: string) => {
+    if (!dateStr) return "Recent";
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return dateStr;
+      return d.toLocaleDateString([], {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch {
+      return dateStr;
+    }
+  };
+
+  // Dedicated Ticket Requests & Conversation Workspace
+  const renderTicketRequestsContent = () => (
+    <div className="max-w-6xl mx-auto space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl sm:text-2xl font-semibold text-foreground">
+            My Support Requests
+          </h2>
+          <p className="text-xs sm:text-sm text-muted-foreground">
+            Track ticket status, review resolutions, and communicate directly with coordinators.
+          </p>
+        </div>
+        {user && (
+          <button
+            onClick={() => {
+              loadMyTickets();
+              refreshUnreadCount();
+            }}
+            disabled={loadingTickets}
+            className="p-2 rounded-xl bg-card border border-border text-muted-foreground hover:text-foreground transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
+            title="Refresh tickets"
+          >
+            <RefreshCw className={cn("w-4 h-4 stroke-[1.75]", loadingTickets && "animate-spin")} />
+          </button>
+        )}
+      </div>
+
+      {!user ? (
+        <div className="p-8 sm:p-12 rounded-3xl bg-card border border-border text-center space-y-4">
+          <Shield className="w-10 h-10 text-muted-foreground mx-auto stroke-[1.75]" aria-hidden="true" />
+          <div className="space-y-1">
+            <h3 className="text-base font-semibold text-foreground">
+              Log In to View Your Requests
+            </h3>
+            <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+              For your privacy and data security, support ticket history is only accessible when logged into your verified paYent account.
+            </p>
+          </div>
+          <Link
+            to="/login"
+            className="px-5 py-2.5 rounded-xl bg-foreground text-background text-xs font-semibold inline-block hover:opacity-90 shadow-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
+          >
+            Log In to paYent
+          </Link>
+        </div>
+      ) : loadingTickets ? (
+        <div className="p-12 text-center space-y-3">
+          <Loader2 className="w-6 h-6 animate-spin mx-auto text-foreground" />
+          <p className="text-xs text-muted-foreground">Loading your support tickets...</p>
+        </div>
+      ) : ticketListError ? (
+        <div className="p-6 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-center space-y-3">
+          <AlertCircle className="w-6 h-6 text-rose-500 mx-auto" />
+          <p className="text-xs text-rose-500">{ticketListError}</p>
+          <button
+            onClick={() => {
+              loadMyTickets();
+              refreshUnreadCount();
+            }}
+            className="px-4 py-2 rounded-xl bg-card border border-border text-xs font-semibold hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
+          >
+            Retry
+          </button>
+        </div>
+      ) : myTickets.length === 0 ? (
+        <div className="p-8 sm:p-12 rounded-3xl bg-card border border-border text-center space-y-4">
+          <MessageSquare className="w-10 h-10 text-muted-foreground mx-auto stroke-[1.75]" aria-hidden="true" />
+          <div className="space-y-1">
+            <h3 className="text-base font-semibold text-foreground">
+              No Support Tickets Found
+            </h3>
+            <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+              You currently have no open or past support requests. If you are experiencing any issue with gear or billing, raise a ticket below.
+            </p>
+          </div>
+          <button
+            onClick={() => setActiveTab("ticket")}
+            className="px-5 py-2.5 rounded-xl bg-foreground text-background text-xs font-semibold hover:opacity-90 cursor-pointer shadow-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
+          >
+            Raise Support Ticket
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {myTickets.map((t) => {
+            const isSelected = selectedRequest?.id === t.id;
+            const msgs = Array.isArray(t.messages) ? t.messages : [];
+            const status = (t.status || "open").toLowerCase();
+            const latestMsg = msgs.length > 0
+              ? (msgs[msgs.length - 1].content || msgs[msgs.length - 1].message)
+              : (t.lastMessage || t.description || t.message || "");
+            const updatedAtStr = t.updatedAt || t.updated_at || t.createdAt || t.created_at;
+
+            return (
+              <div
+                key={t.id}
+                className={cn(
+                  "rounded-2xl border transition-colors overflow-hidden",
+                  isSelected
+                    ? "bg-card border-foreground/30 shadow-md"
+                    : "bg-card/70 border-border hover:border-foreground/20"
+                )}
+              >
+                <div
+                  onClick={() => handleSelectTicket(isSelected ? null : t)}
+                  className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer"
+                >
+                  <div className="space-y-1.5 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-mono text-xs font-semibold text-foreground">
+                        #{t.id}
+                      </span>
+                      <span
+                        className={cn(
+                          "px-2 py-0.5 rounded-full text-xs font-semibold capitalize",
+                          status === "open"
+                            ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
+                            : status === "waiting_for_user"
+                            ? "bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20"
+                            : status === "in_progress" || status === "pending"
+                            ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20"
+                            : status === "resolved"
+                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                            : status === "closed"
+                            ? "bg-neutral-500/10 text-neutral-600 dark:text-neutral-400 border border-neutral-500/20"
+                            : "bg-muted text-muted-foreground"
+                        )}
+                      >
+                        {status === "waiting_for_user"
+                          ? "Waiting for you"
+                          : status === "in_progress"
+                          ? "In Progress"
+                          : status}
+                      </span>
+                      <span className="text-xs text-muted-foreground px-2 py-0.5 rounded-full bg-muted">
+                        {t.category || "General"}
+                      </span>
+                      {(t.unread || (t.unreadCount && t.unreadCount > 0)) && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          <span>New reply</span>
+                        </span>
+                      )}
+                    </div>
+                    <h4 className="text-sm font-semibold text-foreground truncate">
+                      {t.subject}
+                    </h4>
+                    {latestMsg && (
+                      <p className="text-xs text-muted-foreground line-clamp-1 italic">
+                        &ldquo;{latestMsg}&rdquo;
+                      </p>
+                    )}
+                    {t.bookingId && (
+                      <div className="text-xs text-muted-foreground font-mono">
+                        Related Booking: #{t.bookingId}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
+                    <div className="text-right text-xs text-muted-foreground tabular-nums">
+                      <div>Updated: {formatTicketDate(updatedAtStr)}</div>
+                      <div className="text-xs">{msgs.length} message{msgs.length === 1 ? "" : "s"}</div>
+                    </div>
+                    <ChevronDown
+                      className={cn(
+                        "w-4 h-4 text-muted-foreground transition-transform stroke-[1.75]",
+                        isSelected && "rotate-180 text-foreground"
+                      )}
+                    />
+                  </div>
+                </div>
+
+                {isSelected && (
+                  <div className="px-4 sm:px-5 pb-5 pt-2 border-t border-border/50 space-y-4">
+                    <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
+                      {msgs.map((m: any, idx: number) => {
+                        const isAdmin = m.senderType === "admin" || m.sender === "admin";
+                        return (
+                          <div
+                            key={m.id || idx}
+                            className={cn(
+                              "p-3.5 rounded-2xl text-xs space-y-1.5 max-w-[85%] transition-colors",
+                              isAdmin
+                                ? "mr-auto bg-neutral-100 dark:bg-neutral-800/80 border border-neutral-200 dark:border-neutral-700/80 text-foreground"
+                                : "ml-auto bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 shadow-xs"
+                            )}
+                          >
+                            <div className="flex items-center justify-between gap-4 font-semibold text-[11px] opacity-80">
+                              <span className="inline-flex items-center gap-1">
+                                {isAdmin ? (
+                                  <>
+                                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+                                    <span>paYent Support</span>
+                                  </>
+                                ) : (
+                                  <span>{m.sender || "You"}</span>
+                                )}
+                              </span>
+                              <span className="tabular-nums font-mono text-[10px] opacity-70">
+                                {m.timestamp || m.createdAt
+                                  ? new Date(m.timestamp || m.createdAt).toLocaleTimeString([], {
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    })
+                                  : ""}
+                              </span>
+                            </div>
+                            <p className="leading-relaxed whitespace-pre-wrap">{m.content || m.message}</p>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {status === "closed" ? (
+                      <div className="pt-2">
+                        <div className="p-3 rounded-xl bg-neutral-100 dark:bg-neutral-800/80 border border-neutral-200 dark:border-neutral-700 text-xs text-neutral-600 dark:text-neutral-400 text-center flex items-center justify-center gap-2">
+                          <Lock className="w-3.5 h-3.5 shrink-0" />
+                          <span>This support ticket is closed and cannot receive new replies. If you require further assistance, please raise a new ticket.</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          handleSendTicketReply(t.id);
+                        }}
+                        className="pt-2 flex items-center gap-2 border-t border-border/40"
+                      >
+                        <input
+                          type="text"
+                          required
+                          value={replyText}
+                          onChange={(e) => setReplyText(e.target.value)}
+                          placeholder="Send a follow-up message to support..."
+                          className="flex-1 px-3.5 py-2 rounded-xl bg-card border border-border text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-foreground/30"
+                        />
+                        <button
+                          type="submit"
+                          disabled={replying || !replyText.trim()}
+                          className="px-4 py-2 rounded-xl bg-foreground text-background text-xs font-bold hover:opacity-90 disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+                        >
+                          {replying ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                          <span>Reply</span>
+                        </button>
+                      </form>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+
   // =========================================================================
   // VIEW 1: FAQ + SUPPORT LANDING PAGE (NO CATEGORY SELECTED)
-  // Strictly contains ONLY:
-  // 1. Application Header (Navbar via MainLayout)
-  // 2. FAQ + Support Heading (centered)
-  // 3. Exactly five category options in responsive layout
-  // (NO search bar, NO buttons for Knowledge Base / Troubleshooter / Ticket /
-  // My Requests / Contact, NO FAQ lists, NO extra promo content, NO footer)
+  // Features:
+  // 1. FAQ + Support Heading with Back Button
+  // 2. Dedicated My Support Tickets Entry Card with Live Unread Counts
+  // 3. Dedicated Track In Messages Entry Card for Rental Conversations
+  // 4. Five FAQ Category Options in Responsive Layout
+  // 5. Anchored Legal & Security Policy Summaries
   // =========================================================================
   if (!currentCategory) {
+    if (activeTab === "requests") {
+      return (
+        <MainLayout hideFooter={false}>
+          <div className="min-h-[calc(100vh-80px)] bg-background text-foreground transition-colors duration-200 py-10 sm:py-14">
+            <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 w-full space-y-6">
+              <div className="flex items-center justify-between gap-4">
+                <button
+                  onClick={() => {
+                    setActiveTab("faq");
+                    navigate({ search: {} });
+                  }}
+                  className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl border border-border bg-card hover:bg-muted text-xs font-semibold text-foreground transition-colors cursor-pointer shadow-xs group focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5 stroke-[1.75] group-hover:-translate-x-0.5 transition-transform" />
+                  <span>Back to FAQ &amp; Support Hub</span>
+                </button>
+                <Link
+                  to="/messages"
+                  className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground font-medium transition-colors"
+                >
+                  <span>Looking for rental chats?</span>
+                  <span className="font-semibold underline">Track In Messages</span>
+                  <ArrowRight className="w-3 h-3 stroke-[1.75]" />
+                </Link>
+              </div>
+
+              {renderTicketRequestsContent()}
+            </div>
+          </div>
+        </MainLayout>
+      );
+    }
+
     return (
       <MainLayout hideFooter={true}>
-        <div className="min-h-[calc(100vh-80px)] bg-background text-foreground transition-colors duration-200 flex flex-col justify-center py-12 sm:py-16 lg:py-20">
+        <div className="min-h-[calc(100vh-80px)] bg-background text-foreground transition-colors duration-200 flex flex-col justify-center py-10 sm:py-14 lg:py-16">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
-            {/* Centered Heading with Back Button */}
-            <div className="flex flex-col items-center mb-8 sm:mb-12 lg:mb-16">
-              <BackButton fallback="/" className="mb-4" />
+            {/* Top-left corner Back Navigation */}
+            <div className="flex items-center justify-start mb-4 sm:mb-6">
+              <BackButton fallback="/payent" />
+            </div>
+
+            {/* Centered Heading */}
+            <div className="flex flex-col items-center mb-6 sm:mb-8 text-center">
               <h1
                 className="text-3xl sm:text-4xl md:text-5xl font-semibold tracking-tight text-foreground"
                 data-testid="support-heading"
               >
                 FAQ + Support
               </h1>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-2 max-w-lg leading-relaxed">
+                Find answers, manage your support tickets, or continue equipment rental conversations.
+              </p>
             </div>
 
-            {/* Five Category Options in Responsive Layout */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 sm:gap-4 lg:gap-4 xl:gap-5 w-full">
-              {FAQ_CATEGORIES.map((cat, index) => {
-                const Icon = cat.icon;
-                const isFifth = index === 4;
-                return (
-                  <Link
-                    key={cat.id}
-                    to="/support"
-                    search={{ category: cat.id }}
-                    data-testid={`category-card-${cat.id}`}
-                    className={cn(
-                      "group relative rounded-2xl sm:rounded-3xl border border-border/80 bg-card p-4.5 sm:p-5 lg:p-6 text-left transition-[border-color,box-shadow] duration-200 cursor-pointer",
-                      "hover:border-foreground/30 hover:shadow-md dark:hover:shadow-black/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white",
-                      "flex flex-col justify-between",
-                      // Tablet: 5th card positioned neatly across 2 columns
-                      isFifth
-                        ? "sm:col-span-2 sm:max-w-md sm:mx-auto w-full lg:col-span-1 lg:max-w-none lg:mx-0"
-                        : "w-full",
-                      // Responsive consistent minimum heights
-                      "min-h-[100px] sm:min-h-[220px] lg:min-h-[240px]"
-                    )}
-                  >
-                    <div className="flex items-start gap-3.5 sm:flex-col sm:items-start sm:gap-0 h-full justify-between w-full">
-                      <div className="flex items-center gap-3.5 sm:flex-col sm:items-start sm:gap-0 sm:w-full">
-                        {/* Icon Container */}
-                        <div className="p-2.5 sm:p-3 rounded-2xl bg-foreground/5 dark:bg-white/5 border border-border/60 flex items-center justify-center text-foreground shrink-0 group-hover:bg-foreground group-hover:text-background transition-colors duration-200 shadow-sm">
-                          <Icon className="w-5 h-5 sm:w-6 sm:h-6 stroke-[1.75]" aria-hidden="true" />
-                        </div>
-
-                        {/* Title & Description */}
-                        <div className="min-w-0 sm:mt-4 sm:w-full">
-                          <h2 className="text-sm sm:text-base font-semibold text-foreground group-hover:text-foreground transition-colors line-clamp-2">
-                            {cat.name}
-                          </h2>
-                          <p className="text-xs text-muted-foreground mt-1 sm:mt-1.5 leading-relaxed line-clamp-2 sm:line-clamp-3">
-                            {cat.description}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Mobile Chevron / Desktop Action Footer */}
-                      <div className="shrink-0 sm:w-full sm:pt-3 sm:mt-3 sm:border-t sm:border-border/40 flex items-center justify-end sm:justify-between text-xs font-semibold text-muted-foreground group-hover:text-foreground">
-                        <span className="hidden sm:inline-block text-xs font-medium">Explore Topics</span>
-                        <ArrowRight className="w-4 h-4 stroke-[1.75] shrink-0 transition-transform duration-200 group-hover:translate-x-1" aria-hidden="true" />
-                      </div>
+            {/* TOP DEDICATED HUB: 2 CARDS (My Support Tickets & Track In Messages) */}
+            <div className="mb-10 sm:mb-12 grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 w-full">
+              {/* Card 1: My Support Tickets */}
+              <div
+                data-testid="my-support-tickets-card"
+                className="relative rounded-2xl sm:rounded-3xl border border-border/80 bg-card p-5 sm:p-6 text-left transition-[border-color,box-shadow] duration-200 hover:border-foreground/30 hover:shadow-md dark:hover:shadow-black/50 flex flex-col justify-between space-y-4"
+              >
+                <div className="space-y-3.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="p-3 rounded-2xl bg-foreground/5 dark:bg-white/5 border border-border/60 text-foreground flex items-center justify-center">
+                      <Ticket className="w-5 h-5 sm:w-6 sm:h-6 stroke-[1.75]" aria-hidden="true" />
                     </div>
+                    {unreadSupportCount > 0 ? (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        <span>{unreadSupportCount} New {unreadSupportCount === 1 ? "Reply" : "Replies"}</span>
+                      </span>
+                    ) : user ? (
+                      <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-muted text-muted-foreground tabular-nums">
+                        {myTickets.length} {myTickets.length === 1 ? "Ticket" : "Tickets"}
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-muted text-muted-foreground">
+                        Sign In Required
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="space-y-1">
+                    <h2 className="text-base sm:text-lg font-semibold text-foreground">
+                      My Support Tickets
+                    </h2>
+                    <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+                      View your support requests, read admin replies, and continue your conversations.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-border/50 flex items-center justify-between">
+                  <span className="text-[11px] sm:text-xs text-muted-foreground font-medium">
+                    {unreadSupportCount > 0
+                      ? "Admin response awaiting review"
+                      : user
+                      ? "All tickets up to date"
+                      : "Sign in to access your ticket history"}
+                  </span>
+                  <button
+                    onClick={() => {
+                      if (!user) {
+                        navigate({ to: "/login" });
+                      } else {
+                        setActiveTab("requests");
+                        navigate({ search: { tab: "requests" } });
+                      }
+                    }}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-foreground text-background text-xs font-semibold hover:opacity-90 transition-opacity cursor-pointer shadow-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
+                  >
+                    <span>View My Tickets</span>
+                    <ArrowRight className="w-3.5 h-3.5 stroke-[1.75]" aria-hidden="true" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Card 2: Track In Messages (Rental Conversations) */}
+              <div
+                data-testid="track-in-messages-card"
+                className="relative rounded-2xl sm:rounded-3xl border border-border/80 bg-card p-5 sm:p-6 text-left transition-[border-color,box-shadow] duration-200 hover:border-foreground/30 hover:shadow-md dark:hover:shadow-black/50 flex flex-col justify-between space-y-4"
+              >
+                <div className="space-y-3.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="p-3 rounded-2xl bg-foreground/5 dark:bg-white/5 border border-border/60 text-foreground flex items-center justify-center">
+                      <Send className="w-5 h-5 sm:w-6 sm:h-6 stroke-[1.75]" aria-hidden="true" />
+                    </div>
+                    <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-muted text-muted-foreground">
+                      Rental Messaging
+                    </span>
+                  </div>
+
+                  <div className="space-y-1">
+                    <h2 className="text-base sm:text-lg font-semibold text-foreground">
+                      Rental Conversations
+                    </h2>
+                    <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+                      Chat directly with verified lenders about gear condition, pickup coordination, and secret PIN handover codes.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-border/50 flex items-center justify-between">
+                  <span className="text-[11px] sm:text-xs text-muted-foreground font-medium">
+                    Borrower &amp; lender peer messages
+                  </span>
+                  <Link
+                    to="/messages"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-card border border-border hover:bg-muted text-foreground text-xs font-semibold transition-colors shadow-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
+                  >
+                    <span>Track In Messages</span>
+                    <ArrowRight className="w-3.5 h-3.5 stroke-[1.75]" aria-hidden="true" />
                   </Link>
-                );
-              })}
+                </div>
+              </div>
+            </div>
+
+            {/* SECTION: FAQ & HELP TOPICS */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-base sm:text-lg font-semibold text-foreground">
+                    FAQ &amp; Help Topics
+                  </h2>
+                  <p className="text-xs text-muted-foreground">
+                    Select a category below to explore guided answers and equipment troubleshooting.
+                  </p>
+                </div>
+              </div>
+
+              {/* Five Category Options in Responsive Layout (UNTOUCHED) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 sm:gap-4 lg:gap-4 xl:gap-5 w-full">
+                {FAQ_CATEGORIES.map((cat, index) => {
+                  const Icon = cat.icon;
+                  const isFifth = index === 4;
+                  return (
+                    <Link
+                      key={cat.id}
+                      to="/support"
+                      search={{ category: cat.id }}
+                      data-testid={`category-card-${cat.id}`}
+                      className={cn(
+                        "group relative rounded-2xl sm:rounded-3xl border border-border/80 bg-card p-4.5 sm:p-5 lg:p-6 text-left transition-[border-color,box-shadow] duration-200 cursor-pointer",
+                        "hover:border-foreground/30 hover:shadow-md dark:hover:shadow-black/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white",
+                        "flex flex-col justify-between",
+                        // Tablet: 5th card positioned neatly across 2 columns
+                        isFifth
+                          ? "sm:col-span-2 sm:max-w-md sm:mx-auto w-full lg:col-span-1 lg:max-w-none lg:mx-0"
+                          : "w-full",
+                        // Responsive consistent minimum heights
+                        "min-h-[100px] sm:min-h-[220px] lg:min-h-[240px]"
+                      )}
+                    >
+                      <div className="flex items-start gap-3.5 sm:flex-col sm:items-start sm:gap-0 h-full justify-between w-full">
+                        <div className="flex items-center gap-3.5 sm:flex-col sm:items-start sm:gap-0 sm:w-full">
+                          {/* Icon Container */}
+                          <div className="p-2.5 sm:p-3 rounded-2xl bg-foreground/5 dark:bg-white/5 border border-border/60 flex items-center justify-center text-foreground shrink-0 group-hover:bg-foreground group-hover:text-background transition-colors duration-200 shadow-xs">
+                            <Icon className="w-5 h-5 sm:w-6 sm:h-6 stroke-[1.75]" aria-hidden="true" />
+                          </div>
+
+                          {/* Title & Description */}
+                          <div className="min-w-0 sm:mt-4 sm:w-full">
+                            <h2 className="text-sm sm:text-base font-semibold text-foreground group-hover:text-foreground transition-colors line-clamp-2">
+                              {cat.name}
+                            </h2>
+                            <p className="text-xs text-muted-foreground mt-1 sm:mt-1.5 leading-relaxed line-clamp-2 sm:line-clamp-3">
+                              {cat.description}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Mobile Chevron / Desktop Action Footer */}
+                        <div className="shrink-0 sm:w-full sm:pt-3 sm:mt-3 sm:border-t sm:border-border/40 flex items-center justify-end sm:justify-between text-xs font-semibold text-muted-foreground group-hover:text-foreground">
+                          <span className="hidden sm:inline-block text-xs font-medium">Explore Topics</span>
+                          <ArrowRight className="w-4 h-4 stroke-[1.75] shrink-0 transition-transform duration-200 group-hover:translate-x-1" aria-hidden="true" />
+                        </div>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
             </div>
 
             {/* Anchored Legal & Security Summaries (for Footer deep links) */}
@@ -1009,11 +1546,15 @@ export default function Support() {
               >
                 <MessageSquare className="w-3.5 h-3.5 stroke-[1.75]" aria-hidden="true" />
                 <span>My Support Requests</span>
-                {myTickets.length > 0 && (
+                {unreadSupportCount > 0 ? (
+                  <span className="px-1.5 py-0.5 rounded-full text-xs bg-emerald-500 text-white font-bold tabular-nums">
+                    {unreadSupportCount}
+                  </span>
+                ) : myTickets.length > 0 ? (
                   <span className="px-1.5 py-0.5 rounded-full text-xs bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold tabular-nums">
                     {myTickets.length}
                   </span>
-                )}
+                ) : null}
               </button>
             </div>
           </div>
@@ -1684,213 +2225,7 @@ export default function Support() {
           )}
 
           {/* TAB 4: MY SUPPORT REQUESTS */}
-          {activeTab === "requests" && (
-            <div className="max-w-6xl mx-auto space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-xl sm:text-2xl font-semibold text-foreground">
-                    My Support Requests
-                  </h2>
-                  <p className="text-xs sm:text-sm text-muted-foreground">
-                    Track ticket status, review resolutions, and communicate directly with coordinators.
-                  </p>
-                </div>
-                {user && (
-                  <button
-                    onClick={loadMyTickets}
-                    disabled={loadingTickets}
-                    className="p-2 rounded-xl bg-card border border-border text-muted-foreground hover:text-foreground transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
-                    title="Refresh tickets"
-                  >
-                    <RefreshCw className={cn("w-4 h-4 stroke-[1.75]", loadingTickets && "animate-spin")} />
-                  </button>
-                )}
-              </div>
-
-              {!user ? (
-                <div className="p-8 sm:p-12 rounded-3xl bg-card border border-border text-center space-y-4">
-                  <Shield className="w-10 h-10 text-muted-foreground mx-auto stroke-[1.75]" aria-hidden="true" />
-                  <div className="space-y-1">
-                    <h3 className="text-base font-semibold text-foreground">
-                      Log In to View Your Requests
-                    </h3>
-                    <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                      For your privacy and data security, support ticket history is only accessible when logged into your verified paYent account.
-                    </p>
-                  </div>
-                  <Link
-                    to="/login"
-                    className="px-5 py-2.5 rounded-xl bg-foreground text-background text-xs font-semibold inline-block hover:opacity-90 shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
-                  >
-                    Log In to paYent
-                  </Link>
-                </div>
-              ) : loadingTickets ? (
-                <div className="p-12 text-center space-y-3">
-                  <Loader2 className="w-6 h-6 animate-spin mx-auto text-foreground" />
-                  <p className="text-xs text-muted-foreground">Loading your support tickets...</p>
-                </div>
-              ) : ticketListError ? (
-                <div className="p-6 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-center space-y-3">
-                  <AlertCircle className="w-6 h-6 text-rose-500 mx-auto" />
-                  <p className="text-xs text-rose-500">{ticketListError}</p>
-                  <button
-                    onClick={loadMyTickets}
-                    className="px-4 py-2 rounded-xl bg-card border border-border text-xs font-semibold hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
-                  >
-                    Retry
-                  </button>
-                </div>
-              ) : myTickets.length === 0 ? (
-                <div className="p-8 sm:p-12 rounded-3xl bg-card border border-border text-center space-y-4">
-                  <MessageSquare className="w-10 h-10 text-muted-foreground mx-auto stroke-[1.75]" aria-hidden="true" />
-                  <div className="space-y-1">
-                    <h3 className="text-base font-semibold text-foreground">
-                      No Support Tickets Found
-                    </h3>
-                    <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                      You currently have no open or past support requests. If you are experiencing any issue with gear or billing, raise a ticket below.
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setActiveTab("ticket")}
-                    className="px-5 py-2.5 rounded-xl bg-foreground text-background text-xs font-semibold hover:opacity-90 cursor-pointer shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
-                  >
-                    Raise Support Ticket
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {myTickets.map((t) => {
-                    const isSelected = selectedRequest?.id === t.id;
-                    const msgs = Array.isArray(t.messages) ? t.messages : [];
-                    const status = (t.status || "open").toLowerCase();
-                    return (
-                      <div
-                        key={t.id}
-                        className={cn(
-                          "rounded-2xl border transition-colors overflow-hidden",
-                          isSelected
-                            ? "bg-card border-foreground/30 shadow-md"
-                            : "bg-card/70 border-border hover:border-foreground/20"
-                        )}
-                      >
-                        <div
-                          onClick={() => setSelectedRequest(isSelected ? null : t)}
-                          className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer"
-                        >
-                          <div className="space-y-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono text-xs font-semibold text-foreground">
-                                #{t.id}
-                              </span>
-                              <span
-                                className={cn(
-                                  "px-2 py-0.5 rounded-full text-xs font-semibold capitalize",
-                                  status === "open"
-                                    ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
-                                    : status === "pending"
-                                    ? "bg-neutral-500/10 text-neutral-700 dark:text-neutral-300 border border-neutral-500/20"
-                                    : status === "resolved" || status === "closed"
-                                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
-                                    : "bg-muted text-muted-foreground"
-                                )}
-                              >
-                                {status}
-                              </span>
-                              <span className="text-xs text-muted-foreground px-2 py-0.5 rounded-full bg-muted">
-                                {t.category || "General"}
-                              </span>
-                            </div>
-                            <h4 className="text-sm font-semibold text-foreground truncate">
-                              {t.subject}
-                            </h4>
-                            {t.bookingId && (
-                              <div className="text-xs text-muted-foreground font-mono">
-                                Related Booking: #{t.bookingId}
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
-                            <div className="text-right text-xs text-muted-foreground tabular-nums">
-                              <div>{t.createdAt ? t.createdAt.slice(0, 10) : "Recent"}</div>
-                              <div className="text-xs">{msgs.length} messages</div>
-                            </div>
-                            <ChevronDown
-                              className={cn(
-                                "w-4 h-4 text-muted-foreground transition-transform stroke-[1.75]",
-                                isSelected && "rotate-180 text-foreground"
-                              )}
-                            />
-                          </div>
-                        </div>
-
-                        {isSelected && (
-                          <div className="px-4 sm:px-5 pb-5 pt-2 border-t border-border/50 space-y-4">
-                            <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
-                              {msgs.map((m: any, idx: number) => {
-                                const isAdmin = m.senderType === "admin" || m.sender === "admin";
-                                return (
-                                  <div
-                                    key={idx}
-                                    className={cn(
-                                      "p-3.5 rounded-xl text-xs space-y-1 max-w-[85%]",
-                                      isAdmin
-                                        ? "ml-auto bg-foreground text-background"
-                                        : "mr-auto bg-muted border border-border text-foreground"
-                                    )}
-                                  >
-                                    <div className="flex items-center justify-between gap-4 font-semibold text-xs opacity-75">
-                                      <span>{isAdmin ? "paYent Support" : m.sender || "You"}</span>
-                                      <span>
-                                        {m.timestamp
-                                          ? new Date(m.timestamp).toLocaleTimeString([], {
-                                              hour: "2-digit",
-                                              minute: "2-digit",
-                                            })
-                                          : ""}
-                                      </span>
-                                    </div>
-                                    <p className="leading-relaxed whitespace-pre-wrap">{m.content || m.message}</p>
-                                  </div>
-                                );
-                              })}
-                            </div>
-
-                            <form
-                              onSubmit={(e) => {
-                                e.preventDefault();
-                                handleSendTicketReply(t.id);
-                              }}
-                              className="pt-2 flex items-center gap-2 border-t border-border/40"
-                            >
-                              <input
-                                type="text"
-                                required
-                                value={replyText}
-                                onChange={(e) => setReplyText(e.target.value)}
-                                placeholder="Send a follow-up message to support..."
-                                className="flex-1 px-3.5 py-2 rounded-xl bg-card border border-border text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-foreground/30"
-                              />
-                              <button
-                                type="submit"
-                                disabled={replying || !replyText.trim()}
-                                className="px-4 py-2 rounded-xl bg-foreground text-background text-xs font-bold hover:opacity-90 disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
-                              >
-                                {replying ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-                                <span>Reply</span>
-                              </button>
-                            </form>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
+          {activeTab === "requests" && renderTicketRequestsContent()}
 
           {/* SWITCH CATEGORY FOOTER ROW */}
           <div className="mt-14 pt-8 border-t border-border">

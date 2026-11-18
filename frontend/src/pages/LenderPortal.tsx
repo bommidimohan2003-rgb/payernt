@@ -144,7 +144,9 @@ export default function LenderPortal() {
   return (
     <DashboardLayout>
       <div className="space-y-8">
-        <BackButton fallback="/dashboard" className="mb-2" />
+        <div className="flex items-center justify-start mb-2">
+          <BackButton fallback="/dashboard" />
+        </div>
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>

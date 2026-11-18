@@ -33,7 +33,7 @@ try:
 except ImportError:
     pass
 
-from fastapi import FastAPI, HTTPException, Header, Depends, Query, status, Request, Response, WebSocket, WebSocketDisconnect, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Header, Depends, Query, Body, status, Request, Response, WebSocket, WebSocketDisconnect, BackgroundTasks
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -1844,7 +1844,8 @@ def send_password_reset_link(email: str, reset_url: str) -> Tuple[bool, Optional
             email=clean_email,
             title="Password Reset Request",
             message="A password reset link has been dispatched for your account. If you did not request this, please secure your account.",
-            notification_type="security"
+            notification_type="security",
+            audience_role="COMMON"
         )
     except Exception as e:
         logger.warning(f"Failed to create password reset notification: {e}")
@@ -2282,6 +2283,7 @@ def get_user_profile_stats(current_user_email: str = Depends(get_current_user_em
             conn.close()
 
     return get_cached(f"profile_stats:{clean_email}", 30, _calculate_stats)
+
 
 class ProfilePhotoUploadSchema(BaseModel):
     profile_photo_url: Optional[str] = None
@@ -3228,21 +3230,24 @@ def review_kyc_verification_route(
         # 1. In-app notification
         try:
             from database import create_notification
+            is_lender_kyc = acc_type in ("payernt", "vendor", "lender")
             create_notification(
                 email=target_email,
                 title=notif_title,
                 message=notif_msg,
                 type="success" if new_status == "APPROVED" else ("warning" if new_status == "NEEDS_INFORMATION" else "error"),
-                link=notif_link
+                link=notif_link,
+                audience_role="PAYERNT" if is_lender_kyc else "PAYRENT"
             )
-            if acc_type in ("payernt", "vendor", "lender"):
+            if is_lender_kyc:
                 from payernt_database import add_payernt_notification
                 add_payernt_notification(
                     owner_id=target_email,
                     title=notif_title,
                     message=notif_msg,
                     type="success" if new_status == "APPROVED" else ("warning" if new_status == "NEEDS_INFORMATION" else "error"),
-                    action_route=notif_link
+                    action_route=notif_link,
+                    audience_role="PAYERNT"
                 )
         except Exception as e:
             logger.warning(f"Error creating in-app notification for KYC review: {e}")
@@ -6349,7 +6354,7 @@ class CreateSupportTicketSchema(BaseModel):
 @app.get("/api/messages")
 def fetch_user_conversations(current_user_email: str = Depends(get_current_user_email)):
     clean_email = current_user_email.strip().lower()
-    from database import MOCK_SUPPORT_TICKETS
+    from database import MOCK_SUPPORT_TICKETS, get_support_ticket_messages
     db_tickets = fetch_all("""
         SELECT * FROM support_tickets 
         WHERE LOWER(user_email) = %s 
@@ -6368,9 +6373,9 @@ def fetch_user_conversations(current_user_email: str = Depends(get_current_user_
             
     res = []
     for t in combined:
-        msgs = json.loads(t["messages"]) if isinstance(t.get("messages"), str) else (t.get("messages") or [])
+        msgs = get_support_ticket_messages(t["id"], include_internal=False)
         last_msg = msgs[-1] if msgs else {}
-        unread_cnt = sum(1 for m in msgs if m.get("senderType") != "user" and not m.get("read"))
+        unread_cnt = sum(1 for m in msgs if m.get("senderType") == "admin" and not m.get("read") and not m.get("isRead"))
         res.append({
             "id": t["id"],
             "subject": t.get("subject") or "Inquiry",
@@ -6384,30 +6389,40 @@ def fetch_user_conversations(current_user_email: str = Depends(get_current_user_
             "partner": "Payent Support & Coordination",
             "partnerAvatar": "",
             "lastMessage": last_msg.get("content") or last_msg.get("message") or "",
-            "lastMessageAt": last_msg.get("timestamp") or t.get("created_at"),
-            "unread": unread_cnt > 0 or (last_msg.get("senderType") != "user" and not last_msg.get("read")),
+            "lastMessageAt": last_msg.get("timestamp") or last_msg.get("createdAt") or t.get("created_at"),
+            "unread": unread_cnt > 0,
             "unreadCount": unread_cnt,
             "messageCount": len(msgs),
             "messages": msgs
         })
     return res
 
+@app.get("/api/support/unread-count")
+@app.get("/api/messages/unread-count")
+def get_user_unread_support_count_endpoint(current_user_email: str = Depends(get_current_user_email)):
+    clean_email = current_user_email.strip().lower()
+    from database import get_user_unread_support_count
+    count = get_user_unread_support_count(clean_email)
+    return {"unreadCount": count, "unread": count, "count": count}
+
+@app.get("/api/support/{id}")
 @app.get("/api/messages/{id}")
 def fetch_conversation_detail(id: str, current_user_email: str = Depends(get_current_user_email)):
     clean_email = current_user_email.strip().lower()
-    from database import MOCK_SUPPORT_TICKETS
+    from database import MOCK_SUPPORT_TICKETS, get_support_ticket_messages
     ticket = fetch_one("SELECT * FROM support_tickets WHERE id = %s", (id,))
     if not ticket and id in MOCK_SUPPORT_TICKETS:
         ticket = MOCK_SUPPORT_TICKETS[id]
         
     if not ticket:
-        raise HTTPException(status_code=404, detail="Conversation not found.")
+        raise HTTPException(status_code=404, detail="Support ticket not found.")
     if ticket.get("user_email", "").strip().lower() != clean_email:
         user_rec = get_user(clean_email) or {}
         if user_rec.get("role") not in ("admin", "superadmin"):
             raise HTTPException(status_code=403, detail="Not authorized to access this conversation.")
     
-    msgs = json.loads(ticket["messages"]) if isinstance(ticket.get("messages"), str) else (ticket.get("messages") or [])
+    msgs = get_support_ticket_messages(ticket["id"], include_internal=False)
+    unread_cnt = sum(1 for m in msgs if m.get("senderType") == "admin" and not m.get("read") and not m.get("isRead"))
     return {
         "id": ticket["id"],
         "subject": ticket.get("subject") or "Inquiry",
@@ -6420,12 +6435,15 @@ def fetch_conversation_detail(id: str, current_user_email: str = Depends(get_cur
         "updatedAt": ticket.get("updated_at") or ticket.get("created_at"),
         "partner": "Payent Support & Coordination",
         "partnerAvatar": "",
+        "unread": unread_cnt > 0,
+        "unreadCount": unread_cnt,
         "messages": msgs
     }
 
 class ConversationReplySchema(BaseModel):
     message: str
 
+@app.post("/api/support/{id}/reply")
 @app.post("/api/messages/{id}/reply")
 def reply_to_conversation(id: str, data: ConversationReplySchema, current_user_email: str = Depends(get_current_user_email)):
     clean_email = current_user_email.strip().lower()
@@ -6433,50 +6451,100 @@ def reply_to_conversation(id: str, data: ConversationReplySchema, current_user_e
     if not clean_msg:
         raise HTTPException(status_code=422, detail="Message cannot be empty.")
     
-    from database import MOCK_SUPPORT_TICKETS
+    from database import (
+        MOCK_SUPPORT_TICKETS,
+        save_support_ticket_message,
+        get_support_ticket_messages,
+    )
     ticket = fetch_one("SELECT * FROM support_tickets WHERE id = %s", (id,))
     if not ticket and id in MOCK_SUPPORT_TICKETS:
         ticket = MOCK_SUPPORT_TICKETS[id]
         
     if not ticket:
-        raise HTTPException(status_code=404, detail="Conversation not found.")
+        raise HTTPException(status_code=404, detail="Support ticket not found.")
     
     user_rec = get_user(clean_email) or {}
     is_admin = user_rec.get("role") in ("admin", "superadmin")
     if ticket.get("user_email", "").strip().lower() != clean_email and not is_admin:
         raise HTTPException(status_code=403, detail="Not authorized to reply to this conversation.")
     
-    msgs = json.loads(ticket["messages"]) if isinstance(ticket.get("messages"), str) else (ticket.get("messages") or [])
+    status_lower = (ticket.get("status") or "").strip().lower()
+    if status_lower == "closed":
+        raise HTTPException(
+            status_code=400,
+            detail="This support ticket is closed and cannot receive new replies. Please create a new support ticket."
+        )
+
     sender_name = user_rec.get("full_name") or clean_email.split("@")[0]
     now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
-    new_msg = {
-        "id": f"msg-{int(time.time() * 1000)}",
-        "sender": sender_name,
-        "senderType": "admin" if is_admin else "user",
-        "content": clean_msg,
-        "timestamp": now_str
-    }
-    msgs.append(new_msg)
+    sender_type = "admin" if is_admin else "user"
+
+    saved_rec = save_support_ticket_message(
+        ticket_id=id,
+        sender_id=clean_email,
+        sender_type=sender_type,
+        sender_name=sender_name,
+        message=clean_msg,
+        is_read=is_admin,  # If admin replies, user has not read yet; if user replies, user has read
+        created_at=now_str
+    )
+
     new_status = "pending" if is_admin else "open"
-    
     if id in MOCK_SUPPORT_TICKETS:
-        MOCK_SUPPORT_TICKETS[id]["messages"] = msgs
         MOCK_SUPPORT_TICKETS[id]["status"] = new_status
         MOCK_SUPPORT_TICKETS[id]["updated_at"] = now_str
         
     try:
-        execute_query("""
-            UPDATE support_tickets 
-            SET messages = %s, status = %s, updated_at = %s 
-            WHERE id = %s
-        """, (json.dumps(msgs), new_status, now_str, id))
+        execute_query("UPDATE support_tickets SET status = %s, updated_at = %s WHERE id = %s", (new_status, now_str, id))
     except Exception as e:
         logger.warning(f"[reply_to_conversation] DB note: {e}")
-    
+
+    # Dispatch notifications
+    if not is_admin:
+        try:
+            from agent_engine.escalation import record_admin_notification
+            record_admin_notification(
+                title=f"User Reply on Ticket #{id}",
+                message=f"{sender_name} replied: \"{clean_msg[:120]}\"",
+                notification_type="support",
+                ticket_id=id,
+                subject=ticket.get("subject"),
+                user_name=sender_name,
+                category=ticket.get("category")
+            )
+        except Exception as n_err:
+            logger.warning(f"Could not dispatch admin notification for user reply: {n_err}")
+    else:
+        # If admin replied via user endpoint, notify user
+        target_email = (ticket.get("user_email") or "").strip().lower()
+        if target_email:
+            try:
+                from database import create_notification
+                ticket_cat = str(ticket.get("category") or "").lower()
+                is_lender_ticket = ticket_cat in ("lender", "vendor", "payout", "earnings", "listing") or "payernt" in str(ticket.get("link") or "").lower()
+                create_notification(
+                    user_email=target_email,
+                    title=f"Support Reply: #{id}",
+                    message=f"Our support team replied: \"{clean_msg[:120]}\"",
+                    type="support",
+                    link=f"/payernt/support?id={id}" if is_lender_ticket else f"/support?id={id}",
+                    event_key=f"support_reply_{id}_{saved_rec['id']}",
+                    audience_role="PAYERNT" if is_lender_ticket else "PAYRENT"
+                )
+            except Exception as un_err:
+                logger.warning(f"Could not notify user of admin reply: {un_err}")
+
+    # Broadcast real-time message event
+    try:
+        broadcast_chat_message(id, saved_rec)
+    except Exception:
+        pass
+
+    all_msgs = get_support_ticket_messages(id, include_internal=is_admin)
     return {
         "success": True,
         "id": id,
-        "messages": msgs,
+        "messages": all_msgs,
         "updatedAt": now_str
     }
 
@@ -6508,7 +6576,7 @@ def create_new_conversation(data: NewConversationSchema, current_user_email: str
         "timestamp": now_str
     }]
     
-    from database import MOCK_SUPPORT_TICKETS
+    from database import MOCK_SUPPORT_TICKETS, save_support_ticket_message
     MOCK_SUPPORT_TICKETS[ticket_id] = {
         "id": ticket_id,
         "user_email": clean_email,
@@ -6527,6 +6595,16 @@ def create_new_conversation(data: NewConversationSchema, current_user_email: str
             INSERT INTO support_tickets (id, user_email, user_name, subject, category, status, priority, messages, created_at, updated_at)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (ticket_id, clean_email, user_name, clean_sub, clean_cat, "open", "medium", json.dumps(init_messages), now_str, now_str))
+        save_support_ticket_message(
+            ticket_id=ticket_id,
+            sender_id=clean_email,
+            sender_type="user",
+            sender_name=user_name,
+            message=clean_msg,
+            message_id=init_messages[0]["id"],
+            is_read=True,
+            created_at=now_str
+        )
     except Exception as e:
         logger.warning(f"[create_new_conversation] DB note: {e}")
     
@@ -6539,11 +6617,13 @@ def create_new_conversation(data: NewConversationSchema, current_user_email: str
         "createdAt": now_str
     }
 
+@app.patch("/api/support/{id}/read")
+@app.post("/api/support/{id}/read")
 @app.patch("/api/messages/{id}/read")
 @app.post("/api/messages/{id}/read")
 def mark_support_ticket_read(id: str, current_user_email: str = Depends(get_current_user_email)):
     clean_email = current_user_email.strip().lower()
-    from database import MOCK_SUPPORT_TICKETS
+    from database import MOCK_SUPPORT_TICKETS, mark_support_ticket_messages_read
     ticket = fetch_one("SELECT * FROM support_tickets WHERE id = %s", (id,))
     if not ticket and id in MOCK_SUPPORT_TICKETS:
         ticket = MOCK_SUPPORT_TICKETS[id]
@@ -6551,19 +6631,11 @@ def mark_support_ticket_read(id: str, current_user_email: str = Depends(get_curr
     if not ticket:
         raise HTTPException(status_code=404, detail="Conversation not found.")
     if ticket.get("user_email", "").strip().lower() != clean_email:
-        raise HTTPException(status_code=403, detail="Not authorized.")
+        user_rec = get_user(clean_email) or {}
+        if user_rec.get("role") not in ("admin", "superadmin"):
+            raise HTTPException(status_code=403, detail="Not authorized.")
     
-    msgs = json.loads(ticket["messages"]) if isinstance(ticket.get("messages"), str) else (ticket.get("messages") or [])
-    for m in msgs:
-        m["read"] = True
-    now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
-    if id in MOCK_SUPPORT_TICKETS:
-        MOCK_SUPPORT_TICKETS[id]["messages"] = msgs
-        MOCK_SUPPORT_TICKETS[id]["last_read_user_at"] = now_str
-    try:
-        execute_query("UPDATE support_tickets SET messages = %s, last_read_user_at = %s WHERE id = %s", (json.dumps(msgs), now_str, id))
-    except Exception:
-        pass
+    mark_support_ticket_messages_read(id, reader_type="user")
     return {"success": True}
 
 @app.post("/api/support")
@@ -7028,6 +7100,127 @@ def check_superadmin_user(current_user_email: str = Depends(get_current_user_ema
             detail="Forbidden. Superadmin access required."
         )
     return user
+
+
+# =============================================================================
+# STATUTORY CONSENT & PRIVACY RIGHTS ENDPOINTS (DPDP Act 2023 / E-Commerce 2020)
+# =============================================================================
+
+class ConsentRecordSchema(BaseModel):
+    user_id_or_session: str
+    consent_type: str = "COOKIE_PREFERENCES"
+    preferences: Dict[str, Any]
+    policy_version: Optional[str] = "v2026.11"
+    user_email: Optional[str] = None
+
+class PrivacyRequestSchema(BaseModel):
+    request_type: str = "DATA_EXPORT"  # DATA_EXPORT, DATA_CORRECTION, DATA_DELETION, CONSENT_WITHDRAWAL, PRIVACY_GRIEVANCE
+    details: Optional[str] = None
+
+class PrivacyRequestResolveSchema(BaseModel):
+    status: str = "COMPLETED"
+    resolution_notes: str
+
+@app.post("/api/consent")
+def submit_consent_preference(
+    data: ConsentRecordSchema,
+    request: Request,
+    authorization: Optional[str] = Header(None)
+):
+    from database import record_user_consent
+    auth_email = None
+    if authorization and authorization.startswith("Bearer "):
+        try:
+            payload = decode_access_token(authorization.split(" ")[1])
+            if payload and payload.get("sub"):
+                auth_email = payload["sub"].strip().lower()
+        except Exception:
+            pass
+
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    user_agent = request.headers.get("user-agent", "")
+    
+    rec = record_user_consent(
+        user_id_or_session=data.user_id_or_session,
+        consent_type=data.consent_type,
+        preferences=data.preferences,
+        policy_version=data.policy_version or "v2026.11",
+        user_email=auth_email or data.user_email,
+        ip_address=client_ip,
+        user_agent=user_agent
+    )
+    return {"success": True, "record": rec}
+
+@app.get("/api/consent/my")
+def get_my_consents(
+    session_id: Optional[str] = Query(None),
+    email: str = Depends(get_current_any_user_email)
+):
+    from database import get_user_consents
+    records = get_user_consents(user_id_or_session=session_id or "", user_email=email)
+    return {"success": True, "records": records}
+
+@app.get("/api/privacy/my-data-summary")
+def get_my_data_summary(email: str = Depends(get_current_any_user_email)):
+    from database import get_user_personal_data_summary
+    return get_user_personal_data_summary(email)
+
+@app.post("/api/privacy/requests")
+def submit_privacy_request(
+    data: PrivacyRequestSchema,
+    email: str = Depends(get_current_any_user_email)
+):
+    from database import create_privacy_request
+    rec = create_privacy_request(
+        user_email=email,
+        request_type=data.request_type,
+        details=data.details
+    )
+    return {
+        "success": True,
+        "message": "Statutory data privacy request received. Our team will review and process your request within statutory timelines.",
+        "request": rec
+    }
+
+@app.get("/api/privacy/requests")
+def list_my_privacy_requests(email: str = Depends(get_current_any_user_email)):
+    from database import get_user_privacy_requests
+    return {"success": True, "requests": get_user_privacy_requests(email)}
+
+@app.get("/api/privacy/export-download")
+def download_my_data_export(email: str = Depends(get_current_any_user_email)):
+    from database import export_user_personal_data
+    export_payload = export_user_personal_data(email)
+    import json
+    return Response(
+        content=json.dumps(export_payload, indent=2),
+        media_type="application/json",
+        headers={
+            "Content-Disposition": f'attachment; filename="payent_data_archive_{email.replace("@", "_at_")}.json"'
+        }
+    )
+
+@app.get("/api/admin/privacy/requests")
+def admin_list_privacy_requests(current_admin: dict = Depends(check_admin_user)):
+    from database import get_all_privacy_requests_admin
+    return {"success": True, "requests": get_all_privacy_requests_admin()}
+
+@app.post("/api/admin/privacy/requests/{id}/resolve")
+def admin_resolve_privacy_request(
+    id: str,
+    data: PrivacyRequestResolveSchema,
+    current_admin: dict = Depends(check_admin_user)
+):
+    from database import resolve_privacy_request
+    admin_name = current_admin.get("full_name") or current_admin.get("email") or "Admin"
+    resolve_privacy_request(
+        request_id=id,
+        status=data.status,
+        resolution_notes=data.resolution_notes,
+        resolved_by=admin_name
+    )
+    return {"success": True, "message": f"Privacy request {id} updated to {data.status}."}
+
 
 # ==============================================================================
 
@@ -7772,9 +7965,143 @@ def check_due_and_overdue_bookings_for_user(user_email: str):
 
 _last_due_check_timestamps: Dict[str, float] = {}
 
+class UserNotificationManager:
+    def __init__(self):
+        # Maps clean_email -> list of dict(websocket=WebSocket, role=str)
+        self.user_connections: dict[str, list[dict]] = {}
+
+    def connect(self, user_email: str, websocket: Any, role: str = "PAYRENT"):
+        clean_email = user_email.strip().lower()
+        clean_role = (role or "PAYRENT").strip().upper()
+        if clean_email not in self.user_connections:
+            self.user_connections[clean_email] = []
+        self.user_connections[clean_email].append({"websocket": websocket, "role": clean_role})
+
+    def disconnect(self, user_email: str, websocket: Any):
+        clean_email = user_email.strip().lower()
+        if clean_email in self.user_connections:
+            self.user_connections[clean_email] = [
+                c for c in self.user_connections[clean_email] if c["websocket"] != websocket
+            ]
+            if not self.user_connections[clean_email]:
+                del self.user_connections[clean_email]
+
+    def update_role(self, user_email: str, websocket: Any, new_role: str):
+        clean_email = user_email.strip().lower()
+        clean_role = (new_role or "PAYRENT").strip().upper()
+        if clean_email in self.user_connections:
+            for c in self.user_connections[clean_email]:
+                if c["websocket"] == websocket:
+                    c["role"] = clean_role
+
+    def get_recipient_websockets(self, user_email: str, audience_role: str = "PAYRENT") -> list[Any]:
+        """Returns the list of connected WebSockets eligible to receive this role-scoped notification."""
+        clean_email = user_email.strip().lower()
+        target_role = (audience_role or "PAYRENT").strip().upper()
+        conns = list(self.user_connections.get(clean_email, []))
+        recipients = []
+        for c in conns:
+            client_role = c["role"]
+            if target_role == "COMMON" or client_role == "ALL" or client_role == target_role:
+                recipients.append(c["websocket"])
+        return recipients
+
+    async def broadcast(self, user_email: str, notif_data: dict, audience_role: str = "PAYRENT"):
+        clean_email = user_email.strip().lower()
+        target_role = (audience_role or "PAYRENT").strip().upper()
+        recipients = self.get_recipient_websockets(clean_email, target_role)
+        disconnected = []
+        for ws in recipients:
+            try:
+                await ws.send_json({
+                    "type": "notification.new",
+                    "data": notif_data,
+                    "audienceRole": target_role
+                })
+            except Exception:
+                disconnected.append(ws)
+        for ws in disconnected:
+            self.disconnect(clean_email, ws)
+
+user_notif_ws_manager = UserNotificationManager()
+
+def broadcast_user_notification(user_email: str, notif_data: dict, audience_role: str = "PAYRENT"):
+    """Safely dispatches role-scoped notification to active user websocket connections."""
+    clean_email = (user_email or "").strip().lower()
+    if not clean_email or not getattr(user_notif_ws_manager, "user_connections", None) or clean_email not in user_notif_ws_manager.user_connections:
+        return
+    try:
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+        if loop and loop.is_running():
+            asyncio.create_task(user_notif_ws_manager.broadcast(clean_email, notif_data, audience_role))
+        else:
+            asyncio.run(user_notif_ws_manager.broadcast(clean_email, notif_data, audience_role))
+    except Exception as e:
+        logger.debug(f"User notification broadcast notice: {e}")
+
+@app.websocket("/api/notifications/ws")
+async def user_notifications_websocket(
+    websocket: WebSocket,
+    token: Optional[str] = Query(None),
+    role: Optional[str] = Query(None),
+):
+    await websocket.accept()
+    if not token:
+        await websocket.close(code=4001, reason="Authentication token required.")
+        return
+
+    user_email = None
+    try:
+        payload = decode_access_token(token, expected_type="access")
+        if payload and payload.get("sub"):
+            user_email = str(payload.get("email") or payload.get("sub") or "").strip().lower()
+    except Exception:
+        pass
+
+    if not user_email:
+        await websocket.close(code=4001, reason="Invalid authentication token.")
+        return
+
+    active_role = (role or "PAYRENT").strip().upper()
+    user_notif_ws_manager.connect(user_email, websocket, active_role)
+    try:
+        await websocket.send_json({
+            "type": "connection.established",
+            "role": active_role,
+            "email": user_email
+        })
+        while True:
+            raw_msg = await websocket.receive_text()
+            if raw_msg == "ping":
+                await websocket.send_json({"type": "pong"})
+            else:
+                try:
+                    parsed = json.loads(raw_msg)
+                    if parsed.get("type") == "switch_role":
+                        new_role = (parsed.get("role") or "PAYRENT").strip().upper()
+                        user_notif_ws_manager.update_role(user_email, websocket, new_role)
+                        await websocket.send_json({"type": "role_switched", "role": new_role})
+                except Exception:
+                    pass
+    except WebSocketDisconnect:
+        user_notif_ws_manager.disconnect(user_email, websocket)
+    except Exception:
+        user_notif_ws_manager.disconnect(user_email, websocket)
+
 @app.get("/api/notifications")
-def fetch_notifications(email: str = Depends(get_current_any_user_email)):
+def fetch_notifications(
+    role: Optional[str] = Query(None),
+    x_marketplace_role: Optional[str] = Header(None, alias="X-Marketplace-Role"),
+    email: str = Depends(get_current_any_user_email)
+):
     clean_email = email.strip().lower()
+    target_role = (role or x_marketplace_role or "PAYRENT").strip().upper()
+    if target_role not in ("PAYRENT", "PAYERNT", "ALL"):
+        target_role = "PAYRENT"
+
     now_mono = time.monotonic()
     last_check = _last_due_check_timestamps.get(clean_email, 0.0)
     # Run lifecycle due-check asynchronously in background daemon thread at most once per 10 minutes
@@ -7783,7 +8110,7 @@ def fetch_notifications(email: str = Depends(get_current_any_user_email)):
         import threading
         threading.Thread(target=check_due_and_overdue_bookings_for_user, args=(clean_email,), daemon=True).start()
 
-    notifications = get_notifications(clean_email)
+    notifications = get_notifications(clean_email, role=target_role)
     if not notifications:
         return []
     
@@ -7800,8 +8127,24 @@ def fetch_notifications(email: str = Depends(get_current_any_user_email)):
             "bookingId": n.get("booking_id") or n.get("bookingId"),
             "link": n.get("link") or (f"/orders" if n.get("booking_id") else None),
             "eventKey": n.get("event_key") or n.get("eventKey"),
+            "audienceRole": n.get("audience_role") or n.get("audienceRole") or target_role,
         })
     return result
+
+
+@app.get("/api/notifications/unread-count")
+def get_notifications_unread_count_endpoint(
+    role: Optional[str] = Query(None),
+    x_marketplace_role: Optional[str] = Header(None, alias="X-Marketplace-Role"),
+    email: str = Depends(get_current_any_user_email)
+):
+    clean_email = email.strip().lower()
+    target_role = (role or x_marketplace_role or "PAYRENT").strip().upper()
+    if target_role not in ("PAYRENT", "PAYERNT", "ALL"):
+        target_role = "PAYRENT"
+    from database import get_unread_notifications_count
+    count = get_unread_notifications_count(clean_email, role=target_role)
+    return {"success": True, "unreadCount": count, "unread": count, "count": count, "role": target_role}
 
 
 @app.post("/api/notifications/{id}/read")
@@ -7812,9 +8155,25 @@ def read_single_notification(id: str, email: str = Depends(get_current_any_user_
 
 
 @app.post("/api/notifications/read")
-def read_all_notifications(email: str = Depends(get_current_any_user_email)):
-    mark_notifications_read(email)
-    return {"success": True, "message": "All notifications marked as read."}
+def read_all_notifications(
+    role: Optional[str] = Query(None),
+    x_marketplace_role: Optional[str] = Header(None, alias="X-Marketplace-Role"),
+    data: Optional[Dict[str, Any]] = Body(None),
+    email: str = Depends(get_current_any_user_email)
+):
+    payload_role = data.get("role") if isinstance(data, dict) else None
+    target_role = (payload_role or role or x_marketplace_role or "PAYRENT").strip().upper()
+    if target_role not in ("PAYRENT", "PAYERNT", "ALL"):
+        target_role = "PAYRENT"
+    mark_notifications_read(email, role=target_role)
+    return {"success": True, "message": f"All {target_role} notifications marked as read."}
+
+
+@app.delete("/api/notifications/{id}")
+def delete_single_notification(id: str, email: str = Depends(get_current_any_user_email)):
+    from database import delete_notification
+    delete_notification(id, email)
+    return {"success": True, "message": "Notification deleted."}
 
 
 # ----------------------------------------------------------------------
@@ -8342,7 +8701,8 @@ def update_delivery_status_endpoint(delivery_id: str, data: DeliveryStatusUpdate
             email=customer_email,
             title=f"Delivery Update: {target_status.replace('_', ' ').title()}",
             message=status_messages[target_status],
-            notif_type="delivery"
+            notif_type="delivery",
+            audience_role="PAYRENT"
         )
 
     broadcast_delivery_update(clean_did, "delivery.status_updated", {
@@ -8493,7 +8853,8 @@ def confirm_delivery_endpoint(delivery_id: str, current_user_email: str = Depend
             email=lender_email,
             title="Delivery Receipt Confirmed",
             message=f"Customer confirmed receipt for booking #{bid}. The rental period is now underway.",
-            notif_type="booking"
+            notif_type="booking",
+            audience_role="PAYERNT"
         )
 
     broadcast_delivery_update(clean_did, "delivery.confirmed", {
@@ -8798,11 +9159,14 @@ def send_conversation_message_endpoint(conversation_id: str, data: SendChatMessa
     counterparty_email = cust_email if curr_is_admin else (lend_email if clean_user == cust_email else cust_email)
     if counterparty_email and counterparty_email != clean_user:
         preview_text = clean_content[:100] + ("..." if len(clean_content) > 100 else "") if clean_content else "Sent an attachment"
+        is_lender_target = (counterparty_email == lend_email)
         create_notification(
             email=counterparty_email,
             title=f"New Message from {sender_name}",
             message=preview_text,
-            notif_type="message"
+            notif_type="message",
+            link="/payernt/messages" if is_lender_target else f"/messages/{clean_cid}",
+            audience_role="PAYERNT" if is_lender_target else "PAYRENT"
         )
 
     broadcast_chat_message(clean_cid, msg)
@@ -8880,11 +9244,14 @@ def upload_conversation_attachment_endpoint(conversation_id: str, data: MessageA
 
     counterparty_email = cust_email if curr_is_admin else (lend_email if clean_user == cust_email else cust_email)
     if counterparty_email and counterparty_email != clean_user:
+        is_lender_target = (counterparty_email == lend_email)
         create_notification(
             email=counterparty_email,
             title=f"New Attachment from {sender_name}",
             message=content_text,
-            notif_type="message"
+            notif_type="message",
+            link="/payernt/messages" if is_lender_target else f"/messages/{clean_cid}",
+            audience_role="PAYERNT" if is_lender_target else "PAYRENT"
         )
 
     broadcast_chat_message(clean_cid, msg)
@@ -8975,11 +9342,14 @@ def admin_reply_conversation_message_endpoint(
 
     if target_email:
         preview_text = clean_content[:100] + ("..." if len(clean_content) > 100 else "") if clean_content else "Sent an attachment"
+        is_lender_target = (target_email == conv.get("lender_email"))
         create_notification(
             email=target_email,
             title=f"New Message from {admin_name}",
             message=preview_text,
-            notif_type="admin_message"
+            notif_type="admin_message",
+            link="/payernt/messages" if is_lender_target else f"/messages/{clean_cid}",
+            audience_role="PAYERNT" if is_lender_target else "PAYRENT"
         )
 
     broadcast_chat_message(clean_cid, msg)
@@ -10678,7 +11048,9 @@ def admin_approve_withdrawal(tx_id: str, current_admin: dict = Depends(check_adm
             email=user_email,
             title="Withdrawal Processed ✅",
             message=f"Your withdrawal of ₹{tx.get('amount')} has been approved and disbursed.",
-            notif_type="system"
+            notif_type="system",
+            link="/payernt/wallet",
+            audience_role="PAYERNT"
         )
     return {"success": True, "message": f"Withdrawal {tx_id} approved successfully."}
 
@@ -10725,7 +11097,9 @@ def admin_reject_withdrawal(tx_id: str, data: Optional[RejectWithdrawalSchema] =
             email=user_email,
             title="Withdrawal Rejected",
             message=f"Your withdrawal request of ₹{tx.get('amount')} was rejected and refunded to your wallet balance.{reason_txt}",
-            notif_type="system"
+            notif_type="system",
+            link="/payernt/wallet",
+            audience_role="PAYERNT"
         )
     return {"success": True, "message": f"Withdrawal {tx_id} rejected."}
 
@@ -10770,7 +11144,9 @@ def admin_wallet_adjustment(data: WalletAdjustmentSchema, current_admin: dict = 
         email=data.user_email,
         title="Wallet Balance Adjusted",
         message=f"Your wallet was adjusted by ₹{data.amount}. Reason: {data.reason}",
-        notif_type="system"
+        notif_type="system",
+        link="/payernt/wallet",
+        audience_role="PAYERNT"
     )
     return {"success": True, "message": "Wallet adjusted successfully."}
 
@@ -10878,7 +11254,8 @@ def admin_suspend_user(id: str, current_admin: dict = Depends(check_admin_user))
         email=id,
         title="Account Suspended ⚠️",
         message="Your account has been suspended by administration. Please contact support.",
-        notif_type="system"
+        notif_type="system",
+        audience_role="COMMON"
     )
     
     updated = get_user(id)
@@ -10917,7 +11294,8 @@ def admin_activate_user(id: str, current_admin: dict = Depends(check_admin_user)
         email=id,
         title="Account Reactivated ✅",
         message="Your Payent account has been reactivated. You can now use all platform services.",
-        notif_type="system"
+        notif_type="system",
+        audience_role="COMMON"
     )
     
     updated = get_user(id)
@@ -11277,7 +11655,8 @@ def admin_approve_user(id: str, type: Optional[str] = Query(None), current_admin
         email=clean_email,
         title="Account Approved! 🎉",
         message="Your account has been reviewed and approved by our Admin team. You can now log in and access your workspace.",
-        notif_type="system"
+        notif_type="system",
+        audience_role="PAYRENT" if is_payrent_target else "PAYERNT"
     )
     
     updated = get_user(clean_email) or {}
@@ -11418,7 +11797,8 @@ def admin_reject_user(id: str, data: Optional[RejectUserSchema] = None, type: Op
         email=clean_email,
         title="Account Review Update",
         message=f"Your account application was not approved: {rejection_reason}. Please update your details to resubmit.",
-        notif_type="system"
+        notif_type="system",
+        audience_role="PAYRENT" if is_payrent_target else "PAYERNT"
     )
     
     updated = get_user(clean_email) or {}
@@ -12510,7 +12890,9 @@ def admin_approve_product(id: str, data: Optional[ApproveProductSchema] = None, 
             email=owner_email,
             title="Product Approved! 🎉",
             message=f"Your listing '{existing.get('title')}' has been approved by admin with the approved rental price range.",
-            notif_type="system"
+            notif_type="system",
+            link="/payernt/products",
+            audience_role="PAYERNT"
         )
     
     # Audit log
@@ -12569,7 +12951,9 @@ def admin_request_product_revision(id: str, data: RequestProductRevisionSchema, 
             email=owner_email,
             title="Revision Requested for Product 📝",
             message=f"Admin has requested revisions for your listing '{existing.get('title')}'.{req_msg}",
-            notif_type="system"
+            notif_type="system",
+            link="/payernt/products",
+            audience_role="PAYERNT"
         )
         
     # Audit log
@@ -12618,7 +13002,9 @@ def admin_reject_product(id: str, data: Optional[RejectProductSchema] = None, cu
             email=owner_email,
             title="Product Verification Update",
             message=f"Your listing '{existing.get('title')}' was not approved.{reason_txt}",
-            notif_type="system"
+            notif_type="system",
+            link="/payernt/products",
+            audience_role="PAYERNT"
         )
     
     # Audit log
@@ -12657,7 +13043,9 @@ def admin_suspend_product(id: str, data: Optional[RejectProductSchema] = None, c
             email=owner_email,
             title="Listing Suspended ⚠️",
             message=f"Your listing '{existing.get('title')}' has been suspended by administration.{reason_txt}",
-            notif_type="system"
+            notif_type="system",
+            link="/payernt/products",
+            audience_role="PAYERNT"
         )
         
     # Audit log
@@ -12695,7 +13083,9 @@ def admin_restore_product(id: str, current_admin: dict = Depends(check_admin_use
             email=owner_email,
             title="Listing Restored ✅",
             message=f"Your listing '{existing.get('title')}' has been restored and is available for bookings.",
-            notif_type="system"
+            notif_type="system",
+            link="/payernt/products",
+            audience_role="PAYERNT"
         )
         
     # Audit log
@@ -13642,7 +14032,9 @@ def create_customer_review(
             email=lender_email,
             title="New Review Received ⭐",
             message=f"{user_name} gave {data.rating} stars for '{prod_title}'.",
-            notif_type="booking"
+            notif_type="booking",
+            link="/payernt/reviews",
+            audience_role="PAYERNT"
         )
 
     # 5. Broadcast real-time admin event
@@ -14084,7 +14476,31 @@ def admin_support_tickets_list(current_admin: dict = Depends(check_admin_user)):
         
     res = []
     for r in combined:
-        msgs = json.loads(r["messages"]) if isinstance(r.get("messages"), str) else (r.get("messages") or [])
+        raw_msgs = json.loads(r["messages"]) if isinstance(r.get("messages"), str) else (r.get("messages") or [])
+        normalized_msgs = []
+        for m in raw_msgs:
+            m_text = m.get("message") or m.get("content") or ""
+            m_time = m.get("createdAt") or m.get("timestamp") or r.get("created_at")
+            normalized_msgs.append({
+                **m,
+                "message": m_text,
+                "content": m_text,
+                "createdAt": m_time,
+                "timestamp": m_time,
+            })
+
+        first_msg = normalized_msgs[0] if normalized_msgs else {}
+        first_content = first_msg.get("message") or first_msg.get("content") or ""
+        
+        orig_inquiry = first_msg.get("originalInquiry") or ""
+        if not orig_inquiry and "Original user inquiry:" in first_content:
+            try:
+                orig_inquiry = first_content.split("Original user inquiry:")[1].split("Escalation reason:")[0].strip()
+            except Exception:
+                orig_inquiry = first_content
+        if not orig_inquiry:
+            orig_inquiry = first_content
+
         res.append({
             "id": r["id"],
             "subject": r.get("subject") or "Support Request",
@@ -14095,25 +14511,27 @@ def admin_support_tickets_list(current_admin: dict = Depends(check_admin_user)):
             "productReference": r.get("productReference") or r.get("product_reference"),
             "userName": r.get("user_name") or "User",
             "userEmail": r.get("user_email") or "",
-            "messages": msgs,
+            "description": first_content,
+            "originalInquiry": orig_inquiry,
+            "conversationContext": first_msg.get("conversationContext") or [],
+            "messages": normalized_msgs,
             "createdAt": r.get("created_at")
         })
     return res
 
 @app.post("/api/admin/support/{id}/reply")
 def admin_reply_support_ticket(id: str, data: SupportReplySchema, current_admin: dict = Depends(check_admin_user)):
-    from database import MOCK_SUPPORT_TICKETS
-    now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
-    new_msg = {
-        "id": f"tm-{random.randint(100000, 999999)}",
-        "sender": "admin",
-        "senderType": "admin",
-        "message": data.message,
-        "content": data.message,
-        "createdAt": now_str,
-        "timestamp": now_str
-    }
-    
+    clean_msg = (data.message or "").strip()
+    if not clean_msg:
+        raise HTTPException(status_code=422, detail="Message cannot be empty.")
+
+    from database import (
+        MOCK_SUPPORT_TICKETS,
+        save_support_ticket_message,
+        get_support_ticket_messages,
+        create_notification,
+    )
+
     r_ticket = None
     conn = get_db_connection()
     if conn:
@@ -14121,58 +14539,95 @@ def admin_reply_support_ticket(id: str, data: SupportReplySchema, current_admin:
             with conn.cursor() as cursor:
                 cursor.execute("SELECT * FROM support_tickets WHERE id = %s", (id,))
                 r_ticket = cursor.fetchone()
-                if r_ticket:
-                    try:
-                        msg_list = json.loads(r_ticket["messages"]) if isinstance(r_ticket["messages"], str) else (r_ticket["messages"] or [])
-                    except Exception:
-                        msg_list = []
-                    msg_list.append(new_msg)
-                    cursor.execute("UPDATE support_tickets SET messages = %s, status = 'pending' WHERE id = %s", (json.dumps(msg_list), id))
-                    conn.commit()
-                    r_ticket["messages"] = msg_list
-                    r_ticket["status"] = "pending"
         except Exception as e:
-            logger.warning(f"[admin_reply] DB note: {e}")
+            logger.warning(f"[admin_reply] DB fetch note: {e}")
         finally:
             conn.close()
-            
+
     if not r_ticket and id in MOCK_SUPPORT_TICKETS:
         r_ticket = MOCK_SUPPORT_TICKETS[id]
-        msg_list = r_ticket.get("messages", [])
-        msg_list.append(new_msg)
-        r_ticket["messages"] = msg_list
-        r_ticket["status"] = "pending"
-        r_ticket["updated_at"] = now_str
-    elif r_ticket and id in MOCK_SUPPORT_TICKETS:
-        MOCK_SUPPORT_TICKETS[id]["messages"] = r_ticket["messages"]
-        MOCK_SUPPORT_TICKETS[id]["status"] = "pending"
-        MOCK_SUPPORT_TICKETS[id]["updated_at"] = now_str
-        
+
     if not r_ticket:
-        raise HTTPException(status_code=404, detail="Ticket not found")
-        
+        raise HTTPException(status_code=404, detail="Support ticket not found.")
+
+    now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    msg_id = f"tm-{int(time.time() * 1000)}-{random.randint(1000, 9999)}"
+    admin_name = current_admin.get("full_name") or "paYent Support"
+    admin_email = current_admin.get("email") or "admin@payent.com"
+
+    # Persist admin reply in support_ticket_messages and support_tickets.messages
+    saved_rec = save_support_ticket_message(
+        ticket_id=id,
+        sender_id=admin_email,
+        sender_type="admin",
+        sender_name=admin_name,
+        message=clean_msg,
+        message_id=msg_id,
+        is_read=False,
+        created_at=now_str
+    )
+
+    new_status = "waiting_for_user"
+    if id in MOCK_SUPPORT_TICKETS:
+        MOCK_SUPPORT_TICKETS[id]["status"] = new_status
+        MOCK_SUPPORT_TICKETS[id]["updated_at"] = now_str
+
+    try:
+        execute_query("UPDATE support_tickets SET status = %s, updated_at = %s WHERE id = %s", (new_status, now_str, id))
+    except Exception as e:
+        logger.warning(f"[admin_reply] Status update note: {e}")
+
+    # Dispatch User Notification ONLY after successful persistence
+    target_email = (r_ticket.get("user_email") or "").strip().lower()
+    if target_email:
+        try:
+            ticket_cat = str(r_ticket.get("category") or "").lower()
+            is_lender_ticket = ticket_cat in ("lender", "vendor", "payout", "earnings", "listing") or "payernt" in str(r_ticket.get("link") or "").lower()
+            create_notification(
+                user_email=target_email,
+                title=f"Support Reply: #{id}",
+                message=f"Our support team replied to ticket {id}: \"{clean_msg[:120]}\"",
+                type="support",
+                link=f"/payernt/support?id={id}" if is_lender_ticket else f"/support?id={id}",
+                event_key=f"support_reply_{id}_{msg_id}",
+                audience_role="PAYERNT" if is_lender_ticket else "PAYRENT"
+            )
+        except Exception as n_err:
+            logger.warning(f"Could not dispatch user notification for admin reply: {n_err}")
+
+    # Broadcast real-time message event
+    try:
+        broadcast_chat_message(id, saved_rec)
+    except Exception:
+        pass
+
     # Log action
     try:
         execute_query("""
             INSERT INTO admin_logs (id, timestamp, user_name, action, module, ip_address)
             VALUES (%s, %s, %s, %s, %s, %s)
-        """, (f"l-{random.randint(100000, 999999)}", now_str, current_admin["full_name"], f"Replied to ticket {id}", "Reports", "127.0.0.1"))
+        """, (f"l-{random.randint(100000, 999999)}", now_str, admin_name, f"Replied to ticket {id}", "Reports", "127.0.0.1"))
     except Exception:
         pass
-    
-    msgs = json.loads(r_ticket["messages"]) if isinstance(r_ticket.get("messages"), str) else (r_ticket.get("messages") or [])
+
+    all_msgs = get_support_ticket_messages(id, include_internal=True)
     return {
         "id": r_ticket["id"],
         "subject": r_ticket.get("subject") or "Support Request",
         "category": r_ticket.get("category") or "General Help",
-        "status": "pending",
+        "status": new_status,
         "priority": r_ticket.get("priority") or "medium",
         "bookingId": r_ticket.get("bookingId") or r_ticket.get("booking_id"),
         "productReference": r_ticket.get("productReference") or r_ticket.get("product_reference"),
         "userName": r_ticket.get("user_name") or "User",
-        "userEmail": r_ticket.get("user_email") or "",
-        "messages": msgs,
-        "createdAt": r_ticket.get("created_at")
+        "userEmail": target_email,
+        "messages": all_msgs,
+        "messageId": msg_id,
+        "sender": admin_name,
+        "senderType": "admin",
+        "content": clean_msg,
+        "createdAt": r_ticket.get("created_at"),
+        "updatedAt": now_str
     }
 
 @app.post("/api/admin/support/{id}/status")

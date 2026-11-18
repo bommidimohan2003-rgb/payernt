@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams, Link } from "@tanstack/react-router";
+import { BackButton } from "@/components/common/BackButton";
 import {
   ArrowLeft,
   Camera,
@@ -481,14 +482,10 @@ export function LenderProductEdit({ productId: propId }: { productId?: string })
       {/* Top Breadcrumb & Action Bar */}
       <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-border/80">
         <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => navigate({ to: "/payernt/products/$id", params: { id: product.id } })}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border bg-secondary/50 hover:bg-secondary text-xs font-semibold text-foreground transition-all cursor-pointer"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Cancel & Back</span>
-          </button>
+          <BackButton
+            fallback={`/payernt/products/${product.id}`}
+            label="Cancel & Back"
+          />
           <div className="h-4 w-px bg-border" />
           <div>
             <h1 className="text-lg sm:text-xl font-extrabold text-foreground tracking-tight flex items-center gap-2">

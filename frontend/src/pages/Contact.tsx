@@ -12,12 +12,14 @@ import {
   Loader2,
   Sparkles,
   CircleHelp,
+  ArrowRight,
 } from "lucide-react";
 import { MainLayout } from "@/layouts/MainLayout";
 import { BackButton } from "@/components/common/BackButton";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/utils/api";
 import { cn } from "@/lib/utils";
+import { BUSINESS_INFO } from "@/config/businessInfo";
 
 const contactCategories = [
   "Rental Question",
@@ -37,6 +39,8 @@ export default function Contact() {
   const [category, setCategory] = useState(contactCategories[0]);
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
+  const [privacyConsent, setPrivacyConsent] = useState(false);
+  const [marketingConsent, setMarketingConsent] = useState(false);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -70,6 +74,9 @@ export default function Contact() {
     if (!message.trim() || message.trim().length < 10) {
       errs.message = "Message must be at least 10 characters.";
     }
+    if (!privacyConsent) {
+      errs.privacyConsent = "Please acknowledge that you have read the Privacy Policy to proceed.";
+    }
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -91,6 +98,24 @@ export default function Contact() {
         message: message.trim(),
       });
 
+      // Audit consent in database under DPDP Act 2023
+      if (typeof window !== "undefined") {
+        let sessionId = localStorage.getItem("payent:session_id");
+        if (!sessionId) {
+          sessionId = `sess_${Date.now()}`;
+          localStorage.setItem("payent:session_id", sessionId);
+        }
+        api.submitConsent({
+          userIdOrSession: sessionId,
+          consentType: "CONTACT_FORM_PRIVACY",
+          preferences: {
+            privacy_notice_acknowledged: true,
+            optional_marketing: marketingConsent,
+          },
+          userEmail: email.trim().toLowerCase(),
+        }).catch(() => {});
+      }
+
       setSuccessData({
         ticketId: res.ticketId || "INQ-CONFIRMED",
         message:
@@ -100,6 +125,8 @@ export default function Contact() {
       // Clear non-profile inputs on success
       setSubject("");
       setMessage("");
+      setPrivacyConsent(false);
+      setMarketingConsent(false);
     } catch (err: unknown) {
       const errorObj = err as { message?: string };
       setSubmitError(
@@ -131,10 +158,12 @@ export default function Contact() {
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[350px] bg-gradient-to-b from-neutral-200/30 dark:from-[#0B1522] to-transparent rounded-full blur-[140px] pointer-events-none" />
 
         <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-start mb-4 sm:mb-6">
+            <BackButton fallback="/payent" />
+          </div>
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
             {/* Left: Headline & Introduction */}
             <div className="lg:col-span-7">
-              <BackButton fallback="/categories" className="mb-4" />
               {/* Eyebrow */}
               <div className="flex items-center gap-2 mb-3">
                 <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" />
@@ -222,11 +251,11 @@ export default function Contact() {
                       <Mail className="w-4 h-4 text-emerald-500 shrink-0" />
                       <div>
                         <div className="font-semibold text-neutral-900 dark:text-white">Direct Email</div>
-                        <div className="text-[11px] text-neutral-500 dark:text-neutral-400">support@payent.in</div>
+                        <div className="text-[11px] text-neutral-500 dark:text-neutral-400">{BUSINESS_INFO.supportEmail}</div>
                       </div>
                     </div>
                     <a
-                      href="mailto:support@payent.in"
+                      href={`mailto:${BUSINESS_INFO.supportEmail}`}
                       className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
                     >
                       Email Us
@@ -238,11 +267,11 @@ export default function Contact() {
                       <Phone className="w-4 h-4 text-emerald-500 shrink-0" />
                       <div>
                         <div className="font-semibold text-neutral-900 dark:text-white">Phone Support</div>
-                        <div className="text-[11px] text-neutral-500 dark:text-neutral-400">+91 80 4567 8900</div>
+                        <div className="text-[11px] text-neutral-500 dark:text-neutral-400">{BUSINESS_INFO.supportPhoneFormatted}</div>
                       </div>
                     </div>
                     <a
-                      href="tel:+918045678900"
+                      href={`tel:${BUSINESS_INFO.supportPhonePrimary}`}
                       className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
                     >
                       Call
@@ -250,16 +279,29 @@ export default function Contact() {
                   </div>
                 </div>
 
-                {/* Ticket Portal Link */}
-                <div className="pt-2 border-t border-black/5 dark:border-white/5 flex items-center justify-between text-xs">
-                  <span className="text-neutral-500 dark:text-neutral-400 text-[11px]">Submitted rental inquiries?</span>
-                  <Link
-                    to="/messages"
-                    className="font-bold text-neutral-900 dark:text-white hover:underline flex items-center gap-1"
-                  >
-                    <span>Track In Messages</span>
-                    <Send className="w-3 h-3" />
-                  </Link>
+                {/* Ticket & Rental Portal Links */}
+                <div className="pt-2 border-t border-black/5 dark:border-white/5 flex flex-col gap-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-neutral-500 dark:text-neutral-400 text-[11px]">Submitted support tickets?</span>
+                    <Link
+                      to="/support"
+                      search={{ tab: "requests" }}
+                      className="font-bold text-neutral-900 dark:text-white hover:underline flex items-center gap-1"
+                    >
+                      <span>My Support Tickets</span>
+                      <ArrowRight className="w-3 h-3" />
+                    </Link>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-neutral-500 dark:text-neutral-400 text-[11px]">Direct rental conversations?</span>
+                    <Link
+                      to="/messages"
+                      className="font-bold text-neutral-900 dark:text-white hover:underline flex items-center gap-1"
+                    >
+                      <span>Track In Messages</span>
+                      <Send className="w-3 h-3" />
+                    </Link>
+                  </div>
                 </div>
               </div>
             </div>
@@ -294,16 +336,16 @@ export default function Contact() {
                 </div>
                 <div>
                   <div className="text-xs font-bold uppercase tracking-wider text-neutral-400 dark:text-[#8D98A3]">
-                    Email Support
+                    Official Support Email
                   </div>
                   <a
-                    href="mailto:payent_support@gmail.com"
+                    href={`mailto:${BUSINESS_INFO.supportEmail}`}
                     className="mt-1 block text-sm font-bold text-neutral-950 dark:text-white hover:text-primary transition-colors"
                   >
-                    payent_support@gmail.com
+                    {BUSINESS_INFO.supportEmail}
                   </a>
                   <p className="text-[11px] text-neutral-500 dark:text-[#697680] mt-0.5">
-                    For general questions, billing, and listing inquiries.
+                    For general questions, billing, and listing inquiries. Typical response: {BUSINESS_INFO.typicalResponseTime}.
                   </p>
                 </div>
               </div>
@@ -315,16 +357,40 @@ export default function Contact() {
                 </div>
                 <div>
                   <div className="text-xs font-bold uppercase tracking-wider text-neutral-400 dark:text-[#8D98A3]">
-                    Direct Phone / WhatsApp
+                    Support Helpline / WhatsApp
                   </div>
                   <a
-                    href="tel:+917989002612"
+                    href={`tel:${BUSINESS_INFO.supportPhonePrimary}`}
                     className="mt-1 block text-sm font-bold text-neutral-950 dark:text-white hover:text-primary transition-colors font-mono"
                   >
-                    +91 7989002612
+                    {BUSINESS_INFO.supportPhoneFormatted}
                   </a>
                   <p className="text-[11px] text-neutral-500 dark:text-[#697680] mt-0.5">
-                    Direct coordinator assistance during operating hours.
+                    Direct coordinator assistance during operating hours ({BUSINESS_INFO.supportHours}).
+                  </p>
+                </div>
+              </div>
+
+              {/* Statutory Grievance Redressal Card */}
+              <div className="p-5 rounded-2xl bg-amber-500/5 dark:bg-amber-500/10 border border-amber-500/20 shadow-sm flex items-start gap-4">
+                <div className="h-10 w-10 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                  <AlertCircle className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                    Statutory Grievance Redressal
+                  </div>
+                  <div className="mt-1 text-xs text-neutral-700 dark:text-neutral-300">
+                    Under DPDP Act 2023 &amp; IT Rules 2021:
+                  </div>
+                  <a
+                    href={`mailto:${BUSINESS_INFO.grievanceEmail}`}
+                    className="mt-0.5 block text-xs font-bold text-neutral-950 dark:text-white hover:underline"
+                  >
+                    {BUSINESS_INFO.grievanceEmail}
+                  </a>
+                  <p className="text-[10px] text-neutral-500 dark:text-[#8D98A3] mt-1">
+                    Designated Grievance Officer acknowledged within 48h, resolved within 15–30 days.
                   </p>
                 </div>
               </div>
@@ -416,11 +482,19 @@ export default function Contact() {
                   <div className="inline-block px-3.5 py-1 rounded-full bg-black/5 dark:bg-white/10 text-xs font-mono font-semibold text-neutral-700 dark:text-[#C5CCD3]">
                     Ticket ID: {successData.ticketId}
                   </div>
-                  <div className="pt-6">
+                  <div className="pt-6 flex flex-wrap items-center justify-center gap-3">
+                    <Link
+                      to="/support"
+                      search={{ tab: "requests", id: successData.ticketId }}
+                      className="inline-flex items-center gap-1.5 px-6 py-2.5 rounded-full bg-[#161616] text-white dark:bg-[#F2F0EA] dark:text-[#0A0A0A] text-xs font-bold transition-colors shadow-md cursor-pointer"
+                    >
+                      <span>Track In My Support Tickets</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </Link>
                     <button
                       type="button"
                       onClick={handleResetForm}
-                      className="px-6 py-2.5 rounded-full bg-[#161616] text-white dark:bg-[#F2F0EA] dark:text-[#0A0A0A] text-xs font-bold transition-all shadow-md cursor-pointer"
+                      className="px-6 py-2.5 rounded-full border border-black/15 dark:border-white/15 text-neutral-800 dark:text-neutral-200 text-xs font-bold hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
                     >
                       Send Another Message
                     </button>
@@ -455,10 +529,11 @@ export default function Contact() {
                   {/* Name and Email */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-bold text-neutral-800 dark:text-[#C5CCD3] mb-1.5">
+                      <label htmlFor="contact-name" className="block text-xs font-bold text-neutral-800 dark:text-[#C5CCD3] mb-1.5">
                         Your Full Name <span className="text-primary">*</span>
                       </label>
                       <input
+                        id="contact-name"
                         type="text"
                         value={name}
                         onChange={(e) => {
@@ -467,6 +542,8 @@ export default function Contact() {
                             setErrors((prev) => ({ ...prev, name: "" }));
                         }}
                         placeholder="Your full name"
+                        aria-required="true"
+                        aria-invalid={errors.name ? "true" : "false"}
                         className={cn(
                           "w-full px-3.5 py-2.5 rounded-xl border bg-transparent text-xs text-neutral-900 dark:text-white placeholder:text-neutral-400 dark:placeholder:text-[#697680] focus:outline-none focus:ring-1 focus:ring-primary",
                           errors.name
@@ -482,10 +559,11 @@ export default function Contact() {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-neutral-800 dark:text-[#C5CCD3] mb-1.5">
+                      <label htmlFor="contact-email" className="block text-xs font-bold text-neutral-800 dark:text-[#C5CCD3] mb-1.5">
                         Email Address <span className="text-primary">*</span>
                       </label>
                       <input
+                        id="contact-email"
                         type="email"
                         value={email}
                         onChange={(e) => {
@@ -494,6 +572,8 @@ export default function Contact() {
                             setErrors((prev) => ({ ...prev, email: "" }));
                         }}
                         placeholder="you@example.com"
+                        aria-required="true"
+                        aria-invalid={errors.email ? "true" : "false"}
                         className={cn(
                           "w-full px-3.5 py-2.5 rounded-xl border bg-transparent text-xs text-neutral-900 dark:text-white placeholder:text-neutral-400 dark:placeholder:text-[#697680] focus:outline-none focus:ring-1 focus:ring-primary",
                           errors.email
@@ -512,13 +592,14 @@ export default function Contact() {
                   {/* Phone (Optional) & Category */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-bold text-neutral-800 dark:text-[#C5CCD3] mb-1.5">
+                      <label htmlFor="contact-phone" className="block text-xs font-bold text-neutral-800 dark:text-[#C5CCD3] mb-1.5">
                         Phone Number{" "}
                         <span className="text-neutral-400 font-normal">
                           (Optional)
                         </span>
                       </label>
                       <input
+                        id="contact-phone"
                         type="tel"
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
@@ -528,10 +609,11 @@ export default function Contact() {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-neutral-800 dark:text-[#C5CCD3] mb-1.5">
+                      <label htmlFor="contact-category" className="block text-xs font-bold text-neutral-800 dark:text-[#C5CCD3] mb-1.5">
                         Inquiry Category
                       </label>
                       <select
+                        id="contact-category"
                         value={category}
                         onChange={(e) => setCategory(e.target.value)}
                         className="w-full px-3.5 py-2.5 rounded-xl border border-black/15 dark:border-white/15 bg-white dark:bg-[#1E1E1E] text-xs text-neutral-900 dark:text-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer"
@@ -547,10 +629,11 @@ export default function Contact() {
 
                   {/* Subject Line */}
                   <div>
-                    <label className="block text-xs font-bold text-neutral-800 dark:text-[#C5CCD3] mb-1.5">
+                    <label htmlFor="contact-subject" className="block text-xs font-bold text-neutral-800 dark:text-[#C5CCD3] mb-1.5">
                       Subject <span className="text-primary">*</span>
                     </label>
                     <input
+                      id="contact-subject"
                       type="text"
                       value={subject}
                       onChange={(e) => {
@@ -559,6 +642,8 @@ export default function Contact() {
                           setErrors((prev) => ({ ...prev, subject: "" }));
                       }}
                       placeholder="e.g. Question regarding camera gear package in Vizag"
+                      aria-required="true"
+                      aria-invalid={errors.subject ? "true" : "false"}
                       className={cn(
                         "w-full px-3.5 py-2.5 rounded-xl border bg-transparent text-xs text-neutral-900 dark:text-white placeholder:text-neutral-400 dark:placeholder:text-[#697680] focus:outline-none focus:ring-1 focus:ring-primary",
                         errors.subject
@@ -575,10 +660,11 @@ export default function Contact() {
 
                   {/* Message Body */}
                   <div>
-                    <label className="block text-xs font-bold text-neutral-800 dark:text-[#C5CCD3] mb-1.5">
+                    <label htmlFor="contact-message" className="block text-xs font-bold text-neutral-800 dark:text-[#C5CCD3] mb-1.5">
                       Message <span className="text-primary">*</span>
                     </label>
                     <textarea
+                      id="contact-message"
                       rows={5}
                       value={message}
                       onChange={(e) => {
@@ -587,6 +673,8 @@ export default function Contact() {
                           setErrors((prev) => ({ ...prev, message: "" }));
                       }}
                       placeholder="Please describe your inquiry, rental dates, specific camera mount, or question in detail..."
+                      aria-required="true"
+                      aria-invalid={errors.message ? "true" : "false"}
                       className={cn(
                         "w-full px-3.5 py-2.5 rounded-xl border bg-transparent text-xs text-neutral-900 dark:text-white placeholder:text-neutral-400 dark:placeholder:text-[#697680] focus:outline-none focus:ring-1 focus:ring-primary resize-none leading-relaxed",
                         errors.message
@@ -599,6 +687,67 @@ export default function Contact() {
                         {errors.message}
                       </p>
                     )}
+                  </div>
+
+                  {/* Privacy Notice & Consent Checkboxes (Requirement 5B & DPDP Act 2023) */}
+                  <div className="space-y-3 pt-2 pb-1 border-t border-black/5 dark:border-white/5">
+                    <div className="text-[11px] text-neutral-600 dark:text-neutral-400 leading-relaxed">
+                      We collect your name, email, phone (optional), and inquiry details solely to route and respond to your support request, retained according to our{" "}
+                      <Link to="/privacy" className="font-semibold text-primary underline">
+                        Privacy Policy
+                      </Link>
+                      . We never sell your personal data.
+                    </div>
+
+                    {/* Mandatory Affirmative Consent Checkbox (Unchecked by default) */}
+                    <div>
+                      <label className="flex items-start gap-2.5 cursor-pointer text-xs select-none">
+                        <input
+                          id="contact-privacy-consent"
+                          type="checkbox"
+                          checked={privacyConsent}
+                          onChange={(e) => {
+                            setPrivacyConsent(e.target.checked);
+                            if (errors.privacyConsent) {
+                              setErrors((prev) => ({ ...prev, privacyConsent: "" }));
+                            }
+                          }}
+                          className="mt-0.5 h-4 w-4 rounded border-black/20 dark:border-white/20 text-neutral-900 focus:ring-primary cursor-pointer accent-neutral-950 dark:accent-white"
+                        />
+                        <span className="text-neutral-700 dark:text-neutral-300">
+                          I agree that paYent may process my inquiry information in accordance with the{" "}
+                          <Link to="/privacy" className="font-semibold text-primary underline">
+                            Privacy Policy
+                          </Link>{" "}
+                          and{" "}
+                          <Link to="/terms" className="font-semibold text-primary underline">
+                            Terms of Service
+                          </Link>
+                          . <span className="text-primary">*</span>
+                        </span>
+                      </label>
+                      {errors.privacyConsent && (
+                        <p className="text-[11px] text-red-500 mt-1 ml-6.5">
+                          {errors.privacyConsent}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Optional Marketing Updates (Unchecked by default - no dark pattern) */}
+                    <div>
+                      <label className="flex items-start gap-2.5 cursor-pointer text-xs select-none">
+                        <input
+                          id="contact-marketing-consent"
+                          type="checkbox"
+                          checked={marketingConsent}
+                          onChange={(e) => setMarketingConsent(e.target.checked)}
+                          className="mt-0.5 h-4 w-4 rounded border-black/20 dark:border-white/20 text-neutral-900 focus:ring-primary cursor-pointer accent-neutral-950 dark:accent-white"
+                        />
+                        <span className="text-neutral-600 dark:text-neutral-400">
+                          (Optional) Keep me updated with periodic gear rental guides and community announcements. You may unsubscribe anytime.
+                        </span>
+                      </label>
+                    </div>
                   </div>
 
                   {/* Submit Button (Neutral Button System) */}

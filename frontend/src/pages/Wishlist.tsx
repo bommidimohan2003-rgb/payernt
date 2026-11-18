@@ -61,7 +61,9 @@ export default function Wishlist() {
   return (
     <MainLayout>
       <section className="mx-auto max-w-7xl px-4 md:px-6 py-8 sm:py-10">
-        <BackButton fallback="/browse" className="mb-4" />
+        <div className="flex items-center justify-start mb-4">
+          <BackButton fallback="/browse" />
+        </div>
         <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold flex items-center gap-3 tracking-tight">
           <Heart className="h-7 w-7 text-foreground fill-foreground" aria-hidden="true" />
           <span>Your wishlist</span>

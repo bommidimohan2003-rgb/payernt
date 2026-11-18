@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Bell, CheckCircle2, ArrowLeft, Package, Hash, ExternalLink, Check } from "lucide-react";
+import { Bell, CheckCircle2, ArrowLeft, Package, Hash, ExternalLink, Check, Trash2 } from "lucide-react";
 import { useState, useMemo } from "react";
 import { usePayernt } from "@/payernt/context";
 import { getSeoMetadata } from "@/utils/seo";
@@ -21,6 +21,7 @@ function PayerntNotificationsRoute() {
     notifications,
     markNotificationRead,
     markAllNotificationsRead,
+    deleteNotification,
   } = usePayernt();
 
   const [activeFilter, setActiveFilter] = useState<"all" | "unread" | "requests">("all");
@@ -68,7 +69,7 @@ function PayerntNotificationsRoute() {
           </button>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xl font-black text-foreground">Notifications</h1>
+              <h1 className="text-xl font-black text-foreground">Lender Notifications</h1>
               {unreadCount > 0 && (
                 <span className="px-2 py-0.5 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 text-xs font-bold">
                   {unreadCount} unread
@@ -76,7 +77,7 @@ function PayerntNotificationsRoute() {
               )}
             </div>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Review booking requests, rental status changes, returns, and wallet payouts
+              Payernt Lender Notifications — Review booking requests, gear listings, rental status changes, returns, and wallet payouts
             </p>
           </div>
         </div>
@@ -155,11 +156,11 @@ function PayerntNotificationsRoute() {
           <div className="p-12 text-center border border-dashed border-border rounded-2xl bg-card/50">
             <Bell className="w-8 h-8 mx-auto text-muted-foreground/60 mb-2" />
             <p className="text-sm font-semibold text-foreground">
-              {activeFilter === "unread" ? "No unread notifications" : "No notifications yet"}
+              {activeFilter === "unread" ? "No unread lender notifications" : "No lender notifications yet"}
             </p>
             <p className="text-xs text-muted-foreground mt-1">
               {activeFilter === "unread"
-                ? "You're all caught up with booking decisions and handover alerts."
+                ? "You're all caught up with booking decisions, earnings, and handover alerts."
                 : "You will receive updates when borrowers book your gear, initiate returns, or escrow payouts settle."}
             </p>
           </div>
@@ -227,6 +228,19 @@ function PayerntNotificationsRoute() {
                             <span>Mark read</span>
                           </button>
                         )}
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteNotification(n.id);
+                          }}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-red-500/10 text-muted-foreground hover:text-red-500 text-[11px] font-medium transition-colors cursor-pointer"
+                          title="Delete notification"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                          <span>Delete</span>
+                        </button>
                       </div>
                     </div>
                   </div>

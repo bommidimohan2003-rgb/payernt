@@ -18,6 +18,7 @@ import {
 import { Button } from "@/components/common/Button";
 import { Input } from "@/components/common/Input";
 import { SectionBox } from "@/components/common/SectionBox";
+import { BackButton } from "@/components/common/BackButton";
 import { WakeSlider } from "@/components/reactbits/WakeSlider";
 import { useUserLocation } from "@/hooks/useUserLocation";
 import { useAuth } from "@/hooks/useAuth";
@@ -1051,15 +1052,11 @@ export default function FiltersPage() {
       <header className="sticky top-0 z-30 h-16 shrink-0 bg-white/95 dark:bg-[#1E1E1E]/95 backdrop-blur-md border-b border-neutral-200 dark:border-neutral-800 px-3 sm:px-8 flex items-center justify-between gap-2 sm:gap-4">
         {/* Left: Back Link & Title */}
         <div className="flex items-center gap-2 sm:gap-4 min-w-0">
-          <button
-            type="button"
+          <BackButton
             onClick={handleBack}
-            className="inline-flex items-center gap-1.5 sm:gap-2 min-h-[44px] px-2 -ml-1 text-xs sm:text-sm font-semibold text-neutral-600 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white transition-colors rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800/50 shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white cursor-pointer"
-            title="Return to standard Explore view"
-          >
-            <ArrowLeft className="h-4 w-4 stroke-[1.75]" aria-hidden="true" />
-            <span className="hidden sm:inline">Back to Explore</span>
-          </button>
+            fallback={fromRoute}
+            label="Back to Explore"
+          />
           <div className="h-4 w-[1px] bg-neutral-300 dark:bg-neutral-800 hidden sm:block" />
           <h1 className="text-sm sm:text-base font-semibold text-neutral-900 dark:text-white flex items-center gap-1.5 truncate">
             <span>Filter Marketplace</span>

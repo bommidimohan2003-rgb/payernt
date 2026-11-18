@@ -35,6 +35,7 @@ import {
 import { useState, useEffect, useMemo, useRef } from "react";
 import { MainLayout } from "@/layouts/MainLayout";
 import { Button } from "@/components/common/Button";
+import { BackButton } from "@/components/common/BackButton";
 import { Rating } from "@/components/common/Rating";
 import { RentalProductCard } from "@/components/common/RentalProductCard";
 import { useWishlist } from "@/hooks/useWishlist";
@@ -1474,21 +1475,7 @@ const productSchema = product ? {
 
           {/* Back Navigation Bar & Category Breadcrumb */}
           <div className="flex items-center justify-between">
-            <button
-              type="button"
-              onClick={() => {
-                if (typeof window !== "undefined" && window.history.length > 1) {
-                  window.history.back();
-                } else {
-                  navigate({ to: "/categories" });
-                }
-              }}
-              className="group inline-flex items-center gap-2 min-h-[40px] text-xs sm:text-sm font-semibold text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white px-3.5 py-1.5 rounded-full bg-white dark:bg-[#1E1E1E] border border-neutral-200 dark:border-neutral-800 shadow-xs hover:border-neutral-400 dark:hover:border-neutral-600 transition-colors cursor-pointer"
-              aria-label="Go back to previous page"
-            >
-              <ArrowLeft className="h-4 w-4 text-neutral-600 dark:text-neutral-400 group-hover:text-neutral-950 dark:group-hover:text-white transition-colors" aria-hidden="true" />
-              <span>Back</span>
-            </button>
+            <BackButton fallback="/browse" />
 
             {product?.category && (
               <div className="hidden sm:flex items-center gap-2 text-xs text-neutral-600 dark:text-neutral-400">

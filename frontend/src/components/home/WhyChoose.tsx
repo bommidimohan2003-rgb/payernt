@@ -23,7 +23,7 @@ export function WhyChoose() {
       icon: Layers,
     },
     {
-      title: "Escrow-Protected Orders",
+      title: "Secure Payment Holding",
       desc: "Funds held safely until verified handover & return",
       icon: ShieldCheck,
     },

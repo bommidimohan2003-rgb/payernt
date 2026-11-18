@@ -38,6 +38,8 @@ from agent_engine.escalation import (
     propose_human_escalation,
 )
 from agent_engine.fallback_responses import (
+    UNKNOWN_QUESTION_ENGLISH,
+    UNKNOWN_QUESTION_TELUGU,
     build_decline_response,
     build_unknown_fallback_response,
     clear_pending_escalation,
@@ -400,26 +402,72 @@ class HybridQueryCoordinator:
                     "query_type": QueryType.ESCALATION.value,
                 }
 
-            # Retrieve unanswered question from pending record or previous tool payload
+            # Retrieve unanswered question from pending record, previous tool payload, or conversation history
             unanswered_query = None
             if pending_rec:
                 unanswered_query = pending_rec.get("unanswered_query")
             if not unanswered_query and isinstance(prev_tool, dict):
                 unanswered_query = prev_tool.get("unanswered_query") or prev_tool.get("summary")
 
+            if not unanswered_query and conversation_id:
+                try:
+                    from database import fetch_one
+                    last_user_row = fetch_one("""
+                        SELECT content FROM agent_messages
+                        WHERE conversation_id = %s AND sender_type = 'user'
+                          AND LOWER(content) NOT IN ('yes', 'yes, connect me', 'yes connect me', 'connect me', 'talk to human', 'human support', 'i need an agent')
+                        ORDER BY created_at DESC LIMIT 1
+                    """, (conversation_id,))
+                    if last_user_row and last_user_row.get("content"):
+                        unanswered_query = last_user_row["content"].strip()
+                except Exception:
+                    pass
+
             ticket_subject = "Support Request: Unanswered Inquiry"
-            ticket_message = (
-                unanswered_query
-                or "Customer requested human support assistance following an unassisted inquiry."
-            )
+
+            # Format original inquiry and escalation context cleanly
+            if unanswered_query:
+                ticket_description = (
+                    f"Original user inquiry:\n{unanswered_query}\n\n"
+                    f"Escalation reason:\nThe AI Agent could not resolve the user's request.\n\n"
+                    f"Escalation requested:\nYes."
+                )
+            else:
+                ticket_description = "Customer requested human support assistance following an unassisted inquiry."
+
+            is_telugu = (pending_rec and pending_rec.get("is_telugu")) or self.telugu_normalizer.is_tenglish(clean_msg)
+            fallback_ai_text = UNKNOWN_QUESTION_TELUGU if is_telugu else UNKNOWN_QUESTION_ENGLISH
+
+            conv_context = []
+            if unanswered_query:
+                conv_context.append({
+                    "sender": context.full_name or "User",
+                    "senderType": "user",
+                    "text": unanswered_query,
+                    "timestamp": None
+                })
+                conv_context.append({
+                    "sender": "Payent Agent",
+                    "senderType": "assistant",
+                    "text": fallback_ai_text,
+                    "timestamp": None
+                })
+                conv_context.append({
+                    "sender": context.full_name or "User",
+                    "senderType": "user",
+                    "text": clean_msg,
+                    "timestamp": None
+                })
 
             try:
                 ticket_res = create_support_ticket(
                     context=context,
                     subject=ticket_subject,
-                    message=ticket_message,
+                    message=ticket_description,
                     category="General Help",
                     conversation_id=conversation_id,
+                    conversation_context=conv_context,
+                    original_inquiry=unanswered_query or ticket_description,
                 )
             except PersistenceUnavailableError:
                 return {
@@ -492,19 +540,17 @@ class HybridQueryCoordinator:
                 else:
                     if is_telugu:
                         resp_text = (
-                            f"Mee support request successfully create ayyindi.\n\n"
+                            f"Mee support request successfully create ayyindi. Maa support team mee request ni review chesi follow up chestaru. Support section lo updates track chesukovachu.\n\n"
                             f"• **Ticket Reference**: `#{t_id}`\n"
                             f"• **Category**: {ticket_res.get('category', 'General Help')}\n"
-                            f"• **Status**: OPEN\n\n"
-                            f"Maa support team mee request ni review chesi twaralo follow up chestaru."
+                            f"• **Status**: OPEN"
                         )
                     else:
                         resp_text = (
-                            f"Your support request has been created successfully. I have connected you with our human support team and created support ticket **#{t_id}**.\n\n"
+                            f"Your support request has been created successfully. Our support team can review your request and follow up with you. You can track updates in the Support section.\n\n"
                             f"• **Ticket Reference**: `#{t_id}`\n"
                             f"• **Category**: {ticket_res.get('category', 'General Help')}\n"
-                            f"• **Status**: OPEN\n\n"
-                            f"Our support team can review your request and follow up with you shortly."
+                            f"• **Status**: OPEN"
                         )
 
                 return {

@@ -92,6 +92,8 @@ from payernt_database import (
     add_payernt_notification,
     mark_payernt_notification_read,
     mark_all_payernt_notifications_read,
+    delete_payernt_notification,
+    get_payernt_unread_notifications_count,
     get_payernt_messages,
     send_payernt_message,
     mark_payernt_message_read,
@@ -1694,6 +1696,25 @@ def mark_all_notifications_read_endpoint(account: Dict[str, Any] = Depends(get_c
     """Marks all notifications as read."""
     mark_all_payernt_notifications_read(account["id"])
     return {"success": True, "message": "All notifications marked as read."}
+
+
+@payernt_router.delete("/notifications/{notification_id}")
+def delete_vendor_notification_endpoint(
+    notification_id: str,
+    account: Dict[str, Any] = Depends(get_current_payernt_account),
+):
+    """Deletes a vendor notification."""
+    delete_payernt_notification(account["id"], notification_id)
+    return {"success": True, "message": "Notification deleted."}
+
+
+@payernt_router.get("/notifications/unread-count")
+def get_vendor_unread_notifications_count_endpoint(
+    account: Dict[str, Any] = Depends(get_current_payernt_account),
+):
+    """Fetches real unread notifications count for authenticated vendor."""
+    unread_count = get_payernt_unread_notifications_count(account["id"])
+    return {"success": True, "unreadCount": unread_count, "unread": unread_count, "count": unread_count}
 
 
 @payernt_router.get("/messages")

@@ -546,10 +546,13 @@ export default function DeliveryTracking() {
   return (
     <MainLayout>
       <div className="max-w-6xl mx-auto px-4 py-8">
+        {/* Top-left Back Navigation */}
+        <div className="flex items-center justify-start mb-4">
+          <BackButton fallback={isCustomer ? "/orders" : "/lender-portal"} label={`Back to ${isCustomer ? "My Orders" : "Lender Portal"}`} />
+        </div>
         {/* Top Breadcrumb & Title */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4">
           <div>
-            <BackButton fallback={isCustomer ? "/orders" : "/lender-portal"} label={`Back to ${isCustomer ? "My Orders" : "Lender Portal"}`} className="mb-2" />
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight flex items-center gap-2.5">
               <Truck className="h-7 w-7 text-primary" />
               Live Delivery Tracking

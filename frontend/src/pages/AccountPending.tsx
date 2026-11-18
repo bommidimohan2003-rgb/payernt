@@ -22,6 +22,7 @@ import {
   LogIn,
 } from "lucide-react";
 import { LogoIcon } from "@/components/common/LogoIcon";
+import { BackButton } from "@/components/common/BackButton";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/utils/api";
 import { payerntApi } from "@/payernt/payerntApiService";
@@ -276,9 +277,12 @@ export default function AccountPending() {
 
       {/* Header Navigation */}
       <header className="relative z-10 w-full max-w-4xl mx-auto flex items-center justify-between pb-4">
-        <Link to="/" className="flex items-center gap-2 group">
-          <LogoIcon showTagline={true} />
-        </Link>
+        <div className="flex items-center gap-3">
+          <BackButton fallback="/payent" />
+          <Link to="/" className="flex items-center gap-2 group">
+            <LogoIcon showTagline={true} />
+          </Link>
+        </div>
 
         <div className="flex items-center gap-2.5">
           {/* Theme Toggle Button */}

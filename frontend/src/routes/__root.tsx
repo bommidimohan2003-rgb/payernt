@@ -22,6 +22,7 @@ import { CartDrawer } from "@/components/cart/CartDrawer";
 import { AppPreloader } from "@/components/common/AppPreloader";
 import { Navigation4 } from "@/components/navigation/Navigation4";
 import { LanguageProvider } from "@/i18n";
+import { CookieConsentBanner } from "@/components/legal/CookieConsentBanner";
 
 import appCss from "../styles.css?url";
 
@@ -256,6 +257,7 @@ function RootContent() {
 
       {!isGateway && !isPayernt && <CartDrawer />}
       {showChatbot && !isGateway && !isPayernt && <HelpChatbot />}
+      <CookieConsentBanner />
       <Toaster position="bottom-right" richColors />
     </>
   );

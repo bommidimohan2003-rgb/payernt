@@ -292,6 +292,18 @@ export function RegisterForm() {
       }
 
       // Normal Payrent Customer Registration -> Route to Account Pending / Review
+      // Record registration consent under DPDP Act 2023 & Indian IT Rules
+      api.submitConsent({
+        userIdOrSession: accountId || `user_${data.email}`,
+        consentType: "REGISTRATION_TERMS",
+        preferences: {
+          terms_version: "2026.1",
+          privacy_version: "2026.1",
+          accepted_at: new Date().toISOString(),
+        },
+        userEmail: data.email,
+      }).catch(() => {});
+
       toast.success("Account created successfully! Submitted for review.");
       navigate({
         to: "/account-pending",
@@ -483,16 +495,17 @@ export function RegisterForm() {
 
       {/* Terms & Conditions Checkbox with Animated Circle Tick */}
       <div className="pt-2">
-        <label className="flex items-center gap-2.5 text-xs cursor-pointer select-none group">
+        <label htmlFor="register-terms" className="flex items-center gap-2.5 text-xs cursor-pointer select-none group">
           <input
+            id="register-terms"
             type="checkbox"
-            className="sr-only"
+            className="sr-only focus:not-sr-only focus:inline-block focus:w-4 focus:h-4 focus:mr-1"
             {...register("terms")}
           />
           <AnimatedCircleCheck checked={!!watchTerms} />
           <span className="text-muted-foreground text-[11px] leading-tight group-hover:text-foreground transition-colors">
             I accept the{" "}
-            <Link to="/privacy" target="_blank" className="text-foreground hover:underline font-bold">
+            <Link to="/terms" target="_blank" className="text-foreground hover:underline font-bold">
               Terms of Service
             </Link>{" "}
             and{" "}

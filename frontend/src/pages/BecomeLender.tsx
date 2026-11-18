@@ -294,7 +294,9 @@ export default function BecomeLender() {
         <div className="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-[450px] bg-gradient-to-br from-primary/20 via-purple-500/10 to-emerald-500/10 blur-[130px] rounded-full -z-10" />
 
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-12">
-          <BackButton fallback="/dashboard" className="mb-2" />
+          <div className="flex items-center justify-start mb-4">
+            <BackButton fallback="/payent" />
+          </div>
           {/* PERKS GRID SECTION */}
           <div className="space-y-6">
             <div className="text-left">

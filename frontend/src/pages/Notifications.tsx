@@ -1,4 +1,4 @@
-import { Bell, Check, CheckCheck, Package, Hash, ExternalLink, Filter, Calendar } from "lucide-react";
+import { Bell, Check, CheckCheck, Package, Hash, ExternalLink, Filter, Calendar, Trash2 } from "lucide-react";
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { MainLayout } from "@/layouts/MainLayout";
@@ -26,7 +26,7 @@ export default function Notifications() {
     }
     try {
       if (!silent) setLoading(true);
-      const data = await api.getNotifications(currentToken);
+      const data = await api.getNotifications(currentToken, "PAYRENT");
       if (Array.isArray(data)) {
         setList(data);
         storage.set(STORAGE_KEYS.notifications, data);
@@ -94,11 +94,33 @@ export default function Notifications() {
     });
 
     try {
-      await api.markNotificationsRead(currentToken);
+      await api.markNotificationsRead(currentToken, "PAYRENT");
       window.dispatchEvent(new CustomEvent("payent_notifications_updated"));
       toast.success("All notifications marked as read!");
     } catch (err: any) {
       toast.error(err.message || "Failed to mark notifications as read.");
+      loadNotifications(true);
+    }
+  };
+
+  const deleteSingleNotification = async (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const currentToken = storage.get<string | null>(STORAGE_KEYS.token, null);
+    if (!currentToken) return;
+
+    setList((prev) => {
+      const updated = prev.filter((n) => n.id !== id);
+      storage.set(STORAGE_KEYS.notifications, updated);
+      return updated;
+    });
+
+    try {
+      await api.deleteNotification(currentToken, id);
+      window.dispatchEvent(new CustomEvent("payent_notifications_updated"));
+      toast.success("Notification removed.");
+    } catch (err: any) {
+      console.warn("Failed to delete notification:", err);
+      toast.error("Failed to delete notification.");
       loadNotifications(true);
     }
   };
@@ -150,10 +172,14 @@ export default function Notifications() {
   return (
     <MainLayout>
       <section className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
+        {/* Top-left Back Navigation */}
+        <div className="flex items-center justify-start mb-4">
+          <BackButton fallback="/payent" />
+        </div>
+
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4">
           <div className="flex items-center gap-3">
-            <BackButton fallback="/categories" />
             <div className="h-12 w-12 rounded-2xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center shrink-0">
               <Bell className="h-6 w-6" />
             </div>
@@ -169,7 +195,7 @@ export default function Notifications() {
                 )}
               </div>
               <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-                Real-time booking confirmations, gear lifecycle updates, and payment alerts
+                Payrent Renter Notifications — Real-time booking confirmations, gear lifecycle updates, and payment alerts
               </p>
             </div>
           </div>
@@ -249,7 +275,7 @@ export default function Notifications() {
             <div className="card-premium p-12 text-center border border-dashed border-border rounded-2xl bg-card/60">
               <Bell className="h-10 w-10 mx-auto text-muted-foreground/40 mb-3" />
               <p className="font-bold text-base text-foreground">
-                {activeTab === "unread" ? "No unread notifications" : "No notifications found"}
+                {activeTab === "unread" ? "No unread renter notifications" : "No renter notifications found"}
               </p>
               <p className="text-xs sm:text-sm text-muted-foreground mt-1 max-w-sm mx-auto">
                 {activeTab === "unread"
@@ -283,6 +309,12 @@ export default function Notifications() {
                       },
                     ]
                   : []),
+                {
+                  label: "Delete",
+                  icon: <Trash2 className="h-4 w-4" />,
+                  variant: "destructive" as const,
+                  onClick: () => deleteSingleNotification(n.id),
+                },
               ];
 
               return (
@@ -366,6 +398,16 @@ export default function Notifications() {
                               <span>Mark read</span>
                             </button>
                           )}
+
+                          <button
+                            type="button"
+                            onClick={(e) => deleteSingleNotification(n.id, e)}
+                            className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md hover:bg-red-500/10 text-muted-foreground hover:text-red-500 text-[11px] font-medium transition-colors cursor-pointer border border-transparent hover:border-red-500/20"
+                            title="Delete notification"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                            <span>Delete</span>
+                          </button>
                         </div>
                       </div>
                     </div>

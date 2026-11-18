@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "@tanstack/react-router";
+import { BackButton } from "@/components/common/BackButton";
 import {
   ShieldCheck,
   FileText,
@@ -311,14 +312,10 @@ export function PayerntKycPage() {
       />
       {/* Top Navigation & Breadcrumb */}
       <div className="flex items-center justify-between border-b border-border/80 pb-4">
-        <button
-          type="button"
-          onClick={() => navigate({ to: "/payernt/profile" })}
-          className="inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          <span>Back to Lender Profile</span>
-        </button>
+        <BackButton
+          fallback="/payernt/profile"
+          label="Back to Lender Profile"
+        />
 
         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary border border-primary/20 text-xs font-bold uppercase tracking-wider">
           <ShieldCheck className="h-3.5 w-3.5" />

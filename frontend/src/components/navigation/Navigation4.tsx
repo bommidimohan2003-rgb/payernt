@@ -186,29 +186,58 @@ export function Navigation4({
     if (to === "/browse") {
       return (
         pathname.startsWith("/browse") ||
+        pathname.startsWith("/explore") ||
+        pathname.startsWith("/payent/explore") ||
         pathname.startsWith("/categories") ||
-        pathname.startsWith("/product")
+        pathname.startsWith("/filters") ||
+        pathname.startsWith("/product") ||
+        pathname.startsWith("/products") ||
+        pathname.startsWith("/payent/products")
       );
     }
     if (to === "/orders") {
       return (
         pathname.startsWith("/orders") ||
+        pathname.startsWith("/payent/orders") ||
         pathname.startsWith("/cart") ||
-        pathname.startsWith("/checkout")
+        pathname.startsWith("/payent/cart") ||
+        pathname.startsWith("/checkout") ||
+        pathname.startsWith("/payment") ||
+        pathname.startsWith("/payments") ||
+        pathname.startsWith("/bookings") ||
+        pathname.startsWith("/payent/bookings") ||
+        pathname.startsWith("/delivery")
+      );
+    }
+    if (to === "/profile") {
+      return (
+        pathname.startsWith("/profile") ||
+        pathname.startsWith("/payent/profile") ||
+        pathname.startsWith("/settings") ||
+        pathname.startsWith("/payent/settings") ||
+        pathname.startsWith("/kyc") ||
+        pathname.startsWith("/payent/kyc")
       );
     }
     if (to === "/dashboard") {
       return (
         pathname.startsWith("/dashboard") ||
         pathname.startsWith("/wishlist") ||
-        pathname.startsWith("/profile") ||
-        pathname.startsWith("/settings") ||
+        pathname.startsWith("/payent/wishlist") ||
         pathname.startsWith("/messages") ||
-        pathname.startsWith("/notifications")
+        pathname.startsWith("/payent/messages") ||
+        pathname.startsWith("/notifications") ||
+        pathname.startsWith("/payent/notifications") ||
+        pathname.startsWith("/support") ||
+        pathname.startsWith("/faq") ||
+        pathname.startsWith("/contact") ||
+        pathname.startsWith("/help") ||
+        pathname.startsWith("/payent/help") ||
+        pathname.startsWith("/about") ||
+        pathname.startsWith("/reviews") ||
+        pathname.startsWith("/become-lender") ||
+        pathname.startsWith("/lender-portal")
       );
-    }
-    if (to === "/support") {
-      return pathname.startsWith("/support") || pathname.startsWith("/faq");
     }
     return pathname === to;
   };
@@ -224,7 +253,11 @@ export function Navigation4({
       id: "home",
       label: "Home",
       icon: <Home className="h-4 w-4 sm:h-[18px] sm:w-[18px] md:h-[19px] md:w-[19px] stroke-[1.75]" />,
-      isActive: pathname === "/" || pathname === "/payant" || pathname === "/payent" || pathname === "/payent/",
+      isActive:
+        pathname === "/" ||
+        pathname === "/payant" ||
+        pathname === "/payent" ||
+        pathname === "/payent/",
       onClick: () => navigate({ to: "/payent" }),
     },
     {
@@ -246,14 +279,21 @@ export function Navigation4({
       id: "profile",
       label: "Profile",
       icon: <User className="h-4 w-4 sm:h-[18px] sm:w-[18px] md:h-[19px] md:w-[19px] stroke-[1.75]" />,
-      isActive: pathname.startsWith("/profile") || pathname.startsWith("/settings"),
+      isActive: isRouteActive("/profile"),
       onClick: () => navigate({ to: "/profile" }),
     },
     {
       id: "more",
       label: "More",
       icon: <LayoutGrid className="h-4 w-4 sm:h-[18px] sm:w-[18px] md:h-[19px] md:w-[19px] stroke-[1.75]" />,
-      isActive: isRouteActive("/dashboard") && !pathname.startsWith("/profile") && !pathname.startsWith("/settings"),
+      isActive:
+        isRouteActive("/dashboard") &&
+        !isRouteActive("/profile") &&
+        !isRouteActive("/orders") &&
+        !isRouteActive("/browse") &&
+        pathname !== "/" &&
+        pathname !== "/payent" &&
+        pathname !== "/payent/",
       onClick: () => navigate({ to: "/dashboard" }),
     },
   ];
@@ -261,7 +301,13 @@ export function Navigation4({
   if (
     pathname.startsWith("/admin") ||
     pathname.startsWith("/payernt") ||
-    pathname.startsWith("/paye₹nt")
+    pathname.startsWith("/paye₹nt") ||
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/register") ||
+    pathname.startsWith("/otp") ||
+    pathname.startsWith("/account-pending") ||
+    pathname.startsWith("/forgot-password") ||
+    pathname.startsWith("/reset-password")
   ) {
     return null;
   }

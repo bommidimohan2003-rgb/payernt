@@ -1929,6 +1929,18 @@ export function usePayerntStore() {
     });
   };
 
+  const deleteNotification = (notifId: string) => {
+    lastNotifsFetchRef.current = 0;
+    lastDashboardFetchRef.current = 0;
+    setNotifications((prev) => prev.filter((n) => n.id !== notifId));
+    payerntApi.deleteNotification(notifId).catch((err) => {
+      console.warn(
+        "[Payernt] Failed to delete notification on backend:",
+        err,
+      );
+    });
+  };
+
   const markMessageRead = useCallback(
     async (messageId: string) => {
       lastMessagesFetchRef.current = 0;
@@ -2139,6 +2151,7 @@ export function usePayerntStore() {
     resetWalletData,
     markNotificationRead,
     markAllNotificationsRead,
+    deleteNotification,
     fetchMessages,
     markMessageRead,
     sendAdminMessage,

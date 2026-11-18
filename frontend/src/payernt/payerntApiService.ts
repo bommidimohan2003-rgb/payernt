@@ -876,6 +876,31 @@ export const payerntApi = {
     return { success: true };
   },
 
+  async deleteNotification(id: string): Promise<{ success: boolean }> {
+    try {
+      await fetchWithPayerntAuth(
+        `${API_BASE}/api/payernt/notifications/${id}`,
+        {
+          method: "DELETE",
+        },
+      );
+    } catch {}
+    return { success: true };
+  },
+
+  async getUnreadNotificationsCount(): Promise<{ success: boolean; unreadCount: number }> {
+    try {
+      const res = await fetchWithPayerntAuth(
+        `${API_BASE}/api/payernt/notifications/unread-count`,
+      );
+      if (res.ok) {
+        const data = await res.json();
+        return { success: true, unreadCount: Number(data.unreadCount ?? data.count ?? 0) };
+      }
+    } catch {}
+    return { success: false, unreadCount: 0 };
+  },
+
   // ============================================================
   // MESSAGES (ADMIN / PRODUCT BASED)
   // ============================================================

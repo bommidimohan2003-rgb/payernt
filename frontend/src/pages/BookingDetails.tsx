@@ -529,22 +529,8 @@ export function BookingDetails() {
         {/* Navigation & Header */}
 
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
-
           <div className="space-y-1">
-
-            <button
-
-              onClick={() => navigate({ to: "/payent/bookings" })}
-
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-muted-foreground hover:text-foreground transition-colors mb-2 cursor-pointer"
-
-            >
-
-              <ArrowLeft className="w-3.5 h-3.5" />
-
-              <span>Back to My Bookings</span>
-
-            </button>
+            <BackButton fallback="/orders" label="Back to Bookings" className="mb-2" />
 
             <div className="flex items-center gap-2.5 flex-wrap">
 

@@ -6,6 +6,8 @@ type SupportSearchParams = {
   category?: string;
   tab?: "faq" | "troubleshoot" | "ticket" | "requests";
   q?: string;
+  id?: string;
+  ticket?: string;
 };
 
 export const Route = createFileRoute("/support")({
@@ -15,6 +17,8 @@ export const Route = createFileRoute("/support")({
       ? (search.tab as any)
       : undefined,
     q: typeof search.q === "string" ? search.q : undefined,
+    id: typeof search.id === "string" ? search.id : undefined,
+    ticket: typeof search.ticket === "string" ? search.ticket : undefined,
   }),
   head: () =>
     getSeoMetadata({

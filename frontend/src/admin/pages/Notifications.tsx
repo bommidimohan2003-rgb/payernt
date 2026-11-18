@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import {
   Bell,
   CheckCheck,
@@ -12,6 +13,7 @@ import {
   Clock,
   Info,
   ShieldAlert,
+  ArrowRight,
 } from "lucide-react";
 import { notificationsService } from "../services/notifications";
 import { AdminNotification } from "../services/api";
@@ -20,6 +22,7 @@ import { cn } from "@/lib/utils";
 import { adminWS } from "../services/websocket";
 
 export default function Notifications() {
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState<AdminNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -215,56 +218,74 @@ export default function Notifications() {
             </div>
           ) : (
             <div className="divide-y divide-[rgba(161,161,170,0.1)]">
-              {filteredNotifications.map((notif) => (
-                <div
-                  key={notif.id}
-                  className={cn(
-                    "p-4 flex items-center justify-between gap-4 transition-colors",
-                    !notif.read ? "bg-white/[0.02]" : "hover:bg-white/[0.01]"
-                  )}
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div
-                      className={cn(
-                        "h-2 w-2 rounded-full shrink-0",
-                        !notif.read ? "bg-red-500" : "bg-neutral-600"
-                      )}
-                    />
-                    <div className="min-w-0">
-                      <div className="text-xs font-bold text-[#F5F5F5] truncate">
-                        {notif.title}
-                      </div>
-                      <div className="text-[11px] text-[#A1A1AA] line-clamp-1 mt-0.5">
-                        {notif.message}
+              {filteredNotifications.map((notif) => {
+                const match = notif.title.match(/TICK-\d+/) || notif.message.match(/TICK-\d+/);
+                const ticketId = (notif as any).ticket_id || (notif as any).ticketId || (match ? match[0] : null);
+                return (
+                  <div
+                    key={notif.id}
+                    onClick={() => {
+                      if (ticketId) {
+                        navigate({ to: "/admin/support", search: { id: ticketId } });
+                      }
+                    }}
+                    className={cn(
+                      "p-4 flex items-center justify-between gap-4 transition-colors",
+                      ticketId ? "cursor-pointer" : "cursor-default",
+                      !notif.read ? "bg-white/[0.02]" : "hover:bg-white/[0.01]"
+                    )}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div
+                        className={cn(
+                          "h-2 w-2 rounded-full shrink-0",
+                          !notif.read ? "bg-red-500" : "bg-neutral-600"
+                        )}
+                      />
+                      <div className="min-w-0">
+                        <div className="text-xs font-bold text-[#F5F5F5] truncate flex items-center gap-2">
+                          <span>{notif.title}</span>
+                          {ticketId && (
+                            <span className="font-mono text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                              View Ticket →
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-[#A1A1AA] line-clamp-1 mt-0.5">
+                          {notif.message}
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="flex items-center gap-3 shrink-0">
-                    <span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase bg-[#171C23] text-[#A1A1AA] border border-[rgba(161,161,170,0.18)]">
-                      {notif.type || "System"}
-                    </span>
-                    <span className="text-[11px] font-mono text-[#A1A1AA]">
-                      {notif.createdAt ? new Date(notif.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "Recent"}
-                    </span>
-                    <span
-                      className={cn(
-                        "px-2 py-0.5 rounded text-[10px] font-bold uppercase",
-                        !notif.read ? "bg-red-500/10 text-red-400 border border-red-500/20" : "bg-neutral-800 text-neutral-400"
-                      )}
-                    >
-                      {!notif.read ? "Unread" : "Read"}
-                    </span>
-                    <button
-                      onClick={() => handleDelete(notif.id)}
-                      className="p-1 rounded text-[#A1A1AA] hover:text-red-400 transition-colors cursor-pointer"
-                      title="Dismiss"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase bg-[#171C23] text-[#A1A1AA] border border-[rgba(161,161,170,0.18)]">
+                        {notif.type || "System"}
+                      </span>
+                      <span className="text-[11px] font-mono text-[#A1A1AA]">
+                        {notif.createdAt ? new Date(notif.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "Recent"}
+                      </span>
+                      <span
+                        className={cn(
+                          "px-2 py-0.5 rounded text-[10px] font-bold uppercase",
+                          !notif.read ? "bg-red-500/10 text-red-400 border border-red-500/20" : "bg-neutral-800 text-neutral-400"
+                        )}
+                      >
+                        {!notif.read ? "Unread" : "Read"}
+                      </span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(notif.id);
+                        }}
+                        className="p-1 rounded text-[#A1A1AA] hover:text-red-400 transition-colors cursor-pointer"
+                        title="Dismiss"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

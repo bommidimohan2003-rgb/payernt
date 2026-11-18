@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import {
@@ -8,7 +8,10 @@ import {
   RefreshCw,
   ExternalLink,
   ShieldCheck,
+  Copy,
+  Check,
 } from "lucide-react";
+import { toast } from "sonner";
 import { PayentAgentIcon } from "./PayentAgentIcon";
 import { Button } from "./Button";
 
@@ -55,6 +58,7 @@ export function AgentMessage({
   onCancelEscalation,
   onSelectAction,
 }: AgentMessageProps) {
+  const [copiedTicket, setCopiedTicket] = useState(false);
   const formattedTime = new Date(timestamp).toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
@@ -230,45 +234,81 @@ export function AgentMessage({
 
           {/* Support Ticket Confirmed Card (Editorial Docket Style) */}
           {hasCreatedTicket && (
-            <div className="mt-3.5 rounded-xl bg-white border border-[#E1E4E8] p-3.5 shadow-2xs">
-              <div className="flex items-center justify-between pb-2 border-b border-[#E1E4E8]">
-                <span className="flex items-center gap-1.5 text-xs font-semibold text-[#17191C]">
-                  <CheckCircle2 className="h-4 w-4 text-[#16A36A]" />
-                  Support Ticket Docket
-                </span>
+            <div
+              data-testid="support-ticket-docket"
+              className="mt-3.5 rounded-xl bg-white border border-[#E1E4E8] p-4 shadow-2xs space-y-3"
+            >
+              <div className="flex items-center justify-between pb-2.5 border-b border-[#E1E4E8]">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-[#16A36A] shrink-0" aria-hidden="true" />
+                  <span className="text-xs font-bold text-[#17191C] tracking-tight">
+                    Support Ticket Docket
+                  </span>
+                </div>
                 <span className="px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase bg-[#16A36A]/10 text-[#16A36A] border border-[#16A36A]/20">
                   {toolResult.status || "OPEN"}
                 </span>
               </div>
 
-              <div className="mt-2.5 space-y-1">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-[#707780]">Ticket Reference:</span>
-                  <span className="font-mono font-semibold text-[#17191C] bg-[#F5F6F8] px-1.5 py-0.5 rounded border border-[#E1E4E8]">
-                    #{toolResult.ticket_id}
+              <div className="space-y-2 text-xs">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-[#707780] font-medium">Ticket Reference:</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-mono font-bold text-[#17191C] bg-[#F5F6F8] px-2 py-0.5 rounded border border-[#E1E4E8]">
+                      #{toolResult.ticket_id}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (toolResult.ticket_id) {
+                          navigator.clipboard.writeText(String(toolResult.ticket_id));
+                          setCopiedTicket(true);
+                          toast.success("Ticket reference copied to clipboard");
+                          setTimeout(() => setCopiedTicket(false), 2000);
+                        }
+                      }}
+                      className="p-1 rounded text-[#707780] hover:text-[#17191C] hover:bg-[#F5F6F8] transition-colors cursor-pointer"
+                      title="Copy Ticket Reference"
+                      aria-label="Copy Ticket Reference"
+                    >
+                      {copiedTicket ? (
+                        <Check className="h-3 w-3 text-[#16A36A]" />
+                      ) : (
+                        <Copy className="h-3 w-3" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-[#707780] font-medium">Category:</span>
+                  <span className="text-[#252930] font-semibold">
+                    {toolResult.category || "General Help"}
                   </span>
                 </div>
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-[#707780]">Category:</span>
-                  <span className="text-[#252930] font-medium">
-                    {toolResult.category || "General Support"}
+
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-[#707780] font-medium">Status:</span>
+                  <span className="text-[#16A36A] font-semibold">
+                    {toolResult.status || "OPEN"}
                   </span>
                 </div>
               </div>
 
-              <div className="mt-3 pt-2.5 border-t border-[#E1E4E8] flex items-center justify-between">
+              <div className="pt-2.5 border-t border-[#E1E4E8] flex items-center justify-between gap-2">
                 <span className="text-[11px] text-[#707780] flex items-center gap-1">
-                  <ShieldCheck className="h-3.5 w-3.5 text-[#16A36A]" />
-                  Logged in TiDB
+                  <ShieldCheck className="h-3.5 w-3.5 text-[#16A36A] shrink-0" aria-hidden="true" />
+                  <span>Logged in TiDB</span>
                 </span>
                 <Link
                   to="/support"
-                  className="inline-flex items-center gap-1 text-xs font-semibold text-[#16A36A] hover:underline"
+                  search={{ id: toolResult.ticket_id }}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#16A36A]/10 hover:bg-[#16A36A]/20 text-xs font-semibold text-[#16A36A] transition-colors cursor-pointer"
                   onClick={onCloseChat}
                 >
-                  <Headphones className="h-3 w-3" />
-                  View in Support
-                  <ExternalLink className="h-2.5 w-2.5 opacity-70" />
+                  <Headphones className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span>View in Support</span>
+                  <ExternalLink className="h-3 w-3 opacity-70" aria-hidden="true" />
                 </Link>
               </div>
             </div>

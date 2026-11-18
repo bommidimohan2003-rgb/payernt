@@ -153,10 +153,12 @@ export default function About() {
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[450px] bg-gradient-to-b from-neutral-200/40 via-neutral-100/10 to-transparent dark:from-[#0B1522] dark:via-[#071017] dark:to-transparent rounded-full blur-[160px] pointer-events-none" />
 
         <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-start mb-4 sm:mb-6">
+            <BackButton fallback="/payent" />
+          </div>
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
             {/* Left: About Story Headline & CTAs */}
             <div className="lg:col-span-7">
-              <BackButton fallback="/" className="mb-4" />
               {/* Eyebrow */}
               <div className="flex items-center gap-2 mb-4">
                 <span className="inline-block w-2 h-2 rounded-full bg-neutral-900 dark:bg-white" />

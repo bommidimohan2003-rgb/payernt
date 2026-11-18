@@ -1,11 +1,15 @@
 import { Link } from "@tanstack/react-router";
 import { MainLayout } from "@/layouts/MainLayout";
 import { Button } from "@/components/common/Button";
+import { BackButton } from "@/components/common/BackButton";
 
 export default function NotFound() {
   return (
     <MainLayout>
-      <section className="mx-auto max-w-xl px-4 md:px-6 py-24 text-center">
+      <section className="mx-auto max-w-xl px-4 md:px-6 py-16 text-center">
+        <div className="flex items-center justify-start mb-6">
+          <BackButton fallback="/payent" />
+        </div>
         <div className="text-8xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
           404
         </div>

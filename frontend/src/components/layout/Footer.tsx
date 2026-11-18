@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { LogoIcon } from "@/components/common/LogoIcon";
 import { cn } from "@/lib/utils";
+import { BUSINESS_INFO } from "@/config/businessInfo";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -22,7 +23,7 @@ interface BeforeInstallPromptEvent extends Event {
 interface FooterGroup {
   id: string;
   title: string;
-  items?: { label: string; href?: string; to?: string; hash?: string; external?: boolean }[];
+  items?: { label: string; href?: string; to?: string; hash?: string; external?: boolean; onClick?: () => void }[];
   customContent?: React.ReactNode;
 }
 
@@ -79,10 +80,18 @@ export function Footer() {
       id: "legal",
       title: "Legal & Policies",
       items: [
-        { label: "Privacy Policy", to: "/privacy", hash: "privacy-policy" },
-        { label: "Terms of Service", to: "/privacy", hash: "terms-of-service" },
-        { label: "Cancellation & Refund Rules", to: "/support", hash: "cancellation-refunds" },
-        { label: "Rental Agreement & Escrow", to: "/about", hash: "rental-agreement-escrow" },
+        { label: "Privacy Policy", to: "/privacy" },
+        { label: "Terms of Service", to: "/terms" },
+        { label: "Cookie Policy", to: "/cookies" },
+        { label: "Refund & Cancellation Policy", to: "/refund-policy" },
+        {
+          label: "Cookie Settings",
+          onClick: () => {
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(new CustomEvent("payent:open_cookie_settings"));
+            }
+          },
+        },
       ],
     },
     {
@@ -115,17 +124,17 @@ export function Footer() {
         <div className="flex flex-col gap-1.5 text-xs text-neutral-600 dark:text-neutral-400">
           <div className="flex items-center gap-1.5">
             <Mail className="h-3.5 w-3.5 shrink-0 stroke-[1.75] text-neutral-800 dark:text-neutral-200" aria-hidden="true" />
-            <a href="mailto:support@payent.com" className="hover:underline text-neutral-900 dark:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white rounded truncate">
-              support@payent.com
+            <a href={`mailto:${BUSINESS_INFO.supportEmail}`} className="hover:underline text-neutral-900 dark:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white rounded truncate">
+              {BUSINESS_INFO.supportEmail}
             </a>
           </div>
           <div className="flex items-center gap-1.5">
             <Clock className="h-3.5 w-3.5 shrink-0 stroke-[1.75] text-neutral-800 dark:text-neutral-200" aria-hidden="true" />
-            <span>Mon–Sat: 9 AM–7 PM IST</span>
+            <span>{BUSINESS_INFO.supportHours}</span>
           </div>
           <div className="flex items-center gap-1.5">
             <Shield className="h-3.5 w-3.5 shrink-0 stroke-[1.75] text-neutral-800 dark:text-neutral-200" aria-hidden="true" />
-            <span>Escrow &amp; ID Protected</span>
+            <span>Secure Holding &amp; ID Verified</span>
           </div>
         </div>
       ),
@@ -205,7 +214,15 @@ export function Footer() {
                 <ul className="flex flex-col gap-0.5">
                   {g.items.map((item) => (
                     <li key={item.label}>
-                      {item.to ? (
+                      {item.onClick ? (
+                        <button
+                          type="button"
+                          onClick={item.onClick}
+                          className="text-xs text-neutral-600 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white rounded leading-tight text-left cursor-pointer"
+                        >
+                          {item.label}
+                        </button>
+                      ) : item.to ? (
                         <Link
                           to={item.to}
                           hash={item.hash}
@@ -259,7 +276,15 @@ export function Footer() {
                       <ul className="flex flex-col gap-1">
                         {g.items.map((item) => (
                           <li key={item.label}>
-                            {item.to ? (
+                            {item.onClick ? (
+                              <button
+                                type="button"
+                                onClick={item.onClick}
+                                className="text-neutral-600 dark:text-neutral-400 hover:text-neutral-950 dark:hover:text-white transition-colors block py-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white rounded text-left cursor-pointer"
+                              >
+                                {item.label}
+                              </button>
+                            ) : item.to ? (
                               <Link
                                 to={item.to}
                                 hash={item.hash}
@@ -290,11 +315,23 @@ export function Footer() {
 
         {/* Bottom Copyright & Legal note */}
         <div className="mt-2.5 pt-2 border-t border-neutral-100 dark:border-neutral-800/80 flex flex-col sm:flex-row items-center justify-between gap-1.5 text-[11px] sm:text-xs text-neutral-600 dark:text-neutral-400">
-          <p>&copy; {new Date().getFullYear()} paYent Marketplace. All rights reserved.</p>
-          <div className="flex items-center gap-4">
-            <Link to="/privacy" hash="privacy-policy" className="hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white rounded">Privacy</Link>
-            <Link to="/privacy" hash="terms-of-service" className="hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white rounded">Terms</Link>
-            <Link to="/support" hash="security-protocol" className="hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white rounded">Security</Link>
+          <p>&copy; {new Date().getFullYear()} {BUSINESS_INFO.brandName} Marketplace. All rights reserved.</p>
+          <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4">
+            <Link to="/privacy" className="hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white rounded">Privacy</Link>
+            <Link to="/terms" className="hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white rounded">Terms</Link>
+            <Link to="/cookies" className="hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white rounded">Cookies</Link>
+            <Link to="/refund-policy" className="hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white rounded">Refunds</Link>
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof window !== "undefined") {
+                  window.dispatchEvent(new CustomEvent("payent:open_cookie_settings"));
+                }
+              }}
+              className="hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white rounded cursor-pointer"
+            >
+              Cookie Settings
+            </button>
           </div>
         </div>
       </div>

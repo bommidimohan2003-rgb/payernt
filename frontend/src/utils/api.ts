@@ -2005,18 +2005,24 @@ export const api = {
     return res.json();
   },
 
-  async getNotifications(token: string) {
+  async getNotifications(token: string, role: "PAYRENT" | "PAYERNT" | "ALL" = "PAYRENT") {
     if (!token) return [];
+    const normRole = (role || "PAYRENT").toUpperCase();
     return getCachedOrFetch(
-      "user_notifications",
+      `user_notifications_${normRole}`,
       async () => {
-        const res = await this.fetchWithAuth(`${API_BASE}/api/notifications`, {
+        const res = await this.fetchWithAuth(`${API_BASE}/api/notifications?role=${normRole}`, {
           method: "GET",
+          headers: {
+            "X-Marketplace-Role": normRole,
+          },
         });
         if (!res.ok) return [];
         const data = await res.json();
         if (Array.isArray(data)) {
-          storage.set(STORAGE_KEYS.notifications, data);
+          if (normRole === "PAYRENT") {
+            storage.set(STORAGE_KEYS.notifications, data);
+          }
         }
         return data;
       },
@@ -2024,11 +2030,35 @@ export const api = {
     );
   },
 
-  async markNotificationsRead(token: string) {
-    const res = await this.fetchWithAuth(`${API_BASE}/api/notifications/read`, {
+  async getUnreadNotificationsCount(token: string, role: "PAYRENT" | "PAYERNT" = "PAYRENT") {
+    if (!token) return 0;
+    const normRole = (role || "PAYRENT").toUpperCase();
+    try {
+      const res = await this.fetchWithAuth(`${API_BASE}/api/notifications/unread-count?role=${normRole}`, {
+        method: "GET",
+        headers: {
+          "X-Marketplace-Role": normRole,
+        },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return Number(data.unreadCount ?? data.unread ?? data.count ?? 0);
+      }
+    } catch {}
+    return 0;
+  },
+
+  async markNotificationsRead(token: string, role: "PAYRENT" | "PAYERNT" | "ALL" = "PAYRENT") {
+    const normRole = (role || "PAYRENT").toUpperCase();
+    const res = await this.fetchWithAuth(`${API_BASE}/api/notifications/read?role=${normRole}`, {
       method: "POST",
+      headers: {
+        "X-Marketplace-Role": normRole,
+      },
+      body: JSON.stringify({ role: normRole }),
     });
     if (!res.ok) throw new Error("Failed to mark notifications as read");
+    this.invalidateCache(`user_notifications_${normRole}`);
     this.invalidateCache("user_notifications");
     return res.json();
   },
@@ -2038,6 +2068,19 @@ export const api = {
       method: "POST",
     });
     if (!res.ok) throw new Error("Failed to mark notification as read");
+    this.invalidateCache("user_notifications_PAYRENT");
+    this.invalidateCache("user_notifications_PAYERNT");
+    this.invalidateCache("user_notifications");
+    return res.json();
+  },
+
+  async deleteNotification(token: string, id: string) {
+    const res = await this.fetchWithAuth(`${API_BASE}/api/notifications/${id}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) throw new Error("Failed to delete notification");
+    this.invalidateCache("user_notifications_PAYRENT");
+    this.invalidateCache("user_notifications_PAYERNT");
     this.invalidateCache("user_notifications");
     return res.json();
   },
@@ -2708,8 +2751,83 @@ export const api = {
     return await res.json();
   },
 
-  async replyToConversation(token: string, conversationId: string, message: string) {
-    return this.sendMessage(token, conversationId, message);
+  async replyToConversation(arg1: string, arg2: string, arg3?: string) {
+    let token = "";
+    let conversationId = "";
+    let message = "";
+    if (arg3 !== undefined) {
+      if (arg1.startsWith("ey") || arg1.length > 50) {
+        token = arg1;
+        conversationId = arg2;
+        message = arg3;
+      } else {
+        conversationId = arg1;
+        message = arg2;
+        token = arg3;
+      }
+    } else {
+      conversationId = arg1;
+      message = arg2;
+      token = localStorage.getItem("payent:auth:token") || "";
+    }
+    return this.replySupportTicket(conversationId, message, token);
+  },
+
+  async getSupportTicketDetail(id: string, token?: string) {
+    try {
+      const res = await this.fetchWithAuth(`${API_BASE}/api/support/${encodeURIComponent(id)}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      return null;
+    }
+  },
+
+  async replySupportTicket(id: string, message: string, token?: string) {
+    const res = await this.fetchWithAuth(`${API_BASE}/api/support/${encodeURIComponent(id)}/reply`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ message }),
+    });
+    if (!res.ok) {
+      let errorMsg = "Failed to send reply to support.";
+      try {
+        const errJson = await res.json();
+        if (errJson.detail) errorMsg = errJson.detail;
+      } catch {}
+      throw new Error(errorMsg);
+    }
+    return await res.json();
+  },
+
+  async markSupportTicketRead(id: string, token?: string) {
+    try {
+      const res = await this.fetchWithAuth(`${API_BASE}/api/support/${encodeURIComponent(id)}/read`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  },
+
+  async getSupportUnreadCount(token?: string) {
+    try {
+      const res = await this.fetchWithAuth(`${API_BASE}/api/support/unread-count`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
+      if (!res.ok) return 0;
+      const data = await res.json();
+      return Number(data.unreadCount ?? data.unread ?? data.count ?? 0);
+    } catch {
+      return 0;
+    }
   },
 
   async checkAvailabilityBatch(
@@ -3587,6 +3705,98 @@ export const api = {
     });
     if (!res.ok) {
       throw new Error("Unable to retrieve conversation history.");
+    }
+    return await res.json();
+  },
+
+  async submitConsent(payload: {
+    userIdOrSession: string;
+    consentType: string;
+    preferences: Record<string, boolean>;
+    policyVersion?: string;
+    userEmail?: string;
+  }): Promise<{ success: boolean; record: any }> {
+    const token = storage.get<string | null>(STORAGE_KEYS.token, null);
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
+    const res = await fetchWithTimeout(`${API_BASE}/api/consent`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        user_id_or_session: payload.userIdOrSession,
+        consent_type: payload.consentType,
+        preferences: payload.preferences,
+        policy_version: payload.policyVersion || "v2026.11",
+        user_email: payload.userEmail,
+      }),
+    });
+    if (!res.ok) {
+      throw new Error("Failed to record consent preference.");
+    }
+    return await res.json();
+  },
+
+  async getMyConsents(sessionId?: string): Promise<{ success: boolean; records: any[] }> {
+    const token = storage.get<string | null>(STORAGE_KEYS.token, null);
+    const headers: Record<string, string> = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    const query = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : "";
+    const res = await fetchWithTimeout(`${API_BASE}/api/consent/my${query}`, {
+      method: "GET",
+      headers,
+    });
+    if (!res.ok) {
+      return { success: false, records: [] };
+    }
+    return await res.json();
+  },
+
+  async getMyDataSummary(): Promise<any> {
+    const token = storage.get<string | null>(STORAGE_KEYS.token, null);
+    const headers: Record<string, string> = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    const res = await fetchWithTimeout(`${API_BASE}/api/privacy/my-data-summary`, {
+      method: "GET",
+      headers,
+    });
+    if (!res.ok) {
+      throw new Error("Unable to retrieve personal data summary.");
+    }
+    return await res.json();
+  },
+
+  async submitPrivacyRequest(payload: {
+    requestType: string;
+    details?: string;
+  }): Promise<{ success: boolean; message: string; request: any }> {
+    const token = storage.get<string | null>(STORAGE_KEYS.token, null);
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    const res = await fetchWithTimeout(`${API_BASE}/api/privacy/requests`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        request_type: payload.requestType,
+        details: payload.details,
+      }),
+    });
+    if (!res.ok) {
+      throw new Error("Unable to submit privacy request.");
+    }
+    return await res.json();
+  },
+
+  async getMyPrivacyRequests(): Promise<{ success: boolean; requests: any[] }> {
+    const token = storage.get<string | null>(STORAGE_KEYS.token, null);
+    const headers: Record<string, string> = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    const res = await fetchWithTimeout(`${API_BASE}/api/privacy/requests`, {
+      method: "GET",
+      headers,
+    });
+    if (!res.ok) {
+      return { success: false, requests: [] };
     }
     return await res.json();
   },

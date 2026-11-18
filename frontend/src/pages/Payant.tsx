@@ -18,6 +18,7 @@ import {
   Lock,
 } from "lucide-react";
 import { Button } from "@/components/common/Button";
+import { BackButton } from "@/components/common/BackButton";
 import { WakeSlider } from "@/components/reactbits/WakeSlider";
 import { toast } from "sonner";
 
@@ -44,13 +45,7 @@ export default function Payant() {
       {/* Top Glass Navigation Bar */}
       <header className="sticky top-0 z-40 backdrop-blur-xl bg-black/60 border-none border-b-0 shadow-none px-4 sm:px-8 py-4 flex items-center justify-between">
         <div className="flex items-center gap-6">
-          <Link
-            to="/"
-            className="flex items-center gap-2 text-xs font-semibold text-neutral-400 hover:text-white transition-colors group"
-          >
-            <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" />
-            <span>Product Selection</span>
-          </Link>
+          <BackButton fallback="/payent" label="Product Selection" />
           <div className="h-4 w-px bg-white/20" />
           <div className="flex items-center gap-2">
             <span className="font-sans font-black tracking-tight text-xl text-white">

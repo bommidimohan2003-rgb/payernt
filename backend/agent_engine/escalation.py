@@ -105,7 +105,10 @@ def record_admin_notification(
     title: str,
     message: str,
     notification_type: str = "support",
-    ticket_id: Optional[str] = None
+    ticket_id: Optional[str] = None,
+    subject: Optional[str] = None,
+    user_name: Optional[str] = None,
+    category: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Dispatches admin notification via database table and live WebSocket event bus.
@@ -121,6 +124,7 @@ def record_admin_notification(
         "title": clean_title,
         "message": clean_message,
         "type": notification_type,
+        "ticket_id": ticket_id,
         "is_read": False,
         "created_at": now_iso
     }
@@ -138,9 +142,13 @@ def record_admin_notification(
     try:
         broadcast_admin_event_safe("support.ticket_created", {
             "id": ticket_id or notif_id,
+            "ticket_id": ticket_id,
             "title": clean_title,
-            "category": notification_type,
-            "created_at": now_iso
+            "subject": subject or clean_title,
+            "userName": user_name,
+            "category": category or notification_type,
+            "created_at": now_iso,
+            "target": f"/admin/support?id={ticket_id}" if ticket_id else "/admin/support"
         })
     except Exception:
         pass
@@ -285,7 +293,9 @@ def create_support_ticket(
     category: Optional[str] = "General Help",
     booking_id: Optional[str] = None,
     priority: str = "medium",
-    conversation_id: Optional[str] = None
+    conversation_id: Optional[str] = None,
+    conversation_context: Optional[List[Dict[str, Any]]] = None,
+    original_inquiry: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Workflow Step 8: Authenticated, idempotent ticket creation in support_tickets table and MOCK_SUPPORT_TICKETS.
@@ -355,11 +365,15 @@ def create_support_ticket(
         "sender": user_name,
         "senderType": "user",
         "content": clean_msg,
+        "message": clean_msg,
+        "originalInquiry": original_inquiry or clean_msg,
+        "conversationContext": conversation_context or [],
         "bookingId": clean_booking_id,
         "category": norm_category,
         "conversationId": conversation_id,
         "source": "payent_agent",
-        "timestamp": now_str
+        "timestamp": now_str,
+        "createdAt": now_str
     }]
 
     # In-memory store update
@@ -374,6 +388,9 @@ def create_support_ticket(
         "priority": priority,
         "bookingId": clean_booking_id,
         "conversation_id": conversation_id,
+        "description": clean_msg,
+        "originalInquiry": original_inquiry or clean_msg,
+        "conversationContext": conversation_context or [],
         "messages": init_messages,
         "created_at": now_str,
         "updated_at": now_str
@@ -390,6 +407,21 @@ def create_support_ticket(
             clean_sub, norm_category, "open", priority,
             json.dumps(init_messages), now_str, now_str
         ))
+        try:
+            from database import save_support_ticket_message
+            for m in init_messages:
+                save_support_ticket_message(
+                    ticket_id=ticket_id,
+                    sender_id=clean_email,
+                    sender_type="user",
+                    sender_name=user_name,
+                    message=m.get("content") or m.get("message") or "",
+                    message_id=m.get("id"),
+                    is_read=True,
+                    created_at=now_str
+                )
+        except Exception as stm_err:
+            logger.warning(f"Could not persist initial message in support_ticket_messages: {stm_err}")
     except Exception as e:
         logger.error("Failed to insert support ticket into DB: %s", type(e).__name__)
         if IS_PRODUCTION:
@@ -399,9 +431,12 @@ def create_support_ticket(
     # Record Admin Notification & Broadcast Event
     record_admin_notification(
         title=f"New Agent Escalation: {ticket_id}",
-        message=f"Ticket {ticket_id} created by {clean_email} regarding {norm_category}.",
+        message=f"Ticket {ticket_id} created by {user_name} ({clean_email}) regarding {norm_category}: {clean_sub}",
         notification_type=norm_category,
-        ticket_id=ticket_id
+        ticket_id=ticket_id,
+        subject=clean_sub,
+        user_name=user_name,
+        category=norm_category
     )
 
     # Link to agent conversation in persistence if active
@@ -454,12 +489,18 @@ def sanitize_ticket_record(ticket: Dict[str, Any], context: AgentSessionContext)
             if m.get("is_internal") or m.get("senderType") in ("internal_note", "admin_note"):
                 continue
 
+        msg_content = mask_sensitive_text(m.get("content") or m.get("message") or "")
+        msg_time = m.get("timestamp") or m.get("createdAt")
         clean_m = {
             "id": m.get("id"),
             "sender": m.get("sender"),
             "senderType": m.get("senderType"),
-            "content": mask_sensitive_text(m.get("content") or m.get("message") or ""),
-            "timestamp": m.get("timestamp") or m.get("createdAt")
+            "content": msg_content,
+            "message": msg_content,
+            "originalInquiry": m.get("originalInquiry"),
+            "conversationContext": m.get("conversationContext"),
+            "timestamp": msg_time,
+            "createdAt": msg_time
         }
         filtered_msgs.append(clean_m)
 

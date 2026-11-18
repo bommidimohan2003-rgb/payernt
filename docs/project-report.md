@@ -154,10 +154,68 @@ The project has a mixed integration state. Some customer-facing features are bac
 | **Flexible Time-Slot Booking**  | Half-day (Morning 08:00–12:00, Afternoon 13:00–17:00), Full-Day, Turnaround Buffer & Interval Overlap Math, `GET /api/products/{id}/slots`, `GET/POST /api/payernt/products/{id}/availability-config` | Real   |
 | **Live Rental Queue**          | 8-Milestone lifecycle tracking (Order Confirmed → Ready for Pickup → Picked Up [Timer Start] → Rental in Progress [Elapsed & Remaining] → Return Initiated → Item Handed Back to Owner [Timer Stop] → Awaiting Owner Inspection → Rental Completed), persistent ISO timestamps, cross-portal sync via `/api/orders/{id}/queue-advance` & `/api/payernt/bookings/{id}/queue-advance`, `LiveRentalQueue.tsx` in both Renter Portal (`/orders`, `/dashboard`) & Lender Portal (`/payernt/bookings`, `/lender-portal`) | Real   |
 | **Category-Based Booking Restriction** | Strict one-product-per-category concurrency rule during booking-to-delivery lifecycle. Blocks duplicate bookings in the same category from lender acceptance until delivery confirmation (`picked_up`). Thread-safe backend validation on `POST /api/orders` & `POST /api/payments/create-order`, real-time status endpoints (`GET /api/orders/category-restrictions`, `GET /api/orders/check-category-restriction`), and frontend lockouts on `ProductDetails.tsx` & `Checkout.tsx` with exact message: *"You already have a product in this category awaiting delivery. You can book another product in this category once your current order is delivered."* | Real   |
+| **Support Ticket Messaging & Reply Workflow** | Dedicated user Support Requests inbox, admin reply persistence in MySQL/TiDB, realtime thread synchronization, deep linking (`/support?tab=requests&id={id}`), unread badge counts, read receipt updates (`PATCH /api/support/tickets/{id}/read`), and 3-destination navigation architecture (FAQ & Help, My Support Tickets, Track In Messages) | Real   |
 
 ## Technical Debt
 
 The main technical debt areas are clear:
+
+- [RESOLVED Universal Back Button Navigation Audit & Left Top Corner Standardization]
+  1. *Safe Internal History Detection*: Enhanced `BackButton.tsx` to safely inspect internal browser history state (`window.history.length > 1 && (window.history.state?.idx > 0 || (Boolean(document.referrer) && document.referrer.includes(window.location.host)))`). When valid within-app history exists, it triggers `window.history.back()`; when navigated to directly or from an external referrer, it falls back to the declared logical route rather than trapping users or looping.
+  2. *Default Fallback Hardening*: Updated default fallback from `/` (gateway selector) to `/payent` (primary customer marketplace).
+  3. *Universal Left-Top Corner Positioning*: Positioned `<BackButton fallback="..." />` at the top-left corner of the page container before remaining sections start across all primary customer and portal pages:
+     - `Orders.tsx` → `fallback="/payent"`, top-left breadcrumb row
+     - `ProductDetails.tsx` → `fallback="/browse"`, top-left navigation row
+     - `Support.tsx` → `fallback="/payent"`, top-left of page header (removed centered layout)
+     - `Payment.tsx` & `PaymentHistory.tsx` → `fallback="/orders"`, top-left header
+     - `BookingDetails.tsx` → `fallback="/orders"`, top-left header
+     - `AuthLayout.tsx` (Login, Register, Forgot Password, Reset Password) → `fallback="/payent"`, top-left of auth container
+     - `About.tsx` → `fallback="/payent"`, top-left of content container
+     - `Contact.tsx` → `fallback="/payent"`, top-left of content container
+     - `Reviews.tsx` → `fallback="/payent"`, top-left of content container
+     - `Dashboard.tsx` → `fallback="/payent"`, top-left navigation row before admin callout and KYC banner
+     - `Profile.tsx` → `fallback="/payent"`, top-left before approval banners and user forms
+     - `Settings.tsx` → `fallback="/profile"`, top-left before security and account tabs
+     - `Messages.tsx` → `fallback="/payent"`, top-left row before coordination workspace
+     - `Notifications.tsx` → `fallback="/payent"`, top-left row before notification stream
+     - `PrivacyPolicy.tsx` → `fallback="/payent"`, top-left row before policy card
+     - `DeviceVerificationPage.tsx` → `fallback="/payent"`, top-left row before scanner/status card
+     - `Filters.tsx` → standardized `<BackButton onClick={handleBack} fallback={fromRoute} label="Back to Explore" />`
+     - `Wishlist.tsx` → `fallback="/browse"`, top-left row
+     - `Checkout.tsx` → `fallback="/cart"`, top-left row
+     - `Cart.tsx` → `fallback="/explore"`, top-left row
+     - `BecomeLender.tsx` → `fallback="/payent"`, top-left row
+     - `DeliveryTracking.tsx` → `fallback={isCustomer ? "/orders" : "/lender-portal"}`, top-left row
+     - `LenderPortal.tsx` → `fallback="/dashboard"`, top-left row
+     - `OTP.tsx` → `fallback="/login"`, top-left row
+     - `NotFound.tsx` → `fallback="/payent"`, top-left row
+     - `AccountPending.tsx` → `fallback="/payent"`, top-left header row
+     - `Payant.tsx` → `fallback="/payent"`, top-left glass navbar
+     - `LenderProductDetails.tsx`, `LenderProductEdit.tsx`, `PayerntKycPage.tsx` → standardized `BackButton` with appropriate portal fallbacks
+  4. *Automated Verification*: Added unit/integration test coverage in `frontend/tests/navigation-buttons-state.test.ts` (10/10 tests pass, 87/87 frontend tests passing repository-wide, zero TypeScript/Vite build errors).
+
+- [RESOLVED Universal Navigation Dock & Button States Audit]
+  1. *Complete Active Route Matching*: Audited and unified route detection across all 5 primary dock buttons in `Navigation4.tsx`:
+     - **Home**: Active on `/`, `/payent`, `/payent/`, `/payant`; clicks navigate to `/payent`.
+     - **Explore**: Active on `/browse`, `/explore`, `/payent/explore`, `/categories`, `/filters`, `/product`, `/products`, `/payent/products`; clicks navigate to `/browse`.
+     - **Orders**: Active on `/orders`, `/payent/orders`, `/cart`, `/payent/cart`, `/checkout`, `/payment`, `/payments`, `/bookings`, `/payent/bookings`, `/delivery`; displays dynamic cart badge when `cartCount > 0`; clicks navigate to `/orders`.
+     - **Profile**: Active on `/profile`, `/payent/profile`, `/settings`, `/payent/settings`, `/kyc`, `/payent/kyc`; clicks navigate to `/profile`.
+     - **More**: Active on `/dashboard`, `/wishlist`, `/payent/wishlist`, `/messages`, `/payent/messages`, `/notifications`, `/payent/notifications`, `/support`, `/faq`, `/contact`, `/help`, `/payent/help`, `/about`, `/reviews`, `/become-lender`, `/lender-portal`; clicks navigate to `/dashboard`.
+  2. *Auth View Isolation*: Guarded `Navigation4` so it does not render over authentication screens (`/login`, `/register`, `/otp`, `/account-pending`, `/forgot-password`, `/reset-password`).
+  3. *Breakpoint Gap Elimination for Mobile Cart*: In `Orders.tsx`, transitioned the quick cart button from `sm:hidden` to `md:hidden`, ensuring users on tablet/medium viewports (640px to 768px) have uninterrupted cart access without header/navbar gaps.
+  4. *Lender Mobile Bottom Navigation*: In `PayerntMobileBottomNav.tsx`, updated the 5th tab ("More") to remain active when browsing secondary drawer destinations (`/payernt/messages`, `/payernt/analytics`, `/payernt/help`, `/payernt/settings`, `/payernt/profile`).
+  5. *Automated & Live Browser Verification*: Authored `frontend/tests/navigation-buttons-state.test.ts` (8/8 tests passing, 85/85 total frontend tests passing across 23 suites); verified live route transitions and button clicks via Playwright.
+
+- [RESOLVED Support Ticket Messaging Workflow & Dedicated My Support Tickets Entry]
+  1. *Navigation Discoverability & 3 Distinct Destinations*: Refactored the Contact & Support landing page (`/support`) to maintain three prominent, strictly separated pathways:
+     - **Destination 1 (FAQ & Help)**: 5 FAQ category cards (Rental & Product Issues, Billing & Payments, Previous Orders, App & Technical Support, General Help) with deep troubleshooting guides and legal policies.
+     - **Destination 2 (My Support Tickets)**: Dedicated top-level card with live unread badge, new reply indicator, and direct access to `/support?tab=requests`.
+     - **Destination 3 (Track In Messages)**: Dedicated card and subheaders routing peer-to-peer gear chats to `/messages`.
+  2. *Support Ticket Inbox & Conversation*: Built a two-column responsive inbox displaying all 7 required ticket attributes (Ticket ID `#{id}`, subject, category, status badge with special handling for `waiting_for_user`, formatted timestamp, latest message preview, and unread dot). Conversation threads render Admin replies on the left with `ShieldCheck` icon and user messages on the right.
+  3. *Read Receipts & Unread Count Synchronization*: Integrated `PATCH /api/support/tickets/{id}/read` and `GET /api/support/unread-count` so opening a ticket decrements counters immediately and updates all UI badges.
+  4. *Deep Linking Support*: Supported direct URL routing with TanStack Router search parameters (`/support?tab=requests&id={ticket_id}` or `?ticket={ticket_id}`), instantly highlighting and opening target tickets (such as `TICK-1794999087148`).
+  5. *Closed Ticket Safeguards*: Closed tickets render a clear resolution notice and disable message composer inputs to prevent dangling requests.
+  6. *Empirical Verification*: 100% of frontend tests (77/77 passing across 22 suites), 100% of backend tests (20/20 passing), clean production build (`vite build` in 7.43s), and visual confirmation via Playwright screenshot captures.
 
 - [RESOLVED Phase 2: Advanced Production Performance Optimization, Database Tuning & Frontend Efficiency]
   1. *Connection Pool Ping Elimination*: TiDB Cloud is hosted in AWS Singapore (`ap-southeast-1`) with ~50ms WAN latency. In `backend/database.py`, `PooledDB` had `ping=1`, which issued a separate blocking network ping on every single connection checkout (adding 48–55ms per query). Set `ping=0` for zero-overhead checkouts (0.02ms, a 2,500x speedup), added transparent retry logic for dropped connections (MySQL 2006/2013), and added `prewarm_db_pool(5)` during FastAPI async startup to eliminate cold-start TLS handshakes.
@@ -284,6 +342,7 @@ The main technical debt areas are clear:
 - [RESOLVED FastAPI 422 Validation Error & Minified React Error #31 Elimination] (1) FastAPI RequestValidationError Exception Handler: Implemented universal exception handler `@app.exception_handler(RequestValidationError)` in `backend/main.py` converting raw Pydantic validation error lists into clean, human-readable strings for `detail`, `error`, and `message`; (2) Schema Flexibility: Relaxed strict `EmailStr` and `min_length` constraints in `PayerntLoginSchema`, `PayerntRegisterSchema`, and `CheckRegistrationSchema` in `backend/payernt_router.py` to allow application-level regex and complexity validation with clear user-facing error messages; (3) Frontend Error Parser (`extractApiErrorMessage`): Hardened `payerntApiService.ts` across all API endpoints with `extractApiErrorMessage` safely parsing arrays/objects into human-readable strings; (4) Safe JSX Child Rendering: Wrapped error displays in `PayerntAuth.tsx` and `store.ts` with `safeString` to guarantee React never receives raw objects as children (permanently eliminating React error #31); (5) Automated Verification: Verified 10/10 tests OK in `test_three_context_auth_and_switching.py` and clean zero-error production build (`npm run build`).
 - [RESOLVED Complete Notifications Feature & Real-Time Multi-Portal Booking Lifecycle System] (1) 17 Lifecycle Events & Multi-Party Delivery: Engineered authoritative booking lifecycle dispatcher `notify_booking_event` in `backend/database.py` dispatching real-time notifications to renters, lenders, and admins for all 17 supported milestones: booking creation/request, booking accepted/confirmed, booking declined/rejected, renter cancellation, lender cancellation, ready for pickup, pickup confirmed/rental started, return initiated, item handed back, awaiting inspection, rental completed, payment verified, refund processed, location change requested, location change approved, location change rejected, return due date approaching, and overdue notices; (2) Data Persistence & Schema: Migrated `notifications` and `payernt_notifications` tables with `product_name`, `booking_id`, `link`, and `event_key` columns with dedicated indexes, guaranteeing full cross-session durability in MySQL/TiDB and in-memory fallbacks; (3) Idempotency & Duplicate Prevention: Enforced `(user_email, event_key)` checks in database layers preventing duplicate notifications on repeated API calls or webhooks; (4) Multi-Portal UI Support: (a) Renter Portal (`/notifications` & `Navbar.tsx`): Added Notification Bell icon with dynamic unread count badge, filter tabs (All, Unread, Rentals & Bookings), product name and booking ID pills with direct navigation, and 12-15s background polling; (b) Lender Portal (`/payernt/notifications` & `PayerntNavbar.tsx`): Added numeric unread badge, filter tabs, click-to-open request action routes, and 15s polling; (5) Multi-Context Authentication: Updated notification endpoints to use `get_current_any_user_email` and unified vendor account ID / email matching; (6) Verification: Passed all 10 unit test cases in `backend/tests/test_notifications_feature.py` (100% OK) and verified clean zero-error production frontend build.
 - [RESOLVED Live Rental Queue Expand, Collapse & Independent View Details Architecture] (1) Independent Booking History Expansion Architecture: Refactored `Orders.tsx` so each booking card operates as an independent, expandable Booking History card with stable booking ID tracking (`expandedBookingId`), eliminating the full-screen view swap that previously concealed other orders, ensuring other bookings remain compact and visible on the same page with live filter tabs; (2) Dual Toggle Controls & Chevron Feedback: Implemented synchronized "View Details" (when collapsed) and "Close Details" / "Hide Details" (when expanded) buttons with rotating ChevronDown icons and accessible `aria-expanded` attributes on both desktop and mobile layouts across renter and lender portals; (3) Clean DOM Conditional Rendering: Enforced strict conditional mounting (`{isCardExpanded && (...)}` and `{isExpanded && (...)}`), ensuring complete unmounting of hidden controls, timer HUDs, inputs, and action buttons when collapsed, eliminating layout overlap, clipped content, and keyboard trap issues; (4) Persistent State & Hook De-Bouncing: Fixed unwanted expansion resets in `LiveRentalQueue.tsx` by replacing naive `[orderId, compact]` effect triggers with a `useRef` comparison on `compact` prop changes, preventing rental timer ticks, polling updates, or parent re-renders from prematurely resetting the queue's user-toggled expansion state; (5) Isolated Event Propagation: Added `e.stopPropagation()` and `e.preventDefault()` across all expand/collapse/view/hide click triggers in `LiveRentalQueue.tsx`, `Orders.tsx`, and `RentalRequests.tsx`, preventing event bubbling from interfering with parent card actions; (6) Verification: Verified clean zero-error production build (`npm run build`), 100% test pass rate across backend test suites (10/10 OK), and confirmed proper functionality across cancelled, pending, and ongoing bookings in both renter and lender portals.
+- [RESOLVED Admin-to-User Support Reply Integration & Bi-Directional Messaging] (1) Relational TiDB Cloud Persistence: Created `support_ticket_messages` table with indexed `ticket_id`, `sender_id`, `sender_type`, `created_at`, `is_read`, dual-writing with `support_tickets.messages` JSON column for 100% backwards compatibility; (2) Hardened Backend API Handlers: Implemented `/api/admin/support/{id}/reply`, `/api/support/{id}/reply`, `/api/support/{id}`, `/api/support/{id}/read`, and `/api/support/unread-count` in `backend/main.py` with strict IDOR ownership checks (HTTP 403) and closed ticket protection (HTTP 400); (3) Bi-Directional Notifications: Admin replies create persistent user notifications linking to `/support?id={id}`, and user replies trigger `record_admin_notification` alerts in the Admin Support Desk; (4) User Contact & Support UI (`Support.tsx`): Built real-time message viewer with sender discrimination (Admin on left with `ShieldCheck` icon, User on right with `ml-auto`), "Waiting for you" status tags, "New reply" badge indicators, read-only lock banner for closed tickets, active thread polling (4s), and search param deep-linking (`?id=TICK-...`); (5) Empirical Verification: Successfully executed on target ticket `TICK-1794999087148` (owned by `bommidimohan304@gmail.com`), full backend test suite passing 100% (12/12 in `test_support_ticket_messaging_workflow.py` and 8/8 in `test_support_ticket_information_fix.py`), frontend test suite passing 100% (74/74 tests), and clean zero-error Vite 8 / TanStack Start production build.
 
 ## Risks and Recommendations
 
@@ -1457,3 +1516,133 @@ All 8 verification criteria were systematically validated using automated pytest
 - Test Regression Suite: **44 passed** across `test_calendar_availability_and_conflicts.py` (16 passed), `test_blocked_dates_and_calendar.py` (12 passed), and `test_cancellation_and_time_slots.py` (16 passed).
 - Frontend Build: **100% clean production build** (`npm run build` in `frontend/`, 0 errors, built in 6.59s).
 
+---
+
+## Role-Based Notification Separation (Payrent & Payernt)
+
+### 1. Objective & Architecture
+The marketplace features two distinct user personas that can belong to the same registered account:
+- **Payrent**: Renter / Customer who browses, rents gear, tracks deliveries, and makes payments.
+- **Payernt**: Lender / Gear Owner who lists equipment, approves bookings, verifies returns, and manages payouts.
+
+To prevent cognitive clutter, transactional confusion, and security leakage, notification feeds are strictly segregated at the database, API query, and real-time WebSocket distribution layers. Frontend-only filtering is explicitly forbidden.
+
+### 2. Database Schema & Backfill Migration
+- **`notifications` Table**:
+  - Added `audience_role VARCHAR(20) DEFAULT 'PAYRENT' NOT NULL` with index `idx_notif_audience_role`.
+- **`payernt_notifications` Table**:
+  - Added `audience_role VARCHAR(20) DEFAULT 'PAYERNT' NOT NULL` with index `idx_pn_audience_role`.
+- **Migration & Backfill (`backend/scripts/migrate_notification_roles_fast.py`)**:
+  - Automatically classified 427 existing records in `notifications` and 168 records in `payernt_notifications`.
+  - Classifications:
+    - `PAYRENT`: Customer rental confirmations, checkout receipts, return initiation confirmations, customer refunds, customer KYC updates, customer support replies.
+    - `PAYERNT`: Booking requests received, payout/earnings notices, equipment inspection alerts, product listing approvals/rejections/suspensions, lender KYC updates, lender support replies.
+    - `COMMON`: Platform security notices, device registrations, account suspension/reactivation, terms updates.
+
+### 3. Backend Endpoints & Query Isolation
+- **`GET /api/notifications`**:
+  - Query parameter: `?role=PAYRENT|PAYERNT|ALL` (or HTTP header `X-Marketplace-Role`).
+  - Default: `PAYRENT`.
+  - SQL query filter: `WHERE (audience_role = %s OR audience_role = 'COMMON')`.
+- **`GET /api/notifications/unread-count`**:
+  - Returns `unreadCount`, `count`, and `role`, strictly scoped to the active persona.
+- **`POST /api/notifications/read`**:
+  - Role-scoped bulk read operation. Marking all read in Payrent leaves Payernt unread notifications untouched.
+- **`DELETE /api/notifications/{id}` & `DELETE /api/payernt/notifications/{id}`**:
+  - Individual notification deletion with strict owner email verification against both TiDB and mock storage.
+- **Real-Time WebSocket Separation (`/api/notifications/ws`)**:
+  - `UserNotificationManager` tracks connected sockets per email and their active role (`PAYRENT` vs `PAYERNT`).
+  - Real-time broadcasts filter recipients: a `PAYRENT` notification is dispatched exclusively to `PAYRENT` client connections; `PAYERNT` notifications are dispatched to `PAYERNT` connections; `COMMON` notifications are pushed to all active sessions.
+  - Supports dynamic client role switching via `"switch_role"` event without requiring socket reconnection.
+
+### 4. Frontend Integration
+- **Payrent Customer Notifications (`frontend/src/pages/Notifications.tsx`)**:
+  - Header: "Payrent Renter Notifications — Real-time booking confirmations, delivery tracking...".
+  - Empty states: "No unread renter notifications" / "No renter notifications found".
+  - Includes swipe-to-delete and explicit trash button actions.
+- **Payernt Lender Notifications (`frontend/src/routes/payernt/notifications.tsx`)**:
+  - Header: "Payernt Lender Notifications — Review booking requests, gear listings, payouts...".
+  - Empty states: "No unread lender notifications" / "No lender notifications yet".
+  - Integrated with `payerntApiService.deleteNotification`.
+- **API Services (`frontend/src/utils/api.ts` & `frontend/src/payernt/payerntApiService.ts`)**:
+  - Enforces explicit role parameter passing and `X-Marketplace-Role` header on all notification requests.
+
+### 5. Empirical Test Verification
+- **Automated Separation Suite (`backend/tests/test_role_based_notification_separation.py`)**:
+  1. `test_01_payrent_isolation`: **PASSED** (Renter sees ONLY Payrent + COMMON, never Payernt lender notices).
+  2. `test_02_payernt_isolation`: **PASSED** (Lender sees ONLY Payernt + COMMON, never Payrent renter notices).
+  3. `test_03_common_notifications_in_both`: **PASSED** (COMMON alerts visible in both feeds).
+  4. `test_04_role_switching`: **PASSED** (Switching role immediately returns proper role-scoped set).
+  5. `test_05_role_specific_unread_counts`: **PASSED** (Unread counts accurately scoped to active role).
+  6. `test_06_mark_all_read_isolation`: **PASSED** (Marking read in Payrent does not clear unread in Payernt).
+  7. `test_07_realtime_websocket_delivery`: **PASSED** (WebSocket manager routes notices strictly to matching client roles).
+  8. `test_08_user_isolation`: **PASSED** (User A cannot access or delete User B's notifications).
+  9. `test_09_booking_event_classification`: **PASSED** (`notify_booking_event` tags PAYRENT for renter, PAYERNT for lender).
+  10. `test_10_legacy_record_accessibility`: **PASSED** (Legacy unclassified records default cleanly to PAYRENT).
+  11. `test_11_admin_support_reply_isolation`: **PASSED** (Admin support ticket replies scoped by ticket owner type).
+  12. `test_12_regression_checks`: **PASSED** (Deletion and individual marking work across both tables without cross-pollution).
+- **Automated Regression Suite (`backend/tests/test_notifications_feature.py`)**:
+  - All 10 legacy notification tests: **PASSED** (10/10).
+- **Frontend Build**:
+  - `npm --prefix frontend run build`: **PASSED** (0 errors, client and SSR dist generated cleanly).
+
+
+---
+
+## 22. Complete Legal, Privacy, Accessibility, Trust & Compliance Implementation (DPDP Act 2023, IT Rules 2021, CCPA Dark Patterns 2023, WCAG 2.2 AA)
+
+### 1. Architectural Scope & Standards Addressed
+This implementation fulfills all 11 requirements across legal disclosure, user data privacy, accessibility, and Indian e-commerce statutory frameworks without breaking existing application capabilities:
+1. **Privacy Policy (`/privacy`)**: 14-section policy under DPDP Act 2023 & IT Rules 2011/2021 with itemized data inventory, 8 lawful purposes, 7-year statutory tax retention, minor protection (strictly 18+), and designated statutory Grievance Officer details.
+2. **Terms & Conditions (`/terms`)**: Dedicated 20-section intermediary contract defining Section 79 IT Act safe harbor, Payrent vs Payernt roles, mandatory KYC check, deposit holding, PIN/OTP handoff protocol, damage claims, and dispute jurisdiction in Visakhapatnam.
+3. **Cookie Policy (`/cookies`)**: Complete categorization of client storage across Strictly Necessary, Functional/Preferences, Analytics, and Marketing, with a direct trigger to open Cookie Settings.
+4. **Refund and Cancellation Policy (`/refund-policy`)**: 15 distinct rental scenarios reflecting actual backend state transitions with an authoritative Code-to-Policy Verification Table.
+5. **Cookie Consent & Form Consent**:
+   - `CookieConsentBanner.tsx`: 3 equal-weighted choices (Accept All, Reject Optional, Customize Preferences), 4 categories (Necessary locked), SSR safe, persistent under `payent:cookie_consent_v1`.
+   - Contact form: Unchecked mandatory affirmative privacy acknowledgement + unchecked optional marketing updates.
+   - Registration form: Separate links to `/terms` and `/privacy`, affirmative consent checkbox, backend audit logging.
+   - Checkout flow: Unchecked mandatory affirmative checkbox before SlideCommit / Razorpay payment agreeing to Terms, Refund Policy, and security deposit pre-authorisation.
+   - Database persistence: `consent_records` table in TiDB Serverless logging user/session ID, IP, user-agent, policy version `2026.1`, and timestamp.
+6. **Transparent Personal Data Collection (DPDP Section 11 & 12)**:
+   - "Your Data & Privacy" Hub (`DataPrivacyHub.tsx`) embedded in `/settings`.
+   - Real-time personal data overview (Profile, KYC status with masked PAN, order counts, device counts, reviews).
+   - "Export Portable Data (.JSON)" via `GET /api/privacy/export-download`.
+   - Interactive modals for Data Correction, Account/Data Deletion (with 7-year tax retention notice), and Grievance filing.
+   - Admin audit and resolution tracking via `GET /api/admin/privacy/requests` and `POST /api/admin/privacy/requests/{id}/resolve`.
+7. **Third-Party Embeds & Services Register**:
+   - `docs/PAyENT_THIRD_PARTY_SERVICES_REGISTER.md` auditing Razorpay, TiDB Cloud, Railway, Cloudflare, Twilio, and CARTO/OSM.
+   - Firebase verified as a dummy stub (`app: null`) with zero network traffic.
+   - Click-to-load privacy gate on `DeliveryMap.tsx` blocking external tile requests until explicit user confirmation ("Load Live Map").
+8. **Image Alt Text & Colour Contrast (WCAG 2.2 AA)**:
+   - Descriptive `alt={title}` on all rental cards; accessible fallback `<Package>` + "No photo" for broken/missing images.
+   - High contrast ratios (light theme >= 7.5:1, dark theme >= 8.2:1).
+   - Availability and status badges feature dual icon + textual labels (never color alone).
+9. **Keyboard-Friendly Forms & Accessible Controls**:
+   - All inputs linked to labels via `htmlFor="..."` and `id="..."`.
+   - Universal visible focus rings (`focus-visible:ring-2 focus-visible:ring-primary`).
+   - Accessible touch targets meeting >= 44x44px.
+   - Zero nested interactive elements (wishlist `<button>` positioned outside `<Link>`).
+10. **Authentic Reviews, Verified Claims & Business Details**:
+    - Removed synthetic fallback `"Verified Renter"`; neutral fallback is `"Community Member"`.
+    - Removed default 5-star rating fallback; only real ratings rendered.
+    - Verified badge displays strictly if backed by a confirmed booking in TiDB.
+    - Marketing claims audited: "Escrow" qualified to "Secure Payment Holding".
+    - Centralized business info in `frontend/src/config/businessInfo.ts`.
+    - Created `docs/LEGAL_OWNER_INPUT_REQUIRED.md` for corporate CIN, GSTIN, and Grievance Officer name.
+11. **Copyright, Asset Rights & Indian Law Compliance**:
+    - Created `docs/PAyENT_ASSET_RIGHTS_REGISTER.md` cataloging bundled webp media under commercial licenses.
+    - Created `docs/PAyENT_INDIA_COMPLIANCE_ASSESSMENT.md` validating compliance across CPA 2019, CCPA Dark Patterns 2023, DPDP Act 2023, and IT Rules 2021.
+    - Created `docs/PAyENT_ACCESSIBILITY_AUDIT.md` and master `docs/PAyENT_LEGAL_IMPLEMENTATION_REPORT.md`.
+
+### 2. Empirical Test Verification
+- **Automated Legal & Compliance Test Suite (`backend/tests/test_legal_and_compliance.py`)**:
+  1. `test_record_and_retrieve_user_consent`: **PASSED** (Records consent with preferences JSON, IP, user-agent, policy version, and retrieves audit log).
+  2. `test_privacy_request_lifecycle`: **PASSED** (Creates DPR request, retrieves user requests, lists admin requests, resolves with notes).
+  3. `test_personal_data_summary_and_export`: **PASSED** (Validates DPDP Section 11 summary, 8-year tax retention notice, and structured JSON export).
+  4. `test_review_integrity_no_fake_identities`: **PASSED** (Verifies no fake "Verified Renter" fallbacks and no forced 5-star ratings).
+  5. `test_checkout_terms_consent_recording`: **PASSED** (Verifies checkout terms consent recording with deposit authorization).
+- **Regression Suites**:
+  - `backend/tests/test_role_based_notification_separation.py`: **12/12 PASSED (100% OK)**.
+  - `backend/tests/test_notifications_feature.py`: **10/10 PASSED (100% OK)**.
+- **Frontend Production Build**:
+  - `npm --prefix frontend run build`: **PASSED** (0 errors, client and SSR dist generated cleanly).

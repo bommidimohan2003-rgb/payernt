@@ -1,4 +1,5 @@
 import { MainLayout } from "@/layouts/MainLayout";
+import { BackButton } from "@/components/common/BackButton";
 import { AuthGearShowcase } from "@/components/auth/AuthGearShowcase";
 import { CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -28,6 +29,9 @@ export function AuthLayout({
 
         {/* Clean Two-Column Composition: Left Gear Showcase from image, Right authentication form */}
         <div className="relative z-10 w-full max-w-6xl mx-auto">
+          <div className="flex items-center justify-start mb-4">
+            <BackButton fallback="/payent" />
+          </div>
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-12 items-start">
             {/* Left Section – Gear Showcase matching user image exactly in both themes */}
             <div className="lg:col-span-6 xl:col-span-6 flex flex-col justify-start">

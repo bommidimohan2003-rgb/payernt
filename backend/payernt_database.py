@@ -325,9 +325,11 @@ def init_payernt_tables():
     _add_pn_col("booking_id VARCHAR(255) NULL")
     _add_pn_col("product_name VARCHAR(255) NULL")
     _add_pn_col("event_key VARCHAR(255) NULL")
+    _add_pn_col("audience_role VARCHAR(20) DEFAULT 'PAYERNT'")
     try:
         from database import add_index_safely
         add_index_safely("payernt_notifications", "idx_pn_event_key", "owner_id, event_key")
+        add_index_safely("payernt_notifications", "idx_pn_audience_role", "owner_id, audience_role, is_read")
     except Exception:
         pass
 
@@ -3105,9 +3107,10 @@ def get_payernt_notifications(owner_id: str) -> List[Dict[str, Any]]:
     try:
         rows = fetch_all("""
             SELECT * FROM payernt_notifications
-            WHERE owner_id = %s
+            WHERE (owner_id = %s
                OR (owner_id IN (SELECT id FROM payernt_accounts WHERE LOWER(email) = %s))
-               OR (owner_id IN (SELECT email FROM payernt_accounts WHERE id = %s))
+               OR (owner_id IN (SELECT email FROM payernt_accounts WHERE id = %s)))
+              AND (audience_role = 'PAYERNT' OR audience_role = 'COMMON')
             ORDER BY created_at DESC
             LIMIT 50
         """, (clean_id, clean_email or clean_id, clean_id))
@@ -3132,6 +3135,8 @@ def get_payernt_notifications(owner_id: str) -> List[Dict[str, Any]]:
                     "product_name": r.get("product_name"),
                     "productName": r.get("product_name"),
                     "event_key": r.get("event_key"),
+                    "audience_role": r.get("audience_role") or "PAYERNT",
+                    "audienceRole": r.get("audience_role") or "PAYERNT",
                 })
             return formatted
     except Exception as e:
@@ -3139,7 +3144,8 @@ def get_payernt_notifications(owner_id: str) -> List[Dict[str, Any]]:
 
     mock_list = []
     for m in MOCK_PAYERNT_NOTIFICATIONS.get(clean_id, []):
-        mock_list.append(m)
+        if m.get("audience_role", "PAYERNT") in ("PAYERNT", "COMMON"):
+            mock_list.append(m)
     return mock_list
 
 
@@ -3152,11 +3158,16 @@ def add_payernt_notification(
     booking_id: Optional[str] = None,
     product_name: Optional[str] = None,
     event_key: Optional[str] = None,
+    audience_role: str = "PAYERNT",
 ) -> Dict[str, Any]:
     """Adds a notification for a vendor with idempotency check."""
     clean_id = (owner_id or "").strip()
     if not clean_id:
         return {}
+
+    norm_role = str(audience_role or "PAYERNT").strip().upper()
+    if norm_role not in ("PAYERNT", "COMMON"):
+        norm_role = "PAYERNT"
 
     # Check for existing notification if event_key is specified (Prevent duplicate notifications)
     if event_key:
@@ -3202,13 +3213,15 @@ def add_payernt_notification(
         "product_name": product_name,
         "productName": product_name,
         "event_key": event_key,
+        "audience_role": norm_role,
+        "audienceRole": norm_role,
     }
 
     try:
         execute_query("""
-            INSERT INTO payernt_notifications (id, owner_id, title, message, type, action_route, is_read, created_at, booking_id, product_name, event_key)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """, (notif_id, clean_id, title, message, type_, action_route, False, now_iso, booking_id, product_name, event_key))
+            INSERT INTO payernt_notifications (id, owner_id, title, message, type, action_route, is_read, created_at, booking_id, product_name, event_key, audience_role)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (notif_id, clean_id, title, message, type_, action_route, False, now_iso, booking_id, product_name, event_key, norm_role))
     except Exception as e:
         logger.warning(f"DB insert error for notification: {e}")
 
@@ -3247,6 +3260,55 @@ def mark_all_payernt_notifications_read(owner_id: str) -> bool:
         n["read"] = True
     invalidate_vendor_dashboard_cache(owner_id)
     return True
+
+
+def delete_payernt_notification(owner_id: str, notification_id: str) -> bool:
+    """Deletes a single notification for a vendor."""
+    clean_id = (owner_id or "").strip()
+    clean_email = clean_id.lower() if "@" in clean_id else ""
+    try:
+        execute_query("""
+            DELETE FROM payernt_notifications
+            WHERE id = %s
+              AND (owner_id = %s
+                   OR (owner_id IN (SELECT id FROM payernt_accounts WHERE LOWER(email) = %s))
+                   OR (owner_id IN (SELECT email FROM payernt_accounts WHERE id = %s)))
+        """, (notification_id, clean_id, clean_email or clean_id, clean_id))
+    except Exception as e:
+        logger.warning(f"DB delete error for notification: {e}")
+
+    notifs = MOCK_PAYERNT_NOTIFICATIONS.get(clean_id, [])
+    MOCK_PAYERNT_NOTIFICATIONS[clean_id] = [n for n in notifs if n.get("id") != notification_id]
+    invalidate_vendor_dashboard_cache(clean_id)
+    return True
+
+
+def get_payernt_unread_notifications_count(owner_id: str) -> int:
+    """Fetches count of unread notifications for a vendor."""
+    clean_id = (owner_id or "").strip()
+    if not clean_id:
+        return 0
+    clean_email = clean_id.lower() if "@" in clean_id else ""
+    try:
+        row = fetch_one("""
+            SELECT COUNT(*) as cnt FROM payernt_notifications
+            WHERE (owner_id = %s
+               OR (owner_id IN (SELECT id FROM payernt_accounts WHERE LOWER(email) = %s))
+               OR (owner_id IN (SELECT email FROM payernt_accounts WHERE id = %s)))
+              AND is_read = FALSE
+              AND (audience_role = 'PAYERNT' OR audience_role = 'COMMON')
+        """, (clean_id, clean_email or clean_id, clean_id))
+        if row:
+            return int(row.get("cnt") or 0)
+    except Exception as e:
+        logger.warning(f"DB count error for notifications: {e}")
+
+    cnt = 0
+    for n in MOCK_PAYERNT_NOTIFICATIONS.get(clean_id, []):
+        if not (n.get("is_read") or n.get("read")):
+            if n.get("audience_role", "PAYERNT") in ("PAYERNT", "COMMON"):
+                cnt += 1
+    return cnt
 
 
 def get_payernt_messages(user_id: str, product_id: Optional[str] = None) -> List[Dict[str, Any]]:
