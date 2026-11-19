@@ -51,6 +51,13 @@ const PRICE_UNITS = [
 
 type PriceUnitType = "day" | "hour" | "week" | "month";
 
+const PRODUCT_REAL_VIDEOS: Record<string, string> = {
+  "prod-1792661636447": "https://res.cloudinary.com/dvyendk6j/video/upload/v1792661547/sieetnzml3bw1lnu1o5l.webm",
+  "prod-1792662405953": "https://res.cloudinary.com/dvyendk6j/video/upload/v1792662346/bd7frz9yrjjo4gpxry6v.webm",
+  "prod-1792993514066": "https://res.cloudinary.com/dvyendk6j/video/upload/v1792993462/g1zwcru3wloqtek8b95o.webm",
+  "prod-1792996506773": "https://res.cloudinary.com/dvyendk6j/video/upload/v1792996422/bnb6l42nl1bvon0uwlhb.webm",
+};
+
 export default function ProductDetails() {
   const location = useLocation();
   const params = useParams({ strict: false }) as { id?: string; productId?: string };
@@ -68,6 +75,7 @@ export default function ProductDetails() {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [videoModalOpen, setVideoModalOpen] = useState(false);
   const [videoLoadError, setVideoLoadError] = useState(false);
+  const effectiveVideoUrl = product?.videoUrl || (product?.id ? PRODUCT_REAL_VIDEOS[product.id] : undefined);
   const [activeNavSection, setActiveNavSection] = useState("product");
 
   // Price Management State (Fixed Single Price)
@@ -529,12 +537,12 @@ export default function ProductDetails() {
                   <div className="flex flex-col">
                     <span className="text-xs font-semibold text-foreground">10-Second Inspection Video</span>
                     <span className="text-[11px] text-muted-foreground">
-                      {product.videoUrl ? "Lender uploaded physical equipment condition video" : "No separate video uploaded; verified via multi-angle photos"}
+                      {effectiveVideoUrl ? "Lender uploaded physical equipment condition video" : "No separate video uploaded; verified via multi-angle photos"}
                     </span>
                   </div>
                 </div>
 
-                {product.videoUrl ? (
+                {effectiveVideoUrl ? (
                   <button
                     onClick={() => setVideoModalOpen(true)}
                     className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-semibold flex items-center gap-1.5 hover:opacity-90 transition-opacity cursor-pointer"
@@ -1087,7 +1095,7 @@ export default function ProductDetails() {
       {/* ─────────────────────────────────────────────────────────────
           7. VIDEO INSPECTION MODAL
       ────────────────────────────────────────────────────────────── */}
-      {videoModalOpen && product.videoUrl && (
+      {videoModalOpen && effectiveVideoUrl && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <div className="bg-card border border-border/80 rounded-2xl p-6 max-w-2xl w-full shadow-2xl space-y-4">
             <div className="flex items-center justify-between">
@@ -1107,7 +1115,7 @@ export default function ProductDetails() {
             </div>
 
             {/* Warning if video URL is a temporary browser session blob */}
-            {product.videoUrl.startsWith("blob:") && (
+            {effectiveVideoUrl.startsWith("blob:") && (
               <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs space-y-1">
                 <p className="font-bold flex items-center gap-1.5">
                   <AlertCircle className="w-4 h-4 shrink-0" />
@@ -1122,14 +1130,31 @@ export default function ProductDetails() {
             <div className="relative aspect-video bg-black rounded-xl overflow-hidden flex items-center justify-center">
               {!videoLoadError ? (
                 <video
-                  src={product.videoUrl}
+                  src={effectiveVideoUrl}
                   controls
+                  autoPlay
                   playsInline
                   preload="metadata"
                   crossOrigin="anonymous"
-                  onError={() => setVideoLoadError(true)}
+                  id="admin-inspection-video"
+                  onError={() => {
+                    if (product?.id && PRODUCT_REAL_VIDEOS[product.id]) {
+                      const fallbackMp4 = PRODUCT_REAL_VIDEOS[product.id].replace(/\.webm$/, ".mp4");
+                      const videoEl = document.querySelector("#admin-inspection-video") as HTMLVideoElement;
+                      if (videoEl && videoEl.src !== fallbackMp4) {
+                        videoEl.src = fallbackMp4;
+                        videoEl.load();
+                        videoEl.play().catch(() => {});
+                        return;
+                      }
+                    }
+                    setVideoLoadError(true);
+                  }}
                   className="w-full h-full object-contain"
-                />
+                >
+                  <source src={effectiveVideoUrl} type={effectiveVideoUrl.endsWith(".webm") ? "video/webm" : "video/mp4"} />
+                  <source src={effectiveVideoUrl.replace(/\.webm$/, ".mp4")} type="video/mp4" />
+                </video>
               ) : (
                 <div className="p-6 text-center text-white space-y-3">
                   <AlertCircle className="w-10 h-10 text-amber-500 mx-auto" />
@@ -1141,7 +1166,7 @@ export default function ProductDetails() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => window.open(product.videoUrl, "_blank")}
+                    onClick={() => window.open(effectiveVideoUrl, "_blank")}
                     className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:opacity-90 transition-opacity cursor-pointer shadow-md"
                   >
                     <ExternalLink className="w-3.5 h-3.5" /> Open Direct Video Link
@@ -1152,11 +1177,11 @@ export default function ProductDetails() {
 
             <div className="flex items-center justify-between text-xs text-muted-foreground pt-1 border-t border-border/60">
               <span className="font-mono text-[11px] truncate max-w-xs sm:max-w-md">
-                URL: {product.videoUrl}
+                URL: {effectiveVideoUrl}
               </span>
               <button
                 type="button"
-                onClick={() => window.open(product.videoUrl, "_blank")}
+                onClick={() => window.open(effectiveVideoUrl, "_blank")}
                 className="text-primary hover:underline font-semibold flex items-center gap-1 shrink-0 ml-2 cursor-pointer"
               >
                 <span>Direct Link</span>

@@ -1547,6 +1547,8 @@ INITIAL_SEED_PRODUCTS: Dict[str, Dict[str, Any]] = {
             "status": "active"
         },
         "created_at": "2026-10-22T09:33:58.567517+00:00",
+        "video_url": "https://res.cloudinary.com/dvyendk6j/video/upload/v1792661547/sieetnzml3bw1lnu1o5l.webm",
+        "videoUrl": "https://res.cloudinary.com/dvyendk6j/video/upload/v1792661547/sieetnzml3bw1lnu1o5l.webm",
         "status": "approved"
     },
     "prod-1792662405953": {
@@ -1580,6 +1582,8 @@ INITIAL_SEED_PRODUCTS: Dict[str, Dict[str, Any]] = {
             "status": "active"
         },
         "created_at": "2026-10-22T09:46:48.793230+00:00",
+        "video_url": "https://res.cloudinary.com/dvyendk6j/video/upload/v1792662346/bd7frz9yrjjo4gpxry6v.webm",
+        "videoUrl": "https://res.cloudinary.com/dvyendk6j/video/upload/v1792662346/bd7frz9yrjjo4gpxry6v.webm",
         "status": "approved"
     },
     "prod-1792993514066": {
@@ -1610,6 +1614,8 @@ INITIAL_SEED_PRODUCTS: Dict[str, Dict[str, Any]] = {
             "status": "active"
         },
         "created_at": "2026-10-26T05:48:31.994517+00:00",
+        "video_url": "https://res.cloudinary.com/dvyendk6j/video/upload/v1792993462/g1zwcru3wloqtek8b95o.webm",
+        "videoUrl": "https://res.cloudinary.com/dvyendk6j/video/upload/v1792993462/g1zwcru3wloqtek8b95o.webm",
         "status": "approved"
     },
     "prod-1792996506773": {
@@ -1643,6 +1649,8 @@ INITIAL_SEED_PRODUCTS: Dict[str, Dict[str, Any]] = {
             "status": "active"
         },
         "created_at": "2026-10-26T06:38:35.248471+00:00",
+        "video_url": "https://res.cloudinary.com/dvyendk6j/video/upload/v1792996422/bnb6l42nl1bvon0uwlhb.webm",
+        "videoUrl": "https://res.cloudinary.com/dvyendk6j/video/upload/v1792996422/bnb6l42nl1bvon0uwlhb.webm",
         "status": "approved"
     },
     "sony-alpha-a7-iii": {

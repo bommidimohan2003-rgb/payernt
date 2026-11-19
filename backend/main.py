@@ -5791,9 +5791,16 @@ def format_product_dict(p: dict, is_summary: bool = False, booked_pids_set: Opti
     if not raw_img and images_list:
         raw_img = str(images_list[0]).strip()
 
-    v_url = str(p.get("video_url") or p.get("videoUrl") or "").strip()
-    if (not v_url or "gv4p8hu7ccji2cie9xdk" in v_url) and (str(p.get("id", "")) == "prod-1792662405953" or (p.get("title") == "Acer" and p.get("category") == "computers")):
-        v_url = "https://res.cloudinary.com/dvyendk6j/video/upload/v1793724284/l2vmxn9hwk6p0cs4ajoz.mp4"
+    PRODUCT_REAL_VIDEOS = {
+        "prod-1792661636447": "https://res.cloudinary.com/dvyendk6j/video/upload/v1792661547/sieetnzml3bw1lnu1o5l.webm",
+        "prod-1792662405953": "https://res.cloudinary.com/dvyendk6j/video/upload/v1792662346/bd7frz9yrjjo4gpxry6v.webm",
+        "prod-1792993514066": "https://res.cloudinary.com/dvyendk6j/video/upload/v1792993462/g1zwcru3wloqtek8b95o.webm",
+        "prod-1792996506773": "https://res.cloudinary.com/dvyendk6j/video/upload/v1792996422/bnb6l42nl1bvon0uwlhb.webm",
+    }
+    pid_val = str(p.get("id", ""))
+    v_url = str(p.get("video_url") or p.get("videoUrl") or PRODUCT_REAL_VIDEOS.get(pid_val) or "").strip()
+    if (not v_url or "gv4p8hu7ccji2cie9xdk" in v_url or "mixkit" in v_url) and pid_val in PRODUCT_REAL_VIDEOS:
+        v_url = PRODUCT_REAL_VIDEOS[pid_val]
 
     return {
         "id": str(p.get("id", "")),
@@ -6974,7 +6981,8 @@ def fetch_one_product(product_id: str):
         try:
             with conn.cursor() as cursor:
                 cursor.execute("""
-                    SELECT cp.*, 
+                    SELECT cp.*,
+                           COALESCE(cp.video_url, pp.video_url) AS video_url,
                            pp.city AS product_city,
                            pp.area AS product_area,
                            pp.pincode AS product_pincode,

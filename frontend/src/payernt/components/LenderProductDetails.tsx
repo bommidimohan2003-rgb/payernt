@@ -34,6 +34,13 @@ import payerntApi from "../payerntApiService";
 import { VendorAvailabilityCalendar } from "./VendorAvailabilityCalendar";
 import { resolveProductImageUrl, resolveProductDailyRate, normalizePayerntProduct } from "../productUtils";
 
+const PRODUCT_REAL_VIDEOS: Record<string, string> = {
+  "prod-1792661636447": "https://res.cloudinary.com/dvyendk6j/video/upload/v1792661547/sieetnzml3bw1lnu1o5l.webm",
+  "prod-1792662405953": "https://res.cloudinary.com/dvyendk6j/video/upload/v1792662346/bd7frz9yrjjo4gpxry6v.webm",
+  "prod-1792993514066": "https://res.cloudinary.com/dvyendk6j/video/upload/v1792993462/g1zwcru3wloqtek8b95o.webm",
+  "prod-1792996506773": "https://res.cloudinary.com/dvyendk6j/video/upload/v1792996422/bnb6l42nl1bvon0uwlhb.webm",
+};
+
 export function LenderProductDetails({ productId: propId }: { productId?: string }) {
   const navigate = useNavigate();
   const params = useParams({ strict: false }) as { id?: string; productId?: string };
@@ -504,7 +511,7 @@ export function LenderProductDetails({ productId: propId }: { productId?: string
           </div>
 
           {/* 10-Second Equipment Inspection Video */}
-          {(product.videoUrl || (product as any).video_url) && (
+          {Boolean(product.videoUrl || (product as any).video_url || (product?.id && PRODUCT_REAL_VIDEOS[product.id])) && (
             <div className="p-5 rounded-2xl border border-border bg-card space-y-3.5 shadow-2xs text-left">
               <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
                 <div className="flex items-center gap-1.5 text-foreground">
@@ -516,15 +523,23 @@ export function LenderProductDetails({ productId: propId }: { productId?: string
                 </span>
               </div>
 
-              <div className="relative rounded-2xl overflow-hidden bg-black border border-border aspect-video group">
-                <video
-                  src={product.videoUrl || (product as any).video_url}
-                  controls
-                  playsInline
-                  preload="metadata"
-                  className="w-full h-full object-contain"
-                />
-              </div>
+              {(() => {
+                const vUrl = product.videoUrl || (product as any).video_url || (product?.id ? PRODUCT_REAL_VIDEOS[product.id] : "");
+                return (
+                  <div className="relative rounded-2xl overflow-hidden bg-black border border-border aspect-video group">
+                    <video
+                      src={vUrl}
+                      controls
+                      playsInline
+                      preload="metadata"
+                      className="w-full h-full object-contain"
+                    >
+                      {vUrl && <source src={vUrl} type={vUrl.endsWith(".webm") ? "video/webm" : "video/mp4"} />}
+                      {vUrl && <source src={vUrl.replace(/\.webm$/, ".mp4")} type="video/mp4" />}
+                    </video>
+                  </div>
+                );
+              })()}
 
               <p className="text-[11px] text-muted-foreground flex items-center gap-1.5">
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />

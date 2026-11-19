@@ -6,6 +6,13 @@ const getStoredProducts = (): any[] => {
   return [];
 };
 
+const PRODUCT_REAL_VIDEOS: Record<string, string> = {
+  "prod-1792661636447": "https://res.cloudinary.com/dvyendk6j/video/upload/v1792661547/sieetnzml3bw1lnu1o5l.webm",
+  "prod-1792662405953": "https://res.cloudinary.com/dvyendk6j/video/upload/v1792662346/bd7frz9yrjjo4gpxry6v.webm",
+  "prod-1792993514066": "https://res.cloudinary.com/dvyendk6j/video/upload/v1792993462/g1zwcru3wloqtek8b95o.webm",
+  "prod-1792996506773": "https://res.cloudinary.com/dvyendk6j/video/upload/v1792996422/bnb6l42nl1bvon0uwlhb.webm",
+};
+
 const mapToAdminProduct = (p: any): AdminProduct => ({
   id: p.id,
   title: p.title || p.name || "Equipment Listing",

@@ -1646,3 +1646,42 @@ This implementation fulfills all 11 requirements across legal disclosure, user d
   - `backend/tests/test_notifications_feature.py`: **10/10 PASSED (100% OK)**.
 - **Frontend Production Build**:
   - `npm --prefix frontend run build`: **PASSED** (0 errors, client and SSR dist generated cleanly).
+
+
+---
+
+## Preserved Production Accounts & Real 10s Inspection Condition Video Integration
+
+### 1. Account Integrity & Clean State Audit
+The production platform was scrubbed of mock/temporary accounts and consolidated around 6 verified accounts:
+1. `bommidimohan2003@gmail.com` — Superadmin / Administrator
+2. `bommidimohan304@gmail.com` — Lender / User (`mohan bommidi`)
+3. `vasnathchikkala@gmail.com` — Customer / Lender (`Vasnath Chikkala`)
+4. `yernikumar1438@gmail.com` — Lender / User (`Yerni Kumar`)
+5. `shinyshakhina08@gmail.com` — Customer / User (`Shiny Shakhina`)
+6. `pch7509@gmail.com` — Lender / User (`Vinay Pediredla`)
+
+### 2. 4 Real Products & Cloudinary 10s Inspection Videos
+All 4 verified products were synchronized across TiDB Cloud (`custom_products` and `payernt_products`), backend seed datasets, and frontend fallback/normalization layers with their legitimate 10s inspection condition videos:
+
+1. **`prod-1792661636447` — "laptop"** (₹1,500/day | Owner: `bommidimohan304@gmail.com`)
+   - WebM Video: `https://res.cloudinary.com/dvyendk6j/video/upload/v1792661547/sieetnzml3bw1lnu1o5l.webm`
+   - MP4 Video: `https://res.cloudinary.com/dvyendk6j/video/upload/v1792661547/sieetnzml3bw1lnu1o5l.mp4`
+2. **`prod-1792662405953` — "Acer"** (₹800/day | Owner: `bommidimohan304@gmail.com`)
+   - WebM Video: `https://res.cloudinary.com/dvyendk6j/video/upload/v1792662346/bd7frz9yrjjo4gpxry6v.webm`
+   - MP4 Video: `https://res.cloudinary.com/dvyendk6j/video/upload/v1792662346/bd7frz9yrjjo4gpxry6v.mp4`
+3. **`prod-1792993514066` — "Asus vivobook 15"** (₹500/day | Owner: `vasnathchikkala@gmail.com`)
+   - WebM Video: `https://res.cloudinary.com/dvyendk6j/video/upload/v1792993462/g1zwcru3wloqtek8b95o.webm`
+   - MP4 Video: `https://res.cloudinary.com/dvyendk6j/video/upload/v1792993462/g1zwcru3wloqtek8b95o.mp4`
+4. **`prod-1792996506773` — "Laptop"** (₹1,000/day | Owner: `bommidimohan304@gmail.com`)
+   - WebM Video: `https://res.cloudinary.com/dvyendk6j/video/upload/v1792996422/bnb6l42nl1bvon0uwlhb.webm`
+   - MP4 Video: `https://res.cloudinary.com/dvyendk6j/video/upload/v1792996422/bnb6l42nl1bvon0uwlhb.mp4`
+
+### 3. Cross-Browser Dual-Format Video Player Architecture
+To guarantee playback across all desktop and mobile browsers (including iOS Safari, which lacks native WebM support in legacy WebViews):
+- Dual `<source>` tags deliver both native `type="video/webm"` and dynamic Cloudinary transcoded `type="video/mp4"` (`video/mp4; codecs="avc1"`).
+- Dynamic error boundary: if a browser triggers an `onError` event loading a WebM source, the video element automatically upgrades `src` to the `.mp4` variant and restarts playback without user intervention.
+- Synchronized across:
+  - **Payrent (Customer)**: `frontend/src/pages/ProductDetails.tsx` (Inspection Condition Card & Fullscreen Video Player)
+  - **Payernt (Lender)**: `frontend/src/payernt/components/LenderProductDetails.tsx` (Pre-Rental Verification Video)
+  - **Admin**: `frontend/src/admin/pages/ProductDetails.tsx` & `frontend/src/admin/services/products.ts` (Admin Inspection Modal & Media Inspector)

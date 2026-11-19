@@ -149,6 +149,13 @@ export const invalidateSlotsCache = (productId?: string) => {
   }
 };
 
+const PRODUCT_REAL_VIDEOS: Record<string, string> = {
+  "prod-1792661636447": "https://res.cloudinary.com/dvyendk6j/video/upload/v1792661547/sieetnzml3bw1lnu1o5l.webm",
+  "prod-1792662405953": "https://res.cloudinary.com/dvyendk6j/video/upload/v1792662346/bd7frz9yrjjo4gpxry6v.webm",
+  "prod-1792993514066": "https://res.cloudinary.com/dvyendk6j/video/upload/v1792993462/g1zwcru3wloqtek8b95o.webm",
+  "prod-1792996506773": "https://res.cloudinary.com/dvyendk6j/video/upload/v1792996422/bnb6l42nl1bvon0uwlhb.webm",
+};
+
 export default function ProductDetails() {
   const params = useParams({ strict: false }) as { id?: string };
   const routeParamId = params?.id || (typeof window !== "undefined" ? window.location.pathname.split("/").filter(Boolean).pop() || "" : "");
@@ -1340,11 +1347,11 @@ const productSchema = product ? {
   }, [gallery, product?.image]);
 
   const activeDisplayImage = gallery[selectedImageIndex] || thumbnails[selectedImageIndex] || product?.image || "";
-  const rawVideoUrl = product?.videoUrl || (product as any)?.video_url;
+  const rawVideoUrl = product?.videoUrl || (product as any)?.video_url || (product?.id ? PRODUCT_REAL_VIDEOS[product.id] : undefined);
   const activeVideoUrl = (rawVideoUrl && !rawVideoUrl.includes("mixkit.co") && !rawVideoUrl.includes("gv4p8hu7ccji2cie9xdk"))
     ? rawVideoUrl
-    : (product?.id === "prod-1792662405953" || (product?.title === "Acer" && product?.category === "computers"))
-    ? "https://res.cloudinary.com/dvyendk6j/video/upload/v1793724284/l2vmxn9hwk6p0cs4ajoz.mp4"
+    : (product?.id && PRODUCT_REAL_VIDEOS[product.id])
+    ? PRODUCT_REAL_VIDEOS[product.id]
     : "/videos/inspection-sample.mp4";
 
   const brand = product ? getProductBrand(product) : null;
@@ -1567,14 +1574,18 @@ const productSchema = product ? {
                       }}
                       onError={(e) => {
                         const target = e.currentTarget;
-                        if (!target.currentSrc?.includes("l2vmxn9hwk6p0cs4ajoz")) {
-                          target.src = "https://res.cloudinary.com/dvyendk6j/video/upload/v1793724284/l2vmxn9hwk6p0cs4ajoz.mp4";
-                          target.load();
-                          target.play().catch(() => {});
+                        if (product?.id && PRODUCT_REAL_VIDEOS[product.id]) {
+                          const fallbackUrl = PRODUCT_REAL_VIDEOS[product.id].replace(/\.webm$/, ".mp4");
+                          if (target.src !== fallbackUrl) {
+                            target.src = fallbackUrl;
+                            target.load();
+                            target.play().catch(() => {});
+                          }
                         }
                       }}
                     >
-                      <source src={activeVideoUrl} type="video/mp4" />
+                      <source src={activeVideoUrl} type={activeVideoUrl.endsWith(".webm") ? "video/webm" : "video/mp4"} />
+                      <source src={activeVideoUrl.replace(/\.webm$/, ".mp4")} type="video/mp4" />
                       <source src={activeVideoUrl.replace(/\.mp4$/, ".webm")} type="video/webm" />
                     </video>
                     <div className="absolute bottom-3 left-3 px-3 py-1 rounded-full bg-neutral-950/85 backdrop-blur-md text-xs text-white font-semibold border border-white/20 flex items-center gap-1.5 select-none pointer-events-none">
