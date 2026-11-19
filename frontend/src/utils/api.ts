@@ -3640,7 +3640,14 @@ export const api = {
     status: string;
     persistence_error?: boolean;
   }> {
-    const token = storage.get<string | null>(STORAGE_KEYS.token, null);
+    const token =
+      storage.get<string | null>(STORAGE_KEYS.token, null) ||
+      (typeof window !== "undefined"
+        ? localStorage.getItem("paye₹nt_token") ||
+          localStorage.getItem("payernt_token") ||
+          localStorage.getItem("payent:token") ||
+          localStorage.getItem("payent_token")
+        : null);
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     };
@@ -3672,7 +3679,14 @@ export const api = {
       updated_at: string;
     }>;
   }> {
-    const token = storage.get<string | null>(STORAGE_KEYS.token, null);
+    const token =
+      storage.get<string | null>(STORAGE_KEYS.token, null) ||
+      (typeof window !== "undefined"
+        ? localStorage.getItem("paye₹nt_token") ||
+          localStorage.getItem("payernt_token") ||
+          localStorage.getItem("payent:token") ||
+          localStorage.getItem("payent_token")
+        : null);
     const headers: Record<string, string> = {};
     if (token) {
       headers["Authorization"] = `Bearer ${token}`;

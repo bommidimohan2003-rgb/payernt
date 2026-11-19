@@ -89,6 +89,7 @@ import { Route as PayentSettingsRouteImport } from './routes/payent/settings'
 import { Route as PayentWishlistRouteImport } from './routes/payent/wishlist'
 import { Route as PayerntIndexRouteImport } from './routes/payernt/index'
 import { Route as PayerntSplatRouteImport } from './routes/payernt/$'
+import { Route as PayerntAgentRouteImport } from './routes/payernt/agent'
 import { Route as PayerntAnalyticsRouteImport } from './routes/payernt/analytics'
 import { Route as PayerntBookingsRouteImport } from './routes/payernt/bookings'
 import { Route as PayerntEarningsRouteImport } from './routes/payernt/earnings'
@@ -515,6 +516,11 @@ const PayerntSplatRoute = PayerntSplatRouteImport.update({
   path: '/$',
   getParentRoute: () => PayerntRoute,
 } as any)
+const PayerntAgentRoute = PayerntAgentRouteImport.update({
+  id: '/agent',
+  path: '/agent',
+  getParentRoute: () => PayerntRoute,
+} as any)
 const PayerntAnalyticsRoute = PayerntAnalyticsRouteImport.update({
   id: '/analytics',
   path: '/analytics',
@@ -719,6 +725,7 @@ export interface FileRoutesByFullPath {
   '/payent/settings': typeof PayentSettingsRoute
   '/payent/wishlist': typeof PayentWishlistRoute
   '/payernt/$': typeof PayerntSplatRoute
+  '/payernt/agent': typeof PayerntAgentRoute
   '/payernt/analytics': typeof PayerntAnalyticsRoute
   '/payernt/bookings': typeof PayerntBookingsRoute
   '/payernt/earnings': typeof PayerntEarningsRoute
@@ -823,6 +830,7 @@ export interface FileRoutesByTo {
   '/payent/settings': typeof PayentSettingsRoute
   '/payent/wishlist': typeof PayentWishlistRoute
   '/payernt/$': typeof PayerntSplatRoute
+  '/payernt/agent': typeof PayerntAgentRoute
   '/payernt/analytics': typeof PayerntAnalyticsRoute
   '/payernt/bookings': typeof PayerntBookingsRoute
   '/payernt/earnings': typeof PayerntEarningsRoute
@@ -931,6 +939,7 @@ export interface FileRoutesById {
   '/payent/settings': typeof PayentSettingsRoute
   '/payent/wishlist': typeof PayentWishlistRoute
   '/payernt/$': typeof PayerntSplatRoute
+  '/payernt/agent': typeof PayerntAgentRoute
   '/payernt/analytics': typeof PayerntAnalyticsRoute
   '/payernt/bookings': typeof PayerntBookingsRoute
   '/payernt/earnings': typeof PayerntEarningsRoute
@@ -1040,6 +1049,7 @@ export interface FileRouteTypes {
     | '/payent/settings'
     | '/payent/wishlist'
     | '/payernt/$'
+    | '/payernt/agent'
     | '/payernt/analytics'
     | '/payernt/bookings'
     | '/payernt/earnings'
@@ -1144,6 +1154,7 @@ export interface FileRouteTypes {
     | '/payent/settings'
     | '/payent/wishlist'
     | '/payernt/$'
+    | '/payernt/agent'
     | '/payernt/analytics'
     | '/payernt/bookings'
     | '/payernt/earnings'
@@ -1251,6 +1262,7 @@ export interface FileRouteTypes {
     | '/payent/settings'
     | '/payent/wishlist'
     | '/payernt/$'
+    | '/payernt/agent'
     | '/payernt/analytics'
     | '/payernt/bookings'
     | '/payernt/earnings'
@@ -1890,6 +1902,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PayerntSplatRouteImport
       parentRoute: typeof PayerntRoute
     }
+    '/payernt/agent': {
+      id: '/payernt/agent'
+      path: '/agent'
+      fullPath: '/payernt/agent'
+      preLoaderRoute: typeof PayerntAgentRouteImport
+      parentRoute: typeof PayerntRoute
+    }
     '/payernt/analytics': {
       id: '/payernt/analytics'
       path: '/analytics'
@@ -2236,6 +2255,7 @@ const PayerntProductsRouteWithChildren = PayerntProductsRoute._addFileChildren(
 
 interface PayerntRouteChildren {
   PayerntSplatRoute: typeof PayerntSplatRoute
+  PayerntAgentRoute: typeof PayerntAgentRoute
   PayerntAnalyticsRoute: typeof PayerntAnalyticsRoute
   PayerntBookingsRoute: typeof PayerntBookingsRoute
   PayerntEarningsRoute: typeof PayerntEarningsRoute
@@ -2254,6 +2274,7 @@ interface PayerntRouteChildren {
 
 const PayerntRouteChildren: PayerntRouteChildren = {
   PayerntSplatRoute: PayerntSplatRoute,
+  PayerntAgentRoute: PayerntAgentRoute,
   PayerntAnalyticsRoute: PayerntAnalyticsRoute,
   PayerntBookingsRoute: PayerntBookingsRoute,
   PayerntEarningsRoute: PayerntEarningsRoute,

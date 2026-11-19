@@ -1685,3 +1685,33 @@ To guarantee playback across all desktop and mobile browsers (including iOS Safa
   - **Payrent (Customer)**: `frontend/src/pages/ProductDetails.tsx` (Inspection Condition Card & Fullscreen Video Player)
   - **Payernt (Lender)**: `frontend/src/payernt/components/LenderProductDetails.tsx` (Pre-Rental Verification Video)
   - **Admin**: `frontend/src/admin/pages/ProductDetails.tsx` & `frontend/src/admin/services/products.ts` (Admin Inspection Modal & Media Inspector)
+
+
+---
+
+## Payent Agent Integration on Payernt (Lender Portal)
+
+### 1. Architectural Expansion & Lender Awareness
+The autonomous conversational assistant (**Payent Agent**) was integrated across the entire **Payernt** lender portal:
+
+1. **Global Mount & Router Activation (`frontend/src/routes/__root.tsx`)**:
+   - Removed the exclusionary `!isPayernt` gate on `HelpChatbot`, allowing the assistant to mount across all Payernt routes (`/payernt`, `/payernt/products`, `/payernt/bookings`, `/payernt/wallet`, etc.).
+2. **Context-Aware Persona & Suggestion Engine (`frontend/src/components/common/HelpChatbot.tsx`)**:
+   - Automatically detects Payernt routes (`isPayerntRoute`).
+   - Retrieves lender credentials from `paye₹nt_account` and `paye₹nt_token`.
+   - Greets gear owners personally: `"Namaste, [Name]! I am Payent Agent for Lenders..."`.
+   - Surfaces lender-tailored prompt suggestions:
+     - `"Check Rental Requests"`
+     - `"Wallet & Payout Status"`
+     - `"Listing Video Inspection"`
+     - `"Talk to Lender Support"`
+   - Adds visual `"Lender Desk"` badge in the modal header.
+3. **Payernt Navigation Entry Points**:
+   - **Payernt Navbar (`PayerntNavbar.tsx`)**: Added a direct agent launcher button with `PayentAgentIcon` and active green status indicator.
+   - **Payernt Sidebar (`PayerntSidebar.tsx`)**: Added `Payent Agent` in the main navigation stack with `Bot` icon.
+   - **Payernt Mobile Bottom Nav (`PayerntMobileBottomNav.tsx`)**: Added `Payent Agent` in the mobile sheet drawer.
+   - **Lender Help Center (`help.tsx`)**: Added a hero highlight card with a one-click `"Launch Assistant"` button.
+4. **Dedicated Full-Page Route (`/payernt/agent`)**:
+   - Created `frontend/src/routes/payernt/agent.tsx` featuring an interactive conversation console, quick action prompt cards, session tracking, and pop-out controls.
+5. **API & Security Authentication (`frontend/src/utils/api.ts`)**:
+   - Enhanced `api.agentChat` and `api.getAgentConversations` to automatically resolve lender bearer tokens (`paye₹nt_token`, `payernt_token`), enabling the backend to authenticate the lender context (`is_vendor=True`) for querying real rental requests and escrow payouts.

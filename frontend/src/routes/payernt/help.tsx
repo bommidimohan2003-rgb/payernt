@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { HelpCircle, ArrowLeft, MessageSquare, ShieldCheck, Mail, Phone, ExternalLink } from "lucide-react";
+import { HelpCircle, ArrowLeft, MessageSquare, ShieldCheck, Mail, Phone, ExternalLink, Bot, Sparkles } from "lucide-react";
 import { getSeoMetadata } from "@/utils/seo";
 
 export const Route = createFileRoute("/payernt/help")({
@@ -49,6 +49,37 @@ function PayerntHelpRoute() {
             Guidance for gear owners, KYC verifications and payouts
           </p>
         </div>
+      </div>
+
+      {/* Payent AI Assistant Highlight Card */}
+      <div className="p-5 rounded-2xl border border-primary/30 bg-primary/5 relative overflow-hidden flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="p-1.5 rounded-lg bg-primary/10 text-primary">
+              <Bot className="w-4 h-4" />
+            </span>
+            <span className="font-extrabold text-sm text-foreground">Payent Agent for Lenders</span>
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-500 border border-emerald-500/30 flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              24/7 AI Online
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Get instant automated help for rental requests, escrow settlements, 10s inspection video requirements, and pricing rules.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(new CustomEvent("open-payent-help-chat"));
+            }
+          }}
+          className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition-all flex items-center gap-2 shrink-0 cursor-pointer shadow-sm active:scale-95"
+        >
+          <Sparkles className="w-3.5 h-3.5" />
+          <span>Launch Assistant</span>
+        </button>
       </div>
 
       {/* Quick Action Support Channels */}

@@ -40,6 +40,13 @@ const DEFAULT_SUGGESTIONS = [
   "Talk to Human Support",
 ];
 
+const DEFAULT_LENDER_SUGGESTIONS = [
+  "Check Rental Requests",
+  "Wallet & Payout Status",
+  "Listing Video Inspection",
+  "Talk to Lender Support",
+];
+
 export function HelpChatbot() {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -50,6 +57,13 @@ export function HelpChatbot() {
   const [conversationId, setConversationId] = useState<string>("");
   const [sessionId, setSessionId] = useState<string>("");
   const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
+
+  const isPayerntRoute =
+    typeof window !== "undefined" &&
+    (window.location.pathname.startsWith("/payernt") ||
+      window.location.pathname.startsWith("/paye₹nt") ||
+      window.location.pathname === "/become-lender" ||
+      window.location.pathname === "/lender-portal");
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -67,13 +81,40 @@ export function HelpChatbot() {
       setConversationId(savedConvId);
     }
 
-    const token = storage.get<string | null>(STORAGE_KEYS.token, null);
-    const user = storage.get<StoredUser | null>(STORAGE_KEYS.currentUser, null);
+    let token = storage.get<string | null>(STORAGE_KEYS.token, null);
+    let user = storage.get<StoredUser | null>(STORAGE_KEYS.currentUser, null);
+
+    // Fallback to Payernt lender auth session if on Payernt side
+    if (!token && typeof window !== "undefined") {
+      token =
+        localStorage.getItem("paye₹nt_token") ||
+        localStorage.getItem("payernt_token") ||
+        localStorage.getItem("payent_token");
+      const storedAccount = localStorage.getItem("paye₹nt_account");
+      if (storedAccount) {
+        try {
+          const acc = JSON.parse(storedAccount);
+          user = {
+            email: acc.email,
+            name: acc.name || acc.fullName || acc.storeName || acc.email?.split("@")[0],
+          };
+        } catch {}
+      }
+    }
+
     const email = user?.email || null;
     setCurrentUserEmail(email);
 
-    const greetingText =
-      token && email
+    const currentSuggestions = isPayerntRoute
+      ? DEFAULT_LENDER_SUGGESTIONS
+      : DEFAULT_SUGGESTIONS;
+    setActiveSuggestions(currentSuggestions);
+
+    const greetingText = isPayerntRoute
+      ? token && email
+        ? `Namaste, ${user?.name || email.split("@")[0]}! I am Payent Agent for Lenders. How can I assist you with your equipment listings, rental approvals, wallet payouts, or gear verification today?`
+        : "Namaste! I am Payent Agent, your digital assistant for peer-to-peer gear lenders. How can I help you manage your tech equipment today?"
+      : token && email
         ? `Namaste, ${user?.name || email.split("@")[0]}! I am Payent Agent. How can I assist you with your equipment rentals, orders, delivery, or support today?`
         : "Namaste! I am Payent Agent, your digital assistant for peer-to-peer equipment rentals, bookings, payments, and support. How can I help you today?";
 
@@ -83,10 +124,10 @@ export function HelpChatbot() {
         sender: "bot",
         text: greetingText,
         timestamp: new Date(),
-        suggestions: DEFAULT_SUGGESTIONS,
+        suggestions: currentSuggestions,
       },
     ]);
-  }, []);
+  }, [isPayerntRoute]);
 
   // Handle external open event (e.g. from support links)
   useEffect(() => {
@@ -269,6 +310,11 @@ export function HelpChatbot() {
                 <span className="font-semibold text-sm text-white tracking-tight truncate">
                   Payent Agent
                 </span>
+                {isPayerntRoute && (
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 shrink-0">
+                    Lender Desk
+                  </span>
+                )}
               </div>
               <button
                 onClick={() => setIsOpen(false)}

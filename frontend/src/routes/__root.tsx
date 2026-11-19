@@ -256,7 +256,7 @@ function RootContent() {
       <Outlet />
 
       {!isGateway && !isPayernt && <CartDrawer />}
-      {showChatbot && !isGateway && !isPayernt && <HelpChatbot />}
+      {showChatbot && !isGateway && !pathname.startsWith("/admin") && <HelpChatbot />}
       <CookieConsentBanner />
       <Toaster position="bottom-right" richColors />
     </>

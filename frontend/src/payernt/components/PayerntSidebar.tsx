@@ -11,6 +11,7 @@ import {
   Globe,
   LogOut,
   ShieldCheck,
+  Bot,
 } from "lucide-react";
 import { useLanguage, LanguageModal } from "@/i18n";
 
@@ -46,12 +47,18 @@ export function PayerntSidebar({
     if (pathname.startsWith("/payernt/messages")) return "messages";
     if (pathname.startsWith("/payernt/analytics") || pathname.startsWith("/payernt/earnings")) return "analytics";
     if (pathname.startsWith("/payernt/kyc")) return "kyc";
+    if (pathname.startsWith("/payernt/agent")) return "agent";
     if (pathname.startsWith("/payernt/settings") || pathname.startsWith("/payernt/profile")) return "settings";
     return "home";
   })();
 
   const handleNav = (id: string, path: string) => {
     if (onCloseMobileDrawer) onCloseMobileDrawer();
+    if (id === "agent") {
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("open-payent-help-chat"));
+      }
+    }
     if (onNavigateTab) {
       onNavigateTab(id, path);
       return;
@@ -79,6 +86,7 @@ export function PayerntSidebar({
     },
     { id: "analytics", label: tCommon.analytics, icon: BarChart3, path: "/payernt/analytics" },
     { id: "kyc", label: "Aadhaar KYC", icon: ShieldCheck, path: "/payernt/kyc" },
+    { id: "agent", label: "Payent Agent", icon: Bot, path: "/payernt/agent" },
   ];
 
   const getLanguageLabel = () => {

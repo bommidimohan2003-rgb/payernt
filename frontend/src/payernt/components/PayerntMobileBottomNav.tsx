@@ -14,6 +14,7 @@ import {
   User,
   LogOut,
   X,
+  Bot,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLanguage, LanguageModal } from "@/i18n";
@@ -45,6 +46,11 @@ export function PayerntMobileBottomNav({
 
   const handleNav = (path: string) => {
     setIsMoreOpen(false);
+    if (path === "/payernt/agent") {
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("open-payent-help-chat"));
+      }
+    }
     navigate({ to: path as any });
   };
 
@@ -68,6 +74,12 @@ export function PayerntMobileBottomNav({
   ];
 
   const moreItems = [
+    {
+      id: "agent",
+      label: "Payent Agent",
+      icon: Bot,
+      path: "/payernt/agent",
+    },
     {
       id: "messages",
       label: tCommon.messages,
