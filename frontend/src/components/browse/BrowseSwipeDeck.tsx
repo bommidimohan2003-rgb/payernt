@@ -497,6 +497,8 @@ export function BrowseSwipeDeck({
                 }
                 alt=""
                 aria-hidden="true"
+                loading="lazy"
+                decoding="async"
                 className="w-full h-full object-cover opacity-40 blur-[1px]"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
@@ -527,6 +529,8 @@ export function BrowseSwipeDeck({
                   }
                   alt=""
                   aria-hidden="true"
+                  loading="lazy"
+                  decoding="async"
                   className="w-full h-full object-cover opacity-70"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />

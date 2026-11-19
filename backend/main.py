@@ -288,14 +288,19 @@ from config import (
     GOOGLE_CLIENT_ID,
     RAZORPAY_KEY_ID,
     RAZORPAY_KEY_SECRET,
-    RAZORPAY_WEBHOOK_SECRET
+    RAZORPAY_WEBHOOK_SECRET,
+    RAZORPAY_TIMEOUT_SECONDS
 )
+import functools
 
 razorpay_client = None
 if HAS_RAZORPAY and razorpay and RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET:
     try:
         razorpay_client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
-        logger.info("Razorpay Client SDK initialized successfully.")
+        if hasattr(razorpay_client, "session"):
+            _orig_req = razorpay_client.session.request
+            razorpay_client.session.request = functools.partial(_orig_req, timeout=RAZORPAY_TIMEOUT_SECONDS)
+        logger.info(f"Razorpay Client SDK initialized successfully with {RAZORPAY_TIMEOUT_SECONDS}s timeout.")
     except Exception as rzp_err:
         logger.warning(f"Razorpay Client SDK initialization warning: {rzp_err}")
         razorpay_client = None
@@ -1700,6 +1705,22 @@ def login(data: LoginRequestSchema, request: Request, response: Response, backgr
     }
 
     logger.info(f"Successful user login for {clean_email} from IP {client_ip} (session {session_id})")
+
+    # Compound bootstrap payload to eliminate post-login waterfall
+    bootstrap_data = {
+        "cartCount": 0,
+        "unreadNotificationsCount": 0,
+        "kycStatus": user.get("kyc_status") or user.get("status") or "APPROVED",
+        "role": user.get("role", "customer"),
+    }
+    try:
+        from database import get_user_cart, get_unread_notifications_count
+        cart_items = get_user_cart(clean_email) or []
+        bootstrap_data["cartCount"] = len(cart_items)
+        bootstrap_data["unreadNotificationsCount"] = get_unread_notifications_count(clean_email, role="PAYRENT")
+    except Exception as b_err:
+        logger.warning(f"Notice: compiling login bootstrap payload for {clean_email}: {b_err}")
+
     return {
         "success": True,
         "token": access_token,
@@ -1708,6 +1729,7 @@ def login(data: LoginRequestSchema, request: Request, response: Response, backgr
         "accountType": "pay₹ent",
         "role": user["role"],
         "user": user_record,
+        "bootstrap": bootstrap_data,
         "message": "Login successful."
     }
 
@@ -5625,24 +5647,30 @@ def validate_cart_checkout_endpoint(current_user: dict = Depends(get_approved_us
     if not raw_items:
         raise HTTPException(status_code=400, detail="Cart is empty.")
         
+    # Group items by rental date interval to batch conflict checks (eliminates N+1 loop)
+    items_by_interval: dict = {}
+    for it in raw_items:
+        key = (str(it.get("start_date") or ""), str(it.get("end_date") or ""))
+        items_by_interval.setdefault(key, []).append(it)
+
     conflicted_items = []
     subtotal = 0
-    for it in raw_items:
-        pid = it.get("product_id")
-        start_d = it.get("start_date")
-        end_d = it.get("end_date")
-        conflicts = check_products_booking_conflicts([pid], start_d, end_d)
-        if pid in conflicts:
-            conflicted_items.append({
-                "id": it.get("id"),
-                "product_id": pid,
-                "title": it.get("title"),
-                "reason": "Booked for selected dates"
-            })
-        s_dt = parse_date_safely(start_d)
-        e_dt = parse_date_safely(end_d)
-        days = max(1, (e_dt - s_dt).days) if (s_dt and e_dt) else int(it.get("days") or 1)
-        subtotal += int(it.get("daily_price") or it.get("price") or 0) * days
+    for (start_d, end_d), group_items in items_by_interval.items():
+        pids = [g.get("product_id") for g in group_items if g.get("product_id")]
+        conflicts = check_products_booking_conflicts(pids, start_d, end_d)
+        for it in group_items:
+            pid = it.get("product_id")
+            if pid in conflicts:
+                conflicted_items.append({
+                    "id": it.get("id"),
+                    "product_id": pid,
+                    "title": it.get("title"),
+                    "reason": "Booked for selected dates"
+                })
+            s_dt = parse_date_safely(start_d)
+            e_dt = parse_date_safely(end_d)
+            days = max(1, (e_dt - s_dt).days) if (s_dt and e_dt) else int(it.get("days") or 1)
+            subtotal += int(it.get("daily_price") or it.get("price") or 0) * days
         
     if conflicted_items:
         raise HTTPException(
@@ -6354,7 +6382,7 @@ class CreateSupportTicketSchema(BaseModel):
 @app.get("/api/messages")
 def fetch_user_conversations(current_user_email: str = Depends(get_current_user_email)):
     clean_email = current_user_email.strip().lower()
-    from database import MOCK_SUPPORT_TICKETS, get_support_ticket_messages
+    from database import MOCK_SUPPORT_TICKETS, get_support_tickets_messages_batch
     db_tickets = fetch_all("""
         SELECT * FROM support_tickets 
         WHERE LOWER(user_email) = %s 
@@ -6371,9 +6399,12 @@ def fetch_user_conversations(current_user_email: str = Depends(get_current_user_
         if mt.get("user_email", "").strip().lower() == clean_email and tid not in seen_ids:
             combined.append(mt)
             
+    ticket_ids = [t["id"] for t in combined if t.get("id")]
+    messages_by_ticket = get_support_tickets_messages_batch(ticket_ids, include_internal=False)
+
     res = []
     for t in combined:
-        msgs = get_support_ticket_messages(t["id"], include_internal=False)
+        msgs = messages_by_ticket.get(t["id"]) or []
         last_msg = msgs[-1] if msgs else {}
         unread_cnt = sum(1 for m in msgs if m.get("senderType") == "admin" and not m.get("read") and not m.get("isRead"))
         res.append({

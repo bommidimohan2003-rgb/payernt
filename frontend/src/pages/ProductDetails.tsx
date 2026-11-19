@@ -1587,6 +1587,8 @@ const productSchema = product ? {
                     <img
                       src={activeDisplayImage}
                       alt={`${product.title} photo ${selectedImageIndex + 1}`}
+                      loading="eager"
+                      decoding="async"
                       onClick={() => {
                         setIsFullscreenVideoActive(false);
                         setIsPhotoViewerOpen(true);
@@ -1692,6 +1694,8 @@ const productSchema = product ? {
                       <img
                         src={thumb}
                         alt={`${product.title} view ${idx + 1}`}
+                        loading="lazy"
+                        decoding="async"
                         className="w-full h-full object-contain"
                       />
                       {isFourth && remainingCount > 0 && (
@@ -2361,6 +2365,8 @@ const productSchema = product ? {
                               <img
                                 src={photo}
                                 alt={rev.userName}
+                                loading="lazy"
+                                decoding="async"
                                 className="h-11 w-11 rounded-full object-cover border border-neutral-200 dark:border-neutral-700 shadow-xs shrink-0"
                               />
                             ) : (
@@ -2413,6 +2419,8 @@ const productSchema = product ? {
                       <img
                         src={product.image || "/brand/payent-logo-icon.png"}
                         alt={product.title}
+                        loading="lazy"
+                        decoding="async"
                         className="max-h-full max-w-full object-contain"
                       />
                     </div>
@@ -2600,7 +2608,7 @@ const productSchema = product ? {
                         : "border-white/20 hover:border-white/60"
                     )}
                   >
-                    <img src={src} alt={`${product.title} angle ${idx + 1}`} className="w-full h-full object-contain" />
+                    <img src={src} alt={`${product.title} angle ${idx + 1}`} loading="lazy" decoding="async" className="w-full h-full object-contain" />
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                       <span className="px-3 py-1 rounded-full bg-white text-neutral-950 text-xs font-semibold shadow-md">
                         Photo #{idx + 1}
@@ -2651,6 +2659,7 @@ const productSchema = product ? {
                       <img
                         src={gallery[selectedImageIndex] || activeDisplayImage}
                         alt={product.title}
+                        decoding="async"
                         className="max-h-[70vh] max-w-full object-contain rounded-2xl drop-shadow-2xl"
                       />
 
@@ -2724,7 +2733,7 @@ const productSchema = product ? {
                           : "border-white/20 opacity-65 hover:opacity-100"
                       )}
                     >
-                      <img src={src} alt={`${product.title} thumbnail ${idx + 1}`} className="h-full w-full object-contain" />
+                      <img src={src} alt={`${product.title} thumbnail ${idx + 1}`} loading="lazy" decoding="async" className="h-full w-full object-contain" />
                     </button>
                   ))}
                 </div>

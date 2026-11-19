@@ -151,6 +151,14 @@ def init_payernt_tables():
     _add_pp_col("condition_details LONGTEXT NULL")
     _add_pp_col("condition_grade VARCHAR(50) NULL")
 
+    try:
+        from database import add_index_safely
+        add_index_safely("payernt_products", "idx_pp_owner_email", "owner_email")
+        add_index_safely("payernt_products", "idx_pp_status_category", "status, category")
+        add_index_safely("payernt_products", "idx_pp_available", "available")
+    except Exception:
+        pass
+
     def _add_cp_col(col_def: str):
         try:
             execute_query(f"ALTER TABLE custom_products ADD COLUMN {col_def}")

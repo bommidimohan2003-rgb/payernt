@@ -6,6 +6,7 @@ export const REAL_USER_EMAILS = new Set([
   "bommidimohan304@gmail.com",
   "yernikumar1438@gmail.com",
   "bommidimohan2003@gmail.com",
+  "pch7509@gmail.com",
 ]);
 
 export const isFakeUserEmail = (email?: string): boolean => {

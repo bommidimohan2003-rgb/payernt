@@ -192,6 +192,16 @@ export function PayerntAuth({
           localStorage.removeItem("payent:signed_out");
           localStorage.removeItem("paye₹nt_signed_out");
           toast.success(`Welcome back, ${res.account.name}!`);
+
+          // Accelerate post-login loading: Prefetch lender dashboard and products in parallel
+          if ((res as any)?.bootstrap) {
+            try {
+              localStorage.setItem("paye₹nt:bootstrap", JSON.stringify((res as any).bootstrap));
+            } catch {}
+          }
+          payerntApi.getDashboard().catch(() => {});
+          payerntApi.getProducts().catch(() => {});
+
           onAuthSuccess(res.account);
         } else if (res.status === "PENDING_REVIEW" || res.status === "REJECTED") {
           toast.info(safeString(res.error, "Your Payernt account is under administrative review."));

@@ -264,10 +264,30 @@ function isDateInRange(dateStr: string | undefined, start: Date, end: Date): boo
   return d >= start && d <= end;
 }
 
+interface CachedAnalytics {
+  timestamp: number;
+  data: AnalyticsDataset;
+}
+
+const analyticsCache = new Map<string, CachedAnalytics>();
+const ANALYTICS_CACHE_TTL_MS = 60000; // 60-second in-memory SWR cache
+
+export function invalidateAnalyticsCache() {
+  analyticsCache.clear();
+}
+
 /**
  * Main aggregator: pulls live data from existing APIs and computes full analytics dataset.
  */
-export async function fetchAnalyticsData(range: DateRange): Promise<AnalyticsDataset> {
+export async function fetchAnalyticsData(range: DateRange, forceRefresh = false): Promise<AnalyticsDataset> {
+  const cacheKey = `${range.start.toISOString()}_${range.end.toISOString()}`;
+  if (!forceRefresh) {
+    const cached = analyticsCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < ANALYTICS_CACHE_TTL_MS) {
+      return cached.data;
+    }
+  }
+
   const daysCount = Math.max(
     1,
     Math.round((range.end.getTime() - range.start.getTime()) / (1000 * 60 * 60 * 24))
@@ -712,6 +732,13 @@ export async function fetchAnalyticsData(range: DateRange): Promise<AnalyticsDat
     insights,
     rawBookings: currentBookings,
   };
+
+  analyticsCache.set(cacheKey, {
+    timestamp: Date.now(),
+    data: result,
+  });
+
+  return result;
 }
 
 /**

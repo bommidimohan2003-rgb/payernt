@@ -1,5 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate, Link } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { Eye, EyeOff, Lock, Mail, ArrowRight, Loader2 } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { useForm } from "react-hook-form";
@@ -9,6 +10,7 @@ import { Input } from "@/components/common/Input";
 import { AnimatedCircleCheck } from "@/components/common/AnimatedCircleCheck";
 import { useAuth } from "@/hooks/useAuth";
 import { storage, STORAGE_KEYS } from "@/utils/storage";
+import { api } from "@/utils/api";
 import { toast } from "sonner";
 import type { User } from "@/types";
 
@@ -37,6 +39,7 @@ function isValidInternalRedirect(url: string | null | undefined, currentPath: st
 
 export function LoginForm() {
   const { user, ready, login } = useAuth();
+  const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [showPw, setShowPw] = useState(false);
   const [error, setErrorState] = useState<string | null>(null);
@@ -169,8 +172,35 @@ export function LoginForm() {
     const isAdmin = loggedInUser?.role === "admin" || (loggedInUser as any)?.role === "superadmin";
     const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
 
+    const userToken = storage.get<string | null>(STORAGE_KEYS.token, null);
+
+    // Accelerate post-login loading: Seed cache from compound bootstrap payload and prefetch in parallel
+    const bootstrap = (res as any)?.bootstrap;
+    if (bootstrap && loggedInUser?.email) {
+      if (typeof bootstrap.cartCount === "number") {
+        queryClient.setQueryData(["cart", loggedInUser.email], (prev: any) => ({
+          items: prev?.items || [],
+          count: bootstrap.cartCount,
+          subtotal: prev?.subtotal || 0,
+          tax: prev?.tax || 0,
+          total: prev?.total || 0,
+        }));
+      }
+      if (typeof bootstrap.unreadNotificationsCount === "number") {
+        queryClient.setQueryData(["notifications", "unread-count", "PAYRENT"], bootstrap.unreadNotificationsCount);
+      }
+    }
+
+    if (userToken && loggedInUser?.email) {
+      api.prefetchAuthenticatedRoutes(userToken);
+      queryClient.prefetchQuery({
+        queryKey: ["cart", loggedInUser.email],
+        queryFn: () => api.getCart(),
+        staleTime: 1000 * 30,
+      });
+    }
+
     if (isAdmin && loggedInUser) {
-      const userToken = storage.get<string | null>(STORAGE_KEYS.token, null);
       if (userToken) {
         localStorage.setItem("payent:admin:token", userToken);
       }

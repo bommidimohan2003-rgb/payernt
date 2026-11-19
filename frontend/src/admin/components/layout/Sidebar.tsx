@@ -35,7 +35,7 @@ import {
 import { authService } from "../../services/auth";
 import { notificationsService } from "../../services/notifications";
 
-const menuItems = [
+const menuGroups = [
   {
     group: "Core",
     items: [
@@ -96,16 +96,13 @@ const menuItems = [
       },
     ],
   },
-  {
-    group: "Account",
-    items: [
-      { to: "/admin/profile", icon: User, label: "Profile" },
-      { to: "/admin/settings", icon: Settings, label: "Settings" },
-    ],
-  },
 ] as const;
 
-export function Sidebar() {
+interface SidebarProps {
+  className?: string;
+}
+
+export function Sidebar({ className = "" }: SidebarProps) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [mobileOpen, setMobileOpen] = useState(false);
   const [badges, setBadges] = useState({
@@ -156,13 +153,26 @@ export function Sidebar() {
     return badges[key as keyof typeof badges] || 0;
   };
 
+  const isRouteActive = (to: string) => {
+    if (pathname === to) return true;
+    if (to !== "/admin/dashboard" && pathname.startsWith(to)) return true;
+    if (to === "/admin/payments" && pathname.startsWith("/admin/wallet")) return true;
+    if (
+      to === "/admin/support" &&
+      (pathname.startsWith("/admin/help") || pathname.startsWith("/admin/messages"))
+    )
+      return true;
+    if (to === "/admin/activity-logs" && pathname.startsWith("/admin/activity")) return true;
+    return false;
+  };
+
   return (
     <TooltipProvider delayDuration={100}>
       {/* Mobile Menu Trigger Button */}
       <div className="lg:hidden fixed top-3.5 left-4 z-50">
         <button
           onClick={() => setMobileOpen(!mobileOpen)}
-          className="p-2 rounded-xl bg-white dark:bg-[#1E1E1E] border border-[#E6E4E9] dark:border-white/10 text-[#242424] dark:text-[#F5F5F5] shadow-xs hover:bg-[#F8F7F9] dark:hover:bg-white/5 transition-colors"
+          className="p-2 rounded-2xl bg-surface-navigation border border-border text-text-primary shadow-elevation-1 hover:bg-secondary transition-all cursor-pointer"
           aria-label="Toggle Navigation"
         >
           {mobileOpen ? (
@@ -186,28 +196,181 @@ export function Sidebar() {
         )}
       </AnimatePresence>
 
-      {/* Icon-Only Compact Navigation Rail (Symbols Only, No Names) */}
+      {/* Mobile Slide-in Drawer (Matching Payernt Mobile Drawer Style) */}
+      <AnimatePresence>
+        {mobileOpen && (
+          <motion.aside
+            initial={{ x: "-100%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "-100%" }}
+            transition={{ type: "spring", damping: 26, stiffness: 280 }}
+            className="fixed inset-y-0 left-0 z-50 w-72 sm:w-80 bg-surface-navigation border-r border-border shadow-elevation-2 flex flex-col p-4 overflow-y-auto lg:hidden select-none"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3.5 border-b border-border mb-3">
+              <div className="flex items-center gap-3">
+                <div className="h-9 w-9 rounded-2xl bg-gradient-to-r from-[#F9856A] to-[#FF7655] flex items-center justify-center shadow-md">
+                  <span className="font-mono font-black text-sm text-white">
+                    P
+                  </span>
+                </div>
+                <div>
+                  <span className="text-sm font-bold text-text-primary">
+                    Payent Ops
+                  </span>
+                  <p className="text-[10px] text-text-secondary">
+                    Admin Workspace
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setMobileOpen(false)}
+                className="p-1.5 rounded-xl hover:bg-secondary text-text-secondary hover:text-text-primary transition-colors"
+                aria-label="Close Navigation"
+              >
+                <X className="h-4.5 w-4.5" />
+              </button>
+            </div>
+
+            {/* Navigation Groups */}
+            <div className="flex-1 space-y-3.5 overflow-y-auto no-scrollbar">
+              {menuGroups.map((group) => (
+                <div key={group.group} className="space-y-1">
+                  <p className="px-3 text-[10px] font-extrabold uppercase tracking-wider text-text-secondary/70">
+                    {group.group}
+                  </p>
+                  {group.items.map((item) => {
+                    const Icon = item.icon;
+                    const active = isRouteActive(item.to);
+                    const badgeVal =
+                      "badgeKey" in item ? getBadgeValue(item.badgeKey) : 0;
+                    return (
+                      <Link
+                        key={item.to}
+                        to={item.to}
+                        onClick={() => setMobileOpen(false)}
+                        className={cn(
+                          "w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all cursor-pointer",
+                          active
+                            ? "bg-accent-primary text-white shadow-md font-bold"
+                            : "text-text-secondary hover:text-text-primary hover:bg-secondary"
+                        )}
+                      >
+                        <div className="flex items-center gap-3">
+                          <Icon className="h-4 w-4" />
+                          <span>{item.label}</span>
+                        </div>
+                        {badgeVal > 0 && (
+                          <span
+                            className={cn(
+                              "h-4 min-w-4 px-1.5 rounded-full text-[10px] font-extrabold flex items-center justify-center",
+                              active
+                                ? "bg-white/20 text-white"
+                                : "bg-accent-primary text-white"
+                            )}
+                          >
+                            {badgeVal > 99 ? "99+" : badgeVal}
+                          </span>
+                        )}
+                      </Link>
+                    );
+                  })}
+                </div>
+              ))}
+
+              {/* Account Group */}
+              <div className="space-y-1 pt-1">
+                <p className="px-3 text-[10px] font-extrabold uppercase tracking-wider text-text-secondary/70">
+                  Account
+                </p>
+                <Link
+                  to="/admin/profile"
+                  onClick={() => setMobileOpen(false)}
+                  className={cn(
+                    "w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold transition-all cursor-pointer",
+                    pathname === "/admin/profile"
+                      ? "bg-accent-primary text-white shadow-md font-bold"
+                      : "text-text-secondary hover:text-text-primary hover:bg-secondary"
+                  )}
+                >
+                  <User className="h-4 w-4" />
+                  <span>Profile</span>
+                </Link>
+                <Link
+                  to="/admin/settings"
+                  onClick={() => setMobileOpen(false)}
+                  className={cn(
+                    "w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold transition-all cursor-pointer",
+                    pathname === "/admin/settings"
+                      ? "bg-accent-primary text-white shadow-md font-bold"
+                      : "text-text-secondary hover:text-text-primary hover:bg-secondary"
+                  )}
+                >
+                  <Settings className="h-4 w-4" />
+                  <span>Settings</span>
+                </Link>
+              </div>
+            </div>
+
+            {/* Mobile Footer */}
+            <div className="pt-3 border-t border-border mt-3 space-y-2">
+              <div className="flex items-center gap-3 px-3 py-2 rounded-2xl bg-secondary/50">
+                <ProfilePhoto
+                  src={
+                    currentUser?.profilePhotoUrl ||
+                    (currentUser as any)?.profile_photo_url ||
+                    currentUser?.avatar
+                  }
+                  alt={currentUser?.fullName || "Admin"}
+                  size="sm"
+                  shape="rounded"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-bold text-text-primary truncate">
+                    {currentUser?.fullName || "Administrator"}
+                  </p>
+                  <p className="text-[10px] text-text-secondary truncate">
+                    {currentUser?.email || "admin@payent.in"}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileOpen(false);
+                  handleLogout();
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold text-destructive hover:bg-destructive/10 transition-all cursor-pointer"
+              >
+                <LogOut className="h-4 w-4" />
+                <span>Sign Out</span>
+              </button>
+            </div>
+          </motion.aside>
+        )}
+      </AnimatePresence>
+
+      {/* Desktop Floating Rail (Matching PayerntSidebar Exactly) */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 flex flex-col w-[72px] bg-white dark:bg-[#1E1E1E] border-r border-[#E6E4E9] dark:border-[#383838] transition-transform duration-200 ease-out lg:sticky lg:top-0 lg:h-screen shrink-0 select-none shadow-[2px_0_12px_rgba(0,0,0,0.02)]",
-          mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
+          "hidden lg:flex flex-col items-center justify-between py-4 px-2 w-16 sm:w-18 shrink-0 self-stretch my-3 ml-3 rounded-3xl bg-surface-navigation border border-border shadow-elevation-1 backdrop-blur-xl sticky top-3 h-[calc(100vh-1.5rem)] transition-colors duration-200 select-none z-30",
+          className
         )}
+        aria-label="Admin Navigation"
       >
-        {/* Workspace Brand Header (Icon Only) */}
-        <div className="flex items-center justify-center h-16 border-b border-[#E6E4E9] dark:border-[#383838] shrink-0">
+        {/* Top Workspace Brand Icon */}
+        <div className="flex flex-col items-center shrink-0 mb-1">
           <Tooltip>
             <TooltipTrigger asChild>
               <Link
                 to="/admin/dashboard"
-                onClick={() => setMobileOpen(false)}
-                className="group relative flex items-center justify-center"
+                className="flex items-center justify-center h-11 w-11 rounded-2xl bg-gradient-to-r from-[#F9856A] to-[#FF7655] shadow-md hover:scale-105 transition-transform duration-200 cursor-pointer"
                 aria-label="Payent Admin Portal"
               >
-                <div className="h-9 w-9 rounded-xl bg-gradient-to-r from-[#F9856A] to-[#FF7655] flex items-center justify-center shadow-[0_4px_12px_rgba(255,118,85,0.25)] transition-transform group-hover:scale-105">
-                  <span className="font-mono font-black text-sm text-white tracking-tight">
-                    P
-                  </span>
-                </div>
+                <span className="font-mono font-black text-sm text-white tracking-tight">
+                  P
+                </span>
               </Link>
             </TooltipTrigger>
             <TooltipContent
@@ -218,32 +381,22 @@ export function Sidebar() {
               Payent Admin Portal
             </TooltipContent>
           </Tooltip>
+          <div className="w-7 h-[1px] bg-border my-1.5 opacity-60" />
         </div>
 
-        {/* Navigation Rail Items (Symbols Only) */}
-        <nav className="flex-1 overflow-y-auto py-3 space-y-2 no-scrollbar flex flex-col items-center">
-          {menuItems.map((group, gIdx) => (
+        {/* Center Main Navigation Rail */}
+        <nav className="flex-1 w-full overflow-y-auto no-scrollbar flex flex-col items-center gap-2 py-1">
+          {menuGroups.map((group, gIdx) => (
             <div
               key={group.group}
-              className="w-full flex flex-col items-center space-y-1.5"
+              className="w-full flex flex-col items-center gap-2"
             >
-              {/* Subtle hairline between groups */}
               {gIdx > 0 && (
-                <div className="w-7 h-[1px] bg-[#E6E4E9] dark:bg-[#383838] my-1 opacity-70" />
+                <div className="w-7 h-[1px] bg-border my-1 opacity-60 shrink-0" />
               )}
 
               {group.items.map((it) => {
-                const active =
-                  pathname === it.to ||
-                  (it.to !== "/admin/dashboard" &&
-                    pathname.startsWith(it.to)) ||
-                  (it.to === "/admin/payments" &&
-                    pathname.startsWith("/admin/wallet")) ||
-                  (it.to === "/admin/support" &&
-                    (pathname.startsWith("/admin/help") ||
-                      pathname.startsWith("/admin/messages"))) ||
-                  (it.to === "/admin/activity-logs" &&
-                    pathname.startsWith("/admin/activity"));
+                const active = isRouteActive(it.to);
                 const badgeVal =
                   "badgeKey" in it ? getBadgeValue(it.badgeKey) : 0;
 
@@ -252,27 +405,27 @@ export function Sidebar() {
                     <TooltipTrigger asChild>
                       <Link
                         to={it.to}
-                        onClick={() => setMobileOpen(false)}
                         aria-label={it.label}
                         className={cn(
-                          "group relative flex items-center justify-center h-10 w-10 rounded-xl transition-all duration-150 cursor-pointer",
+                          "relative group flex items-center justify-center h-11 w-11 rounded-2xl transition-all duration-200 cursor-pointer shrink-0",
                           active
-                            ? "bg-[#242424] text-white dark:bg-[#1E1E1E] dark:text-[#FFFFFF] dark:border dark:border-[#383838] shadow-xs"
-                            : "text-[#77757D] hover:text-[#242424] hover:bg-[#F8F7F9] dark:text-[#B3B3B3] dark:hover:text-[#FFFFFF] dark:hover:bg-[#262626]",
+                            ? "bg-accent-primary text-white shadow-md scale-102 font-bold"
+                            : "text-text-secondary hover:text-text-primary hover:bg-secondary border border-transparent"
                         )}
                       >
-                        <it.icon
-                          className={cn(
-                            "h-5 w-5 shrink-0 transition-transform group-hover:scale-105",
-                            active
-                              ? "text-white dark:text-[#FFFFFF]"
-                              : "text-[#77757D] group-hover:text-[#242424] dark:text-[#B3B3B3] dark:group-hover:text-[#FFFFFF]",
-                          )}
-                        />
+                        <it.icon className="h-4.5 w-4.5 stroke-[1.8]" />
 
-                        {/* Pending notification dot */}
                         {badgeVal > 0 && (
-                          <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-[#FF7655] ring-2 ring-white dark:ring-[#1E1E1E]" />
+                          <span
+                            className={cn(
+                              "absolute -top-1 -right-1 flex h-3.5 min-w-3.5 px-1 items-center justify-center rounded-full text-[9px] font-black shadow-xs",
+                              active
+                                ? "bg-white text-accent-primary"
+                                : "bg-accent-primary text-white"
+                            )}
+                          >
+                            {badgeVal > 99 ? "99+" : badgeVal}
+                          </span>
                         )}
                       </Link>
                     </TooltipTrigger>
@@ -283,7 +436,7 @@ export function Sidebar() {
                     >
                       <span>{it.label}</span>
                       {badgeVal > 0 && (
-                        <span className="px-1.5 py-0.5 rounded-full bg-[#FF7655] text-white text-[10px] font-mono">
+                        <span className="px-1.5 py-0.5 rounded-full bg-accent-primary text-white text-[10px] font-mono">
                           {badgeVal}
                         </span>
                       )}
@@ -295,15 +448,45 @@ export function Sidebar() {
           ))}
         </nav>
 
-        {/* User Identity & Logout Rail Footer (Symbols Only) */}
-        <div className="p-2 border-t border-[#E6E4E9] dark:border-[#383838] shrink-0 flex flex-col items-center gap-2">
-          {/* User Profile Avatar with Tooltip */}
+        {/* Bottom Stack: Settings, Profile & Logout */}
+        <div className="flex flex-col items-center gap-2.5 w-full pt-3.5 border-t border-border mt-auto shrink-0">
+          {/* Settings */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Link
+                to="/admin/settings"
+                aria-label="Settings"
+                className={cn(
+                  "relative group flex items-center justify-center h-11 w-11 rounded-2xl transition-all duration-200 cursor-pointer",
+                  pathname === "/admin/settings"
+                    ? "bg-accent-primary text-white shadow-md font-bold"
+                    : "text-text-secondary hover:text-text-primary hover:bg-secondary border border-transparent"
+                )}
+              >
+                <Settings className="h-4.5 w-4.5 stroke-[1.8]" />
+              </Link>
+            </TooltipTrigger>
+            <TooltipContent
+              side="right"
+              sideOffset={12}
+              className="bg-[#242424] text-white dark:bg-[#1E1E1E] dark:text-[#FFFFFF] text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-black/10 dark:border-[#383838] shadow-xl"
+            >
+              Settings
+            </TooltipContent>
+          </Tooltip>
+
+          {/* Admin Profile */}
           <Tooltip>
             <TooltipTrigger asChild>
               <Link
                 to="/admin/profile"
                 aria-label="Admin Profile"
-                className="group relative h-9 w-9 rounded-xl overflow-hidden border border-[#E6E4E9] dark:border-[#383838] flex items-center justify-center hover:border-neutral-400 dark:hover:border-white/50 transition-colors"
+                className={cn(
+                  "relative group flex items-center justify-center h-11 w-11 rounded-2xl overflow-hidden border border-border hover:scale-105 transition-all cursor-pointer",
+                  pathname === "/admin/profile"
+                    ? "ring-2 ring-accent-primary border-transparent"
+                    : "hover:border-foreground/40"
+                )}
               >
                 <ProfilePhoto
                   src={
@@ -323,21 +506,23 @@ export function Sidebar() {
               className="bg-[#242424] text-white dark:bg-[#1E1E1E] dark:text-[#FFFFFF] text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-black/10 dark:border-[#383838] shadow-xl flex flex-col"
             >
               <span>{currentUser?.fullName || "Administrator"}</span>
-              <span className="text-[10px] text-[#B3B3B3] font-mono font-normal">
+              <span className="text-[10px] text-muted-foreground font-mono font-normal">
                 {currentUser?.email || "admin@payent.in"}
               </span>
             </TooltipContent>
           </Tooltip>
 
-          {/* Sign Out Button (Symbol Only with Tooltip) */}
+          {/* Sign Out Button */}
           <Tooltip>
             <TooltipTrigger asChild>
               <button
+                type="button"
                 onClick={handleLogout}
-                className="group relative h-9 w-9 rounded-xl flex items-center justify-center text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition-colors cursor-pointer"
+                className="flex items-center justify-center h-11 w-11 rounded-2xl text-destructive hover:bg-destructive/10 border border-transparent transition-all duration-200 cursor-pointer relative group"
+                title="Sign Out"
                 aria-label="Sign Out"
               >
-                <LogOut className="h-4.5 w-4.5 shrink-0" />
+                <LogOut className="h-4.5 w-4.5 stroke-[1.8]" />
               </button>
             </TooltipTrigger>
             <TooltipContent
@@ -353,3 +538,5 @@ export function Sidebar() {
     </TooltipProvider>
   );
 }
+
+export default Sidebar;

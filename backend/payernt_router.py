@@ -978,6 +978,18 @@ def login_payernt_vendor(data: PayerntLoginSchema, request: Request = None):
 
         sanitized = _sanitize_payernt_account(account)
 
+        # Compound bootstrap payload to eliminate post-login waterfall for lenders
+        bootstrap_data = {
+            "unreadNotificationsCount": 0,
+            "kycStatus": account.get("status") or "APPROVED",
+            "role": resolved_role,
+        }
+        try:
+            from database import get_unread_notifications_count
+            bootstrap_data["unreadNotificationsCount"] = get_unread_notifications_count(account["email"], role="PAYERNT")
+        except Exception as b_err:
+            logger.warning(f"Notice: compiling lender login bootstrap payload: {b_err}")
+
         return {
             "success": True,
             "message": "Signed in to paye₹nt successfully.",
@@ -994,6 +1006,7 @@ def login_payernt_vendor(data: PayerntLoginSchema, request: Request = None):
             "email": account["email"],
             "role": resolved_role,
             "account": sanitized,
+            "bootstrap": bootstrap_data,
             "token": access_token,
             "refreshToken": refresh_token,
         }
@@ -2459,29 +2472,34 @@ def update_product_availability_config_endpoint(
                 if b_item.get("reason"):
                     clean_item["reason"] = str(b_item["reason"]).strip()
                 clean_new_blocked.append(clean_item)
-
-                order_conflicts = check_products_booking_conflicts(
-                    [product_id], date_iso, date_iso, include_blocked_dates=False
-                )
-                if product_id in order_conflicts:
-                    raise HTTPException(
-                        status_code=status.HTTP_409_CONFLICT,
-                        detail=f"Cannot block date {date_iso}: An active renter reservation already exists for this date."
-                    )
             elif isinstance(b_item, str):
                 d = parse_date_safely(b_item)
                 if not d:
                     continue
                 date_iso = d.strftime("%Y-%m-%d")
                 clean_new_blocked.append(date_iso)
-                order_conflicts = check_products_booking_conflicts(
-                    [product_id], date_iso, date_iso, include_blocked_dates=False
-                )
-                if product_id in order_conflicts:
-                    raise HTTPException(
-                        status_code=status.HTTP_409_CONFLICT,
-                        detail=f"Cannot block date {date_iso}: An active renter reservation already exists for this date."
+
+        # Batch-verify conflicts across blocked date range in a single query (eliminates N+1 loop)
+        dates_to_check = [
+            item["date"] if isinstance(item, dict) else item
+            for item in clean_new_blocked
+        ]
+        if dates_to_check:
+            min_date = min(dates_to_check)
+            max_date = max(dates_to_check)
+            range_conflicts = check_products_booking_conflicts(
+                [product_id], min_date, max_date, include_blocked_dates=False
+            )
+            if product_id in range_conflicts:
+                for date_iso in dates_to_check:
+                    date_conflicts = check_products_booking_conflicts(
+                        [product_id], date_iso, date_iso, include_blocked_dates=False
                     )
+                    if product_id in date_conflicts:
+                        raise HTTPException(
+                            status_code=status.HTTP_409_CONFLICT,
+                            detail=f"Cannot block date {date_iso}: An active renter reservation already exists for this date."
+                        )
 
     update_fields = {}
     if data.allowHalfDay is not None:

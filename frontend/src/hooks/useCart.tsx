@@ -112,12 +112,43 @@ export function CartProvider({ children }: { children: ReactNode }) {
     mutationFn: async (itemId: string) => {
       return await api.removeFromCart(itemId);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["cart"] });
-      toast.success("Item removed from cart.");
+    onMutate: async (itemId: string) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ["cart"] });
+
+      // Snapshot previous cart data
+      const cartKey = ["cart", user?.email || "guest"];
+      const previousCart = queryClient.getQueryData<CartResponse>(cartKey);
+
+      // Optimistically remove item from query cache
+      if (previousCart) {
+        const nextItems = previousCart.items.filter((item) => item.id !== itemId);
+        const nextSubtotal = nextItems.reduce((acc, it) => acc + (it.price || 0), 0);
+        queryClient.setQueryData<CartResponse>(cartKey, {
+          ...previousCart,
+          items: nextItems,
+          count: nextItems.length,
+          subtotal: nextSubtotal,
+          tax: Math.round(nextSubtotal * 0.18),
+          total: nextSubtotal + Math.round(nextSubtotal * 0.18),
+        });
+      }
+
+      return { previousCart, cartKey };
     },
-    onError: () => {
+    onError: (_err, _itemId, context) => {
+      // Rollback on network/server error
+      if (context?.previousCart && context?.cartKey) {
+        queryClient.setQueryData(context.cartKey, context.previousCart);
+      }
       toast.error("Failed to remove item.");
+    },
+    onSettled: () => {
+      // Always sync with authoritative server state
+      queryClient.invalidateQueries({ queryKey: ["cart"] });
+    },
+    onSuccess: () => {
+      toast.success("Item removed from cart.");
     },
   });
 
@@ -125,12 +156,35 @@ export function CartProvider({ children }: { children: ReactNode }) {
     mutationFn: async () => {
       return await api.clearCart();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["cart"] });
-      toast.success("Cart cleared.");
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ["cart"] });
+
+      const cartKey = ["cart", user?.email || "guest"];
+      const previousCart = queryClient.getQueryData<CartResponse>(cartKey);
+
+      // Optimistically clear items
+      queryClient.setQueryData<CartResponse>(cartKey, {
+        items: [],
+        count: 0,
+        subtotal: 0,
+        tax: 0,
+        total: 0,
+      });
+
+      return { previousCart, cartKey };
     },
-    onError: () => {
+    onError: (_err, _variables, context) => {
+      // Rollback on network/server error
+      if (context?.previousCart && context?.cartKey) {
+        queryClient.setQueryData(context.cartKey, context.previousCart);
+      }
       toast.error("Failed to clear cart.");
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["cart"] });
+    },
+    onSuccess: () => {
+      toast.success("Cart cleared.");
     },
   });
 

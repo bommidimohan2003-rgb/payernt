@@ -260,6 +260,16 @@ export function LenderProductDetails({ productId: propId }: { productId?: string
           <button
             onClick={() => {
               toggleAvailability(product.id);
+              setProduct((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      availabilityStatus: isAvailable ? "paused" : "available",
+                      availability: isAvailable ? "paused" : "available",
+                      isAvailable: !isAvailable,
+                    }
+                  : prev
+              );
               toast.success(isAvailable ? "Listing paused." : "Listing set to active.");
             }}
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${isAvailable

@@ -298,7 +298,7 @@ export function useAuth() {
         if (typeof window !== "undefined") {
           window.dispatchEvent(new CustomEvent("payent:storage_change"));
         }
-        return { ok: true, user: loggedUser };
+        return { ok: true, user: loggedUser, bootstrap: (res as any)?.bootstrap };
       }
       return { ok: false, error: "Invalid credentials from server." };
     } catch (e) {

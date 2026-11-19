@@ -91,6 +91,8 @@ export function ProductAngleViewer({
             key={idx}
             src={angle.image}
             alt={`${productTitle} - ${angle.label} view`}
+            loading={idx === 0 ? "eager" : "lazy"}
+            decoding="async"
             className={cn(
               "absolute inset-0 h-full w-full object-cover object-center",
               isReducedMotion
@@ -190,6 +192,8 @@ export function ProductAngleViewer({
               <img
                 src={angle.image}
                 alt={`${productTitle} ${angle.label}`}
+                loading="lazy"
+                decoding="async"
                 className="h-full w-full object-cover rounded-xl"
               />
               <span

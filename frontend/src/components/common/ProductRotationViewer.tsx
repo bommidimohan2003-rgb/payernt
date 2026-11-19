@@ -56,14 +56,15 @@ export function ProductRotationViewer({
       img.onload = () => {
         count++;
         setLoadedCount(count);
-        if (count >= total) {
+        // Pipelined readiness: Allow interaction as soon as first 4 key frames arrive
+        if (count >= Math.min(total, 4)) {
           setIsLoaded(true);
         }
       };
       img.onerror = () => {
         count++;
         setLoadedCount(count);
-        if (count >= total) {
+        if (count >= Math.min(total, 4)) {
           setIsLoaded(true);
         }
       };
@@ -223,6 +224,7 @@ export function ProductRotationViewer({
         <img
           src={frames[currentFrame]}
           alt={`${productTitle} - 360 degree view angle ${currentAngleDegrees} degrees`}
+          decoding="async"
           className="h-full w-full object-cover pointer-events-none"
         />
 

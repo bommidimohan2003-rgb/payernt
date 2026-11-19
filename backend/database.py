@@ -452,6 +452,8 @@ def init_db(force: bool = False):
     add_index_safely("user_kyc_verifications", "idx_kyc_account_type", "account_type")
     add_index_safely("user_kyc_verifications", "idx_kyc_status", "status")
     add_index_safely("user_kyc_verifications", "idx_kyc_user_id", "user_id")
+    add_index_safely("user_kyc_verifications", "idx_kyc_status_created", "status, created_at")
+    add_index_safely("user_kyc_verifications", "idx_kyc_created_at", "created_at")
 
     # 1. Dedicated Admin Accounts Table
     execute_query("""
@@ -658,6 +660,11 @@ def init_db(force: bool = False):
     add_index_safely("orders", "idx_orders_created_at", "created_at")
     add_index_safely("orders", "idx_orders_product_status", "product_id, status")
     add_index_safely("orders", "idx_orders_user_created", "user_email, created_at")
+    add_index_safely("orders", "idx_orders_rzp_order", "razorpay_order_id")
+    add_index_safely("orders", "idx_orders_rzp_pay", "razorpay_payment_id")
+    add_index_safely("orders", "idx_orders_user_status_created", "user_email, status, created_at")
+    add_index_safely("orders", "idx_orders_lender_status", "lender_email, status")
+    add_index_safely("orders", "idx_orders_vendor_status", "vendor_id, status")
 
     # Create user_addresses table for renter delivery address book
     execute_query("""
@@ -1009,6 +1016,10 @@ def init_db(force: bool = False):
     add_column_safely("payments", "updated_at VARCHAR(100)")
     add_index_safely("payments", "idx_payments_customer_id", "customer_id")
     add_index_safely("payments", "idx_payments_booking_id", "booking_id")
+    add_index_safely("payments", "idx_payments_order_id", "order_id")
+    add_index_safely("payments", "idx_payments_rzp_order", "razorpay_order_id")
+    add_index_safely("payments", "idx_payments_rzp_pay", "razorpay_payment_id")
+    add_index_safely("payments", "idx_payments_status", "status")
 
     # Create processed_payment_events table for webhook idempotency
     execute_query("""
@@ -1112,6 +1123,9 @@ def init_db(force: bool = False):
     """)
     add_index_safely("deliveries", "idx_deliveries_booking_id", "booking_id")
     add_index_safely("deliveries", "idx_deliveries_status", "status")
+    add_index_safely("deliveries", "idx_deliveries_booking_status", "booking_id, status")
+    add_index_safely("deliveries", "idx_deliveries_vendor", "vendor_id")
+    add_index_safely("deliveries", "idx_deliveries_renter", "renter_id")
     add_column_safely("deliveries", "delivery_boy_id VARCHAR(255) NULL")
     add_column_safely("deliveries", "delivery_boy_name VARCHAR(255) NULL")
     add_column_safely("deliveries", "delivery_boy_phone VARCHAR(50) NULL")
@@ -1458,10 +1472,10 @@ MOCK_USERS = {
     "yernikumar1438@gmail.com": {
         "email": "yernikumar1438@gmail.com",
         "firebase_uid": "user-uid-yerni",
-        "phone": "+91 9876543214",
+        "phone": "+91 9701041513",
         "password_hash": _admin_hashed_pwd,
         "full_name": "Yerni Kumar",
-        "role": "customer",
+        "role": "lender",
         "avatar": "",
         "address": "Kondapur",
         "city": "Hyderabad",
@@ -1471,8 +1485,24 @@ MOCK_USERS = {
         "panMasked": "XXXXX1234F",
         "created_at": dt.now(timezone.utc).isoformat(),
         "last_login_at": dt.now(timezone.utc).isoformat(),
-        "status": "PENDING_REVIEW",
-        "verified": False
+        "status": "active",
+        "verified": True
+    },
+    "pch7509@gmail.com": {
+        "email": "pch7509@gmail.com",
+        "firebase_uid": "user-uid-pch7509",
+        "phone": "+91 8374661542",
+        "password_hash": _admin_hashed_pwd,
+        "full_name": "Vinay Pediredla",
+        "role": "lender",
+        "avatar": "",
+        "address": "Visakhapatnam",
+        "city": "Visakhapatnam",
+        "pincode": "530001",
+        "created_at": dt.now(timezone.utc).isoformat(),
+        "last_login_at": dt.now(timezone.utc).isoformat(),
+        "status": "active",
+        "verified": True
     }
 }
 MOCK_OTPS = {}
@@ -1486,9 +1516,138 @@ MOCK_NOTIFICATIONS = {}
 MOCK_PROCESSED_EVENTS = set()
 MOCK_USER_EVENTS = []
 INITIAL_SEED_PRODUCTS: Dict[str, Dict[str, Any]] = {
+    "prod-1792661636447": {
+        "id": "prod-1792661636447",
+        "user_email": "bommidimohan304@gmail.com",
+        "title": "laptop",
+        "name": "laptop",
+        "description": "laptop available for peer-to-peer equipment rental on paYent.",
+        "price": 1500.0,
+        "daily_rate": 1500.0,
+        "image": "https://res.cloudinary.com/dvyendk6j/image/upload/v1792661493/scqqacvsphkrel8zffxf.jpg",
+        "images": [
+            "https://res.cloudinary.com/dvyendk6j/image/upload/v1792661493/scqqacvsphkrel8zffxf.jpg",
+            "https://res.cloudinary.com/dvyendk6j/image/upload/v1792661509/qp5yqz55vutnq4lzzsc7.jpg"
+        ],
+        "category": "electronics",
+        "rating": 5.0,
+        "reviews": 12,
+        "available": True,
+        "owner_name": "mohan bommidi",
+        "owner_email": "bommidimohan304@gmail.com",
+        "owner_id": "bommidimohan304@gmail.com",
+        "owner_rating": 5.0,
+        "owner_status": "active",
+        "owner": {
+            "id": "bommidimohan304@gmail.com",
+            "name": "mohan bommidi",
+            "email": "bommidimohan304@gmail.com",
+            "city": "Hyderabad",
+            "rating": 5.0,
+            "status": "active"
+        },
+        "created_at": "2026-10-22T09:33:58.567517+00:00",
+        "status": "approved"
+    },
+    "prod-1792662405953": {
+        "id": "prod-1792662405953",
+        "user_email": "bommidimohan304@gmail.com",
+        "title": "Acer",
+        "name": "Acer",
+        "description": "Acer available for peer-to-peer equipment rental on paYent.",
+        "price": 800.0,
+        "daily_rate": 800.0,
+        "image": "https://res.cloudinary.com/dvyendk6j/image/upload/v1792662275/ntgpwzp3buougc01t5py.jpg",
+        "images": [
+            "https://res.cloudinary.com/dvyendk6j/image/upload/v1792662275/ntgpwzp3buougc01t5py.jpg",
+            "https://res.cloudinary.com/dvyendk6j/image/upload/v1792662300/qzazy9q91ibv728pmqh1.jpg"
+        ],
+        "category": "computers",
+        "rating": 5.0,
+        "reviews": 8,
+        "available": True,
+        "owner_name": "mohan bommidi",
+        "owner_email": "bommidimohan304@gmail.com",
+        "owner_id": "bommidimohan304@gmail.com",
+        "owner_rating": 5.0,
+        "owner_status": "active",
+        "owner": {
+            "id": "bommidimohan304@gmail.com",
+            "name": "mohan bommidi",
+            "email": "bommidimohan304@gmail.com",
+            "city": "Hyderabad",
+            "rating": 5.0,
+            "status": "active"
+        },
+        "created_at": "2026-10-22T09:46:48.793230+00:00",
+        "status": "approved"
+    },
+    "prod-1792993514066": {
+        "id": "prod-1792993514066",
+        "user_email": "vasnathchikkala@gmail.com",
+        "title": "Asus vivobook 15",
+        "name": "Asus vivobook 15",
+        "description": "Asus vivobook 15 available for peer-to-peer equipment rental on paYent.",
+        "price": 500.0,
+        "daily_rate": 500.0,
+        "image": "https://res.cloudinary.com/dvyendk6j/image/upload/v1792993404/tgwa5rknbphu9evg94hc.jpg",
+        "images": ["https://res.cloudinary.com/dvyendk6j/image/upload/v1792993404/tgwa5rknbphu9evg94hc.jpg"],
+        "category": "computers",
+        "rating": 5.0,
+        "reviews": 5,
+        "available": True,
+        "owner_name": "Vasnath Chikkala",
+        "owner_email": "vasnathchikkala@gmail.com",
+        "owner_id": "vasnathchikkala@gmail.com",
+        "owner_rating": 5.0,
+        "owner_status": "active",
+        "owner": {
+            "id": "vasnathchikkala@gmail.com",
+            "name": "Vasnath Chikkala",
+            "email": "vasnathchikkala@gmail.com",
+            "city": "Hyderabad",
+            "rating": 5.0,
+            "status": "active"
+        },
+        "created_at": "2026-10-26T05:48:31.994517+00:00",
+        "status": "approved"
+    },
+    "prod-1792996506773": {
+        "id": "prod-1792996506773",
+        "user_email": "bommidimohan304@gmail.com",
+        "title": "Laptop",
+        "name": "Laptop",
+        "description": "Laptop available for peer-to-peer equipment rental on paYent.",
+        "price": 1000.0,
+        "daily_rate": 1000.0,
+        "image": "https://res.cloudinary.com/dvyendk6j/image/upload/v1792996354/o8ustwgko3mpfqy2u60p.jpg",
+        "images": [
+            "https://res.cloudinary.com/dvyendk6j/image/upload/v1792996354/o8ustwgko3mpfqy2u60p.jpg",
+            "https://res.cloudinary.com/dvyendk6j/image/upload/v1792996367/tikfaygjcjsxj7iddmao.jpg"
+        ],
+        "category": "Laptops & Computing",
+        "rating": 5.0,
+        "reviews": 15,
+        "available": True,
+        "owner_name": "mohan bommidi",
+        "owner_email": "bommidimohan304@gmail.com",
+        "owner_id": "bommidimohan304@gmail.com",
+        "owner_rating": 5.0,
+        "owner_status": "active",
+        "owner": {
+            "id": "bommidimohan304@gmail.com",
+            "name": "mohan bommidi",
+            "email": "bommidimohan304@gmail.com",
+            "city": "Hyderabad",
+            "rating": 5.0,
+            "status": "active"
+        },
+        "created_at": "2026-10-26T06:38:35.248471+00:00",
+        "status": "approved"
+    },
     "sony-alpha-a7-iii": {
         "id": "sony-alpha-a7-iii",
-        "user_email": "sai.teja@payent.example.com",
+        "user_email": "pch7509@gmail.com",
         "title": "Sony Alpha a7 III",
         "name": "Sony Alpha a7 III",
         "category": "cameras",
@@ -1506,15 +1665,15 @@ INITIAL_SEED_PRODUCTS: Dict[str, Dict[str, Any]] = {
         "condition_grade": "Excellent",
         "status": "approved",
         "available": True,
-        "owner_name": "Sai Teja",
-        "owner_email": "sai.teja@payent.example.com",
-        "owner_id": "owner-sai-teja",
+        "owner_name": "Vinay Pediredla",
+        "owner_email": "pch7509@gmail.com",
+        "owner_id": "pch7509@gmail.com",
         "owner_rating": 4.9,
         "owner_status": "active",
         "owner": {
-            "id": "owner-sai-teja",
-            "name": "Sai Teja",
-            "email": "sai.teja@payent.example.com",
+            "id": "pch7509@gmail.com",
+            "name": "Vinay Pediredla",
+            "email": "pch7509@gmail.com",
             "city": "Hyderabad",
             "rating": 4.9,
             "status": "active"
@@ -1523,7 +1682,7 @@ INITIAL_SEED_PRODUCTS: Dict[str, Dict[str, Any]] = {
     },
     "canon-eos-r5": {
         "id": "canon-eos-r5",
-        "user_email": "arun.kumar@payent.example.com",
+        "user_email": "yernikumar1438@gmail.com",
         "title": "Canon EOS R5 Mirrorless Camera",
         "name": "Canon EOS R5 Mirrorless Camera",
         "category": "cameras",
@@ -1541,15 +1700,15 @@ INITIAL_SEED_PRODUCTS: Dict[str, Dict[str, Any]] = {
         "condition_grade": "Like New",
         "status": "approved",
         "available": True,
-        "owner_name": "Arun Kumar",
-        "owner_email": "arun.kumar@payent.example.com",
-        "owner_id": "owner-arun-k",
+        "owner_name": "Yerni Kumar",
+        "owner_email": "yernikumar1438@gmail.com",
+        "owner_id": "yernikumar1438@gmail.com",
         "owner_rating": 4.9,
         "owner_status": "active",
         "owner": {
-            "id": "owner-arun-k",
-            "name": "Arun Kumar",
-            "email": "arun.kumar@payent.example.com",
+            "id": "yernikumar1438@gmail.com",
+            "name": "Yerni Kumar",
+            "email": "yernikumar1438@gmail.com",
             "city": "Bengaluru",
             "rating": 4.9,
             "status": "active"
@@ -1558,7 +1717,7 @@ INITIAL_SEED_PRODUCTS: Dict[str, Dict[str, Any]] = {
     },
     "red-komodo-6k": {
         "id": "red-komodo-6k",
-        "user_email": "cinema.pro@payent.example.com",
+        "user_email": "bommidimohan304@gmail.com",
         "title": "RED Komodo 6K Cinema Camera",
         "name": "RED Komodo 6K Cinema Camera",
         "category": "cameras",
@@ -1576,15 +1735,15 @@ INITIAL_SEED_PRODUCTS: Dict[str, Dict[str, Any]] = {
         "condition_grade": "Excellent",
         "status": "approved",
         "available": True,
-        "owner_name": "Cinema Gear Pro",
-        "owner_email": "cinema.pro@payent.example.com",
-        "owner_id": "owner-cinema-pro",
+        "owner_name": "Mohan Bommidi",
+        "owner_email": "bommidimohan304@gmail.com",
+        "owner_id": "bommidimohan304@gmail.com",
         "owner_rating": 4.9,
         "owner_status": "active",
         "owner": {
-            "id": "owner-cinema-pro",
-            "name": "Cinema Gear Pro",
-            "email": "cinema.pro@payent.example.com",
+            "id": "bommidimohan304@gmail.com",
+            "name": "Mohan Bommidi",
+            "email": "bommidimohan304@gmail.com",
             "city": "Hyderabad",
             "rating": 4.9,
             "status": "active"
@@ -1593,7 +1752,7 @@ INITIAL_SEED_PRODUCTS: Dict[str, Dict[str, Any]] = {
     },
     "dji-mavic-3-pro": {
         "id": "dji-mavic-3-pro",
-        "user_email": "aerial.hub@payent.example.com",
+        "user_email": "pch7509@gmail.com",
         "title": "DJI Mavic 3 Pro Cine Combo",
         "name": "DJI Mavic 3 Pro Cine Combo",
         "category": "drones",
@@ -1611,15 +1770,15 @@ INITIAL_SEED_PRODUCTS: Dict[str, Dict[str, Any]] = {
         "condition_grade": "Like New",
         "status": "approved",
         "available": True,
-        "owner_name": "Aerial Hub India",
-        "owner_email": "aerial.hub@payent.example.com",
-        "owner_id": "owner-aerial-hub",
+        "owner_name": "Vinay Pediredla",
+        "owner_email": "pch7509@gmail.com",
+        "owner_id": "pch7509@gmail.com",
         "owner_rating": 4.9,
         "owner_status": "active",
         "owner": {
-            "id": "owner-aerial-hub",
-            "name": "Aerial Hub India",
-            "email": "aerial.hub@payent.example.com",
+            "id": "pch7509@gmail.com",
+            "name": "Vinay Pediredla",
+            "email": "pch7509@gmail.com",
             "city": "Mumbai",
             "rating": 4.9,
             "status": "active"
@@ -1628,7 +1787,7 @@ INITIAL_SEED_PRODUCTS: Dict[str, Dict[str, Any]] = {
     },
     "dji-mini-4-pro": {
         "id": "dji-mini-4-pro",
-        "user_email": "rohit.varma@payent.example.com",
+        "user_email": "yernikumar1438@gmail.com",
         "title": "DJI Mini 4 Pro Fly More Combo",
         "name": "DJI Mini 4 Pro Fly More Combo",
         "category": "drones",
@@ -1646,15 +1805,15 @@ INITIAL_SEED_PRODUCTS: Dict[str, Dict[str, Any]] = {
         "condition_grade": "Excellent",
         "status": "approved",
         "available": True,
-        "owner_name": "Rohit Varma",
-        "owner_email": "rohit.varma@payent.example.com",
-        "owner_id": "owner-rohit-v",
+        "owner_name": "Yerni Kumar",
+        "owner_email": "yernikumar1438@gmail.com",
+        "owner_id": "yernikumar1438@gmail.com",
         "owner_rating": 4.8,
         "owner_status": "active",
         "owner": {
-            "id": "owner-rohit-v",
-            "name": "Rohit Varma",
-            "email": "rohit.varma@payent.example.com",
+            "id": "yernikumar1438@gmail.com",
+            "name": "Yerni Kumar",
+            "email": "yernikumar1438@gmail.com",
             "city": "Hyderabad",
             "rating": 4.8,
             "status": "active"
@@ -1663,7 +1822,7 @@ INITIAL_SEED_PRODUCTS: Dict[str, Dict[str, Any]] = {
     },
     "macbook-pro-m3-max": {
         "id": "macbook-pro-m3-max",
-        "user_email": "studio.labs@payent.example.com",
+        "user_email": "vasnathchikkala@gmail.com",
         "title": "Apple MacBook Pro 16\" (M3 Max, 64GB, 2TB)",
         "name": "Apple MacBook Pro 16\" (M3 Max, 64GB, 2TB)",
         "category": "laptops",
@@ -1681,15 +1840,15 @@ INITIAL_SEED_PRODUCTS: Dict[str, Dict[str, Any]] = {
         "condition_grade": "Like New",
         "status": "approved",
         "available": True,
-        "owner_name": "Studio Labs",
-        "owner_email": "studio.labs@payent.example.com",
-        "owner_id": "owner-studio-labs",
+        "owner_name": "Vasnath Chikkala",
+        "owner_email": "vasnathchikkala@gmail.com",
+        "owner_id": "vasnathchikkala@gmail.com",
         "owner_rating": 5.0,
         "owner_status": "active",
         "owner": {
-            "id": "owner-studio-labs",
-            "name": "Studio Labs",
-            "email": "studio.labs@payent.example.com",
+            "id": "vasnathchikkala@gmail.com",
+            "name": "Vasnath Chikkala",
+            "email": "vasnathchikkala@gmail.com",
             "city": "Bengaluru",
             "rating": 5.0,
             "status": "active"
@@ -1698,7 +1857,7 @@ INITIAL_SEED_PRODUCTS: Dict[str, Dict[str, Any]] = {
     },
     "rode-wireless-pro": {
         "id": "rode-wireless-pro",
-        "user_email": "sound.craft@payent.example.com",
+        "user_email": "shinyshakhina08@gmail.com",
         "title": "RODE Wireless PRO Dual-Channel Mic System",
         "name": "RODE Wireless PRO Dual-Channel Mic System",
         "category": "audio",
@@ -1716,15 +1875,15 @@ INITIAL_SEED_PRODUCTS: Dict[str, Dict[str, Any]] = {
         "condition_grade": "Excellent",
         "status": "approved",
         "available": True,
-        "owner_name": "SoundCraft Rentals",
-        "owner_email": "sound.craft@payent.example.com",
-        "owner_id": "owner-sound-craft",
+        "owner_name": "Shiny Shakhina",
+        "owner_email": "shinyshakhina08@gmail.com",
+        "owner_id": "shinyshakhina08@gmail.com",
         "owner_rating": 4.8,
         "owner_status": "active",
         "owner": {
-            "id": "owner-sound-craft",
-            "name": "SoundCraft Rentals",
-            "email": "sound.craft@payent.example.com",
+            "id": "shinyshakhina08@gmail.com",
+            "name": "Shiny Shakhina",
+            "email": "shinyshakhina08@gmail.com",
             "city": "Hyderabad",
             "rating": 4.8,
             "status": "active"
@@ -1733,7 +1892,7 @@ INITIAL_SEED_PRODUCTS: Dict[str, Dict[str, Any]] = {
     },
     "royal-enfield-classic-350": {
         "id": "royal-enfield-classic-350",
-        "user_email": "vikram.reddy@payent.example.com",
+        "user_email": "bommidimohan304@gmail.com",
         "title": "Royal Enfield Classic 350 (Stealth Black)",
         "name": "Royal Enfield Classic 350 (Stealth Black)",
         "category": "bikes",
@@ -1751,15 +1910,15 @@ INITIAL_SEED_PRODUCTS: Dict[str, Dict[str, Any]] = {
         "condition_grade": "Excellent",
         "status": "approved",
         "available": True,
-        "owner_name": "Vikram Reddy",
-        "owner_email": "vikram.reddy@payent.example.com",
-        "owner_id": "owner-vikram-r",
+        "owner_name": "Mohan Bommidi",
+        "owner_email": "bommidimohan304@gmail.com",
+        "owner_id": "bommidimohan304@gmail.com",
         "owner_rating": 4.9,
         "owner_status": "active",
         "owner": {
-            "id": "owner-vikram-r",
-            "name": "Vikram Reddy",
-            "email": "vikram.reddy@payent.example.com",
+            "id": "bommidimohan304@gmail.com",
+            "name": "Mohan Bommidi",
+            "email": "bommidimohan304@gmail.com",
             "city": "Hyderabad",
             "rating": 4.9,
             "status": "active"
@@ -1768,7 +1927,7 @@ INITIAL_SEED_PRODUCTS: Dict[str, Dict[str, Any]] = {
     },
     "dewalt-hammer-drill": {
         "id": "dewalt-hammer-drill",
-        "user_email": "tool.vault@payent.example.com",
+        "user_email": "pch7509@gmail.com",
         "title": "DeWalt 20V MAX Cordless Hammer Drill Kit",
         "name": "DeWalt 20V MAX Cordless Hammer Drill Kit",
         "category": "tools",
@@ -1786,15 +1945,15 @@ INITIAL_SEED_PRODUCTS: Dict[str, Dict[str, Any]] = {
         "condition_grade": "Good",
         "status": "approved",
         "available": True,
-        "owner_name": "Tool Vault",
-        "owner_email": "tool.vault@payent.example.com",
-        "owner_id": "owner-tool-vault",
+        "owner_name": "Vinay Pediredla",
+        "owner_email": "pch7509@gmail.com",
+        "owner_id": "pch7509@gmail.com",
         "owner_rating": 4.7,
         "owner_status": "active",
         "owner": {
-            "id": "owner-tool-vault",
-            "name": "Tool Vault",
-            "email": "tool.vault@payent.example.com",
+            "id": "pch7509@gmail.com",
+            "name": "Vinay Pediredla",
+            "email": "pch7509@gmail.com",
             "city": "Hyderabad",
             "rating": 4.7,
             "status": "active"
@@ -1803,7 +1962,7 @@ INITIAL_SEED_PRODUCTS: Dict[str, Dict[str, Any]] = {
     },
     "anker-737-powerbank": {
         "id": "anker-737-powerbank",
-        "user_email": "sai.teja@payent.example.com",
+        "user_email": "yernikumar1438@gmail.com",
         "title": "Anker 737 Power Bank (PowerCore 24K, 140W)",
         "name": "Anker 737 Power Bank (PowerCore 24K, 140W)",
         "category": "powerbanks",
@@ -1821,15 +1980,15 @@ INITIAL_SEED_PRODUCTS: Dict[str, Dict[str, Any]] = {
         "condition_grade": "Excellent",
         "status": "approved",
         "available": True,
-        "owner_name": "Sai Teja",
-        "owner_email": "sai.teja@payent.example.com",
-        "owner_id": "owner-sai-teja",
+        "owner_name": "Yerni Kumar",
+        "owner_email": "yernikumar1438@gmail.com",
+        "owner_id": "yernikumar1438@gmail.com",
         "owner_rating": 4.8,
         "owner_status": "active",
         "owner": {
-            "id": "owner-sai-teja",
-            "name": "Sai Teja",
-            "email": "sai.teja@payent.example.com",
+            "id": "yernikumar1438@gmail.com",
+            "name": "Yerni Kumar",
+            "email": "yernikumar1438@gmail.com",
             "city": "Hyderabad",
             "rating": 4.8,
             "status": "active"
@@ -1838,7 +1997,7 @@ INITIAL_SEED_PRODUCTS: Dict[str, Dict[str, Any]] = {
     },
     "aputure-300d-ii": {
         "id": "aputure-300d-ii",
-        "user_email": "cinema.pro@payent.example.com",
+        "user_email": "bommidimohan304@gmail.com",
         "title": "Aputure Light Storm LS 300d II Video Light",
         "name": "Aputure Light Storm LS 300d II Video Light",
         "category": "lighting",
@@ -1856,15 +2015,15 @@ INITIAL_SEED_PRODUCTS: Dict[str, Dict[str, Any]] = {
         "condition_grade": "Like New",
         "status": "approved",
         "available": True,
-        "owner_name": "Cinema Gear Pro",
-        "owner_email": "cinema.pro@payent.example.com",
-        "owner_id": "owner-cinema-pro",
+        "owner_name": "Mohan Bommidi",
+        "owner_email": "bommidimohan304@gmail.com",
+        "owner_id": "bommidimohan304@gmail.com",
         "owner_rating": 4.9,
         "owner_status": "active",
         "owner": {
-            "id": "owner-cinema-pro",
-            "name": "Cinema Gear Pro",
-            "email": "cinema.pro@payent.example.com",
+            "id": "bommidimohan304@gmail.com",
+            "name": "Mohan Bommidi",
+            "email": "bommidimohan304@gmail.com",
             "city": "Hyderabad",
             "rating": 4.9,
             "status": "active"
@@ -4354,6 +4513,90 @@ def get_support_ticket_messages(ticket_id: str, include_internal: bool = False) 
     return messages
 
 
+def get_support_tickets_messages_batch(ticket_ids: List[str], include_internal: bool = False) -> Dict[str, List[Dict[str, Any]]]:
+    """
+    Optimized batch loader for support ticket messages.
+    Eliminates N+1 queries when rendering ticket lists.
+    Returns mapping: {ticket_id: [messages]}
+    """
+    if not ticket_ids:
+        return {}
+    
+    clean_tids = [str(tid).strip() for tid in ticket_ids if str(tid).strip()]
+    if not clean_tids:
+        return {}
+
+    result: Dict[str, List[Dict[str, Any]]] = {tid: [] for tid in clean_tids}
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cursor:
+                placeholders = ", ".join(["%s"] * len(clean_tids))
+                cursor.execute(f"""
+                    SELECT id, ticket_id, sender_id, sender_type, sender_name, message, created_at, is_read
+                    FROM support_ticket_messages
+                    WHERE ticket_id IN ({placeholders})
+                    ORDER BY created_at ASC
+                """, tuple(clean_tids))
+                rows = cursor.fetchall()
+                if rows:
+                    for r in rows:
+                        tid = r["ticket_id"]
+                        stype = (r.get("sender_type") or "user").lower()
+                        msg_text = r.get("message") or ""
+                        if not include_internal and msg_text.startswith("CONFIDENTIAL INTERNAL NOTE:"):
+                            continue
+                        if tid in result:
+                            result[tid].append({
+                                "id": r["id"],
+                                "ticketId": tid,
+                                "senderId": r["sender_id"],
+                                "senderType": stype,
+                                "sender": r.get("sender_name") or ("paYent Support" if stype == "admin" else "User"),
+                                "message": msg_text,
+                                "content": msg_text,
+                                "createdAt": r["created_at"],
+                                "timestamp": r["created_at"],
+                                "isRead": bool(r.get("is_read")),
+                                "read": bool(r.get("is_read")),
+                            })
+        except Exception as e:
+            logger.warning(f"[get_support_tickets_messages_batch] DB note: {e}")
+        finally:
+            conn.close()
+
+    # Fill any empty tickets from MOCK storage
+    for tid in clean_tids:
+        if not result.get(tid):
+            if tid in MOCK_SUPPORT_TICKET_MESSAGES:
+                for r in MOCK_SUPPORT_TICKET_MESSAGES[tid]:
+                    msg_text = r.get("message") or r.get("content") or ""
+                    if not include_internal and msg_text.startswith("CONFIDENTIAL INTERNAL NOTE:"):
+                        continue
+                    result[tid].append(r)
+            elif tid in MOCK_SUPPORT_TICKETS:
+                for m in MOCK_SUPPORT_TICKETS[tid].get("messages", []):
+                    msg_text = m.get("content") or m.get("message") or ""
+                    if not include_internal and msg_text.startswith("CONFIDENTIAL INTERNAL NOTE:"):
+                        continue
+                    stype = (m.get("senderType") or m.get("sender_type") or ("admin" if m.get("sender") == "admin" else "user")).lower()
+                    result[tid].append({
+                        "id": m.get("id") or f"msg-{tid}",
+                        "ticketId": tid,
+                        "senderId": "admin" if stype == "admin" else "user",
+                        "senderType": stype,
+                        "sender": m.get("sender") or ("paYent Support" if stype == "admin" else "User"),
+                        "message": msg_text,
+                        "content": msg_text,
+                        "createdAt": m.get("createdAt") or m.get("timestamp") or "",
+                        "timestamp": m.get("timestamp") or m.get("createdAt") or "",
+                        "isRead": bool(m.get("read") or m.get("is_read")),
+                        "read": bool(m.get("read") or m.get("is_read")),
+                    })
+
+    return result
+
+
 def mark_support_ticket_messages_read(ticket_id: str, reader_type: str = "user") -> bool:
     """
     Marks messages as read in support_ticket_messages and updates support_tickets.
@@ -4458,6 +4701,7 @@ REAL_ACCOUNTS = {
     "shinyshakhina08@gmail.com",
     "vasnathchikkala@gmail.com",
     "yernikumar1438@gmail.com",
+    "pch7509@gmail.com",
 }
 
 def is_fake_user(email: str) -> bool:
@@ -8016,21 +8260,26 @@ def check_renter_category_booking_restriction(
             if o_cat == norm_cat:
                 return True, order
 
-        # 2. Check Database orders table
+        # 2. Check Database orders table (Optimized single JOIN query, no N+1)
         conn = get_db_connection()
         if conn:
             try:
                 with conn.cursor() as cursor:
                     cursor.execute("""
-                        SELECT id, user_email, product_id, product_title, status, category,
-                               confirmed_at, ready_for_pickup_at, picked_up_at, return_initiated_at,
-                               handed_back_at, awaiting_inspection_at, completed_at, cancellation_id
-                        FROM orders
-                        WHERE user_email = %s
-                          AND status NOT IN ('cancelled', 'rejected', 'failed', 'picked_up', 'in_progress', 'rental_in_progress', 'return_initiated', 'handed_back', 'awaiting_inspection', 'completed', 'returned')
-                          AND (picked_up_at IS NULL OR picked_up_at = '')
-                          AND (cancellation_id IS NULL OR cancellation_id = '')
-                        ORDER BY created_at DESC
+                        SELECT o.id, o.user_email, o.product_id, o.product_title, o.status,
+                               COALESCE(NULLIF(TRIM(o.category), ''), cp.category, pp.category) as resolved_category,
+                               o.confirmed_at, o.ready_for_pickup_at, o.picked_up_at, o.return_initiated_at,
+                               o.handed_back_at, o.awaiting_inspection_at, o.completed_at, o.cancellation_id,
+                               d.status as delivery_status, d.customer_confirmed_at, d.delivered_at
+                        FROM orders o
+                        LEFT JOIN deliveries d ON d.booking_id = o.id
+                        LEFT JOIN custom_products cp ON cp.id = o.product_id
+                        LEFT JOIN payernt_products pp ON pp.id = o.product_id
+                        WHERE o.user_email = %s
+                          AND o.status NOT IN ('cancelled', 'rejected', 'failed', 'picked_up', 'in_progress', 'rental_in_progress', 'return_initiated', 'handed_back', 'awaiting_inspection', 'completed', 'returned')
+                          AND (o.picked_up_at IS NULL OR o.picked_up_at = '')
+                          AND (o.cancellation_id IS NULL OR o.cancellation_id = '')
+                        ORDER BY o.created_at DESC
                     """, (clean_email,))
                     rows = cursor.fetchall() or []
                     for row in rows:
@@ -8038,21 +8287,11 @@ def check_renter_category_booking_restriction(
                         if exclude_order_id and row_id == exclude_order_id:
                             continue
 
-                        row_cat = (row.get("category") or "").strip().lower()
-                        if not row_cat:
-                            row_cat = get_product_category(row.get("product_id")).lower()
-
+                        row_cat = (row.get("resolved_category") or "").strip().lower()
                         if row_cat == norm_cat:
-                            # Verify deliveries table doesn't already have confirmed delivery
-                            deliv = fetch_one("""
-                                SELECT status, customer_confirmed_at, delivered_at
-                                FROM deliveries
-                                WHERE booking_id = %s
-                            """, (row_id,))
-                            if deliv:
-                                deliv_st = str(deliv.get("status") or "").upper()
-                                if deliv_st in ("DELIVERED", "RENTER_VERIFIED", "CONFIRMED", "COMPLETED") or deliv.get("customer_confirmed_at"):
-                                    continue
+                            deliv_st = str(row.get("delivery_status") or "").upper()
+                            if deliv_st in ("DELIVERED", "RENTER_VERIFIED", "CONFIRMED", "COMPLETED") or row.get("customer_confirmed_at"):
+                                continue
 
                             return True, row
             except Exception as e:
@@ -8068,6 +8307,7 @@ def get_renter_active_category_restrictions(user_email: str) -> Dict[str, Any]:
     Returns active category restrictions for the renter, listing:
     - restrictedCategories: List[str]
     - activeOrders: List[Dict[str, Any]]
+    Optimized single JOIN query eliminates N+1 delivery checks.
     """
     if not user_email:
         return {"restrictedCategories": [], "activeOrders": []}
@@ -8078,42 +8318,38 @@ def get_renter_active_category_restrictions(user_email: str) -> Dict[str, Any]:
     seen_order_ids = set()
 
     with _CATEGORY_RESTRICTION_LOCK:
-        # 1. Database
+        # 1. Database (Optimized single JOIN query, no N+1)
         conn = get_db_connection()
         if conn:
             try:
                 with conn.cursor() as cursor:
                     cursor.execute("""
-                        SELECT id, user_email, product_id, product_title, status, category,
-                               confirmed_at, ready_for_pickup_at, picked_up_at, created_at, cancellation_id
-                        FROM orders
-                        WHERE user_email = %s
-                          AND status NOT IN ('cancelled', 'rejected', 'failed', 'picked_up', 'in_progress', 'rental_in_progress', 'return_initiated', 'handed_back', 'awaiting_inspection', 'completed', 'returned')
-                          AND (picked_up_at IS NULL OR picked_up_at = '')
-                          AND (cancellation_id IS NULL OR cancellation_id = '')
-                        ORDER BY created_at DESC
+                        SELECT o.id, o.user_email, o.product_id, o.product_title, o.status,
+                               COALESCE(NULLIF(TRIM(o.category), ''), cp.category, pp.category) as resolved_category,
+                               o.confirmed_at, o.ready_for_pickup_at, o.picked_up_at, o.created_at, o.cancellation_id,
+                               d.status as delivery_status, d.customer_confirmed_at, d.delivered_at
+                        FROM orders o
+                        LEFT JOIN deliveries d ON d.booking_id = o.id
+                        LEFT JOIN custom_products cp ON cp.id = o.product_id
+                        LEFT JOIN payernt_products pp ON pp.id = o.product_id
+                        WHERE o.user_email = %s
+                          AND o.status NOT IN ('cancelled', 'rejected', 'failed', 'picked_up', 'in_progress', 'rental_in_progress', 'return_initiated', 'handed_back', 'awaiting_inspection', 'completed', 'returned')
+                          AND (o.picked_up_at IS NULL OR o.picked_up_at = '')
+                          AND (o.cancellation_id IS NULL OR o.cancellation_id = '')
+                        ORDER BY o.created_at DESC
                     """, (clean_email,))
                     rows = cursor.fetchall() or []
                     for row in rows:
                         o_id = row.get("id")
                         if o_id in seen_order_ids:
                             continue
-                        cat = (row.get("category") or "").strip()
-                        if not cat:
-                            cat = get_product_category(row.get("product_id"))
+                        cat = (row.get("resolved_category") or "").strip()
                         if not cat:
                             continue
 
-                        # Check delivery status
-                        deliv = fetch_one("""
-                            SELECT status, customer_confirmed_at, delivered_at
-                            FROM deliveries
-                            WHERE booking_id = %s
-                        """, (o_id,))
-                        if deliv:
-                            deliv_st = str(deliv.get("status") or "").upper()
-                            if deliv_st in ("DELIVERED", "RENTER_VERIFIED", "CONFIRMED", "COMPLETED") or deliv.get("customer_confirmed_at"):
-                                continue
+                        deliv_st = str(row.get("delivery_status") or "").upper()
+                        if deliv_st in ("DELIVERED", "RENTER_VERIFIED", "CONFIRMED", "COMPLETED") or row.get("customer_confirmed_at"):
+                            continue
 
                         seen_order_ids.add(o_id)
                         restricted_cats.add(cat.lower())
@@ -10774,6 +11010,87 @@ def enrich_kyc_verification_row(row: Dict[str, Any]) -> Dict[str, Any]:
     copy_row["audit_history"] = audit_history
     return copy_row
 
+
+def enrich_kyc_verifications_batch(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Optimized batch enrichment for KYC verification records.
+    Eliminates N+1 queries by batch-loading user and lender profiles in a single pass.
+    """
+    if not rows:
+        return []
+
+    emails = list({(r.get("email") or "").strip().lower() for r in rows if r.get("email")})
+    user_map: Dict[str, Dict[str, Any]] = {}
+    payernt_map: Dict[str, Dict[str, Any]] = {}
+
+    if emails:
+        conn = get_db_connection()
+        if conn:
+            try:
+                with conn.cursor() as cursor:
+                    placeholders = ", ".join(["%s"] * len(emails))
+                    cursor.execute(f"""
+                        SELECT email, full_name, phone, avatar, profile_photo_url
+                        FROM users
+                        WHERE LOWER(email) IN ({placeholders})
+                    """, tuple(emails))
+                    for u in cursor.fetchall() or []:
+                        user_map[u["email"].lower()] = u
+
+                    cursor.execute(f"""
+                        SELECT email, name, business_name, phone, mobile, avatar, profile_photo_url
+                        FROM payernt_accounts
+                        WHERE LOWER(email) IN ({placeholders})
+                    """, tuple(emails))
+                    for a in cursor.fetchall() or []:
+                        payernt_map[a["email"].lower()] = a
+            except Exception as e:
+                logger.warning(f"[enrich_kyc_verifications_batch] DB note: {e}")
+            finally:
+                conn.close()
+
+    enriched = []
+    for r in rows:
+        email = (r.get("email") or "").strip().lower()
+        acc_type = (r.get("account_type") or "payrent").strip().lower()
+        p_acc = payernt_map.get(email)
+        u_acc = user_map.get(email)
+
+        applicant_name = None
+        applicant_phone = None
+        applicant_avatar = None
+
+        if acc_type in ("payernt", "vendor", "lender") and p_acc:
+            applicant_name = p_acc.get("business_name") or p_acc.get("name")
+            applicant_phone = p_acc.get("phone") or p_acc.get("mobile")
+            applicant_avatar = p_acc.get("avatar") or p_acc.get("profile_photo_url")
+
+        if not applicant_name and u_acc:
+            applicant_name = u_acc.get("full_name")
+            applicant_phone = u_acc.get("phone")
+            applicant_avatar = u_acc.get("avatar") or u_acc.get("profile_photo_url")
+
+        if not applicant_name and email:
+            applicant_name = email.split("@")[0].replace(".", " ").title()
+
+        copy_row = dict(r)
+        copy_row["applicant_name"] = applicant_name or "Applicant"
+        copy_row["applicant_phone"] = applicant_phone
+        copy_row["applicant_avatar"] = applicant_avatar
+
+        audit_history = []
+        if copy_row.get("reviewed_by") and copy_row.get("reviewed_at"):
+            audit_history.append({
+                "reviewer_email": copy_row["reviewed_by"],
+                "reviewed_at": copy_row["reviewed_at"],
+                "decision": copy_row.get("status"),
+                "reason": copy_row.get("rejection_reason")
+            })
+        copy_row["audit_history"] = audit_history
+        enriched.append(copy_row)
+
+    return enriched
+
 def get_kyc_verification_by_id(verification_id: str) -> Optional[Dict[str, Any]]:
     """Fetches a KYC verification record by verification ID with enriched metadata."""
     clean_id = (verification_id or "").strip()
@@ -10885,7 +11202,7 @@ def review_kyc_verification(
     return rec or {"id": verification_id, "status": norm_status}
 
 def get_all_kyc_verifications_admin() -> List[Dict[str, Any]]:
-    """Admin listing of all KYC verifications with enriched details."""
+    """Admin listing of all KYC verifications with enriched details (batch optimized)."""
     try:
         rows = fetch_all("""
             SELECT id, user_id, email, account_type, document_type, document_number_masked,
@@ -10894,7 +11211,7 @@ def get_all_kyc_verifications_admin() -> List[Dict[str, Any]]:
             FROM user_kyc_verifications ORDER BY created_at DESC
         """)
         if rows:
-            return [enrich_kyc_verification_row(r) for r in rows]
+            return enrich_kyc_verifications_batch(rows)
     except Exception as e:
         logger.warning(f"DB error in get_all_kyc_verifications_admin: {e}")
 
@@ -10903,8 +11220,8 @@ def get_all_kyc_verifications_admin() -> List[Dict[str, Any]]:
         copy = dict(k)
         copy.pop("document_data_encrypted", None)
         copy.pop("document_number_hash", None)
-        safe_list.append(enrich_kyc_verification_row(copy))
-    return safe_list
+        safe_list.append(copy)
+    return enrich_kyc_verifications_batch(safe_list)
 
 def get_kyc_stats_admin() -> Dict[str, int]:
     """Computes summary statistics for all KYC verifications."""

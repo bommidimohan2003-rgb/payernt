@@ -1,5 +1,7 @@
 import os
 from urllib.parse import urlparse
+from typing import List, Optional
+from pydantic import BaseModel, Field, field_validator
 
 # Suppress uv hardlink warning by explicitly setting link mode to copy
 os.environ["UV_LINK_MODE"] = "copy"
@@ -15,92 +17,29 @@ try:
 except ImportError:
     pass
 
-# ENVIRONMENT Config
-ENV = os.getenv("ENV", os.getenv("ENVIRONMENT", "development")).lower()
-IS_PRODUCTION = ENV in ("production", "prod")
-ALLOW_PRODUCTION_TESTING = os.getenv("ALLOW_PRODUCTION_TESTING", "false").lower() in ("true", "1", "yes")
+# Helper to parse DATABASE_URL
+_db_url_raw = os.getenv("DATABASE_URL") or os.getenv("TIDB_DATABASE_URL")
+_parsed_host = ""
+_parsed_port = 4000
+_parsed_user = ""
+_parsed_password = ""
+_parsed_db = "payent_marketplace_db"
 
-def assert_testing_allowed():
-    """
-    Safeguard preventing test/seed scripts from running against live production
-    without explicit ALLOW_PRODUCTION_TESTING=true environment authorization.
-    """
-    if IS_PRODUCTION and not ALLOW_PRODUCTION_TESTING:
-        raise RuntimeError(
-            "FATAL DATA INTEGRITY SAFEGUARD: Test/seed scripts are blocked from running in ENV='production'. "
-            "To execute tests against dedicated environments, set ENV=testing or use an isolated test database."
-        )
-
-# Parse DATABASE_URL if provided (e.g. TiDB Cloud / Railway / Cloud)
-DATABASE_URL = os.getenv("DATABASE_URL") or os.getenv("TIDB_DATABASE_URL")
-
-if DATABASE_URL:
+if _db_url_raw:
     try:
-        url = urlparse(DATABASE_URL)
-        MYSQL_HOST = url.hostname or ""
-        MYSQL_PORT = url.port or 4000
-        MYSQL_USER = url.username or ""
-        MYSQL_PASSWORD = url.password or ""
-        MYSQL_DB = url.path.lstrip("/") or "payent_marketplace_db"
-    except Exception as e:
-        print(f"Warning: Failed to parse DATABASE_URL: {e}")
-        MYSQL_HOST = os.getenv("TIDB_HOST", os.getenv("MYSQLHOST", os.getenv("MYSQL_HOST", "")))
-        MYSQL_PORT = int(os.getenv("TIDB_PORT", os.getenv("MYSQLPORT", os.getenv("MYSQL_PORT", "4000"))))
-        MYSQL_USER = os.getenv("TIDB_USER", os.getenv("MYSQLUSER", os.getenv("MYSQL_USER", "")))
-        MYSQL_PASSWORD = os.getenv("TIDB_PASSWORD", os.getenv("MYSQLPASSWORD", os.getenv("MYSQL_PASSWORD", "")))
-        MYSQL_DB = os.getenv("TIDB_DATABASE", os.getenv("MYSQLDATABASE", os.getenv("MYSQL_DB", "payent_marketplace_db")))
-else:
-    MYSQL_HOST = os.getenv("TIDB_HOST", os.getenv("MYSQLHOST", os.getenv("MYSQL_HOST", "localhost" if not IS_PRODUCTION else "")))
-    MYSQL_PORT = int(os.getenv("TIDB_PORT", os.getenv("MYSQLPORT", os.getenv("MYSQL_PORT", "4000" if not IS_PRODUCTION else "4000"))))
-    MYSQL_USER = os.getenv("TIDB_USER", os.getenv("MYSQLUSER", os.getenv("MYSQL_USER", "root" if not IS_PRODUCTION else "")))
-    MYSQL_PASSWORD = os.getenv("TIDB_PASSWORD", os.getenv("MYSQLPASSWORD", os.getenv("MYSQL_PASSWORD", "")))
-    MYSQL_DB = os.getenv("TIDB_DATABASE", os.getenv("MYSQLDATABASE", os.getenv("MYSQL_DB", "payent_marketplace_db")))
+        _u = urlparse(_db_url_raw)
+        _parsed_host = _u.hostname or ""
+        _parsed_port = _u.port or 4000
+        _parsed_user = _u.username or ""
+        _parsed_password = _u.password or ""
+        _parsed_db = _u.path.lstrip("/") or "payent_marketplace_db"
+    except Exception as _e:
+        print(f"Warning: Failed to parse DATABASE_URL: {_e}")
 
-# TiDB Aliases for modern configuration
-TIDB_HOST = MYSQL_HOST
-TIDB_PORT = MYSQL_PORT
-TIDB_USER = MYSQL_USER
-TIDB_PASSWORD = MYSQL_PASSWORD
-TIDB_DATABASE = MYSQL_DB
+_raw_env = os.getenv("ENV", os.getenv("ENVIRONMENT", "development")).lower()
+_is_prod = _raw_env in ("production", "prod")
 
-MYSQL_SSL = os.getenv("MYSQL_SSL", os.getenv("TIDB_SSL", "true")).lower() in ("true", "1", "yes")
-TIDB_SSL = MYSQL_SSL
-TIDB_SSL_CA = os.getenv("TIDB_SSL_CA", os.getenv("MYSQL_SSL_CA", ""))
-
-# Fail-fast security validation for production mode
-if IS_PRODUCTION:
-    if not MYSQL_HOST or not MYSQL_USER or not MYSQL_PASSWORD:
-        raise RuntimeError(
-            "FATAL SECURITY CONFIGURATION: Production database credentials (DATABASE_URL or TIDB_HOST / TIDB_USER / TIDB_PASSWORD) "
-            "are missing. Set required database environment variables in Railway service settings."
-        )
-
-# Security & Secrets
-DEFAULT_INSECURE_SECRET = "payent_super_secret_key_change_me_in_production"
-JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "" if IS_PRODUCTION else "payent_dev_jwt_secret_key_2026_local_only")
-
-if IS_PRODUCTION:
-    if not JWT_SECRET_KEY or JWT_SECRET_KEY == DEFAULT_INSECURE_SECRET:
-        raise RuntimeError(
-            "FATAL SECURITY CONFIGURATION: JWT_SECRET_KEY must be explicitly set to a high-entropy secret in production."
-        )
-
-ADMIN_CREATION_SECRET = os.getenv("ADMIN_CREATION_SECRET", os.getenv("ADMIN_SETUP_CODE", "" if IS_PRODUCTION else "PAYENT-ADMIN-SECRET-2026"))
-if IS_PRODUCTION and not ADMIN_CREATION_SECRET:
-    print("[CONFIG WARNING]: ADMIN_CREATION_SECRET is unconfigured in production. Bootstrap admin creation will be disabled.")
-
-ADMIN_SETUP_CODE = os.getenv("ADMIN_SETUP_CODE", "" if IS_PRODUCTION else "PAYENT-ADMIN-2026")
-RAZORPAY_WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET", "")
-
-JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
-if JWT_ALGORITHM not in ["HS256", "HS384", "HS512"]:
-    raise RuntimeError(f"FATAL SECURITY ERROR: Insecure or unsupported JWT_ALGORITHM '{JWT_ALGORITHM}'")
-
-# Token Expiries
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))  # 24 hours (1440 minutes)
-REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7"))        # 7 days
-
-# CORS Configuration — Strict Origin Whitelist
+# Default CORS origins
 DEFAULT_TRUSTED_ORIGINS = [
     "https://frontend.bommidimohan2003.workers.dev",
     "https://payent.in",
@@ -125,75 +64,244 @@ DEV_LOCAL_ORIGINS = [
     "http://testserver",
 ]
 
-ALLOWED_ORIGINS_RAW = os.getenv("ALLOWED_ORIGINS", "")
-ALLOWED_ORIGINS = list(DEFAULT_TRUSTED_ORIGINS)
-if ALLOWED_ORIGINS_RAW and ALLOWED_ORIGINS_RAW.strip() != "*":
-    for origin in ALLOWED_ORIGINS_RAW.split(","):
-        clean_o = origin.strip()
-        if clean_o and clean_o != "*" and clean_o not in ALLOWED_ORIGINS:
-            ALLOWED_ORIGINS.append(clean_o)
+def _build_allowed_origins(is_production: bool) -> List[str]:
+    origins = list(DEFAULT_TRUSTED_ORIGINS)
+    raw_custom = os.getenv("ALLOWED_ORIGINS", "")
+    if raw_custom and raw_custom.strip() != "*":
+        for o in raw_custom.split(","):
+            c = o.strip()
+            if c and c != "*" and c not in origins:
+                origins.append(c)
+    if not is_production:
+        for dev_o in DEV_LOCAL_ORIGINS:
+            if dev_o not in origins:
+                origins.append(dev_o)
+    return origins
 
-if not IS_PRODUCTION:
-    for dev_origin in DEV_LOCAL_ORIGINS:
-        if dev_origin not in ALLOWED_ORIGINS:
-            ALLOWED_ORIGINS.append(dev_origin)
+# ==============================================================================
+# Central Pydantic Settings Validation Schema
+# ==============================================================================
 
-# Twilio Verify Config (Optional / Fallback)
-ENABLE_TWILIO_SMS = os.getenv("ENABLE_TWILIO_SMS", "false").lower() == "true"
-TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID", "")
-TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN", "")
-TWILIO_VERIFY_SERVICE_SID = os.getenv("TWILIO_VERIFY_SERVICE_SID", "")
-DISABLE_TWILIO_FOR_FIREBASE = os.getenv("DISABLE_TWILIO_FOR_FIREBASE", "true").lower() == "true"
+class PayentSettings(BaseModel):
+    """
+    Centralized, strongly typed, and secure Pydantic v2 application configuration.
+    Validates required production credentials and supplies safe development fallbacks.
+    """
+    env: str = Field(default=_raw_env)
+    is_production: bool = Field(default=_is_prod)
+    allow_production_testing: bool = Field(
+        default=os.getenv("ALLOW_PRODUCTION_TESTING", "false").lower() in ("true", "1", "yes")
+    )
+    
+    # Relational Database / TiDB Cloud
+    mysql_host: str = Field(
+        default=_parsed_host or os.getenv("TIDB_HOST", os.getenv("MYSQLHOST", os.getenv("MYSQL_HOST", "localhost" if not _is_prod else "")))
+    )
+    mysql_port: int = Field(
+        default=_parsed_port or int(os.getenv("TIDB_PORT", os.getenv("MYSQLPORT", os.getenv("MYSQL_PORT", "4000"))))
+    )
+    mysql_user: str = Field(
+        default=_parsed_user or os.getenv("TIDB_USER", os.getenv("MYSQLUSER", os.getenv("MYSQL_USER", "root" if not _is_prod else "")))
+    )
+    mysql_password: str = Field(
+        default=_parsed_password or os.getenv("TIDB_PASSWORD", os.getenv("MYSQLPASSWORD", os.getenv("MYSQL_PASSWORD", "")))
+    )
+    mysql_db: str = Field(
+        default=_parsed_db or os.getenv("TIDB_DATABASE", os.getenv("MYSQLDATABASE", os.getenv("MYSQL_DB", "payent_marketplace_db")))
+    )
+    mysql_ssl: bool = Field(
+        default=os.getenv("MYSQL_SSL", os.getenv("TIDB_SSL", "true")).lower() in ("true", "1", "yes")
+    )
+    tidb_ssl_ca: str = Field(
+        default=os.getenv("TIDB_SSL_CA", os.getenv("MYSQL_SSL_CA", ""))
+    )
 
-# Payment Gateway (Razorpay) Config
-RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID", "")
-RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET", "")
+    # JWT Authentication & Authorization
+    jwt_secret_key: str = Field(
+        default=os.getenv("JWT_SECRET_KEY", "" if _is_prod else "payent_dev_jwt_secret_key_2026_local_only")
+    )
+    jwt_algorithm: str = Field(default=os.getenv("JWT_ALGORITHM", "HS256"))
+    access_token_expire_minutes: int = Field(
+        default=int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))
+    )
+    refresh_token_expire_days: int = Field(
+        default=int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
+    )
+    admin_setup_code: str = Field(
+        default=os.getenv("ADMIN_SETUP_CODE", "" if _is_prod else "PAYENT-ADMIN-2026")
+    )
+    admin_creation_secret: str = Field(
+        default=os.getenv("ADMIN_CREATION_SECRET", os.getenv("ADMIN_SETUP_CODE", "" if _is_prod else "PAYENT-ADMIN-SECRET-2026"))
+    )
+    pin_hash_secret: str = Field(
+        default=os.getenv("PIN_HASH_SECRET", "" if _is_prod else "dev_keyed_pin_hash_secret_safe_for_testing_only_32_bytes_min")
+    )
+
+    # Razorpay Payment Gateway
+    razorpay_key_id: str = Field(default=os.getenv("RAZORPAY_KEY_ID", ""))
+    razorpay_key_secret: str = Field(default=os.getenv("RAZORPAY_KEY_SECRET", ""))
+    razorpay_webhook_secret: str = Field(default=os.getenv("RAZORPAY_WEBHOOK_SECRET", ""))
+    razorpay_timeout_seconds: float = Field(default=10.0)
+
+    # Twilio / SMS Verify
+    enable_twilio_sms: bool = Field(
+        default=os.getenv("ENABLE_TWILIO_SMS", "false").lower() == "true"
+    )
+    twilio_account_sid: str = Field(default=os.getenv("TWILIO_ACCOUNT_SID", ""))
+    twilio_auth_token: str = Field(default=os.getenv("TWILIO_AUTH_TOKEN", ""))
+    twilio_verify_service_sid: str = Field(default=os.getenv("TWILIO_VERIFY_SERVICE_SID", ""))
+    disable_twilio_for_firebase: bool = Field(
+        default=os.getenv("DISABLE_TWILIO_FOR_FIREBASE", "true").lower() == "true"
+    )
+    otp_provider: str = Field(
+        default="twilio" if _is_prod else os.getenv("OTP_PROVIDER", "mock").lower()
+    )
+
+    # Cloudinary Asset Storage
+    cloudinary_cloud_name: str = Field(
+        default=os.getenv("CLOUDINARY_CLOUD_NAME", os.getenv("VITE_CLOUDINARY_CLOUD_NAME", "dvyendk6j"))
+    )
+    cloudinary_api_key: str = Field(default=os.getenv("CLOUDINARY_API_KEY", ""))
+    cloudinary_api_secret: str = Field(default=os.getenv("CLOUDINARY_API_SECRET", ""))
+    cloudinary_url: str = Field(default=os.getenv("CLOUDINARY_URL", ""))
+    cloudinary_upload_preset: str = Field(
+        default=os.getenv("CLOUDINARY_UPLOAD_PRESET", os.getenv("VITE_CLOUDINARY_UPLOAD_PRESET", "payernt_uploads."))
+    )
+    cloudinary_timeout_seconds: float = Field(default=12.0)
+
+    # SMTP Mailer
+    smtp_host: str = Field(default=os.getenv("SMTP_HOST", ""))
+    smtp_port: int = Field(default=int(os.getenv("SMTP_PORT", "587")))
+    smtp_user: str = Field(default=os.getenv("SMTP_USER", os.getenv("SMTP_USERNAME", "")))
+    smtp_password: str = Field(default=os.getenv("SMTP_PASSWORD", os.getenv("SMTP_PASS", "")))
+    smtp_use_tls: bool = Field(
+        default=os.getenv("SMTP_USE_TLS", "true").lower() in ("true", "1", "yes")
+    )
+    smtp_use_ssl: bool = Field(
+        default=os.getenv("SMTP_USE_SSL", "false").lower() in ("true", "1", "yes")
+    )
+    mail_from: str = Field(
+        default=os.getenv("MAIL_FROM", os.getenv("SMTP_FROM_EMAIL", "no-reply@payent.in"))
+    )
+    mail_from_name: str = Field(default=os.getenv("MAIL_FROM_NAME", "Payent Security"))
+    smtp_timeout_seconds: float = Field(default=12.0)
+
+    # External Social Auth & URLs
+    frontend_url: str = Field(
+        default=os.getenv("FRONTEND_URL", os.getenv("BASE_URL", "https://frontend.bommidimohan2003.workers.dev"))
+    )
+    google_client_id: str = Field(
+        default=os.getenv("GOOGLE_CLIENT_ID", os.getenv("VITE_GOOGLE_CLIENT_ID", ""))
+    )
+    allowed_origins: List[str] = Field(default_factory=lambda: _build_allowed_origins(_is_prod))
+
+    @field_validator("jwt_algorithm")
+    @classmethod
+    def validate_jwt_algorithm(cls, v: str) -> str:
+        if v not in ["HS256", "HS384", "HS512"]:
+            raise ValueError(f"Insecure or unsupported JWT_ALGORITHM: '{v}'")
+        return v
+
+# Instantiate and validate settings
+settings = PayentSettings()
+
+# ==============================================================================
+# Security Hardening & Fail-Fast Production Guards
+# ==============================================================================
+
+ENV = settings.env
+IS_PRODUCTION = settings.is_production
+ALLOW_PRODUCTION_TESTING = settings.allow_production_testing
+
+def assert_testing_allowed():
+    """Safeguard preventing test/seed scripts from running against live production."""
+    if IS_PRODUCTION and not ALLOW_PRODUCTION_TESTING:
+        raise RuntimeError(
+            "FATAL DATA INTEGRITY SAFEGUARD: Test/seed scripts are blocked from running in ENV='production'. "
+            "To execute tests against dedicated environments, set ENV=testing or use an isolated test database."
+        )
 
 if IS_PRODUCTION:
-    if not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET:
+    if not settings.mysql_host or not settings.mysql_user or not settings.mysql_password:
+        raise RuntimeError(
+            "FATAL SECURITY CONFIGURATION: Production database credentials (DATABASE_URL or TIDB_HOST / TIDB_USER / TIDB_PASSWORD) "
+            "are missing. Set required database environment variables in Railway service settings."
+        )
+    if not settings.jwt_secret_key or settings.jwt_secret_key == "payent_super_secret_key_change_me_in_production":
+        raise RuntimeError(
+            "FATAL SECURITY CONFIGURATION: JWT_SECRET_KEY must be explicitly set to a high-entropy secret in production."
+        )
+    if not settings.pin_hash_secret:
+        raise RuntimeError(
+            "CRITICAL: PIN_HASH_SECRET environment variable is required in production for secure keyed HMAC PIN hashing."
+        )
+    if settings.pin_hash_secret == settings.jwt_secret_key:
+        raise RuntimeError("FATAL SECURITY: PIN_HASH_SECRET must not be identical to JWT_SECRET_KEY.")
+    if not settings.admin_creation_secret:
+        print("[CONFIG WARNING]: ADMIN_CREATION_SECRET is unconfigured in production. Bootstrap admin creation will be disabled.")
+    if not settings.razorpay_key_id or not settings.razorpay_key_secret:
         print("Notice: Production RAZORPAY_KEY_ID or RAZORPAY_KEY_SECRET is unconfigured. Real-time payments require Railway environment keys.")
-    if not RAZORPAY_WEBHOOK_SECRET:
+    if not settings.razorpay_webhook_secret:
         print("Notice: Production RAZORPAY_WEBHOOK_SECRET is unconfigured. Webhook verification requires Railway environment key.")
 
-# SMTP & Email Delivery Config
-SMTP_HOST = os.getenv("SMTP_HOST", "")
-SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
-SMTP_USER = os.getenv("SMTP_USER", os.getenv("SMTP_USERNAME", ""))
-SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", os.getenv("SMTP_PASS", ""))
-SMTP_USE_TLS = os.getenv("SMTP_USE_TLS", "true").lower() in ("true", "1", "yes")
-SMTP_USE_SSL = os.getenv("SMTP_USE_SSL", "false").lower() in ("true", "1", "yes")
-MAIL_FROM = os.getenv("MAIL_FROM", os.getenv("SMTP_FROM_EMAIL", "no-reply@payent.in"))
-MAIL_FROM_NAME = os.getenv("MAIL_FROM_NAME", "Payent Security")
-FRONTEND_URL = os.getenv("FRONTEND_URL", os.getenv("BASE_URL", "https://frontend.bommidimohan2003.workers.dev"))
-GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", os.getenv("VITE_GOOGLE_CLIENT_ID", ""))
+# ==============================================================================
+# Exported Backward-Compatible Configuration Constants
+# ==============================================================================
 
-# PIN Keyed Hashing & Development OTP Config
-PIN_HASH_SECRET = os.getenv("PIN_HASH_SECRET", "")
-if IS_PRODUCTION and not PIN_HASH_SECRET:
-    # Fail fast if unconfigured in production
-    raise RuntimeError("CRITICAL: PIN_HASH_SECRET environment variable is required in production for secure keyed HMAC PIN hashing.")
-elif not PIN_HASH_SECRET:
-    # In development mode, fallback to a dedicated static dev key (never reuse JWT_SECRET_KEY)
-    PIN_HASH_SECRET = "dev_keyed_pin_hash_secret_safe_for_testing_only_32_bytes_min"
+DATABASE_URL = _db_url_raw
+MYSQL_HOST = settings.mysql_host
+MYSQL_PORT = settings.mysql_port
+MYSQL_USER = settings.mysql_user
+MYSQL_PASSWORD = settings.mysql_password
+MYSQL_DB = settings.mysql_db
+MYSQL_SSL = settings.mysql_ssl
+TIDB_HOST = MYSQL_HOST
+TIDB_PORT = MYSQL_PORT
+TIDB_USER = MYSQL_USER
+TIDB_PASSWORD = MYSQL_PASSWORD
+TIDB_DATABASE = MYSQL_DB
+TIDB_SSL = MYSQL_SSL
+TIDB_SSL_CA = settings.tidb_ssl_ca
 
-if IS_PRODUCTION and PIN_HASH_SECRET == JWT_SECRET_KEY:
-    raise RuntimeError("FATAL SECURITY: PIN_HASH_SECRET must not be identical to JWT_SECRET_KEY.")
+JWT_SECRET_KEY = settings.jwt_secret_key
+JWT_ALGORITHM = settings.jwt_algorithm
+ACCESS_TOKEN_EXPIRE_MINUTES = settings.access_token_expire_minutes
+REFRESH_TOKEN_EXPIRE_DAYS = settings.refresh_token_expire_days
+ADMIN_SETUP_CODE = settings.admin_setup_code
+ADMIN_CREATION_SECRET = settings.admin_creation_secret
+PIN_HASH_SECRET = settings.pin_hash_secret
 
-# OTP Provider & Mock OTP Configuration
-_configured_otp_provider = os.getenv("OTP_PROVIDER", "mock" if not IS_PRODUCTION else "twilio").lower()
-if IS_PRODUCTION:
-    # In production, mock OTP mode is strictly forbidden regardless of env vars
-    OTP_PROVIDER = "twilio"
-    IS_MOCK_OTP_MODE = False
-    ENABLE_TEST_OTP_RESPONSE = False
-else:
-    OTP_PROVIDER = _configured_otp_provider
-    IS_MOCK_OTP_MODE = (OTP_PROVIDER == "mock")
-    ENABLE_TEST_OTP_RESPONSE = (os.getenv("ENABLE_TEST_OTP_RESPONSE", "true" if IS_MOCK_OTP_MODE else "false").lower() == "true") and not IS_PRODUCTION
+RAZORPAY_KEY_ID = settings.razorpay_key_id
+RAZORPAY_KEY_SECRET = settings.razorpay_key_secret
+RAZORPAY_WEBHOOK_SECRET = settings.razorpay_webhook_secret
+RAZORPAY_TIMEOUT_SECONDS = settings.razorpay_timeout_seconds
 
-# Cloudinary Storage Configuration
-CLOUDINARY_CLOUD_NAME = os.getenv("CLOUDINARY_CLOUD_NAME", os.getenv("VITE_CLOUDINARY_CLOUD_NAME", "dvyendk6j"))
-CLOUDINARY_API_KEY = os.getenv("CLOUDINARY_API_KEY", "")
-CLOUDINARY_API_SECRET = os.getenv("CLOUDINARY_API_SECRET", "")
-CLOUDINARY_URL = os.getenv("CLOUDINARY_URL", "")
-CLOUDINARY_UPLOAD_PRESET = os.getenv("CLOUDINARY_UPLOAD_PRESET", os.getenv("VITE_CLOUDINARY_UPLOAD_PRESET", "payernt_uploads."))
+ENABLE_TWILIO_SMS = settings.enable_twilio_sms
+TWILIO_ACCOUNT_SID = settings.twilio_account_sid
+TWILIO_AUTH_TOKEN = settings.twilio_auth_token
+TWILIO_VERIFY_SERVICE_SID = settings.twilio_verify_service_sid
+DISABLE_TWILIO_FOR_FIREBASE = settings.disable_twilio_for_firebase
+OTP_PROVIDER = settings.otp_provider
+IS_MOCK_OTP_MODE = (OTP_PROVIDER == "mock") and not IS_PRODUCTION
+ENABLE_TEST_OTP_RESPONSE = (os.getenv("ENABLE_TEST_OTP_RESPONSE", "true" if IS_MOCK_OTP_MODE else "false").lower() == "true") and not IS_PRODUCTION
+
+CLOUDINARY_CLOUD_NAME = settings.cloudinary_cloud_name
+CLOUDINARY_API_KEY = settings.cloudinary_api_key
+CLOUDINARY_API_SECRET = settings.cloudinary_api_secret
+CLOUDINARY_URL = settings.cloudinary_url
+CLOUDINARY_UPLOAD_PRESET = settings.cloudinary_upload_preset
+CLOUDINARY_TIMEOUT_SECONDS = settings.cloudinary_timeout_seconds
+
+SMTP_HOST = settings.smtp_host
+SMTP_PORT = settings.smtp_port
+SMTP_USER = settings.smtp_user
+SMTP_PASSWORD = settings.smtp_password
+SMTP_USE_TLS = settings.smtp_use_tls
+SMTP_USE_SSL = settings.smtp_use_ssl
+MAIL_FROM = settings.mail_from
+MAIL_FROM_NAME = settings.mail_from_name
+SMTP_TIMEOUT_SECONDS = settings.smtp_timeout_seconds
+
+FRONTEND_URL = settings.frontend_url
+GOOGLE_CLIENT_ID = settings.google_client_id
+ALLOWED_ORIGINS = settings.allowed_origins

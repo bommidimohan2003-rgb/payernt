@@ -60,7 +60,7 @@ export function Topbar() {
   return (
     <header className="sticky top-0 z-30 flex items-center justify-between px-6 md:px-8 h-16 bg-white/95 dark:bg-[#1E1E1E]/95 border-b border-[#E6E4E9] dark:border-[#383838] backdrop-blur-md transition-colors duration-200">
       {/* Left side: Current page title & contextual subtitle */}
-      <div className="flex flex-col justify-center min-w-0 pr-4">
+      <div className="flex flex-col justify-center min-w-0 pr-4 pl-11 lg:pl-0">
         <h1 className="text-base font-bold tracking-tight text-[#242424] dark:text-[#FFFFFF] truncate">
           {currentMeta.title}
         </h1>

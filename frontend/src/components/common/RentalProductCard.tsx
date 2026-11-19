@@ -223,6 +223,7 @@ export function RentalProductCard({
         <Link
           to="/product/$id"
           params={{ id: productId }}
+          preload="intent"
           className="flex flex-col h-full w-full focus:outline-none focus-visible:ring-2 focus-visible:ring-white rounded-[24px] sm:rounded-[26px]"
           aria-label={`View details for ${title}`}
         >
@@ -367,6 +368,7 @@ export function RentalProductCard({
       <Link
         to="/product/$id"
         params={{ id: productId }}
+        preload="intent"
         className={cn(
           "relative flex w-full flex-col justify-end overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white",
           isExplore

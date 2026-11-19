@@ -97,6 +97,11 @@ export default function Payment() {
   // 10-Minute Session Timer
   const [timeLeft, setTimeLeft] = useState(600);
 
+  // Pre-warm Razorpay Gateway SDK on page mount
+  useEffect(() => {
+    loadRazorpayScript().catch(() => {});
+  }, []);
+
   // 1. Fetch Order (Primary) or Product (Fallback)
   useEffect(() => {
     let isMounted = true;

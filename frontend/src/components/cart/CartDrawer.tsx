@@ -144,6 +144,14 @@ export function CartDrawer() {
                         <img
                           src={item.image}
                           alt={item.title}
+                          loading="lazy"
+                          decoding="async"
+                          width={64}
+                          height={64}
+                          onError={(e) => {
+                            // Fallback on image load error
+                            (e.currentTarget as HTMLImageElement).style.display = "none";
+                          }}
                           className="h-16 w-16 shrink-0 rounded-lg object-cover border border-neutral-200 dark:border-white/10 bg-neutral-100 dark:bg-neutral-800"
                         />
                       ) : (

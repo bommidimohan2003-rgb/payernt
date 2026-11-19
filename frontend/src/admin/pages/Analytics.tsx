@@ -126,7 +126,7 @@ export default function Analytics() {
       if (isRefresh) setRefreshing(true);
       else setLoading(true);
 
-      const data = await fetchAnalyticsData(dateRange);
+      const data = await fetchAnalyticsData(dateRange, isRefresh);
       setDataset(data);
     } catch (err) {
       console.error("[Analytics] Error loading analytics data:", err);

@@ -1306,10 +1306,12 @@ export function usePayerntStore() {
   };
 
   const toggleAvailability = (id: string) => {
+    let prevStatus: ProductAvailability = "available";
     let nextStatus: ProductAvailability = "available";
     setProducts((prev) => {
       const nextList = prev.map((p) => {
         if (p.id !== id) return p;
+        prevStatus = p.availabilityStatus;
         nextStatus =
           p.availabilityStatus === "available" ? "paused" : "available";
         return {
@@ -1327,9 +1329,20 @@ export function usePayerntStore() {
     lastDashboardFetchRef.current = 0;
     payerntApi
       .updateProductStatus(id, "active", nextStatus)
-      .catch((e) =>
-        console.warn("[paye₹nt Backend] toggleAvailability sync:", e),
-      );
+      .catch((e) => {
+        console.warn("[paye₹nt Backend] toggleAvailability sync failed, rolling back:", e);
+        // Rollback optimistic state
+        setProducts((prev) => {
+          const rollbackList = prev.map((p) =>
+            p.id === id ? { ...p, availabilityStatus: prevStatus } : p
+          );
+          try {
+            localStorage.setItem(STORAGE_KEY_PRODUCTS, JSON.stringify(rollbackList));
+          } catch {}
+          return rollbackList;
+        });
+        toast.error("Failed to update listing status on server. Reverted.");
+      });
     window.dispatchEvent(new CustomEvent("payent_products_updated"));
   };
 

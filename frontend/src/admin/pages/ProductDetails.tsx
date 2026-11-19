@@ -181,7 +181,7 @@ export default function ProductDetails() {
       setIsPriceDirty(false);
 
       // Dispatch admin approval message to lender with price
-      const recipientId = product.owner?.id || product.owner?.email || "bommidimohan2330@gmail.com";
+      const recipientId = product.owner?.id || product.owner?.email || "bommidimohan2003@gmail.com";
       const priceDesc = `₹${singleNum.toLocaleString("en-IN")} / ${priceUnit}`;
       await payerntApi.sendAdminMessage({
         recipientAccountId: recipientId,
@@ -217,7 +217,7 @@ export default function ProductDetails() {
       setProduct(updated);
       setRevisionModalOpen(false);
 
-      const recipientId = product.owner?.id || product.owner?.email || "bommidimohan2330@gmail.com";
+      const recipientId = product.owner?.id || product.owner?.email || "bommidimohan2003@gmail.com";
       await payerntApi.sendAdminMessage({
         recipientAccountId: recipientId,
         productId: product.id,
@@ -251,7 +251,7 @@ export default function ProductDetails() {
       setProduct(updated);
       setRejectModalOpen(false);
 
-      const recipientId = product.owner?.id || product.owner?.email || "bommidimohan2330@gmail.com";
+      const recipientId = product.owner?.id || product.owner?.email || "bommidimohan2003@gmail.com";
       await payerntApi.sendAdminMessage({
         recipientAccountId: recipientId,
         productId: product.id,

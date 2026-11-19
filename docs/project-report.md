@@ -551,7 +551,7 @@ Phase 11 transitions PAYENT from "technically validated" to **"controlled real-u
 ### 1. Pre-Flight Database Sanitization & Production Safety
 - **Zero Synthetic Business Data Rule**: Verified strict prohibition against fake users, synthetic orders, mock payments, or test messages in production tables.
 - **Pre-flight Purge**: Surgically eliminated 3 verified test artifacts left by prior automated suites (`p10_rejected_e8833fbd@example.com`, `p-ephem-7eff94`, `p-p10-gear-e8833fbd`).
-- **Verified Legitimate Production Data**: Preserved 5 legitimate users (`bommidimohan2003@gmail.com` [Admin], `bommidimohan304@gmail.com`, `shinyshakhina08@gmail.com`, `vasnathchikkala@gmail.com`, `yernikumar1438@gmail.com`) and 2 legitimate gear listings (`Laptop` and `Sony Alpha A7 IV Camera`).
+- **Verified Legitimate Production Data**: Preserved 6 legitimate users (`bommidimohan2003@gmail.com` [Admin], `bommidimohan304@gmail.com`, `shinyshakhina08@gmail.com`, `vasnathchikkala@gmail.com`, `yernikumar1438@gmail.com`, `pch7509@gmail.com`) and their verified gear listings. All test, synthetic, and orphaned accounts and mock listings purged from all database tables and fallback structures.
 
 ### 2. Micro-Fixes Implementation
 1. **`/api/categories` Route Alias**:
@@ -746,7 +746,7 @@ Phase 11 transitions PAYENT from "technically validated" to **"controlled real-u
 ### 1. Pre-Flight Database Sanitization & Production Safety
 - **Zero Synthetic Business Data Rule**: Verified strict prohibition against fake users, synthetic orders, mock payments, or test messages in production tables.
 - **Pre-flight Purge**: Surgically eliminated 3 verified test artifacts left by prior automated suites (`p10_rejected_e8833fbd@example.com`, `p-ephem-7eff94`, `p-p10-gear-e8833fbd`).
-- **Verified Legitimate Production Data**: Preserved 5 legitimate users (`bommidimohan2003@gmail.com` [Admin], `bommidimohan304@gmail.com`, `shinyshakhina08@gmail.com`, `vasnathchikkala@gmail.com`, `yernikumar1438@gmail.com`) and 2 legitimate gear listings (`Laptop` and `Sony Alpha A7 IV Camera`).
+- **Verified Legitimate Production Data**: Preserved 6 legitimate users (`bommidimohan2003@gmail.com` [Admin], `bommidimohan304@gmail.com`, `shinyshakhina08@gmail.com`, `vasnathchikkala@gmail.com`, `yernikumar1438@gmail.com`, `pch7509@gmail.com`) and their verified gear listings. All test, synthetic, and orphaned accounts and mock listings purged from all database tables and fallback structures.
 
 ### 2. Micro-Fixes Implementation
 1. **`/api/categories` Route Alias**:

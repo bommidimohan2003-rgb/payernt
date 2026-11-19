@@ -42,6 +42,7 @@ export function AdminProductImage({
       onError={() => setError(true)}
       className={cn("object-cover border border-border/60 bg-secondary/40 shrink-0", className)}
       loading="lazy"
+      decoding="async"
     />
   );
 }

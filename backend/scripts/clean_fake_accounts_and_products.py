@@ -13,8 +13,12 @@ def clean_database():
     cur = conn.cursor()
 
     REAL_EMAILS = [
+        "bommidimohan304@gmail.com",
         "bommidimohan2003@gmail.com",
-        "bommidimohan2330@gmail.com"
+        "vasnathchikkala@gmail.com",
+        "yernikumar1438@gmail.com",
+        "shinyshakhina08@gmail.com",
+        "pch7509@gmail.com"
     ]
     
     print("=" * 60)

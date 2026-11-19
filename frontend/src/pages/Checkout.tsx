@@ -130,6 +130,11 @@ export default function Checkout() {
   const [dateConflictError, setDateConflictError] = useState<string | null>(null);
   const [isValidatingDates, setIsValidatingDates] = useState(false);
 
+  // Pre-warm Razorpay Payment Gateway SDK in background while user configures booking
+  useEffect(() => {
+    loadRazorpayScript().catch(() => {});
+  }, []);
+
   useEffect(() => {
     if (!product?.id || !start || !end) return;
     let active = true;
