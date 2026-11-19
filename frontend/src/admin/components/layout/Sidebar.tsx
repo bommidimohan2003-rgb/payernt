@@ -209,13 +209,14 @@ export function Sidebar({ className = "" }: SidebarProps) {
             {/* Header */}
             <div className="flex items-center justify-between pb-3.5 border-b border-border mb-3">
               <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-2xl bg-black flex items-center justify-center shadow-md border border-neutral-800">
-                  <span
-                    className="font-sans font-black text-base text-white leading-none -translate-x-[0.5px]"
-                    style={{ fontFamily: "'Arial Black', -apple-system, BlinkMacSystemFont, sans-serif" }}
-                  >
-                    p
-                  </span>
+                <div className="h-9 w-9 flex items-center justify-center select-none shrink-0">
+                  <img
+                    src="/brand/payent-logo.svg"
+                    alt="Payent Ops"
+                    className="w-9 h-9 select-none"
+                    width={36}
+                    height={36}
+                  />
                 </div>
                 <div>
                   <span className="text-sm font-bold text-text-primary">
@@ -368,15 +369,16 @@ export function Sidebar({ className = "" }: SidebarProps) {
             <TooltipTrigger asChild>
               <Link
                 to="/admin/dashboard"
-                className="flex items-center justify-center h-11 w-11 rounded-2xl bg-black shadow-md hover:scale-105 transition-transform duration-200 cursor-pointer border border-neutral-800"
+                className="flex items-center justify-center h-10 w-10 hover:scale-105 transition-transform duration-200 cursor-pointer select-none"
                 aria-label="Payent Admin Portal"
               >
-                <span
-                  className="font-sans font-black text-xl text-white leading-none -translate-x-[0.5px]"
-                  style={{ fontFamily: "'Arial Black', -apple-system, BlinkMacSystemFont, sans-serif" }}
-                >
-                  p
-                </span>
+                <img
+                  src="/brand/payent-logo.svg"
+                  alt="Payent Admin Portal"
+                  className="w-10 h-10 select-none"
+                  width={40}
+                  height={40}
+                />
               </Link>
             </TooltipTrigger>
             <TooltipContent
