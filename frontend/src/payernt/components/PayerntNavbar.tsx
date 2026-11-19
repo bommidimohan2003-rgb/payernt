@@ -11,7 +11,6 @@ import type { LenderNotification, DemoUser, PayerntAccount } from "../types";
 import { useTheme } from "@/hooks/useTheme";
 import { useLanguage } from "@/i18n";
 import { ProfilePhoto } from "@/components/common/ProfilePhoto";
-import { PayentAgentIcon } from "@/components/common/PayentAgentIcon";
 interface PayerntNavbarProps {
   activeTab?: string;
   onTabChange?: (tab: any) => void;
@@ -89,24 +88,8 @@ export function PayerntNavbar({
               </span>
             </button>
           </div>
-          {/* Right: Theme Toggle, Agent, Notifications, Profile Avatar */}
+          {/* Right: Theme Toggle, Notifications, Profile Avatar */}
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Payent Agent AI Assistant Button */}
-            <button
-              type="button"
-              onClick={() => {
-                if (typeof window !== "undefined") {
-                  window.dispatchEvent(new CustomEvent("open-payent-help-chat"));
-                }
-              }}
-              className="relative flex h-9 w-9 items-center justify-center rounded-full border border-neutral-300 dark:border-neutral-700/80 hover:border-neutral-400 dark:hover:border-neutral-500 bg-transparent hover:bg-neutral-100 dark:hover:bg-white/5 text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              aria-label="Payent Agent AI Assistant"
-              title="Payent Agent (Lender AI Assistant)"
-            >
-              <PayentAgentIcon size={18} />
-              <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-background" />
-            </button>
-
             {/* Theme Toggle Button */}
             <button
               type="button"
