@@ -33,7 +33,8 @@ DEFAULT_INTENT_DEFINITIONS: List[IntentDefinition] = [
         english_keywords=(
             "human", "agent", "person", "representative", "operator", "executive",
             "support team", "customer care", "customer support", "actual person", "talk to human",
-            "real person", "call me", "human support", "live agent"
+            "real person", "call me", "human support", "live agent",
+            "lender support", "talk to lender support", "lender desk", "lender help", "lender care"
         ),
         telugu_keywords=(
             "human support kavali", "support agent tho matladali", "customer care kavali",
@@ -42,7 +43,8 @@ DEFAULT_INTENT_DEFINITIONS: List[IntentDefinition] = [
         ),
         synonyms=(
             "talk to someone", "speak to agent", "connect me to agent", "human help",
-            "live agent", "connect me to customer support", "connect to support team"
+            "live agent", "connect me to customer support", "connect to support team",
+            "lender support", "talk to lender support"
         ),
         exact_phrases=(
             "i need human support",
@@ -55,6 +57,11 @@ DEFAULT_INTENT_DEFINITIONS: List[IntentDefinition] = [
             "connect to agent",
             "speak to a human",
             "customer care number",
+            "talk to lender support",
+            "lender support",
+            "connect me to lender support",
+            "speak to lender support",
+            "lender desk",
             "human support kavali",
             "support agent tho matladali",
             "customer care kavali",
@@ -67,10 +74,11 @@ DEFAULT_INTENT_DEFINITIONS: List[IntentDefinition] = [
             "proceed with ticket",
         ),
         regex_patterns=(
-            r"\b(talk|speak|connect)\s+(to|with)\s+(a\s+)?(human|agent|person|representative|executive|customer\s+support|customer\s+care)\b",
-            r"\b(need|want)\s+(an?\s+)?(human\s+support|live\s+agent|real\s+person|actual\s+person|customer\s+care|customer\s+support)\b",
+            r"\b(talk|speak|connect)\s+(to|with)\s+(a\s+)?(human|agent|person|representative|executive|customer\s+support|customer\s+care|lender\s+support|lender\s+desk)\b",
+            r"\b(need|want)\s+(an?\s+)?(human\s+support|live\s+agent|real\s+person|actual\s+person|customer\s+care|customer\s+support|lender\s+support|lender\s+help)\b",
             r"\b(i\s+want\s+to\s+)?(speak\s+to\s+(customer\s+)?support|report\s+a\s+delivery\s+problem)\b",
             r"\bconnect\s+me\s+to\s+(customer\s+)?support\b",
+            r"\blender\s+support\b",
             r"\b(human|agent|person|real\s+person)\s+tho\s+matladali\b",
             r"\bsupport\s+team(\s+ki)?\s+connect\s+(cheyali|cheyyi|cheyyandi)\b",
         ),
@@ -333,9 +341,15 @@ DEFAULT_INTENT_DEFINITIONS: List[IntentDefinition] = [
     IntentDefinition(
         canonical_name="BOOKING_STATUS",
         description="User is inquiring about the current status or progress of an active or upcoming booking.",
-        english_keywords=("booking status", "order status", "booking progress", "is booking confirmed", "check booking", "my rental status", "where is my booking", "status of my booking", "status of booking", "status of order"),
+        english_keywords=(
+            "booking status", "order status", "booking progress", "is booking confirmed", "check booking",
+            "my rental status", "where is my booking", "status of my booking", "status of booking", "status of order",
+            "rental requests", "check rental requests", "rental bookings",
+            "my rental requests", "lender requests", "incoming requests", "incoming rental requests",
+            "check requests", "rental request status"
+        ),
         telugu_keywords=("na booking enti", "booking status enti", "booking confirm ayyinda", "booking ekkada undi", "order status enti"),
-        synonyms=("order check", "booking state", "rental active", "booking confirmation check", "status of my booking"),
+        synonyms=("order check", "booking state", "rental active", "booking confirmation check", "status of my booking", "rental requests", "incoming rental requests"),
         exact_phrases=(
             "where is my booking",
             "check my booking",
@@ -344,12 +358,24 @@ DEFAULT_INTENT_DEFINITIONS: List[IntentDefinition] = [
             "what is the status of my order",
             "status of my booking",
             "is my booking confirmed",
+            "check rental requests",
+            "rental requests",
+            "check my rental requests",
+            "my rental requests",
+            "incoming rental requests",
+            "incoming requests",
+            "check incoming requests",
+            "view rental requests",
+            "show rental requests",
+            "what are my rental requests",
             "na booking enti",
             "booking status enti",
             "booking confirm ayyinda",
             "booking ekkada undi",
         ),
         regex_patterns=(
+            r"\b(what\s+is|check|where\s+is|view|show|see|my|incoming|all|any)\s+(rental\s+requests?|rental\s+bookings?|lender\s+requests?)\b",
+            r"^(check\s+)?rental\s+requests?$",
             r"\b(what\s+is|check|where\s+is)\s+(my\s+)?(booking|order)\s+(status)?\b",
             r"\b(what\s+is\s+the\s+status\s+of|status\s+of)\s+(my\s+)?(booking|order)\b",
             r"\b(booking|order)\s+(status|progress|state|confirmed)\b",
@@ -395,9 +421,14 @@ DEFAULT_INTENT_DEFINITIONS: List[IntentDefinition] = [
     IntentDefinition(
         canonical_name="PAYMENT_STATUS",
         description="User wants to check if a rental payment was received, confirmed, or verified.",
-        english_keywords=("payment status", "payment confirmed", "transaction check", "did payment go through", "payment receipt", "payment history"),
+        english_keywords=(
+            "payment status", "payment confirmed", "transaction check", "did payment go through", "payment receipt", "payment history",
+            "wallet status", "payout status", "wallet and payout status", "wallet & payout status",
+            "payout & wallet status", "payouts", "escrow payouts", "wallet balance", "lender payouts",
+            "lender wallet", "check wallet", "check payout"
+        ),
         telugu_keywords=("payment success ayyinda", "dabulu poyaya", "payment aipoinda"),
-        synonyms=("verify payment", "payment verification", "paid status"),
+        synonyms=("verify payment", "payment verification", "paid status", "wallet status", "payout status", "wallet and payout status"),
         exact_phrases=(
             "check my payment",
             "is my payment successful",
@@ -407,8 +438,19 @@ DEFAULT_INTENT_DEFINITIONS: List[IntentDefinition] = [
             "payment success ayyinda",
             "did my payment go through",
             "show my payment details",
+            "wallet & payout status",
+            "wallet and payout status",
+            "payout & wallet status",
+            "payout status",
+            "wallet status",
+            "check my wallet",
+            "check wallet status",
+            "how are payouts processed",
+            "wallet balance",
         ),
         regex_patterns=(
+            r"\b(wallet|payouts?|escrow\s+payouts?)\s*(&|and)?\s*(payouts?|wallet)?\s*(status|balance)?\b",
+            r"\b(check|what\s+is|show)\s+(my\s+)?(wallet|payouts?|earnings)\s*(status|balance)?\b",
             r"\b(check|verify|what\s+is|show)\s+(my\s+)?(payment|transaction)\s+(status|details)?\b",
             r"\b(is|did)\s+(my\s+)?(payment|transaction)\s+(go\s+through|completed?|done|successful?|received)\b",
             r"\bpayment\s+(success|confirmed|verified|status|completed)\b",
@@ -424,19 +466,21 @@ DEFAULT_INTENT_DEFINITIONS: List[IntentDefinition] = [
     IntentDefinition(
         canonical_name="BOOKING_ACCEPTANCE",
         description="Vendor or lender asking how to accept or confirm an incoming rental request.",
-        english_keywords=("accept booking", "accept request", "how to accept", "confirm rental", "vendor accept", "approve rental request"),
+        english_keywords=("accept booking", "accept request", "how to accept", "confirm rental", "vendor accept", "approve rental request", "accept a rental request", "accept rental request"),
         telugu_keywords=("booking accept cheyali", "request approve cheyali"),
-        synonyms=("confirm booking request", "approve renter"),
+        synonyms=("confirm booking request", "approve renter", "accept a rental request"),
         exact_phrases=(
             "how do i accept a booking",
             "accept booking request",
             "approve this rental",
+            "how do i accept a rental request from a customer",
+            "accept a rental request",
         ),
         regex_patterns=(
-            r"\b(how\s+to\s+)?accept\s+(a\s+)?(booking|request|rental)\b",
-            r"\bapprove\s+(the\s+)?(renter|booking\s+request)\b",
+            r"\b(how\s+to\s+|how\s+do\s+i\s+)?accept\s+(a\s+)?(booking|request|rental|rental\s+request)\b",
+            r"\bapprove\s+(the\s+)?(renter|booking\s+request|rental\s+request)\b",
         ),
-        priority=68,
+        priority=75,
         confidence_threshold=0.70,
         clarification_message="Are you a lender asking how to accept a pending rental request?",
         response_template_key="booking_acceptance_clarification",
@@ -491,9 +535,14 @@ DEFAULT_INTENT_DEFINITIONS: List[IntentDefinition] = [
     IntentDefinition(
         canonical_name="PRODUCT_APPROVAL",
         description="Vendor asking about listing approval, admin review timeline, or verification status.",
-        english_keywords=("product approved", "listing review", "product pending", "when listing active", "item verification", "product under review", "listing status", "product status"),
+        english_keywords=(
+            "product approved", "listing review", "product pending", "when listing active", "item verification", "product under review", "listing status", "product status",
+            "listing video inspection", "video inspection", "10s video inspection policy",
+            "10s video inspection", "listing video", "condition video", "video inspection policy",
+            "inspection video policy"
+        ),
         telugu_keywords=("product approve ayyinda", "listing pending lo undi", "naa product listing status enti", "product status enti"),
-        synonyms=("is my product live", "listing approval timeline", "product review status", "my product listing status"),
+        synonyms=("is my product live", "listing approval timeline", "product review status", "my product listing status", "video inspection", "listing video inspection"),
         exact_phrases=(
             "when will my product be approved",
             "is my listing approved",
@@ -501,8 +550,17 @@ DEFAULT_INTENT_DEFINITIONS: List[IntentDefinition] = [
             "product approve ayyinda",
             "naa product listing status enti",
             "my product listing status",
+            "listing video inspection",
+            "listing video inspection policy",
+            "10s video inspection policy",
+            "video inspection policy",
+            "inspection video policy",
+            "condition video inspection",
+            "explain the 10s condition video inspection policy",
         ),
         regex_patterns=(
+            r"\b(10s\s+|listing\s+)?video\s+inspection(\s+policy)?\b",
+            r"\bcondition\s+video(\s+inspection)?\b",
             r"\b(when|why|is)\s+.*(product|listing)\s+(approved|live|reviewed|active)\b",
             r"\b(naa|my)?\s*(product|listing)\s+(status|approval|review)\b",
             r"\b(product|listing)\s+under\s+review\b",

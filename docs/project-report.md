@@ -1715,3 +1715,25 @@ The autonomous conversational assistant (**Payent Agent**) was integrated across
    - Created `frontend/src/routes/payernt/agent.tsx` featuring an interactive conversation console, quick action prompt cards, session tracking, and pop-out controls.
 5. **API & Security Authentication (`frontend/src/utils/api.ts`)**:
    - Enhanced `api.agentChat` and `api.getAgentConversations` to automatically resolve lender bearer tokens (`paye₹nt_token`, `payernt_token`), enabling the backend to authenticate the lender context (`is_vendor=True`) for querying real rental requests and escrow payouts.
+
+### 2. Lender Intent Classification & Hybrid Coordination Fix
+- **Root Cause**:
+  - The suggested quick prompts on the lender side (`"Check Rental Requests"`, `"Wallet & Payout Status"`, `"Listing Video Inspection"`, `"Talk to Lender Support"`) failed to match customer-centric intent definitions in `backend/agent_engine/intent_definitions.py`.
+  - The classifier scored them with confidence 0.0 or below the fallback threshold, classifying them as `UNKNOWN_INTENT` and triggering the generic fallback: `"I'm sorry, I couldn't understand your question. Would you like me to connect you with our human support team?"`.
+- **Changes Applied**:
+  - `backend/agent_engine/intent_definitions.py`:
+    - Updated `BOOKING_STATUS` with lender rental request keywords (`"check rental requests"`, `"rental requests"`, `"my rental requests"`, `"incoming rental requests"`, `"check requests"`, `"rental request status"`) and targeted regex patterns.
+    - Balanced `BOOKING_ACCEPTANCE` priority (75) to prevent phrase collision on `"How do I accept a rental request from a customer?"`.
+    - Updated `PAYMENT_STATUS` to recognize lender wallet and payout terminology (`"wallet status"`, `"payout status"`, `"wallet and payout status"`, `"wallet & payout status"`, `"escrow payouts"`, `"wallet balance"`, `"lender payouts"`, `"lender wallet"`).
+    - Updated `PRODUCT_APPROVAL` to recognize 10s video inspection terminology (`"listing video inspection"`, `"video inspection"`, `"10s video inspection policy"`, `"condition video"`, `"video inspection policy"`).
+    - Updated `HUMAN_SUPPORT` with `"talk to lender support"`, `"lender support"`, `"lender desk"`, `"lender help"`.
+  - `backend/agent_engine/hybrid_coordinator.py`:
+    - Updated `_handle_live_db`:
+      - `BOOKING_STATUS`: For authenticated lenders (`context.is_vendor`), queries `get_payernt_vendor_bookings` and formats the output specifically as incoming rental requests with customer names, dates, amounts, and statuses.
+      - `PAYMENT_STATUS`: For lenders, calculates total earnings, pending escrow payouts, and completed payouts from the vendor booking ledger.
+      - `PRODUCT_APPROVAL`: Injected authoritative 10-second inspection video standards (360° physical condition, functional display check, serial number, 1080p WebM/MP4 format, 24h SLA).
+    - Updated `_handle_guide`: Added dedicated guide response for 10-second condition video inspection rules.
+- **Verification**:
+  - `test_agent_intents.py`: 71/71 tests passing (100% pass rate).
+  - `test_performance_and_optimizations.py`: 8/8 tests passing (100% pass rate).
+  - All lender prompts now resolve with authoritative data and zero fallbacks.

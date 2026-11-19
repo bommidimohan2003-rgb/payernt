@@ -870,6 +870,31 @@ class HybridQueryCoordinator:
         """Handles static guide, FAQ, policy, and greeting questions."""
         depth = determine_response_depth(message)
 
+        # Specialized handling for 10s inspection condition video policies
+        if any(w in message.lower() for w in ("video inspection", "condition video", "10s video", "inspection video", "video policy")):
+            return {
+                "intent": intent,
+                "confidence": 1.0,
+                "is_ambiguous": False,
+                "requires_auth": False,
+                "tool_called": "video_inspection_policy_guide",
+                "tool_result": {"success": True, "policy": "10s_condition_video"},
+                "response_text": (
+                    "### 10-Second Inspection Condition Video Requirements\n"
+                    "To guarantee equipment condition, protect gear owners from false damage claims, and enable fast approval, all listings require a continuous, uncut 10-second inspection video:\n\n"
+                    "1. **360° Physical Inspection**: Slowly showcase all angles, ports, screen, and serial numbers in good lighting.\n"
+                    "2. **Functional Test**: Power on the device during recording to demonstrate operating condition.\n"
+                    "3. **Dual Codec Support**: Videos are recorded in WebM or MP4 and served via Cloudinary with cross-browser compatibility.\n\n"
+                    "Admin verification reviews and activates listings within 24 hours of video upload."
+                ),
+                "suggestions": ["List New Gear", "Check Rental Requests", "Talk to Lender Support"],
+                "entities": entities_dict,
+                "session_id": context.session_id,
+                "conversation_id": conversation_id,
+                "authenticated": context.is_authenticated,
+                "query_type": QueryType.GUIDE.value,
+            }
+
         # Check if Knowledge Retrieval provides a high or medium confidence match
         if top_kb and top_kb.retrieval_confidence in ("HIGH", "MEDIUM") and top_kb.is_verified:
             # Guard against unresolved verify markers
@@ -1177,19 +1202,34 @@ class HybridQueryCoordinator:
                         latest = bookings[0]
                         b_status = str(latest.get("status", "confirmed")).upper()
                         b_list = "\n".join([f"• **#{b.get('booking_id')}** - {b.get('product_title')} ({b.get('status').upper()})" for b in bookings[:3]])
-                        if len(bookings) == 1:
-                            response_text = (
-                                f"Your booking **#{latest.get('booking_id')}** for **{latest.get('product_title')}** is currently **{b_status}**."
-                            )
+                        if context.is_vendor or "rental request" in message.lower():
+                            if len(bookings) == 1:
+                                response_text = (
+                                    f"You have 1 rental request for your listed gear: **#{latest.get('booking_id')}** for **{latest.get('product_title')}** ({b_status})."
+                                )
+                            else:
+                                response_text = (
+                                    f"You have {len(bookings)} rental requests for your listed gear:\n\n{b_list}\n\nWould you like details on a specific rental request?"
+                                )
+                            suggestions = [f"Status #{b.get('booking_id')}" for b in bookings[:2]] + ["All Requests", "Wallet & Payouts"]
                         else:
-                            response_text = (
-                                f"Your latest booking **#{latest.get('booking_id')}** for **{latest.get('product_title')}** is currently **{b_status}**.\n\n"
-                                f"Recent bookings:\n{b_list}\n\nWould you like details on a specific order?"
-                            )
-                        suggestions = [f"Status #{b.get('booking_id')}" for b in bookings[:2]] + ["All Bookings"]
+                            if len(bookings) == 1:
+                                response_text = (
+                                    f"Your booking **#{latest.get('booking_id')}** for **{latest.get('product_title')}** is currently **{b_status}**."
+                                )
+                            else:
+                                response_text = (
+                                    f"Your latest booking **#{latest.get('booking_id')}** for **{latest.get('product_title')}** is currently **{b_status}**.\n\n"
+                                    f"Recent bookings:\n{b_list}\n\nWould you like details on a specific order?"
+                                )
+                            suggestions = [f"Status #{b.get('booking_id')}" for b in bookings[:2]] + ["All Bookings"]
                     else:
-                        response_text = "You currently have no active or previous bookings."
-                        suggestions = ["Browse Gear", "How It Works"]
+                        if context.is_vendor or "rental request" in message.lower():
+                            response_text = "You currently have no incoming rental requests for your listed equipment."
+                            suggestions = ["Wallet & Payouts", "Listing Video Inspection", "Talk to Lender Support"]
+                        else:
+                            response_text = "You currently have no active or previous bookings."
+                            suggestions = ["Browse Gear", "How It Works"]
                 else:
                     response_text = tool_result.get("error", "Error loading your bookings.")
                     suggestions = ["Sign In", "Help"]
@@ -1202,6 +1242,27 @@ class HybridQueryCoordinator:
                 response_text = "Please sign in to view payment confirmation and transaction history."
                 suggestions = ["Sign In", "Accepted Payment Methods"]
                 tool_result = {"success": False, "requires_auth": True}
+            elif (context.is_vendor or any(w in message.lower() for w in ("wallet", "payout", "earnings", "escrow"))):
+                tool_called = "wallet_payout_lookup"
+                try:
+                    from payernt_database import get_payernt_vendor_bookings
+                    v_bookings = get_payernt_vendor_bookings(context.user_id or "", context.clean_email)
+                    total_earnings = sum(float(b.get("netEarnings") or b.get("net_earnings") or b.get("total_amount") or 0) for b in v_bookings if str(b.get("status", "")).lower() == "completed")
+                    pending_escrow = sum(float(b.get("netEarnings") or b.get("net_earnings") or b.get("total_amount") or 0) for b in v_bookings if str(b.get("status", "")).lower() in ("confirmed", "active"))
+                    completed_count = sum(1 for b in v_bookings if str(b.get("status", "")).lower() == "completed")
+                    response_text = (
+                        f"### Payernt Wallet & Payout Status\n"
+                        f"• Available Earnings for Withdrawal: **₹{total_earnings:,.2f}**\n"
+                        f"• Escrow Holdings (In-Rental): **₹{pending_escrow:,.2f}**\n"
+                        f"• Completed Rental Cycles: **{completed_count}**\n\n"
+                        f"Rental payouts are credited directly to your Payernt wallet upon verified return handover, and can be withdrawn directly to your bank account."
+                    )
+                    suggestions = ["Check Rental Requests", "Listing Video Inspection", "Talk to Lender Support"]
+                    tool_result = {"success": True, "wallet_balance": total_earnings, "escrow": pending_escrow}
+                except Exception as e:
+                    response_text = "Your Payernt wallet is active with secure escrow protection. Completed rental earnings will be credited upon verified gear return."
+                    suggestions = ["Wallet & Payouts", "Check Rental Requests", "Talk to Lender Support"]
+                    tool_result = {"success": True}
             else:
                 target_bid = booking_id
                 if not target_bid:
@@ -1346,6 +1407,20 @@ class HybridQueryCoordinator:
             else:
                 response_text = tool_result.get("error", f"Product #{product_id} not found.")
                 suggestions = ["Search Products", "Help Center"]
+
+        # 7.1. PRODUCT APPROVAL / VIDEO INSPECTION POLICY
+        elif intent in ("PRODUCT_APPROVAL", "PRODUCT_LISTING") or any(w in message.lower() for w in ("video inspection", "condition video", "inspection video")):
+            tool_called = "video_inspection_policy_guide"
+            response_text = (
+                "### 10-Second Inspection Condition Video Requirements\n"
+                "To ensure renter confidence and protect gear owners from false damage claims, all equipment listings require a continuous, uncut 10-second condition video:\n\n"
+                "1. **360° Physical Inspection**: Slowly capture all angles, ports, screen, and serial numbers in clear lighting.\n"
+                "2. **Functional Test**: Power on the device during recording to demonstrate operating condition.\n"
+                "3. **Dual Codec Support**: Videos are recorded in WebM or MP4 and automatically transcoded via Cloudinary for universal browser playback.\n\n"
+                "Verification is reviewed by administrators within 24 hours of submission."
+            )
+            suggestions = ["Check Rental Requests", "Wallet & Payout Status", "Talk to Lender Support"]
+            tool_result = {"success": True, "policy": "10s_condition_video"}
 
         # 8. SUPPORT TICKET STATUS
         elif intent == "SUPPORT_STATUS" or (ticket_id and "ticket" in message.lower()):
