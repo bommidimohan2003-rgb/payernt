@@ -140,38 +140,63 @@ export function HelpChatbot() {
   // Account switching / logout safety: clear conversation when authentication state changes
   useEffect(() => {
     const checkAuthChange = () => {
+      let email: string | null = null;
+      let userName: string | undefined = undefined;
+
       const user = storage.get<StoredUser | null>(
         STORAGE_KEYS.currentUser,
         null,
       );
-      const email = user?.email || null;
+      if (user?.email) {
+        email = user.email;
+        userName = user.name;
+      } else if (isPayerntRoute && typeof window !== "undefined") {
+        const storedAccount =
+          localStorage.getItem("paye₹nt_account") ||
+          localStorage.getItem("payernt_account");
+        if (storedAccount) {
+          try {
+            const acc = JSON.parse(storedAccount);
+            email = acc.email || null;
+            userName = acc.name || acc.fullName || acc.storeName;
+          } catch {}
+        }
+      }
+
       if (email !== currentUserEmail) {
         setCurrentUserEmail(email);
         sessionStorage.removeItem("payent_agent_conv_id");
         setConversationId("");
-        const greeting = email
-          ? `Welcome back, ${user?.name || email.split("@")[0]}! How can I assist you today?`
-          : "Namaste! I am Payent Agent. How can I help you with your gear rentals today?";
+        const greeting = isPayerntRoute
+          ? email
+            ? `Welcome back, ${userName || email.split("@")[0]}! I am Payent Agent for Lenders. How can I assist you with your equipment listings, rental approvals, wallet payouts, or gear verification today?`
+            : "Namaste! I am Payent Agent, your digital assistant for peer-to-peer gear lenders. How can I help you manage your tech equipment today?"
+          : email
+            ? `Welcome back, ${userName || email.split("@")[0]}! How can I assist you today?`
+            : "Namaste! I am Payent Agent. How can I help you with your gear rentals today?";
+        const suggestions = isPayerntRoute
+          ? DEFAULT_LENDER_SUGGESTIONS
+          : DEFAULT_SUGGESTIONS;
         setMessages([
           {
             id: `msg_switched_${Date.now()}`,
             sender: "bot",
             text: greeting,
             timestamp: new Date(),
-            suggestions: DEFAULT_SUGGESTIONS,
+            suggestions,
           },
         ]);
-        setActiveSuggestions(DEFAULT_SUGGESTIONS);
+        setActiveSuggestions(suggestions);
       }
     };
 
     window.addEventListener("storage", checkAuthChange);
-    const interval = setInterval(checkAuthChange, 2000);
+    window.addEventListener("paye₹nt_auth_change", checkAuthChange);
     return () => {
       window.removeEventListener("storage", checkAuthChange);
-      clearInterval(interval);
+      window.removeEventListener("paye₹nt_auth_change", checkAuthChange);
     };
-  }, [currentUserEmail]);
+  }, [currentUserEmail, isPayerntRoute]);
 
   // Auto-scroll to bottom on new messages or typing state change
   useEffect(() => {

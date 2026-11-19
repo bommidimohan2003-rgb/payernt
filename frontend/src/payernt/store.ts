@@ -194,7 +194,16 @@ export function usePayerntStore() {
         accountToSet = getRehydratedAccount();
       }
       if (accountToSet && token) {
-        setActiveAccount(accountToSet);
+        setActiveAccount((prev) => {
+          if (
+            prev &&
+            prev.accountId === accountToSet.accountId &&
+            prev.email === accountToSet.email
+          ) {
+            return prev;
+          }
+          return accountToSet;
+        });
       }
       const storedUser = localStorage.getItem(STORAGE_KEY_ACTIVE_USER);
       if (storedUser) setActiveUserId(storedUser);
@@ -274,7 +283,17 @@ export function usePayerntStore() {
         const stored = localStorage.getItem(STORAGE_KEY_ACCOUNT);
         if (stored && token) {
           try {
-            setActiveAccount(JSON.parse(stored));
+            const parsed = JSON.parse(stored);
+            setActiveAccount((prev) => {
+              if (
+                prev &&
+                prev.accountId === parsed?.accountId &&
+                prev.email === parsed?.email
+              ) {
+                return prev;
+              }
+              return parsed;
+            });
           } catch {
             setActiveAccount(null);
           }
@@ -935,7 +954,16 @@ export function usePayerntStore() {
         return inFlightDashboardRef.current;
       }
 
-      setIsLoadingDashboard(true);
+      // TTL cache guard: avoid redundant server hammering within CACHE_TTL_MS unless forced
+      const now = Date.now();
+      if (!forceFull && now - lastDashboardFetchRef.current < CACHE_TTL_MS) {
+        return;
+      }
+
+      // Only show full loading state if initial load (no data yet) or user explicitly forced a full refresh
+      if (forceFull || !backendDashboard) {
+        setIsLoadingDashboard(true);
+      }
       setDashboardError(null);
 
       const promise = (async () => {
@@ -1080,7 +1108,7 @@ export function usePayerntStore() {
   useEffect(() => {
     if (!activeAccount || !isAuthenticated) return;
     refreshDashboard();
-    fetchNotifications(true);
+    fetchNotifications();
 
     const handleRefresh = () => {
       refreshDashboard();
@@ -1092,7 +1120,7 @@ export function usePayerntStore() {
         const elapsed = Date.now() - lastDashboardFetchRef.current;
         if (elapsed > 15000) {
           refreshDashboard();
-          fetchNotifications(true);
+          fetchNotifications(false);
         }
       }
     };
@@ -1127,10 +1155,10 @@ export function usePayerntStore() {
         document.visibilityState === "visible"
       ) {
         refreshDashboard(false);
-        fetchBookings(true);
-        fetchNotifications(true);
+        fetchBookings(false);
+        fetchNotifications(false);
       }
-    }, 15000);
+    }, 30000);
 
     return () => {
       window.removeEventListener("paye₹nt_data_refresh", handleRefresh);
@@ -1141,7 +1169,7 @@ export function usePayerntStore() {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       clearInterval(pollInterval);
     };
-  }, [activeAccount, isAuthenticated, refreshDashboard]);
+  }, [activeAccount?.accountId, isAuthenticated]);
 
   const switchDemoUser = (userId: string) => {
     const found = DEMO_USERS.find((u) => u.id === userId);

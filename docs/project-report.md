@@ -1737,3 +1737,25 @@ The autonomous conversational assistant (**Payent Agent**) was integrated across
   - `test_agent_intents.py`: 71/71 tests passing (100% pass rate).
   - `test_performance_and_optimizations.py`: 8/8 tests passing (100% pass rate).
   - All lender prompts now resolve with authoritative data and zero fallbacks.
+
+### 3. Payernt Dashboard Refresh Frequency & Polling Stabilization
+- **Root Cause**:
+  - `frontend/src/components/common/HelpChatbot.tsx` had a `setInterval(checkAuthChange, 2000)` polling every 2 seconds. When mounted on Payernt routes, `checkAuthChange` failed to inspect lender storage (`paye₹nt_account`), mistakenly treating the lender as logged out and triggering state mutations and re-renders every 2 seconds.
+  - In `frontend/src/payernt/store.ts`:
+    - `refreshDashboard` lacked a TTL cache guard (unlike all other fetchers), meaning any trigger immediately dispatched a full remote `/api/payernt/dashboard` network request.
+    - `refreshDashboard` unconditionally set `setIsLoadingDashboard(true)` even for background polling, turning all overview cards into loading skeleton animations.
+    - The sync `useEffect` had `[activeAccount, isAuthenticated, refreshDashboard]` in its dependency array, which re-triggered whenever `activeAccount` object reference churned from `storage` event listeners.
+- **Changes Applied**:
+  - `frontend/src/components/common/HelpChatbot.tsx`:
+    - Removed the aggressive 2000ms `setInterval`.
+    - Extended `checkAuthChange` to inspect both `STORAGE_KEYS.currentUser` and `paye₹nt_account` / `payernt_account`.
+    - Wired reactive `storage` and `paye₹nt_auth_change` listeners.
+  - `frontend/src/payernt/store.ts`:
+    - Added TTL cache guard (`CACHE_TTL_MS = 15000`) to `refreshDashboard(forceFull)`.
+    - Restricted `setIsLoadingDashboard(true)` to initial cold load (`!backendDashboard`) or manual forced refreshes (`forceFull === true`), keeping background sync completely silent without skeleton flicker.
+    - Stabilized `activeAccount` updates with deep ID/email comparison to prevent reference churn.
+    - Scoped sync `useEffect` dependencies strictly to `[activeAccount?.accountId, isAuthenticated]`.
+    - Adjusted background polling interval to 30s with non-forcing flags (`fetchBookings(false)`, `fetchNotifications(false)`).
+- **Verification**:
+  - Frontend production build (`npm run build`): Passed cleanly (client + SSR 0 errors).
+  - Dashboard loads stably and smoothly without 2-second refreshes.
