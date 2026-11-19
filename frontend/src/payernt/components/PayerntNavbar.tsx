@@ -74,15 +74,36 @@ export function PayerntNavbar({
     <>
       <header className="sticky top-0 z-40 w-full border-none border-b-0 shadow-none bg-background/85 backdrop-blur-2xl transition-colors duration-200">
         <div className="w-full px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          {/* Left: Brand Name Only (No Logo, No Online Pill) */}
+          {/* Left: Brand Identity with Official Logo */}
           <div className="flex items-center">
             <button
               type="button"
               onClick={handleBrandClick}
-              className="flex items-center text-left cursor-pointer focus:outline-none group select-none transition-transform active:scale-95"
+              className="flex items-center gap-2.5 text-left cursor-pointer focus:outline-none group select-none transition-transform active:scale-95"
               title={isHome ? "Return to Gateway (Choose Experience)" : "Payernt Home"}
               aria-label={isHome ? "Return to Gateway (Choose Experience)" : "Payernt Home"}
             >
+              <svg
+                viewBox="0 0 512 512"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                className="w-7 h-7 sm:w-8 sm:h-8 shrink-0 select-none drop-shadow-xs"
+                aria-hidden="true"
+              >
+                <rect width="512" height="512" rx="112" fill="#000000" />
+                <text
+                  x="252"
+                  y="332"
+                  fontFamily="'Arial Black', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif"
+                  fontSize="290"
+                  fontWeight="900"
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  fill="#FFFFFF"
+                >
+                  p
+                </text>
+              </svg>
               <span className="font-extrabold tracking-tight text-xl sm:text-2xl text-foreground font-display">
                 paye₹nt
               </span>

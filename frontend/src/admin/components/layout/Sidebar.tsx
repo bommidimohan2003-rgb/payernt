@@ -209,9 +209,12 @@ export function Sidebar({ className = "" }: SidebarProps) {
             {/* Header */}
             <div className="flex items-center justify-between pb-3.5 border-b border-border mb-3">
               <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-2xl bg-gradient-to-r from-[#F9856A] to-[#FF7655] flex items-center justify-center shadow-md">
-                  <span className="font-mono font-black text-sm text-white">
-                    P
+                <div className="h-9 w-9 rounded-2xl bg-black flex items-center justify-center shadow-md border border-neutral-800">
+                  <span
+                    className="font-sans font-black text-base text-white leading-none -translate-x-[0.5px]"
+                    style={{ fontFamily: "'Arial Black', -apple-system, BlinkMacSystemFont, sans-serif" }}
+                  >
+                    p
                   </span>
                 </div>
                 <div>
@@ -365,11 +368,14 @@ export function Sidebar({ className = "" }: SidebarProps) {
             <TooltipTrigger asChild>
               <Link
                 to="/admin/dashboard"
-                className="flex items-center justify-center h-11 w-11 rounded-2xl bg-gradient-to-r from-[#F9856A] to-[#FF7655] shadow-md hover:scale-105 transition-transform duration-200 cursor-pointer"
+                className="flex items-center justify-center h-11 w-11 rounded-2xl bg-black shadow-md hover:scale-105 transition-transform duration-200 cursor-pointer border border-neutral-800"
                 aria-label="Payent Admin Portal"
               >
-                <span className="font-mono font-black text-sm text-white tracking-tight">
-                  P
+                <span
+                  className="font-sans font-black text-xl text-white leading-none -translate-x-[0.5px]"
+                  style={{ fontFamily: "'Arial Black', -apple-system, BlinkMacSystemFont, sans-serif" }}
+                >
+                  p
                 </span>
               </Link>
             </TooltipTrigger>

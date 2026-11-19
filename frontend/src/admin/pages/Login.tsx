@@ -132,6 +132,14 @@ export default function Login() {
         <div className="glass bg-card/65 rounded-3xl p-8 shadow-2xl border border-border/80 relative space-y-6">
           {/* Logo & Header */}
           <div className="flex flex-col items-center text-center">
+            <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-black text-white shadow-xl border border-neutral-800 mb-3 select-none">
+              <span
+                className="font-sans font-black text-3xl leading-none -translate-x-[0.5px]"
+                style={{ fontFamily: "'Arial Black', -apple-system, BlinkMacSystemFont, sans-serif" }}
+              >
+                p
+              </span>
+            </div>
             <span className="font-sans font-black tracking-tight text-3xl text-foreground mb-2">
               PAYENT
             </span>
