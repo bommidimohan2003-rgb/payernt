@@ -388,12 +388,29 @@ export default function Checkout() {
 
   const qrTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Rental Calculations
-  const days = Math.max(
-    1,
-    Math.round((+new Date(end + "T00:00:00") - +new Date(start + "T00:00:00")) / 86400000) + 1,
-  );
-  const subtotal = (product?.price ?? 0) * days;
+  // Rental Calculations: 1 Full Day & Custom 24h slots are 1 rental day!
+  const isMultiDayCalendar = search.mode === "custom";
+  const days = isMultiDayCalendar
+    ? Math.max(
+        1,
+        Math.round((+new Date(end + "T00:00:00") - +new Date(start + "T00:00:00")) / 86400000) + 1,
+      )
+    : 1;
+
+  const isHalfDay =
+    search.mode === "half_day_morning" ||
+    search.mode === "half_day_afternoon" ||
+    search.slot === "morning" ||
+    search.slot === "afternoon";
+
+  const customHoursParam = Number((search as any).hours) || 24;
+  const unitPrice = isHalfDay
+    ? Math.round((product?.price ?? 0) * 0.5)
+    : search.mode === "custom_slot" && customHoursParam < 24
+    ? Math.max(Math.round((product?.price ?? 0) * 0.25), Math.round((product?.price ?? 0) * (customHoursParam / 24)))
+    : (product?.price ?? 0);
+
+  const subtotal = unitPrice * days;
   const discount = applied ? subtotal * 0.1 : 0;
   const taxableBase = Math.max(0, subtotal - discount);
   const tax = taxableBase * 0.05;
@@ -1518,7 +1535,11 @@ export default function Checkout() {
                         </span>
                       </div>
                       <div className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold pt-0.5">
-                        Duration: {days} Days ({days * 24} Elapsed Hours)
+                        {isHalfDay
+                          ? "Duration: Half-Day (4 Hours)"
+                          : search.mode === "custom_slot"
+                          ? `Duration: Custom Slot (${customHoursParam} Hours)`
+                          : `Duration: ${days} ${days === 1 ? "Day (24-Hour Rental)" : `Days (${days * 24} Elapsed Hours)`}`}
                       </div>
                     </div>
                   </div>

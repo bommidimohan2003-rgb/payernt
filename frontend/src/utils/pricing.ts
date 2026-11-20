@@ -38,7 +38,8 @@ export interface SlotPriceOptions {
 export function getSlotPrice(
   slotId: string,
   product?: SlotPriceOptions["product"],
-  daySlots?: SlotPriceOptions["daySlots"]
+  daySlots?: SlotPriceOptions["daySlots"],
+  customHours?: number
 ): number {
   const normSlot = (slotId || "full_day").toLowerCase().trim();
 
@@ -71,6 +72,16 @@ export function getSlotPrice(
     return Math.round(fullDayPrice * 0.5);
   }
 
-  // 4. Full Day: Retain product configured full-day price unchanged
+  // 4. Custom Slot rule: based on configured hours or fullDayPrice
+  if (normSlot === "custom_slot" || normSlot === "custom_hours") {
+    if (customHours && customHours > 0) {
+      if (customHours >= 24) return fullDayPrice;
+      if (customHours === 4) return Math.round(fullDayPrice * 0.5);
+      return Math.max(Math.round(fullDayPrice * 0.25), Math.round(fullDayPrice * (customHours / 24)));
+    }
+    return fullDayPrice;
+  }
+
+  // 5. Full Day: Retain product configured full-day price unchanged
   return fullDayPrice;
 }

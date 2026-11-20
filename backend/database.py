@@ -7673,9 +7673,28 @@ def normalize_slot_interval(
         end_dt = datetime.datetime(d.year, d.month, d.day, 17, 0, 0, tzinfo=timezone.utc)
         return start_dt, end_dt
     else:
-        # Full day = operating rental day 08:00 to 17:00
-        start_dt = datetime.datetime(d.year, d.month, d.day, 8, 0, 0, tzinfo=timezone.utc)
-        end_dt = datetime.datetime(d.year, d.month, d.day, 17, 0, 0, tzinfo=timezone.utc)
+        # Full day / 24-Hour rolling period (e.g. 10:00 AM today to 10:00 AM next day)
+        h, m = 10, 0
+        if start_time and ":" in str(start_time):
+            try:
+                parts = str(start_time).strip().split(":")
+                h = int(parts[0])
+                m = int(parts[1][:2])
+            except Exception:
+                h, m = 10, 0
+        start_dt = datetime.datetime(d.year, d.month, d.day, h, m, 0, tzinfo=timezone.utc)
+        if end_time and ":" in str(end_time) and slot_key in ("custom_slot", "custom_hours", "custom"):
+            try:
+                parts = str(end_time).strip().split(":")
+                eh = int(parts[0])
+                em = int(parts[1][:2])
+                end_dt = datetime.datetime(d.year, d.month, d.day, eh, em, 0, tzinfo=timezone.utc)
+                if end_dt <= start_dt:
+                    end_dt += datetime.timedelta(days=1)
+                return start_dt, end_dt
+            except Exception:
+                pass
+        end_dt = start_dt + datetime.timedelta(hours=24)
         return start_dt, end_dt
 
 def _extract_order_interval(order: dict) -> Tuple[Optional[datetime.datetime], Optional[datetime.datetime]]:
@@ -7924,15 +7943,33 @@ def get_product_slots_for_date(
     slot_configs = [
         ("morning", "Half Day — Morning", "08:00", "12:00", "Morning — 8:00 AM to 12:00 PM", morning_enabled, morning_rate),
         ("afternoon", "Half Day — Afternoon", "13:00", "17:00", "Afternoon — 1:00 PM to 5:00 PM", afternoon_enabled, afternoon_rate),
-        ("full_day", "Full Day", "08:00", "08:00", "Full Day — 24 Hours", full_day_enabled, daily_rate),
+        ("full_day", "1 Full Day", "10:00", "10:00", "Full 24-Hour Period", full_day_enabled, daily_rate),
+        ("custom_slot", "Custom Slot", "10:00", "10:00", "User Customization", True, daily_rate),
     ]
+
+    # Real-time IST clock evaluation for today
+    now_utc = dt.now(timezone.utc)
+    now_ist = now_utc + datetime.timedelta(hours=5, minutes=30)
+    current_minutes_ist = now_ist.hour * 60 + now_ist.minute
 
     for s_id, s_name, s_time, e_time, s_label, enabled, rate in slot_configs:
         start_dt, end_dt = normalize_slot_interval(date_str, s_id, s_time, e_time)
 
+        is_slot_closed_by_time = False
+        if d == today_dt:
+            # Morning slot ends at 12:00 PM (12 * 60 = 720 mins)
+            if s_id == "morning" and current_minutes_ist >= 720:
+                is_slot_closed_by_time = True
+            # Afternoon slot ends at 5:00 PM (17 * 60 = 1020 mins)
+            elif s_id == "afternoon" and current_minutes_ist >= 1020:
+                is_slot_closed_by_time = True
+
         if is_past:
             status = "not_available"
             status_label = "Past Date"
+        elif is_slot_closed_by_time:
+            status = "closed"
+            status_label = "Closed (Time Passed)"
         elif not enabled:
             status = "not_available"
             status_label = "Not Offered by Lender"

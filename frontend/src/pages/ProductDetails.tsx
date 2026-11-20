@@ -31,8 +31,9 @@ import {
   Maximize2,
   X,
   LayoutGrid,
+  Sliders,
 } from "lucide-react";
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { MainLayout } from "@/layouts/MainLayout";
 import { Button } from "@/components/common/Button";
 import { BackButton } from "@/components/common/BackButton";
@@ -257,7 +258,7 @@ export default function ProductDetails() {
     setTodayStr(todayVal);
     setTomorrowStr(tomorrowVal);
     setStartDate((prev) => prev || todayVal);
-    setEndDate((prev) => prev || todayVal);
+    setEndDate((prev) => prev || tomorrowVal);
   }, []);
   const [availabilityChecked, setAvailabilityChecked] = useState<boolean>(false);
   const [isAvailableForDates, setIsAvailableForDates] = useState<boolean | null>(null);
@@ -266,11 +267,13 @@ export default function ProductDetails() {
   const [isCheckingAvailability, setIsCheckingAvailability] = useState<boolean>(false);
 
   // Flexible Rental Duration & Time Slot State
-  type DurationMode = "half_day_morning" | "half_day_afternoon" | "full_day" | "custom";
+  type DurationMode = "half_day_morning" | "half_day_afternoon" | "full_day" | "custom_slot" | "custom";
   const [durationMode, setDurationMode] = useState<DurationMode>("full_day");
-  const [selectedSlot, setSelectedSlot] = useState<"morning" | "afternoon" | "full_day">("full_day");
+  const [selectedSlot, setSelectedSlot] = useState<"morning" | "afternoon" | "full_day" | "custom_slot">("full_day");
+  const [pickupTime, setPickupTime] = useState<string>("10:00 AM");
+  const [customHours, setCustomHours] = useState<number>(24);
   const [daySlots, setDaySlots] = useState<Array<{
-    id: "morning" | "afternoon" | "full_day";
+    id: "morning" | "afternoon" | "full_day" | "custom_slot";
     name: string;
     label: string;
     startTime: string;
@@ -303,6 +306,120 @@ export default function ProductDetails() {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [isSlotDropdownOpen]);
+
+  // Standard pickup times for 24-hour and custom slots
+  const AVAILABLE_PICKUP_TIMES = useMemo(
+    () => [
+      "08:00 AM",
+      "09:00 AM",
+      "10:00 AM",
+      "11:00 AM",
+      "12:00 PM",
+      "01:00 PM",
+      "02:00 PM",
+      "03:00 PM",
+      "04:00 PM",
+      "05:00 PM",
+      "06:00 PM",
+      "07:00 PM",
+      "08:00 PM",
+    ],
+    []
+  );
+
+  const parseTimeToMinutes = (tStr: string) => {
+    const match = tStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+    if (!match) return 600;
+    let h = parseInt(match[1], 10);
+    const m = parseInt(match[2], 10);
+    const period = match[3].toUpperCase();
+    if (period === "PM" && h < 12) h += 12;
+    if (period === "AM" && h === 12) h = 0;
+    return h * 60 + m;
+  };
+
+  // Check if a time slot has already passed for today
+  const isSlotClosedForSelectedDate = useCallback(
+    (slotId: string) => {
+      if (!startDate || !todayStr) return false;
+      if (startDate < todayStr) return true; // Past dates are closed
+      if (startDate > todayStr) return false; // Future dates are open
+
+      // Today: evaluate against current clock time
+      const now = new Date();
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+      if (slotId === "morning") {
+        // Morning Slot: 8:00 AM to 12:00 PM (ends at 12:00 PM = 720 mins)
+        // If current time >= 12:00 PM (e.g. 12:20 PM), close and strike-out!
+        return currentMinutes >= 12 * 60;
+      }
+      if (slotId === "afternoon") {
+        // Afternoon Slot: 1:00 PM to 5:00 PM (ends at 5:00 PM = 1020 mins)
+        return currentMinutes >= 17 * 60;
+      }
+      return false;
+    },
+    [startDate, todayStr]
+  );
+
+  // Check if a specific pickup time has passed today
+  const isPickupTimePastToday = useCallback(
+    (tStr: string) => {
+      if (!startDate || !todayStr) return false;
+      if (startDate < todayStr) return true;
+      if (startDate > todayStr) return false;
+      const now = new Date();
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+      const targetMin = parseTimeToMinutes(tStr);
+      return currentMinutes >= targetMin;
+    },
+    [startDate, todayStr]
+  );
+
+  // Return date and time string for custom hours
+  const calculatedCustomReturnStr = useMemo(() => {
+    if (!startDate) return "";
+    const [y, m, d] = startDate.split("-").map(Number);
+    const startMin = parseTimeToMinutes(pickupTime);
+    const totalEndMin = startMin + customHours * 60;
+    const additionalDays = Math.floor(totalEndMin / 1440);
+    const returnMinInDay = totalEndMin % 1440;
+
+    let rh = Math.floor(returnMinInDay / 60);
+    const rm = returnMinInDay % 60;
+    const period = rh >= 12 ? "PM" : "AM";
+    if (rh > 12) rh -= 12;
+    if (rh === 0) rh = 12;
+    const formattedTime = `${String(rh).padStart(2, "0")}:${String(rm).padStart(2, "0")} ${period}`;
+
+    const returnDate = new Date(y, m - 1, d + additionalDays);
+    const dateStr = toDateInputValue(returnDate);
+    return `${dateStr} at ${formattedTime}`;
+  }, [startDate, pickupTime, customHours]);
+
+  // Real-time slot fallback: If selected slot has passed today, auto-switch to an open slot
+  useEffect(() => {
+    if (startDate === todayStr && isSlotClosedForSelectedDate(selectedSlot)) {
+      if (!isSlotClosedForSelectedDate("afternoon")) {
+        setSelectedSlot("afternoon");
+        setDurationMode("half_day_afternoon");
+      } else {
+        setSelectedSlot("full_day");
+        setDurationMode("full_day");
+      }
+    }
+  }, [startDate, todayStr, isSlotClosedForSelectedDate, selectedSlot]);
+
+  // Adjust pickup time if selected time has passed today
+  useEffect(() => {
+    if (startDate === todayStr && isPickupTimePastToday(pickupTime)) {
+      const firstAvailable = AVAILABLE_PICKUP_TIMES.find((t) => !isPickupTimePastToday(t));
+      if (firstAvailable) {
+        setPickupTime(firstAvailable);
+      }
+    }
+  }, [startDate, todayStr, pickupTime, isPickupTimePastToday, AVAILABLE_PICKUP_TIMES]);
 
   // Stale-While-Revalidate: hydrate local cache & fetch latest product details post-mount
   useEffect(() => {
@@ -606,6 +723,7 @@ export default function ProductDetails() {
       rawMode === "half_day_morning" ||
       rawMode === "half_day_afternoon" ||
       rawMode === "full_day" ||
+      rawMode === "custom_slot" ||
       rawMode === "custom"
         ? rawMode
         : "full_day";
@@ -622,7 +740,20 @@ export default function ProductDetails() {
       if (startDate) setEndDate(startDate);
     } else if (mode === "full_day") {
       setSelectedSlot("full_day");
-      if (startDate) setEndDate(startDate);
+      // 24-Hour rolling period: end date is next day
+      if (startDate) {
+        const parts = startDate.split("-").map(Number);
+        const nextDay = new Date(parts[0], parts[1] - 1, parts[2] + 1);
+        setEndDate(toDateInputValue(nextDay));
+      }
+    } else if (mode === "custom_slot") {
+      setSelectedSlot("custom_slot");
+      if (startDate) {
+        const parts = startDate.split("-").map(Number);
+        const dayOffset = customHours >= 24 ? Math.ceil(customHours / 24) : 0;
+        const targetDate = new Date(parts[0], parts[1] - 1, parts[2] + dayOffset);
+        setEndDate(toDateInputValue(targetDate));
+      }
     } else if (mode === "custom") {
       setSelectedSlot("full_day");
       if (startDate && (!endDate || endDate === startDate)) {
@@ -636,19 +767,33 @@ export default function ProductDetails() {
   };
 
   const handleSlotSelect = (rawSlotId: string) => {
-    const slotId: "morning" | "afternoon" | "full_day" =
-      rawSlotId === "morning" || rawSlotId === "afternoon" || rawSlotId === "full_day"
-        ? rawSlotId
+    const slotId: "morning" | "afternoon" | "full_day" | "custom_slot" =
+      rawSlotId === "morning" || rawSlotId === "afternoon" || rawSlotId === "custom_slot"
+        ? (rawSlotId as any)
         : "full_day";
     setSelectedSlot(slotId);
     if (slotId === "morning") {
       setDurationMode("half_day_morning");
+      if (startDate) setEndDate(startDate);
     } else if (slotId === "afternoon") {
       setDurationMode("half_day_afternoon");
+      if (startDate) setEndDate(startDate);
+    } else if (slotId === "custom_slot") {
+      setDurationMode("custom_slot");
+      if (startDate) {
+        const parts = startDate.split("-").map(Number);
+        const dayOffset = customHours >= 24 ? Math.ceil(customHours / 24) : 0;
+        const targetDate = new Date(parts[0], parts[1] - 1, parts[2] + dayOffset);
+        setEndDate(toDateInputValue(targetDate));
+      }
     } else {
       setDurationMode("full_day");
+      if (startDate) {
+        const parts = startDate.split("-").map(Number);
+        const nextDay = new Date(parts[0], parts[1] - 1, parts[2] + 1);
+        setEndDate(toDateInputValue(nextDay));
+      }
     }
-    if (startDate) setEndDate(startDate);
     setAvailabilityChecked(false);
     setIsAvailableForDates(null);
     setAvailabilityMessage("");
@@ -671,31 +816,17 @@ export default function ProductDetails() {
     }
     if (durationMode === "full_day") {
       const parts = startDate.split("-").map(Number);
-      const d = new Date(parts[0], parts[1] - 1, parts[2]);
-      d.setDate(d.getDate() + 1);
-      return `${toDateInputValue(d)} at 10:00 AM (24h)`;
+      const d = new Date(parts[0], parts[1] - 1, parts[2] + 1);
+      return `${toDateInputValue(d)} at ${pickupTime} (24h)`;
+    }
+    if (durationMode === "custom_slot") {
+      return `${calculatedCustomReturnStr} (${customHours}h)`;
     }
     const days = rentalDays > 0 ? rentalDays : 1;
     const parts = startDate.split("-").map(Number);
-    const d = new Date(parts[0], parts[1] - 1, parts[2]);
-    d.setDate(d.getDate() + days);
-    return `${endDate || toDateInputValue(d)} at 10:00 AM (${days * 24}h)`;
-  }, [startDate, endDate, durationMode, rentalDays]);
-
-  const estimatedTotal = useMemo(() => {
-    if (!product) return 0;
-    const baseDailyPrice = Number(product.price) || 0;
-    if (durationMode === "half_day_morning" || durationMode === "half_day_afternoon") {
-      return Math.round(baseDailyPrice * 0.5);
-    }
-    if (durationMode === "full_day") {
-      const fullSlot = daySlots.find((s) => s.id === "full_day");
-      if (fullSlot && fullSlot.price) return fullSlot.price;
-      return baseDailyPrice;
-    }
-    if (rentalDays <= 0) return 0;
-    return rentalDays * baseDailyPrice;
-  }, [product, durationMode, daySlots, rentalDays]);
+    const d = new Date(parts[0], parts[1] - 1, parts[2] + days);
+    return `${endDate || toDateInputValue(d)} at ${pickupTime} (${days * 24}h)`;
+  }, [startDate, endDate, durationMode, rentalDays, pickupTime, calculatedCustomReturnStr, customHours]);
 
   // Dynamic slot rates
   const morningPrice = useMemo(() => {
@@ -716,7 +847,32 @@ export default function ProductDetails() {
     return Number(product?.price) || 0;
   }, [daySlots, product?.price]);
 
-  // Active Slot Info for Dropdown Display (monochrome aligned)
+  const customSlotPrice = useMemo(() => {
+    const baseDailyPrice = Number(product?.price) || 0;
+    if (customHours >= 24) return baseDailyPrice;
+    if (customHours === 4) return morningPrice;
+    return Math.max(Math.round(baseDailyPrice * 0.25), Math.round(baseDailyPrice * (customHours / 24)));
+  }, [product?.price, morningPrice, customHours]);
+
+  const estimatedTotal = useMemo(() => {
+    if (!product) return 0;
+    const baseDailyPrice = Number(product.price) || 0;
+    if (durationMode === "half_day_morning" || durationMode === "half_day_afternoon") {
+      return Math.round(baseDailyPrice * 0.5);
+    }
+    if (durationMode === "full_day") {
+      const fullSlot = daySlots.find((s) => s.id === "full_day");
+      if (fullSlot && fullSlot.price) return fullSlot.price;
+      return baseDailyPrice;
+    }
+    if (durationMode === "custom_slot") {
+      return customSlotPrice;
+    }
+    if (rentalDays <= 0) return 0;
+    return rentalDays * baseDailyPrice;
+  }, [product, durationMode, daySlots, rentalDays, customSlotPrice]);
+
+  // Active Slot Info for Dropdown Display
   const currentSlotInfo = useMemo(() => {
     if (durationMode === "half_day_morning") {
       return {
@@ -746,6 +902,20 @@ export default function ProductDetails() {
         tag: "Afternoon",
       };
     }
+    if (durationMode === "custom_slot") {
+      return {
+        id: "custom_slot" as const,
+        title: "Custom Slot",
+        time: `${pickupTime} (${customHours}h rental)`,
+        shortTime: `${customHours}h Custom`,
+        price: customSlotPrice,
+        priceSuffix: "",
+        icon: Sliders,
+        iconColor: "text-neutral-900 dark:text-neutral-100",
+        iconBg: "bg-neutral-200/80 dark:bg-neutral-800",
+        tag: "Custom",
+      };
+    }
     if (durationMode === "custom") {
       return {
         id: "custom" as const,
@@ -763,7 +933,7 @@ export default function ProductDetails() {
     return {
       id: "full_day" as const,
       title: "1 Full Day",
-      time: "Full 24-Hour Rental Period",
+      time: `24-Hour Period (${pickupTime} → Next Day ${pickupTime})`,
       shortTime: "24 Hours",
       price: fullDayPrice,
       priceSuffix: "",
@@ -772,13 +942,13 @@ export default function ProductDetails() {
       iconBg: "bg-neutral-200/80 dark:bg-neutral-800",
       tag: "Full Day",
     };
-  }, [durationMode, morningPrice, afternoonPrice, fullDayPrice, rentalDays, startDate, endDate]);
+  }, [durationMode, morningPrice, afternoonPrice, fullDayPrice, customSlotPrice, rentalDays, startDate, endDate, pickupTime, customHours]);
 
+  // Clean slot options WITHOUT subtitle descriptions (matching user specification)
   const slotOptions = useMemo(() => [
     {
       id: "morning" as const,
       title: "Morning Slot",
-      time: "8:00 AM – 12:00 PM (4 Hours)",
       price: morningPrice,
       priceSuffix: "",
       icon: Sun,
@@ -789,7 +959,6 @@ export default function ProductDetails() {
     {
       id: "afternoon" as const,
       title: "Afternoon Slot",
-      time: "1:00 PM – 5:00 PM (4 Hours)",
       price: afternoonPrice,
       priceSuffix: "",
       icon: Sun,
@@ -800,7 +969,6 @@ export default function ProductDetails() {
     {
       id: "full_day" as const,
       title: "1 Full Day",
-      time: "Full 24-Hour Rental Period",
       price: fullDayPrice,
       priceSuffix: "",
       icon: Calendar,
@@ -809,9 +977,18 @@ export default function ProductDetails() {
       tag: "Popular",
     },
     {
+      id: "custom_slot" as const,
+      title: "Custom Slot",
+      price: customSlotPrice,
+      priceSuffix: "",
+      icon: Sliders,
+      iconColor: "text-neutral-900 dark:text-neutral-100",
+      iconBg: "bg-neutral-200/80 dark:bg-neutral-800",
+      tag: "Custom",
+    },
+    {
       id: "custom" as const,
       title: "Multi-Day Rental",
-      time: "Select custom date range on calendar",
       price: fullDayPrice,
       priceSuffix: "/day",
       icon: Clock,
@@ -819,7 +996,7 @@ export default function ProductDetails() {
       iconBg: "bg-neutral-200/80 dark:bg-neutral-800",
       tag: "Flexible",
     },
-  ], [morningPrice, afternoonPrice, fullDayPrice]);
+  ], [morningPrice, afternoonPrice, fullDayPrice, customSlotPrice]);
 
   // Handle Date Changes (resets check state)
   const handleStartDateChange = (val: string) => {
@@ -827,7 +1004,20 @@ export default function ProductDetails() {
     setAvailabilityChecked(false);
     setIsAvailableForDates(null);
     setAvailabilityMessage("");
-    if (durationMode !== "custom") {
+    if (durationMode === "full_day") {
+      if (val) {
+        const parts = val.split("-").map(Number);
+        const nextDay = new Date(parts[0], parts[1] - 1, parts[2] + 1);
+        setEndDate(toDateInputValue(nextDay));
+      }
+    } else if (durationMode === "custom_slot") {
+      if (val) {
+        const parts = val.split("-").map(Number);
+        const dayOffset = customHours >= 24 ? Math.ceil(customHours / 24) : 0;
+        const targetDate = new Date(parts[0], parts[1] - 1, parts[2] + dayOffset);
+        setEndDate(toDateInputValue(targetDate));
+      }
+    } else if (durationMode !== "custom") {
       setEndDate(val);
     } else if (endDate && val && endDate <= val) {
       const [y, m, d] = val.split("-").map(Number);
@@ -1863,72 +2053,77 @@ const productSchema = product ? {
                       {slotOptions.map((opt) => {
                         const isSelected =
                           (opt.id === "custom" && durationMode === "custom") ||
-                          (opt.id !== "custom" && selectedSlot === opt.id && durationMode !== "custom");
+                          (opt.id === "custom_slot" && durationMode === "custom_slot") ||
+                          (opt.id === "full_day" && durationMode === "full_day") ||
+                          (opt.id === "morning" && durationMode === "half_day_morning") ||
+                          (opt.id === "afternoon" && durationMode === "half_day_afternoon");
+                        const isClosed = isSlotClosedForSelectedDate(opt.id);
                         const OptIcon = opt.icon;
 
                         return (
                           <button
                             key={opt.id}
                             type="button"
+                            disabled={isClosed}
                             onClick={() => {
+                              if (isClosed) return;
                               if (opt.id === "custom") {
                                 handleDurationModeChange("custom");
                                 setShowFullCalendar(true);
+                              } else if (opt.id === "custom_slot") {
+                                handleSlotSelect("custom_slot");
                               } else {
                                 handleSlotSelect(opt.id);
                               }
                               setIsSlotDropdownOpen(false);
                             }}
                             className={cn(
-                              "w-full p-2 sm:p-2.5 rounded-lg flex items-center justify-between gap-2.5 text-left transition-colors cursor-pointer",
-                              isSelected
-                                ? "bg-neutral-950 text-white dark:bg-white dark:text-neutral-950"
-                                : "hover:bg-neutral-100 dark:hover:bg-neutral-800/70 border border-transparent text-neutral-900 dark:text-neutral-100"
+                              "w-full p-2.5 sm:p-3 rounded-xl flex items-center justify-between gap-2.5 text-left transition-colors",
+                              isClosed
+                                ? "opacity-50 cursor-not-allowed bg-neutral-50/50 dark:bg-neutral-900/40 text-neutral-400 dark:text-neutral-500 border border-neutral-100 dark:border-neutral-800"
+                                : isSelected
+                                ? "bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 cursor-pointer shadow-sm"
+                                : "hover:bg-neutral-100 dark:hover:bg-neutral-800/70 border border-transparent text-neutral-900 dark:text-neutral-100 cursor-pointer"
                             )}
+                            title={isClosed ? `${opt.title} has already passed for today` : undefined}
                           >
                             <div className="flex items-center gap-2.5 min-w-0">
                               <div
                                 className={cn(
                                   "h-7 w-7 rounded-md flex items-center justify-center shrink-0",
-                                  isSelected
+                                  isClosed
+                                    ? "bg-neutral-200/50 dark:bg-neutral-800/50 text-neutral-400 dark:text-neutral-500"
+                                    : isSelected
                                     ? "bg-white/15 text-white dark:bg-neutral-950/10 dark:text-neutral-950"
                                     : cn(opt.iconBg, opt.iconColor)
                                 )}
                               >
                                 <OptIcon className="h-3.5 w-3.5" aria-hidden="true" />
                               </div>
-                              <div className="truncate min-w-0">
-                                <div className="flex items-center gap-1.5">
-                                  <span className="text-xs font-bold truncate">
-                                    {opt.title}
-                                  </span>
-                                  <span
-                                    className={cn(
-                                      "text-[11px] font-medium tabular-nums px-1.5 py-0.5 rounded",
-                                      isSelected
-                                        ? "bg-white/20 text-white dark:bg-black/10 dark:text-neutral-950"
-                                        : "bg-neutral-200/70 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300"
-                                    )}
-                                  >
-                                    {opt.tag}
-                                  </span>
-                                </div>
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <span className={cn("text-xs font-bold truncate", isClosed && "line-through text-neutral-400 dark:text-neutral-500")}>
+                                  {opt.title}
+                                </span>
                                 <span
                                   className={cn(
-                                    "text-[11px] block truncate",
-                                    isSelected ? "text-neutral-200 dark:text-neutral-700" : "text-neutral-600 dark:text-neutral-400"
+                                    "text-[11px] font-medium tabular-nums px-1.5 py-0.5 rounded",
+                                    isClosed
+                                      ? "bg-rose-500/15 text-rose-600 dark:text-rose-400 font-semibold"
+                                      : isSelected
+                                      ? "bg-white/20 text-white dark:bg-black/10 dark:text-neutral-950"
+                                      : "bg-neutral-200/70 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300"
                                   )}
                                 >
-                                  {opt.time}
+                                  {isClosed ? "Closed" : opt.tag}
                                 </span>
                               </div>
                             </div>
 
                             <div className="flex items-center gap-2 shrink-0">
-                              <span className="text-xs font-semibold tabular-nums">
+                              <span className={cn("text-xs font-semibold tabular-nums", isClosed && "line-through text-neutral-400 dark:text-neutral-500")}>
                                 ₹{opt.price}{opt.priceSuffix}
                               </span>
-                              <div className={cn("w-4 h-4 rounded-full flex items-center justify-center", isSelected ? "opacity-100" : "opacity-0")}>
+                              <div className={cn("w-4 h-4 rounded-full flex items-center justify-center", isSelected && !isClosed ? "opacity-100" : "opacity-0")}>
                                 <Check className="h-3.5 w-3.5 stroke-[1.75]" aria-hidden="true" />
                               </div>
                             </div>
@@ -1938,6 +2133,171 @@ const productSchema = product ? {
                     </div>
                   )}
                 </div>
+
+                {/* 1 Full Day: 24-Hour Rolling Schedule & Pickup Time Selector */}
+                {durationMode === "full_day" && (
+                  <div className="pt-2">
+                    <div className="p-3 sm:p-3.5 rounded-xl bg-neutral-50 dark:bg-[#262626] border border-neutral-200 dark:border-neutral-700/80 space-y-2.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4 text-neutral-700 dark:text-neutral-300 shrink-0" aria-hidden="true" />
+                          <span className="text-xs font-bold text-neutral-900 dark:text-neutral-100">
+                            24-Hour Rental Period
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <label className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
+                            Pickup:
+                          </label>
+                          <select
+                            value={pickupTime}
+                            onChange={(e) => setPickupTime(e.target.value)}
+                            className="text-xs font-bold px-2 py-1 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-[#1E1E1E] text-neutral-900 dark:text-white cursor-pointer outline-none"
+                          >
+                            {AVAILABLE_PICKUP_TIMES.map((t) => {
+                              const isPast = isPickupTimePastToday(t);
+                              return (
+                                <option key={t} value={t} disabled={isPast}>
+                                  {t} {isPast ? "(Passed)" : ""}
+                                </option>
+                              );
+                            })}
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* 24-Hour Schedule Window Display */}
+                      <div className="grid grid-cols-2 gap-2 p-2.5 rounded-lg bg-white/80 dark:bg-[#1E1E1E]/80 border border-neutral-200/70 dark:border-neutral-800 text-xs">
+                        <div>
+                          <span className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wider block">Pickup</span>
+                          <span className="font-bold text-neutral-900 dark:text-white block truncate">
+                            {startDate ? `${startDate} at ${pickupTime}` : "Select Date"}
+                          </span>
+                        </div>
+                        <div className="border-l border-neutral-200 dark:border-neutral-700/60 pl-2.5">
+                          <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block">Return (24h)</span>
+                          <span className="font-bold text-neutral-900 dark:text-white block truncate">
+                            {endDate ? `${endDate} at ${pickupTime}` : "Next Day"}
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-neutral-500 dark:text-neutral-400 leading-tight">
+                        Full 24-hour rental window: return by the same time on the next day.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* User Customization Slot Panel */}
+                {durationMode === "custom_slot" && (
+                  <div className="pt-2">
+                    <div className="p-3 sm:p-3.5 rounded-xl bg-neutral-50 dark:bg-[#262626] border border-neutral-200 dark:border-neutral-700/80 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Sliders className="h-4 w-4 text-neutral-700 dark:text-neutral-300 shrink-0" aria-hidden="true" />
+                          <span className="text-xs font-bold text-neutral-900 dark:text-neutral-100">
+                            User Customization
+                          </span>
+                        </div>
+                        <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-neutral-200/80 dark:bg-neutral-800 text-neutral-900 dark:text-white tabular-nums">
+                          ₹{customSlotPrice}
+                        </span>
+                      </div>
+
+                      {/* Pickup Time Selector */}
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400 block">
+                          Select Pickup Time:
+                        </label>
+                        <div className="flex flex-wrap gap-1.5">
+                          {["08:00 AM", "10:00 AM", "12:00 PM", "02:00 PM", "04:00 PM", "06:00 PM"].map((t) => {
+                            const isPast = isPickupTimePastToday(t);
+                            const isSel = pickupTime === t;
+                            return (
+                              <button
+                                key={t}
+                                type="button"
+                                disabled={isPast}
+                                onClick={() => setPickupTime(t)}
+                                className={cn(
+                                  "text-xs px-2.5 py-1 rounded-lg border transition-colors cursor-pointer",
+                                  isPast
+                                    ? "opacity-40 line-through cursor-not-allowed bg-neutral-100 dark:bg-neutral-800/40 text-neutral-400 border-transparent"
+                                    : isSel
+                                    ? "bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 border-neutral-950 dark:border-white font-bold"
+                                    : "bg-white dark:bg-[#1E1E1E] text-neutral-800 dark:text-neutral-200 border-neutral-200 dark:border-neutral-700 hover:border-neutral-400"
+                                )}
+                              >
+                                {t}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Duration Selector */}
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400 block">
+                          Choose Duration:
+                        </label>
+                        <div className="grid grid-cols-4 gap-1.5">
+                          {[
+                            { hours: 4, label: "4 Hours", desc: "Half Day" },
+                            { hours: 8, label: "8 Hours", desc: "Workday" },
+                            { hours: 12, label: "12 Hours", desc: "Extended" },
+                            { hours: 24, label: "24 Hours", desc: "Full Day" },
+                          ].map((item) => {
+                            const isSel = customHours === item.hours;
+                            return (
+                              <button
+                                key={item.hours}
+                                type="button"
+                                onClick={() => {
+                                  setCustomHours(item.hours);
+                                  if (startDate) {
+                                    const parts = startDate.split("-").map(Number);
+                                    const dayOffset = item.hours >= 24 ? Math.ceil(item.hours / 24) : 0;
+                                    const targetDate = new Date(parts[0], parts[1] - 1, parts[2] + dayOffset);
+                                    setEndDate(toDateInputValue(targetDate));
+                                  }
+                                }}
+                                className={cn(
+                                  "p-2 rounded-lg border text-center transition-colors cursor-pointer",
+                                  isSel
+                                    ? "bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 border-neutral-950 dark:border-white font-bold"
+                                    : "bg-white dark:bg-[#1E1E1E] text-neutral-800 dark:text-neutral-200 border-neutral-200 dark:border-neutral-700 hover:border-neutral-400"
+                                )}
+                              >
+                                <div className="text-xs font-bold">{item.label}</div>
+                                <div className={cn("text-[10px]", isSel ? "text-neutral-300 dark:text-neutral-700" : "text-neutral-500")}>
+                                  {item.desc}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Calculated Schedule Card */}
+                      <div className="grid grid-cols-2 gap-2 p-2.5 rounded-lg bg-white/80 dark:bg-[#1E1E1E]/80 border border-neutral-200/70 dark:border-neutral-800 text-xs">
+                        <div>
+                          <span className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wider block">Pickup</span>
+                          <span className="font-bold text-neutral-900 dark:text-white block truncate">
+                            {startDate} at {pickupTime}
+                          </span>
+                        </div>
+                        <div className="border-l border-neutral-200 dark:border-neutral-700/60 pl-2.5">
+                          <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block">
+                            Return ({customHours}h)
+                          </span>
+                          <span className="font-bold text-neutral-900 dark:text-white block truncate">
+                            {calculatedCustomReturnStr}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Multi-Day Days Marker / Stepper */}
                 {durationMode === "custom" && (
@@ -2003,11 +2363,13 @@ const productSchema = product ? {
                   <div>
                     <div className="text-xs font-semibold text-neutral-900 dark:text-neutral-100">
                       {durationMode === "half_day_morning"
-                        ? "1 Day • Morning Slot"
+                        ? "1 Day • Morning Slot (8:00 AM – 12:00 PM)"
                         : durationMode === "half_day_afternoon"
-                        ? "1 Day • Afternoon Slot"
+                        ? "1 Day • Afternoon Slot (1:00 PM – 5:00 PM)"
                         : durationMode === "full_day"
-                        ? startDate ? `1 Day • Full Day (${startDate})` : "1 Day • Full Day"
+                        ? startDate ? `24 Hours • Full Day (${startDate} ${pickupTime} → ${endDate} ${pickupTime})` : "1 Day • 24 Hours Full Day"
+                        : durationMode === "custom_slot"
+                        ? `Custom Slot • ${customHours}h (${startDate} ${pickupTime} → ${calculatedCustomReturnStr})`
                         : `${rentalDays} Days Rental (${startDate} → ${endDate})`}
                     </div>
                   </div>
