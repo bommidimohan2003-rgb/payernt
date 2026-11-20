@@ -343,14 +343,22 @@ export default function ProductDetails() {
     return h * 60 + m;
   };
 
-  // Check if a time slot has already passed for today
+  // Check if a time slot has already passed for today or is blocked by lender/reservations
   const isSlotClosedForSelectedDate = useCallback(
     (slotId: string) => {
       if (!startDate || !todayStr) return false;
       if (startDate < todayStr) return true; // Past dates are closed
-      if (startDate > todayStr) return false; // Future dates are open
 
-      // Today: evaluate against current clock time
+      // 1. Check real-time API slot status (evaluates lender blocks, reservations, buffer, and next-day overlap)
+      const apiSlot = daySlots.find((s) => s.id === slotId);
+      if (apiSlot && (apiSlot.status === "blocked" || apiSlot.status === "booked" || apiSlot.status === "not_available" || apiSlot.status === "closed")) {
+        return true;
+      }
+
+      // If future date and no API block, it is open
+      if (startDate > todayStr) return false;
+
+      // 2. Today: evaluate against current clock time
       const now = new Date();
       const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
@@ -365,7 +373,7 @@ export default function ProductDetails() {
       }
       return false;
     },
-    [startDate, todayStr]
+    [startDate, todayStr, daySlots]
   );
 
   // Check if a specific pickup time has passed today
@@ -450,18 +458,24 @@ export default function ProductDetails() {
     }
   }, [durationMode, startDate, effectiveReturnDate, endDate, getNextDateStr]);
 
-  // Real-time slot fallback: If selected slot has passed today, auto-switch to an open slot
+  // Real-time slot fallback: If selected slot has passed today or is blocked by owner, auto-switch to an open slot
   useEffect(() => {
-    if (startDate === todayStr && isSlotClosedForSelectedDate(selectedSlot)) {
+    if (isSlotClosedForSelectedDate(selectedSlot)) {
       if (!isSlotClosedForSelectedDate("afternoon")) {
         setSelectedSlot("afternoon");
         setDurationMode("half_day_afternoon");
-      } else {
+      } else if (!isSlotClosedForSelectedDate("morning")) {
+        setSelectedSlot("morning");
+        setDurationMode("half_day_morning");
+      } else if (!isSlotClosedForSelectedDate("custom_slot")) {
+        setSelectedSlot("custom_slot");
+        setDurationMode("custom_slot");
+      } else if (!isSlotClosedForSelectedDate("full_day")) {
         setSelectedSlot("full_day");
         setDurationMode("full_day");
       }
     }
-  }, [startDate, todayStr, isSlotClosedForSelectedDate, selectedSlot]);
+  }, [startDate, isSlotClosedForSelectedDate, selectedSlot]);
 
   // Adjust pickup time if selected time has passed today
   useEffect(() => {
@@ -2135,6 +2149,16 @@ const productSchema = product ? {
                           (opt.id === "morning" && durationMode === "half_day_morning") ||
                           (opt.id === "afternoon" && durationMode === "half_day_afternoon");
                         const isClosed = isSlotClosedForSelectedDate(opt.id);
+                        const apiSlot = daySlots.find((s) => s.id === opt.id);
+                        const isBlocked = apiSlot?.status === "blocked" || (apiSlot as any)?.isBlocked;
+                        const isBooked = apiSlot?.status === "booked";
+                        const badgeLabel = isBlocked
+                          ? "Blocked"
+                          : isBooked
+                          ? "Booked"
+                          : isClosed
+                          ? "Closed"
+                          : opt.tag;
                         const OptIcon = opt.icon;
 
                         return (
@@ -2162,7 +2186,7 @@ const productSchema = product ? {
                                 ? "bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 cursor-pointer shadow-sm"
                                 : "hover:bg-neutral-100 dark:hover:bg-neutral-800/70 border border-transparent text-neutral-900 dark:text-neutral-100 cursor-pointer"
                             )}
-                            title={isClosed ? `${opt.title} has already passed for today` : undefined}
+                            title={isClosed ? `${opt.title} is unavailable for selected date` : undefined}
                           >
                             <div className="flex items-center gap-2.5 min-w-0">
                               <div
@@ -2191,7 +2215,7 @@ const productSchema = product ? {
                                       : "bg-neutral-200/70 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300"
                                   )}
                                 >
-                                  {isClosed ? "Closed" : opt.tag}
+                                  {badgeLabel}
                                 </span>
                               </div>
                             </div>
@@ -2319,6 +2343,17 @@ const productSchema = product ? {
                           );
                         })}
                       </div>
+
+                      {/* Warning if 24-hour return overlaps with owner blocked date */}
+                      {daySlots.find((s) => s.id === "full_day")?.status === "blocked" && (
+                        <div className="flex items-start gap-2 p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 text-xs text-rose-700 dark:text-rose-300">
+                          <AlertCircle className="h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400 mt-0.5" />
+                          <div className="space-y-0.5">
+                            <span className="font-bold block">24-Hour Rental Blocked</span>
+                            <span>The return date ({effectiveReturnDate}) is blocked by the equipment owner. Please switch to a same-day slot (Morning or Afternoon) or choose another date.</span>
+                          </div>
+                        </div>
+                      )}
 
                       {/* 24-Hour Schedule Window Display */}
                       <div className="grid grid-cols-2 gap-2 p-2.5 rounded-lg bg-white/80 dark:bg-[#1E1E1E]/80 border border-neutral-200/70 dark:border-neutral-800 text-xs">

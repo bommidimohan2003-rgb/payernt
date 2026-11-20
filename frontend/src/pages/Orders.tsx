@@ -36,6 +36,7 @@ import {
   FileText,
   Loader2,
   ShoppingCart,
+  Upload,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/common/Button";
@@ -423,6 +424,99 @@ export default function Orders() {
     setSelectedReason("");
     setCancellationExplanation("");
   }, [isCancelling]);
+
+  // Report Issue / Dispute Modal State (Refund Policy Section 5)
+  const [reportingOrder, setReportingOrder] = useState<Order | null>(null);
+  const [reportSubject, setReportSubject] = useState<string>("Billing Dispute / Unauthorized Deduction");
+  const [reportCategory, setReportCategory] = useState<string>("Billing & Payments");
+  const [reportSerialNumber, setReportSerialNumber] = useState<string>("");
+  const [reportDescription, setReportDescription] = useState<string>("");
+  const [reportPhotos, setReportPhotos] = useState<Array<{ name: string; url: string }>>([]);
+  const [isSubmittingReport, setIsSubmittingReport] = useState<boolean>(false);
+  const [reportSuccessTicketId, setReportSuccessTicketId] = useState<string | null>(null);
+
+  const openReportIssueModal = useCallback((order: Order) => {
+    setReportingOrder(order);
+    setReportSubject("Billing Dispute / Unauthorized Deduction");
+    setReportCategory("Billing & Payments");
+    setReportSerialNumber("");
+    setReportDescription("");
+    setReportPhotos([]);
+    setIsSubmittingReport(false);
+    setReportSuccessTicketId(null);
+  }, []);
+
+  const closeReportIssueModal = useCallback(() => {
+    if (isSubmittingReport) return;
+    setReportingOrder(null);
+    setReportSuccessTicketId(null);
+  }, [isSubmittingReport]);
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    Array.from(files).forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (uploadEvent) => {
+        const url = uploadEvent.target?.result as string;
+        if (url) {
+          setReportPhotos((prev) => [...prev, { name: file.name, url }]);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleReportSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reportingOrder) return;
+    if (reportDescription.trim().length < 10) {
+      toast.error("Please provide an incident description with at least 10 characters.");
+      return;
+    }
+
+    const token = storage.get<string | null>(STORAGE_KEYS.token, null);
+    if (!token) {
+      toast.error("Please sign in to file an incident or dispute.");
+      return;
+    }
+
+    setIsSubmittingReport(true);
+    try {
+      const messageBody = [
+        `[Dispute / Issue Report for Booking #${reportingOrder.id}]`,
+        `Product: ${reportingOrder.productTitle || (reportingOrder as any).product_title || "Gear"}`,
+        `Issue Type: ${reportSubject}`,
+        reportSerialNumber ? `Device Serial Number: ${reportSerialNumber}` : "Device Serial Number: Not provided",
+        "",
+        "Incident Description:",
+        reportDescription.trim(),
+        reportPhotos.length > 0 ? `\nPhotographic Proof: ${reportPhotos.length} photo(s) attached.` : "",
+      ]
+        .filter(Boolean)
+        .join("\n");
+
+      const res = await api.createSupportTicket(token, {
+        subject: `[Dispute #${reportingOrder.id}] ${reportSubject}`,
+        message: messageBody,
+        category: reportCategory,
+        bookingId: reportingOrder.id,
+        productReference: reportingOrder.productTitle || (reportingOrder as any).product_title,
+      });
+
+      if (res && (res.ticketId || res.id)) {
+        const tid = res.ticketId || res.id;
+        setReportSuccessTicketId(tid);
+        toast.success(`Dispute request filed. Ticket reference #${tid}`);
+      } else {
+        throw new Error("Unable to submit ticket. Please retry.");
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to submit dispute ticket.");
+    } finally {
+      setIsSubmittingReport(false);
+    }
+  };
   const [revealedPins, setRevealedPins] = useState<Record<string, { pin: string; instructions?: string }>>({});
   const [loadingPinOrderId, setLoadingPinOrderId] = useState<string | null>(null);
 
@@ -1907,6 +2001,18 @@ export default function Orders() {
                                 <span>Chat with Lender</span>
                               </button>
 
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openReportIssueModal(o);
+                                }}
+                                className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-amber-500/30 dark:border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-900 dark:text-amber-200 font-semibold text-xs transition-colors cursor-pointer shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                              >
+                                <AlertTriangle className="h-3.5 w-3.5 stroke-[1.75] text-amber-600 dark:text-amber-400" />
+                                <span>Report an Issue</span>
+                              </button>
+
                               {isEligibleForCancellation(o) && (
                                 <button
                                   type="button"
@@ -2420,6 +2526,224 @@ export default function Orders() {
                   <span>{isSavingLocation ? "Saving..." : "Update Location"}</span>
                 </Button>
               </div>
+            </motion.div>
+          </div>
+        )}
+
+        {/* Report an Issue / Dispute Request Modal (Refund Policy Section 5) */}
+        {reportingOrder && (
+          <div key="report-issue-modal" className="fixed inset-0 z-50 grid place-items-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.12 }}
+              onClick={closeReportIssueModal}
+              className="fixed inset-0 bg-black/60 dark:bg-[#050709]/85 backdrop-blur-sm"
+            />
+            <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="report-modal-title"
+              initial={{ opacity: 0, scale: 0.96, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 10 }}
+              transition={{ duration: 0.14, ease: "easeOut" }}
+              className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-neutral-200 dark:border-white/20 bg-white dark:bg-[#1E1E1E] p-5 sm:p-6 shadow-2xl z-10 space-y-4 text-left"
+            >
+              <div className="flex items-center justify-between border-b border-neutral-200/70 dark:border-white/10 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-600 dark:text-amber-400">
+                    <AlertTriangle className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h3 id="report-modal-title" className="text-base font-bold text-neutral-900 dark:text-white">
+                      Report an Issue & Dispute Request
+                    </h3>
+                    <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                      Booking #{reportingOrder.id} • {reportingOrder.productTitle || (reportingOrder as any).product_title || "Gear"}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeReportIssueModal}
+                  aria-label="Close report modal"
+                  className="p-1.5 rounded-lg text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                >
+                  <X className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </div>
+
+              {reportSuccessTicketId ? (
+                <div className="py-6 text-center space-y-4">
+                  <div className="h-12 w-12 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 mx-auto flex items-center justify-center">
+                    <CheckCircle2 className="h-6 w-6" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <h4 className="text-sm font-bold text-neutral-900 dark:text-white">
+                      Dispute Ticket #{reportSuccessTicketId} Logged
+                    </h4>
+                    <p className="text-xs text-neutral-600 dark:text-neutral-400 max-w-sm mx-auto leading-relaxed">
+                      Per Section 5 of the Payent Refund &amp; Cancellation Policy, our billing and disputes team will review your photographs and incident details. Any applicable payment adjustments will be initiated within <strong>24 business hours</strong>.
+                    </p>
+                  </div>
+                  <div className="flex justify-center gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        closeReportIssueModal();
+                        navigate({ to: "/support" });
+                      }}
+                      className="px-4 py-2 rounded-xl bg-neutral-900 dark:bg-white text-white dark:text-black font-semibold text-xs hover:opacity-90 transition-opacity cursor-pointer"
+                    >
+                      View in Support Desk
+                    </button>
+                    <button
+                      type="button"
+                      onClick={closeReportIssueModal}
+                      className="px-4 py-2 rounded-xl border border-neutral-300 dark:border-neutral-700 text-xs font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 cursor-pointer"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <form onSubmit={handleReportSubmit} className="space-y-4 text-xs">
+                  {/* Step Banner */}
+                  <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-900 dark:text-amber-200 space-y-1">
+                    <div className="font-semibold flex items-center gap-1.5">
+                      <ShieldCheck className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                      <span>Policy Section 5: Official Dispute Procedure</span>
+                    </div>
+                    <p className="text-[11px] leading-relaxed opacity-90">
+                      Submit clear photos, serial numbers, and incident description. Our billing desk reviews tickets and initiates payment adjustments within 24 business hours.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="font-semibold text-neutral-800 dark:text-neutral-200 block mb-1">
+                      Dispute Reason / Issue Category *
+                    </label>
+                    <select
+                      value={reportSubject}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setReportSubject(val);
+                        if (val.includes("Billing") || val.includes("Deduction")) {
+                          setReportCategory("Billing & Payments");
+                        } else if (val.includes("Damage") || val.includes("Defect")) {
+                          setReportCategory("Equipment Condition");
+                        } else {
+                          setReportCategory("General Support");
+                        }
+                      }}
+                      className="w-full px-3 py-2 rounded-lg bg-neutral-50 dark:bg-black/40 border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-white focus:outline-hidden focus:border-neutral-950 dark:focus:border-white"
+                    >
+                      <option value="Billing Dispute / Unauthorized Deduction">Billing Dispute / Unauthorized Deduction</option>
+                      <option value="Gear Damaged or Defective on Handover">Gear Damaged or Defective on Handover</option>
+                      <option value="Missing Gear Accessories or Cables">Missing Gear Accessories or Cables</option>
+                      <option value="Item Not as Described / Wrong Model">Item Not as Described / Wrong Model</option>
+                      <option value="Security Deposit Withholding Dispute">Security Deposit Withholding Dispute</option>
+                      <option value="Cancellation / Refund Discrepancy">Cancellation / Refund Discrepancy</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="font-semibold text-neutral-800 dark:text-neutral-200 block mb-1">
+                      Device Serial Number (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={reportSerialNumber}
+                      onChange={(e) => setReportSerialNumber(e.target.value)}
+                      placeholder="e.g. SN-883492-X or lens mount barcode"
+                      className="w-full px-3 py-2 rounded-lg bg-neutral-50 dark:bg-black/40 border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-white placeholder:text-neutral-500 focus:outline-hidden focus:border-neutral-950 dark:focus:border-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="font-semibold text-neutral-800 dark:text-neutral-200 block mb-1">
+                      Incident Description * (min 10 characters)
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={reportDescription}
+                      onChange={(e) => setReportDescription(e.target.value)}
+                      placeholder="Please explain the discrepancy, incident details, timestamps, or deduction issues..."
+                      className="w-full px-3 py-2 rounded-lg bg-neutral-50 dark:bg-black/40 border border-neutral-200 dark:border-white/10 text-neutral-900 dark:text-white placeholder:text-neutral-500 focus:outline-hidden focus:border-neutral-950 dark:focus:border-white resize-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="font-semibold text-neutral-800 dark:text-neutral-200 block mb-1">
+                      Clear Photographs &amp; Evidence (Recommended)
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-white/5 hover:bg-neutral-100 dark:hover:bg-white/10 cursor-pointer text-xs font-semibold text-neutral-800 dark:text-neutral-200 transition-colors">
+                        <Upload className="h-3.5 w-3.5" />
+                        <span>Upload Photos</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          onChange={handlePhotoUpload}
+                          className="hidden"
+                        />
+                      </label>
+                      <span className="text-[11px] text-neutral-500">
+                        {reportPhotos.length === 0 ? "No photos attached yet" : `${reportPhotos.length} photo(s) selected`}
+                      </span>
+                    </div>
+
+                    {reportPhotos.length > 0 && (
+                      <div className="flex flex-wrap gap-2 pt-2">
+                        {reportPhotos.map((p, idx) => (
+                          <div key={idx} className="relative group w-14 h-14 rounded-lg overflow-hidden border border-neutral-200 dark:border-neutral-700">
+                            <img src={p.url} alt={p.name} className="w-full h-full object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => setReportPhotos((prev) => prev.filter((_, i) => i !== idx))}
+                              className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-neutral-200/70 dark:border-white/10">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={closeReportIssueModal}
+                      disabled={isSubmittingReport}
+                      className="text-xs"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      variant="primary"
+                      size="sm"
+                      disabled={isSubmittingReport || reportDescription.trim().length < 10}
+                      className="bg-neutral-950 hover:bg-neutral-800 text-white dark:bg-white dark:hover:bg-neutral-200 dark:text-neutral-950 text-xs font-bold px-4 py-2"
+                    >
+                      {isSubmittingReport ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                          <span>Filing Dispute...</span>
+                        </>
+                      ) : (
+                        <span>Submit Dispute &amp; Refund Request</span>
+                      )}
+                    </Button>
+                  </div>
+                </form>
+              )}
             </motion.div>
           </div>
         )}

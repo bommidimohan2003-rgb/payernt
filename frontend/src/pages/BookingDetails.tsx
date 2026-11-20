@@ -40,6 +40,8 @@ import {
 
   Package,
 
+  AlertTriangle,
+
 } from "lucide-react";
 
 import { motion } from "framer-motion";
@@ -1120,6 +1122,26 @@ export function BookingDetails() {
                   </span>
 
                   <ArrowLeft className="w-3 h-3 rotate-180 text-muted-foreground" />
+
+                </Link>
+
+                <Link
+
+                  to="/orders"
+
+                  className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-xs font-bold text-amber-900 dark:text-amber-200 hover:bg-amber-500/20 transition-all"
+
+                >
+
+                  <span className="flex items-center gap-2">
+
+                    <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+
+                    <span>Report an Issue / Dispute Refund</span>
+
+                  </span>
+
+                  <ArrowLeft className="w-3 h-3 rotate-180 text-amber-600 dark:text-amber-400" />
 
                 </Link>
 
