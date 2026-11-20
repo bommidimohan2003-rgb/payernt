@@ -292,20 +292,25 @@ export default function ProductDetails() {
   const [isSlotDropdownOpen, setIsSlotDropdownOpen] = useState(false);
   const slotDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Close slot dropdown on outside click
+  // Pickup Time Dropdown State (custom modern picker)
+  const [isPickupDropdownOpen, setIsPickupDropdownOpen] = useState(false);
+  const pickupDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdowns on outside click
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (slotDropdownRef.current && !slotDropdownRef.current.contains(event.target as Node)) {
         setIsSlotDropdownOpen(false);
       }
+      if (pickupDropdownRef.current && !pickupDropdownRef.current.contains(event.target as Node)) {
+        setIsPickupDropdownOpen(false);
+      }
     }
-    if (isSlotDropdownOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
+    document.addEventListener("mousedown", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [isSlotDropdownOpen]);
+  }, []);
 
   // Standard pickup times for 24-hour and custom slots
   const AVAILABLE_PICKUP_TIMES = useMemo(
@@ -377,6 +382,15 @@ export default function ProductDetails() {
     [startDate, todayStr]
   );
 
+  // Helper to get exactly next day in YYYY-MM-DD
+  const getNextDateStr = useCallback((dateStr: string): string => {
+    if (!dateStr) return "";
+    const parts = dateStr.split("-").map(Number);
+    if (parts.length !== 3 || isNaN(parts[0])) return "";
+    const nextDay = new Date(parts[0], parts[1] - 1, parts[2] + 1);
+    return toDateInputValue(nextDay);
+  }, []);
+
   // Return date and time string for custom hours
   const calculatedCustomReturnStr = useMemo(() => {
     if (!startDate) return "";
@@ -397,6 +411,44 @@ export default function ProductDetails() {
     const dateStr = toDateInputValue(returnDate);
     return `${dateStr} at ${formattedTime}`;
   }, [startDate, pickupTime, customHours]);
+
+  // Authoritative Effective Return Date for UI and booking flows
+  const effectiveReturnDate = useMemo(() => {
+    if (!startDate) return "";
+    if (durationMode === "full_day") {
+      return getNextDateStr(startDate);
+    }
+    if (durationMode === "half_day_morning" || durationMode === "half_day_afternoon") {
+      return startDate;
+    }
+    if (durationMode === "custom_slot") {
+      const [y, m, d] = startDate.split("-").map(Number);
+      const startMin = parseTimeToMinutes(pickupTime);
+      const totalEndMin = startMin + customHours * 60;
+      const additionalDays = Math.floor(totalEndMin / 1440);
+      const returnDate = new Date(y, m - 1, d + additionalDays);
+      return toDateInputValue(returnDate);
+    }
+    return endDate && endDate > startDate ? endDate : getNextDateStr(startDate);
+  }, [startDate, endDate, durationMode, pickupTime, customHours, getNextDateStr]);
+
+  // Keep endDate synchronized with 24-hour rolling return
+  useEffect(() => {
+    if (durationMode === "full_day" && startDate) {
+      const targetEnd = getNextDateStr(startDate);
+      if (endDate !== targetEnd) {
+        setEndDate(targetEnd);
+      }
+    } else if ((durationMode === "half_day_morning" || durationMode === "half_day_afternoon") && startDate) {
+      if (endDate !== startDate) {
+        setEndDate(startDate);
+      }
+    } else if (durationMode === "custom_slot" && startDate) {
+      if (endDate !== effectiveReturnDate) {
+        setEndDate(effectiveReturnDate);
+      }
+    }
+  }, [durationMode, startDate, effectiveReturnDate, endDate, getNextDateStr]);
 
   // Real-time slot fallback: If selected slot has passed today, auto-switch to an open slot
   useEffect(() => {
@@ -1006,27 +1058,36 @@ export default function ProductDetails() {
     setAvailabilityMessage("");
     if (durationMode === "full_day") {
       if (val) {
-        const parts = val.split("-").map(Number);
-        const nextDay = new Date(parts[0], parts[1] - 1, parts[2] + 1);
-        setEndDate(toDateInputValue(nextDay));
+        setEndDate(getNextDateStr(val));
       }
     } else if (durationMode === "custom_slot") {
       if (val) {
-        const parts = val.split("-").map(Number);
-        const dayOffset = customHours >= 24 ? Math.ceil(customHours / 24) : 0;
-        const targetDate = new Date(parts[0], parts[1] - 1, parts[2] + dayOffset);
-        setEndDate(toDateInputValue(targetDate));
+        const [y, m, d] = val.split("-").map(Number);
+        const startMin = parseTimeToMinutes(pickupTime);
+        const totalEndMin = startMin + customHours * 60;
+        const additionalDays = Math.floor(totalEndMin / 1440);
+        const returnDate = new Date(y, m - 1, d + additionalDays);
+        setEndDate(toDateInputValue(returnDate));
       }
-    } else if (durationMode !== "custom") {
+    } else if (durationMode === "half_day_morning" || durationMode === "half_day_afternoon") {
       setEndDate(val);
     } else if (endDate && val && endDate <= val) {
-      const [y, m, d] = val.split("-").map(Number);
-      const nextDay = new Date(y, m - 1, d + 1);
-      setEndDate(toDateInputValue(nextDay));
+      setEndDate(getNextDateStr(val));
     }
   };
 
   const handleEndDateChange = (val: string) => {
+    if (durationMode === "full_day") {
+      if (startDate) setEndDate(getNextDateStr(startDate));
+      return;
+    }
+    if (durationMode === "custom_slot") {
+      return;
+    }
+    if (durationMode === "half_day_morning" || durationMode === "half_day_afternoon") {
+      if (startDate) setEndDate(startDate);
+      return;
+    }
     setEndDate(val);
     setAvailabilityChecked(false);
     setIsAvailableForDates(null);
@@ -1035,7 +1096,20 @@ export default function ProductDetails() {
 
   const handleDateRangeChange = (start: string, end: string) => {
     setStartDate(start);
-    setEndDate(end);
+    if (durationMode === "full_day") {
+      setEndDate(getNextDateStr(start));
+    } else if (durationMode === "half_day_morning" || durationMode === "half_day_afternoon") {
+      setEndDate(start);
+    } else if (durationMode === "custom_slot") {
+      const [y, m, d] = start.split("-").map(Number);
+      const startMin = parseTimeToMinutes(pickupTime);
+      const totalEndMin = startMin + customHours * 60;
+      const additionalDays = Math.floor(totalEndMin / 1440);
+      const returnDate = new Date(y, m - 1, d + additionalDays);
+      setEndDate(toDateInputValue(returnDate));
+    } else {
+      setEndDate(end);
+    }
     setAvailabilityChecked(false);
     setIsAvailableForDates(null);
     setAvailabilityMessage("");
@@ -1068,7 +1142,7 @@ export default function ProductDetails() {
     }
 
     const start = new Date(startDate);
-    const end = new Date(durationMode === "custom" ? endDate : startDate);
+    const end = new Date(effectiveReturnDate || startDate);
     const today = new Date(todayStr);
 
     if (start < today) {
@@ -1132,7 +1206,7 @@ export default function ProductDetails() {
       }
     };
     try {
-      const checkEnd = durationMode === "custom" ? endDate : startDate;
+      const checkEnd = effectiveReturnDate || startDate;
       const effectiveSession = durationMode === "custom" ? "full_day" : selectedSlot;
       const apiBase = getApiBase();
       const controller = new AbortController();
@@ -1234,12 +1308,14 @@ export default function ProductDetails() {
   const handleProceedToCheckout = () => {
     if (!product) return;
 
+    const finalEndDate = effectiveReturnDate || (durationMode === "full_day" ? getNextDateStr(startDate) : startDate);
+
     if (!user) {
       toast.info("Please log in to proceed with your gear booking.");
       navigate({
         to: "/login",
         search: {
-          redirect: `/checkout?id=${id}&start=${startDate}&end=${durationMode === "custom" ? endDate : startDate}&mode=${durationMode}&slot=${selectedSlot}`
+          redirect: `/checkout?id=${id}&start=${startDate}&end=${finalEndDate}&mode=${durationMode}&slot=${selectedSlot}&startTime=${encodeURIComponent(pickupTime)}&hours=${durationMode === "custom_slot" ? customHours : 24}`
         } as any,
       });
       return;
@@ -1268,15 +1344,16 @@ export default function ProductDetails() {
       return;
     }
 
-    const checkEnd = durationMode === "custom" ? endDate : startDate;
     navigate({
       to: "/checkout",
       search: {
         id: product.id,
         start: startDate,
-        end: checkEnd,
+        end: finalEndDate,
         mode: durationMode,
         slot: selectedSlot,
+        startTime: pickupTime,
+        hours: durationMode === "custom_slot" ? customHours : 24,
       } as any,
     });
   };
@@ -2134,36 +2211,113 @@ const productSchema = product ? {
                   )}
                 </div>
 
-                {/* 1 Full Day: 24-Hour Rolling Schedule & Pickup Time Selector */}
+                {/* 1 Full Day: 24-Hour Rolling Schedule & Custom Pickup Time Picker */}
                 {durationMode === "full_day" && (
                   <div className="pt-2">
-                    <div className="p-3 sm:p-3.5 rounded-xl bg-neutral-50 dark:bg-[#262626] border border-neutral-200 dark:border-neutral-700/80 space-y-2.5">
+                    <div className="p-3 sm:p-3.5 rounded-xl bg-neutral-50 dark:bg-[#262626] border border-neutral-200 dark:border-neutral-700/80 space-y-3">
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
                           <Clock className="h-4 w-4 text-neutral-700 dark:text-neutral-300 shrink-0" aria-hidden="true" />
-                          <span className="text-xs font-bold text-neutral-900 dark:text-neutral-100">
-                            24-Hour Rental Period
-                          </span>
+                          <div>
+                            <span className="text-xs font-bold text-neutral-900 dark:text-neutral-100 block">
+                              24-Hour Rental Period
+                            </span>
+                            <span className="text-[10px] text-neutral-500 dark:text-neutral-400">
+                              Pickup & Return at same time next day
+                            </span>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <label className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
-                            Pickup:
-                          </label>
-                          <select
-                            value={pickupTime}
-                            onChange={(e) => setPickupTime(e.target.value)}
-                            className="text-xs font-bold px-2 py-1 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-[#1E1E1E] text-neutral-900 dark:text-white cursor-pointer outline-none"
+
+                        {/* Modern Custom Pickup Dropdown Trigger */}
+                        <div ref={pickupDropdownRef} className="relative shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setIsPickupDropdownOpen((prev) => !prev)}
+                            className={cn(
+                              "flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer shadow-xs",
+                              isPickupDropdownOpen
+                                ? "border-neutral-950 dark:border-white bg-neutral-100 dark:bg-neutral-800 text-neutral-950 dark:text-white ring-2 ring-neutral-950/10 dark:ring-white/10"
+                                : "border-neutral-300 dark:border-neutral-700 bg-white dark:bg-[#1E1E1E] text-neutral-900 dark:text-white hover:border-neutral-400 dark:hover:border-neutral-600"
+                            )}
+                            aria-label="Select pickup time"
                           >
-                            {AVAILABLE_PICKUP_TIMES.map((t) => {
-                              const isPast = isPickupTimePastToday(t);
-                              return (
-                                <option key={t} value={t} disabled={isPast}>
-                                  {t} {isPast ? "(Passed)" : ""}
-                                </option>
-                              );
-                            })}
-                          </select>
+                            <Clock className="w-3.5 h-3.5 text-neutral-500 dark:text-neutral-400" />
+                            <span>{pickupTime}</span>
+                            <ChevronDown className={cn("w-3.5 h-3.5 text-neutral-400 transition-transform duration-200", isPickupDropdownOpen && "rotate-180")} />
+                          </button>
+
+                          {/* Custom Styled Popover Menu */}
+                          {isPickupDropdownOpen && (
+                            <div className="absolute right-0 top-full mt-2 z-40 w-64 p-2.5 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-neutral-200 dark:border-neutral-700/80 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+                              <div className="flex items-center justify-between px-1.5 py-1 border-b border-neutral-100 dark:border-neutral-800 mb-2">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+                                  Select Pickup Time
+                                </span>
+                                <span className="text-[10px] text-neutral-400 font-medium">
+                                  24h Window
+                                </span>
+                              </div>
+                              <div className="grid grid-cols-2 gap-1.5 max-h-56 overflow-y-auto p-0.5">
+                                {AVAILABLE_PICKUP_TIMES.map((t) => {
+                                  const isPast = isPickupTimePastToday(t);
+                                  const isSel = pickupTime === t;
+                                  return (
+                                    <button
+                                      key={t}
+                                      type="button"
+                                      disabled={isPast}
+                                      onClick={() => {
+                                        setPickupTime(t);
+                                        setIsPickupDropdownOpen(false);
+                                      }}
+                                      className={cn(
+                                        "flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all text-left",
+                                        isPast
+                                          ? "opacity-30 line-through cursor-not-allowed text-neutral-400 dark:text-neutral-500 bg-neutral-100/50 dark:bg-neutral-800/20"
+                                          : isSel
+                                          ? "bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 font-bold shadow-xs cursor-pointer"
+                                          : "text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800/80 cursor-pointer"
+                                      )}
+                                    >
+                                      <span>{t}</span>
+                                      {isSel && <Check className="w-3 h-3 stroke-[2.5]" />}
+                                      {isPast && <span className="text-[9px] font-normal no-underline">Passed</span>}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
                         </div>
+                      </div>
+
+                      {/* Quick-Pick Horizontal Pill Selector */}
+                      <div className="flex items-center gap-1.5 overflow-x-auto py-0.5 scrollbar-none">
+                        <span className="text-[10px] font-bold text-neutral-500 dark:text-neutral-400 shrink-0 uppercase tracking-wider">
+                          Quick:
+                        </span>
+                        {["08:00 AM", "09:00 AM", "10:00 AM", "12:00 PM", "02:00 PM", "04:00 PM", "06:00 PM"].map((t) => {
+                          const isPast = isPickupTimePastToday(t);
+                          const isSel = pickupTime === t;
+                          return (
+                            <button
+                              key={t}
+                              type="button"
+                              disabled={isPast}
+                              onClick={() => setPickupTime(t)}
+                              className={cn(
+                                "text-[11px] px-2.5 py-1 rounded-lg border transition-all cursor-pointer shrink-0 font-medium",
+                                isPast
+                                  ? "opacity-35 line-through cursor-not-allowed border-transparent text-neutral-400"
+                                  : isSel
+                                  ? "bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 border-neutral-950 dark:border-white font-bold shadow-xs"
+                                  : "bg-white dark:bg-[#1E1E1E] text-neutral-700 dark:text-neutral-300 border-neutral-200 dark:border-neutral-700/80 hover:border-neutral-400"
+                              )}
+                            >
+                              {t}
+                            </button>
+                          );
+                        })}
                       </div>
 
                       {/* 24-Hour Schedule Window Display */}
@@ -2177,7 +2331,7 @@ const productSchema = product ? {
                         <div className="border-l border-neutral-200 dark:border-neutral-700/60 pl-2.5">
                           <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block">Return (24h)</span>
                           <span className="font-bold text-neutral-900 dark:text-white block truncate">
-                            {endDate ? `${endDate} at ${pickupTime}` : "Next Day"}
+                            {effectiveReturnDate ? `${effectiveReturnDate} at ${pickupTime}` : "Next Day"}
                           </span>
                         </div>
                       </div>
@@ -2210,7 +2364,7 @@ const productSchema = product ? {
                           Select Pickup Time:
                         </label>
                         <div className="flex flex-wrap gap-1.5">
-                          {["08:00 AM", "10:00 AM", "12:00 PM", "02:00 PM", "04:00 PM", "06:00 PM"].map((t) => {
+                          {AVAILABLE_PICKUP_TIMES.map((t) => {
                             const isPast = isPickupTimePastToday(t);
                             const isSel = pickupTime === t;
                             return (
@@ -2367,10 +2521,10 @@ const productSchema = product ? {
                         : durationMode === "half_day_afternoon"
                         ? "1 Day • Afternoon Slot (1:00 PM – 5:00 PM)"
                         : durationMode === "full_day"
-                        ? startDate ? `24 Hours • Full Day (${startDate} ${pickupTime} → ${endDate} ${pickupTime})` : "1 Day • 24 Hours Full Day"
+                        ? startDate ? `24 Hours • Full Day (${startDate} ${pickupTime} → ${effectiveReturnDate} ${pickupTime})` : "1 Day • 24 Hours Full Day"
                         : durationMode === "custom_slot"
                         ? `Custom Slot • ${customHours}h (${startDate} ${pickupTime} → ${calculatedCustomReturnStr})`
-                        : `${rentalDays} Days Rental (${startDate} → ${endDate})`}
+                        : `${rentalDays} Days Rental (${startDate} → ${effectiveReturnDate})`}
                     </div>
                   </div>
                   <div className="text-right">

@@ -7647,7 +7647,21 @@ def calculate_booking_interval(
             end_dt = start_dt + datetime.timedelta(hours=24 * days)
         return start_dt, end_dt
 
-    # Full Day / Multi-Day standard: 08:00 on start date to 17:00 on end date
+    # Full Day / 24-Hour rolling period (e.g. 10:00 AM on start date to 10:00 AM next day)
+    if slot in ("full_day", "custom_slot") or dur in ("full_day", "custom_slot"):
+        sh, sm = 10, 0
+        if start_time and ":" in str(start_time):
+            try:
+                parts = str(start_time).strip().split(":")
+                sh, sm = int(parts[0]), int(parts[1][:2])
+            except Exception:
+                sh, sm = 10, 0
+        start_dt = datetime.datetime(s_date.year, s_date.month, s_date.day, sh, sm, 0, tzinfo=timezone.utc)
+        days = max(1, (e_date - s_date).days)
+        end_dt = start_dt + datetime.timedelta(hours=24 * days)
+        return start_dt, end_dt
+
+    # Multi-Day standard: 08:00 on start date to 17:00 on end date
     start_dt = datetime.datetime(s_date.year, s_date.month, s_date.day, 8, 0, 0, tzinfo=timezone.utc)
     end_dt = datetime.datetime(e_date.year, e_date.month, e_date.day, 17, 0, 0, tzinfo=timezone.utc)
     return start_dt, end_dt

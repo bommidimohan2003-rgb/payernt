@@ -480,9 +480,13 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
 
     setConflictMessage(null);
 
-    // Single-day mode
+    // Single-day mode & 24-Hour rolling rental
     if (durationMode !== "custom") {
-      handleDatesUpdate(dateKey, dateKey);
+      const isFullDay = durationMode === "full_day" || session === "full_day";
+      const [y, m, d] = dateKey.split("-").map(Number);
+      const nextDay = new Date(y, m - 1, d + 1);
+      const nextDayKey = formatDateKey(nextDay.getFullYear(), nextDay.getMonth(), nextDay.getDate());
+      handleDatesUpdate(dateKey, isFullDay ? nextDayKey : dateKey);
       setActiveTarget("start");
       return;
     }
@@ -654,7 +658,10 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
               onSelectDurationMode("full_day");
               setActiveTarget("start");
               if (selectedStartDate) {
-                handleDatesUpdate(selectedStartDate, selectedStartDate);
+                const [y, m, d] = selectedStartDate.split("-").map(Number);
+                const nextDay = new Date(y, m - 1, d + 1);
+                const nextDayKey = formatDateKey(nextDay.getFullYear(), nextDay.getMonth(), nextDay.getDate());
+                handleDatesUpdate(selectedStartDate, nextDayKey);
               }
             }}
             className={cn(
@@ -945,7 +952,7 @@ export const RenterBookingCalendar: React.FC<RenterBookingCalendarProps> = ({
                 <strong className="text-foreground font-mono">
                   {selectedStartDate}
                 </strong>
-                {durationMode === "custom" && selectedEndDate && selectedEndDate !== selectedStartDate && (
+                {selectedEndDate && selectedEndDate !== selectedStartDate && (
                   <>
                     {" "}
                     →{" "}
