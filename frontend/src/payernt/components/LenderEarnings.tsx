@@ -179,34 +179,50 @@ export function LenderEarnings({
       </div>
 
       {/* Payout Transactions Log Table */}
-      <div className="relative rounded-2xl sm:rounded-3xl border border-neutral-300/80 dark:border-neutral-700/80 bg-card dark:bg-[#1E1E1E] pt-5 sm:pt-6 p-4 sm:p-6 overflow-hidden shadow-xs space-y-4 text-left">
-        <div className="absolute -top-3 left-4 px-2 bg-card dark:bg-[#1E1E1E] flex items-center gap-1.5 z-10 pointer-events-none select-none">
-          <span className="text-xs sm:text-[13px] font-bold tracking-tight text-foreground font-display">
+      <div className="rounded-2xl sm:rounded-3xl border border-neutral-300/80 dark:border-neutral-700/80 bg-card dark:bg-[#1E1E1E] p-4 sm:p-6 shadow-xs space-y-4 text-left">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <h3 className="text-sm sm:text-base font-bold tracking-tight text-foreground font-display">
             Completed Rental Settlement Log
-          </span>
-        </div>
-        <div className="absolute -top-3 right-4 px-1.5 bg-card dark:bg-[#1E1E1E] z-10">
-          <span className="text-xs text-muted-foreground font-medium">
+          </h3>
+          <span className="text-xs text-muted-foreground font-medium w-fit px-2.5 py-0.5 rounded-full bg-secondary border border-border/60">
             {transactions.length} Total Records
           </span>
         </div>
 
-        <div className="rounded-2xl border border-border/80 bg-card overflow-hidden">
+        {/* Desktop table (hidden on mobile) */}
+        <div className="hidden sm:block rounded-2xl border border-border/80 bg-card overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="border-b border-border/70 bg-secondary/40 text-muted-foreground uppercase text-[10px] font-extrabold tracking-wider">
-                  <th className="py-3 px-4">Gear / Order ID</th>
-                  <th className="py-3 px-4">Borrower</th>
-                  <th className="py-3 px-4">Rental Duration</th>
-                  <th className="py-3 px-4">Gross Rental</th>
-                  <th className="py-3 px-4">Platform Fee</th>
-                  <th className="py-3 px-4">Net Payout</th>
-                  <th className="py-3 px-4">Settlement Status</th>
+                <tr className="border-b border-border/70 bg-secondary/40 uppercase text-[10px] tracking-wider">
+                  <th className="py-3 px-4 text-left font-extrabold text-muted-foreground whitespace-nowrap">Gear / Order ID</th>
+                  <th className="py-3 px-4 text-left font-extrabold text-muted-foreground whitespace-nowrap">Borrower</th>
+                  <th className="py-3 px-4 text-left font-extrabold text-muted-foreground whitespace-nowrap">Rental Duration</th>
+                  <th className="py-3 px-4 text-left font-extrabold text-muted-foreground whitespace-nowrap">Gross Rental</th>
+                  <th className="py-3 px-4 text-left font-extrabold text-muted-foreground whitespace-nowrap">Platform Fee</th>
+                  <th className="py-3 px-4 text-left font-extrabold text-muted-foreground whitespace-nowrap">Net Payout</th>
+                  <th className="py-3 px-4 text-left font-extrabold text-muted-foreground whitespace-nowrap">Settlement Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/50 font-medium">
-                {transactions.map((tx) => (
+                {transactions.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-16 px-4 text-center">
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="flex items-center justify-center h-14 w-14 rounded-2xl bg-secondary/60 border border-border text-muted-foreground">
+                          <CheckCircle2 className="h-7 w-7 opacity-40" />
+                        </div>
+                        <div>
+                          <p className="font-bold text-foreground text-sm">No completed rentals yet</p>
+                          <p className="text-muted-foreground text-xs mt-1">
+                            Settled payouts will appear here once a rental cycle is complete.
+                          </p>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  transactions.map((tx) => (
                   <tr key={tx.id} className="hover:bg-secondary/20 transition-colors">
                     <td className="py-3.5 px-4">
                       <div className="flex items-center gap-3">
@@ -246,10 +262,73 @@ export function LenderEarnings({
                       )}
                     </td>
                   </tr>
-                ))}
+                  ))
+                )}
               </tbody>
             </table>
           </div>
+        </div>
+
+        {/* Mobile stacked cards (hidden on sm+) */}
+        <div className="sm:hidden flex flex-col divide-y divide-border/50 rounded-2xl border border-border/80 bg-card overflow-hidden">
+          {transactions.length === 0 ? (
+            <div className="flex flex-col items-center gap-3 py-14 px-4 text-center">
+              <div className="flex items-center justify-center h-14 w-14 rounded-2xl bg-secondary/60 border border-border text-muted-foreground">
+                <CheckCircle2 className="h-7 w-7 opacity-40" />
+              </div>
+              <div>
+                <p className="font-bold text-foreground text-sm">No completed rentals yet</p>
+                <p className="text-muted-foreground text-xs mt-1">
+                  Settled payouts will appear here once a rental cycle is complete.
+                </p>
+              </div>
+            </div>
+          ) : (
+          transactions.map((tx) => (
+            <div key={tx.id} className="flex flex-col gap-2.5 p-4">
+              <div className="flex items-center gap-3">
+                <img
+                  src={tx.productImage}
+                  alt={tx.productTitle}
+                  className="h-12 w-12 rounded-xl object-cover bg-secondary shrink-0 border border-border"
+                />
+                <div className="min-w-0">
+                  <p className="font-bold text-foreground text-sm line-clamp-1">{tx.productTitle}</p>
+                  <span className="font-mono text-[10px] text-muted-foreground">{tx.orderId}</span>
+                </div>
+                <div className="ml-auto shrink-0">
+                  {tx.payoutStatus === "settled" ? (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                      <CheckCircle2 className="h-3 w-3" /> Settled
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                      <Clock className="h-3 w-3" /> In Escrow
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+                <div>
+                  <span className="text-muted-foreground font-medium uppercase text-[10px] tracking-wider">Borrower</span>
+                  <p className="font-semibold text-foreground">{tx.renterName}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground font-medium uppercase text-[10px] tracking-wider">Duration</span>
+                  <p className="text-muted-foreground">{tx.rentalPeriod} ({tx.rentalDays}d)</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground font-medium uppercase text-[10px] tracking-wider">Gross Rental</span>
+                  <p className="font-semibold text-foreground">₹{(tx.grossRental ?? 0).toLocaleString("en-IN")}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground font-medium uppercase text-[10px] tracking-wider">Net Payout</span>
+                  <p className="font-extrabold text-foreground text-sm">₹{(tx.netPayout ?? 0).toLocaleString("en-IN")}</p>
+                </div>
+              </div>
+            </div>
+          ))
+          )}
         </div>
       </div>
 

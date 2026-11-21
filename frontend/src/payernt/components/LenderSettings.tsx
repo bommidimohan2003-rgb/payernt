@@ -90,7 +90,7 @@ export function LenderSettingsView({
   };
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6 text-left pb-16 px-1 sm:px-0">
+    <div className="w-full space-y-6 text-left pb-16">
       {/* Back to Home Button */}
       {onBack && (
         <div>

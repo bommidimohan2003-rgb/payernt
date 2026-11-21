@@ -13,7 +13,7 @@ import { PayerntMessages } from "./components/PayerntMessages";
 
 export function PayerntApp() {
   const [activeTab, setActiveTab] = useState<
-    "home" | "products" | "requests" | "wallet" | "profile" | "list" | "messages" | "analytics"
+    "home" | "products" | "requests" | "wallet" | "profile" | "list" | "messages" | "analytics" | "kyc" | "dashboard"
   >(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
@@ -26,7 +26,9 @@ export function PayerntApp() {
         tabParam === "profile" ||
         tabParam === "list" ||
         tabParam === "messages" ||
-        tabParam === "analytics"
+        tabParam === "analytics" ||
+        tabParam === "kyc" ||
+        tabParam === "dashboard"
       ) {
         return tabParam as any;
       }
@@ -39,7 +41,7 @@ export function PayerntApp() {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const tabParam = params.get("tab");
-      if (tabParam && tabParam !== activeTab && ["home", "products", "requests", "wallet", "profile", "list", "messages"].includes(tabParam)) {
+      if (tabParam && tabParam !== activeTab && ["home", "products", "requests", "wallet", "profile", "list", "messages", "analytics", "kyc", "dashboard"].includes(tabParam)) {
         setActiveTab(tabParam as any);
       }
     }
@@ -99,7 +101,13 @@ export function PayerntApp() {
       <main className={`flex-1 w-full ${activeTab === "home" ? "max-w-none p-0" : "mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 sm:py-8"}`}>
         <AnimatePresence mode="wait">
           {activeTab === "home" && (
-            <div key="home" className="w-full">
+            <div key="home" className="w-full min-h-[65vh] flex flex-col items-center justify-center p-6 text-center">
+              {/* Intentionally empty home page as requested */}
+            </div>
+          )}
+
+          {activeTab === "dashboard" && (
+            <div key="dashboard" className="w-full">
               <PayerntHome
                 stats={stats}
                 products={userProducts}

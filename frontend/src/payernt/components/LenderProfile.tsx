@@ -140,7 +140,7 @@ export function LenderProfileView({
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 text-left pb-16">
+    <div className="w-full space-y-8 text-left pb-16">
       {/* Back Button */}
       {onBack && (
         <div>
@@ -495,6 +495,31 @@ export function LenderProfileView({
             </div>
             {theme === "dark" && <CheckCircle2 className="h-4 w-4 text-foreground" />}
           </button>
+        </div>
+      </div>
+
+      {/* Account Session & Log Out Section */}
+      <div className="rounded-3xl border border-destructive/30 bg-destructive/5 p-6 sm:p-8 space-y-4 shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h3 className="text-base font-bold text-foreground font-display flex items-center gap-2">
+              <LogOut className="h-4 w-4 text-destructive" />
+              <span>Host Account Session</span>
+            </h3>
+            <p className="text-xs text-muted-foreground mt-1">
+              End your active session on this device. You will need to log in again with your credentials to manage gear and bookings.
+            </p>
+          </div>
+          {onLogout && (
+            <button
+              type="button"
+              onClick={onLogout}
+              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-2xl bg-destructive text-white hover:bg-destructive/90 text-xs font-bold cursor-pointer shrink-0 shadow-xs active:scale-98 transition-all"
+            >
+              <LogOut className="h-4 w-4" />
+              <span>Log Out of Host Account</span>
+            </button>
+          )}
         </div>
       </div>
 

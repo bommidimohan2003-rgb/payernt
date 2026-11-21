@@ -2,10 +2,6 @@ import React, { useState, useEffect } from "react";
 import { Link } from "@tanstack/react-router";
 import {
   ChevronDown,
-  Instagram,
-  Linkedin,
-  Twitter,
-  Youtube,
   Mail,
   Clock,
   Download,
@@ -139,55 +135,6 @@ export function Footer() {
         </div>
       ),
     },
-    {
-      id: "social",
-      title: "Social Media",
-      customContent: (
-        <div className="flex flex-col gap-2">
-          <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-snug">
-            Creator updates &amp; new gear drops.
-          </p>
-          <div className="flex items-center gap-1.5">
-            <a
-              href="https://twitter.com/payent"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Twitter / X"
-              className="h-10 w-10 sm:h-8 sm:w-8 rounded-full border border-neutral-300 dark:border-neutral-700/80 bg-neutral-100 dark:bg-[#262626] flex items-center justify-center text-neutral-800 dark:text-neutral-200 hover:border-neutral-950 dark:hover:border-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
-            >
-              <Twitter className="h-3.5 w-3.5 stroke-[1.75]" aria-hidden="true" />
-            </a>
-            <a
-              href="https://instagram.com/payent"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Instagram"
-              className="h-10 w-10 sm:h-8 sm:w-8 rounded-full border border-neutral-300 dark:border-neutral-700/80 bg-neutral-100 dark:bg-[#262626] flex items-center justify-center text-neutral-800 dark:text-neutral-200 hover:border-neutral-950 dark:hover:border-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
-            >
-              <Instagram className="h-3.5 w-3.5 stroke-[1.75]" aria-hidden="true" />
-            </a>
-            <a
-              href="https://linkedin.com/company/payent"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="LinkedIn"
-              className="h-10 w-10 sm:h-8 sm:w-8 rounded-full border border-neutral-300 dark:border-neutral-700/80 bg-neutral-100 dark:bg-[#262626] flex items-center justify-center text-neutral-800 dark:text-neutral-200 hover:border-neutral-950 dark:hover:border-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
-            >
-              <Linkedin className="h-3.5 w-3.5 stroke-[1.75]" aria-hidden="true" />
-            </a>
-            <a
-              href="https://youtube.com/@payent"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="YouTube"
-              className="h-10 w-10 sm:h-8 sm:w-8 rounded-full border border-neutral-300 dark:border-neutral-700/80 bg-neutral-100 dark:bg-[#262626] flex items-center justify-center text-neutral-800 dark:text-neutral-200 hover:border-neutral-950 dark:hover:border-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
-            >
-              <Youtube className="h-3.5 w-3.5 stroke-[1.75]" aria-hidden="true" />
-            </a>
-          </div>
-        </div>
-      ),
-    },
   ];
 
   return (
@@ -203,8 +150,8 @@ export function Footer() {
           </div>
         </div>
 
-        {/* Desktop: Single horizontal 6-col row on lg+, 3-col on md */}
-        <div className="hidden md:grid md:grid-cols-3 lg:grid-cols-6 gap-3.5 lg:gap-4">
+        {/* Desktop: Single horizontal 5-col row on lg+, 3-col on md */}
+        <div className="hidden md:grid md:grid-cols-3 lg:grid-cols-5 gap-3.5 lg:gap-4">
           {groups.map((g) => (
             <div key={g.id} className="flex flex-col gap-1 min-w-0">
               <h3 className="text-xs font-semibold text-neutral-900 dark:text-white">

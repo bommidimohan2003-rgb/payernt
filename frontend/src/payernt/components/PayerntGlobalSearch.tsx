@@ -2,103 +2,19 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   Search,
   X,
-  ArrowRight,
   Package,
-  Layers,
-  Plus,
   Calendar,
-  Wallet,
-  MessageSquare,
-  BarChart3,
-  User,
   CornerDownLeft,
-  Sparkles,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useNavigate } from "@tanstack/react-router";
 import type { PayerntProduct, RentalRequest } from "../types";
-
-export interface PageRegistryItem {
-  id: string;
-  tab: "home" | "products" | "requests" | "wallet" | "profile" | "list" | "messages";
-  title: string;
-  description: string;
-  keywords: string[];
-  icon: React.ComponentType<{ className?: string }>;
-  badge?: string;
-}
-
-export const PAYERNT_PAGE_REGISTRY: PageRegistryItem[] = [
-  {
-    id: "home",
-    tab: "home",
-    title: "Overview",
-    description: "Revenue metrics, performance charts and live status",
-    keywords: ["home", "dashboard", "overview", "main", "command center", "stats", "metrics"],
-    icon: Package,
-  },
-  {
-    id: "products",
-    tab: "products",
-    title: "My Listings",
-    description: "Manage listed gear, verification status, and daily rates",
-    keywords: ["listings", "my listings", "gear", "equipment", "products", "inventory", "items", "catalog"],
-    icon: Layers,
-  },
-  {
-    id: "list",
-    tab: "list",
-    title: "Create Listing",
-    description: "List new cameras, laptops, audio gear, or equipment",
-    keywords: ["create", "create listing", "add gear", "new listing", "post", "upload", "add equipment", "list"],
-    icon: Plus,
-    badge: "Action",
-  },
-  {
-    id: "requests",
-    tab: "requests",
-    title: "Bookings & Handover",
-    description: "Review borrower reservations, handover PINs, and returns",
-    keywords: ["bookings", "rental requests", "reservations", "rentals", "handover", "orders", "borrow", "book", "pin"],
-    icon: Calendar,
-  },
-  {
-    id: "wallet",
-    tab: "wallet",
-    title: "Wallet & Payouts",
-    description: "Available balance, escrow holdings, withdrawals and bank account",
-    keywords: ["wallet", "balance", "earnings", "earn", "withdraw", "payout", "bank", "escrow", "funds", "revenue"],
-    icon: Wallet,
-  },
-  {
-    id: "messages",
-    tab: "messages",
-    title: "Messages",
-    description: "Admin notices, product reviews and platform alerts",
-    keywords: ["messages", "msg", "admin", "review", "revision", "chat", "inbox", "alerts", "notifications", "updates"],
-    icon: MessageSquare,
-  },
-  {
-    id: "analytics",
-    tab: "home",
-    title: "Analytics & Performance",
-    description: "Earnings trends, rental volume and monthly performance",
-    keywords: ["analytics", "revenue", "charts", "graphs", "performance", "yield", "reports", "stats"],
-    icon: BarChart3,
-  },
-  {
-    id: "profile",
-    tab: "profile",
-    title: "Profile & KYC",
-    description: "Identity verification, security PIN and account details",
-    keywords: ["profile", "settings", "kyc", "aadhaar", "security", "pin", "contact", "account"],
-    icon: User,
-  },
-];
+import { usePayernt } from "../context";
 
 interface PayerntGlobalSearchProps {
   isOpen: boolean;
   onClose: () => void;
-  onNavigate: (tab: "home" | "products" | "requests" | "wallet" | "profile" | "list" | "messages") => void;
+  onNavigate?: (tab: any) => void;
   products?: PayerntProduct[];
   rentalRequests?: RentalRequest[];
   onSelectProduct?: (productId: string) => void;
@@ -112,13 +28,30 @@ export function PayerntGlobalSearch({
   products = [],
   rentalRequests = [],
   onSelectProduct,
-  unreadMessagesCount = 0,
 }: PayerntGlobalSearchProps) {
+  const navigate = useNavigate();
+  let payerntStore: any = null;
+  try {
+    payerntStore = usePayernt();
+  } catch {
+    // context optional fallback
+  }
+
+  const effectiveProducts: PayerntProduct[] =
+    products && products.length > 0
+      ? products
+      : payerntStore?.userProducts || payerntStore?.products || [];
+
+  const effectiveRequests: RentalRequest[] =
+    rentalRequests && rentalRequests.length > 0
+      ? rentalRequests
+      : payerntStore?.rentalRequests || [];
+
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Auto-focus on open
+  // Auto-focus on open and clear state
   useEffect(() => {
     if (isOpen) {
       setQuery("");
@@ -143,52 +76,58 @@ export function PayerntGlobalSearch({
     return () => window.removeEventListener("keydown", handleGlobalKeyDown);
   }, [isOpen, onClose]);
 
-  // Filter matching pages
-  const matchingPages = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return PAYERNT_PAGE_REGISTRY.slice(0, 6);
-
-    return PAYERNT_PAGE_REGISTRY.filter((page) => {
-      if (page.title.toLowerCase().includes(q)) return true;
-      if (page.description.toLowerCase().includes(q)) return true;
-      return page.keywords.some((kw) => kw.includes(q) || q.includes(kw));
-    });
-  }, [query]);
-
-  // Filter matching products
+  // Filter matching products (only when user has typed a query)
   const matchingProducts = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return [];
-    return products
+    return effectiveProducts
       .filter((p) => {
         return (
           p.title?.toLowerCase().includes(q) ||
           p.category?.toLowerCase().includes(q) ||
-          p.brand?.toLowerCase().includes(q)
+          p.brand?.toLowerCase().includes(q) ||
+          p.serialNumber?.toLowerCase().includes(q) ||
+          p.verificationStatus?.toLowerCase().includes(q)
         );
       })
-      .slice(0, 4);
-  }, [query, products]);
+      .slice(0, 6);
+  }, [query, effectiveProducts]);
 
-  // Total results combined
-  const totalItemsCount = matchingPages.length + matchingProducts.length;
+  // Filter matching bookings / rental requests (only when user has typed a query)
+  const matchingRequests = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    return effectiveRequests
+      .filter((r) => {
+        return (
+          r.renter?.name?.toLowerCase().includes(q) ||
+          r.productTitle?.toLowerCase().includes(q) ||
+          r.status?.toLowerCase().includes(q) ||
+          r.id?.toLowerCase().includes(q) ||
+          r.handoverPin?.includes(q)
+        );
+      })
+      .slice(0, 6);
+  }, [query, effectiveRequests]);
+
+  const totalItemsCount = matchingProducts.length + matchingRequests.length;
 
   useEffect(() => {
     setSelectedIndex(0);
   }, [query]);
-
-  const handleSelectPage = (page: PageRegistryItem) => {
-    onClose();
-    onNavigate(page.tab);
-  };
 
   const handleSelectProductItem = (productId: string) => {
     onClose();
     if (onSelectProduct) {
       onSelectProduct(productId);
     } else {
-      onNavigate("products");
+      navigate({ to: "/payernt/products" as any }).catch(() => {});
     }
+  };
+
+  const handleSelectRequestItem = (requestId: string) => {
+    onClose();
+    navigate({ to: "/payernt/bookings" as any }).catch(() => {});
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -200,13 +139,13 @@ export function PayerntGlobalSearch({
       setSelectedIndex((prev) => (totalItemsCount > 0 ? (prev - 1 + totalItemsCount) % totalItemsCount : 0));
     } else if (e.key === "Enter") {
       e.preventDefault();
-      if (selectedIndex < matchingPages.length) {
-        const page = matchingPages[selectedIndex];
-        if (page) handleSelectPage(page);
-      } else {
-        const prodIndex = selectedIndex - matchingPages.length;
-        const prod = matchingProducts[prodIndex];
+      if (selectedIndex < matchingProducts.length) {
+        const prod = matchingProducts[selectedIndex];
         if (prod) handleSelectProductItem(prod.id);
+      } else {
+        const reqIndex = selectedIndex - matchingProducts.length;
+        const req = matchingRequests[reqIndex];
+        if (req) handleSelectRequestItem(req.id);
       }
     } else if (e.key === "Escape") {
       onClose();
@@ -223,7 +162,7 @@ export function PayerntGlobalSearch({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-background/80 backdrop-blur-md"
+            className="fixed inset-0 bg-neutral-950/60 dark:bg-black/80 backdrop-blur-md"
           />
 
           {/* Modal Command Palette */}
@@ -235,7 +174,7 @@ export function PayerntGlobalSearch({
             className="relative w-full max-w-xl bg-card border border-border rounded-2xl shadow-2xl overflow-hidden z-10 flex flex-col"
           >
             {/* Input Header */}
-            <div className="flex items-center px-4 py-3.5 border-b border-border bg-muted/20">
+            <div className="flex items-center px-4 py-3.5 border-b border-border bg-muted/30">
               <Search className="h-4 w-4 text-muted-foreground mr-3 shrink-0" />
               <input
                 ref={inputRef}
@@ -243,116 +182,70 @@ export function PayerntGlobalSearch({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Search pages, products or actions..."
+                placeholder="Search gear, serial numbers, or bookings..."
                 className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
               />
               {query && (
                 <button
+                  type="button"
                   onClick={() => {
                     setQuery("");
                     inputRef.current?.focus();
                   }}
-                  className="p-1 rounded-md text-muted-foreground hover:text-foreground mr-1 cursor-pointer"
+                  className="p-1 rounded-md text-muted-foreground hover:text-foreground mr-2 cursor-pointer"
+                  aria-label="Clear query"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
               )}
-              <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.5 text-[10px] font-mono rounded bg-muted border border-border text-muted-foreground">
-                ESC
-              </kbd>
+              {/* Close Button on Right */}
+              <button
+                type="button"
+                onClick={onClose}
+                className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                aria-label="Close search"
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
 
             {/* Results Body */}
             <div className="max-h-96 overflow-y-auto p-2 space-y-1">
-              {/* Pages Section */}
-              {matchingPages.length > 0 && (
-                <div className="px-2 py-1">
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground font-semibold">
-                    QUICK ACCESS
-                  </span>
+              {/* Initial State when no query is typed - Clean uncluttered prompt without page suggestions */}
+              {!query.trim() && (
+                <div className="py-12 px-4 text-center space-y-2">
+                  <div className="w-10 h-10 rounded-full bg-muted/60 flex items-center justify-center mx-auto text-muted-foreground">
+                    <Search className="h-5 w-5 stroke-[1.75]" />
+                  </div>
+                  <p className="text-sm font-semibold text-foreground">
+                    Search Lender Gear & Bookings
+                  </p>
+                  <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                    Type an equipment title, brand, model, serial number, or renter name to search your catalog and reservations.
+                  </p>
                 </div>
               )}
-
-              {matchingPages.map((page, index) => {
-                const isSelected = index === selectedIndex;
-                const PageIcon = page.icon;
-
-                return (
-                  <button
-                    key={page.id}
-                    onClick={() => handleSelectPage(page)}
-                    onMouseEnter={() => setSelectedIndex(index)}
-                    className={`w-full flex items-center justify-between p-2.5 rounded-xl text-left transition-all cursor-pointer ${
-                      isSelected
-                        ? "bg-primary text-primary-foreground shadow-xs"
-                        : "text-foreground hover:bg-muted"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div
-                        className={`p-1.5 rounded-lg border ${
-                          isSelected
-                            ? "bg-primary-foreground/20 border-primary-foreground/30 text-primary-foreground"
-                            : "bg-muted border-border text-muted-foreground"
-                        }`}
-                      >
-                        <PageIcon className="h-4 w-4" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold truncate leading-tight">
-                            {page.title}
-                          </span>
-                          {page.badge && (
-                            <span
-                              className={`px-1.5 py-0.5 rounded text-[9px] font-medium uppercase tracking-wider ${
-                                isSelected
-                                  ? "bg-primary-foreground/20 text-primary-foreground"
-                                  : "bg-primary/10 text-primary"
-                              }`}
-                            >
-                              {page.badge}
-                            </span>
-                          )}
-                        </div>
-                        <p
-                          className={`text-[11px] truncate ${
-                            isSelected ? "text-primary-foreground/80" : "text-muted-foreground"
-                          }`}
-                        >
-                          {page.description}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1 pl-2 shrink-0">
-                      {isSelected ? (
-                        <CornerDownLeft className="h-3.5 w-3.5" />
-                      ) : (
-                        <ArrowRight className="h-3.5 w-3.5 opacity-40" />
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
 
               {/* Matching Products Section */}
               {matchingProducts.length > 0 && (
                 <>
-                  <div className="px-2 pt-3 pb-1 border-t border-border mt-2">
+                  <div className="px-2 pt-2 pb-1 flex items-center justify-between">
                     <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground font-semibold">
-                      LISTED GEAR
+                      MY LISTED GEAR
+                    </span>
+                    <span className="text-[10px] text-muted-foreground font-mono">
+                      {matchingProducts.length} items
                     </span>
                   </div>
                   {matchingProducts.map((prod, pIdx) => {
-                    const itemIndex = matchingPages.length + pIdx;
-                    const isSelected = itemIndex === selectedIndex;
+                    const isSelected = pIdx === selectedIndex;
 
                     return (
                       <button
                         key={prod.id}
+                        type="button"
                         onClick={() => handleSelectProductItem(prod.id)}
-                        onMouseEnter={() => setSelectedIndex(itemIndex)}
+                        onMouseEnter={() => setSelectedIndex(pIdx)}
                         className={`w-full flex items-center justify-between p-2.5 rounded-xl text-left transition-all cursor-pointer ${
                           isSelected
                             ? "bg-primary text-primary-foreground shadow-xs"
@@ -379,29 +272,91 @@ export function PayerntGlobalSearch({
                               }`}
                             >
                               ₹{prod.dailyRate}/day • {prod.category || "Gear"} • {prod.verificationStatus}
+                              {prod.serialNumber ? ` • S/N: ${prod.serialNumber}` : ""}
                             </span>
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-1 pl-2 shrink-0">
-                          {isSelected ? (
+                        {isSelected && (
+                          <div className="flex items-center pl-2 shrink-0">
                             <CornerDownLeft className="h-3.5 w-3.5" />
-                          ) : (
-                            <ArrowRight className="h-3.5 w-3.5 opacity-40" />
-                          )}
-                        </div>
+                          </div>
+                        )}
                       </button>
                     );
                   })}
                 </>
               )}
 
-              {/* Empty State */}
-              {totalItemsCount === 0 && (
-                <div className="py-8 text-center space-y-2">
-                  <p className="text-xs font-medium text-foreground">No matching pages or gear found</p>
-                  <p className="text-[11px] text-muted-foreground">
-                    Try searching for "wallet", "listings", "bookings", or "create"
+              {/* Matching Bookings / Rental Requests Section */}
+              {matchingRequests.length > 0 && (
+                <>
+                  <div className="px-2 pt-3 pb-1 border-t border-border mt-2 flex items-center justify-between">
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground font-semibold">
+                      RENTAL BOOKINGS & HANDOVER
+                    </span>
+                    <span className="text-[10px] text-muted-foreground font-mono">
+                      {matchingRequests.length} requests
+                    </span>
+                  </div>
+                  {matchingRequests.map((req, rIdx) => {
+                    const itemIndex = matchingProducts.length + rIdx;
+                    const isSelected = itemIndex === selectedIndex;
+
+                    return (
+                      <button
+                        key={req.id}
+                        type="button"
+                        onClick={() => handleSelectRequestItem(req.id)}
+                        onMouseEnter={() => setSelectedIndex(itemIndex)}
+                        className={`w-full flex items-center justify-between p-2.5 rounded-xl text-left transition-all cursor-pointer ${
+                          isSelected
+                            ? "bg-primary text-primary-foreground shadow-xs"
+                            : "text-foreground hover:bg-muted"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div
+                            className={`p-1.5 rounded-lg border ${
+                              isSelected
+                                ? "bg-primary-foreground/20 border-primary-foreground/30 text-primary-foreground"
+                                : "bg-muted border-border text-muted-foreground"
+                            }`}
+                          >
+                            <Calendar className="h-4 w-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <span className="text-xs font-semibold truncate block leading-tight">
+                              {req.productTitle} — {req.renter?.name || "Borrower"}
+                            </span>
+                            <span
+                              className={`text-[10px] font-mono block ${
+                                isSelected ? "text-primary-foreground/80" : "text-muted-foreground"
+                              }`}
+                            >
+                              Status: {req.status} • {req.startDate} to {req.endDate}
+                              {req.handoverPin ? ` • PIN: ${req.handoverPin}` : ""}
+                            </span>
+                          </div>
+                        </div>
+
+                        {isSelected && (
+                          <div className="flex items-center pl-2 shrink-0">
+                            <CornerDownLeft className="h-3.5 w-3.5" />
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </>
+              )}
+
+              {/* Empty State when query returned nothing */}
+              {query.trim() && totalItemsCount === 0 && (
+                <div className="py-12 px-4 text-center space-y-1.5">
+                  <p className="text-sm font-medium text-foreground">No matching gear or bookings found</p>
+                  <p className="text-xs text-muted-foreground">
+                    No records match "{query}". Try checking the spelling or searching another model.
                   </p>
                 </div>
               )}
@@ -420,7 +375,7 @@ export function PayerntGlobalSearch({
                   <span>Select</span>
                 </span>
               </div>
-              <span className="font-mono text-[10px]">paYent Command Search</span>
+              <span className="font-mono text-[10px]">paye₹nt Search</span>
             </div>
           </motion.div>
         </div>

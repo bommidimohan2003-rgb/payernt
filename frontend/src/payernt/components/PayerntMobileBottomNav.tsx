@@ -15,6 +15,10 @@ import {
   LogOut,
   X,
   Bot,
+  PlusCircle,
+  ShieldCheck,
+  LayoutDashboard,
+  Bell,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLanguage, LanguageModal } from "@/i18n";
@@ -38,7 +42,8 @@ export function PayerntMobileBottomNav({
 
   const currentTab = (() => {
     if (pathname === "/payernt" || pathname === "/payernt/") return "home";
-    if (pathname.startsWith("/payernt/products")) return "products";
+    if (pathname.startsWith("/payernt/products") && !pathname.startsWith("/payernt/products/create")) return "products";
+    if (pathname.startsWith("/payernt/list") || pathname.startsWith("/payernt/products/create")) return "list";
     if (pathname.startsWith("/payernt/bookings") || pathname.startsWith("/payernt/requests")) return "bookings";
     if (pathname.startsWith("/payernt/wallet") || pathname.startsWith("/payernt/earnings")) return "wallet";
     return "";
@@ -61,24 +66,29 @@ export function PayerntMobileBottomNav({
   };
 
   const primaryTabs = [
-    { id: "home", label: tCommon.home, icon: Home, path: "/payernt" },
-    { id: "products", label: tCommon.products, icon: Package, path: "/payernt/products" },
+    { id: "home", label: "Home", icon: Home, path: "/payernt" },
+    { id: "products", label: "Products", icon: Package, path: "/payernt/products" },
+    { id: "list", label: "Listings", icon: PlusCircle, path: "/payernt/list" },
     {
       id: "bookings",
-      label: tCommon.bookings,
+      label: "Bookings",
       icon: Calendar,
       path: "/payernt/bookings",
       badge: pendingRequestsCount > 0 ? pendingRequestsCount : undefined,
     },
-    { id: "wallet", label: tCommon.wallet, icon: Wallet, path: "/payernt/wallet" },
+    { id: "wallet", label: "Wallets", icon: Wallet, path: "/payernt/wallet" },
   ];
 
   const moreItems = [
+    { id: "analytics", label: "Analytics", icon: BarChart3, path: "/payernt/analytics" },
+    { id: "kyc", label: "Aadhaar KYC", icon: ShieldCheck, path: "/payernt/kyc" },
+    { id: "profile", label: "Profile & Account", icon: User, path: "/payernt/profile" },
+    { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, path: "/payernt/dashboard" },
     {
-      id: "agent",
-      label: "Payent Agent",
-      icon: Bot,
-      path: "/payernt/agent",
+      id: "notifications",
+      label: "Notifications",
+      icon: Bell,
+      path: "/payernt/notifications",
     },
     {
       id: "messages",
@@ -87,10 +97,14 @@ export function PayerntMobileBottomNav({
       path: "/payernt/messages",
       badge: unreadMessagesCount > 0 ? unreadMessagesCount : undefined,
     },
-    { id: "analytics", label: tCommon.analytics, icon: BarChart3, path: "/payernt/analytics" },
+    {
+      id: "agent",
+      label: "Payent Agent",
+      icon: Bot,
+      path: "/payernt/agent",
+    },
     { id: "help", label: tCommon.helpAndSupport, icon: HelpCircle, path: "/payernt/help" },
     { id: "settings", label: tCommon.settings, icon: Settings, path: "/payernt/settings" },
-    { id: "profile", label: tCommon.profile, icon: User, path: "/payernt/profile" },
   ];
 
   const isMoreActive =
@@ -100,7 +114,7 @@ export function PayerntMobileBottomNav({
   return (
     <>
       {/* Floating Transparent Bottom Navigation Bar - Hovering on Screen */}
-      <div className="fixed bottom-3 inset-x-3 sm:bottom-4 sm:inset-x-4 z-40 md:hidden pointer-events-none flex justify-center">
+      <div className="fixed bottom-3 inset-x-3 sm:bottom-4 sm:inset-x-4 z-40 sm:hidden pointer-events-none flex justify-center">
         <nav
           className="pointer-events-auto w-full max-w-md bg-white/70 dark:bg-[#1E1E1E]/75 backdrop-blur-2xl border border-neutral-200/70 dark:border-white/10 shadow-[0_10px_35px_rgba(0,0,0,0.18)] dark:shadow-[0_12px_40px_rgba(0,0,0,0.6)] rounded-2xl sm:rounded-3xl transition-all duration-200 py-1.5 px-2 ring-1 ring-black/[0.04] dark:ring-white/[0.06]"
           aria-label="Mobile Bottom Navigation"
@@ -182,7 +196,7 @@ export function PayerntMobileBottomNav({
       {/* More Menu Sheet Modal */}
       <AnimatePresence>
         {isMoreOpen && (
-          <div className="fixed inset-0 z-50 md:hidden flex flex-col justify-end">
+          <div className="fixed inset-0 z-50 sm:hidden flex flex-col justify-end">
             {/* Backdrop */}
             <motion.div
               initial={{ opacity: 0 }}

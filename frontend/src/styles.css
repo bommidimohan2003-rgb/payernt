@@ -933,3 +933,73 @@ html:not(.dark) .border-white\/10 {
 
 
 
+
+
+/* ============================================================
+   Payernt Responsive Layout Utilities
+   Mobile-first. Breakpoints: 480, 640, 768, 1024, 1280, 1536, 1920px
+   ============================================================ */
+
+/* Full-height using dvh (accounts for mobile browser bars) */
+.min-h-screen-safe {
+  min-height: 100dvh;
+}
+.h-screen-safe {
+  height: 100dvh;
+}
+
+/* Fluid typography scale via clamp() */
+@layer base {
+  :root {
+    --font-size-body: clamp(0.875rem, 1.2vw, 1.125rem);
+    --font-size-sm: clamp(0.75rem, 1vw, 0.875rem);
+    --font-size-h1: clamp(1.5rem, 3.5vw, 2.5rem);
+    --font-size-h2: clamp(1.25rem, 2.5vw, 2rem);
+    --font-size-h3: clamp(1.1rem, 2vw, 1.5rem);
+    --spacing-section: clamp(1rem, 4vw, 4rem);
+  }
+
+  /* Payernt layout safe-area padding for bottom nav on iOS */
+  .payernt-bottom-safe {
+    padding-bottom: max(env(safe-area-inset-bottom), 20px);
+  }
+
+  /* Ensure images and videos are fluid */
+  img, video, canvas, svg {
+    max-width: 100%;
+    height: auto;
+  }
+}
+
+/* Ultra-wide content cap: sidebar + content max 1400px centred */
+@media (min-width: 1920px) {
+  .payernt-content-wrap {
+    max-width: 1400px;
+    margin-inline: auto;
+  }
+}
+
+/* Touch device minimum tap target helper */
+@media (hover: none) and (pointer: coarse) {
+  .touch-target-safe {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* Tablet sidebar transition: show icon rail from 640px */
+@media (min-width: 640px) and (max-width: 767px) {
+  /* Slim sidebar at sm breakpoint */
+  .payernt-sidebar-sm {
+    width: 56px;
+  }
+}
+
+/* Responsive table: prevent horizontal overflow on small screens */
+@media (max-width: 639px) {
+  table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}

@@ -1,21 +1,33 @@
-import React, { useState, useRef, useEffect } from "react";
-import { useNavigate, useRouterState } from "@tanstack/react-router";
+import React, { useState, useEffect } from "react";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   Bell,
   Sun,
   Moon,
-  LogOut,
+  Search,
+  Settings,
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
-import type { LenderNotification, DemoUser, PayerntAccount } from "../types";
+import type { LenderNotification, DemoUser, PayerntAccount, PayerntProduct, RentalRequest } from "../types";
 import { useTheme } from "@/hooks/useTheme";
 import { useLanguage } from "@/i18n";
 import { ProfilePhoto } from "@/components/common/ProfilePhoto";
+import { PayerntGlobalSearch } from "./PayerntGlobalSearch";
+
+const PAYERNT_SEARCH_PLACEHOLDERS = [
+  "Search my listed gear...",
+  "Search bookings & renters...",
+  "Search serial numbers...",
+  "Search payouts & wallet...",
+  "Search lender dashboard...",
+];
+
 interface PayerntNavbarProps {
   activeTab?: string;
   onTabChange?: (tab: any) => void;
   pendingRequestsCount?: number;
   notifications?: LenderNotification[];
+  products?: PayerntProduct[];
+  rentalRequests?: RentalRequest[];
   onMarkNotificationRead?: (id: string) => void;
   onMarkAllNotificationsRead?: () => void;
   onResetDemo?: () => void;
@@ -24,30 +36,86 @@ interface PayerntNavbarProps {
   onLogout?: () => void;
   onToggleSidebar?: () => void;
 }
+
 export function PayerntNavbar({
   activeTab,
   onTabChange,
   pendingRequestsCount = 0,
   notifications = [],
+  products,
+  rentalRequests,
   onMarkNotificationRead = () => {},
   onMarkAllNotificationsRead = () => {},
   activeUser,
   activeAccount,
-  onLogout,
   onToggleSidebar,
 }: PayerntNavbarProps) {
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { theme, toggle: toggleTheme } = useTheme();
   const { tCommon } = useLanguage();
-  const [isNotifOpen, setIsNotifOpen] = useState(false);
-  const notifRef = useRef<HTMLDivElement>(null);
+
+  // Search modal state and typewriter animation
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [phraseIndex, setPhraseIndex] = useState(0);
+  const [displayText, setDisplayText] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Typewriter animation effect
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setDisplayText("Search lender gear & bookings...");
+      return;
+    }
+
+    const currentPhrase = PAYERNT_SEARCH_PLACEHOLDERS[phraseIndex % PAYERNT_SEARCH_PLACEHOLDERS.length];
+    let timer: NodeJS.Timeout;
+
+    if (!isDeleting) {
+      if (displayText.length < currentPhrase.length) {
+        timer = setTimeout(() => {
+          setDisplayText(currentPhrase.slice(0, displayText.length + 1));
+        }, 60);
+      } else {
+        timer = setTimeout(() => {
+          setIsDeleting(true);
+        }, 1800);
+      }
+    } else {
+      if (displayText.length > 0) {
+        timer = setTimeout(() => {
+          setDisplayText(displayText.slice(0, -1));
+        }, 30);
+      } else {
+        timer = setTimeout(() => {
+          setIsDeleting(false);
+          setPhraseIndex((prev) => (prev + 1) % PAYERNT_SEARCH_PLACEHOLDERS.length);
+        }, 350);
+      }
+    }
+
+    return () => clearTimeout(timer);
+  }, [displayText, isDeleting, phraseIndex]);
+
+  // Global key shortcut listener for Cmd+K / Ctrl+K
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setSearchOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   const isHome =
     (pathname === "/payernt" ||
       pathname === "/payernt/" ||
       pathname === "/paye₹nt" ||
       pathname === "/paye₹nt/") &&
     (!activeTab || activeTab === "home");
+
   const handleBrandClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     if (isHome) {
@@ -59,23 +127,20 @@ export function PayerntNavbar({
       navigate({ to: "/payernt" as any });
     }
   };
+
   const displayName = activeAccount?.name || activeUser?.fullName || activeUser?.name || "Lender";
   const unreadCount = notifications.filter((n) => !n.read).length;
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
-        setIsNotifOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+
+  const isNotifActive = pathname === "/payernt/notifications" || pathname.startsWith("/payernt/notifications");
+  const isProfileActive = pathname === "/payernt/profile" || pathname.startsWith("/payernt/profile");
+  const isSettingsActive = pathname === "/payernt/settings" || pathname.startsWith("/payernt/settings");
+
   return (
     <>
       <header className="sticky top-0 z-40 w-full border-none border-b-0 shadow-none bg-background/85 backdrop-blur-2xl transition-colors duration-200">
-        <div className="w-full px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+        <div className="w-full px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2 sm:gap-4">
           {/* Left: Brand Identity with Official Logo */}
-          <div className="flex items-center">
+          <div className="flex items-center shrink-0">
             <button
               type="button"
               onClick={handleBrandClick}
@@ -101,118 +166,87 @@ export function PayerntNavbar({
               </span>
             </button>
           </div>
-          {/* Right: Theme Toggle, Notifications, Profile Avatar */}
-          <div className="flex items-center gap-2 sm:gap-3">
-            {/* Theme Toggle Button */}
+
+          {/* Center: Search Bar with Typewriter Animation */}
+          <div className="flex-1 min-w-0 max-w-[170px] xs:max-w-[210px] sm:max-w-[270px] md:max-w-[340px] mx-1 sm:mx-2">
+            <button
+              type="button"
+              onClick={() => setSearchOpen(true)}
+              id="payernt-nav-search-btn"
+              aria-label="Search lender gear and bookings"
+              className="w-full flex items-center gap-1.5 xs:gap-2 sm:gap-2.5 min-h-[44px] sm:min-h-[40px] px-2.5 xs:px-3 sm:px-3.5 py-2 rounded-full border border-neutral-300 dark:border-neutral-700/80 bg-neutral-50 dark:bg-[#262626] text-neutral-600 dark:text-neutral-400 hover:border-neutral-950 dark:hover:border-white hover:text-neutral-950 dark:hover:text-white transition-colors cursor-pointer text-xs sm:text-sm shadow-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
+            >
+              <Search className="h-3.5 w-3.5 sm:h-4 sm:w-4 stroke-[1.75] shrink-0 text-neutral-500 dark:text-neutral-400" aria-hidden="true" />
+              <span className="truncate text-left text-[11px] xs:text-xs sm:text-sm text-neutral-600 dark:text-neutral-300">
+                {displayText || "\u00A0"}
+              </span>
+              <span
+                className="inline-block w-[1.5px] h-3 sm:h-3.5 bg-neutral-900 dark:bg-neutral-100 animate-pulse ml-0.5 shrink-0"
+                aria-hidden="true"
+              />
+            </button>
+          </div>
+
+          {/* Right Controls in exact order: 1.notification, 2.theme, 3.profile, 4.settings */}
+          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+            {/* 1. Notification Icon - Direct Link to notification page with reliable tap/click targets */}
+            <Link
+              to="/payernt/notifications"
+              preload="intent"
+              preloadDelay={0}
+              onClick={() => {
+                if (onTabChange) onTabChange("notifications");
+              }}
+              className={`relative flex min-h-[44px] min-w-[44px] h-9 w-9 items-center justify-center rounded-full border transition-all cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring shrink-0 ${
+                isNotifActive
+                  ? "bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 border-neutral-950 dark:border-white shadow-xs font-bold"
+                  : "border-neutral-300 dark:border-neutral-700/80 hover:border-neutral-400 dark:hover:border-neutral-500 bg-transparent hover:bg-neutral-100 dark:hover:bg-white/5 text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white"
+              }`}
+              aria-label={tCommon.notifications}
+              title={tCommon.notifications}
+            >
+              <Bell className="h-4 w-4 pointer-events-none" />
+              {unreadCount > 0 && (
+                <span
+                  className={`absolute -top-1 -right-1 flex h-4 min-w-4 px-1 items-center justify-center rounded-full text-[10px] font-bold shadow-xs pointer-events-none ${
+                    isNotifActive
+                      ? "bg-white text-neutral-950 dark:bg-neutral-950 dark:text-white border border-neutral-300 dark:border-neutral-700"
+                      : "bg-destructive text-white"
+                  }`}
+                >
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
+            </Link>
+
+            {/* 2. Theme Toggle Button */}
             <button
               type="button"
               onClick={toggleTheme}
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-neutral-300 dark:border-neutral-700/80 hover:border-neutral-400 dark:hover:border-neutral-500 bg-transparent hover:bg-neutral-100 dark:hover:bg-white/5 text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="flex min-h-[44px] min-w-[44px] h-9 w-9 items-center justify-center rounded-full border border-neutral-300 dark:border-neutral-700/80 hover:border-neutral-400 dark:hover:border-neutral-500 bg-transparent hover:bg-neutral-100 dark:hover:bg-white/5 text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring shrink-0"
               aria-label={`Switch to ${theme === "dark" ? "Light" : "Dark"} Mode`}
               title={`Switch to ${theme === "dark" ? "Light" : "Dark"} Mode`}
             >
               {theme === "dark" ? (
-                <Sun className="h-4 w-4 text-neutral-300 hover:text-white transition-transform" />
+                <Sun className="h-4 w-4 text-neutral-300 hover:text-white transition-transform pointer-events-none" />
               ) : (
-                <Moon className="h-4 w-4 text-neutral-700 hover:text-neutral-950 transition-transform" />
+                <Moon className="h-4 w-4 text-neutral-700 hover:text-neutral-950 transition-transform pointer-events-none" />
               )}
             </button>
-            {/* Notification Icon */}
-            <div className="relative" ref={notifRef}>
-              <button
-                type="button"
-                onClick={() => setIsNotifOpen(!isNotifOpen)}
-                className="relative flex h-9 w-9 items-center justify-center rounded-xl text-text-secondary hover:text-text-primary hover:bg-secondary transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                aria-label={tCommon.notifications}
-                title={tCommon.notifications}
-              >
-                <Bell className="h-4 w-4" />
-                {unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 flex h-4 min-w-4 px-1 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-white shadow-xs">
-                    {unreadCount > 9 ? "9+" : unreadCount}
-                  </span>
-                )}
-              </button>
-              {/* Notification Drawer Popover */}
-              <AnimatePresence>
-                {isNotifOpen && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 6, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 6, scale: 0.95 }}
-                    className="absolute right-0 mt-2 w-80 sm:w-96 max-w-[calc(100vw-2rem)] rounded-2xl border border-border bg-surface-modal shadow-elevation-3 p-4 z-50 text-left space-y-3"
-                  >
-                    <div className="flex items-center justify-between border-b border-border pb-2">
-                      <span className="font-bold text-xs text-foreground">{tCommon.notifications}</span>
-                      {unreadCount > 0 && (
-                        <button
-                          type="button"
-                          onClick={onMarkAllNotificationsRead}
-                          className="text-[11px] text-text-secondary hover:text-foreground font-medium cursor-pointer"
-                        >
-                          {tCommon.markAllAsRead}
-                        </button>
-                      )}
-                    </div>
-                    <div className="max-h-64 overflow-y-auto space-y-2 pr-1">
-                      {notifications.length === 0 ? (
-                        <p className="text-xs text-text-secondary text-center py-4">
-                          {tCommon.noNotifications}
-                        </p>
-                      ) : (
-                        notifications.map((n) => (
-                          <div
-                            key={n.id}
-                            onClick={() => {
-                              onMarkNotificationRead(n.id);
-                              setIsNotifOpen(false);
-                              if (n.actionRoute) {
-                                navigate({ to: `/payernt/${n.actionRoute}` as any });
-                              } else if (n.bookingId) {
-                                navigate({ to: "/payernt/requests" as any });
-                              }
-                            }}
-                            className={`p-2.5 rounded-xl border text-xs transition-colors cursor-pointer ${
-                              n.read
-                                ? "border-border bg-secondary/50 text-text-secondary"
-                                : "border-border bg-secondary text-foreground font-medium"
-                            }`}
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="font-bold text-xs text-neutral-900 dark:text-white">{n.title}</span>
-                              <span className="text-[10px] text-neutral-500">{n.timestamp}</span>
-                            </div>
-                            <p className="text-[11px] text-neutral-600 dark:text-neutral-400 mt-0.5">{n.message}</p>
-                            {n.productName && (
-                              <div className="mt-1.5 flex items-center gap-1 text-[10px] text-neutral-500 dark:text-neutral-400">
-                                <span className="font-medium text-neutral-700 dark:text-neutral-300 truncate max-w-[200px]">📦 {n.productName}</span>
-                              </div>
-                            )}
-                          </div>
-                        ))
-                      )}
-                    </div>
-                    <div className="pt-2 border-t border-neutral-200/80 dark:border-white/10 text-center">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsNotifOpen(false);
-                          navigate({ to: "/payernt/notifications" as any });
-                        }}
-                        className="text-xs font-bold text-neutral-900 dark:text-white hover:underline cursor-pointer"
-                      >
-                        View all notifications &rarr;
-                      </button>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-            {/* Real User Profile Photo */}
-            <button
-              type="button"
-              onClick={() => navigate({ to: "/payernt/profile" })}
-              className="flex items-center justify-center rounded-full hover:ring-2 hover:ring-primary/40 transition-all cursor-pointer"
+
+            {/* 3. Real User Profile Photo */}
+            <Link
+              to="/payernt/profile"
+              preload="intent"
+              preloadDelay={0}
+              onClick={() => {
+                if (onTabChange) onTabChange("profile");
+              }}
+              className={`flex items-center justify-center rounded-full transition-all cursor-pointer shrink-0 ${
+                isProfileActive
+                  ? "ring-2 ring-neutral-950 dark:ring-white shadow-xs"
+                  : "hover:ring-2 hover:ring-primary/40"
+              }`}
               title={`${tCommon.profile} (${displayName})`}
               aria-label={`${tCommon.profile}: ${displayName}`}
             >
@@ -229,24 +263,40 @@ export function PayerntNavbar({
                 size="sm"
                 shape="circle"
               />
-            </button>
+            </Link>
 
-            {/* Direct One-Click Logout Button on Header (Visible on ALL screen sizes) */}
-            {onLogout && (
-              <button
-                type="button"
-                onClick={onLogout}
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-neutral-300 dark:border-neutral-700/80 hover:border-destructive/50 dark:hover:border-destructive/50 bg-transparent hover:bg-destructive/10 text-neutral-600 dark:text-neutral-400 hover:text-destructive dark:hover:text-destructive transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive shrink-0"
-                aria-label={tCommon.logout}
-                title={tCommon.logout}
-              >
-                <LogOut className="h-4 w-4" />
-              </button>
-            )}
+            {/* 4. Settings Button */}
+            <Link
+              to="/payernt/settings"
+              preload="intent"
+              preloadDelay={0}
+              onClick={() => {
+                if (onTabChange) onTabChange("settings");
+              }}
+              className={`flex min-h-[44px] min-w-[44px] h-9 w-9 items-center justify-center rounded-full border transition-all cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring shrink-0 ${
+                isSettingsActive
+                  ? "bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 border-neutral-950 dark:border-white shadow-xs font-bold"
+                  : "border-neutral-300 dark:border-neutral-700/80 hover:border-neutral-400 dark:hover:border-neutral-500 bg-transparent hover:bg-neutral-100 dark:hover:bg-white/5 text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white"
+              }`}
+              aria-label={tCommon.settings}
+              title={tCommon.settings}
+            >
+              <Settings className="h-4 w-4 pointer-events-none" />
+            </Link>
           </div>
         </div>
       </header>
+
+      {/* Lender Global Search Command Palette Modal */}
+      <PayerntGlobalSearch
+        isOpen={searchOpen}
+        onClose={() => setSearchOpen(false)}
+        onNavigate={onTabChange}
+        products={products}
+        rentalRequests={rentalRequests}
+      />
     </>
   );
 }
+
 export default PayerntNavbar;

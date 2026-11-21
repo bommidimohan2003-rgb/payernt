@@ -1,5 +1,4 @@
-import { createFileRoute, Outlet, useRouterState, useNavigate } from "@tanstack/react-router";
-import { useReducedMotion, motion, AnimatePresence } from "framer-motion";
+import { createFileRoute, Outlet, useRouterState } from "@tanstack/react-router";
 import { PayerntProvider, usePayernt } from "@/payernt/context";
 import { PayerntNavbar } from "@/payernt/components/PayerntNavbar";
 import { PayerntSidebar } from "@/payernt/components/PayerntSidebar";
@@ -20,24 +19,11 @@ export const Route = createFileRoute("/payernt")({
 
 function PayerntPageTransitionOutlet() {
   const currentPath = useRouterState({ select: (s) => s.location.pathname });
-  const shouldReduceMotion = useReducedMotion();
 
   return (
-    <AnimatePresence mode="wait">
-      <motion.div
-        key={currentPath}
-        initial={{ opacity: 0, y: shouldReduceMotion ? 0 : 6 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: shouldReduceMotion ? 0 : -4 }}
-        transition={{
-          duration: shouldReduceMotion ? 0 : 0.18,
-          ease: [0.16, 1, 0.3, 1],
-        }}
-        className="w-full"
-      >
-        <Outlet />
-      </motion.div>
-    </AnimatePresence>
+    <div key={currentPath} className="w-full animate-in fade-in duration-100">
+      <Outlet />
+    </div>
   );
 }
 
@@ -54,6 +40,8 @@ function PayerntLayout() {
     resetToDefaults,
     stats,
     unreadMessagesCount,
+    userProducts,
+    rentalRequests,
   } = usePayernt();
 
   // Strict Authentication Gate for all lender routes
@@ -67,6 +55,8 @@ function PayerntLayout() {
       <PayerntNavbar
         pendingRequestsCount={stats.pendingRequestsCount}
         notifications={notifications}
+        products={userProducts}
+        rentalRequests={rentalRequests}
         onMarkNotificationRead={markNotificationRead}
         onMarkAllNotificationsRead={markAllNotificationsRead}
         onResetDemo={resetToDefaults}
@@ -76,7 +66,7 @@ function PayerntLayout() {
       />
 
       {/* Main Container with Sidebar + Content */}
-      <div className="flex-1 flex w-full max-w-[1700px] mx-auto p-3 sm:p-4 md:p-6 pb-24 md:pb-6 gap-3 sm:gap-5 items-stretch">
+      <div className="flex-1 flex w-full max-w-[1400px] mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6 pb-24 sm:pb-6 gap-3 sm:gap-5 items-start">
         {/* Left Sidebar (Desktop Only) */}
         <PayerntSidebar
           pendingRequestsCount={stats.pendingRequestsCount}
