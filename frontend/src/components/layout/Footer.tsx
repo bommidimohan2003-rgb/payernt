@@ -57,6 +57,7 @@ export function Footer() {
       title: "About paYent",
       items: [
         { label: "About Our Platform", to: "/about" },
+        { label: "Rental Agreement & Escrow", to: "/about", hash: "rental-agreement-escrow" },
         { label: "Browse Catalog", to: "/browse" },
         { label: "All Categories", to: "/categories" },
         { label: "Become a Lender", to: "/become-lender" },
@@ -68,6 +69,7 @@ export function Footer() {
       items: [
         { label: "Help Center & FAQ", to: "/faq" },
         { label: "Contact Support", to: "/contact" },
+        { label: "Cancellation & Refunds", to: "/support", hash: "cancellation-refunds" },
         { label: "Rental Orders", to: "/orders" },
         { label: "KYC Verification", to: "/kyc" },
       ],
@@ -76,8 +78,8 @@ export function Footer() {
       id: "legal",
       title: "Legal & Policies",
       items: [
-        { label: "Privacy Policy", to: "/privacy" },
-        { label: "Terms of Service", to: "/terms" },
+        { label: "Privacy Policy", to: "/privacy", hash: "privacy-policy" },
+        { label: "Terms of Service", to: "/privacy", hash: "terms-of-service" },
         { label: "Cookie Policy", to: "/cookies" },
         { label: "Refund & Cancellation Policy", to: "/refund-policy" },
         {
@@ -130,7 +132,9 @@ export function Footer() {
           </div>
           <div className="flex items-center gap-1.5">
             <Shield className="h-3.5 w-3.5 shrink-0 stroke-[1.75] text-neutral-800 dark:text-neutral-200" aria-hidden="true" />
-            <span>Secure Holding &amp; ID Verified</span>
+            <Link to="/support" hash="security-protocol" className="hover:underline">
+              Secure Holding &amp; ID Verified
+            </Link>
           </div>
         </div>
       ),
@@ -151,7 +155,7 @@ export function Footer() {
         </div>
 
         {/* Desktop: Single horizontal 5-col row on lg+, 3-col on md */}
-        <div className="hidden md:grid md:grid-cols-3 lg:grid-cols-5 gap-3.5 lg:gap-4">
+        <div className="hidden md:grid md:grid-cols-3 lg:grid-cols-6 gap-3.5 lg:gap-4">
           {groups.map((g) => (
             <div key={g.id} className="flex flex-col gap-1 min-w-0">
               <h3 className="text-xs font-semibold text-neutral-900 dark:text-white">
@@ -264,11 +268,11 @@ export function Footer() {
         <div className="mt-2.5 pt-2 border-t border-neutral-100 dark:border-neutral-800/80 flex flex-col sm:flex-row items-center justify-between gap-1.5 text-[11px] sm:text-xs text-neutral-600 dark:text-neutral-400">
           <p>&copy; {new Date().getFullYear()} {BUSINESS_INFO.brandName} Marketplace. All rights reserved.</p>
           <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4">
-            <Link to="/privacy" className="hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white rounded">Privacy</Link>
-            <Link to="/terms" className="hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white rounded">Terms</Link>
+            <Link to="/privacy" hash="privacy-policy" className="hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white rounded">Privacy</Link>
+            <Link to="/privacy" hash="terms-of-service" className="hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white rounded">Terms</Link>
             <Link to="/cookies" className="hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white rounded">Cookies</Link>
             <Link to="/refund-policy" className="hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white rounded">Refunds</Link>
-            <button
+<button
               type="button"
               onClick={() => {
                 if (typeof window !== "undefined") {
