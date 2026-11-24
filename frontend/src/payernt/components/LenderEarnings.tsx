@@ -192,7 +192,7 @@ export function LenderEarnings({
         {/* Desktop table (hidden on mobile) */}
         <div className="hidden sm:block rounded-2xl border border-border/80 bg-card overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
+            <table className="w-full min-w-[780px] text-left text-xs border-collapse">
               <thead>
                 <tr className="border-b border-border/70 bg-secondary/40 uppercase text-[10px] tracking-wider">
                   <th className="py-3 px-4 text-left font-extrabold text-muted-foreground whitespace-nowrap">Gear / Order ID</th>

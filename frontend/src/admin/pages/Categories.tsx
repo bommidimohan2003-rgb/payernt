@@ -104,7 +104,7 @@ export default function Categories() {
 
   const handleDelete = async (cat: AdminCategory) => {
     if (cat.count && cat.count > 0) {
-      alert(`Cannot delete category '${cat.name}' because ${cat.count} active gear items depend on it. Reassign items first.`);
+      toast.error(`Cannot delete category '${cat.name}' because ${cat.count} active gear items depend on it. Reassign items first.`);
       return;
     }
     if (!confirm(`Are you sure you want to delete category '${cat.name}'?`)) return;

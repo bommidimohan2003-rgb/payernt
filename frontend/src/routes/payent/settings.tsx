@@ -1,18 +1,17 @@
-import { createFileRoute } from "@tanstack/react-router";
-import Settings from "@/pages/Settings";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { getSeoMetadata } from "@/utils/seo";
-import { ProtectedRoute } from "@/components/common/ProtectedRoute";
 
 export const Route = createFileRoute("/payent/settings")({
+  beforeLoad: () => {
+    throw redirect({ to: "/payernt/settings" });
+  },
   head: () =>
     getSeoMetadata({
-      title: "Renter Settings | pay₹ent",
-      description: "Manage security preferences, communication channels, and privacy settings.",
+      title: "Settings | Payernt",
+      description: "Manage security settings, notifications and payout configurations.",
       path: "/payent/settings",
     }),
-  component: () => (
-    <ProtectedRoute>
-      <Settings />
-    </ProtectedRoute>
-  ),
+  component: () => null,
 });
+
+export default Route;

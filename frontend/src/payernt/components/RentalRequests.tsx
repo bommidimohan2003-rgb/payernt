@@ -963,7 +963,7 @@ export function RentalRequests({
   };
 
   return (
-    <div className="space-y-6 text-left pb-16 max-w-6xl mx-auto">
+    <div className="w-full space-y-6 text-left pb-16">
       {/* Back Button */}
       {onBack && (
         <div>

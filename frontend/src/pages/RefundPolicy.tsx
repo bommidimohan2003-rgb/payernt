@@ -94,18 +94,18 @@ export function RefundPolicy() {
 
   return (
     <MainLayout>
-      <div className="max-w-5xl mx-auto px-4 md:px-6 py-10 md:py-16 text-neutral-900 dark:text-white">
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 md:py-16 text-neutral-900 dark:text-white">
         <div className="flex items-center justify-start mb-6">
           <BackButton fallback="/payent" />
         </div>
 
         {/* Header */}
-        <div className="text-center space-y-4 mb-10">
+        <div className="text-center space-y-3 sm:space-y-4 mb-8 sm:mb-10">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 border border-neutral-200 dark:border-neutral-700 text-xs font-semibold">
             <RotateCcw className="h-4 w-4 stroke-[1.75]" aria-hidden="true" />
             <span>Consumer Protection (E-Commerce) Rules 2020 Compliant</span>
           </div>
-          <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight font-display">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-semibold tracking-tight font-display break-words">
             Refund &amp; Cancellation Policy
           </h1>
           <p className="text-xs sm:text-sm md:text-base text-neutral-600 dark:text-neutral-400 max-w-2xl mx-auto font-normal">
@@ -114,8 +114,8 @@ export function RefundPolicy() {
         </div>
 
         {/* Core Principles Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
-          <div className="p-5 rounded-3xl bg-neutral-50 dark:bg-[#1E1E1E] border border-neutral-200 dark:border-neutral-800 space-y-2">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 sm:gap-4 mb-8 sm:mb-10">
+          <div className="p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-neutral-50 dark:bg-[#1E1E1E] border border-neutral-200 dark:border-neutral-800 space-y-2">
             <div className="h-8 w-8 rounded-xl bg-neutral-200 dark:bg-neutral-800 flex items-center justify-center text-neutral-900 dark:text-white">
               <ShieldCheck className="h-4 w-4" />
             </div>
@@ -125,7 +125,7 @@ export function RefundPolicy() {
             </p>
           </div>
 
-          <div className="p-5 rounded-3xl bg-neutral-50 dark:bg-[#1E1E1E] border border-neutral-200 dark:border-neutral-800 space-y-2">
+          <div className="p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-neutral-50 dark:bg-[#1E1E1E] border border-neutral-200 dark:border-neutral-800 space-y-2">
             <div className="h-8 w-8 rounded-xl bg-neutral-200 dark:bg-neutral-800 flex items-center justify-center text-neutral-900 dark:text-white">
               <Clock className="h-4 w-4" />
             </div>
@@ -135,7 +135,7 @@ export function RefundPolicy() {
             </p>
           </div>
 
-          <div className="p-5 rounded-3xl bg-neutral-50 dark:bg-[#1E1E1E] border border-neutral-200 dark:border-neutral-800 space-y-2">
+          <div className="p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-neutral-50 dark:bg-[#1E1E1E] border border-neutral-200 dark:border-neutral-800 space-y-2">
             <div className="h-8 w-8 rounded-xl bg-neutral-200 dark:bg-neutral-800 flex items-center justify-center text-neutral-900 dark:text-white">
               <FileCheck className="h-4 w-4" />
             </div>
@@ -147,7 +147,7 @@ export function RefundPolicy() {
         </div>
 
         {/* Policy Body */}
-        <div className="bg-white dark:bg-[#1E1E1E] border border-neutral-200 dark:border-neutral-800 rounded-3xl p-6 md:p-10 shadow-sm space-y-10 text-xs md:text-sm text-neutral-600 dark:text-neutral-300 leading-relaxed font-normal">
+        <div className="bg-white dark:bg-[#1E1E1E] border border-neutral-200 dark:border-neutral-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-10 shadow-sm space-y-8 sm:space-y-10 text-xs md:text-sm text-neutral-600 dark:text-neutral-300 leading-relaxed font-normal">
           {/* Section 1 */}
           <section className="space-y-3">
             <h2 className="text-base sm:text-lg font-bold text-neutral-950 dark:text-white">
@@ -212,8 +212,8 @@ export function RefundPolicy() {
               The following overview outlines your cancellation eligibility and refund entitlement across typical marketplace rental situations:
             </p>
 
-            <div className="overflow-x-auto rounded-2xl border border-neutral-200 dark:border-neutral-800">
-              <table className="w-full text-left border-collapse text-xs">
+            <div className="overflow-x-auto rounded-2xl border border-neutral-200 dark:border-neutral-800 -mx-1 sm:mx-0">
+              <table className="w-full min-w-[650px] text-left border-collapse text-xs">
                 <thead className="bg-neutral-50 dark:bg-neutral-800/60 border-b border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-white font-bold">
                   <tr>
                     <th className="py-3 px-3">Rental Scenario</th>

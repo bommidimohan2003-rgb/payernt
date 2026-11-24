@@ -55,18 +55,18 @@ export function TermsOfService() {
 
   return (
     <MainLayout>
-      <div className="max-w-5xl mx-auto px-4 md:px-6 py-10 md:py-16 text-neutral-900 dark:text-white">
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 md:py-16 text-neutral-900 dark:text-white">
         <div className="flex items-center justify-start mb-6">
           <BackButton fallback="/payent" />
         </div>
 
         {/* Header */}
-        <div className="text-center space-y-4 mb-10">
+        <div className="text-center space-y-3 sm:space-y-4 mb-8 sm:mb-10">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 border border-neutral-200 dark:border-neutral-700 text-xs font-semibold">
             <Scale className="h-4 w-4 stroke-[1.75]" aria-hidden="true" />
             <span>Intermediary Terms of Service &bull; Information Technology Act 2000</span>
           </div>
-          <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight font-display">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-semibold tracking-tight font-display break-words">
             Terms of Service
           </h1>
           <p className="text-xs sm:text-sm md:text-base text-neutral-600 dark:text-neutral-400 max-w-2xl mx-auto font-normal">
@@ -75,7 +75,7 @@ export function TermsOfService() {
         </div>
 
         {/* Table of Contents */}
-        <div className="mb-10 p-5 rounded-3xl bg-neutral-50 dark:bg-[#1E1E1E] border border-neutral-200 dark:border-neutral-800 shadow-xs">
+        <div className="mb-8 sm:mb-10 p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-neutral-50 dark:bg-[#1E1E1E] border border-neutral-200 dark:border-neutral-800 shadow-xs">
           <h2 className="text-xs font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 mb-3">
             Table of Contents
           </h2>
@@ -84,7 +84,7 @@ export function TermsOfService() {
               <a
                 key={s.id}
                 href={`#${s.id}`}
-                className="py-1 text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white hover:underline truncate"
+                className="py-1 text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white hover:underline break-words"
               >
                 {s.label}
               </a>
@@ -93,7 +93,10 @@ export function TermsOfService() {
         </div>
 
         {/* Terms Container */}
-        <div className="bg-white dark:bg-[#1E1E1E] border border-neutral-200 dark:border-neutral-800 rounded-3xl p-6 md:p-10 shadow-sm space-y-10 text-xs md:text-sm text-neutral-600 dark:text-neutral-300 leading-relaxed font-normal">
+        <div
+          id="terms-of-service"
+          className="scroll-mt-24 bg-white dark:bg-[#1E1E1E] border border-neutral-200 dark:border-neutral-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-10 shadow-sm space-y-8 sm:space-y-10 text-xs md:text-sm text-neutral-600 dark:text-neutral-300 leading-relaxed font-normal"
+        >
           {/* Section 1 */}
           <section id="platform-identity" className="scroll-mt-24 space-y-3">
             <h2 className="text-base sm:text-lg font-bold text-neutral-950 dark:text-white flex items-center gap-2">

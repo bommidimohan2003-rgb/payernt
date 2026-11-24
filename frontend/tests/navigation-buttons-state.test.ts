@@ -82,11 +82,13 @@ describe("paYent Universal Navigation & Button States Verification", () => {
     assert.match(orders, /<ShoppingCart/);
   });
 
-  it("Profile page includes theme toggle button with immediate toggleTheme action", () => {
+  it("Profile page includes theme dropdown menu with Light, Dark, and System options", () => {
     const profile = readSrc("pages/Profile.tsx");
     assert.match(profile, /id="profile-theme-toggle-btn"/);
-    assert.match(profile, /onClick=\{toggleTheme\}/);
-    assert.match(profile, /aria-label=\{theme === "dark" \? "Switch to Light Theme" : "Switch to Dark Theme"\}/);
+    assert.match(profile, /DropdownMenu/);
+    assert.match(profile, /setThemeMode\("light"\)/);
+    assert.match(profile, /setThemeMode\("dark"\)/);
+    assert.match(profile, /setThemeMode\("system"\)/);
   });
 
   it("PayerntMobileBottomNav keeps More tab active on secondary drawer routes", () => {

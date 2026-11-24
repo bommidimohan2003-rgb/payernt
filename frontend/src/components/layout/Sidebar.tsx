@@ -6,7 +6,6 @@ import {
   LayoutDashboard,
   MessageSquare,
   Package,
-  Settings,
   User,
   Globe,
   LogOut,
@@ -42,7 +41,6 @@ export function Sidebar() {
     { to: "/notifications", icon: Bell, label: tCommon.notifications },
     { to: "/messages", icon: MessageSquare, label: tCommon.messages },
     { to: "/profile", icon: User, label: tCommon.profile },
-    { to: "/settings", icon: Settings, label: tCommon.settings },
   ];
 
   return (
