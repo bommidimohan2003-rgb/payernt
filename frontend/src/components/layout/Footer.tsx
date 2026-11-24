@@ -60,7 +60,7 @@ export function Footer() {
         { label: "Rental Agreement & Escrow", to: "/about", hash: "rental-agreement-escrow" },
         { label: "Browse Catalog", to: "/browse" },
         { label: "All Categories", to: "/categories" },
-        { label: "Become a Lender", to: "/become-lender" },
+        { label: "Become a Lender", to: "/payernt" },
       ],
     },
     {

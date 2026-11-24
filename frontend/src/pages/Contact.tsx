@@ -154,9 +154,6 @@ export default function Contact() {
     <MainLayout>
       {/* 1. CONTACT HERO (Section 39) */}
       <section className="relative overflow-hidden bg-neutral-50/70 dark:bg-[#1E1E1E] pt-16 pb-16 sm:pt-20 sm:pb-24 transition-colors duration-300">
-        {/* Ambient background glow */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[350px] bg-gradient-to-b from-neutral-200/30 dark:from-[#0B1522] to-transparent rounded-full blur-[140px] pointer-events-none" />
-
         <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-start mb-4 sm:mb-6">
             <BackButton fallback="/payent" />
@@ -167,13 +164,13 @@ export default function Contact() {
               {/* Eyebrow */}
               <div className="flex items-center gap-2 mb-3">
                 <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" />
-                <span className="text-xs font-bold uppercase tracking-widest text-neutral-500 dark:text-[#AAB3BC]">
+                <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-[#AAB3BC]">
                   Let's Talk
                 </span>
               </div>
 
               {/* Headline */}
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-neutral-950 dark:text-white leading-[1.1]">
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-semibold tracking-tight text-neutral-950 dark:text-white leading-[1.1]">
                 Have a question? <br />
                 <span className="underline decoration-neutral-400 dark:decoration-neutral-600 underline-offset-8">
                   Let's figure it out.
@@ -315,10 +312,10 @@ export default function Contact() {
           {/* LEFT: GENUINE CONTACT INFORMATION (Section 41) */}
           <div className="lg:col-span-5 space-y-8">
             <div>
-              <span className="text-xs font-bold uppercase tracking-widest text-primary">
+              <span className="text-xs font-semibold uppercase tracking-wider text-primary">
                 Direct Channels
               </span>
-              <h2 className="mt-2 text-2xl font-black tracking-tight text-neutral-950 dark:text-white">
+              <h2 className="mt-2 text-2xl font-bold tracking-tight text-neutral-950 dark:text-white">
                 Get in touch with support
               </h2>
               <p className="mt-2 text-xs sm:text-sm text-neutral-600 dark:text-[#AAB3BC]">
@@ -384,10 +381,10 @@ export default function Contact() {
                     Under DPDP Act 2023 &amp; IT Rules 2021:
                   </div>
                   <a
-                    href={`mailto:${BUSINESS_INFO.grievanceEmail}`}
+                    href={`mailto:${BUSINESS_INFO.grievanceOfficer.email}`}
                     className="mt-0.5 block text-xs font-bold text-neutral-950 dark:text-white hover:underline"
                   >
-                    {BUSINESS_INFO.grievanceEmail}
+                    {BUSINESS_INFO.grievanceOfficer.email}
                   </a>
                   <p className="text-[10px] text-neutral-500 dark:text-[#8D98A3] mt-1">
                     Designated Grievance Officer acknowledged within 48h, resolved within 15–30 days.
@@ -472,7 +469,7 @@ export default function Contact() {
                   <div className="h-14 w-14 rounded-full bg-emerald-500/10 text-emerald-500 mx-auto flex items-center justify-center">
                     <CheckCircle2 className="h-8 w-8" />
                   </div>
-                  <h3 className="text-xl font-black text-neutral-950 dark:text-white">
+                  <h3 className="text-xl font-bold text-neutral-950 dark:text-white">
                     Message sent successfully.
                   </h3>
                   <p className="text-sm text-neutral-600 dark:text-[#AAB3BC] max-w-md mx-auto">
@@ -504,7 +501,7 @@ export default function Contact() {
                 /* CONTACT FORM (Section 42) */
                 <form onSubmit={handleSubmit} className="space-y-5">
                   <div>
-                    <h3 className="text-lg font-black text-neutral-950 dark:text-white">
+                    <h3 className="text-lg font-bold text-neutral-950 dark:text-white">
                       Send us an inquiry
                     </h3>
                     <p className="text-xs text-neutral-500 dark:text-[#8D98A3] mt-1">

@@ -62,7 +62,7 @@ export function PrivacyPolicy() {
             <Shield className="h-4 w-4 stroke-[1.75]" aria-hidden="true" />
             <span>DPDP Act 2023 &amp; IT Rules 2021 Compliant Notice</span>
           </div>
-          <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight font-display">
+          <h1 className="text-3xl md:text-5xl font-semibold tracking-tight font-display">
             Privacy Policy
           </h1>
           <p className="text-xs sm:text-sm md:text-base text-neutral-600 dark:text-neutral-400 max-w-2xl mx-auto font-normal">
@@ -405,6 +405,12 @@ export function PrivacyPolicy() {
                 In accordance with the Consumer Protection (E-Commerce) Rules, 2020 and Information Technology Rules, 2021, the designated statutory contact details are:
               </p>
               <div className="p-5 rounded-2xl bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-200 dark:border-neutral-800 space-y-2 text-xs">
+                <div>
+                  <span className="font-bold text-neutral-900 dark:text-white">Customer Support:</span>{" "}
+                  <a href={`mailto:${BUSINESS_INFO.supportEmail}`} className="font-semibold underline hover:opacity-80">
+                    support@payent.com
+                  </a>
+                </div>
                 <div>
                   <span className="font-bold text-neutral-900 dark:text-white">Officer Name:</span>{" "}
                   <span>{BUSINESS_INFO.grievanceOfficer.name}</span>

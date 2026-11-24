@@ -2,6 +2,26 @@
 @source "../src";
 @import "tw-animate-css";
 
+/* ============================================================
+   Self-Hosted Typography: Manrope (Variable 300..800)
+   ============================================================ */
+@font-face {
+  font-family: 'Manrope';
+  font-style: normal;
+  font-weight: 300 800;
+  font-display: swap;
+  src: url('/fonts/manrope/manrope-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Manrope';
+  font-style: normal;
+  font-weight: 300 800;
+  font-display: swap;
+  src: url('/fonts/manrope/manrope-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme inline {
@@ -21,6 +41,7 @@
   --color-text-secondary: var(--text-secondary);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-brand-navy: var(--brand-navy);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
@@ -53,8 +74,8 @@
   --color-admin-error: var(--admin-error);
   --color-admin-orange-start: var(--admin-orange-start);
   --color-admin-orange-end: var(--admin-orange-end);
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Outfit", "Inter", sans-serif;
+  --font-sans: "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 @layer base {
@@ -177,11 +198,14 @@
 }
 
 :root {
-  --radius: 0.9rem;
+  --radius: 0.625rem;
   /* ============================================================
-     LIGHT THEME PALETTE (paYent Monochrome System)
+     LIGHT THEME PALETTE (paYent Refined Editorial Minimalist System)
+     - Clean, structured off-white canvas with pure white elevated cards
+     - Controlled deep navy (#0B2545) brand accent & focus signatures
+     - Meaningful emerald status indicators
      ============================================================ */
-  --background: #FFFFFF;
+  --background: #FAFAFA;
   --foreground: #0A0A0A;
   --surface-navigation: #FFFFFF;
   --surface-card: #FFFFFF;
@@ -191,25 +215,27 @@
   --popover: #FFFFFF;
   --popover-foreground: #0A0A0A;
   --text-primary: #0A0A0A;
-  --text-secondary: #525252;
-  --border: #E5E5E5;
-  --input: #E5E5E5;
+  --text-secondary: #5C6470;
+  --border: #E5E7EB;
+  --input: #E5E7EB;
+  --brand-navy: #0B2545;
+  --brand-navy-foreground: #FFFFFF;
   --accent-primary: #0A0A0A;
   --accent-hover: #262626;
   --primary: #0A0A0A;
   --primary-foreground: #FFFFFF;
-  --secondary: #F5F5F5;
+  --secondary: #F1F3F5;
   --secondary-foreground: #0A0A0A;
-  --muted: #F5F5F5;
-  --muted-foreground: #525252;
+  --muted: #F1F3F5;
+  --muted-foreground: #5C6470;
   --accent: #0A0A0A;
   --accent-foreground: #FFFFFF;
   --destructive: #C93636;
   --error: #C93636;
   --warning: #8A5A00;
   --success: #047857;
-  --ring: #0A0A0A;
-  --focus-ring: #0A0A0A;
+  --ring: #0B2545;
+  --focus-ring: #0B2545;
 
   /* Button Tokens - Light Mode */
   --btn-primary-bg: #0A0A0A;
@@ -287,6 +313,8 @@
   --text-muted: #8A8A8A;
   --border: #383838;
   --input: #1E1E1E;
+  --brand-navy: #1B3B6F;
+  --brand-navy-foreground: #FFFFFF;
   --accent-primary: #FFFFFF;
   --accent-hover: #E5E5E5;
   --primary: #FFFFFF;

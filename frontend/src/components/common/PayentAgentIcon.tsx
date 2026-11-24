@@ -9,8 +9,9 @@ export interface PayentAgentIconProps {
 
 /**
  * paYent Agent Brand Symbol
- * - Chat bubble on a deep charcoal circular foundation (#17191C)
- * - Emerald green accent dot (#16A36A) for the online / active indicator
+ * - White stylized geometric "P"
+ * - Deep Charcoal circular foundation (#17191C)
+ * - Subtle emerald green parcel accent (#16A36A)
  * - Clean vector construction, optimized for small and large sizes
  */
 export function PayentAgentIcon({
@@ -43,24 +44,45 @@ export function PayentAgentIcon({
         strokeWidth="1.5"
       />
 
-      {/* Chat bubble body */}
+      {/* Stem of the P */}
       <path
-        d="M8 11.5C8 10.12 9.12 9 10.5 9H21.5C22.88 9 24 10.12 24 11.5V18.5C24 19.88 22.88 21 21.5 21H17.5L14 24V21H10.5C9.12 21 8 19.88 8 18.5V11.5Z"
-        fill="#FFFFFF"
-        fillOpacity="0.12"
+        d="M10.5 8V24"
         stroke="#FFFFFF"
-        strokeWidth="1.75"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
+
+      {/* Loop of the P forming a precision parcel container */}
+      <path
+        d="M10.5 8H17C19.76 8 22 10.01 22 12.5C22 14.99 19.76 17 17 17H10.5"
+        stroke="#FFFFFF"
+        strokeWidth="2.5"
+        strokeLinecap="round"
         strokeLinejoin="round"
       />
 
-      {/* Three chat dots */}
-      <circle cx="12" cy="15" r="1.2" fill="#FFFFFF" />
-      <circle cx="16" cy="15" r="1.2" fill="#FFFFFF" />
-      <circle cx="20" cy="15" r="1.2" fill="#FFFFFF" />
+      {/* Internal parcel ribbon / route seam */}
+      <path
+        d="M10.5 12.5H21.5"
+        stroke="#FFFFFF"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+        strokeOpacity="0.4"
+      />
+      <path
+        d="M16 8V17"
+        stroke="#FFFFFF"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+        strokeOpacity="0.4"
+      />
 
-      {/* Emerald online / active accent */}
+      {/* Waypoint base anchor */}
+      <circle cx="10.5" cy="24" r="1.25" fill="#FFFFFF" />
+
+      {/* Subtle emerald green parcel accent node */}
       {showAccent && (
-        <circle cx="21.5" cy="9.5" r="2" fill="#16A36A" />
+        <circle cx="20.5" cy="8.5" r="1.75" fill="#16A36A" />
       )}
     </svg>
   );

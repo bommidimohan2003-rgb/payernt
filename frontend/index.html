@@ -7,11 +7,11 @@
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="icon" type="image/x-icon" href="/favicon.ico" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-  <!-- Preconnect & DNS-Prefetch for CDN assets, fonts, and payment gateways -->
+  <!-- Self-hosted Manrope Web Font Preload (High Priority, Swap Display) -->
+  <link rel="preload" href="/fonts/manrope/manrope-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <!-- Preconnect & DNS-Prefetch for CDN assets and payment gateways -->
   <link rel="preconnect" href="https://res.cloudinary.com" crossorigin />
   <link rel="dns-prefetch" href="https://res.cloudinary.com" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="preconnect" href="https://checkout.razorpay.com" crossorigin />
   <link rel="dns-prefetch" href="https://checkout.razorpay.com" />
   <script>

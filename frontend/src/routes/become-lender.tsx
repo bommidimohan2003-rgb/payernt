@@ -3,12 +3,12 @@ import { getSeoMetadata } from "@/utils/seo";
 
 export const Route = createFileRoute("/become-lender")({
   beforeLoad: () => {
-    throw redirect({ to: "/browse" });
+    throw redirect({ to: "/payernt" });
   },
   head: () =>
     getSeoMetadata({
-      title: "Explore Gear | Payent",
-      description: "Discover professional cameras, drones, and laptops on Payent.",
+      title: "Become a Lender | Payernt",
+      description: "List what you own, get it verified, and start earning on Payernt.",
       path: "/become-lender",
     }),
   component: () => null,

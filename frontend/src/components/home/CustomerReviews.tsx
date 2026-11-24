@@ -292,7 +292,7 @@ export function CustomerReviews() {
                             </span>
                           )}
                           {isVerified && (
-                            <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
                               ✓ Verified Renter
                             </span>
                           )}

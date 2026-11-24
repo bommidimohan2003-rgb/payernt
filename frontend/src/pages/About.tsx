@@ -149,9 +149,6 @@ export default function About() {
     <MainLayout>
       {/* 1. ABOUT HERO (Section 29) */}
       <section className="relative overflow-hidden bg-neutral-50/70 dark:bg-[#1E1E1E] pt-16 pb-20 sm:pt-24 sm:pb-28 transition-colors duration-300">
-        {/* Ambient background glow */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[450px] bg-gradient-to-b from-neutral-200/40 via-neutral-100/10 to-transparent dark:from-[#0B1522] dark:via-[#071017] dark:to-transparent rounded-full blur-[160px] pointer-events-none" />
-
         <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-start mb-4 sm:mb-6">
             <BackButton fallback="/payent" />
@@ -177,8 +174,7 @@ export default function About() {
 
               {/* Supporting Text */}
               <p className="mt-5 text-sm sm:text-base text-neutral-600 dark:text-[#AAB3BC] leading-relaxed max-w-xl">
-                paYent connects creators with the technology they need to create
-                more without owning everything. Rent verified cinema cameras, drones, workstations, and audio gear directly from trusted owners.
+                paYent unites two verified communities: <strong className="text-neutral-900 dark:text-white font-semibold">Payrent</strong> for creators renting gear on demand, and <strong className="text-neutral-900 dark:text-white font-semibold">Payernt</strong> for lenders turning idle equipment into sustainable income.
               </p>
 
               {/* Quick CTAs */}
@@ -187,8 +183,14 @@ export default function About() {
                   to="/browse"
                   className="inline-flex items-center gap-2 h-11 px-6 rounded-full bg-[#161616] text-[#FFFFFF] hover:bg-[#292929] active:bg-[#0B0B0B] dark:bg-[#F2F0EA] dark:text-[#0A0A0A] dark:hover:bg-[#FFFFFF] text-xs font-semibold transition-colors shadow-md cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
                 >
-                  <span>Explore Gear</span>
+                  <span>Explore Rentals</span>
                   <ArrowRight className="h-4 w-4 stroke-[1.75]" aria-hidden="true" />
+                </Link>
+                <Link
+                  to="/payernt"
+                  className="inline-flex items-center gap-2 h-11 px-6 rounded-full border border-neutral-300 dark:border-neutral-700 bg-transparent text-neutral-900 dark:text-white hover:bg-neutral-100 dark:hover:bg-white/5 text-xs font-semibold transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-950 dark:focus-visible:ring-white"
+                >
+                  <span>List Your Gear</span>
                 </Link>
               </div>
 
@@ -427,6 +429,97 @@ export default function About() {
         </div>
       </section>
 
+      {/* 4.5 PAYRENT (RENTER) & PAYERNT (LENDER) SIDES */}
+      <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16 sm:py-20 border-t border-neutral-200 dark:border-neutral-800">
+        <div className="max-w-2xl mb-12">
+          <span className="text-xs font-semibold text-neutral-600 dark:text-neutral-400">
+            Marketplace Architecture
+          </span>
+          <h2 className="mt-2 text-2xl sm:text-3xl font-semibold tracking-tight text-neutral-950 dark:text-white">
+            Two sides. One trusted ecosystem.
+          </h2>
+          <p className="mt-2 text-sm text-neutral-600 dark:text-[#AAB3BC]">
+            paYent is structured around two dedicated experiences designed for the specific needs of creators and equipment owners.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="p-6 sm:p-8 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-neutral-200/90 dark:border-white/10 shadow-xs flex flex-col justify-between">
+            <div>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-neutral-100 dark:bg-white/5 text-neutral-900 dark:text-white text-xs font-semibold mb-4">
+                <span>pay₹ent</span> &bull; <span>Renter Experience</span>
+              </div>
+              <h3 className="text-xl font-semibold text-neutral-950 dark:text-white mb-2">
+                For Creators &amp; Production Crews
+              </h3>
+              <p className="text-xs sm:text-sm text-neutral-600 dark:text-[#AAB3BC] leading-relaxed mb-4">
+                Access professional cameras, cinema primes, drones, and post-production workstations for exact shoot dates without ownership capital.
+              </p>
+              <ul className="space-y-2 text-xs text-neutral-600 dark:text-neutral-300">
+                <li className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                  <span>Browse by city, category, daily rate &amp; shoot dates</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                  <span>Identity verification &amp; Razorpay payment escrow</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                  <span>Secure 8-digit PIN verification on equipment handover</span>
+                </li>
+              </ul>
+            </div>
+            <div className="mt-6 pt-4 border-t border-neutral-100 dark:border-neutral-800">
+              <Link
+                to="/browse"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-neutral-900 dark:text-white hover:underline"
+              >
+                <span>Browse Rental Catalog</span>
+                <ArrowRight className="w-3.5 h-3.5 stroke-[1.75]" aria-hidden="true" />
+              </Link>
+            </div>
+          </div>
+
+          <div className="p-6 sm:p-8 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-neutral-200/90 dark:border-white/10 shadow-xs flex flex-col justify-between">
+            <div>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-neutral-100 dark:bg-white/5 text-neutral-900 dark:text-white text-xs font-semibold mb-4">
+                <span>paye₹nt</span> &bull; <span>Lender Portal</span>
+              </div>
+              <h3 className="text-xl font-semibold text-neutral-950 dark:text-white mb-2">
+                For Gear Owners &amp; Studios
+              </h3>
+              <p className="text-xs sm:text-sm text-neutral-600 dark:text-[#AAB3BC] leading-relaxed mb-4">
+                Turn idle cinema rigs, audio equipment, and workstations into predictable earnings with complete control over your gear.
+              </p>
+              <ul className="space-y-2 text-xs text-neutral-600 dark:text-neutral-300">
+                <li className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                  <span>Aadhaar &amp; PAN KYC verification for equipment security</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                  <span>Custom day rates, deposit terms &amp; calendar availability</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                  <span>Direct settlement payouts upon safe equipment return</span>
+                </li>
+              </ul>
+            </div>
+            <div className="mt-6 pt-4 border-t border-neutral-100 dark:border-neutral-800">
+              <Link
+                to="/payernt"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-neutral-900 dark:text-white hover:underline"
+              >
+                <span>Join Lender Network</span>
+                <ArrowRight className="w-3.5 h-3.5 stroke-[1.75]" aria-hidden="true" />
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* 5. HOW PAYENT WORKS (Section 33) */}
       <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-20 sm:py-28">
         <div className="text-center max-w-2xl mx-auto">
@@ -613,10 +706,10 @@ export default function About() {
 
           <div className="shrink-0">
             <Link
-              to="/browse"
+              to="/payernt"
               className="inline-flex items-center gap-2.5 h-12 px-8 rounded-full bg-white text-black hover:bg-[#EAEAEA] text-sm font-semibold transition-colors shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-white cursor-pointer"
             >
-              <span>Explore Gear</span>
+              <span>Become a Lender</span>
               <ArrowRight className="h-4 w-4 stroke-[1.75]" aria-hidden="true" />
             </Link>
           </div>
