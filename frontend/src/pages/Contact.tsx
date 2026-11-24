@@ -186,7 +186,7 @@ export default function Contact() {
               <div className="mt-6 flex flex-wrap items-center gap-3 text-xs text-neutral-500 dark:text-neutral-400">
                 <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold border border-emerald-500/20">
                   <Clock className="w-3.5 h-3.5" />
-                  <span>Support Hours: 9:00 AM – 9:00 PM IST</span>
+                  <span>Support Hours: 24 Hours Customer Support Available</span>
                 </div>
                 <div className="flex items-center gap-1.5 text-neutral-600 dark:text-neutral-300">
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
@@ -420,10 +420,10 @@ export default function Contact() {
                     Support Availability
                   </div>
                   <div className="mt-1 text-sm font-bold text-neutral-950 dark:text-white">
-                    Monday – Saturday
+                    24x7 / 365 Days
                   </div>
                   <p className="text-[11px] text-neutral-500 dark:text-[#697680] mt-0.5">
-                    9:00 AM – 7:00 PM IST
+                    24 Hours Customer Support Available
                   </p>
                 </div>
               </div>

@@ -92,8 +92,8 @@ export const BUSINESS_INFO: BusinessInfo = {
   supportPhonePrimary: "+917989002612",
   supportPhoneFormatted: "+91 79890 02612",
   supportPhoneTollFree: "+91 80 4567 8900",
-  supportHours: "9:00 AM – 7:00 PM IST",
-  supportDays: "Monday through Saturday",
+  supportHours: "24 Hours Customer Support Available",
+  supportDays: "24x7 / 365 Days",
   typicalResponseTime: "Within 2 to 4 business hours",
 
   // Statutory Grievance Officer details under Consumer Protection (E-Commerce) Rules 2020 (Rule 4(4))
