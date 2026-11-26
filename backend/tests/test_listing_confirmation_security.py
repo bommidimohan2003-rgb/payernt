@@ -47,6 +47,15 @@ class TestListingConfirmationSecurityFlow:
             pincode="560038",
             password="SecurePassword123!",
         )
+        # Approve KYC for vendor in test
+        from database import MOCK_KYC_VERIFICATIONS
+        MOCK_KYC_VERIFICATIONS[f"kyc_{cls.vendor_email}_payernt"] = {
+            "id": f"kyc_{cls.vendor_email}_payernt",
+            "email": cls.vendor_email,
+            "account_type": "payernt",
+            "status": "APPROVED",
+            "created_at": "2026-11-20T00:00:00Z",
+        }
         cls.token = create_access_token(
             data={"sub": cls.vendor_email, "account_type": "paye₹nt", "user_id": cls.acc["id"]}
         )

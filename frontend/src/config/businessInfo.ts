@@ -87,8 +87,8 @@ export const BUSINESS_INFO: BusinessInfo = {
   registeredOffice: "[Pending Owner Verification: Registered Office Address, India]",
   principalPlaceOfBusiness: "[Pending Owner Verification: Principal Place of Business Address, India]",
 
-  // Centralized Support Contacts (Resolved across prior inconsistent references: support@payent.in, payent_support@gmail.com, support@payent.com)
-  supportEmail: "support@payent.com",
+  // Centralized Support Contacts
+  supportEmail: "payentsupport@gmail.com",
   supportPhonePrimary: "+917989002612",
   supportPhoneFormatted: "+91 79890 02612",
   supportPhoneTollFree: "+91 80 4567 8900",

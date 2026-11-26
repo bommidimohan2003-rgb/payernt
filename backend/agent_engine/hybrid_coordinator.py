@@ -483,7 +483,7 @@ class HybridQueryCoordinator:
                     },
                     "response_text": (
                         "I am unable to submit your support ticket right now due to a temporary connection delay. "
-                        "Please try again in a few moments, or reach out to support@payent.com directly."
+                        "Please try again in a few moments, or reach out to payentsupport@gmail.com directly."
                     ),
                     "suggestions": ["Retry Support Ticket", "Help Center"],
                     "entities": {},

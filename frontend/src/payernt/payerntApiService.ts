@@ -210,6 +210,36 @@ export const payerntApi = {
     }
   },
 
+  async registerOtpRequest(params: { email: string; phone?: string }): Promise<{
+    success: boolean;
+    message?: string;
+    error?: string;
+  }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/payernt/auth/register/request`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: params.email.trim().toLowerCase(),
+          phoneNumber: params.phone,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        return { success: true, message: data.message };
+      }
+      return {
+        success: false,
+        error: extractApiErrorMessage(data, "Failed to send verification code."),
+      };
+    } catch (e: any) {
+      return {
+        success: false,
+        error: e?.message || "Unable to reach server. Please check your network connection.",
+      };
+    }
+  },
+
   async register(params: {
     name: string;
     email: string;
@@ -219,6 +249,7 @@ export const payerntApi = {
     pincode?: string;
     password: string;
     confirmPassword?: string;
+    otp?: string;
   }): Promise<{
     success: boolean;
     status?: string;
@@ -273,6 +304,94 @@ export const payerntApi = {
       return {
         success: false,
         error: e?.message || "Unable to connect to the server.",
+      };
+    }
+  },
+
+  async loginOtpRequest(email: string): Promise<{
+    success: boolean;
+    message?: string;
+    error?: string;
+  }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/payernt/auth/login/otp/request`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim().toLowerCase() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        return { success: true, message: data.message };
+      }
+      return {
+        success: false,
+        error: extractApiErrorMessage(data, "Failed to send login code."),
+      };
+    } catch (e: any) {
+      return {
+        success: false,
+        error: e?.message || "Unable to reach server.",
+      };
+    }
+  },
+
+  async loginOtpVerify(params: { email: string; otp: string }): Promise<{
+    success: boolean;
+    status?: string;
+    accountType?: string;
+    account?: PayerntAccount;
+    token?: string;
+    error?: string;
+  }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/payernt/auth/login/otp/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: params.email.trim().toLowerCase(),
+          otp: params.otp.trim(),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        try {
+          localStorage.removeItem("payent:token");
+          localStorage.removeItem("payent:currentUser");
+          localStorage.removeItem("payent:refreshToken");
+          localStorage.removeItem("pay₹ent_session");
+          localStorage.removeItem("pay₹ent_account");
+          localStorage.removeItem("payent_token");
+          window.dispatchEvent(new CustomEvent("payent:storage_change"));
+        } catch {}
+
+        if (data.token) {
+          localStorage.setItem("paye₹nt_token", data.token);
+        }
+        if (data.refreshToken) {
+          localStorage.setItem("paye₹nt_refresh_token", data.refreshToken);
+        }
+        return { success: true, account: data.account, token: data.token };
+      }
+      if (res.status === 403) {
+        const detail =
+          typeof data?.detail === "object" && !Array.isArray(data?.detail)
+            ? data.detail
+            : {};
+        return {
+          success: false,
+          status: detail.status || data.status || "PENDING_REVIEW",
+          accountType: detail.accountType || data.accountType || "Payernt",
+          error: extractApiErrorMessage(data, "Your Payernt account is currently under review."),
+        };
+      }
+      return {
+        success: false,
+        error: extractApiErrorMessage(data, "Invalid verification code."),
+      };
+    } catch (e: any) {
+      return {
+        success: false,
+        error: e?.message || "Unable to reach server.",
       };
     }
   },

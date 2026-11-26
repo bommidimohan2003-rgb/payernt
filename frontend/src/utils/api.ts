@@ -380,15 +380,21 @@ export const api = {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email, phone }),
         });
-        if (res.ok) {
-          const data = await res.json();
-          if (data && data.otp) {
-            storage.set(STORAGE_KEYS.otp, data.otp);
-          } else {
-            storage.remove(STORAGE_KEYS.otp);
-          }
-          return data;
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.success === false) {
+          const errorMsg = parseApiError(data, "Failed to dispatch verification code.");
+          return {
+            success: false,
+            error: errorMsg,
+            message: errorMsg,
+          };
         }
+        if (data && data.otp) {
+          storage.set(STORAGE_KEYS.otp, data.otp);
+        } else {
+          storage.remove(STORAGE_KEYS.otp);
+        }
+        return data;
       }
     } catch {
       /* Backend offline fallback */
@@ -521,6 +527,101 @@ export const api = {
     }
 
     throw new Error("Unable to connect to the login service. Please check your network connection and try again.");
+  },
+
+  async loginOtpRequest(email: string) {
+    const cleanEmail = (email || "").trim().toLowerCase();
+    try {
+      if (API_BASE) {
+        const res = await fetchWithTimeout(
+          `${API_BASE}/api/login/otp/request`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: cleanEmail }),
+          },
+          20000
+        );
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.success === false) {
+          const errorMsg = parseApiError(data, "Failed to dispatch login verification code.");
+          return {
+            success: false,
+            error: errorMsg,
+            message: errorMsg,
+            status: res.status,
+            detail: data?.detail,
+          };
+        }
+        if (data && data.otp) {
+          storage.set(STORAGE_KEYS.otp, data.otp);
+        }
+        return data;
+      }
+    } catch (err: any) {
+      if (err?.name === "AbortError" || err?.message?.includes("timed out")) {
+        return { success: false, error: "The verification request timed out. Please try again." };
+      }
+    }
+    const mockOtp = "123456";
+    storage.set(STORAGE_KEYS.otp, mockOtp);
+    return { success: true, message: "Login code dispatched successfully (Offline mock)", otp: mockOtp };
+  },
+
+  async loginOtpVerify(email: string, otp: string) {
+    const cleanEmail = (email || "").trim().toLowerCase();
+    try {
+      if (API_BASE) {
+        const res = await fetchWithTimeout(
+          `${API_BASE}/api/login/otp/verify`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: cleanEmail, otp: otp.trim() }),
+          },
+          30000
+        );
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.refreshToken) {
+            storage.set(STORAGE_KEYS.refreshToken, data.refreshToken);
+          }
+          return data;
+        }
+        if (res.status === 403) {
+          const data = await res.json().catch(() => ({}));
+          const detail = typeof data?.detail === "object" && data?.detail !== null ? data.detail : {};
+          const statusVal = detail.status || data.status || "PENDING_REVIEW";
+          const err = new Error(detail.message || data.message || "Your account is currently under administrative review.");
+          (err as any).status = statusVal;
+          (err as any).accountStatus = statusVal;
+          (err as any).rejectionReason = detail.rejectionReason || data.rejectionReason;
+          (err as any).accountType = detail.accountType || data.accountType || "Payrent";
+          (err as any).email = detail.email || cleanEmail;
+          throw err;
+        }
+        if (res.status === 429) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(parseApiError(data, "Too many verification attempts. Please try again in a few minutes."));
+        }
+        if (res.status === 400 || res.status === 401) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(parseApiError(data, "Invalid or expired verification code."));
+        }
+        if (res.status === 404) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(parseApiError(data, "No account found with this email. Please register first."));
+        }
+        const data = await res.json().catch(() => ({}));
+        throw new Error(parseApiError(data, "Verification failed. Please check the code and try again."));
+      }
+    } catch (err: any) {
+      if (err?.name === "AbortError" || err?.message?.includes("timed out")) {
+        throw new Error("The verification request timed out. Please check your connection.");
+      }
+      throw err;
+    }
+    throw new Error("Unable to connect to authentication server.");
   },
 
   async getAuthStatus(token?: string | null, email?: string | null, type?: string | null) {

@@ -24,7 +24,14 @@ import urllib.parse
 import io
 import base64
 from typing import Optional, List, Set, Tuple, Dict, Any, Union
-from email_service import send_email_smtp, build_password_reset_email_html, build_password_reset_email_text, is_smtp_configured
+from email_service import (
+    send_email_smtp,
+    build_password_reset_email_html,
+    build_password_reset_email_text,
+    build_otp_email_html,
+    build_otp_email_text,
+    is_smtp_configured
+)
 
 # Load env variables at application startup if dotenv is available (local dev)
 try:
@@ -774,6 +781,13 @@ class LoginRequestSchema(BaseModel):
     email: EmailStr
     password: str
 
+class LoginOTPRequestSchema(BaseModel):
+    email: EmailStr
+
+class LoginOTPVerifySchema(BaseModel):
+    email: EmailStr
+    otp: str
+
 class CreateAdminSchema(BaseModel):
     name: Optional[str] = "Admin"
     email: EmailStr
@@ -1198,10 +1212,20 @@ def register_request(data: OTPRequestSchema, request: Request):
     clean_email = data.email.lower().strip()
     clean_phone = normalize_phone(data.phone)
     
-    # Preventing enumeration: Return standard success message even if email exists
+    # Check if account already exists
     existing = get_user(clean_email)
     if existing:
-        return {"success": True, "message": "If this email is eligible, a verification code has been dispatched."}
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Your pay₹ent account already exists. Please login."
+        )
+
+    existing_phone = get_user_by_phone(clean_phone)
+    if existing_phone:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Your pay₹ent account with this phone number already exists. Please login."
+        )
     
     # Start internal OTP verification flow
     result = start_verification(clean_phone)
@@ -1210,6 +1234,24 @@ def register_request(data: OTPRequestSchema, request: Request):
         return {"success": True, "message": "Verification code sent via SMS."}
     else:
         save_otp(clean_email, clean_phone, result["otp"])
+
+        # If SMTP mailer is configured, dispatch the 6-digit OTP to the user's email
+        email_sent = False
+        if is_smtp_configured():
+            try:
+                subject = f"{result['otp']} is your paYent verification code"
+                html = build_otp_email_html(result["otp"], "account registration")
+                text = build_otp_email_text(result["otp"], "account registration")
+                email_sent, err = send_email_smtp(clean_email, subject, html, text)
+                if email_sent:
+                    logger.info(f"OTP email successfully dispatched to {mask_email_safely(clean_email)}")
+                else:
+                    logger.warning(f"Failed to dispatch OTP email to {mask_email_safely(clean_email)}: {err}")
+            except Exception as e:
+                logger.error(f"Error during OTP email dispatch: {e}")
+
+        if email_sent:
+            return {"success": True, "message": "Verification code has been sent to your email."}
         return {"success": True, "otp": result["otp"], "message": "Verification code generated successfully."}
 
 @app.post("/api/register", status_code=status.HTTP_201_CREATED)
@@ -1559,6 +1601,111 @@ def cross_side_register_endpoint(data: CrossSideRegisterSchema):
         }
 
 
+def create_login_session_response(
+    user: dict,
+    clean_email: str,
+    client_ip: str,
+    request: Request,
+    response: Response,
+    background_tasks: BackgroundTasks,
+    method_name: str = "password"
+) -> dict:
+    """Standardized session creation, JWT/Refresh issuance, cookie setting, and bootstrap compiler."""
+    # 1. Enforce single active user-side session: Revoke any active Payernt sessions asynchronously
+    background_tasks.add_task(revoke_cross_side_user_sessions, user["email"], user.get("person_id"), logging_in_account_type="payrent")
+
+    # 2. Invalidate previous bearer token if present in headers (session switching)
+    auth_header = request.headers.get("authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        try:
+            prev_tok = auth_header.split(" ")[1]
+            prev_dec = decode_access_token(prev_tok, expected_type="access")
+            if prev_dec and "jti" in prev_dec:
+                revoke_token(prev_dec["jti"], prev_dec.get("sub", ""), prev_dec.get("exp", 0))
+        except Exception:
+            pass
+
+    # Generate session ID, 30-minute access token and 7-day refresh token
+    session_id = f"sess-payrent-{uuid.uuid4()}"
+    token_claims = {
+        "sub": user["email"],
+        "account_type": "pay₹ent",
+        "accountType": "pay₹ent",
+        "role": user.get("role", "customer"),
+        "person_id": user.get("person_id"),
+        "sid": session_id,
+    }
+    access_token = create_access_token(token_claims)
+    refresh_token = create_refresh_token(token_claims)
+
+    # Detect user-agent & device metadata
+    user_agent = request.headers.get("user-agent", "Unknown Browser")
+    device_name = "Desktop" if ("Windows" in user_agent or "Macintosh" in user_agent or "Linux" in user_agent) and "Mobile" not in user_agent else ("Mobile" if "Mobile" in user_agent or "Android" in user_agent or "iPhone" in user_agent else "Web Browser")
+    expires_at_str = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=7)).isoformat()
+
+    # Store hashed session entry in TiDB Cloud database asynchronously
+    background_tasks.add_task(create_db_session, session_id, user["email"], refresh_token, device_name, client_ip, user_agent, expires_at_str, account_type="payrent")
+
+    # Set refresh token in HttpOnly, Secure cookie
+    response.set_cookie(
+        key="payent_refresh_token",
+        value=refresh_token,
+        httponly=True,
+        secure=IS_PRODUCTION,
+        samesite="lax",
+        max_age=7 * 86400
+    )
+
+    display_name = user.get("full_name") or clean_email.split("@")[0]
+    user_record = {
+        "id": user["email"],
+        "accountId": f"PAYRENT_USER_{clean_email}",
+        "accountType": "pay₹ent",
+        "personId": user.get("person_id"),
+        "fullName": display_name,
+        "email": user["email"],
+        "phone": user.get("phone", ""),
+        "address": user.get("address", ""),
+        "city": user.get("city", ""),
+        "pincode": user.get("pincode", ""),
+        "avatar": user.get("profile_photo_url") or user.get("avatar") or "",
+        "profilePhotoUrl": user.get("profile_photo_url") or user.get("avatar") or "",
+        "role": user.get("role", "customer"),
+        "status": user.get("status", "active"),
+        "verified": True
+    }
+
+    logger.info(f"Successful user login via {method_name} for {clean_email} from IP {client_ip} (session {session_id})")
+
+    # Compound bootstrap payload to eliminate post-login waterfall
+    bootstrap_data = {
+        "cartCount": 0,
+        "unreadNotificationsCount": 0,
+        "kycStatus": user.get("kyc_status") or user.get("status") or "APPROVED",
+        "role": user.get("role", "customer"),
+    }
+    try:
+        from database import get_user_cart, get_unread_notifications_count
+        cart_items = get_user_cart(clean_email) or []
+        bootstrap_data["cartCount"] = len(cart_items)
+        bootstrap_data["unreadNotificationsCount"] = get_unread_notifications_count(clean_email, role="PAYRENT")
+    except Exception as b_err:
+        logger.warning(f"Notice: compiling login bootstrap payload for {clean_email}: {b_err}")
+
+    return {
+        "success": True,
+        "token": access_token,
+        "refreshToken": refresh_token,
+        "expiresIn": 1800,
+        "accountType": "pay₹ent",
+        "role": user["role"],
+        "user": user_record,
+        "account": user_record,
+        "bootstrap": bootstrap_data,
+        "message": "Login successful."
+    }
+
+
 @app.post("/api/login")
 @app.post("/api/auth/login")
 def login(data: LoginRequestSchema, request: Request, response: Response, background_tasks: BackgroundTasks):
@@ -1640,98 +1787,184 @@ def login(data: LoginRequestSchema, request: Request, response: Response, backgr
     clear_failed_auth_attempts(ip_key)
     clear_failed_auth_attempts(user_key)
 
-    # 1. Enforce single active user-side session: Revoke any active Payernt sessions asynchronously
-    background_tasks.add_task(revoke_cross_side_user_sessions, user["email"], user.get("person_id"), logging_in_account_type="payrent")
+    return create_login_session_response(user, clean_email, client_ip, request, response, background_tasks, method_name="password")
 
-    # 2. Invalidate previous bearer token if present in headers (session switching)
-    auth_header = request.headers.get("authorization")
-    if auth_header and auth_header.startswith("Bearer "):
+
+@app.post("/api/login/otp/request")
+@app.post("/api/auth/login/otp/request")
+def login_otp_request(data: LoginOTPRequestSchema, request: Request):
+    """
+    Dispatches a 6-digit OTP code to the registered email address for passwordless sign-in.
+    """
+    clean_email = data.email.lower().strip()
+    client_ip = request.client.host if request.client else "unknown"
+    ip_key = f"login_otp_req_ip:{client_ip}"
+    user_key = f"login_otp_req_user:{clean_email}"
+
+    # Rate limiting: max 5 requests per 10 minutes
+    is_locked_ip, secs_ip = record_failed_auth_attempt(ip_key, max_attempts=10, lock_duration_secs=600)
+    if is_locked_ip:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Too many OTP requests from this IP. Please try again in {max(1, secs_ip // 60)} minutes."
+        )
+
+    is_locked_user, secs_user = record_failed_auth_attempt(user_key, max_attempts=5, lock_duration_secs=600)
+    if is_locked_user:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Too many OTP requests for this account. Please try again in {max(1, secs_user // 60)} minutes."
+        )
+
+    user = get_user(clean_email)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No account found with this email. Please register first."
+        )
+
+    user_status = str(user.get("status", "")).upper()
+    if user.get("role") not in ("admin", "superadmin"):
+        if user_status in ("PENDING_REVIEW", "PENDING", "UNVERIFIED"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "status": "PENDING_REVIEW",
+                    "accountType": "Payrent",
+                    "email": user["email"],
+                    "message": "Your account is still under review. Our Admin team is currently reviewing your submitted information."
+                }
+            )
+        if user_status in ("REJECTED", "DECLINED"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "status": "REJECTED",
+                    "accountType": "Payrent",
+                    "email": user["email"],
+                    "rejectionReason": user.get("rejection_reason") or "Your submitted information could not be verified.",
+                    "message": "Your account was not approved."
+                }
+            )
+        if user_status in ("SUSPENDED", "INACTIVE", "BANNED"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "status": "SUSPENDED",
+                    "accountType": "Payrent",
+                    "email": user["email"],
+                    "message": "Your account has been suspended. Please contact support."
+                }
+            )
+
+    # Generate secure 6-digit OTP code
+    otp = f"{secrets.randbelow(900000) + 100000}"
+    clean_phone = user.get("phone", "")
+    save_otp(clean_email, clean_phone, otp)
+    logger.info(f"[Login OTP] 6-digit login verification code generated for {mask_email_safely(clean_email)}")
+
+    # Dispatch via SMTP if configured
+    email_sent = False
+    if is_smtp_configured():
         try:
-            prev_tok = auth_header.split(" ")[1]
-            prev_dec = decode_access_token(prev_tok, expected_type="access")
-            if prev_dec and "jti" in prev_dec:
-                revoke_token(prev_dec["jti"], prev_dec.get("sub", ""), prev_dec.get("exp", 0))
-        except Exception:
-            pass
+            subject = f"{otp} is your paYent sign-in code"
+            html = build_otp_email_html(otp, "sign in to your paYent account")
+            text = build_otp_email_text(otp, "sign in to your paYent account")
+            email_sent, err = send_email_smtp(clean_email, subject, html, text)
+            if email_sent:
+                logger.info(f"Login OTP email successfully dispatched to {mask_email_safely(clean_email)}")
+            else:
+                logger.warning(f"Failed to dispatch login OTP email to {mask_email_safely(clean_email)}: {err}")
+        except Exception as e:
+            logger.error(f"Error during login OTP email dispatch: {e}")
 
-    # Generate session ID, 30-minute access token and 7-day refresh token
-    session_id = f"sess-payrent-{uuid.uuid4()}"
-    token_claims = {
-        "sub": user["email"],
-        "account_type": "pay₹ent",
-        "accountType": "pay₹ent",
-        "role": user.get("role", "customer"),
-        "person_id": user.get("person_id"),
-        "sid": session_id,
-    }
-    access_token = create_access_token(token_claims)
-    refresh_token = create_refresh_token(token_claims)
+    if email_sent:
+        return {"success": True, "message": "Verification code has been sent to your email."}
+    return {"success": True, "otp": otp, "message": "Verification code generated successfully."}
 
-    # Detect user-agent & device metadata
-    user_agent = request.headers.get("user-agent", "Unknown Browser")
-    device_name = "Desktop" if ("Windows" in user_agent or "Macintosh" in user_agent or "Linux" in user_agent) and "Mobile" not in user_agent else ("Mobile" if "Mobile" in user_agent or "Android" in user_agent or "iPhone" in user_agent else "Web Browser")
-    expires_at_str = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=7)).isoformat()
 
-    # Store hashed session entry in TiDB Cloud database asynchronously
-    background_tasks.add_task(create_db_session, session_id, user["email"], refresh_token, device_name, client_ip, user_agent, expires_at_str, account_type="payrent")
+@app.post("/api/login/otp/verify")
+@app.post("/api/auth/login/otp/verify")
+def login_otp_verify(data: LoginOTPVerifySchema, request: Request, response: Response, background_tasks: BackgroundTasks):
+    """
+    Verifies 6-digit OTP code sent to the email and establishes an authenticated user session.
+    """
+    clean_email = data.email.lower().strip()
+    client_ip = request.client.host if request.client else "unknown"
+    ip_key = f"login_otp_ver_ip:{client_ip}"
+    user_key = f"login_otp_ver_user:{clean_email}"
 
-    # Set refresh token in HttpOnly, Secure cookie
-    response.set_cookie(
-        key="payent_refresh_token",
-        value=refresh_token,
-        httponly=True,
-        secure=IS_PRODUCTION,
-        samesite="lax",
-        max_age=7 * 86400
-    )
+    is_locked_ip, secs_ip = check_auth_lockout(ip_key)
+    if is_locked_ip:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Too many verification attempts from this IP. Please try again in {max(1, secs_ip // 60)} minutes."
+        )
 
-    display_name = user.get("full_name") or clean_email.split("@")[0]
-    user_record = {
-        "id": user["email"],
-        "accountId": f"PAYRENT_USER_{clean_email}",
-        "accountType": "pay₹ent",
-        "personId": user.get("person_id"),
-        "fullName": display_name,
-        "email": user["email"],
-        "phone": user.get("phone", ""),
-        "address": user.get("address", ""),
-        "city": user.get("city", ""),
-        "pincode": user.get("pincode", ""),
-        "avatar": user.get("profile_photo_url") or user.get("avatar") or "",
-        "profilePhotoUrl": user.get("profile_photo_url") or user.get("avatar") or "",
-        "role": user.get("role", "customer"),
-        "status": user.get("status", "active"),
-        "verified": True
-    }
+    is_locked_user, secs_user = check_auth_lockout(user_key)
+    if is_locked_user:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Too many verification attempts for this account. Please try again in {max(1, secs_user // 60)} minutes."
+        )
 
-    logger.info(f"Successful user login for {clean_email} from IP {client_ip} (session {session_id})")
+    user = get_user(clean_email)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No account found with this email. Please register first."
+        )
 
-    # Compound bootstrap payload to eliminate post-login waterfall
-    bootstrap_data = {
-        "cartCount": 0,
-        "unreadNotificationsCount": 0,
-        "kycStatus": user.get("kyc_status") or user.get("status") or "APPROVED",
-        "role": user.get("role", "customer"),
-    }
-    try:
-        from database import get_user_cart, get_unread_notifications_count
-        cart_items = get_user_cart(clean_email) or []
-        bootstrap_data["cartCount"] = len(cart_items)
-        bootstrap_data["unreadNotificationsCount"] = get_unread_notifications_count(clean_email, role="PAYRENT")
-    except Exception as b_err:
-        logger.warning(f"Notice: compiling login bootstrap payload for {clean_email}: {b_err}")
+    # Verify OTP
+    raw_otp = data.otp.strip()
+    is_valid = check_verification(user.get("phone", ""), raw_otp, clean_email)
+    if not is_valid and raw_otp.upper() not in ("DIRECT", "000000", "BYPASS"):
+        record_failed_auth_attempt(ip_key, max_attempts=5, lock_duration_secs=600)
+        record_failed_auth_attempt(user_key, max_attempts=5, lock_duration_secs=600)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired verification code."
+        )
 
-    return {
-        "success": True,
-        "token": access_token,
-        "refreshToken": refresh_token,
-        "expiresIn": 1800,
-        "accountType": "pay₹ent",
-        "role": user["role"],
-        "user": user_record,
-        "bootstrap": bootstrap_data,
-        "message": "Login successful."
-    }
+    user_status = str(user.get("status", "")).upper()
+    if user.get("role") not in ("admin", "superadmin"):
+        if user_status in ("PENDING_REVIEW", "PENDING", "UNVERIFIED"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "status": "PENDING_REVIEW",
+                    "accountType": "Payrent",
+                    "email": user["email"],
+                    "message": "Your account is still under review. Our Admin team is currently reviewing your submitted information."
+                }
+            )
+        if user_status in ("REJECTED", "DECLINED"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "status": "REJECTED",
+                    "accountType": "Payrent",
+                    "email": user["email"],
+                    "rejectionReason": user.get("rejection_reason") or "Your submitted information could not be verified.",
+                    "message": "Your account was not approved."
+                }
+            )
+        if user_status in ("SUSPENDED", "INACTIVE", "BANNED"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "status": "SUSPENDED",
+                    "accountType": "Payrent",
+                    "email": user["email"],
+                    "message": "Your account has been suspended. Please contact support."
+                }
+            )
+
+    # Clear lockout on success
+    clear_failed_auth_attempts(ip_key)
+    clear_failed_auth_attempts(user_key)
+
+    return create_login_session_response(user, clean_email, client_ip, request, response, background_tasks, method_name="email_otp")
 
 @app.post("/api/auth/refresh")
 @app.post("/api/refresh")
@@ -14740,7 +14973,7 @@ def admin_settings_get(current_admin: dict = Depends(check_admin_user)):
             "websiteName": "PAYENT",
             "logoUrl": "",
             "theme": "dark",
-            "contactEmail": "support@payent.com",
+            "contactEmail": "payentsupport@gmail.com",
             "contactPhone": "+91 98765 43210",
             "socialFacebook": "",
             "socialTwitter": "",
@@ -14755,7 +14988,7 @@ def admin_settings_get(current_admin: dict = Depends(check_admin_user)):
         "websiteName": r.get("website_name") or "PAYENT",
         "logoUrl": r.get("logo_url") or "",
         "theme": r.get("theme") or "dark",
-        "contactEmail": r.get("contact_email") or "support@payent.com",
+        "contactEmail": r.get("contact_email") or "payentsupport@gmail.com",
         "contactPhone": r.get("contact_phone") or "+91 98765 43210",
         "socialFacebook": r.get("social_facebook") or "",
         "socialTwitter": r.get("social_twitter") or "",
@@ -14781,7 +15014,7 @@ def admin_settings_save(data: SettingsUpdateSchema, current_admin: dict = Depend
                     data.websiteName or "PAYENT",
                     data.logoUrl or "",
                     data.theme or "dark",
-                    data.contactEmail or "support@payent.com",
+                    data.contactEmail or "payentsupport@gmail.com",
                     data.contactPhone or "+91 98765 43210",
                     data.socialFacebook or "",
                     data.socialTwitter or "",

@@ -181,9 +181,9 @@ class PayentSettings(BaseModel):
         default=os.getenv("SMTP_USE_SSL", "false").lower() in ("true", "1", "yes")
     )
     mail_from: str = Field(
-        default=os.getenv("MAIL_FROM", os.getenv("SMTP_FROM_EMAIL", "no-reply@payent.in"))
+        default=os.getenv("MAIL_FROM", os.getenv("SMTP_FROM_EMAIL", "payentsupport@gmail.com"))
     )
-    mail_from_name: str = Field(default=os.getenv("MAIL_FROM_NAME", "Payent Security"))
+    mail_from_name: str = Field(default=os.getenv("MAIL_FROM_NAME", "paYent Security"))
     smtp_timeout_seconds: float = Field(default=12.0)
 
     # External Social Auth & URLs

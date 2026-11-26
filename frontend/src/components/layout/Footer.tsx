@@ -75,24 +75,6 @@ export function Footer() {
       ],
     },
     {
-      id: "legal",
-      title: "Legal & Policies",
-      items: [
-        { label: "Privacy Policy", to: "/privacy", hash: "privacy-policy" },
-        { label: "Terms of Service", to: "/privacy", hash: "terms-of-service" },
-        { label: "Cookie Policy", to: "/cookies" },
-        { label: "Refund & Cancellation Policy", to: "/refund-policy" },
-        {
-          label: "Cookie Settings",
-          onClick: () => {
-            if (typeof window !== "undefined") {
-              window.dispatchEvent(new CustomEvent("payent:open_cookie_settings"));
-            }
-          },
-        },
-      ],
-    },
-    {
       id: "app",
       title: "Download Our App",
       customContent: (
@@ -154,8 +136,8 @@ export function Footer() {
           </div>
         </div>
 
-        {/* Desktop: Single horizontal 5-col row on lg+, 3-col on md */}
-        <div className="hidden md:grid md:grid-cols-3 lg:grid-cols-6 gap-3.5 lg:gap-4">
+        {/* Desktop: Single horizontal 4-col row on lg+, 2-col on md */}
+        <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
           {groups.map((g) => (
             <div key={g.id} className="flex flex-col gap-1 min-w-0">
               <h3 className="text-xs font-semibold text-neutral-900 dark:text-white">

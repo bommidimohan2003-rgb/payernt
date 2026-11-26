@@ -6,7 +6,6 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
-  ArrowLeft,
   Save,
   Trash2,
   Info,
@@ -1754,32 +1753,13 @@ export function ListProductWizard({
 
   return (
     <div className="w-full space-y-6 text-left pb-16">
-      {/* Back Button */}
-      {onCancel && (
-        <div>
-          <button
-            type="button"
-            onClick={onCancel}
-            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border border-border/80 bg-card hover:bg-secondary text-xs font-semibold text-foreground transition-all cursor-pointer shadow-2xs group"
-          >
-            <ArrowLeft className="h-3.5 w-3.5 group-hover:-translate-x-0.5 transition-transform" />
-            <span>Back to Home</span>
-          </button>
-        </div>
-      )}
-
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/80 pb-4">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-extrabold uppercase tracking-wider">
-              <Sparkles className="h-3 w-3" /> paYent Listing Studio
-            </span>
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground font-display mt-1">
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground font-display">
             Create Equipment Listing
           </h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
+          <p className="text-xs text-muted-foreground mt-1">
             Complete the 5 listing steps to publish gear for peer-to-peer rentals.
           </p>
         </div>

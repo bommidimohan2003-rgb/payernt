@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   ShieldCheck,
   Mail,
@@ -18,6 +18,7 @@ import {
   DollarSign,
   Shield,
   Layers,
+  RefreshCw,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -42,6 +43,7 @@ export function PayerntAuth({
   const [mode, setMode] = useState<"login" | "register">(initialMode);
 
   // --- LOGIN STATES ---
+  const [authMode, setAuthMode] = useState<"password" | "otp">("password");
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [showLoginPassword, setShowLoginPassword] = useState(false);
@@ -49,7 +51,18 @@ export function PayerntAuth({
   const [loginErrors, setLoginErrors] = useState<{ email?: string; password?: string; general?: string }>({});
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
-  // --- REGISTER STATES (Address & Pincode omitted per requirement) ---
+  // --- LOGIN OTP STATES ---
+  const [loginOtpStep, setLoginOtpStep] = useState<"request" | "verify">("request");
+  const [loginOtpEmail, setLoginOtpEmail] = useState("");
+  const [loginOtpDigits, setLoginOtpDigits] = useState<string[]>(["", "", "", "", "", ""]);
+  const [isSendingLoginOtp, setIsSendingLoginOtp] = useState(false);
+  const [isVerifyingLoginOtp, setIsVerifyingLoginOtp] = useState(false);
+  const [loginResendCooldown, setLoginResendCooldown] = useState(0);
+  const [loginOtpError, setLoginOtpError] = useState<string | null>(null);
+  const loginOtpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  // --- REGISTER STATES ---
+  const [registerStep, setRegisterStep] = useState<"details" | "otp">("details");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -68,6 +81,30 @@ export function PayerntAuth({
   }>({});
   const [isRegistering, setIsRegistering] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
+
+  // --- REGISTER OTP STATES ---
+  const [registerOtpDigits, setRegisterOtpDigits] = useState<string[]>(["", "", "", "", "", ""]);
+  const [isVerifyingRegisterOtp, setIsVerifyingRegisterOtp] = useState(false);
+  const [isResendingRegisterOtp, setIsResendingRegisterOtp] = useState(false);
+  const [registerResendCooldown, setRegisterResendCooldown] = useState(0);
+  const [registerOtpError, setRegisterOtpError] = useState<string | null>(null);
+  const registerOtpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  useEffect(() => {
+    if (loginResendCooldown <= 0) return;
+    const interval = setInterval(() => {
+      setLoginResendCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [loginResendCooldown]);
+
+  useEffect(() => {
+    if (registerResendCooldown <= 0) return;
+    const interval = setInterval(() => {
+      setRegisterResendCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [registerResendCooldown]);
 
   const handleCheckUser = async () => {
     const cleanName = name.trim();
@@ -132,7 +169,7 @@ export function PayerntAuth({
     return String(val);
   };
 
-  // --- LOGIN SUBMIT ---
+  // --- LOGIN SUBMIT (PASSWORD) ---
   const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const errors: { email?: string; password?: string; general?: string } = {};
@@ -231,12 +268,181 @@ export function PayerntAuth({
       });
   };
 
-  // --- REGISTER SUBMIT ---
-  const handleRegisterSubmit = (e: React.FormEvent) => {
+  // --- LOGIN OTP HANDLERS ---
+  const handleRequestLoginOtp = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const cleanEmail = loginOtpEmail.trim().toLowerCase();
+    if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      setLoginOtpError("Please enter a valid registered email address.");
+      return;
+    }
+
+    setLoginOtpError(null);
+    setIsSendingLoginOtp(true);
+    try {
+      const res = await payerntApi.loginOtpRequest(cleanEmail);
+      if (res.success) {
+        setLoginOtpStep("verify");
+        setLoginOtpDigits(["", "", "", "", "", ""]);
+        setLoginResendCooldown(60);
+        toast.success(`Login verification code sent to ${cleanEmail}`);
+        setTimeout(() => {
+          loginOtpInputRefs.current[0]?.focus();
+        }, 100);
+      } else {
+        const msg = res.error || "Failed to send login code.";
+        setLoginOtpError(msg);
+        toast.error(msg);
+      }
+    } catch (err: any) {
+      const msg = err?.message || "Failed to dispatch verification code.";
+      setLoginOtpError(msg);
+      toast.error(msg);
+    } finally {
+      setIsSendingLoginOtp(false);
+    }
+  };
+
+  const handleVerifyLoginOtp = async (codeToVerify?: string) => {
+    const code = (codeToVerify || loginOtpDigits.join("")).trim();
+    if (code.length !== 6 || !/^\d{6}$/.test(code)) {
+      setLoginOtpError("Please enter all 6 numeric digits of your login code.");
+      return;
+    }
+
+    setLoginOtpError(null);
+    setIsVerifyingLoginOtp(true);
+    try {
+      const cleanEmail = loginOtpEmail.trim().toLowerCase();
+      const res = await payerntApi.loginOtpVerify({ email: cleanEmail, otp: code });
+      if (res.success && res.account) {
+        const role = res.account.role || (res as any).role || (res as any).user?.role;
+        if (role === "admin" || role === "superadmin") {
+          if (res.token) {
+            localStorage.setItem("payent:admin:token", res.token);
+          }
+          localStorage.setItem(
+            "payent:admin:current_user",
+            JSON.stringify({
+              id: res.account.email || res.account.accountId || (res.account as any).id,
+              fullName: res.account.name || "Administrator",
+              email: res.account.email,
+              role: "admin",
+              status: "active",
+              avatar: res.account.profilePhotoUrl || res.account.profile_photo_url || res.account.avatar || "",
+              createdAt: res.account.createdAt || new Date().toISOString(),
+            })
+          );
+          localStorage.removeItem("payent:admin:logged_out");
+          localStorage.removeItem("payent:signed_out");
+          localStorage.removeItem("paye₹nt_signed_out");
+          window.dispatchEvent(new Event("payent:admin:profile-updated"));
+          toast.success(`Welcome back, ${res.account.name} (Administrator)!`);
+          navigate({ to: "/admin/dashboard" });
+          return;
+        }
+
+        localStorage.removeItem("payent:signed_out");
+        localStorage.removeItem("paye₹nt_signed_out");
+        toast.success(`Welcome back, ${res.account.name}!`);
+
+        payerntApi.getDashboard().catch(() => {});
+        payerntApi.getProducts().catch(() => {});
+        onAuthSuccess(res.account);
+      } else if (res.status === "PENDING_REVIEW" || res.status === "REJECTED") {
+        toast.info(safeString(res.error, "Your Payernt account is under administrative review."));
+        navigate({
+          to: "/account-pending",
+          search: { type: "payernt", email: cleanEmail } as any,
+        });
+      } else {
+        const msg = safeString(res.error, "Invalid or expired verification code.");
+        setLoginOtpError(msg);
+        toast.error(msg);
+      }
+    } catch (err: any) {
+      const msg = err?.message || "Verification failed. Please try again.";
+      setLoginOtpError(msg);
+      toast.error(msg);
+    } finally {
+      setIsVerifyingLoginOtp(false);
+    }
+  };
+
+  const handleResendLoginOtp = async () => {
+    if (loginResendCooldown > 0 || isSendingLoginOtp) return;
+    setIsSendingLoginOtp(true);
+    setLoginOtpError(null);
+    try {
+      const cleanEmail = loginOtpEmail.trim().toLowerCase();
+      const res = await payerntApi.loginOtpRequest(cleanEmail);
+      if (res.success) {
+        setLoginResendCooldown(60);
+        toast.success("A fresh login code has been sent to your email!");
+      } else {
+        const msg = res.error || "Failed to resend code.";
+        setLoginOtpError(msg);
+        toast.error(msg);
+      }
+    } catch {
+      toast.error("Unable to resend code. Please check your connection.");
+    } finally {
+      setIsSendingLoginOtp(false);
+    }
+  };
+
+  const handleLoginDigitChange = (index: number, value: string) => {
+    const numericChar = value.replace(/\D/g, "").slice(-1);
+    const updated = [...loginOtpDigits];
+    updated[index] = numericChar;
+    setLoginOtpDigits(updated);
+    setLoginOtpError(null);
+
+    if (numericChar && index < 5) {
+      loginOtpInputRefs.current[index + 1]?.focus();
+    }
+    if (numericChar && index === 5) {
+      const fullCode = updated.join("");
+      if (fullCode.length === 6) {
+        handleVerifyLoginOtp(fullCode);
+      }
+    }
+  };
+
+  const handleLoginKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Backspace") {
+      if (!loginOtpDigits[index] && index > 0) {
+        loginOtpInputRefs.current[index - 1]?.focus();
+      }
+    } else if (e.key === "ArrowLeft" && index > 0) {
+      loginOtpInputRefs.current[index - 1]?.focus();
+    } else if (e.key === "ArrowRight" && index < 5) {
+      loginOtpInputRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleLoginPaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    if (!pasted) return;
+    const updated = [...loginOtpDigits];
+    for (let i = 0; i < 6; i++) {
+      updated[i] = pasted[i] || "";
+    }
+    setLoginOtpDigits(updated);
+    setLoginOtpError(null);
+    const targetIndex = Math.min(pasted.length, 5);
+    loginOtpInputRefs.current[targetIndex]?.focus();
+    if (pasted.length === 6) {
+      handleVerifyLoginOtp(pasted);
+    }
+  };
+
+  // --- REGISTER SUBMIT (REQUEST EMAIL OTP) ---
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const errors: typeof registerErrors = {};
 
-    // 1. Name validation
     const cleanName = name.trim();
     if (!cleanName) {
       errors.name = "Full Name is required.";
@@ -244,7 +450,6 @@ export function PayerntAuth({
       errors.name = "Please enter a valid full name (at least 2 letters).";
     }
 
-    // 2. Email validation
     const cleanEmail = email.trim().toLowerCase();
     if (!cleanEmail) {
       errors.email = "Email Address is required.";
@@ -252,7 +457,6 @@ export function PayerntAuth({
       errors.email = "Please enter a valid email address.";
     }
 
-    // Phone validation (10 digits Indian mobile)
     const cleanPhone = phone.replace(/\D/g, "");
     if (!cleanPhone) {
       errors.phone = "Mobile Number is required.";
@@ -260,21 +464,18 @@ export function PayerntAuth({
       errors.phone = "Mobile Number must be exactly 10 digits.";
     }
 
-    // Password validation
     if (!password) {
       errors.password = "Password is required.";
     } else if (!isPasswordValid) {
       errors.password = "Password must meet all requirements.";
     }
 
-    // Confirm Password validation
     if (!confirmPassword) {
       errors.confirmPassword = "Confirm Password is required.";
     } else if (confirmPassword !== password) {
       errors.confirmPassword = "Passwords do not match.";
     }
 
-    // Terms validation
     if (!termsAccepted) {
       errors.terms = "Please accept the Terms of Service & Privacy Policy.";
     }
@@ -288,10 +489,47 @@ export function PayerntAuth({
     setRegisterErrors({});
     setIsRegistering(true);
 
-    // Note: address, pincode and KYC documents are omitted during account registration per specification
-    // (Aadhaar KYC is completed in dedicated host verification flow post-registration).
-    payerntApi
-      .register({
+    try {
+      const res = await payerntApi.registerOtpRequest({
+        email: cleanEmail,
+        phone: cleanPhone,
+      });
+
+      if (res.success) {
+        setRegisterStep("otp");
+        setRegisterOtpDigits(["", "", "", "", "", ""]);
+        setRegisterResendCooldown(60);
+        toast.success(`Verification code sent to ${cleanEmail}`);
+        setTimeout(() => {
+          registerOtpInputRefs.current[0]?.focus();
+        }, 100);
+      } else {
+        const msg = safeString(res.error, "Failed to send verification code.");
+        toast.error(msg);
+      }
+    } catch (err: any) {
+      toast.error(safeString(err?.message || err, "Unable to send verification code. Try again."));
+    } finally {
+      setIsRegistering(false);
+    }
+  };
+
+  // --- REGISTER OTP VERIFY & COMPLETE ---
+  const handleVerifyRegisterOtp = async (codeToVerify?: string) => {
+    const code = (codeToVerify || registerOtpDigits.join("")).trim();
+    if (code.length !== 6 || !/^\d{6}$/.test(code)) {
+      setRegisterOtpError("Please enter all 6 numeric digits of your verification code.");
+      return;
+    }
+
+    setRegisterOtpError(null);
+    setIsVerifyingRegisterOtp(true);
+    const cleanName = name.trim();
+    const cleanPhone = phone.replace(/\D/g, "");
+    const cleanEmail = email.trim().toLowerCase();
+
+    try {
+      const res = await payerntApi.register({
         name: cleanName,
         email: cleanEmail,
         phoneNumber: cleanPhone,
@@ -299,24 +537,97 @@ export function PayerntAuth({
         pincode: "000000",
         password,
         confirmPassword,
-      })
-      .then((res) => {
-        setIsRegistering(false);
-        if (res.success) {
-          toast.success("Payernt account created successfully! Submitted for Admin review.");
-          navigate({
-            to: "/account-pending",
-            search: { type: "payernt", email: cleanEmail } as any,
-          });
-        } else {
-          const msg = safeString(res.error, "Failed to create account.");
-          toast.error(msg);
-        }
-      })
-      .catch((err) => {
-        setIsRegistering(false);
-        toast.error(safeString(err?.message || err, "Registration failed. Try again."));
+        otp: code,
       });
+
+      if (res.success) {
+        toast.success("Payernt account created successfully! Submitted for Admin review.");
+        navigate({
+          to: "/account-pending",
+          search: { type: "payernt", email: cleanEmail } as any,
+        });
+      } else {
+        const msg = safeString(res.error, "Failed to create account.");
+        setRegisterOtpError(msg);
+        toast.error(msg);
+      }
+    } catch (err: any) {
+      const msg = safeString(err?.message || err, "Registration failed. Try again.");
+      setRegisterOtpError(msg);
+      toast.error(msg);
+    } finally {
+      setIsVerifyingRegisterOtp(false);
+    }
+  };
+
+  const handleResendRegisterOtp = async () => {
+    if (registerResendCooldown > 0 || isResendingRegisterOtp) return;
+    setIsResendingRegisterOtp(true);
+    setRegisterOtpError(null);
+    try {
+      const cleanEmail = email.trim().toLowerCase();
+      const cleanPhone = phone.replace(/\D/g, "");
+      const res = await payerntApi.registerOtpRequest({ email: cleanEmail, phone: cleanPhone });
+      if (res.success) {
+        setRegisterResendCooldown(60);
+        toast.success("A fresh verification code has been sent to your email!");
+      } else {
+        const msg = res.error || "Failed to resend code.";
+        setRegisterOtpError(msg);
+        toast.error(msg);
+      }
+    } catch {
+      toast.error("Unable to resend code. Please check your connection.");
+    } finally {
+      setIsResendingRegisterOtp(false);
+    }
+  };
+
+  const handleRegisterDigitChange = (index: number, value: string) => {
+    const numericChar = value.replace(/\D/g, "").slice(-1);
+    const updated = [...registerOtpDigits];
+    updated[index] = numericChar;
+    setRegisterOtpDigits(updated);
+    setRegisterOtpError(null);
+
+    if (numericChar && index < 5) {
+      registerOtpInputRefs.current[index + 1]?.focus();
+    }
+    if (numericChar && index === 5) {
+      const fullCode = updated.join("");
+      if (fullCode.length === 6) {
+        handleVerifyRegisterOtp(fullCode);
+      }
+    }
+  };
+
+  const handleRegisterKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Backspace") {
+      if (!registerOtpDigits[index] && index > 0) {
+        registerOtpInputRefs.current[index - 1]?.focus();
+      }
+    } else if (e.key === "ArrowLeft" && index > 0) {
+      registerOtpInputRefs.current[index - 1]?.focus();
+    } else if (e.key === "ArrowRight" && index < 5) {
+      registerOtpInputRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleRegisterPaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    if (!pasted) return;
+    const updated = [...registerOtpDigits];
+    for (let i = 0; i < 6; i++) {
+      updated[i] = pasted[i] || "";
+    }
+    setRegisterOtpDigits(updated);
+    setRegisterOtpError(null);
+    const targetIndex = Math.min(pasted.length, 5);
+    registerOtpInputRefs.current[targetIndex]?.focus();
+    if (pasted.length === 6) {
+      handleVerifyRegisterOtp(pasted);
+    }
   };
 
   return (
@@ -410,125 +721,396 @@ export function PayerntAuth({
                       </div>
                     )}
 
-                    <form onSubmit={handleLoginSubmit} className="space-y-3">
-                      {/* Email address */}
-                      <div className="w-full relative pt-1.5">
-                        <div
-                          className={`group relative flex items-center gap-2 rounded-xl border bg-card px-3 sm:px-3.5 h-10.5 sm:h-11 transition-colors border-neutral-400/80 dark:border-neutral-600 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/40 ${
-                            loginErrors.email ? "border-destructive focus-within:ring-destructive/30" : ""
-                          }`}
-                        >
-                          <label
-                            htmlFor="payernt-login-email"
-                            className={`absolute -top-2.5 left-3.5 px-1.5 bg-card text-[11px] font-semibold tracking-tight transition-colors pointer-events-none select-none z-10 ${
-                              loginErrors.email ? "text-destructive" : "text-muted-foreground group-focus-within:text-primary"
+                    {authMode === "password" ? (
+                      <form onSubmit={handleLoginSubmit} className="space-y-3">
+                        {/* Email address */}
+                        <div className="w-full relative pt-1.5">
+                          <div
+                            className={`group relative flex items-center gap-2 rounded-xl border bg-card px-3 sm:px-3.5 h-10.5 sm:h-11 transition-colors border-neutral-400/80 dark:border-neutral-600 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/40 ${
+                              loginErrors.email ? "border-destructive focus-within:ring-destructive/30" : ""
                             }`}
                           >
-                            Email address
-                          </label>
-                          <span className="text-muted-foreground shrink-0 flex items-center justify-center">
-                            <Mail className="h-4 w-4" />
-                          </span>
-                          <input
-                            id="payernt-login-email"
-                            type="email"
-                            autoComplete="email"
-                            value={loginEmail}
-                            onChange={(e) => {
-                              setLoginEmail(e.target.value);
-                              if (loginErrors.email) setLoginErrors((prev) => ({ ...prev, email: undefined }));
-                            }}
-                            className="flex-1 min-w-0 w-full bg-transparent outline-none text-sm placeholder:text-muted-foreground text-foreground"
-                          />
+                            <label
+                              htmlFor="payernt-login-email"
+                              className={`absolute -top-2.5 left-3.5 px-1.5 bg-card text-[11px] font-semibold tracking-tight transition-colors pointer-events-none select-none z-10 ${
+                                loginErrors.email ? "text-destructive" : "text-muted-foreground group-focus-within:text-primary"
+                              }`}
+                            >
+                              Email address
+                            </label>
+                            <span className="text-muted-foreground shrink-0 flex items-center justify-center">
+                              <Mail className="h-4 w-4" />
+                            </span>
+                            <input
+                              id="payernt-login-email"
+                              type="email"
+                              autoComplete="email"
+                              value={loginEmail}
+                              onChange={(e) => {
+                                setLoginEmail(e.target.value);
+                                if (loginErrors.email) setLoginErrors((prev) => ({ ...prev, email: undefined }));
+                              }}
+                              className="flex-1 min-w-0 w-full bg-transparent outline-none text-sm placeholder:text-muted-foreground text-foreground"
+                            />
+                          </div>
+                          {loginErrors.email && (
+                            <p className="mt-1 text-xs text-destructive">{loginErrors.email}</p>
+                          )}
                         </div>
-                        {loginErrors.email && (
-                          <p className="mt-1 text-xs text-destructive">{loginErrors.email}</p>
-                        )}
-                      </div>
 
-                      {/* Password */}
-                      <div className="w-full relative pt-1.5">
-                        <div
-                          className={`group relative flex items-center gap-2 rounded-xl border bg-card px-3 sm:px-3.5 h-10.5 sm:h-11 transition-colors border-neutral-400/80 dark:border-neutral-600 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/40 ${
-                            loginErrors.password ? "border-destructive focus-within:ring-destructive/30" : ""
-                          }`}
-                        >
-                          <label
-                            htmlFor="payernt-login-password"
-                            className={`absolute -top-2.5 left-3.5 px-1.5 bg-card text-[11px] font-semibold tracking-tight transition-colors pointer-events-none select-none z-10 ${
-                              loginErrors.password ? "text-destructive" : "text-muted-foreground group-focus-within:text-primary"
+                        {/* Password */}
+                        <div className="w-full relative pt-1.5">
+                          <div
+                            className={`group relative flex items-center gap-2 rounded-xl border bg-card px-3 sm:px-3.5 h-10.5 sm:h-11 transition-colors border-neutral-400/80 dark:border-neutral-600 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/40 ${
+                              loginErrors.password ? "border-destructive focus-within:ring-destructive/30" : ""
                             }`}
                           >
-                            Password
+                            <label
+                              htmlFor="payernt-login-password"
+                              className={`absolute -top-2.5 left-3.5 px-1.5 bg-card text-[11px] font-semibold tracking-tight transition-colors pointer-events-none select-none z-10 ${
+                                loginErrors.password ? "text-destructive" : "text-muted-foreground group-focus-within:text-primary"
+                              }`}
+                            >
+                              Password
+                            </label>
+                            <span className="text-muted-foreground shrink-0 flex items-center justify-center">
+                              <Lock className="h-4 w-4" />
+                            </span>
+                            <input
+                              id="payernt-login-password"
+                              type={showLoginPassword ? "text" : "password"}
+                              autoComplete="current-password"
+                              value={loginPassword}
+                              onChange={(e) => {
+                                setLoginPassword(e.target.value);
+                                if (loginErrors.password) setLoginErrors((prev) => ({ ...prev, password: undefined }));
+                              }}
+                              className="flex-1 min-w-0 w-full bg-transparent outline-none text-sm placeholder:text-muted-foreground text-foreground"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowLoginPassword(!showLoginPassword)}
+                              className="p-1 -mr-1 text-muted-foreground hover:text-foreground cursor-pointer focus:outline-none transition-colors shrink-0 flex items-center justify-center"
+                              aria-label={showLoginPassword ? "Hide password" : "Show password"}
+                            >
+                              {showLoginPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </button>
+                          </div>
+                          {loginErrors.password && (
+                            <p className="mt-1 text-xs text-destructive">{loginErrors.password}</p>
+                          )}
+                        </div>
+
+                        {/* Remember Me & Forgot Password Row */}
+                        <div className="flex items-center justify-between text-xs sm:text-sm pt-1">
+                          <label className="inline-flex items-center gap-2 cursor-pointer text-muted-foreground hover:text-foreground transition-colors select-none group">
+                            <input
+                              type="checkbox"
+                              checked={rememberMe}
+                              onChange={(e) => setRememberMe(e.target.checked)}
+                              className="sr-only"
+                            />
+                            <AnimatedCircleCheck checked={rememberMe} size={18} />
+                            <span>Remember me</span>
                           </label>
-                          <span className="text-muted-foreground shrink-0 flex items-center justify-center">
-                            <Lock className="h-4 w-4" />
-                          </span>
-                          <input
-                            id="payernt-login-password"
-                            type={showLoginPassword ? "text" : "password"}
-                            autoComplete="current-password"
-                            value={loginPassword}
-                            onChange={(e) => {
-                              setLoginPassword(e.target.value);
-                              if (loginErrors.password) setLoginErrors((prev) => ({ ...prev, password: undefined }));
-                            }}
-                            className="flex-1 min-w-0 w-full bg-transparent outline-none text-sm placeholder:text-muted-foreground text-foreground"
-                          />
                           <button
                             type="button"
-                            onClick={() => setShowLoginPassword(!showLoginPassword)}
-                            className="p-1 -mr-1 text-muted-foreground hover:text-foreground cursor-pointer focus:outline-none transition-colors shrink-0 flex items-center justify-center"
-                            aria-label={showLoginPassword ? "Hide password" : "Show password"}
+                            onClick={() => navigate({ to: "/forgot-password", search: { token: "" } as any })}
+                            className="text-foreground hover:underline font-bold text-xs cursor-pointer focus:outline-none"
                           >
-                            {showLoginPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            Forgot password?
                           </button>
                         </div>
-                        {loginErrors.password && (
-                          <p className="mt-1 text-xs text-destructive">{loginErrors.password}</p>
-                        )}
-                      </div>
 
-                      {/* Remember Me & Forgot Password Row */}
-                      <div className="flex items-center justify-between text-xs sm:text-sm pt-1">
-                        <label className="inline-flex items-center gap-2 cursor-pointer text-muted-foreground hover:text-foreground transition-colors select-none group">
-                          <input
-                            type="checkbox"
-                            checked={rememberMe}
-                            onChange={(e) => setRememberMe(e.target.checked)}
-                            className="sr-only"
-                          />
-                          <AnimatedCircleCheck checked={rememberMe} size={18} />
-                          <span>Remember me</span>
-                        </label>
+                        {/* Primary Button: Sign in to Payernt */}
+                        <button
+                          type="submit"
+                          disabled={isLoggingIn}
+                          className="w-full font-extrabold h-10.5 sm:h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-lg active:scale-98 flex items-center justify-center gap-2 cursor-pointer mt-2 disabled:opacity-50"
+                        >
+                          {isLoggingIn ? (
+                            <div className="flex items-center gap-2">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <span>Signing in to Payernt...</span>
+                            </div>
+                          ) : (
+                            <>
+                              <span>Sign in to Payernt</span>
+                              <ArrowRight className="h-4 w-4" />
+                            </>
+                          )}
+                        </button>
+
+                        {/* OR Divider */}
+                        <div className="relative my-4">
+                          <div className="absolute inset-0 flex items-center">
+                            <div className="w-full border-t border-border/70 dark:border-[#2D2D2D]" />
+                          </div>
+                          <div className="relative flex justify-center text-xs uppercase">
+                            <span className="bg-card dark:bg-[#1E1E1E] px-3 text-muted-foreground font-semibold tracking-wider text-[11px]">
+                              Or
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Alternative: Email OTP Login Button */}
                         <button
                           type="button"
-                          onClick={() => navigate({ to: "/forgot-password", search: { token: "" } as any })}
-                          className="text-foreground hover:underline font-bold text-xs cursor-pointer focus:outline-none"
+                          onClick={() => {
+                            if (loginEmail) setLoginOtpEmail(loginEmail);
+                            setAuthMode("otp");
+                            setLoginOtpStep("request");
+                            setLoginErrors({});
+                            setLoginOtpError(null);
+                          }}
+                          className="w-full font-bold h-10.5 sm:h-11 rounded-xl border border-border/80 dark:border-neutral-700/80 bg-secondary/50 hover:bg-secondary dark:bg-[#252525] dark:hover:bg-[#2A2A2A] text-foreground transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-98 text-xs sm:text-sm"
                         >
-                          Forgot password?
+                          <Mail className="h-4 w-4 text-primary shrink-0" />
+                          <span>Sign in with Email OTP</span>
                         </button>
-                      </div>
-
-                      {/* Primary Button: Sign in to Payernt */}
-                      <button
-                        type="submit"
-                        disabled={isLoggingIn}
-                        className="w-full font-extrabold h-10.5 sm:h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-lg active:scale-98 flex items-center justify-center gap-2 cursor-pointer mt-2 disabled:opacity-50"
-                      >
-                        {isLoggingIn ? (
-                          <div className="flex items-center gap-2">
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            <span>Signing in to Payernt...</span>
+                      </form>
+                    ) : (
+                      /* EMAIL OTP LOGIN FLOW */
+                      loginOtpStep === "request" ? (
+                        <form onSubmit={handleRequestLoginOtp} className="space-y-3">
+                          <div className="space-y-1">
+                            <p className="text-xs text-muted-foreground leading-relaxed">
+                              Enter your registered email address to receive a secure 6-digit login verification code.
+                            </p>
                           </div>
-                        ) : (
-                          <>
-                            <span>Sign in to Payernt</span>
-                            <ArrowRight className="h-4 w-4" />
-                          </>
-                        )}
-                      </button>
-                    </form>
+
+                          {loginOtpError && (
+                            <div className="p-3.5 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs font-semibold flex items-center gap-2">
+                              <XCircle className="h-4 w-4 shrink-0" />
+                              <span>{safeString(loginOtpError)}</span>
+                            </div>
+                          )}
+
+                          <div className="w-full relative pt-1.5">
+                            <div className="group relative flex items-center gap-2 rounded-xl border bg-card px-3 sm:px-3.5 h-10.5 sm:h-11 transition-colors border-neutral-400/80 dark:border-neutral-600 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/40">
+                              <label
+                                htmlFor="payernt-otp-email"
+                                className="absolute -top-2.5 left-3.5 px-1.5 bg-card text-[11px] font-semibold tracking-tight transition-colors pointer-events-none select-none z-10 text-muted-foreground group-focus-within:text-primary"
+                              >
+                                Email address
+                              </label>
+                              <span className="text-muted-foreground shrink-0 flex items-center justify-center">
+                                <Mail className="h-4 w-4" />
+                              </span>
+                              <input
+                                id="payernt-otp-email"
+                                type="email"
+                                autoComplete="email"
+                                value={loginOtpEmail}
+                                onChange={(e) => {
+                                  setLoginOtpEmail(e.target.value);
+                                  setLoginOtpError(null);
+                                }}
+                                className="flex-1 min-w-0 w-full bg-transparent outline-none text-sm placeholder:text-muted-foreground text-foreground"
+                                required
+                              />
+                            </div>
+                          </div>
+
+                          <button
+                            type="submit"
+                            disabled={isSendingLoginOtp}
+                            className="w-full font-extrabold h-10.5 sm:h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-lg active:scale-98 flex items-center justify-center gap-2 cursor-pointer mt-2 disabled:opacity-50"
+                          >
+                            {isSendingLoginOtp ? (
+                              <div className="flex items-center gap-2">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                <span>Sending Login Code...</span>
+                              </div>
+                            ) : (
+                              <>
+                                <span>Send Login Code</span>
+                                <ArrowRight className="h-4 w-4" />
+                              </>
+                            )}
+                          </button>
+
+                          {/* OR Divider */}
+                          <div className="relative my-4">
+                            <div className="absolute inset-0 flex items-center">
+                              <div className="w-full border-t border-border/70 dark:border-[#2D2D2D]" />
+                            </div>
+                            <div className="relative flex justify-center text-xs uppercase">
+                              <span className="bg-card dark:bg-[#1E1E1E] px-3 text-muted-foreground font-semibold tracking-wider text-[11px]">
+                                Or
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Switch to Password Button */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (loginOtpEmail) setLoginEmail(loginOtpEmail);
+                              setAuthMode("password");
+                              setLoginErrors({});
+                              setLoginOtpError(null);
+                            }}
+                            className="w-full font-bold h-10.5 sm:h-11 rounded-xl border border-border/80 dark:border-neutral-700/80 bg-secondary/50 hover:bg-secondary dark:bg-[#252525] dark:hover:bg-[#2A2A2A] text-foreground transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-98 text-xs sm:text-sm"
+                          >
+                            <Lock className="h-4 w-4 text-primary shrink-0" />
+                            <span>Sign in with Password</span>
+                          </button>
+                        </form>
+                      ) : (
+                        /* OTP Verification View */
+                        <div className="space-y-4">
+                          <div className="text-center space-y-1">
+                            <p className="text-xs text-muted-foreground leading-relaxed">
+                              Enter the 6-digit login code sent to{" "}
+                              <span className="font-bold text-foreground">{loginOtpEmail}</span>
+                            </p>
+                            <div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setLoginOtpStep("request");
+                                  setLoginOtpError(null);
+                                }}
+                                className="text-[11px] font-semibold text-primary hover:underline cursor-pointer inline-flex items-center gap-1"
+                              >
+                                <ArrowLeft className="h-3 w-3" />
+                                <span>Change email address</span>
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* 6 Digit Input Group */}
+                          <div className="space-y-3">
+                            <label className="block text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                              Enter 6-Digit Code
+                            </label>
+                            <div className="flex items-center justify-center gap-2 sm:gap-2.5" onPaste={handleLoginPaste}>
+                              {loginOtpDigits.map((digit, i) => (
+                                <input
+                                  key={i}
+                                  ref={(el) => {
+                                    loginOtpInputRefs.current[i] = el;
+                                  }}
+                                  type="text"
+                                  inputMode="numeric"
+                                  pattern="[0-9]*"
+                                  maxLength={1}
+                                  value={digit}
+                                  onChange={(e) => handleLoginDigitChange(i, e.target.value)}
+                                  onKeyDown={(e) => handleLoginKeyDown(i, e)}
+                                  disabled={isVerifyingLoginOtp}
+                                  aria-label={`Digit ${i + 1} of login code`}
+                                  className={`h-12 w-11 sm:h-14 sm:w-12 text-center text-xl sm:text-2xl font-mono font-extrabold rounded-xl border bg-card text-foreground transition-all focus:outline-none focus:ring-2 disabled:opacity-50 ${
+                                    loginOtpError
+                                      ? "border-destructive/60 focus:border-destructive focus:ring-destructive/20"
+                                      : "border-border/80 focus:border-primary focus:ring-primary/20"
+                                  }`}
+                                />
+                              ))}
+                            </div>
+
+                            {loginOtpError && (
+                              <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs font-semibold text-center flex items-center justify-center gap-1.5">
+                                <XCircle className="h-4 w-4 shrink-0" />
+                                <span>{loginOtpError}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => handleVerifyLoginOtp()}
+                            disabled={isVerifyingLoginOtp || loginOtpDigits.join("").length < 6}
+                            className="w-full font-extrabold h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-lg active:scale-98 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                          >
+                            {isVerifyingLoginOtp ? (
+                              <div className="flex items-center gap-2">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                <span>Verifying Code...</span>
+                              </div>
+                            ) : (
+                              <>
+                                <CheckCircle2 className="h-4 w-4 shrink-0" />
+                                <span>Verify & Sign In</span>
+                              </>
+                            )}
+                          </button>
+
+                          {/* Resend & Back */}
+                          <div className="flex items-center justify-between pt-1 text-xs">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setLoginOtpStep("request");
+                                setLoginOtpError(null);
+                              }}
+                              className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground font-semibold transition-colors cursor-pointer"
+                            >
+                              <ArrowLeft className="h-3.5 w-3.5" />
+                              <span>Back</span>
+                            </button>
+
+                            <div>
+                              {loginResendCooldown > 0 ? (
+                                <span className="text-muted-foreground font-medium text-[11px]">
+                                  Resend in <strong className="font-mono text-foreground">{loginResendCooldown}s</strong>
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={handleResendLoginOtp}
+                                  disabled={isSendingLoginOtp}
+                                  className="inline-flex items-center gap-1 text-primary hover:underline font-bold text-xs cursor-pointer disabled:opacity-50"
+                                >
+                                  {isSendingLoginOtp ? (
+                                    <>
+                                      <Loader2 className="h-3 w-3 animate-spin" />
+                                      <span>Sending...</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <RefreshCw className="h-3 w-3" />
+                                      <span>Resend Code</span>
+                                    </>
+                                  )}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="p-2.5 rounded-xl bg-secondary/50 border border-border/60 text-[11px] text-muted-foreground text-center">
+                            <span>Code is valid for 5 minutes. Check spam or junk folder if not received.</span>
+                          </div>
+
+                          {/* OR Divider */}
+                          <div className="relative my-4">
+                            <div className="absolute inset-0 flex items-center">
+                              <div className="w-full border-t border-border/70 dark:border-[#2D2D2D]" />
+                            </div>
+                            <div className="relative flex justify-center text-xs uppercase">
+                              <span className="bg-card dark:bg-[#1E1E1E] px-3 text-muted-foreground font-semibold tracking-wider text-[11px]">
+                                Or
+                              </span>
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (loginOtpEmail) setLoginEmail(loginOtpEmail);
+                              setAuthMode("password");
+                              setLoginErrors({});
+                              setLoginOtpError(null);
+                            }}
+                            className="w-full font-bold h-10.5 sm:h-11 rounded-xl border border-border/80 dark:border-neutral-700/80 bg-secondary/50 hover:bg-secondary dark:bg-[#252525] dark:hover:bg-[#2A2A2A] text-foreground transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-98 text-xs sm:text-sm"
+                          >
+                            <Lock className="h-4 w-4 text-primary shrink-0" />
+                            <span>Sign in with Password</span>
+                          </button>
+                        </div>
+                      )
+                    )}
 
                     {/* Switch Link to Register */}
                     <div className="pt-2 text-center">
@@ -538,7 +1120,9 @@ export function PayerntAuth({
                           type="button"
                           onClick={() => {
                             setMode("register");
+                            setRegisterStep("details");
                             setLoginErrors({});
+                            setRegisterErrors({});
                           }}
                           className="font-bold text-foreground hover:underline cursor-pointer"
                         >
@@ -556,289 +1140,404 @@ export function PayerntAuth({
                     transition={{ duration: 0.2 }}
                     className="space-y-3 text-left"
                   >
-                    <form onSubmit={handleRegisterSubmit} className="space-y-3">
-                      {/* 1. Full Name */}
-                      <div className="w-full relative pt-1.5">
-                        <div
-                          className={`group relative flex items-center gap-2 rounded-xl border bg-card px-3 sm:px-3.5 h-10.5 sm:h-11 transition-colors border-neutral-400/80 dark:border-neutral-600 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/40 ${
-                            registerErrors.name ? "border-destructive focus-within:ring-destructive/30" : ""
-                          }`}
-                        >
-                          <label
-                            htmlFor="payernt-register-name"
-                            className={`absolute -top-2.5 left-3.5 px-1.5 bg-card text-[11px] font-semibold tracking-tight transition-colors pointer-events-none select-none z-10 ${
-                              registerErrors.name ? "text-destructive" : "text-muted-foreground group-focus-within:text-primary"
-                            }`}
-                          >
-                            Full Name <span className="text-destructive">*</span>
-                          </label>
-                          <span className="text-muted-foreground shrink-0 flex items-center justify-center">
-                            <User className="h-4 w-4" />
-                          </span>
-                          <input
-                            id="payernt-register-name"
-                            type="text"
-                            autoComplete="name"
-                            value={name}
-                            onChange={(e) => {
-                              setName(e.target.value);
-                              if (registerErrors.name) setRegisterErrors((prev) => ({ ...prev, name: undefined }));
-                            }}
-                            className="flex-1 min-w-0 w-full bg-transparent outline-none text-sm placeholder:text-muted-foreground text-foreground"
-                          />
-                        </div>
-                        {registerErrors.name && (
-                          <p className="mt-1 text-xs text-destructive">{registerErrors.name}</p>
-                        )}
-                      </div>
-
-                      {/* 2. Mobile Number & Check button */}
-                      <div className="w-full relative pt-1.5">
-                        <div className="flex items-start gap-2">
+                    {registerStep === "details" ? (
+                      <form onSubmit={handleRegisterSubmit} className="space-y-3">
+                        {/* 1. Full Name */}
+                        <div className="w-full relative pt-1.5">
                           <div
-                            className={`group relative flex-1 flex items-center gap-2 rounded-xl border bg-card px-3 sm:px-3.5 h-10.5 sm:h-11 transition-colors border-neutral-400/80 dark:border-neutral-600 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/40 ${
-                              registerErrors.phone ? "border-destructive focus-within:ring-destructive/30" : ""
+                            className={`group relative flex items-center gap-2 rounded-xl border bg-card px-3 sm:px-3.5 h-10.5 sm:h-11 transition-colors border-neutral-400/80 dark:border-neutral-600 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/40 ${
+                              registerErrors.name ? "border-destructive focus-within:ring-destructive/30" : ""
                             }`}
                           >
                             <label
-                              htmlFor="payernt-register-phone"
+                              htmlFor="payernt-register-name"
                               className={`absolute -top-2.5 left-3.5 px-1.5 bg-card text-[11px] font-semibold tracking-tight transition-colors pointer-events-none select-none z-10 ${
-                                registerErrors.phone ? "text-destructive" : "text-muted-foreground group-focus-within:text-primary"
+                                registerErrors.name ? "text-destructive" : "text-muted-foreground group-focus-within:text-primary"
                               }`}
                             >
-                              Mobile Number <span className="text-destructive">*</span>
+                              Full Name <span className="text-destructive">*</span>
                             </label>
-                            <span className="text-xs font-bold text-muted-foreground select-none shrink-0">
-                              +91
+                            <span className="text-muted-foreground shrink-0 flex items-center justify-center">
+                              <User className="h-4 w-4" />
                             </span>
                             <input
-                              id="payernt-register-phone"
-                              type="tel"
-                              maxLength={10}
-                              autoComplete="tel"
-                              value={phone}
+                              id="payernt-register-name"
+                              type="text"
+                              autoComplete="name"
+                              value={name}
                               onChange={(e) => {
-                                const val = e.target.value.replace(/\D/g, "").slice(0, 10);
-                                setPhone(val);
-                                if (registerErrors.phone) setRegisterErrors((prev) => ({ ...prev, phone: undefined }));
+                                setName(e.target.value);
+                                if (registerErrors.name) setRegisterErrors((prev) => ({ ...prev, name: undefined }));
                               }}
                               className="flex-1 min-w-0 w-full bg-transparent outline-none text-sm placeholder:text-muted-foreground text-foreground"
                             />
                           </div>
+                          {registerErrors.name && (
+                            <p className="mt-1 text-xs text-destructive">{registerErrors.name}</p>
+                          )}
+                        </div>
+
+                        {/* 2. Mobile Number & Check button */}
+                        <div className="w-full relative pt-1.5">
+                          <div className="flex items-start gap-2">
+                            <div
+                              className={`group relative flex-1 flex items-center gap-2 rounded-xl border bg-card px-3 sm:px-3.5 h-10.5 sm:h-11 transition-colors border-neutral-400/80 dark:border-neutral-600 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/40 ${
+                                registerErrors.phone ? "border-destructive focus-within:ring-destructive/30" : ""
+                              }`}
+                            >
+                              <label
+                                htmlFor="payernt-register-phone"
+                                className={`absolute -top-2.5 left-3.5 px-1.5 bg-card text-[11px] font-semibold tracking-tight transition-colors pointer-events-none select-none z-10 ${
+                                  registerErrors.phone ? "text-destructive" : "text-muted-foreground group-focus-within:text-primary"
+                                }`}
+                              >
+                                Mobile Number <span className="text-destructive">*</span>
+                              </label>
+                              <span className="text-xs font-bold text-muted-foreground select-none shrink-0">
+                                +91
+                              </span>
+                              <input
+                                id="payernt-register-phone"
+                                type="tel"
+                                maxLength={10}
+                                autoComplete="tel"
+                                value={phone}
+                                onChange={(e) => {
+                                  const val = e.target.value.replace(/\D/g, "").slice(0, 10);
+                                  setPhone(val);
+                                  if (registerErrors.phone) setRegisterErrors((prev) => ({ ...prev, phone: undefined }));
+                                }}
+                                className="flex-1 min-w-0 w-full bg-transparent outline-none text-sm placeholder:text-muted-foreground text-foreground"
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={handleCheckUser}
+                              disabled={isChecking}
+                              className="h-10.5 sm:h-11 px-3.5 rounded-xl border border-neutral-400/80 dark:border-neutral-600 bg-secondary hover:bg-secondary/80 text-foreground font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shrink-0 disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-1.5"
+                              title="Check existing account records"
+                            >
+                              {isChecking ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <span>Check</span>
+                              )}
+                            </button>
+                          </div>
+                          {registerErrors.phone && (
+                            <p className="mt-1 text-xs text-destructive">{registerErrors.phone}</p>
+                          )}
+                        </div>
+
+                        {/* 3. Email Address */}
+                        <div className="w-full relative pt-1.5">
+                          <div
+                            className={`group relative flex items-center gap-2 rounded-xl border bg-card px-3 sm:px-3.5 h-10.5 sm:h-11 transition-colors border-neutral-400/80 dark:border-neutral-600 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/40 ${
+                              registerErrors.email ? "border-destructive focus-within:ring-destructive/30" : ""
+                            }`}
+                          >
+                            <label
+                              htmlFor="payernt-register-email"
+                              className={`absolute -top-2.5 left-3.5 px-1.5 bg-card text-[11px] font-semibold tracking-tight transition-colors pointer-events-none select-none z-10 ${
+                                registerErrors.email ? "text-destructive" : "text-muted-foreground group-focus-within:text-primary"
+                              }`}
+                            >
+                              Email Address <span className="text-destructive">*</span>
+                            </label>
+                            <span className="text-muted-foreground shrink-0 flex items-center justify-center">
+                              <Mail className="h-4 w-4" />
+                            </span>
+                            <input
+                              id="payernt-register-email"
+                              type="email"
+                              autoComplete="email"
+                              value={email}
+                              onChange={(e) => {
+                                setEmail(e.target.value);
+                                if (registerErrors.email) setRegisterErrors((prev) => ({ ...prev, email: undefined }));
+                              }}
+                              className="flex-1 min-w-0 w-full bg-transparent outline-none text-sm placeholder:text-muted-foreground text-foreground"
+                            />
+                          </div>
+                          {registerErrors.email && (
+                            <p className="mt-1 text-xs text-destructive">{registerErrors.email}</p>
+                          )}
+                        </div>
+
+                        {/* Password & Confirm Password */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {/* Password */}
+                          <div className="w-full relative pt-1.5">
+                            <div
+                              className={`group relative flex items-center gap-2 rounded-xl border bg-card px-3 sm:px-3.5 h-10.5 sm:h-11 transition-colors border-neutral-400/80 dark:border-neutral-600 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/40 ${
+                                registerErrors.password ? "border-destructive focus-within:ring-destructive/30" : ""
+                              }`}
+                            >
+                              <label
+                                htmlFor="payernt-register-password"
+                                className={`absolute -top-2.5 left-3.5 px-1.5 bg-card text-[11px] font-semibold tracking-tight transition-colors pointer-events-none select-none z-10 ${
+                                  registerErrors.password ? "text-destructive" : "text-muted-foreground group-focus-within:text-primary"
+                                }`}
+                              >
+                                Password <span className="text-destructive">*</span>
+                              </label>
+                              <span className="text-muted-foreground shrink-0 flex items-center justify-center">
+                                <Lock className="h-4 w-4" />
+                              </span>
+                              <input
+                                id="payernt-register-password"
+                                type={showPassword ? "text" : "password"}
+                                autoComplete="new-password"
+                                value={password}
+                                onChange={(e) => {
+                                  setPassword(e.target.value);
+                                  if (registerErrors.password) setRegisterErrors((prev) => ({ ...prev, password: undefined }));
+                                }}
+                                className="flex-1 min-w-0 w-full bg-transparent outline-none text-sm placeholder:text-muted-foreground text-foreground"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="p-1 -mr-1 text-muted-foreground hover:text-foreground cursor-pointer focus:outline-none transition-colors shrink-0 flex items-center justify-center"
+                                aria-label={showPassword ? "Hide password" : "Show password"}
+                              >
+                                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                              </button>
+                            </div>
+                            {registerErrors.password && (
+                              <p className="mt-1 text-xs text-destructive">{registerErrors.password}</p>
+                            )}
+                          </div>
+
+                          {/* Confirm Password */}
+                          <div className="w-full relative pt-1.5">
+                            <div
+                              className={`group relative flex items-center gap-2 rounded-xl border bg-card px-3 sm:px-3.5 h-10.5 sm:h-11 transition-colors border-neutral-400/80 dark:border-neutral-600 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/40 ${
+                                registerErrors.confirmPassword ? "border-destructive focus-within:ring-destructive/30" : ""
+                              }`}
+                            >
+                              <label
+                                htmlFor="payernt-register-confirm"
+                                className={`absolute -top-2.5 left-3.5 px-1.5 bg-card text-[11px] font-semibold tracking-tight transition-colors pointer-events-none select-none z-10 ${
+                                  registerErrors.confirmPassword ? "text-destructive" : "text-muted-foreground group-focus-within:text-primary"
+                                }`}
+                              >
+                                Confirm Password <span className="text-destructive">*</span>
+                              </label>
+                              <span className="text-muted-foreground shrink-0 flex items-center justify-center">
+                                <Lock className="h-4 w-4" />
+                              </span>
+                              <input
+                                id="payernt-register-confirm"
+                                type={showConfirmPassword ? "text" : "password"}
+                                autoComplete="new-password"
+                                value={confirmPassword}
+                                onChange={(e) => {
+                                  setConfirmPassword(e.target.value);
+                                  if (registerErrors.confirmPassword) setRegisterErrors((prev) => ({ ...prev, confirmPassword: undefined }));
+                                }}
+                                className="flex-1 min-w-0 w-full bg-transparent outline-none text-sm placeholder:text-muted-foreground text-foreground"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                className="p-1 -mr-1 text-muted-foreground hover:text-foreground cursor-pointer focus:outline-none transition-colors shrink-0 flex items-center justify-center"
+                                aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                              >
+                                {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                              </button>
+                            </div>
+                            {registerErrors.confirmPassword && (
+                              <p className="mt-1 text-xs text-destructive">{registerErrors.confirmPassword}</p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Password Requirements Guidance */}
+                        {password.length > 0 && !isPasswordValid && (
+                          <div className="p-2.5 rounded-xl bg-secondary/80 border border-border/80 text-[11px] space-y-1 text-muted-foreground">
+                            <p className="font-semibold text-foreground">Password requirements:</p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+                              <span className={hasMinLen ? "text-emerald-500 font-medium" : ""}>
+                                • 8+ characters
+                              </span>
+                              <span className={hasUppercase ? "text-emerald-500 font-medium" : ""}>
+                                • Uppercase letter
+                              </span>
+                              <span className={hasLowercase ? "text-emerald-500 font-medium" : ""}>
+                                • Lowercase letter
+                              </span>
+                              <span className={hasNumber && hasSpecial ? "text-emerald-500 font-medium" : ""}>
+                                • Number & symbol
+                              </span>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Terms & Conditions Checkbox with Animated Circle Tick */}
+                        <div className="pt-2">
+                          <label className="flex items-center gap-2.5 text-xs cursor-pointer select-none group">
+                            <input
+                              type="checkbox"
+                              checked={termsAccepted}
+                              onChange={(e) => {
+                                setTermsAccepted(e.target.checked);
+                                if (registerErrors.terms) setRegisterErrors((prev) => ({ ...prev, terms: undefined }));
+                              }}
+                              className="sr-only"
+                            />
+                            <AnimatedCircleCheck checked={termsAccepted} />
+                            <span className="text-muted-foreground text-[11px] leading-tight group-hover:text-foreground transition-colors">
+                              I accept the{" "}
+                              <Link to="/privacy" target="_blank" className="text-foreground hover:underline font-bold">
+                                Lender Terms
+                              </Link>{" "}
+                              and{" "}
+                              <Link to="/privacy" target="_blank" className="text-foreground hover:underline font-bold">
+                                Equipment Policy
+                              </Link>
+                            </span>
+                          </label>
+                          {registerErrors.terms && (
+                            <p className="mt-1 text-xs text-destructive font-medium">
+                              {registerErrors.terms}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Primary Action Button: Continue to Email Verification */}
+                        <button
+                          type="submit"
+                          disabled={isRegistering}
+                          className="w-full font-extrabold h-10.5 sm:h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-lg active:scale-98 flex items-center justify-center gap-2 cursor-pointer mt-2 disabled:opacity-50"
+                        >
+                          {isRegistering ? (
+                            <div className="flex items-center gap-2">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <span>Sending Verification Code...</span>
+                            </div>
+                          ) : (
+                            <>
+                              <span>Continue to Email Verification</span>
+                              <ArrowRight className="h-4 w-4" />
+                            </>
+                          )}
+                        </button>
+                      </form>
+                    ) : (
+                      /* EMAIL OTP VERIFICATION STEP */
+                      <div className="space-y-4">
+                        <div className="text-center space-y-1">
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            Enter the 6-digit verification code sent to{" "}
+                            <span className="font-bold text-foreground">{email}</span>
+                          </p>
+                        </div>
+
+                        {/* 6 Digit Input Group */}
+                        <div className="space-y-3">
+                          <label className="block text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                            Enter 6-Digit Code
+                          </label>
+                          <div className="flex items-center justify-center gap-2 sm:gap-2.5" onPaste={handleRegisterPaste}>
+                            {registerOtpDigits.map((digit, i) => (
+                              <input
+                                key={i}
+                                ref={(el) => {
+                                  registerOtpInputRefs.current[i] = el;
+                                }}
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                maxLength={1}
+                                value={digit}
+                                onChange={(e) => handleRegisterDigitChange(i, e.target.value)}
+                                onKeyDown={(e) => handleRegisterKeyDown(i, e)}
+                                disabled={isVerifyingRegisterOtp}
+                                aria-label={`Digit ${i + 1} of verification code`}
+                                className={`h-12 w-11 sm:h-14 sm:w-12 text-center text-xl sm:text-2xl font-mono font-extrabold rounded-xl border bg-card text-foreground transition-all focus:outline-none focus:ring-2 disabled:opacity-50 ${
+                                  registerOtpError
+                                    ? "border-destructive/60 focus:border-destructive focus:ring-destructive/20"
+                                    : "border-border/80 focus:border-primary focus:ring-primary/20"
+                                }`}
+                              />
+                            ))}
+                          </div>
+
+                          {registerOtpError && (
+                            <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs font-semibold text-center flex items-center justify-center gap-1.5">
+                              <XCircle className="h-4 w-4 shrink-0" />
+                              <span>{registerOtpError}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleVerifyRegisterOtp()}
+                          disabled={isVerifyingRegisterOtp || registerOtpDigits.join("").length < 6}
+                          className="w-full font-extrabold h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-lg active:scale-98 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                        >
+                          {isVerifyingRegisterOtp ? (
+                            <div className="flex items-center gap-2">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <span>Verifying Code...</span>
+                            </div>
+                          ) : (
+                            <>
+                              <CheckCircle2 className="h-4 w-4 shrink-0" />
+                              <span>Verify & Complete Registration</span>
+                            </>
+                          )}
+                        </button>
+
+                        {/* Resend & Back Navigation */}
+                        <div className="flex items-center justify-between pt-1 text-xs">
                           <button
                             type="button"
-                            onClick={handleCheckUser}
-                            disabled={isChecking}
-                            className="h-10.5 sm:h-11 px-3.5 rounded-xl border border-neutral-400/80 dark:border-neutral-600 bg-secondary hover:bg-secondary/80 text-foreground font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shrink-0 disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-1.5"
-                            title="Check existing account records"
+                            onClick={() => {
+                              setRegisterStep("details");
+                              setRegisterOtpError(null);
+                            }}
+                            className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground font-semibold transition-colors cursor-pointer"
                           >
-                            {isChecking ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <span>Check</span>
-                            )}
+                            <ArrowLeft className="h-3.5 w-3.5" />
+                            <span>Back to Details</span>
                           </button>
-                        </div>
-                        {registerErrors.phone && (
-                          <p className="mt-1 text-xs text-destructive">{registerErrors.phone}</p>
-                        )}
-                      </div>
 
-                      {/* 3. Email Address */}
-                      <div className="w-full relative pt-1.5">
-                        <div
-                          className={`group relative flex items-center gap-2 rounded-xl border bg-card px-3 sm:px-3.5 h-10.5 sm:h-11 transition-colors border-neutral-400/80 dark:border-neutral-600 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/40 ${
-                            registerErrors.email ? "border-destructive focus-within:ring-destructive/30" : ""
-                          }`}
-                        >
-                          <label
-                            htmlFor="payernt-register-email"
-                            className={`absolute -top-2.5 left-3.5 px-1.5 bg-card text-[11px] font-semibold tracking-tight transition-colors pointer-events-none select-none z-10 ${
-                              registerErrors.email ? "text-destructive" : "text-muted-foreground group-focus-within:text-primary"
-                            }`}
-                          >
-                            Email Address <span className="text-destructive">*</span>
-                          </label>
-                          <span className="text-muted-foreground shrink-0 flex items-center justify-center">
-                            <Mail className="h-4 w-4" />
-                          </span>
-                          <input
-                            id="payernt-register-email"
-                            type="email"
-                            autoComplete="email"
-                            value={email}
-                            onChange={(e) => {
-                              setEmail(e.target.value);
-                              if (registerErrors.email) setRegisterErrors((prev) => ({ ...prev, email: undefined }));
-                            }}
-                            className="flex-1 min-w-0 w-full bg-transparent outline-none text-sm placeholder:text-muted-foreground text-foreground"
-                          />
-                        </div>
-                        {registerErrors.email && (
-                          <p className="mt-1 text-xs text-destructive">{registerErrors.email}</p>
-                        )}
-                      </div>
-
-                      {/* Password & Confirm Password */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {/* Password */}
-                        <div className="w-full relative pt-1.5">
-                          <div
-                            className={`group relative flex items-center gap-2 rounded-xl border bg-card px-3 sm:px-3.5 h-10.5 sm:h-11 transition-colors border-neutral-400/80 dark:border-neutral-600 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/40 ${
-                              registerErrors.password ? "border-destructive focus-within:ring-destructive/30" : ""
-                            }`}
-                          >
-                            <label
-                              htmlFor="payernt-register-password"
-                              className={`absolute -top-2.5 left-3.5 px-1.5 bg-card text-[11px] font-semibold tracking-tight transition-colors pointer-events-none select-none z-10 ${
-                                registerErrors.password ? "text-destructive" : "text-muted-foreground group-focus-within:text-primary"
-                              }`}
-                            >
-                              Password <span className="text-destructive">*</span>
-                            </label>
-                            <span className="text-muted-foreground shrink-0 flex items-center justify-center">
-                              <Lock className="h-4 w-4" />
-                            </span>
-                            <input
-                              id="payernt-register-password"
-                              type={showPassword ? "text" : "password"}
-                              autoComplete="new-password"
-                              value={password}
-                              onChange={(e) => {
-                                setPassword(e.target.value);
-                                if (registerErrors.password) setRegisterErrors((prev) => ({ ...prev, password: undefined }));
-                              }}
-                              className="flex-1 min-w-0 w-full bg-transparent outline-none text-sm placeholder:text-muted-foreground text-foreground"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setShowPassword(!showPassword)}
-                              className="p-1 -mr-1 text-muted-foreground hover:text-foreground cursor-pointer focus:outline-none transition-colors shrink-0 flex items-center justify-center"
-                              aria-label={showPassword ? "Hide password" : "Show password"}
-                            >
-                              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                            </button>
-                          </div>
-                          {registerErrors.password && (
-                            <p className="mt-1 text-xs text-destructive">{registerErrors.password}</p>
-                          )}
-                        </div>
-
-                        {/* Confirm Password */}
-                        <div className="w-full relative pt-1.5">
-                          <div
-                            className={`group relative flex items-center gap-2 rounded-xl border bg-card px-3 sm:px-3.5 h-10.5 sm:h-11 transition-colors border-neutral-400/80 dark:border-neutral-600 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/40 ${
-                              registerErrors.confirmPassword ? "border-destructive focus-within:ring-destructive/30" : ""
-                            }`}
-                          >
-                            <label
-                              htmlFor="payernt-register-confirm"
-                              className={`absolute -top-2.5 left-3.5 px-1.5 bg-card text-[11px] font-semibold tracking-tight transition-colors pointer-events-none select-none z-10 ${
-                                registerErrors.confirmPassword ? "text-destructive" : "text-muted-foreground group-focus-within:text-primary"
-                              }`}
-                            >
-                              Confirm Password <span className="text-destructive">*</span>
-                            </label>
-                            <span className="text-muted-foreground shrink-0 flex items-center justify-center">
-                              <Lock className="h-4 w-4" />
-                            </span>
-                            <input
-                              id="payernt-register-confirm"
-                              type={showConfirmPassword ? "text" : "password"}
-                              autoComplete="new-password"
-                              value={confirmPassword}
-                              onChange={(e) => {
-                                setConfirmPassword(e.target.value);
-                                if (registerErrors.confirmPassword) setRegisterErrors((prev) => ({ ...prev, confirmPassword: undefined }));
-                              }}
-                              className="flex-1 min-w-0 w-full bg-transparent outline-none text-sm placeholder:text-muted-foreground text-foreground"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                              className="p-1 -mr-1 text-muted-foreground hover:text-foreground cursor-pointer focus:outline-none transition-colors shrink-0 flex items-center justify-center"
-                              aria-label={showConfirmPassword ? "Hide password" : "Show password"}
-                            >
-                              {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                            </button>
-                          </div>
-                          {registerErrors.confirmPassword && (
-                            <p className="mt-1 text-xs text-destructive">{registerErrors.confirmPassword}</p>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Password Requirements Guidance */}
-                      {password.length > 0 && !isPasswordValid && (
-                        <div className="p-2.5 rounded-xl bg-secondary/80 border border-border/80 text-[11px] space-y-1 text-muted-foreground">
-                          <p className="font-semibold text-foreground">Password requirements:</p>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
-                            <span className={hasMinLen ? "text-emerald-500 font-medium" : ""}>
-                              • 8+ characters
-                            </span>
-                            <span className={hasUppercase ? "text-emerald-500 font-medium" : ""}>
-                              • Uppercase letter
-                            </span>
-                            <span className={hasLowercase ? "text-emerald-500 font-medium" : ""}>
-                              • Lowercase letter
-                            </span>
-                            <span className={hasNumber && hasSpecial ? "text-emerald-500 font-medium" : ""}>
-                              • Number & symbol
-                            </span>
+                          <div>
+                            {registerResendCooldown > 0 ? (
+                              <span className="text-muted-foreground font-medium text-[11px]">
+                                Resend in <strong className="font-mono text-foreground">{registerResendCooldown}s</strong>
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={handleResendRegisterOtp}
+                                disabled={isResendingRegisterOtp}
+                                className="inline-flex items-center gap-1 text-primary hover:underline font-bold text-xs cursor-pointer disabled:opacity-50"
+                              >
+                                {isResendingRegisterOtp ? (
+                                  <>
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                    <span>Sending...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <RefreshCw className="h-3 w-3" />
+                                    <span>Resend Code</span>
+                                  </>
+                                )}
+                              </button>
+                            )}
                           </div>
                         </div>
-                      )}
 
-                      {/* Terms & Conditions Checkbox with Animated Circle Tick */}
-                      <div className="pt-2">
-                        <label className="flex items-center gap-2.5 text-xs cursor-pointer select-none group">
-                          <input
-                            type="checkbox"
-                            checked={termsAccepted}
-                            onChange={(e) => {
-                              setTermsAccepted(e.target.checked);
-                              if (registerErrors.terms) setRegisterErrors((prev) => ({ ...prev, terms: undefined }));
-                            }}
-                            className="sr-only"
-                          />
-                          <AnimatedCircleCheck checked={termsAccepted} />
-                          <span className="text-muted-foreground text-[11px] leading-tight group-hover:text-foreground transition-colors">
-                            I accept the{" "}
-                            <Link to="/privacy" target="_blank" className="text-foreground hover:underline font-bold">
-                              Lender Terms
-                            </Link>{" "}
-                            and{" "}
-                            <Link to="/privacy" target="_blank" className="text-foreground hover:underline font-bold">
-                              Equipment Policy
-                            </Link>
-                          </span>
-                        </label>
-                        {registerErrors.terms && (
-                          <p className="mt-1 text-xs text-destructive font-medium">
-                            {registerErrors.terms}
-                          </p>
-                        )}
+                        <div className="p-2.5 rounded-xl bg-secondary/50 border border-border/60 text-[11px] text-muted-foreground text-center">
+                          <span>Code is valid for 5 minutes. Check spam or junk folder if you don't see it immediately.</span>
+                        </div>
                       </div>
-
-                      {/* Primary Action Button: Create Payernt Account */}
-                      <button
-                        type="submit"
-                        disabled={isRegistering}
-                        className="w-full font-extrabold h-10.5 sm:h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-lg active:scale-98 flex items-center justify-center gap-2 cursor-pointer mt-2 disabled:opacity-50"
-                      >
-                        {isRegistering ? (
-                          <div className="flex items-center gap-2">
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            <span>Creating Payernt Account...</span>
-                          </div>
-                        ) : (
-                          <>
-                            <span>Create Payernt Account</span>
-                            <ArrowRight className="h-4 w-4" />
-                          </>
-                        )}
-                      </button>
-                    </form>
+                    )}
 
                     {/* Switch to Login Link */}
                     <div className="pt-2 text-center">
@@ -848,7 +1547,9 @@ export function PayerntAuth({
                           type="button"
                           onClick={() => {
                             setMode("login");
+                            setAuthMode("password");
                             setRegisterErrors({});
+                            setLoginErrors({});
                           }}
                           className="font-bold text-foreground hover:underline cursor-pointer"
                         >

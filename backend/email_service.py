@@ -183,3 +183,105 @@ If you did not request this reset, you can safely ignore this email.
 
 — The Payent Security Team
 """
+
+def build_otp_email_html(otp: str, purpose: str = "account registration") -> str:
+    """Generates a responsive HTML email template for 6-digit OTP verification."""
+    return f"""<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Your paYent Verification Code</title>
+  <style>
+    body {{
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background-color: #0c0d0e;
+      color: #e2e8f0;
+      margin: 0;
+      padding: 0;
+    }}
+    .container {{
+      max-width: 520px;
+      margin: 40px auto;
+      background: #14171a;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 16px;
+      padding: 36px 32px;
+    }}
+    .logo {{
+      font-size: 24px;
+      font-weight: 900;
+      color: #10b981;
+      letter-spacing: -0.5px;
+      margin-bottom: 20px;
+    }}
+    .title {{
+      font-size: 20px;
+      font-weight: 800;
+      color: #ffffff;
+      margin-bottom: 10px;
+    }}
+    .text {{
+      font-size: 14px;
+      line-height: 1.6;
+      color: #94a3b8;
+      margin-bottom: 24px;
+    }}
+    .otp-box {{
+      background: #1e2329;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 12px;
+      padding: 18px 24px;
+      text-align: center;
+      margin: 24px 0;
+    }}
+    .otp-code {{
+      font-size: 32px;
+      font-weight: 900;
+      letter-spacing: 8px;
+      color: #10b981;
+      font-family: monospace;
+    }}
+    .footer {{
+      font-size: 12px;
+      color: #64748b;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding-top: 20px;
+      margin-top: 24px;
+    }}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">paYent</div>
+    <div class="title">Verification Code</div>
+    <p class="text">
+      Use the 6-digit verification code below to complete your {purpose}. This code is valid for <strong>5 minutes</strong>.
+    </p>
+    <div class="otp-box">
+      <div class="otp-code">{otp}</div>
+    </div>
+    <p class="text" style="font-size: 12px; color: #64748b;">
+      If you did not request this verification code, please ignore this email or secure your account. Never share your verification code with anyone.
+    </p>
+    <div class="footer">
+      paYent Technologies • Peer-to-Peer Creator Gear Marketplace
+    </div>
+  </div>
+</body>
+</html>"""
+
+def build_otp_email_text(otp: str, purpose: str = "account registration") -> str:
+    """Generates plain text email body for 6-digit OTP verification."""
+    return f"""paYent — VERIFICATION CODE
+
+Your 6-digit verification code for {purpose} is:
+
+{otp}
+
+This code expires in 5 minutes and can only be used once.
+
+If you did not request this code, please safely ignore this email. Never share your verification code with anyone.
+
+— The paYent Security Team
+"""

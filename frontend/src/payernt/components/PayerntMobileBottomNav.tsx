@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import {
-  Home,
   Package,
   Calendar,
   Wallet,
@@ -41,11 +40,12 @@ export function PayerntMobileBottomNav({
   const { tCommon, language } = useLanguage();
 
   const currentTab = (() => {
-    if (pathname === "/payernt" || pathname === "/payernt/") return "home";
+    if (pathname === "/payernt" || pathname === "/payernt/") return "list";
     if (pathname.startsWith("/payernt/products") && !pathname.startsWith("/payernt/products/create")) return "products";
     if (pathname.startsWith("/payernt/list") || pathname.startsWith("/payernt/products/create")) return "list";
     if (pathname.startsWith("/payernt/bookings") || pathname.startsWith("/payernt/requests")) return "bookings";
     if (pathname.startsWith("/payernt/wallet") || pathname.startsWith("/payernt/earnings")) return "wallet";
+    if (pathname.startsWith("/payernt/dashboard")) return "dashboard";
     return "";
   })();
 
@@ -66,9 +66,8 @@ export function PayerntMobileBottomNav({
   };
 
   const primaryTabs = [
-    { id: "home", label: "Home", icon: Home, path: "/payernt" },
+    { id: "list", label: "Listings", icon: PlusCircle, path: "/payernt" },
     { id: "products", label: "Products", icon: Package, path: "/payernt/products" },
-    { id: "list", label: "Listings", icon: PlusCircle, path: "/payernt/list" },
     {
       id: "bookings",
       label: "Bookings",
@@ -77,6 +76,7 @@ export function PayerntMobileBottomNav({
       badge: pendingRequestsCount > 0 ? pendingRequestsCount : undefined,
     },
     { id: "wallet", label: "Wallets", icon: Wallet, path: "/payernt/wallet" },
+    { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, path: "/payernt/dashboard" },
   ];
 
   const moreItems = [

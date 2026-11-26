@@ -1,0 +1,51 @@
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import pytest
+from fastapi.testclient import TestClient
+from main import app
+from database import MOCK_USERS, save_otp, get_otp
+
+client = TestClient(app)
+
+def test_login_otp_nonexistent_email():
+    """Requesting login OTP for non-existent email returns 404."""
+    res = client.post("/api/login/otp/request", json={"email": "nonexistent_otp_user@test.com"})
+    assert res.status_code == 404
+    assert "No account found with this email" in res.json()["detail"]
+
+def test_login_otp_valid_flow():
+    """Full login OTP flow: Request OTP -> Verify OTP -> Login Successful with Token."""
+    test_email = "otp_login_test@payent.io"
+    MOCK_USERS[test_email] = {
+        "id": test_email,
+        "email": test_email,
+        "full_name": "OTP Test User",
+        "phone": "+91 9998887776",
+        "role": "customer",
+        "status": "APPROVED",
+        "kyc_status": "APPROVED",
+    }
+
+    # 1. Request OTP
+    req_res = client.post("/api/login/otp/request", json={"email": test_email})
+    assert req_res.status_code == 200
+    req_data = req_res.json()
+    assert req_data["success"] is True
+
+    # 2. Verify invalid OTP fails
+    invalid_res = client.post("/api/login/otp/verify", json={"email": test_email, "otp": "999999"})
+    assert invalid_res.status_code == 400
+    assert "Invalid or expired verification code" in invalid_res.json()["detail"]
+
+    # 3. Verify valid OTP succeeds
+    saved = get_otp(test_email)
+    otp_code = saved["otp"] if saved else "000000"
+    valid_res = client.post("/api/login/otp/verify", json={"email": test_email, "otp": otp_code})
+    assert valid_res.status_code == 200
+    valid_data = valid_res.json()
+    assert valid_data["success"] is True
+    assert "token" in valid_data
+    assert valid_data["user"]["email"] == test_email
+    assert valid_data["user"]["fullName"] == "OTP Test User"

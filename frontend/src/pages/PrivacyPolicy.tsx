@@ -408,7 +408,7 @@ export function PrivacyPolicy() {
                 <div>
                   <span className="font-bold text-neutral-900 dark:text-white">Customer Support:</span>{" "}
                   <a href={`mailto:${BUSINESS_INFO.supportEmail}`} className="font-semibold underline hover:opacity-80">
-                    support@payent.com
+                    {BUSINESS_INFO.supportEmail}
                   </a>
                 </div>
                 <div>

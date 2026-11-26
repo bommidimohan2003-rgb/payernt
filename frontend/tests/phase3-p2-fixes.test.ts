@@ -274,8 +274,8 @@ describe("Phase 3 P2 Fixes (F-23 through F-34)", () => {
 
   it("F-31: Footer legal links map to distinct anchored sections, contact email is unified & dead static app box is removed", () => {
     const footerSrc = readSrc("components/layout/Footer.tsx");
-    assert.match(footerSrc, /to:\s*"\/privacy",\s*hash:\s*"privacy-policy"/);
-    assert.match(footerSrc, /to:\s*"\/privacy",\s*hash:\s*"terms-of-service"/);
+    assert.match(footerSrc, /(to:\s*"\/privacy",\s*hash:\s*"privacy-policy"|to="\/privacy"\s+hash="privacy-policy")/);
+    assert.match(footerSrc, /(to:\s*"\/privacy",\s*hash:\s*"terms-of-service"|to="\/privacy"\s+hash="terms-of-service")/);
     assert.match(footerSrc, /to:\s*"\/support",\s*hash:\s*"cancellation-refunds"/);
     assert.match(footerSrc, /to="\/support"\s+hash="security-protocol"/);
     assert.match(footerSrc, /to:\s*"\/about",\s*hash:\s*"rental-agreement-escrow"/);
@@ -285,7 +285,7 @@ describe("Phase 3 P2 Fixes (F-23 through F-34)", () => {
     const privacySrc = readSrc("pages/PrivacyPolicy.tsx");
     assert.match(privacySrc, /id="privacy-policy"/);
     assert.match(privacySrc, /id="terms-of-service"/);
-    assert.match(privacySrc, /support@payent\.com/);
+    assert.match(privacySrc, /(payentsupport@gmail\.com|support@payent\.com|BUSINESS_INFO\.supportEmail)/);
     assert.doesNotMatch(privacySrc, /payent_support@gmail\.com/);
 
     const supportSrc = readSrc("pages/Support.tsx");

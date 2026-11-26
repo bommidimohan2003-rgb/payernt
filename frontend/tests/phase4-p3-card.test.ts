@@ -145,7 +145,7 @@ describe("Phase 4 Part A — Final P3 Cleanup (F-35 through F-40)", () => {
       assert.match(src, /py-2\.5 sm:py-3\.5/, `${rel} should use compact py-2.5 sm:py-3.5 vertical padding`);
       assert.doesNotMatch(src, /animate-pulse/, `${rel} should not use pulsing skeleton shimmers`);
     }
-    assert.match(readSrc("components/layout/Footer.tsx"), /lg:grid-cols-6/);
+    assert.match(readSrc("components/layout/Footer.tsx"), /lg:grid-cols-(4|6)/);
 
     const rvSrc = readSrc("components/home/RecentlyViewed.tsx");
     assert.match(rvSrc, /RentalProductCardSkeleton/);

@@ -8,10 +8,12 @@ import {
   Phone,
   User,
   ArrowRight,
+  ArrowLeft,
   ShieldCheck,
   Loader2,
   CheckCircle2,
   XCircle,
+  RefreshCw,
 } from "lucide-react";
 import { useMemo, useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
@@ -82,11 +84,28 @@ function isValidInternalRedirect(url: string | null | undefined, currentPath: st
 export function RegisterForm() {
   const { user, ready } = useAuth();
   const navigate = useNavigate();
+  const [step, setStep] = useState<"details" | "otp">("details");
+  const [pendingData, setPendingData] = useState<FormValues | null>(null);
+  const [otpDigits, setOtpDigits] = useState<string[]>(["", "", "", "", "", ""]);
+  const [otpError, setOtpError] = useState<string | null>(null);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [isResendingOtp, setIsResendingOtp] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const otpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
   const [showPw, setShowPw] = useState(false);
   const [showConfirmPw, setShowConfirmPw] = useState(false);
   const [error, setErrorState] = useState<string | null>(null);
   const [isChecking, setIsChecking] = useState(false);
   const hasNavigatedRef = useRef(false);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const interval = setInterval(() => {
+      setResendCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [resendCooldown]);
 
   useEffect(() => {
     if (hasNavigatedRef.current) return;
@@ -215,20 +234,65 @@ export function RegisterForm() {
 
   const onSubmit = async (data: FormValues) => {
     setErrorState(null);
-    try {
-      const adminCode =
-        showAdminOption && data.isAdmin ? data.adminCode : undefined;
-      const panUpper = data.panNumber ? data.panNumber.toUpperCase().trim() : undefined;
-      const cleanPhone = data.phone.replace(/\D/g, "");
+    setOtpError(null);
+    const cleanPhone = data.phone.replace(/\D/g, "");
+    const cleanEmail = data.email.trim().toLowerCase();
 
-      // Address, Pincode and KYC documents are omitted from initial customer registration
-      // (completed in dedicated PAN KYC flow post-registration).
+    try {
+      // 1. Dispatch Email Verification OTP via SMTP / Backend
+      const reqRes = await api.registerRequest(cleanEmail, cleanPhone);
+      if (!reqRes?.success) {
+        const errorMsg = reqRes?.error || reqRes?.message || "Failed to dispatch verification code.";
+        const lower = errorMsg.toLowerCase();
+        if (lower.includes("email") || lower.includes("exists")) {
+          setError("email", { type: "server", message: errorMsg });
+        } else if (lower.includes("phone") || lower.includes("mobile")) {
+          setError("phone", { type: "server", message: errorMsg });
+        } else {
+          setErrorState(errorMsg);
+        }
+        toast.error(errorMsg);
+        return;
+      }
+
+      // 2. Transition to OTP Verification Step
+      setPendingData(data);
+      setStep("otp");
+      setOtpDigits(["", "", "", "", "", ""]);
+      setResendCooldown(60);
+      toast.success(`Verification code sent to ${cleanEmail}`);
+      setTimeout(() => {
+        otpInputRefs.current[0]?.focus();
+      }, 100);
+    } catch (err: any) {
+      const msg = err?.message || "Failed to dispatch verification code. Please check your connection.";
+      setErrorState(msg);
+      toast.error(msg);
+    }
+  };
+
+  const handleVerifyOtp = async (codeToVerify?: string) => {
+    if (!pendingData) return;
+    const code = (codeToVerify || otpDigits.join("")).trim();
+    if (code.length !== 6 || !/^\d{6}$/.test(code)) {
+      setOtpError("Please enter all 6 numeric digits of your verification code.");
+      return;
+    }
+
+    setOtpError(null);
+    setIsVerifyingOtp(true);
+    try {
+      const adminCode = showAdminOption && pendingData.isAdmin ? pendingData.adminCode : undefined;
+      const panUpper = pendingData.panNumber ? pendingData.panNumber.toUpperCase().trim() : undefined;
+      const cleanPhone = pendingData.phone.replace(/\D/g, "");
+      const cleanEmail = pendingData.email.trim().toLowerCase();
+
       const res = await api.registerVerify(
-        data.email,
+        cleanEmail,
         cleanPhone,
-        "DIRECT",
-        data.password,
-        data.fullName,
+        code,
+        pendingData.password,
+        pendingData.fullName,
         adminCode,
         undefined, // address removed
         "India",
@@ -238,43 +302,24 @@ export function RegisterForm() {
       );
 
       if (!res?.success) {
-        const errorMsg = res?.error || res?.message || "Failed to create account.";
-        const lower = errorMsg.toLowerCase();
-        if (lower.includes("email") || lower.includes("exists")) {
-          setError("email", { type: "server", message: errorMsg });
-        } else if (lower.includes("phone") || lower.includes("mobile")) {
-          setError("phone", { type: "server", message: errorMsg });
-        } else if (lower.includes("pan") && data.panNumber) {
-          setError("panNumber", { type: "server", message: errorMsg });
-        } else if (
-          lower.includes("password") ||
-          lower.includes("breach") ||
-          lower.includes("character") ||
-          lower.includes("common") ||
-          lower.includes("safer")
-        ) {
-          setError("password", { type: "server", message: errorMsg });
-        } else if (lower.includes("admin")) {
-          setError("adminCode", { type: "server", message: errorMsg });
-        } else {
-          setErrorState(errorMsg);
-        }
+        const errorMsg = res?.error || res?.message || "Invalid or expired verification code.";
+        setOtpError(errorMsg);
         toast.error(errorMsg);
         return;
       }
 
       const userObj = res.user || res.account || {};
-      const accountId = userObj.accountId || `PAYRENT_USER_${data.email}`;
+      const accountId = userObj.accountId || `PAYRENT_USER_${cleanEmail}`;
       const panMasked = userObj.panMasked || (panUpper ? `XXXXX${panUpper.slice(5)}` : undefined);
-      const createdRole = userObj.role || (data.isAdmin ? "admin" : "customer");
+      const createdRole = userObj.role || (pendingData.isAdmin ? "admin" : "customer");
 
       if (createdRole === "admin" && res.token) {
         const createdUser: UserType = {
-          id: userObj.id || userObj.email || data.email,
+          id: userObj.id || userObj.email || cleanEmail,
           accountId,
           accountType: "pay₹ent",
-          fullName: userObj.fullName || userObj.name || data.fullName,
-          email: userObj.email || data.email,
+          fullName: userObj.fullName || userObj.name || pendingData.fullName,
+          email: userObj.email || cleanEmail,
           phone: cleanPhone,
           panNumber: panUpper,
           panMasked,
@@ -286,7 +331,7 @@ export function RegisterForm() {
         storage.set(STORAGE_KEYS.currentUser, createdUser);
         localStorage.setItem("payent:admin:token", res.token);
         localStorage.setItem("payent:admin:current_user", JSON.stringify(createdUser));
-        toast.success("Admin account created successfully!");
+        toast.success("Admin account created and verified successfully!");
         navigate({ to: "/admin/dashboard" });
         return;
       }
@@ -294,45 +339,99 @@ export function RegisterForm() {
       // Normal Payrent Customer Registration -> Route to Account Pending / Review
       // Record registration consent under DPDP Act 2023 & Indian IT Rules
       api.submitConsent({
-        userIdOrSession: accountId || `user_${data.email}`,
+        userIdOrSession: accountId || `user_${cleanEmail}`,
         consentType: "REGISTRATION_TERMS",
         preferences: {
           terms_version: "2026.1",
           privacy_version: "2026.1",
           accepted_at: new Date().toISOString(),
         },
-        userEmail: data.email,
+        userEmail: cleanEmail,
       }).catch(() => {});
 
-      toast.success("Account created successfully! Submitted for review.");
+      toast.success("Email verified and account registered successfully!");
       navigate({
         to: "/account-pending",
-        search: { type: "payrent", email: data.email } as any,
+        search: { type: "payrent", email: cleanEmail } as any,
       });
-    } catch (err) {
-      const msg =
-        (err as { message?: string })?.message ?? "Failed to create account.";
-      const lower = msg.toLowerCase();
-      if (lower.includes("email") || lower.includes("exists")) {
-        setError("email", { type: "server", message: msg });
-      } else if (lower.includes("phone")) {
-        setError("phone", { type: "server", message: msg });
-      } else if (lower.includes("pan")) {
-        setError("panNumber", { type: "server", message: "Enter a valid PAN number." });
-      } else if (
-        lower.includes("password") ||
-        lower.includes("breach") ||
-        lower.includes("character") ||
-        lower.includes("common") ||
-        lower.includes("safer")
-      ) {
-        setError("password", { type: "server", message: msg });
-      } else if (lower.includes("admin")) {
-        setError("adminCode", { type: "server", message: msg });
-      } else {
-        setErrorState(msg);
-      }
+    } catch (err: any) {
+      const msg = err?.message || "Failed to verify registration code.";
+      setOtpError(msg);
       toast.error(msg);
+    } finally {
+      setIsVerifyingOtp(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (!pendingData || resendCooldown > 0 || isResendingOtp) return;
+    setIsResendingOtp(true);
+    setOtpError(null);
+    try {
+      const cleanPhone = pendingData.phone.replace(/\D/g, "");
+      const cleanEmail = pendingData.email.trim().toLowerCase();
+      const res = await api.registerRequest(cleanEmail, cleanPhone);
+      if (res?.success) {
+        setResendCooldown(60);
+        toast.success("A fresh verification code has been dispatched to your email!");
+      } else {
+        const msg = res?.error || res?.message || "Failed to resend verification code.";
+        setOtpError(msg);
+        toast.error(msg);
+      }
+    } catch {
+      toast.error("Unable to resend verification code. Please check your network.");
+    } finally {
+      setIsResendingOtp(false);
+    }
+  };
+
+  const handleDigitChange = (index: number, value: string) => {
+    const numericChar = value.replace(/\D/g, "").slice(-1);
+    const updated = [...otpDigits];
+    updated[index] = numericChar;
+    setOtpDigits(updated);
+    setOtpError(null);
+
+    if (numericChar && index < 5) {
+      otpInputRefs.current[index + 1]?.focus();
+    }
+
+    if (numericChar && index === 5) {
+      const fullCode = updated.join("");
+      if (fullCode.length === 6) {
+        handleVerifyOtp(fullCode);
+      }
+    }
+  };
+
+  const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Backspace") {
+      if (!otpDigits[index] && index > 0) {
+        otpInputRefs.current[index - 1]?.focus();
+      }
+    } else if (e.key === "ArrowLeft" && index > 0) {
+      otpInputRefs.current[index - 1]?.focus();
+    } else if (e.key === "ArrowRight" && index < 5) {
+      otpInputRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    if (!pasted) return;
+    const updated = [...otpDigits];
+    for (let i = 0; i < 6; i++) {
+      updated[i] = pasted[i] || "";
+    }
+    setOtpDigits(updated);
+    setOtpError(null);
+    const targetIndex = Math.min(pasted.length, 5);
+    otpInputRefs.current[targetIndex]?.focus();
+
+    if (pasted.length === 6) {
+      handleVerifyOtp(pasted);
     }
   };
 
@@ -341,6 +440,145 @@ export function RegisterForm() {
     setValidationFailed(true);
     setTimeout(() => setValidationFailed(false), 2000);
   };
+
+  if (step === "otp") {
+    return (
+      <div className="space-y-5 text-left">
+        {/* Top Header */}
+        <div className="text-center space-y-2">
+          <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary mb-1">
+            <Mail className="h-6 w-6 stroke-[2]" />
+          </div>
+          <h2 className="text-xl sm:text-2xl font-extrabold tracking-tight text-foreground font-display">
+            Verify Your Email
+          </h2>
+          <p className="text-xs text-muted-foreground leading-relaxed max-w-sm mx-auto">
+            We have sent a 6-digit verification code to{" "}
+            <span className="font-bold text-foreground">{pendingData?.email}</span>
+          </p>
+          <div>
+            <button
+              type="button"
+              onClick={() => {
+                setStep("details");
+                setOtpError(null);
+              }}
+              className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline cursor-pointer"
+            >
+              <ArrowLeft className="h-3 w-3" />
+              <span>Wrong email or phone? Edit details</span>
+            </button>
+          </div>
+        </div>
+
+        {/* 6-Digit OTP Input Grid */}
+        <div className="space-y-3">
+          <label className="block text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Enter 6-Digit Verification Code
+          </label>
+          <div className="flex items-center justify-center gap-2 sm:gap-2.5" onPaste={handlePaste}>
+            {otpDigits.map((digit, i) => (
+              <input
+                key={i}
+                ref={(el) => {
+                  otpInputRefs.current[i] = el;
+                }}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={1}
+                value={digit}
+                onChange={(e) => handleDigitChange(i, e.target.value)}
+                onKeyDown={(e) => handleKeyDown(i, e)}
+                disabled={isVerifyingOtp}
+                aria-label={`Digit ${i + 1} of verification code`}
+                className={`h-12 w-11 sm:h-14 sm:w-12 text-center text-xl sm:text-2xl font-mono font-extrabold rounded-xl border bg-card text-foreground transition-all focus:outline-none focus:ring-2 disabled:opacity-50 ${
+                  otpError
+                    ? "border-destructive/60 focus:border-destructive focus:ring-destructive/20"
+                    : "border-border/80 focus:border-primary focus:ring-primary/20"
+                }`}
+              />
+            ))}
+          </div>
+
+          {otpError && (
+            <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs font-semibold text-center flex items-center justify-center gap-1.5">
+              <XCircle className="h-4 w-4 shrink-0" />
+              <span>{otpError}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Primary Action Button: Verify & Complete Registration */}
+        <Button
+          type="button"
+          onClick={() => handleVerifyOtp()}
+          disabled={isVerifyingOtp || otpDigits.join("").length < 6}
+          loading={isVerifyingOtp}
+          className="w-full font-extrabold h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-lg active:scale-98 flex items-center justify-center gap-2 cursor-pointer"
+        >
+          {isVerifyingOtp ? (
+            <div className="flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>Verifying Code...</span>
+            </div>
+          ) : (
+            <>
+              <CheckCircle2 className="h-4 w-4 shrink-0" />
+              <span>Verify & Complete Registration</span>
+            </>
+          )}
+        </Button>
+
+        {/* Resend & Back Navigation */}
+        <div className="flex items-center justify-between pt-1 text-xs">
+          <button
+            type="button"
+            onClick={() => {
+              setStep("details");
+              setOtpError(null);
+            }}
+            className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground font-semibold transition-colors cursor-pointer"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            <span>Back to Details</span>
+          </button>
+
+          <div>
+            {resendCooldown > 0 ? (
+              <span className="text-muted-foreground font-medium text-[11px]">
+                Resend in <strong className="font-mono text-foreground">{resendCooldown}s</strong>
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={handleResendOtp}
+                disabled={isResendingOtp}
+                className="inline-flex items-center gap-1 text-primary hover:underline font-bold text-xs cursor-pointer disabled:opacity-50"
+              >
+                {isResendingOtp ? (
+                  <>
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    <span>Sending...</span>
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-3 w-3" />
+                    <span>Resend Code</span>
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Advisory */}
+        <div className="p-2.5 rounded-xl bg-secondary/50 border border-border/60 text-[11px] text-muted-foreground text-center">
+          <span>Code is valid for 5 minutes. Check spam or junk folder if you don't see it immediately.</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="space-y-3 text-left">
@@ -521,7 +759,7 @@ export function RegisterForm() {
         )}
       </div>
 
-      {/* Primary Action Button: Create Payrent Account */}
+      {/* Primary Action Button: Get Verification Code */}
       <Button
         type="submit"
         className="w-full font-extrabold h-10.5 sm:h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-lg active:scale-98 flex items-center justify-center gap-2 cursor-pointer mt-2"
@@ -532,12 +770,12 @@ export function RegisterForm() {
         {isSubmitting ? (
           <div className="flex items-center gap-2">
             <Loader2 className="h-4 w-4 animate-spin" />
-            <span>Creating Payrent Account...</span>
+            <span>Sending Verification Code...</span>
           </div>
         ) : (
           <>
             <ArrowRight className="h-4 w-4 shrink-0" />
-            <span>Create Payrent Account</span>
+            <span>Continue to Email Verification</span>
           </>
         )}
       </Button>

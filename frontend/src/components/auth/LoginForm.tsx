@@ -1,7 +1,18 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate, Link } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { Eye, EyeOff, Lock, Mail, ArrowRight, Loader2 } from "lucide-react";
+import {
+  Eye,
+  EyeOff,
+  Lock,
+  Mail,
+  ArrowRight,
+  ArrowLeft,
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  RefreshCw,
+} from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -38,12 +49,35 @@ function isValidInternalRedirect(url: string | null | undefined, currentPath: st
 }
 
 export function LoginForm() {
-  const { user, ready, login } = useAuth();
+  const { user, ready, login, loginWithOtp } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+
+  // Mode: "password" or "otp"
+  const [authMode, setAuthMode] = useState<"password" | "otp">("password");
+
+  // Password Login State
   const [showPw, setShowPw] = useState(false);
   const [error, setErrorState] = useState<string | null>(null);
   const hasNavigatedRef = useRef(false);
+
+  // Email OTP State
+  const [otpStep, setOtpStep] = useState<"request" | "verify">("request");
+  const [otpEmail, setOtpEmail] = useState("");
+  const [otpDigits, setOtpDigits] = useState<string[]>(["", "", "", "", "", ""]);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [otpError, setOtpError] = useState<string | null>(null);
+  const otpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const interval = setInterval(() => {
+      setResendCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [resendCooldown]);
 
   useEffect(() => {
     // Prevent multiple executions / navigation bounce loops
@@ -71,10 +105,6 @@ export function LoginForm() {
       searchParams?.get("redirect") ||
       searchParams?.get("returnUrl");
 
-    // CRITICAL LOOP GUARD: If the user arrived at /login with a redirect parameter
-    // (e.g. ?redirect=/dashboard or ?redirect=/admin), they were redirected here because
-    // their existing session was invalid or unauthorized. NEVER auto-navigate back to the
-    // rejected URL on mount! That causes an infinite ping-pong freeze ("Page Unresponsive").
     if (redirectUrl) {
       return;
     }
@@ -98,6 +128,8 @@ export function LoginForm() {
     handleSubmit,
     watch,
     setError,
+    setValue,
+    getValues,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -107,40 +139,7 @@ export function LoginForm() {
 
   const watchRemember = watch("remember");
 
-  const onSubmit = async (data: FormValues) => {
-    setErrorState(null);
-    const res = await login(data.email, data.password);
-    if (!res.ok) {
-      const msg = res.error ?? "Invalid email or password.";
-      const lower = msg.toLowerCase();
-      if (
-        lower.includes("under review") ||
-        lower.includes("not approved") ||
-        lower.includes("pending") ||
-        lower.includes("rejected") ||
-        (res as any)?.status === "PENDING_REVIEW" ||
-        (res as any)?.status === "REJECTED"
-      ) {
-        toast.info(msg);
-        navigate({
-          to: "/account-pending",
-          search: { type: "payrent", email: data.email } as any,
-        });
-        return;
-      }
-      if (msg.toLowerCase().includes("password")) {
-        setError("password", { type: "server", message: msg });
-      } else if (
-        msg.toLowerCase().includes("email") ||
-        msg.toLowerCase().includes("user")
-      ) {
-        setError("email", { type: "server", message: msg });
-      } else {
-        setErrorState(msg);
-      }
-      return;
-    }
-
+  const handleLoginSuccess = (res: any, email: string) => {
     toast.success("Signed in successfully!");
 
     const currentUser = storage.get<User | null>(
@@ -242,6 +241,193 @@ export function LoginForm() {
     }
   };
 
+  const onSubmit = async (data: FormValues) => {
+    setErrorState(null);
+    const res = await login(data.email, data.password);
+    if (!res.ok) {
+      const msg = res.error ?? "Invalid email or password.";
+      const lower = msg.toLowerCase();
+      if (
+        lower.includes("under review") ||
+        lower.includes("not approved") ||
+        lower.includes("pending") ||
+        lower.includes("rejected") ||
+        (res as any)?.status === "PENDING_REVIEW" ||
+        (res as any)?.status === "REJECTED"
+      ) {
+        toast.info(msg);
+        navigate({
+          to: "/account-pending",
+          search: { type: "payrent", email: data.email } as any,
+        });
+        return;
+      }
+      if (msg.toLowerCase().includes("password")) {
+        setError("password", { type: "server", message: msg });
+      } else if (
+        msg.toLowerCase().includes("email") ||
+        msg.toLowerCase().includes("user")
+      ) {
+        setError("email", { type: "server", message: msg });
+      } else {
+        setErrorState(msg);
+      }
+      return;
+    }
+
+    handleLoginSuccess(res, data.email);
+  };
+
+  const handleRequestOtp = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setOtpError(null);
+    const cleanEmail = otpEmail.trim().toLowerCase();
+    if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      setOtpError("Please enter a valid email address.");
+      return;
+    }
+
+    setIsSendingOtp(true);
+    try {
+      const res = await api.loginOtpRequest(cleanEmail);
+      if (res?.success) {
+        setOtpStep("verify");
+        setOtpDigits(["", "", "", "", "", ""]);
+        setResendCooldown(60);
+        toast.success(`Login verification code sent to ${cleanEmail}`);
+        setTimeout(() => {
+          otpInputRefs.current[0]?.focus();
+        }, 100);
+      } else {
+        const errorMsg = res?.error || res?.message || "Failed to send login code.";
+        setOtpError(errorMsg);
+        toast.error(errorMsg);
+      }
+    } catch (err: any) {
+      const msg = err?.message || "Failed to dispatch verification code.";
+      setOtpError(msg);
+      toast.error(msg);
+    } finally {
+      setIsSendingOtp(false);
+    }
+  };
+
+  const handleVerifyOtp = async (codeToVerify?: string) => {
+    const code = (codeToVerify || otpDigits.join("")).trim();
+    if (code.length !== 6 || !/^\d{6}$/.test(code)) {
+      setOtpError("Please enter all 6 numeric digits of your login code.");
+      return;
+    }
+
+    setOtpError(null);
+    setIsVerifyingOtp(true);
+    try {
+      const cleanEmail = otpEmail.trim().toLowerCase();
+      const res = await loginWithOtp(cleanEmail, code);
+      if (!res.ok) {
+        const msg = res.error ?? "Invalid or expired verification code.";
+        const lower = msg.toLowerCase();
+        if (
+          lower.includes("under review") ||
+          lower.includes("not approved") ||
+          lower.includes("pending") ||
+          lower.includes("rejected") ||
+          (res as any)?.status === "PENDING_REVIEW" ||
+          (res as any)?.status === "REJECTED"
+        ) {
+          toast.info(msg);
+          navigate({
+            to: "/account-pending",
+            search: { type: "payrent", email: cleanEmail } as any,
+          });
+          return;
+        }
+        setOtpError(msg);
+        toast.error(msg);
+        return;
+      }
+
+      handleLoginSuccess(res, cleanEmail);
+    } catch (err: any) {
+      const msg = err?.message || "Verification failed. Please try again.";
+      setOtpError(msg);
+      toast.error(msg);
+    } finally {
+      setIsVerifyingOtp(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (resendCooldown > 0 || isSendingOtp) return;
+    setIsSendingOtp(true);
+    setOtpError(null);
+    try {
+      const cleanEmail = otpEmail.trim().toLowerCase();
+      const res = await api.loginOtpRequest(cleanEmail);
+      if (res?.success) {
+        setResendCooldown(60);
+        toast.success("A fresh login code has been sent to your email!");
+      } else {
+        const msg = res?.error || res?.message || "Failed to resend code.";
+        setOtpError(msg);
+        toast.error(msg);
+      }
+    } catch {
+      toast.error("Unable to resend code. Please check your connection.");
+    } finally {
+      setIsSendingOtp(false);
+    }
+  };
+
+  const handleDigitChange = (index: number, value: string) => {
+    const numericChar = value.replace(/\D/g, "").slice(-1);
+    const updated = [...otpDigits];
+    updated[index] = numericChar;
+    setOtpDigits(updated);
+    setOtpError(null);
+
+    if (numericChar && index < 5) {
+      otpInputRefs.current[index + 1]?.focus();
+    }
+
+    if (numericChar && index === 5) {
+      const fullCode = updated.join("");
+      if (fullCode.length === 6) {
+        handleVerifyOtp(fullCode);
+      }
+    }
+  };
+
+  const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Backspace") {
+      if (!otpDigits[index] && index > 0) {
+        otpInputRefs.current[index - 1]?.focus();
+      }
+    } else if (e.key === "ArrowLeft" && index > 0) {
+      otpInputRefs.current[index - 1]?.focus();
+    } else if (e.key === "ArrowRight" && index < 5) {
+      otpInputRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    if (!pasted) return;
+    const updated = [...otpDigits];
+    for (let i = 0; i < 6; i++) {
+      updated[i] = pasted[i] || "";
+    }
+    setOtpDigits(updated);
+    setOtpError(null);
+    const targetIndex = Math.min(pasted.length, 5);
+    otpInputRefs.current[targetIndex]?.focus();
+
+    if (pasted.length === 6) {
+      handleVerifyOtp(pasted);
+    }
+  };
+
   const [validationFailed, setValidationFailed] = useState(false);
   const onInvalid = () => {
     setValidationFailed(true);
@@ -249,88 +435,353 @@ export function LoginForm() {
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="space-y-4 text-left">
-      {/* Email Address Field with Persistent Label */}
-      <Input
-        label="Email address"
-        type="email"
-        autoComplete="email"
-        icon={<Mail className="h-5 w-5 stroke-[1.6]" />}
-        error={errors.email?.message}
-        {...register("email")}
-      />
+    <div className="space-y-4 text-left">
+      {authMode === "password" ? (
+        <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="space-y-4">
+          {/* Email Address Field with Persistent Label */}
+          <Input
+            label="Email address"
+            type="email"
+            autoComplete="email"
+            icon={<Mail className="h-5 w-5 stroke-[1.6]" />}
+            error={errors.email?.message}
+            {...register("email")}
+          />
 
-      {/* Password Field with Persistent Label & Show/Hide */}
-      <Input
-        label="Password"
-        type={showPw ? "text" : "password"}
-        autoComplete="current-password"
-        icon={<Lock className="h-5 w-5 stroke-[1.6]" />}
-        rightAdornment={
+          {/* Password Field with Persistent Label & Show/Hide */}
+          <Input
+            label="Password"
+            type={showPw ? "text" : "password"}
+            autoComplete="current-password"
+            icon={<Lock className="h-5 w-5 stroke-[1.6]" />}
+            rightAdornment={
+              <button
+                type="button"
+                onClick={() => setShowPw((v) => !v)}
+                className="p-1.5 -mr-1 text-muted-foreground/80 dark:text-[#BDBDBD] hover:text-foreground dark:hover:text-white cursor-pointer focus:outline-none transition-colors shrink-0 flex items-center justify-center"
+                aria-label={showPw ? "Hide password" : "Show password"}
+              >
+                {showPw ? (
+                  <EyeOff className="h-5 w-5 stroke-[1.6]" />
+                ) : (
+                  <Eye className="h-5 w-5 stroke-[1.6]" />
+                )}
+              </button>
+            }
+            error={errors.password?.message}
+            {...register("password")}
+          />
+
+          {/* Remember Me & Forgot Password Row */}
+          <div className="flex items-center justify-between text-xs sm:text-sm pt-1">
+            <label className="inline-flex items-center gap-2 cursor-pointer text-muted-foreground hover:text-foreground transition-colors select-none group">
+              <input
+                type="checkbox"
+                className="sr-only"
+                {...register("remember")}
+              />
+              <AnimatedCircleCheck checked={!!watchRemember} size={18} />
+              <span>Remember me</span>
+            </label>
+            <button
+              type="button"
+              onClick={() => navigate({ to: "/forgot-password", search: { token: "" } as any })}
+              className="text-foreground hover:underline font-bold text-xs cursor-pointer focus:outline-none"
+            >
+              Forgot password?
+            </button>
+          </div>
+
+          {/* Global Server Error Message */}
+          {error && (
+            <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs font-semibold">
+              {error}
+            </div>
+          )}
+
+          {/* Primary Action Button: Sign in to Payrent */}
+          <Button
+            type="submit"
+            className="w-full font-extrabold h-10.5 sm:h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-lg active:scale-98 flex items-center justify-center gap-2 cursor-pointer mt-2"
+            loading={isSubmitting}
+            isError={Boolean(error) || validationFailed}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? (
+              <div className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Signing in to Payrent...</span>
+              </div>
+            ) : (
+              <>
+                <ArrowRight className="h-4 w-4 shrink-0" />
+                <span>Sign in to Payrent</span>
+              </>
+            )}
+          </Button>
+
+          {/* OR Divider */}
+          <div className="relative my-4">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-border/70 dark:border-[#2D2D2D]" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-card dark:bg-[#1E1E1E] px-3 text-muted-foreground font-semibold tracking-wider text-[11px]">
+                Or
+              </span>
+            </div>
+          </div>
+
+          {/* Alternative: Email OTP Login Button */}
           <button
             type="button"
-            onClick={() => setShowPw((v) => !v)}
-            className="p-1.5 -mr-1 text-muted-foreground/80 dark:text-[#BDBDBD] hover:text-foreground dark:hover:text-white cursor-pointer focus:outline-none transition-colors shrink-0 flex items-center justify-center"
-            aria-label={showPw ? "Hide password" : "Show password"}
+            onClick={() => {
+              const currentEmail = getValues("email");
+              if (currentEmail) setOtpEmail(currentEmail);
+              setAuthMode("otp");
+              setOtpStep("request");
+              setErrorState(null);
+              setOtpError(null);
+            }}
+            className="w-full font-bold h-10.5 sm:h-11 rounded-xl border border-border/80 dark:border-neutral-700/80 bg-secondary/50 hover:bg-secondary dark:bg-[#252525] dark:hover:bg-[#2A2A2A] text-foreground transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-98 text-xs sm:text-sm"
           >
-            {showPw ? (
-              <EyeOff className="h-5 w-5 stroke-[1.6]" />
-            ) : (
-              <Eye className="h-5 w-5 stroke-[1.6]" />
-            )}
+            <Mail className="h-4 w-4 text-primary shrink-0" />
+            <span>Sign in with Email OTP</span>
           </button>
-        }
-        error={errors.password?.message}
-        {...register("password")}
-      />
+        </form>
+      ) : (
+        /* Email OTP Section */
+        otpStep === "request" ? (
+          <form onSubmit={handleRequestOtp} className="space-y-4">
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Enter your registered email address to receive a secure 6-digit login verification code.
+              </p>
+            </div>
 
-      {/* Remember Me & Forgot Password Row */}
-      <div className="flex items-center justify-between text-xs sm:text-sm pt-1">
-        <label className="inline-flex items-center gap-2 cursor-pointer text-muted-foreground hover:text-foreground transition-colors select-none group">
-          <input
-            type="checkbox"
-            className="sr-only"
-            {...register("remember")}
-          />
-          <AnimatedCircleCheck checked={!!watchRemember} size={18} />
-          <span>Remember me</span>
-        </label>
-        <button
-          type="button"
-          onClick={() => navigate({ to: "/forgot-password", search: { token: "" } as any })}
-          className="text-foreground hover:underline font-bold text-xs cursor-pointer focus:outline-none"
-        >
-          Forgot password?
-        </button>
-      </div>
+            <Input
+              label="Email address"
+              type="email"
+              autoComplete="email"
+              value={otpEmail}
+              onChange={(e) => {
+                setOtpEmail(e.target.value);
+                setOtpError(null);
+              }}
+              icon={<Mail className="h-5 w-5 stroke-[1.6]" />}
+              error={otpError || undefined}
+              required
+            />
 
-      {/* Global Server Error Message */}
-      {error && (
-        <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs font-semibold">
-          {error}
-        </div>
-      )}
+            {otpError && (
+              <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs font-semibold">
+                {otpError}
+              </div>
+            )}
 
-      {/* Primary Action Button: Sign in to Payrent */}
-      <Button
-        type="submit"
-        className="w-full font-extrabold h-10.5 sm:h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-lg active:scale-98 flex items-center justify-center gap-2 cursor-pointer mt-2"
-        loading={isSubmitting}
-        isError={Boolean(error) || validationFailed}
-        disabled={isSubmitting}
-      >
-        {isSubmitting ? (
-          <div className="flex items-center gap-2">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <span>Signing in to Payrent...</span>
-          </div>
+            <Button
+              type="submit"
+              disabled={isSendingOtp}
+              loading={isSendingOtp}
+              className="w-full font-extrabold h-10.5 sm:h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-lg active:scale-98 flex items-center justify-center gap-2 cursor-pointer mt-2"
+            >
+              {isSendingOtp ? (
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Sending Login Code...</span>
+                </div>
+              ) : (
+                <>
+                  <ArrowRight className="h-4 w-4 shrink-0" />
+                  <span>Send Login Code</span>
+                </>
+              )}
+            </Button>
+
+            {/* OR Divider */}
+            <div className="relative my-4">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-border/70 dark:border-[#2D2D2D]" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-card dark:bg-[#1E1E1E] px-3 text-muted-foreground font-semibold tracking-wider text-[11px]">
+                  Or
+                </span>
+              </div>
+            </div>
+
+            {/* Alternative: Password Login Button */}
+            <button
+              type="button"
+              onClick={() => {
+                if (otpEmail) setValue("email", otpEmail);
+                setAuthMode("password");
+                setErrorState(null);
+                setOtpError(null);
+              }}
+              className="w-full font-bold h-10.5 sm:h-11 rounded-xl border border-border/80 dark:border-neutral-700/80 bg-secondary/50 hover:bg-secondary dark:bg-[#252525] dark:hover:bg-[#2A2A2A] text-foreground transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-98 text-xs sm:text-sm"
+            >
+              <Lock className="h-4 w-4 text-primary shrink-0" />
+              <span>Sign in with Password</span>
+            </button>
+          </form>
         ) : (
-          <>
-            <ArrowRight className="h-4 w-4 shrink-0" />
-            <span>Sign in to Payrent</span>
-          </>
-        )}
-      </Button>
+          /* OTP Verification Step */
+          <div className="space-y-5">
+            <div className="text-center space-y-1">
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Enter the 6-digit login code sent to{" "}
+                <span className="font-bold text-foreground">{otpEmail}</span>
+              </p>
+              <div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOtpStep("request");
+                    setOtpError(null);
+                  }}
+                  className="text-[11px] font-semibold text-primary hover:underline cursor-pointer inline-flex items-center gap-1"
+                >
+                  <ArrowLeft className="h-3 w-3" />
+                  <span>Change email address</span>
+                </button>
+              </div>
+            </div>
+
+            {/* 6 Digit Input Group */}
+            <div className="space-y-3">
+              <label className="block text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Enter 6-Digit Code
+              </label>
+              <div className="flex items-center justify-center gap-2 sm:gap-2.5" onPaste={handlePaste}>
+                {otpDigits.map((digit, i) => (
+                  <input
+                    key={i}
+                    ref={(el) => {
+                      otpInputRefs.current[i] = el;
+                    }}
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={1}
+                    value={digit}
+                    onChange={(e) => handleDigitChange(i, e.target.value)}
+                    onKeyDown={(e) => handleKeyDown(i, e)}
+                    disabled={isVerifyingOtp}
+                    aria-label={`Digit ${i + 1} of login code`}
+                    className={`h-12 w-11 sm:h-14 sm:w-12 text-center text-xl sm:text-2xl font-mono font-extrabold rounded-xl border bg-card text-foreground transition-all focus:outline-none focus:ring-2 disabled:opacity-50 ${
+                      otpError
+                        ? "border-destructive/60 focus:border-destructive focus:ring-destructive/20"
+                        : "border-border/80 focus:border-primary focus:ring-primary/20"
+                    }`}
+                  />
+                ))}
+              </div>
+
+              {otpError && (
+                <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs font-semibold text-center flex items-center justify-center gap-1.5">
+                  <XCircle className="h-4 w-4 shrink-0" />
+                  <span>{otpError}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Verify CTA */}
+            <Button
+              type="button"
+              onClick={() => handleVerifyOtp()}
+              disabled={isVerifyingOtp || otpDigits.join("").length < 6}
+              loading={isVerifyingOtp}
+              className="w-full font-extrabold h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-lg active:scale-98 flex items-center justify-center gap-2 cursor-pointer"
+            >
+              {isVerifyingOtp ? (
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Verifying Code...</span>
+                </div>
+              ) : (
+                <>
+                  <CheckCircle2 className="h-4 w-4 shrink-0" />
+                  <span>Verify & Sign In</span>
+                </>
+              )}
+            </Button>
+
+            {/* Resend & Back */}
+            <div className="flex items-center justify-between pt-1 text-xs">
+              <button
+                type="button"
+                onClick={() => {
+                  setOtpStep("request");
+                  setOtpError(null);
+                }}
+                className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground font-semibold transition-colors cursor-pointer"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                <span>Back</span>
+              </button>
+
+              <div>
+                {resendCooldown > 0 ? (
+                  <span className="text-muted-foreground font-medium text-[11px]">
+                    Resend in <strong className="font-mono text-foreground">{resendCooldown}s</strong>
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleResendOtp}
+                    disabled={isSendingOtp}
+                    className="inline-flex items-center gap-1 text-primary hover:underline font-bold text-xs cursor-pointer disabled:opacity-50"
+                  >
+                    {isSendingOtp ? (
+                      <>
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        <span>Sending...</span>
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="h-3 w-3" />
+                        <span>Resend Code</span>
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="p-2.5 rounded-xl bg-secondary/50 border border-border/60 text-[11px] text-muted-foreground text-center">
+              <span>Code is valid for 5 minutes. Check spam or junk folder if not received.</span>
+            </div>
+
+            {/* OR Divider */}
+            <div className="relative my-4">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-border/70 dark:border-[#2D2D2D]" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-card dark:bg-[#1E1E1E] px-3 text-muted-foreground font-semibold tracking-wider text-[11px]">
+                  Or
+                </span>
+              </div>
+            </div>
+
+            {/* Alternative: Password Login Button */}
+            <button
+              type="button"
+              onClick={() => {
+                if (otpEmail) setValue("email", otpEmail);
+                setAuthMode("password");
+                setErrorState(null);
+                setOtpError(null);
+              }}
+              className="w-full font-bold h-10.5 sm:h-11 rounded-xl border border-border/80 dark:border-neutral-700/80 bg-secondary/50 hover:bg-secondary dark:bg-[#252525] dark:hover:bg-[#2A2A2A] text-foreground transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-98 text-xs sm:text-sm"
+            >
+              <Lock className="h-4 w-4 text-primary shrink-0" />
+              <span>Sign in with Password</span>
+            </button>
+          </div>
+        )
+      )}
 
       {/* Switch to Register Link */}
       <div className="pt-2 text-center">
@@ -344,6 +795,6 @@ export function LoginForm() {
           </Link>
         </p>
       </div>
-    </form>
+    </div>
   );
 }

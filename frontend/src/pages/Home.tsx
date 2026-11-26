@@ -24,7 +24,7 @@ const orgSchema = {
   ],
   contactPoint: {
     "@type": "ContactPoint",
-    email: "support@payent.com",
+    email: "payentsupport@gmail.com",
     contactType: "customer support",
   },
 };

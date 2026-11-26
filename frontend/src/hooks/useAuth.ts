@@ -181,6 +181,120 @@ export function useAuth() {
     };
   }, []);
 
+  const processLoginResponse = useCallback(async (res: any, email: string) => {
+    storage.set(STORAGE_KEYS.token, res.token);
+    if (res.refreshToken) {
+      storage.set(STORAGE_KEYS.refreshToken, res.refreshToken);
+    }
+
+    let loggedUser: User;
+    if (res.user) {
+      loggedUser = {
+        id: res.user.email || res.user.id || email,
+        accountId: res.user.accountId || `PAYRENT_USER_${Date.now()}`,
+        accountType: "pay₹ent",
+        fullName:
+          res.user.fullName ||
+          res.user.name ||
+          email.split("@")[0],
+        email: res.user.email || email,
+        phone: res.user.phone || "",
+        address: res.user.address || "",
+        city: res.user.city || "",
+        state: res.user.state || "",
+        country: res.user.country || "India",
+        pincode: res.user.pincode || "",
+        panNumber: res.user.panNumber || "",
+        avatar: res.user.profilePhotoUrl || res.user.profile_photo_url || res.user.avatar || "",
+        profilePhotoUrl: res.user.profilePhotoUrl || res.user.profile_photo_url || "",
+        profile_photo_url: res.user.profilePhotoUrl || res.user.profile_photo_url || "",
+        role: res.user.role || res.role || "customer",
+        status: res.user.status || "active",
+        aadhaarMasked: res.user.aadhaarMasked || res.user.aadhaar_masked || "",
+        website: res.user.website || "",
+        upiId: res.user.upiId || "",
+      };
+    } else {
+      try {
+        const profile = await api.getMe(res.token);
+        loggedUser = {
+          id: profile?.email || email,
+          accountId: (profile as any)?.accountId || `PAYRENT_USER_${Date.now()}`,
+          accountType: "pay₹ent",
+          fullName:
+            profile?.fullName ||
+            (profile as any)?.name ||
+            email.split("@")[0],
+          email: profile?.email || email,
+          phone: profile?.phone || "",
+          address: profile?.address || "",
+          city: profile?.city || "",
+          state: profile?.state || "",
+          country: profile?.country || "India",
+          pincode: profile?.pincode || "",
+          panNumber: (profile as any)?.panNumber || "",
+          avatar: profile?.profilePhotoUrl || profile?.profile_photo_url || profile?.avatar || "",
+          profilePhotoUrl: profile?.profilePhotoUrl || profile?.profile_photo_url || "",
+          profile_photo_url: profile?.profilePhotoUrl || profile?.profile_photo_url || "",
+          role: profile?.role || res.role || "customer",
+          status: profile?.status || "active",
+          aadhaarMasked: profile?.aadhaarMasked || profile?.aadhaar_masked || "",
+          website: profile?.website || "",
+          upiId: profile?.upiId || "",
+        };
+      } catch {
+        loggedUser = {
+          id: email,
+          accountId: `PAYRENT_USER_${Date.now()}`,
+          accountType: "pay₹ent",
+          fullName: email.split("@")[0],
+          email: email,
+          role: res.role || "customer",
+          status: "active",
+        };
+      }
+    }
+
+    // 1. Enforce single active user-side session: Invalidate Payernt state on client
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("paye₹nt_token");
+      localStorage.removeItem("payernt_token");
+      localStorage.removeItem("paye₹nt_account");
+      localStorage.removeItem("payernt_account");
+      localStorage.removeItem("paye₹nt_session");
+      localStorage.removeItem("payernt_session");
+      localStorage.removeItem("paye₹nt_active_user");
+      localStorage.removeItem("payernt_active_user");
+      window.dispatchEvent(new CustomEvent("paye₹nt_auth_change", { detail: null }));
+    }
+
+    storage.set(STORAGE_KEYS.currentUser, loggedUser);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(
+        "pay₹ent_session",
+        JSON.stringify({
+          accountId: loggedUser.accountId,
+          accountType: "pay₹ent",
+          email: loggedUser.email,
+          name: loggedUser.fullName,
+          loggedInAt: new Date().toISOString(),
+        })
+      );
+      localStorage.setItem("pay₹ent_account", JSON.stringify(loggedUser));
+    }
+    if ((loggedUser.role === "admin" || (loggedUser as any).role === "superadmin") && typeof window !== "undefined") {
+      localStorage.setItem("payent:admin:token", res.token);
+      localStorage.setItem("payent:admin:current_user", JSON.stringify(loggedUser));
+      localStorage.removeItem("payent:admin:logged_out");
+      window.dispatchEvent(new Event("payent:admin:profile-updated"));
+    }
+    setUser(loggedUser);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("payent:storage_change"));
+    }
+    return { ok: true, user: loggedUser, bootstrap: (res as any)?.bootstrap };
+  }, []);
+
   const login = useCallback(async (email: string, password: string) => {
     try {
       if (typeof window !== "undefined") {
@@ -188,121 +302,11 @@ export function useAuth() {
       }
       const res = await api.login(email, password);
       if (res.success && res.token) {
-        storage.set(STORAGE_KEYS.token, res.token);
-        if (res.refreshToken) {
-          storage.set(STORAGE_KEYS.refreshToken, res.refreshToken);
-        }
-
-        let loggedUser: User;
-        if (res.user) {
-          loggedUser = {
-            id: res.user.email || res.user.id || email,
-            accountId: res.user.accountId || `PAYRENT_USER_${Date.now()}`,
-            accountType: "pay₹ent",
-            fullName:
-              res.user.fullName ||
-              res.user.name ||
-              email.split("@")[0],
-            email: res.user.email || email,
-            phone: res.user.phone || "",
-            address: res.user.address || "",
-            city: res.user.city || "",
-            state: res.user.state || "",
-            country: res.user.country || "India",
-            pincode: res.user.pincode || "",
-            panNumber: res.user.panNumber || "",
-            avatar: res.user.profilePhotoUrl || res.user.profile_photo_url || res.user.avatar || "",
-            profilePhotoUrl: res.user.profilePhotoUrl || res.user.profile_photo_url || "",
-            profile_photo_url: res.user.profilePhotoUrl || res.user.profile_photo_url || "",
-            role: res.user.role || res.role || "customer",
-            status: res.user.status || "active",
-            aadhaarMasked: res.user.aadhaarMasked || res.user.aadhaar_masked || "",
-            website: res.user.website || "",
-            upiId: res.user.upiId || "",
-          };
-        } else {
-          try {
-            const profile = await api.getMe(res.token);
-            loggedUser = {
-              id: profile?.email || email,
-              accountId: (profile as any)?.accountId || `PAYRENT_USER_${Date.now()}`,
-              accountType: "pay₹ent",
-              fullName:
-                profile?.fullName ||
-                (profile as any)?.name ||
-                email.split("@")[0],
-              email: profile?.email || email,
-              phone: profile?.phone || "",
-              address: profile?.address || "",
-              city: profile?.city || "",
-              state: profile?.state || "",
-              country: profile?.country || "India",
-              pincode: profile?.pincode || "",
-              panNumber: (profile as any)?.panNumber || "",
-              avatar: profile?.profilePhotoUrl || profile?.profile_photo_url || profile?.avatar || "",
-              profilePhotoUrl: profile?.profilePhotoUrl || profile?.profile_photo_url || "",
-              profile_photo_url: profile?.profilePhotoUrl || profile?.profile_photo_url || "",
-              role: profile?.role || res.role || "customer",
-              status: profile?.status || "active",
-              aadhaarMasked: profile?.aadhaarMasked || profile?.aadhaar_masked || "",
-              website: profile?.website || "",
-              upiId: profile?.upiId || "",
-            };
-          } catch {
-            loggedUser = {
-              id: email,
-              accountId: `PAYRENT_USER_${Date.now()}`,
-              accountType: "pay₹ent",
-              fullName: email.split("@")[0],
-              email: email,
-              role: res.role || "customer",
-              status: "active",
-            };
-          }
-        }
-
-        // 1. Enforce single active user-side session: Invalidate Payernt state on client
-        if (typeof window !== "undefined") {
-          localStorage.removeItem("paye₹nt_token");
-          localStorage.removeItem("payernt_token");
-          localStorage.removeItem("paye₹nt_account");
-          localStorage.removeItem("payernt_account");
-          localStorage.removeItem("paye₹nt_session");
-          localStorage.removeItem("payernt_session");
-          localStorage.removeItem("paye₹nt_active_user");
-          localStorage.removeItem("payernt_active_user");
-          window.dispatchEvent(new CustomEvent("paye₹nt_auth_change", { detail: null }));
-        }
-
-        storage.set(STORAGE_KEYS.currentUser, loggedUser);
-        if (typeof window !== "undefined") {
-          localStorage.setItem(
-            "pay₹ent_session",
-            JSON.stringify({
-              accountId: loggedUser.accountId,
-              accountType: "pay₹ent",
-              email: loggedUser.email,
-              name: loggedUser.fullName,
-              loggedInAt: new Date().toISOString(),
-            })
-          );
-          localStorage.setItem("pay₹ent_account", JSON.stringify(loggedUser));
-        }
-        if ((loggedUser.role === "admin" || (loggedUser as any).role === "superadmin") && typeof window !== "undefined") {
-          localStorage.setItem("payent:admin:token", res.token);
-          localStorage.setItem("payent:admin:current_user", JSON.stringify(loggedUser));
-          localStorage.removeItem("payent:admin:logged_out");
-          window.dispatchEvent(new Event("payent:admin:profile-updated"));
-        }
-        setUser(loggedUser);
-        if (typeof window !== "undefined") {
-          window.dispatchEvent(new CustomEvent("payent:storage_change"));
-        }
-        return { ok: true, user: loggedUser, bootstrap: (res as any)?.bootstrap };
+        return await processLoginResponse(res, email);
       }
       return { ok: false, error: "Invalid credentials from server." };
     } catch (e) {
-      const err = e as { name?: string; message?: string };
+      const err = e as { name?: string; message?: string; status?: string; accountStatus?: string };
       if (
         err?.name === "AbortError" ||
         err?.name === "TimeoutError" ||
@@ -325,9 +329,32 @@ export function useAuth() {
           error: err?.message || "Unable to connect to the authentication server at http://127.0.0.1:8001. Please ensure the backend is running."
         };
       }
-      return { ok: false, error: err.message || "Invalid email or password." };
+      return { ok: false, error: err.message || "Invalid email or password.", status: err.status || err.accountStatus };
     }
-  }, []);
+  }, [processLoginResponse]);
+
+  const loginWithOtp = useCallback(async (email: string, otp: string) => {
+    try {
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("payent:signed_out");
+      }
+      const res = await api.loginOtpVerify(email, otp);
+      if (res.success && res.token) {
+        return await processLoginResponse(res, email);
+      }
+      return { ok: false, error: "Invalid verification code." };
+    } catch (e: any) {
+      const err = e as { name?: string; message?: string; status?: string; accountStatus?: string };
+      if (
+        err?.name === "AbortError" ||
+        err?.name === "TimeoutError" ||
+        err?.message?.includes("timed out")
+      ) {
+        return { ok: false, error: "Verification request timed out. Please try again." };
+      }
+      return { ok: false, error: err.message || "Invalid or expired verification code.", status: err.status || err.accountStatus };
+    }
+  }, [processLoginResponse]);
 
   const register = useCallback(async (email: string, phone: string) => {
     try {
@@ -430,5 +457,5 @@ export function useAuth() {
     });
   }, []);
 
-  return { user, ready, login, register, logout, logoutAll, getSessions, revokeSession, updateUser };
+  return { user, ready, login, loginWithOtp, register, logout, logoutAll, getSessions, revokeSession, updateUser };
 }
